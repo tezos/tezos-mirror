@@ -48,6 +48,10 @@ let operation_conflict_encoding =
           (req "existing" Operation_hash.encoding)
           (req "new_operation" Operation_hash.encoding))
 
+let pp_option pp fmt = function
+  | None -> Format.fprintf fmt "none"
+  | Some v -> Format.fprintf fmt "%a" pp v
+
 module Consensus = struct
   type error += Forbidden_delegate of Signature.Public_key_hash.t
 
@@ -134,7 +138,6 @@ module Consensus = struct
       }
     | Consensus_operation_not_allowed
     | Missing_companion_key_for_bls_dal of Consensus_key.t
-    | Aggregate_disabled
     | Aggregate_in_mempool
     | Aggregate_not_implemented
     | Non_bls_key_in_aggregate
@@ -390,19 +393,6 @@ module Consensus = struct
       Data_encoding.empty
       (function Aggregate_in_mempool -> Some () | _ -> None)
       (fun () -> Aggregate_in_mempool) ;
-    register_error_kind
-      `Permanent
-      ~id:"validate.aggregate_disabled"
-      ~title:"Aggregate operations disabled"
-      ~description:
-        "Aggregate operations are disabled by the corresponding feature flag"
-      ~pp:(fun ppf () ->
-        Format.fprintf
-          ppf
-          "Aggregate operations are disabled by the corresponding feature flag")
-      Data_encoding.empty
-      (function Aggregate_disabled -> Some () | _ -> None)
-      (fun () -> Aggregate_disabled) ;
     register_error_kind
       `Permanent
       ~id:"validate.aggregate_not_implemented"
@@ -1030,6 +1020,7 @@ module Anonymous = struct
     | Too_early_dal_denunciation of {level : Raw_level.t; current : Raw_level.t}
     | Outdated_dal_denunciation of {level : Raw_level.t; last_cycle : Cycle.t}
     | Invalid_shard_index of {given : int; min : int; max : int}
+    | Invalid_lag_index of {given : int; min : int; max : int}
     | Dal_already_denounced of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
@@ -1038,22 +1029,32 @@ module Anonymous = struct
         tb_slot : Slot.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
+      }
+    | Invalid_accusation_unexpected_lag_index of {
+        tb_slot : Slot.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Invalid_accusation_slot_not_attested of {
         tb_slot : Slot.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Invalid_accusation_shard_is_not_trap of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
         shard_index : int;
       }
     | Invalid_accusation_wrong_shard_owner of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
         shard_index : int;
         shard_owner : Signature.Public_key_hash.t;
       }
@@ -1061,16 +1062,19 @@ module Anonymous = struct
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Accusation_validity_error_cannot_get_slot_headers of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Accusation_validity_error_levels_mismatch of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
         accusation_published_level : Raw_level.t;
         store_published_level : Raw_level.t;
       }
@@ -1159,6 +1163,25 @@ module Anonymous = struct
         | _ -> None)
       (fun (given, min, max) -> Invalid_shard_index {given; min; max}) ;
     register_error_kind
+      `Permanent
+      ~id:"validate.operation.block.invalid_dal_lag_index"
+      ~title:"Invalid DAL lag index"
+      ~description:
+        "The given lag index is out of range of representable lag indices"
+      ~pp:(fun ppf (given, min, max) ->
+        Format.fprintf
+          ppf
+          "The given lag index %d is out of range of representable lag indices \
+           [%d, %d]"
+          given
+          min
+          max)
+      (obj3 (req "given" int31) (req "min" int31) (req "max" int31))
+      (function
+        | Invalid_lag_index {given; min; max} -> Some (given, min, max)
+        | _ -> None)
+      (fun (given, min, max) -> Invalid_lag_index {given; min; max}) ;
+    register_error_kind
       `Branch
       ~id:"validate.operation.already_dal_denounced"
       ~title:"Already denounced for DAL entrapement"
@@ -1187,85 +1210,130 @@ module Anonymous = struct
       ~description:
         "Invalid accusation: the attestation operation has no DAL content for \
          the denounced consensus slot."
-      ~pp:(fun ppf (tb_slot, level, slot_index) ->
+      ~pp:(fun ppf (tb_slot, level, slot_index, lag_index_opt) ->
         Format.fprintf
           ppf
-          "Invalid accusation for consensus slot %a, level %a, and DAL slot \
-           index %a: the attestation operation has no DAL content for this \
-           consensus slot."
+          "Invalid accusation for consensus slot %a, level %a, lag_index %a, \
+           and DAL slot index %a: the attestation operation has no DAL content \
+           for this consensus slot."
           Slot.pp
           tb_slot
           Raw_level.pp
           level
+          (pp_option Format.pp_print_int)
+          lag_index_opt
           Dal.Slot_index.pp
           slot_index)
-      (obj3
+      (obj4
          (req "TB_slot" Slot.encoding)
          (req "level" Raw_level.encoding)
-         (req "slot_index" Dal.Slot_index.encoding))
+         (req "slot_index" Dal.Slot_index.encoding)
+         (opt "lag_index" Data_encoding.uint8))
       (function
-        | Invalid_accusation_no_dal_content {tb_slot; level; slot_index} ->
-            Some (tb_slot, level, slot_index)
+        | Invalid_accusation_no_dal_content
+            {tb_slot; level; slot_index; lag_index_opt} ->
+            Some (tb_slot, level, slot_index, lag_index_opt)
         | _ -> None)
-      (fun (tb_slot, level, slot_index) ->
-        Invalid_accusation_no_dal_content {tb_slot; level; slot_index}) ;
+      (fun (tb_slot, level, slot_index, lag_index_opt) ->
+        Invalid_accusation_no_dal_content
+          {tb_slot; level; slot_index; lag_index_opt}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.invalid_accusation_unexpected_lag_index"
+      ~title:"Invalid accusation: unexpected lag index presence/absence"
+      ~description:"Invalid accusation: unexpected lag index presence/absence."
+      ~pp:(fun ppf (tb_slot, level, slot_index, lag_index_opt) ->
+        Format.fprintf
+          ppf
+          "Invalid accusation for validator slot %a, level %a, lag_index %a, \
+           and DAL slot index %a. The lag index's %s is unexpected."
+          Slot.pp
+          tb_slot
+          Raw_level.pp
+          level
+          (pp_option Format.pp_print_int)
+          lag_index_opt
+          Dal.Slot_index.pp
+          slot_index
+          (match lag_index_opt with None -> "absence" | Some _ -> "presence"))
+      (obj4
+         (req "TB_slot" Slot.encoding)
+         (req "level" Raw_level.encoding)
+         (req "slot_index" Dal.Slot_index.encoding)
+         (opt "lag_index" Data_encoding.uint8))
+      (function
+        | Invalid_accusation_unexpected_lag_index
+            {tb_slot; level; slot_index; lag_index_opt} ->
+            Some (tb_slot, level, slot_index, lag_index_opt)
+        | _ -> None)
+      (fun (tb_slot, level, slot_index, lag_index_opt) ->
+        Invalid_accusation_unexpected_lag_index
+          {tb_slot; level; slot_index; lag_index_opt}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.invalid_accusation_slot_not_attested"
       ~title:"Invalid accusation: the delegate did not attest the DAL slot"
       ~description:
         "Invalid accusation: the delegate did not attest the DAL slot."
-      ~pp:(fun ppf (tb_slot, level, slot_index) ->
+      ~pp:(fun ppf (tb_slot, level, slot_index, lag_index_opt) ->
         Format.fprintf
           ppf
-          "Invalid accusation for validator slot %a, level %a, and DAL slot \
-           index %a: the delegate did not attest the DAL slot."
+          "Invalid accusation for validator slot %a, level %a, lag_index %a, \
+           and DAL slot index %a: the delegate did not attest the DAL slot."
           Slot.pp
           tb_slot
           Raw_level.pp
           level
+          (pp_option Format.pp_print_int)
+          lag_index_opt
           Dal.Slot_index.pp
           slot_index)
-      (obj3
+      (obj4
          (req "TB_slot" Slot.encoding)
          (req "level" Raw_level.encoding)
-         (req "slot_index" Dal.Slot_index.encoding))
+         (req "slot_index" Dal.Slot_index.encoding)
+         (opt "lag_index" Data_encoding.uint8))
       (function
-        | Invalid_accusation_slot_not_attested {tb_slot; level; slot_index} ->
-            Some (tb_slot, level, slot_index)
+        | Invalid_accusation_slot_not_attested
+            {tb_slot; level; slot_index; lag_index_opt} ->
+            Some (tb_slot, level, slot_index, lag_index_opt)
         | _ -> None)
-      (fun (tb_slot, level, slot_index) ->
-        Invalid_accusation_slot_not_attested {tb_slot; level; slot_index}) ;
+      (fun (tb_slot, level, slot_index, lag_index_opt) ->
+        Invalid_accusation_slot_not_attested
+          {tb_slot; level; slot_index; lag_index_opt}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.invalid_accusation_shard_is_not_trap"
       ~title:"Invalid accusation: the provided shard is not a trap"
       ~description:"Invalid accusation: the provided shard is not a trap."
-      ~pp:(fun ppf (delegate, level, slot_index, shard_index) ->
+      ~pp:(fun ppf (delegate, level, slot_index, lag_index_opt, shard_index) ->
         Format.fprintf
           ppf
           "Invalid accusation for delegate %a, level %a, DAL slot index %a, \
-           and shard index %d: the provided shard is not a trap."
+           lag_index %a, and shard index %d: the provided shard is not a trap."
           Signature.Public_key_hash.pp
           delegate
           Raw_level.pp
           level
           Dal.Slot_index.pp
           slot_index
+          (pp_option Format.pp_print_int)
+          lag_index_opt
           shard_index)
-      (obj4
+      (obj5
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "level" Raw_level.encoding)
          (req "slot_index" Dal.Slot_index.encoding)
+         (opt "lag_index" Data_encoding.uint8)
          (req "shard_index" int31))
       (function
         | Invalid_accusation_shard_is_not_trap
-            {delegate; level; slot_index; shard_index} ->
-            Some (delegate, level, slot_index, shard_index)
+            {delegate; level; slot_index; lag_index_opt; shard_index} ->
+            Some (delegate, level, slot_index, lag_index_opt, shard_index)
         | _ -> None)
-      (fun (delegate, level, slot_index, shard_index) ->
+      (fun (delegate, level, slot_index, lag_index_opt, shard_index) ->
         Invalid_accusation_shard_is_not_trap
-          {delegate; level; slot_index; shard_index}) ;
+          {delegate; level; slot_index; lag_index_opt; shard_index}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.invalid_accusation_wrong_shard_owner"
@@ -1274,60 +1342,86 @@ module Anonymous = struct
       ~description:
         "Invalid accusation: the provided shard is not assigned to the \
          attester."
-      ~pp:(fun ppf (delegate, level, slot_index, shard_index, shard_owner) ->
+      ~pp:(fun
+          ppf
+          (delegate, level, slot_index, lag_index_opt, shard_index, shard_owner)
+        ->
         Format.fprintf
           ppf
           "Invalid accusation for delegate %a, level %a, DAL slot index %a, \
-           and shard index %d: the shard is assigned to %a, not the attester."
+           lag_index %a, and shard index %d: the shard is assigned to %a, not \
+           the attester."
           Signature.Public_key_hash.pp
           delegate
           Raw_level.pp
           level
           Dal.Slot_index.pp
           slot_index
+          (pp_option Format.pp_print_int)
+          lag_index_opt
           shard_index
           Signature.Public_key_hash.pp
           shard_owner)
-      (obj5
+      (obj6
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "level" Raw_level.encoding)
          (req "slot_index" Dal.Slot_index.encoding)
+         (opt "lag_index" Data_encoding.uint8)
          (req "shard_index" Data_encoding.int31)
          (req "shard_owner" Signature.Public_key_hash.encoding))
       (function
         | Invalid_accusation_wrong_shard_owner
-            {delegate; level; slot_index; shard_index; shard_owner} ->
-            Some (delegate, level, slot_index, shard_index, shard_owner)
+            {
+              delegate;
+              level;
+              slot_index;
+              lag_index_opt;
+              shard_index;
+              shard_owner;
+            } ->
+            Some
+              ( delegate,
+                level,
+                slot_index,
+                lag_index_opt,
+                shard_index,
+                shard_owner )
         | _ -> None)
-      (fun (delegate, level, slot_index, shard_index, shard_owner) ->
+      (fun (delegate, level, slot_index, lag_index_opt, shard_index, shard_owner)
+         ->
         Invalid_accusation_wrong_shard_owner
-          {delegate; level; slot_index; shard_index; shard_owner}) ;
+          {delegate; level; slot_index; lag_index_opt; shard_index; shard_owner}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.invalid_accusation_slot_not_published"
       ~title:"Invalid accusation: DAL slot not published"
       ~description:"Invalid accusation: the DAL slot was not published."
-      ~pp:(fun ppf (delegate, level, slot_index) ->
+      ~pp:(fun ppf (delegate, level, slot_index, lag_index_opt) ->
         Format.fprintf
           ppf
-          "Invalid accusation for delegate %a, level %a, and DAL slot index \
-           %a: the DAL slot was not published."
+          "Invalid accusation for delegate %a, level %a, lag_index %a, and DAL \
+           slot index %a: the DAL slot was not published."
           Signature.Public_key_hash.pp
           delegate
           Raw_level.pp
           level
+          (pp_option Format.pp_print_int)
+          lag_index_opt
           Dal.Slot_index.pp
           slot_index)
-      (obj3
+      (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "level" Raw_level.encoding)
-         (req "slot_index" Dal.Slot_index.encoding))
+         (req "slot_index" Dal.Slot_index.encoding)
+         (opt "lag_index" Data_encoding.uint8))
       (function
-        | Invalid_accusation_slot_not_published {delegate; level; slot_index} ->
-            Some (delegate, level, slot_index)
+        | Invalid_accusation_slot_not_published
+            {delegate; level; slot_index; lag_index_opt} ->
+            Some (delegate, level, slot_index, lag_index_opt)
         | _ -> None)
-      (fun (delegate, level, slot_index) ->
-        Invalid_accusation_slot_not_published {delegate; level; slot_index}) ;
+      (fun (delegate, level, slot_index, lag_index_opt) ->
+        Invalid_accusation_slot_not_published
+          {delegate; level; slot_index; lag_index_opt}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.accusation_validity_error_cannot_get_slot_headers"
@@ -1335,29 +1429,33 @@ module Anonymous = struct
       ~description:
         "Accusation validity internal error: unable to retrieve the required \
          DAL slot headers."
-      ~pp:(fun ppf (delegate, level, slot_index) ->
+      ~pp:(fun ppf (delegate, level, slot_index, lag_index_opt) ->
         Format.fprintf
           ppf
-          "Accusation validity internal error for delegate %a, level %a, and \
-           DAL slot index %a: unable to retrieve the required slot headers."
+          "Accusation validity internal error for delegate %a, level %a, \
+           lag_index %a, and DAL slot index %a: unable to retrieve the \
+           required slot headers."
           Signature.Public_key_hash.pp
           delegate
           Raw_level.pp
           level
+          (pp_option Format.pp_print_int)
+          lag_index_opt
           Dal.Slot_index.pp
           slot_index)
-      (obj3
+      (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "level" Raw_level.encoding)
-         (req "slot_index" Dal.Slot_index.encoding))
+         (req "slot_index" Dal.Slot_index.encoding)
+         (opt "lag_index" Data_encoding.uint8))
       (function
         | Accusation_validity_error_cannot_get_slot_headers
-            {delegate; level; slot_index} ->
-            Some (delegate, level, slot_index)
+            {delegate; level; slot_index; lag_index_opt} ->
+            Some (delegate, level, slot_index, lag_index_opt)
         | _ -> None)
-      (fun (delegate, level, slot_index) ->
+      (fun (delegate, level, slot_index, lag_index_opt) ->
         Accusation_validity_error_cannot_get_slot_headers
-          {delegate; level; slot_index}) ;
+          {delegate; level; slot_index; lag_index_opt}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.accusation_validity_error_levels_mismatch"
@@ -1370,28 +1468,32 @@ module Anonymous = struct
           ( delegate,
             level,
             slot_index,
+            lag_index_opt,
             accusation_published_level,
             store_published_level )
         ->
         Format.fprintf
           ppf
-          "Accusation validity error for delegate %a, level %a, and DAL slot \
-           index %a: mismatch between published levels in evidence (%a) and \
-           storage (%a)."
+          "Accusation validity error for delegate %a, level %a, lag_index %a, \
+           and DAL slot index %a: mismatch between published levels in \
+           evidence (%a) and storage (%a)."
           Signature.Public_key_hash.pp
           delegate
           Raw_level.pp
           level
+          (pp_option Format.pp_print_int)
+          lag_index_opt
           Dal.Slot_index.pp
           slot_index
           Raw_level.pp
           accusation_published_level
           Raw_level.pp
           store_published_level)
-      (obj5
+      (obj6
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "level" Raw_level.encoding)
          (req "slot_index" Dal.Slot_index.encoding)
+         (opt "lag_index" Data_encoding.uint8)
          (req "accusation_published_level" Raw_level.encoding)
          (req "store_published_level" Raw_level.encoding))
       (function
@@ -1400,6 +1502,7 @@ module Anonymous = struct
               delegate;
               level;
               slot_index;
+              lag_index_opt;
               accusation_published_level;
               store_published_level;
             } ->
@@ -1407,12 +1510,14 @@ module Anonymous = struct
               ( delegate,
                 level,
                 slot_index,
+                lag_index_opt,
                 accusation_published_level,
                 store_published_level )
         | _ -> None)
       (fun ( delegate,
              level,
              slot_index,
+             lag_index_opt,
              accusation_published_level,
              store_published_level )
          ->
@@ -1421,6 +1526,7 @@ module Anonymous = struct
             delegate;
             level;
             slot_index;
+            lag_index_opt;
             accusation_published_level;
             store_published_level;
           }) ;
@@ -1677,6 +1783,13 @@ module Manager = struct
     | Sc_rollup_arith_pvm_disabled
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
+    | Tz5_account_disabled
+    | Sc_rollup_refutation_game_start_too_early of {
+        current_level : Raw_level.t;
+        earliest_start_level : Raw_level.t;
+        conflict_inbox_level : Raw_level.t;
+        commitment_period_in_blocks : int;
+      }
 
   let () =
     register_error_kind
@@ -1938,7 +2051,80 @@ module Manager = struct
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" zkru_disabled_description)
       Data_encoding.unit
       (function Zk_rollup_feature_disabled -> Some () | _ -> None)
-      (fun () -> Zk_rollup_feature_disabled)
+      (fun () -> Zk_rollup_feature_disabled) ;
+    let tz5_account_disabled_description =
+      "tz5 ML-DSA-44 accounts are disabled"
+    in
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.tz5_account_disabled"
+      ~title:"tz5 ML-DSA-44 accounts are disabled"
+      ~description:tz5_account_disabled_description
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "%s" tz5_account_disabled_description)
+      Data_encoding.unit
+      (function Tz5_account_disabled -> Some () | _ -> None)
+      (fun () -> Tz5_account_disabled)
+
+  let () =
+    register_error_kind
+      `Temporary
+      ~id:"validate.operation.sc_rollup_refutation_game_start_too_early"
+      ~title:"Refutation game starts too early"
+      ~description:
+        "The refutation game cannot be started yet. The protocol requires a \
+         delay of one commitment period to ensure sufficient time has passed \
+         since the commitment being challenged was published."
+      ~pp:(fun
+          ppf
+          ( current_level,
+            earliest_start_level,
+            conflict_inbox_level,
+            commitment_period_in_blocks )
+        ->
+        Format.fprintf
+          ppf
+          "Cannot start refutation game at level %a. Earliest start level is \
+           %a (= conflict inbox level %a + commitment period %d)."
+          Raw_level.pp
+          current_level
+          Raw_level.pp
+          earliest_start_level
+          Raw_level.pp
+          conflict_inbox_level
+          commitment_period_in_blocks)
+      Data_encoding.(
+        obj4
+          (req "current_level" Raw_level.encoding)
+          (req "earliest_start_level" Raw_level.encoding)
+          (req "conflict_inbox_level" Raw_level.encoding)
+          (req "commitment_period_in_blocks" int31))
+      (function
+        | Sc_rollup_refutation_game_start_too_early
+            {
+              current_level;
+              earliest_start_level;
+              conflict_inbox_level;
+              commitment_period_in_blocks;
+            } ->
+            Some
+              ( current_level,
+                earliest_start_level,
+                conflict_inbox_level,
+                commitment_period_in_blocks )
+        | _ -> None)
+      (fun ( current_level,
+             earliest_start_level,
+             conflict_inbox_level,
+             commitment_period_in_blocks )
+         ->
+        Sc_rollup_refutation_game_start_too_early
+          {
+            current_level;
+            earliest_start_level;
+            conflict_inbox_level;
+            commitment_period_in_blocks;
+          })
 end
 
 type error += Failing_noop_error

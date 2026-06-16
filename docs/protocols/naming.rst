@@ -49,6 +49,7 @@ Here is the list of protocol names and links to the corresponding changelogs:
 * :doc:`021 Quebec <021_quebec>`
 * :doc:`022 Rio <022_rio>`
 * :doc:`023 Seoul <023_seoul>`
+* :doc:`024 Tallinn <024_tallinn>`
 * ...
 
 Due to the evolving nature of the in-use protocols, the above absolute protocol
@@ -79,12 +80,11 @@ in-use and upcoming protocols:
 External resources
 ------------------
 
-The current status of a protocol in the governance process can be found at election pages such as: tzstats.com_, tzkt.io_, or tezosagora.org_.
+The current status of a protocol in the governance process can be found at election pages such as tzkt.io_ or tezosagora.org_.
 
 An interesting blog post on the history of the initial Tezos economic protocols
 is: `A quick history of past upgrades
 <https://research-development.nomadic-labs.com/amendments-at-work-in-tezos.html#a-quick-history-of-past-upgrades>`_.
 
-.. _tzstats.com: https://tzstats.com/election/head
 .. _tzkt.io: https://tzkt.io/governance/current/exploration
 .. _tezosagora.org: https://www.tezosagora.org/period

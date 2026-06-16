@@ -176,37 +176,82 @@ include
 
 let kind = Sc_rollup.Kind.Riscv
 
-let get_tick state =
-  let open Lwt_syntax in
-  let* state = decode state in
-  Lwt.return (Sc_rollup.Tick.of_z state.Sc_rollup_riscv.tick)
-
 type status = Riscv_dummy_status
 
-let get_status ~is_reveal_enabled:_ _state = Lwt.return Riscv_dummy_status
-
 let string_of_status Riscv_dummy_status = "riscv_dummy_status"
-
-let get_outbox _level _state = Lwt.return []
-
-(* It is safe to pass the [is_reveal_enabled_predicate]:
-   [eval_many] always stops at the beginning of a new Tezos block,
-   so no execution of several Tezos block inboxes is possible. *)
-(* Copied from [arith_pvm.ml]. *)
-let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug:_
-    ~is_reveal_enabled ?stop_at_snapshot ~max_steps initial_state =
-  ignore stop_at_snapshot ;
-  ignore max_steps ;
-  ignore is_reveal_enabled ;
-  Lwt.return (initial_state, 0L)
 
 let new_dissection = Game_helpers.default_new_dissection
 
 module State = Context.PVMState
 
-module Inspect_durable_state = struct
-  let lookup _state _keys =
-    raise (Invalid_argument "No durable storage for riscv PVM")
+module Mutable_state :
+  Pvm_sig.MUTABLE_STATE_S
+    with type t = Ctxt_wrapper.mut_state
+     and type repo = repo
+     and type hash = hash
+     and type status = status = struct
+  include Irmin_context.PVMState
+
+  type t = tree ref
+
+  type hash = Sc_rollup.State_hash.t
+
+  type repo = Irmin_context.repo
+
+  type nonrec status = status
+
+  let get_tick state =
+    let open Lwt_syntax in
+    let* s = decode !state in
+    Lwt.return (Sc_rollup.Tick.of_z s.Sc_rollup_riscv.tick)
+
+  let state_hash state = state_hash !state
+
+  let get_current_level state =
+    let open Lwt_syntax in
+    let+ level = get_current_level !state in
+    Option.map Raw_level.to_int32 level
+
+  let get_outbox _level _state = Lwt.return []
+
+  let get_status ~is_reveal_enabled:_ _state = Lwt.return Riscv_dummy_status
+
+  let set_initial_state ~empty =
+    let open Lwt_syntax in
+    let+ state = initial_state ~empty:!empty in
+    empty := state
+
+  let install_boot_sector state boot_sector =
+    let open Lwt_syntax in
+    let+ new_state = install_boot_sector !state boot_sector in
+    state := new_state
+
+  let is_input_state ~is_reveal_enabled state =
+    is_input_state ~is_reveal_enabled !state
+
+  let set_input input state =
+    let open Lwt_syntax in
+    let* imm_state = set_input input !state in
+    state := imm_state ;
+    return_unit
+
+  let eval_many ?check_invalid_kernel:_ ?fallback_to_slow_vm:_
+      ~reveal_builtins:_ ~write_debug:_ ~is_reveal_enabled:_ ?stop_at_snapshot:_
+      ~max_steps:_ _mut_state =
+    Lwt.return 0L
+
+  module Inspect_durable_state = struct
+    let lookup _state _keys =
+      raise (Invalid_argument "No durable storage for riscv PVM")
+  end
+
+  module Internal_for_tests = struct
+    let insert_failure state =
+      let open Lwt_syntax in
+      let* imm_state = Internal_for_tests.insert_failure !state in
+      state := imm_state ;
+      return_unit
+  end
 end
 
 module Unsafe_patches = struct
@@ -217,6 +262,9 @@ module Unsafe_patches = struct
     match p with
     | Increase_max_nb_ticks _ -> assert false
     | Patch_durable_storage _ -> assert false
+    | Patch_PVM_version _ -> assert false
 
   let apply _state (x : t) = match x with _ -> .
+
+  let apply_mutable _ (x : t) = match x with _ -> .
 end

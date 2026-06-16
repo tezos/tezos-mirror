@@ -35,21 +35,22 @@ let job_build =
          ["teztale-binaries/" ^ arch_string ^ "/octez-teztale-*"])
     ~variables:[("PROFILE", "static")]
     ~cargo_cache:true
-    ~sccache:(Cacio.sccache ~cache_size:"2G" ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "make teztale";
-      "mkdir -p ./teztale-binaries/" ^ arch_string;
-      "mv octez-teztale-* ./teztale-binaries/" ^ arch_string ^ "/";
-    ]
+    ~sccache:(Cacio.sccache ())
+    ~script:
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "make teztale";
+        "mkdir -p ./teztale-binaries/" ^ arch_string;
+        "mv octez-teztale-* ./teztale-binaries/" ^ arch_string ^ "/";
+      ]
 
 let job_gitlab_release =
   CI.job
     "gitlab_release"
     ~__POS__
-    ~image:Tezos_ci.Images.ci_release
+    ~image:Tezos_ci.Images.Base_images.ci_release
     ~stage:Publish
     ~description:"Create a GitLab release for Teztale."
     ~needs:
@@ -57,7 +58,7 @@ let job_gitlab_release =
         (Artifacts, job_build `release Amd64);
         (Artifacts, job_build `release Arm64);
       ]
-    ["./teztale/scripts/releases/create_gitlab_release.sh"]
+    ~script:["./teztale/scripts/releases/create_gitlab_release.sh"]
 
 let job_release_page =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -65,7 +66,7 @@ let job_release_page =
   CI.job
     "release_page"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.CI.release_page
     ~stage:Publish
     ~description:
       "Update the Teztale release page. If running in a test pipeline, the \
@@ -95,42 +96,49 @@ let job_release_page =
           ]
       | `real ->
           [
-            ("S3_BUCKET", "site-prod.octez.tezos.com/releases");
+            ("S3_BUCKET", "site-prod.octez.tezos.com");
             ("URL", "octez.tezos.com");
+            ("BUCKET_PATH", "/releases");
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
-    [
-      "eval $(opam env)";
-      "sudo apk add aws-cli pandoc";
-      "./teztale/scripts/releases/publish_release_page.sh";
-    ]
+    ~script:
+      ["eval $(opam env)"; "./teztale/scripts/releases/publish_release_page.sh"]
 
 let register () =
-  CI.register_before_merging_jobs
+  Cacio.register_merge_request_jobs
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Teztale."
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
-  CI.register_global_release_jobs
+  Cacio.register_release_jobs
     [(Manual, job_release_page `real `build_dependencies)] ;
-  CI.register_global_test_release_jobs
+  Cacio.register_test_release_jobs
     [(Manual, job_release_page `test `build_dependencies)] ;
-  CI.register_global_publish_release_page_jobs
+  Cacio.register_jobs
+    Non_release_tag
+    [(Auto, job_build `release Amd64); (Auto, job_build `release Arm64)] ;
+  Cacio.register_jobs
+    Non_release_tag_test
+    [(Auto, job_build `release Amd64); (Auto, job_build `release Arm64)] ;
+  Cacio.register_jobs
+    Publish_release_page
     [
       ( Manual,
         (* [no_build_dependencies] because we don't want the build job to run
            as their artifacts are not needed to update the release page. *)
         job_release_page `real `no_build_dependencies );
     ] ;
-  CI.register_global_test_publish_release_page_jobs
+  Cacio.register_jobs
+    Test_publish_release_page
     [
       ( Manual,
         (* [no_build_dependencies] because we don't want the build job to run
            as their artifacts are not needed to update the release page. *)
         job_release_page `test `no_build_dependencies );
     ] ;
-  CI.register_global_scheduled_test_release_jobs
+  Cacio.register_jobs
+    Scheduled_test_release
     [
       (* Explicitly include the build jobs so that they have trigger [Auto]. *)
       (Auto, job_build `release Amd64);

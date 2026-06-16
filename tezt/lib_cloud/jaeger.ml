@@ -5,9 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = unit
+type t = {port : int}
 
-let run () =
+let run ?(port = 16686) ?(interface = "0.0.0.0") () =
   let* () =
     Process.run
       "docker"
@@ -19,10 +19,13 @@ let run () =
         "--rm";
         "--name";
         "jaeger";
-        "-p";
-        "16686:16686";
-        "-p";
-        "14250:14250";
+        "-e";
+        sf "QUERY_HTTP_SERVER_HOST_PORT=%s:%d" interface port;
+        "-e";
+        (* Turned off to avoid port collision with the OTel collector on port
+           4317. The OTel collector already collects OpenTelemetry traces, so
+           there is no need to launch a second receiver. *)
+        "COLLECTOR_OTLP_ENABLED=false";
         "jaegertracing/all-in-one:latest";
       ]
   in
@@ -30,11 +33,18 @@ let run () =
   let run () =
     Process.spawn
       "curl"
-      ["-s"; "-o"; "/dev/null"; "-w"; "%{http_code}"; "http://localhost:16686/"]
+      [
+        "-s";
+        "-o";
+        "/dev/null";
+        "-w";
+        "%{http_code}";
+        sf "http://localhost:%d/" port;
+      ]
   in
   let* _ = Env.wait_process ~is_ready ~run () in
-  Lwt.return ()
+  Lwt.return {port}
 
-let shutdown () =
+let shutdown _t =
   let* () = Docker.kill "jaeger" |> Process.check in
   Lwt.return_unit

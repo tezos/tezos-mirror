@@ -73,7 +73,7 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
           ( Constant.bootstrap2,
             Some
               {
-                Protocol.balance = Some 1000000;
+                Protocol.balance = Some 1000000L;
                 consensus_key = None;
                 delegate = None;
               },
@@ -176,6 +176,12 @@ let measure_and_add_data_point f ~tag =
   in
   Long_test.add_data_point data_point ;
   return res
+
+(** Create expected attestation array with given slots attested. *)
+let expected_attestation dal_parameters attested_slots =
+  let arr = Array.make dal_parameters.Dal.Parameters.number_of_slots false in
+  List.iter (fun i -> arr.(i) <- true) attested_slots ;
+  arr
 
 (** Test the time it takes for one node to publish a slot
     and another node to download it.
@@ -291,7 +297,22 @@ let test_produce_and_propagate_shards ~executors ~protocol =
     let* {dal_attestation; _} =
       Node.RPC.(call node1 @@ get_chain_block_metadata ())
     in
-    Check.((Some [|true|] = dal_attestation) (option (array bool)))
+    let number_of_lags = List.length dal_parameters.attestation_lags in
+    let* dal_attestation =
+      match dal_attestation with
+      | None -> return None
+      | Some str ->
+          let* dal_attestations =
+            Dal.Slot_availability.decode
+              protocol
+              (Node.as_rpc_endpoint node1)
+              dal_parameters
+              str
+          in
+          return (Some dal_attestations.(number_of_lags - 1))
+    in
+    let expected_attestation = expected_attestation dal_parameters [0] in
+    Check.((Some expected_attestation = dal_attestation) (option (array bool)))
       ~error_msg:"Unexpected DAL attestations: expected %L, got %R" ;
     unit
   in

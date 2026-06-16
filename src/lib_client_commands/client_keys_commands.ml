@@ -34,17 +34,19 @@ let group =
 let algo_param () =
   let open Lwt_result_syntax in
   Tezos_clic.parameter
-    ~autocomplete:(fun _ -> return ["ed25519"; "secp256k1"; "p256"; "bls"])
+    ~autocomplete:(fun _ ->
+      return ["ed25519"; "secp256k1"; "p256"; "bls"; "mldsa44"])
     (fun _ name ->
       match name with
       | "ed25519" -> return Signature.Ed25519
       | "secp256k1" -> return Signature.Secp256k1
       | "p256" -> return Signature.P256
       | "bls" -> return Signature.Bls
+      | "mldsa44" -> return Signature.Mldsa44
       | name ->
           failwith
             "Unknown signature algorithm (%s). Available: 'ed25519', \
-             'secp256k1','p256' or 'bls'"
+             'secp256k1','p256', 'bls' or 'mldsa44'"
             name)
 
 let sig_algo_arg =
@@ -52,7 +54,7 @@ let sig_algo_arg =
     ~doc:"use custom signature algorithm"
     ~long:"sig"
     ~short:'s'
-    ~placeholder:"ed25519|secp256k1|p256|bls"
+    ~placeholder:"ed25519|secp256k1|p256|bls|mldsa44"
     ~default:"ed25519"
     (algo_param ())
 
@@ -63,6 +65,7 @@ let algo_to_prefix algo =
   | Secp256k1 -> "tz2"
   | P256 -> "tz3"
   | Bls -> "tz4"
+  | Mldsa44 -> "tz5"
 
 let gen_keys_containing ?(encrypted = false) ?(prefix = false)
     ?(ignore_case = false) ?(force = false) ~algo ~containing ~name

@@ -3,6 +3,7 @@
 :math:`\newcommand\exp[1]{\F{exp}{#1}}`
 
 
+.. _adaptive_issuance:
 .. _adaptive_issuance_tallinn:
 
 =================
@@ -43,6 +44,7 @@ emission rates increase, incentivizing participants to stake funds to
 re-approach the target. Conversely, incentives decrease as the ratio
 increases beyond the target.
 
+.. _adaptive_issuance_rate:
 .. _adaptive_issuance_rate_tallinn:
 
 Adaptive issuance rate
@@ -55,6 +57,7 @@ and a :ref:`dynamic rate <dynamic_rate_tallinn>`. This value is kept within
 a minimal and a maximal value, to ensure nominal emissions remain within
 reasonable bounds.
 
+.. _staked_ratio:
 .. _staked_ratio_tallinn:
 
 Staked ratio
@@ -77,6 +80,7 @@ Where:
 - ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
 - ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.
 
+.. _static_rate:
 .. _static_rate_tallinn:
 
 Static rate
@@ -95,6 +99,7 @@ The static rate is defined as follows:
 
 The choice of a scaling factor ensures that the curve takes reasonable values for plausible staked ratios. Moreover, since Adaptive Issuance is activated with a dynamic rate of 0, and at current staked ratio (that is, ~7.5% of the total supply), this factor allows for a smooth transition from the issuance rate (~4.6%) from the Oxford protocol (before the activation of Adaptive Issuance).
 
+.. _dynamic_rate:
 .. _dynamic_rate_tallinn:
 
 Dynamic rate
@@ -126,6 +131,7 @@ Where:
 
 In a nutshell, ``dynamic_rate(c)`` increases and decreases by an amount proportional to the distance between the target rate and the interval ``[48%; 52%]``. Note that to ensure that the issuance rate is kept within :ref:`the minimum and maximum bounds <minimum_and_maximum_rates_tallinn>`, the dynamic rate might be adjusted accordingly. More precisely, if :ref:`the issuance rate <issuance_rate_tallinn>` would surpass the maximum issuance allowed for a given cycle, then ``dynamic_rate(c)`` would be reduced to keep the issuance rate within the bounds (this part of the formula has been omitted from the above pseudocode for brevity).
 
+.. _minimum_and_maximum_rates:
 .. _minimum_and_maximum_rates_tallinn:
 
 Minimum and maximum rates
@@ -209,6 +215,7 @@ Where:
   below this bound for the initial period.
 - ``issuance_global_max`` (10%) is the final value for the upper bound, reached at the end of the transition period.
 
+.. _adaptive_maximum:
 .. _adaptive_maximum_tallinn:
 
 Adaptive Maximum
@@ -285,6 +292,7 @@ The function that defines the adaptive maximum is:
   while fully satisfying the minimum rate.
 
 
+.. _issuance_rate:
 .. _issuance_rate_tallinn:
 
 Issuance rate
@@ -309,6 +317,7 @@ maximum <adaptive_maximum_tallinn>`, computed for the cycle ``c + 1``.
     return max( min(total_rate, maximum_rate), minimum_rate )
 
 
+.. _adaptive_rewards:
 .. _adaptive_rewards_tallinn:
 
 Adaptive rewards
@@ -322,6 +331,7 @@ each block of the cycle and distributed between the various rewards,
 in proportion to their relative :ref:`weights
 <rewards_weights_tallinn>`.
 
+.. _rewards_weights:
 .. _rewards_weights_tallinn:
 
 Reward weights

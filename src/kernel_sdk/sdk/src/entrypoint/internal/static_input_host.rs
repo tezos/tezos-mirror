@@ -9,6 +9,11 @@
 //! To create the new [`Runtime`], an existing [`Runtime`] will need to be provided along
 //! the contents of an [`Inbox`] in a serialized format with [`serde_json`]
 
+use tezos_smart_rollup_core::STORE_HASH_SIZE;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
+
 use crate::core_unsafe::PREIMAGE_HASH_SIZE;
 use crate::host::{Runtime, RuntimeError, ValueType};
 use crate::storage::path::Path;
@@ -45,35 +50,12 @@ impl StaticInbox {
 }
 
 /// A smart rollup [`Runtime`] layer which uses a static inbox on top of another [`Runtime`].
-struct StaticInputHost<'runtime, R: Runtime> {
+struct StaticInputHost<'runtime, R> {
     host: &'runtime mut R,
     inbox: &'runtime mut Inbox,
 }
 
-impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
-    #[inline(always)]
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.host.write_output(from)
-    }
-
-    #[inline(always)]
-    fn write_debug(&self, msg: &str) {
-        self.host.write_debug(msg)
-    }
-
-    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        let message = if let Some((level, id, bytes)) = self.inbox.next() {
-            Some(Message::new(level, id, bytes))
-        } else {
-            // We want to consume the rollup's inbox, but not polute the kernel's view of the inbox
-            // with that.
-            self.host.read_input()?;
-            None
-        };
-
-        Ok(message)
-    }
-
+impl<Host: StorageV1> StorageV1 for StaticInputHost<'_, Host> {
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         self.host.store_has(path)
     }
@@ -156,6 +138,21 @@ impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
     }
 
     #[inline(always)]
+    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
+        self.host.store_value_size(path)
+    }
+
+    #[inline(always)]
+    fn store_get_hash(
+        &self,
+        path: &impl Path,
+    ) -> Result<[u8; STORE_HASH_SIZE], RuntimeError> {
+        self.host.store_get_hash(path)
+    }
+}
+
+impl<R: HostReveal> HostReveal for StaticInputHost<'_, R> {
+    #[inline(always)]
     fn reveal_preimage(
         &self,
         hash: &[u8; PREIMAGE_HASH_SIZE],
@@ -165,18 +162,50 @@ impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
     }
 
     #[inline(always)]
-    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
-        self.host.store_value_size(path)
+    fn reveal_metadata(&self) -> RollupMetadata {
+        self.host.reveal_metadata()
+    }
+
+    #[inline(always)]
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host
+            .reveal_dal_page(published_level, slot_index, page_index, destination)
+    }
+
+    #[inline(always)]
+    fn reveal_dal_parameters(&self) -> RollupDalParameters {
+        self.host.reveal_dal_parameters()
+    }
+}
+
+impl<R: WasmHost> WasmHost for StaticInputHost<'_, R> {
+    #[inline(always)]
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.host.write_output(from)
+    }
+
+    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
+        let message = if let Some((level, id, bytes)) = self.inbox.next() {
+            Some(Message::new(level, id, bytes))
+        } else {
+            // We want to consume the rollup's inbox, but not polute the kernel's view of the inbox
+            // with that.
+            self.host.read_input()?;
+            None
+        };
+
+        Ok(message)
     }
 
     #[inline(always)]
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
         self.host.mark_for_reboot()
-    }
-
-    #[inline(always)]
-    fn reveal_metadata(&self) -> RollupMetadata {
-        self.host.reveal_metadata()
     }
 
     #[inline(always)]
@@ -203,21 +232,6 @@ impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
     fn runtime_version(&self) -> Result<String, RuntimeError> {
         self.host.runtime_version()
     }
-
-    #[inline(always)]
-    fn reveal_dal_page(
-        &self,
-        published_level: i32,
-        slot_index: u8,
-        page_index: i16,
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host
-            .reveal_dal_page(published_level, slot_index, page_index, destination)
-    }
-
-    #[inline(always)]
-    fn reveal_dal_parameters(&self) -> RollupDalParameters {
-        self.host.reveal_dal_parameters()
-    }
 }
+
+impl<R: Runtime> Runtime for StaticInputHost<'_, R> {}

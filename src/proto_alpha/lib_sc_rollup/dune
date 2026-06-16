@@ -7,7 +7,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-alpha.protocol)
+  tezos-protocol-alpha.protocol
+  octez-libs.smart-rollup-wasm-in-memory)
  (inline_tests
   (flags -verbose)
   (modes native)

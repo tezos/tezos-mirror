@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name Tezos_layer2_shell)
+ (public_name octez-l2-libs.layer2_shell)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-l2-libs.irmin_context
+  lambda-term)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))

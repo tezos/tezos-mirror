@@ -94,6 +94,7 @@ type t = {
   extra_operations : Operations_source.t option;
   pre_emptive_forge_time : Time.System.Span.t;
   remote_calls_timeout : float option;
+  multi_node : bool;
 }
 
 let default_fees_config =
@@ -133,6 +134,8 @@ let default_pre_emptive_forge_time = Time.System.Span.of_seconds_exn 0.
 
 let default_remote_calls_timeout = None
 
+let default_multi_node = false
+
 let default_config =
   {
     fees = default_fees_config;
@@ -147,6 +150,7 @@ let default_config =
     extra_operations = default_extra_operations;
     pre_emptive_forge_time = default_pre_emptive_forge_time;
     remote_calls_timeout = default_remote_calls_timeout;
+    multi_node = default_multi_node;
   }
 
 let make ?(minimal_fees = default_fees_config.minimal_fees)
@@ -159,7 +163,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     ?(votes = default_votes_config) ?force_apply_from_round
     ?(force = default_force) ?(state_recorder = default_state_recorder_config)
     ?extra_operations ?(pre_emptive_forge_time = default_pre_emptive_forge_time)
-    ?remote_calls_timeout () =
+    ?remote_calls_timeout ?(multi_node = default_multi_node) () =
   let fees =
     {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte}
   in
@@ -187,6 +191,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     extra_operations;
     pre_emptive_forge_time;
     remote_calls_timeout;
+    multi_node;
   }
 
 let fees_config_encoding : fees_config Data_encoding.t =
@@ -310,6 +315,7 @@ let encoding : t Data_encoding.t =
               extra_operations;
               pre_emptive_forge_time;
               remote_calls_timeout;
+              multi_node;
             }
           ->
          ( ( fees,
@@ -322,7 +328,7 @@ let encoding : t Data_encoding.t =
              force,
              state_recorder,
              pre_emptive_forge_time ),
-           (extra_operations, remote_calls_timeout) ))
+           (extra_operations, remote_calls_timeout, multi_node) ))
        (fun ( ( fees,
                 validation,
                 nonce,
@@ -333,7 +339,7 @@ let encoding : t Data_encoding.t =
                 force,
                 state_recorder,
                 pre_emptive_forge_time ),
-              (extra_operations, remote_calls_timeout) )
+              (extra_operations, remote_calls_timeout, multi_node) )
           ->
          {
            fees;
@@ -348,6 +354,7 @@ let encoding : t Data_encoding.t =
            extra_operations;
            pre_emptive_forge_time;
            remote_calls_timeout;
+           multi_node;
          })
        (merge_objs
           (obj10
@@ -365,9 +372,10 @@ let encoding : t Data_encoding.t =
              (req "force" force_config_encoding)
              (req "state_recorder" state_recorder_config_encoding)
              (req "pre_emptive_forge_time" Time.System.Span.encoding))
-          (obj2
+          (obj3
              (opt "extra_operations" Operations_source.encoding)
-             (opt "remote_calls_timeout" float)))
+             (opt "remote_calls_timeout" float)
+             (dft "multi_node" bool default_multi_node)))
 
 let pp fmt t =
   let json = Data_encoding.Json.construct encoding t in

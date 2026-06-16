@@ -1,6 +1,6 @@
-// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>                            
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
 //
-// SPDX-License-Identifier: MIT                                               
+// SPDX-License-Identifier: MIT
 
 #![allow(dead_code, unused_imports)]
 #![allow(clippy::all)]
@@ -229,7 +229,7 @@ tztEntity : TztEntity<'a> = {
   "output" "(" "StaticError" <s:string> ")" => Output(TztError(TypecheckerError(Some(s)))),
   "output" "(" "StaticError" "_"  ")" => Output(TztError(TypecheckerError(None))),
   "output" "Overflow" => Output(TztError(InterpreterError(Overflow))),
-  "output" "Gas_exhaustion" => Output(TztError(InterpreterError(OutOfGas(gas::OutOfGas)))),
+  "output" "Gas_exhaustion" => Output(TztError(InterpreterError(OutOfGas))),
   "amount" <m:mutezAmount> => TztEntity::Amount(m),
   "balance" <m:mutezAmount> => TztEntity::Balance(m),
   "chain_id" <Micheline> => TztEntity::ChainId(<>),

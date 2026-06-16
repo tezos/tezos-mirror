@@ -1,9 +1,0 @@
-{
-  "private": true,
-  "type": "commonjs",
-  "description": "n/a",
-  "license": "n/a",
-  "dependencies": {
-    "kaitai-struct": "0.10.0"
-  }
-}

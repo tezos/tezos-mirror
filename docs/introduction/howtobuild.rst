@@ -11,7 +11,11 @@ If you are using Octez for production, consider installing forms of prebuilt bin
 
 You can either build all the executables, as illustrated below, or only a subset of the executables, as detailed in section :ref:`compile_sources`.
 
-**TL;DR**: From a fresh Debian Bookworm x86_64, you typically want to select a source branch in the Octez repository, e.g.:
+.. note::
+
+	In order to build Octez v24.0 (and later versions) from sources, please make sure that you have installed opam [v2.3 or later](https://opam.ocaml.org/doc/Install.html).
+
+**TL;DR**: From a fresh Debian Trixie x86_64, you typically want to select a source branch in the Octez repository, e.g.:
 
 .. literalinclude:: compile-sources.sh
   :language: shell
@@ -28,7 +32,7 @@ and then do:
 
 .. literalinclude:: compile-sources.sh
   :language: shell
-  :start-after: [get sources]
+  :start-after: [source cargo]
   :end-before: [end init opam]
 
 

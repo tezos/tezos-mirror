@@ -5,7 +5,10 @@
 //! Micheline serialization.
 
 use std::mem::size_of;
-use tezos_data_encoding::{enc::BinWriter, types::Zarith};
+use tezos_data_encoding::{
+    enc::{BinError, BinResult, BinWriter},
+    types::Zarith,
+};
 
 use super::constants::*;
 use crate::{
@@ -16,7 +19,7 @@ use crate::{
 trait AppEncoder<'a>: IntoIterator<Item = &'a Micheline<'a>> + Sized {
     const NO_ANNOTS_TAG: u8;
     const WITH_ANNOTS_TAG: u8;
-    fn encode(prim: &Prim, args: Self, annots: &Annotations, out: &mut Vec<u8>) {
+    fn encode(prim: &Prim, args: Self, annots: &Annotations, out: &mut Vec<u8>) -> BinResult {
         if annots.is_empty() {
             out.push(Self::NO_ANNOTS_TAG);
         } else {
@@ -24,11 +27,12 @@ trait AppEncoder<'a>: IntoIterator<Item = &'a Micheline<'a>> + Sized {
         }
         prim.encode(out);
         for arg in args {
-            encode_micheline(arg, out)
+            encode_micheline(arg, out)?;
         }
         if !annots.is_empty() {
             annots.encode_bytes(out)
         }
+        Ok(())
     }
 }
 
@@ -50,7 +54,7 @@ impl<'a> AppEncoder<'a> for [&'a Micheline<'a>; 2] {
 impl<'a> AppEncoder<'a> for &'a [Micheline<'a>] {
     const NO_ANNOTS_TAG: u8 = APP_GENERIC;
     const WITH_ANNOTS_TAG: u8 = APP_GENERIC;
-    fn encode(prim: &Prim, args: Self, annots: &Annotations, out: &mut Vec<u8>) {
+    fn encode(prim: &Prim, args: Self, annots: &Annotations, out: &mut Vec<u8>) -> BinResult {
         match args {
             [] => AppEncoder::encode(prim, [], annots, out),
             [arg] => AppEncoder::encode(prim, [arg], annots, out),
@@ -58,12 +62,14 @@ impl<'a> AppEncoder<'a> for &'a [Micheline<'a>] {
             _ => {
                 out.push(Self::WITH_ANNOTS_TAG);
                 prim.encode(out);
-                with_patchback_len(out, |out| {
+                with_patchback_len_result(out, |out| {
                     for arg in args {
-                        encode_micheline(arg, out)
+                        encode_micheline(arg, out)?;
                     }
-                });
-                annots.encode_bytes(out)
+                    Ok(())
+                })?;
+                annots.encode_bytes(out);
+                Ok(())
             }
         }
     }
@@ -125,7 +131,10 @@ impl Annotations<'_> {
     /// assert_eq!(&out, b"\x00\x00\x00\x0B%field @var");
     /// ```
     pub fn encode_bytes(&self, out: &mut Vec<u8>) {
-        with_patchback_len(out, |out| {
+        // Annotation encoding is infallible, so we adapt to
+        // `with_patchback_len_result` by wrapping in `Ok(())`. Using
+        // `.expect` here is safe because the closure cannot return an error.
+        with_patchback_len_result(out, |out| {
             // Add them space-separated
             let mut is_first = true;
             for ann in self.iter() {
@@ -135,7 +144,9 @@ impl Annotations<'_> {
                 is_first = false;
                 ann.encode_bytes(out);
             }
+            Ok(())
         })
+        .expect("annotation encoding is infallible");
     }
 }
 
@@ -161,37 +172,51 @@ fn put_string(s: &str, out: &mut Vec<u8>) {
     out.extend_from_slice(s.as_bytes())
 }
 
-fn with_patchback_len(out: &mut Vec<u8>, f: impl FnOnce(&mut Vec<u8>)) {
+fn with_patchback_len_result(
+    out: &mut Vec<u8>,
+    f: impl FnOnce(&mut Vec<u8>) -> BinResult,
+) -> BinResult {
     put_len(0, out); // don't know the right length in advance
     let i = out.len();
     let len_place = (i - size_of::<Len>())..i; // to fill length later
-    f(out);
+    f(out)?;
     let len_of_written = (out.len() - i) as Len;
-    out[len_place].copy_from_slice(&len_of_written.to_be_bytes())
+    out[len_place].copy_from_slice(&len_of_written.to_be_bytes());
+    Ok(())
 }
 
 /// Put a container.
-fn put_seq<V>(list: &[V], out: &mut Vec<u8>, encoder: fn(&V, &mut Vec<u8>)) {
+fn put_seq<V>(
+    list: &[V],
+    out: &mut Vec<u8>,
+    encoder: fn(&V, &mut Vec<u8>) -> BinResult,
+) -> BinResult {
     out.push(SEQ_TAG);
-    with_patchback_len(out, |out| {
+    with_patchback_len_result(out, |out| {
         for val in list {
-            encoder(val, out)
+            encoder(val, out)?;
         }
-    });
+        Ok(())
+    })
 }
 
 /// Recursive encoding function for [Value].
-fn encode_micheline(mich: &Micheline, out: &mut Vec<u8>) {
+fn encode_micheline(mich: &Micheline, out: &mut Vec<u8>) -> BinResult {
     use Micheline::*;
     match mich {
         Int(n) => {
             let z = Zarith(n.clone());
             out.push(NUMBER_TAG);
             z.bin_write(out)
-                .unwrap_or_else(|err| panic!("Encoding zarith number unexpectedly failed: {err}"))
         }
-        String(s) => put_string(s, out),
-        Bytes(b) => put_bytes(b, out),
+        String(s) => {
+            put_string(s, out);
+            Ok(())
+        }
+        Bytes(b) => {
+            put_bytes(b, out);
+            Ok(())
+        }
         Seq(s) => put_seq(s, out, encode_micheline),
         App(prim, args, anns) => AppEncoder::encode(prim, *args, anns, out),
     }
@@ -199,28 +224,27 @@ fn encode_micheline(mich: &Micheline, out: &mut Vec<u8>) {
 
 impl Micheline<'_> {
     /// Serialize a value.
-    pub fn encode(&self) -> Vec<u8> {
+    pub fn encode(&self) -> Result<Vec<u8>, BinError> {
         self.encode_starting_with(&[])
     }
 
     /// Serialize a value like PACK does.
-    pub fn encode_for_pack(&self) -> Vec<u8> {
+    pub fn encode_for_pack(&self) -> Result<Vec<u8>, BinError> {
         self.encode_starting_with(&[0x05])
     }
 
     /// Like [Value::encode], but allows specifying a prefix, useful for
     /// `PACK` implementation.
-    pub(crate) fn encode_starting_with(&self, start_bytes: &[u8]) -> Vec<u8> {
+    pub(crate) fn encode_starting_with(&self, start_bytes: &[u8]) -> Result<Vec<u8>, BinError> {
         let mut out = Vec::from(start_bytes);
-        encode_micheline(self, &mut out);
-        out
+        encode_micheline(self, &mut out)?;
+        Ok(out)
     }
 }
 
 impl BinWriter for Micheline<'_> {
-    fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
-        encode_micheline(self, out);
-        Ok(())
+    fn bin_write(&self, out: &mut Vec<u8>) -> BinResult {
+        encode_micheline(self, out)
     }
 }
 
@@ -234,7 +258,7 @@ mod test_encoding {
             .strip_prefix("0x")
             .unwrap_or_else(|| panic!("The `expected` argument must start from 0x"));
         assert_eq!(
-            v.into().encode(),
+            v.into().encode().unwrap(),
             hex::decode(hex_bytes)
                 .unwrap_or_else(|_| panic!("Bad hex string in `expected` argument"))
         )
@@ -366,6 +390,50 @@ mod test_encoding {
                 Micheline::Seq(&vec![app!(Unit); 1000]),
                 "0x02000007d0030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b030b",
           );
+        }
+    }
+
+    /// Tests that exercise the `Result`-returning encode contract.
+    mod result_contract {
+        use super::*;
+
+        /// Confirms `encode` returns `Ok` for a typical Micheline value, and
+        /// that the return type is `Result<Vec<u8>, BinError>` (compile-time
+        /// contract: the `?` operator can be used to chain).
+        #[test]
+        fn encode_returns_result_ok() {
+            fn try_encode<'a>(v: Micheline<'a>) -> Result<Vec<u8>, BinError> {
+                let bytes = v.encode()?;
+                Ok(bytes)
+            }
+            let bytes = try_encode(Micheline::Int(42.into())).expect("ok");
+            assert!(!bytes.is_empty());
+        }
+
+        /// Confirms `encode_for_pack` likewise returns `Result` and prefixes
+        /// with `0x05`.
+        #[test]
+        fn encode_for_pack_returns_result_ok() {
+            let bytes = Micheline::Int(0.into())
+                .encode_for_pack()
+                .expect("encode_for_pack ok");
+            assert_eq!(bytes.first(), Some(&0x05));
+        }
+
+        /// Confirms that a `BinError` produced by an inner encoder propagates
+        /// out of `with_patchback_len_result` correctly.
+        #[test]
+        fn patchback_propagates_errors() {
+            let mut out = vec![];
+            let err: BinResult = with_patchback_len_result(&mut out, |_out| {
+                Err(BinError::custom("synthetic encode failure".to_string()))
+            });
+            assert!(err.is_err());
+            let msg = format!("{}", err.unwrap_err());
+            assert!(
+                msg.contains("synthetic encode failure"),
+                "unexpected error message: {msg}"
+            );
         }
     }
 

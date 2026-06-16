@@ -12,8 +12,9 @@ use crate::{
 use primitive_types::{H256, U256};
 use rlp::{Encodable, RlpStream};
 use tezos_ethereum::rlp_helpers::{append_timestamp, append_u256_le};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 pub const UPGRADE_TAG: u8 = 0x01;
 pub const SEQUENCER_UPGRADE_TAG: u8 = 0x02;
@@ -75,7 +76,10 @@ impl Encodable for Event<'_> {
 }
 
 impl Event<'_> {
-    pub fn store<Host: Runtime>(&self, host: &mut Host) -> anyhow::Result<()> {
+    pub fn store<Host>(&self, host: &mut Host) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + IsEvmNode,
+    {
         if !host.is_evm_node() {
             storage::store_event(host, self)?;
         }

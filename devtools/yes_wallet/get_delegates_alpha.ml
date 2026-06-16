@@ -40,7 +40,7 @@ module Get_delegates = struct
   end
 
   module Signature = struct
-    include Tezos_crypto.Signature.V2
+    include Tezos_crypto.Signature.V3
 
     module To_latest = struct
       let public_key_hash = Fun.id
@@ -52,7 +52,7 @@ module Get_delegates = struct
       let signature = Fun.id
     end
 
-    module Of_latest = Tezos_crypto.Signature.V2.Of_V_latest
+    module Of_latest = Tezos_crypto.Signature.V3.Of_V_latest
   end
 
   module Contract = struct

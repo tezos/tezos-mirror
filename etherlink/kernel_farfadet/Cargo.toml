@@ -62,7 +62,7 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 ] }
 
 # kernel crates
-revm-etherlink = { package = "revm-etherlink", path = "./revm" }
+revm-etherlink = { package = "revm-etherlink-farfadet", path = "./revm" }
 tezos_ethereum = { package = "tezos_ethereum_farfadet", path = "./ethereum" }
 tezos_tezlink = { package = "tezos_tezlink_farfadet", path = "./tezos" }
 tezos-execution = { package = "tezos-execution-farfadet", path = "./tezos_execution" }

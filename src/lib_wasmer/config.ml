@@ -23,11 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* For documentation please refer to the [Tezos_wasmer] module. *)
+(** Wasmer engine configuration.
+
+    Controls compiler backend selection and WebAssembly feature flags.
+    The feature flags are kept in sync with the features available through
+    the Octez WebAssembly interpreter (tezos-webassembly-interpreter). *)
 
 open Utils
 open Api
 
+(** [make_features ()] creates a Wasmer feature set matching the features
+    supported by the Octez WebAssembly interpreter. *)
 let make_features () =
   let open Functions.Wasmer.Features in
   let features = new_ () in
@@ -45,16 +51,24 @@ let make_features () =
   ignore (threads features false : bool) ;
   features
 
+(** Compiler backend used by the Wasmer engine. *)
 type compiler = Types.Wasmer.Compiler.t = CRANELIFT | LLVM | SINGLEPASS
 
+(** [is_compiler_available compiler] checks whether [compiler] is linked
+    into the current Wasmer distribution. *)
 let is_compiler_available = Functions.Wasmer.Compiler.is_available
 
 exception Compiler_unavailable of compiler
 
 type t = {compiler : compiler}
 
+(** Sensible default configuration. Uses SINGLEPASS for fast compilation. *)
 let default = {compiler = SINGLEPASS}
 
+(** [to_owned desc] converts a configuration descriptor into an owned
+    Wasmer config pointer ready to pass to {!Engine.create}.
+    Raises {!Compiler_unavailable} if the selected compiler backend is
+    not available. *)
 let to_owned desc =
   let conf = Functions.Config.new_ () in
   check_null_ptr Error.(make_exception Create_configuration) conf ;

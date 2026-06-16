@@ -91,6 +91,72 @@ module Dal = struct
 
   let publish_slots_regularly = arg_to_clic publish_slots_regularly_arg
 
+  let banned_addrs = arg_to_clic banned_addrs_arg
+
+  (* Snapshot-specific arguments (not in Cli.Term). *)
+  let positive_int_parameter name =
+    Tezos_clic.parameter (fun _ s ->
+        let open Lwt_result_syntax in
+        match int_of_string_opt s with
+        | Some i when i >= 0 -> return i
+        | _ -> failwith "Expected a non-negative integer for %s, got %s" name s)
+
+  let min_published_level =
+    Tezos_clic.arg
+      ~doc:"Minimum published level to export/import."
+      ~long:"min-published-level"
+      ~placeholder:"INT"
+      (positive_int_parameter "min-published-level")
+
+  let max_published_level =
+    Tezos_clic.arg
+      ~doc:"Maximum published level to export/import."
+      ~long:"max-published-level"
+      ~placeholder:"INT"
+      (positive_int_parameter "max-published-level")
+
+  let slots_parameter =
+    Tezos_clic.parameter (fun _ s ->
+        let open Lwt_result_syntax in
+        let parts = String.split_on_char ',' s in
+        let rec parse = function
+          | [] -> return []
+          | p :: rest -> (
+              let* rest_parsed = parse rest in
+              match int_of_string_opt (String.trim p) with
+              | Some i when i >= 0 -> return (i :: rest_parsed)
+              | _ -> failwith "Invalid slot index in slots list: %s" p)
+        in
+        parse parts)
+
+  let slots =
+    Tezos_clic.arg
+      ~doc:
+        "Comma-separated slot indexes to export/import. If omitted, all slots \
+         are handled."
+      ~long:"slots"
+      ~placeholder:"INDEX1,INDEX2,..."
+      slots_parameter
+
+  let no_check =
+    Tezos_clic.switch
+      ~doc:"Skip validation checks during import."
+      ~long:"no-check"
+      ()
+
+  let compress =
+    Tezos_clic.switch
+      ~doc:
+        "Export as a compressed tar archive instead of a plain data directory."
+      ~long:"compress"
+      ()
+
+  let skip_shards =
+    Tezos_clic.switch
+      ~doc:"Do not export or import shards."
+      ~long:"skip-shards"
+      ()
+
   let commands =
     let open Tezos_clic in
     let group = {name = "dal"; title = "Commands related to the DAL daemon."} in
@@ -101,13 +167,142 @@ module Dal = struct
         ~group
         ~desc:"Print SQL statements describing the tables created in the store."
         args
-        (prefixes ["debug"; "dal"; "print"; "store"; "schemas"] @@ stop)
+        (prefixes ["dal"; "debug"; "print"; "store"; "schemas"] @@ stop)
         (fun () _cctxt -> Cli.Action.debug_print_store_schemas ())
+    in
+    (* With Seq, options are parsed first; the remaining args are passed as a
+       sequence. We take the last one as PATH so "snapshot export [OPTIONS] PATH"
+       matches the DAL node interface. *)
+    let path_from_seq (path_list : string list) =
+      let open Lwt_result_syntax in
+      match List.rev path_list with
+      | path :: _ when path <> "" && path.[0] <> '-' -> return path
+      | path :: _ ->
+          failwith
+            "Invalid path %s: path must be last and not look like an option."
+            path
+      | [] -> failwith "The path argument is required."
+    in
+    let snapshot_export =
+      let open Tezos_clic in
+      let args =
+        args8
+          data_dir
+          config_file
+          endpoint
+          min_published_level
+          max_published_level
+          slots
+          compress
+          skip_shards
+      in
+      command
+        ~group
+        ~desc:"Export DAL node store data to a snapshot directory."
+        args
+        (prefixes ["dal"; "snapshot"; "export"]
+        @@ seq_of_param (fun next ->
+               param
+                 ~name:"PATH"
+                 ~desc:"Path to the destination directory for the snapshot."
+                 (parameter (fun _ s -> Lwt_result_syntax.return s))
+                 next))
+        (fun ( data_dir,
+               config_file,
+               endpoint,
+               min_published_level,
+               max_published_level,
+               slots,
+               compress,
+               skip_shards )
+             path_list
+             _cctxt
+           ->
+          let open Lwt_result_syntax in
+          let* path = path_from_seq path_list in
+          let data_dir =
+            Option.value ~default:Configuration_file.default.data_dir data_dir
+          in
+          let config_file =
+            Option.value
+              ~default:(Configuration_file.default_config_file data_dir)
+              config_file
+          in
+          let min_level = Option.map Int32.of_int min_published_level in
+          let max_level = Option.map Int32.of_int max_published_level in
+          Snapshot.export
+            ~compress
+            ~skip_shards
+            ~data_dir
+            ~config_file
+            ~endpoint
+            ~min_published_level:min_level
+            ~max_published_level:max_level
+            ~slots
+            path)
+    in
+    let snapshot_import =
+      let open Tezos_clic in
+      let args =
+        args8
+          data_dir
+          config_file
+          endpoint
+          min_published_level
+          max_published_level
+          slots
+          no_check
+          skip_shards
+      in
+      command
+        ~group
+        ~desc:"Import DAL node store data from a snapshot directory."
+        args
+        (prefixes ["dal"; "snapshot"; "import"]
+        @@ seq_of_param (fun next ->
+               param
+                 ~name:"PATH"
+                 ~desc:"Path to the source directory of the snapshot to import."
+                 (parameter (fun _ s -> Lwt_result_syntax.return s))
+                 next))
+        (fun ( data_dir,
+               config_file,
+               endpoint,
+               min_published_level,
+               max_published_level,
+               slots,
+               no_check,
+               skip_shards )
+             path_list
+             _cctxt
+           ->
+          let open Lwt_result_syntax in
+          let* path = path_from_seq path_list in
+          let data_dir =
+            Option.value ~default:Configuration_file.default.data_dir data_dir
+          in
+          let config_file =
+            Option.value
+              ~default:(Configuration_file.default_config_file data_dir)
+              config_file
+          in
+          let min_level = Option.map Int32.of_int min_published_level in
+          let max_level = Option.map Int32.of_int max_published_level in
+          Snapshot.import
+            ~check:(not no_check)
+            ~skip_shards
+            ~data_dir
+            ~config_file
+            ~endpoint
+            ~min_published_level:min_level
+            ~max_published_level:max_level
+            ~slots
+            path)
     in
     let run =
       let open Tezos_clic in
       let args =
-        Tezos_clic.args26
+        Tezos_clic.args27
           data_dir
           config_file
           rpc_addr
@@ -132,6 +327,7 @@ module Dal = struct
           ignore_l1_config_peers
           disable_amplification
           ignore_topics
+          banned_addrs
           batching_configuration
           publish_slots_regularly
       in
@@ -139,7 +335,7 @@ module Dal = struct
         ~group
         ~desc:"Run the Octez DAL"
         args
-        (prefixes ["run"; "dal"] @@ stop)
+        (prefixes ["dal"; "run"] @@ stop)
         (fun ( data_dir,
                config_file,
                rpc_addr,
@@ -164,6 +360,7 @@ module Dal = struct
                ignore_l1_config_peers,
                disable_amplification,
                ignore_topics,
+               banned_addrs,
                batching_configuration,
                publish_slots_regularly )
              _cctxt
@@ -193,6 +390,7 @@ module Dal = struct
             ~ignore_l1_config_peers
             ~disable_amplification
             ?ignore_topics
+            ?banned_addrs
             ?batching_configuration
             ?publish_slots_regularly
             ())
@@ -200,7 +398,7 @@ module Dal = struct
     let mk_config_command ~prefix:p ~desc action =
       let open Tezos_clic in
       let args =
-        Tezos_clic.args23
+        Tezos_clic.args24
           data_dir
           config_file
           rpc_addr
@@ -223,13 +421,14 @@ module Dal = struct
           verbose
           ignore_l1_config_peers
           disable_amplification
+          banned_addrs
           batching_configuration
       in
       command
         ~group
         ~desc
         args
-        (prefixes ["config"; "dal"; p] @@ stop)
+        (prefixes ["dal"; "config"; p] @@ stop)
         (fun ( data_dir,
                config_file,
                rpc_addr,
@@ -252,6 +451,7 @@ module Dal = struct
                verbose,
                ignore_l1_config_peers,
                disable_amplification,
+               banned_addrs,
                batching_configuration )
              _cctxt
            ->
@@ -278,6 +478,7 @@ module Dal = struct
             ?verbose:(Some verbose)
             ?ignore_l1_config_peers:(Some ignore_l1_config_peers)
             ?disable_amplification:(Some disable_amplification)
+            ?banned_addrs
             ?batching_configuration
             ())
     in
@@ -293,6 +494,15 @@ module Dal = struct
         ~prefix:"init"
         Cli.Action.config_init
     in
+    let config_reset =
+      mk_config_command
+        ~desc:
+          "This command replaces the existing configuration file in the \
+           specified or default location with the parameters provided on the \
+           command-line. This configuration is then used by the run command."
+        ~prefix:"reset"
+        Cli.Action.config_reset
+    in
     let config_update =
       mk_config_command
         ~desc:
@@ -302,7 +512,15 @@ module Dal = struct
         ~prefix:"update"
         Cli.Action.config_update
     in
-    [run; config_init; config_update; debug_print_store_schemas]
+    [
+      run;
+      config_init;
+      config_reset;
+      config_update;
+      snapshot_export;
+      snapshot_import;
+      debug_print_store_schemas;
+    ]
 end
 
 module Baker = struct
@@ -327,6 +545,12 @@ module Baker = struct
     in
     let parsed_config_file = parsed.Client_config.parsed_config_file in
     let parsed_args = parsed.Client_config.parsed_args in
+    let rpc_config =
+      Client_main_run.parse_rpc_config
+        parsed_config_file
+        parsed_args
+        C.default_media_type
+    in
     let*! () =
       Client_main_run.init_logging
         (module C)
@@ -335,7 +559,7 @@ module Baker = struct
         ~base_dir
         ()
     in
-    return_unit
+    return rpc_config
 
   let commands client_config =
     let open Lwt_result_syntax in
@@ -359,11 +583,14 @@ module Baker = struct
              directory_parameter
         @@ sources_param)
         (fun args data_dir sources cctxt ->
-          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
-          let args = Configuration.create_config args in
+          let* rpc_config =
+            init_logging client_config ~base_dir:cctxt#get_base_dir
+          in
+          let args = Configuration.create_config cctxt rpc_config args in
           Daemon.Baker.run
             ~keep_alive:args.keep_alive
             ~command:(Daemon.Run_with_local_node {data_dir; args; sources})
+            ~extra_nodes:args.extra_nodes
             cctxt);
       command
         ~group
@@ -371,11 +598,14 @@ module Baker = struct
         baker_args
         (prefixes ["run"; "remotely"] @@ sources_param)
         (fun args sources cctxt ->
-          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
-          let args = Configuration.create_config args in
+          let* rpc_config =
+            init_logging client_config ~base_dir:cctxt#get_base_dir
+          in
+          let args = Configuration.create_config cctxt rpc_config args in
           Daemon.Baker.run
             ~keep_alive:args.keep_alive
             ~command:(Daemon.Run_remotely {args; sources})
+            ~extra_nodes:args.extra_nodes
             cctxt);
       command
         ~group
@@ -383,10 +613,15 @@ module Baker = struct
         (args2 pidfile_arg keep_alive_arg)
         (prefixes ["run"; "vdf"] @@ stop)
         (fun (pidfile, keep_alive) cctxt ->
-          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
+          (* Initialize logging system for its side effects. The returned
+             rpc_config is not needed for VDF command. *)
+          let* _rpc_config =
+            init_logging client_config ~base_dir:cctxt#get_base_dir
+          in
           Daemon.Baker.run
             ~keep_alive
             ~command:(Daemon.Run_vdf {pidfile; keep_alive})
+            ~extra_nodes:[]
             cctxt);
       command
         ~group
@@ -402,11 +637,16 @@ module Baker = struct
               let default_daily_logs_path = Some "octez-accuser"
             end)
           in
-          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
+          (* Initialize logging system for its side effects. The returned
+             rpc_config is not needed for accuser command. *)
+          let* _rpc_config =
+            init_logging client_config ~base_dir:cctxt#get_base_dir
+          in
           Daemon.Baker.run
             ~keep_alive
             ~command:
               (Daemon.Run_accuser {pidfile; preserved_levels; keep_alive})
+            ~extra_nodes:[]
             cctxt);
     ]
     @ Dal.commands
@@ -433,6 +673,7 @@ module Accuser = struct
             ~keep_alive
             ~command:
               (Daemon.Run_accuser {pidfile; preserved_levels; keep_alive})
+            ~extra_nodes:[]
             cctxt);
     ]
 end

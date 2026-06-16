@@ -12,6 +12,8 @@ val is_ready : unit -> unit Lwt.t
 (** [cannot_start ()] advertises the node was not able to start its
     prevalidator worker.
 
-    This typically happen when starting a proxy node or a observer node in
+    This typically happen when starting an observer node in
     finalized view at the very beginning of an Etherlink chain. *)
 val cannot_start : unit -> unit Lwt.t
+
+val failed_da_fee_read : unit -> unit Lwt.t

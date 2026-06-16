@@ -1,43 +1,54 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
+use evm_types::{CustomPrecompileAbort, CustomPrecompileError};
 use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
-    interpreter::{CallInput, CallInputs, Gas, InterpreterResult},
-    primitives::Address,
+    interpreter::{CallInput, CallInputs, Gas, InstructionResult, InterpreterResult},
+    primitives::{Address, Bytes},
 };
 
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
+
 use crate::{
-    database::DatabasePrecompileStateChanges,
+    database::EtherlinkVMDB,
     journal::Journal,
     precompiles::{
         change_sequencer_key::change_sequencer_key_precompile,
         constants::{
             CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, CUSTOMS,
-            GLOBAL_COUNTER_PRECOMPILE_ADDRESS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
-            TABLE_PRECOMPILE_ADDRESS,
+            GLOBAL_COUNTER_PRECOMPILE_ADDRESS, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
+            VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS,
         },
-        error::CustomPrecompileError,
         global_counter::global_counter_precompile,
-        guard::revert,
+        runtime_gateway::runtime_gateway_precompile,
         send_outbox_message::send_outbox_message_precompile,
         table::table_precompile,
+        verify_tezos_signature::verify_tezos_signature_precompile,
     },
-    Error,
+    storage::version::EVMVersion,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct EtherlinkPrecompiles {
     pub builtins: EthPrecompiles,
+}
+
+impl Default for EtherlinkPrecompiles {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EtherlinkPrecompiles {
     pub fn new() -> Self {
         Self {
-            builtins: EthPrecompiles::default(),
+            builtins: EthPrecompiles::new(EVMVersion::default().into()),
         }
     }
 
@@ -49,14 +60,15 @@ impl EtherlinkPrecompiles {
         CUSTOMS.contains(address) || self.builtins.contains(address)
     }
 
-    fn run_custom_precompile<CTX, DB>(
+    fn run_custom_precompile<'j, CTX, Host, R>(
         &mut self,
         context: &mut CTX,
         inputs: &CallInputs,
-    ) -> Result<Option<InterpreterResult>, Error>
+    ) -> Result<Option<InterpreterResult>, CustomPrecompileAbort>
     where
-        DB: DatabasePrecompileStateChanges,
-        CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+        Host: StorageV1 + 'j,
+        R: Registry + 'j,
+        CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
     {
         // NIT: can probably do this more efficiently by keeping an immutable
         // reference on the slice but next mutable call makes it nontrivial
@@ -84,27 +96,39 @@ impl EtherlinkPrecompiles {
             CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS => {
                 change_sequencer_key_precompile(&calldata, context, inputs)
             }
+            RUNTIME_GATEWAY_PRECOMPILE_ADDRESS => {
+                runtime_gateway_precompile(&calldata, context, inputs)
+            }
+            VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS => {
+                verify_tezos_signature_precompile(&calldata, inputs)
+            }
             _ => return Ok(None),
         };
 
         let interpreter_result = match result {
             Ok(interpreter_result) => interpreter_result,
-            Err(CustomPrecompileError::Revert(reason)) => {
-                revert(reason, Gas::new_spent(inputs.gas_limit))
-            }
-            Err(CustomPrecompileError::Abort(runtime)) => {
-                return Err(Error::Runtime(runtime))
-            }
+            Err(CustomPrecompileError::Revert(reason, gas)) => InterpreterResult {
+                result: InstructionResult::Revert,
+                gas,
+                output: Bytes::copy_from_slice(reason.as_bytes()),
+            },
+            Err(CustomPrecompileError::OutOfGas) => InterpreterResult {
+                result: InstructionResult::OutOfGas,
+                gas: Gas::new_spent(inputs.gas_limit),
+                output: Bytes::new(),
+            },
+            Err(CustomPrecompileError::Abort(abort)) => return Err(abort),
         };
 
         Ok(Some(interpreter_result))
     }
 }
 
-impl<CTX, DB> PrecompileProvider<CTX> for EtherlinkPrecompiles
+impl<'j, CTX, Host, R> PrecompileProvider<CTX> for EtherlinkPrecompiles
 where
-    DB: DatabasePrecompileStateChanges,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     type Output = InterpreterResult;
 

@@ -89,9 +89,19 @@ if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
   OPAMCLI=2.0 opam install --yes --unlock-base "ocaml-base-compiler.$ocaml_version"
 fi
 
+OPAMREQV="2.3.0"
+OPAMV="$(opam --version)"
+
 # Use the opam cache by default
 # Third party packages are too often unreliable
-opam option --global 'archive-mirrors="https://opam.ocaml.org/cache"'
+if [ "$(printf '%s\n' "$OPAMREQV" "$OPAMV" | sort -V | head -n1)" = "$OPAMREQV" ]; then
+  opam option --global 'archive-mirrors="https://opam.ocaml.org/cache"'
+else
+  echo "Your opam version is less than the advised ${OPAMREQV}. The installation may fail and we suggest to upgrade opam."
+  echo "The recommended way to install/upgrade opam is by doing"
+  echo '  bash -c "sh <(curl -fsSL https://opam.ocaml.org/install.sh)"'
+  echo "See: https://opam.ocaml.org/doc/Install.html#Binary-distribution"
+fi
 
 # Must be done before using 'opam install' to install packages that depend on Rust.
 "$script_dir"/install_build_deps.rust.sh

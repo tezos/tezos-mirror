@@ -9,6 +9,7 @@ use crate::blueprint_storage::{
     blueprint_path, clear_all_blueprints, store_current_block_header,
 };
 use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
+use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
@@ -19,19 +20,24 @@ use crate::migration::legacy::{
     WITHDRAWAL_ADDRESS,
 };
 use crate::storage::{
-    read_chain_id, read_storage_version, store_backlog, store_dal_slots,
-    store_storage_version, tweak_dal_activation, StorageVersion, DELAYED_BRIDGE,
-    ENABLE_FA_BRIDGE, EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS,
-    KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE, SEQUENCER_GOVERNANCE,
+    read_chain_id, read_l1_level, read_last_info_per_level_timestamp,
+    read_storage_version, store_backlog, store_dal_slots, store_storage_version,
+    tweak_dal_activation, StorageVersion, ENABLE_FA_BRIDGE, EVM_TRANSACTIONS_OBJECTS,
+    EVM_TRANSACTIONS_RECEIPTS, SEQUENCER_GOVERNANCE,
 };
-use primitive_types::U256;
+use crate::transaction::{Transaction, TransactionContent};
+use primitive_types::{H160, H256, U256};
+use revm_etherlink::helpers::legacy::FaDeposit;
 use revm_etherlink::storage::block::BLOCKS_STORED;
 use revm_etherlink::storage::version::{store_evm_version, EVMVersion};
+use tezos_ethereum::block::EthBlock;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_runtime::runtime::{evm_node_flag, IsEvmNode};
+use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 #[derive(Eq, PartialEq)]
 pub enum MigrationStatus {
@@ -50,7 +56,7 @@ const MAINNET_CHAIN_ID: u64 = 42793;
 
 #[allow(dead_code)]
 fn is_etherlink_network(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     expected_chain_id: u64,
 ) -> Result<bool, Error> {
     match read_chain_id(host) {
@@ -71,17 +77,11 @@ pub fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), Runtime
     }
 }
 
-const TMP_NEXT_BLUEPRINT_PATH: RefPath =
-    RefPath::assert_from(b"/__tmp_next_blueprint_path");
-
 mod legacy {
     // This module contains copies of old implementations of some
     // functions. The legacy semantics of these functions is needed in
     // some migration step to access the storage using the fields
     // which were present at the time.
-
-    use crate::chains::ChainFamily;
-
     use super::*;
     use primitive_types::{H160, H256};
     use revm::state::AccountInfo;
@@ -89,13 +89,17 @@ mod legacy {
         helpers::legacy::{alloy_to_u256, u256_to_alloy},
         storage::world_state_handler::StorageAccount,
     };
+    use tezos_ethereum::block::EthBlock;
     use tezos_smart_rollup_host::path::Path;
     use tezos_smart_rollup_storage::storage::Storage;
     use tezos_storage::read_h256_be;
     use thiserror::Error;
 
-    pub fn read_next_blueprint_number<Host: Runtime>(
-        host: &Host,
+    pub const TMP_NEXT_BLUEPRINT_PATH: RefPath =
+        RefPath::assert_from(b"/__tmp_next_blueprint_path");
+
+    pub fn read_next_blueprint_number(
+        host: &impl StorageV1,
     ) -> Result<U256, crate::Error> {
         match block_storage::read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
         {
@@ -147,7 +151,7 @@ mod legacy {
         /// integer.
         pub fn increment_nonce(
             &mut self,
-            host: &mut impl Runtime,
+            host: &mut impl StorageV1,
         ) -> Result<(), AccountStorageError> {
             let mut old_info = self.info(host)?;
 
@@ -162,7 +166,7 @@ mod legacy {
         /// Get the **balance** of an account in Wei held by the account.
         pub fn balance(
             &self,
-            host: &mut impl Runtime,
+            host: &mut impl StorageV1,
         ) -> Result<U256, AccountStorageError> {
             let new_format_account = StorageAccount::from_path(self.path.clone());
             Ok(alloy_to_u256(&new_format_account.info(host)?.balance))
@@ -174,7 +178,7 @@ mod legacy {
         /// ie the account held enough funds, the function returns `Ok(true)`.
         pub fn balance_remove(
             &mut self,
-            host: &mut impl Runtime,
+            host: &mut impl StorageV1,
             amount: U256,
         ) -> Result<bool, AccountStorageError> {
             let mut old_info = self.info(host)?;
@@ -190,7 +194,7 @@ mod legacy {
 
         pub fn set_info_without_code(
             &mut self,
-            host: &mut impl Runtime,
+            host: &mut impl StorageV1,
             info: AccountInfo,
         ) -> Result<(), AccountStorageError> {
             let mut new_format_account = StorageAccount::from_path(self.path.clone());
@@ -201,7 +205,7 @@ mod legacy {
 
         pub fn info(
             &self,
-            host: &mut impl Runtime,
+            host: &mut impl StorageV1,
         ) -> Result<AccountInfo, AccountStorageError> {
             let new_format_account = StorageAccount::from_path(self.path.clone());
             new_format_account
@@ -228,7 +232,7 @@ mod legacy {
         #[error("Transaction storage API error: {0:?}")]
         StorageError(tezos_smart_rollup_storage::StorageError),
         #[error("REVM Storage error: {0}")]
-        REVMStorageError(revm_etherlink::Error),
+        REVMStorageError(revm_etherlink::EvmRunError),
         /// Technically, the Ethereum account nonce can overflow if
         /// an account does an incredible number of transactions.
         #[error("Nonce overflow")]
@@ -241,8 +245,20 @@ mod legacy {
         }
     }
 
-    impl From<revm_etherlink::Error> for AccountStorageError {
-        fn from(error: revm_etherlink::Error) -> Self {
+    impl From<revm_etherlink::EvmKernelError> for AccountStorageError {
+        fn from(error: revm_etherlink::EvmKernelError) -> Self {
+            AccountStorageError::REVMStorageError(error.into())
+        }
+    }
+
+    impl From<revm_etherlink::EvmDbError> for AccountStorageError {
+        fn from(error: revm_etherlink::EvmDbError) -> Self {
+            AccountStorageError::REVMStorageError(error.into())
+        }
+    }
+
+    impl From<revm_etherlink::EvmRunError> for AccountStorageError {
+        fn from(error: revm_etherlink::EvmRunError) -> Self {
             AccountStorageError::REVMStorageError(error)
         }
     }
@@ -280,30 +296,56 @@ mod legacy {
     }
 
     pub fn read_current_hash(
-        host: &impl Runtime,
+        host: &impl StorageV1,
         root: &impl Path,
     ) -> anyhow::Result<H256> {
         read_h256_be(host, &current_hash(root)?)
     }
 
-    pub fn read_current(
-        host: &mut impl Runtime,
-        root: &impl Path,
-        chain_family: &ChainFamily,
-    ) -> anyhow::Result<L2Block> {
-        let hash = read_current_hash(host, root)?;
-        let block_path = path(root, hash)?;
+    pub fn read_current_etherlink_block(
+        host: &mut impl StorageV1,
+    ) -> anyhow::Result<EthBlock> {
+        let hash = read_current_hash(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+        let block_path = path(&ETHERLINK_SAFE_STORAGE_ROOT_PATH, hash)?;
         let bytes = &host.store_read_all(&block_path)?;
-        let block_from_bytes = L2Block::try_from_bytes(chain_family, bytes)?;
+        let block_from_bytes = EthBlock::from_bytes(bytes)?;
         Ok(block_from_bytes)
+    }
+
+    pub const KERNEL_GOVERNANCE: RefPath =
+        RefPath::assert_from(b"/evm/kernel_governance");
+
+    pub const KERNEL_SECURITY_GOVERNANCE: RefPath =
+        RefPath::assert_from(b"/evm/kernel_security_governance");
+
+    pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
+
+    pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/evm/keep_events");
+
+    const EVENTS: RefPath = RefPath::assert_from(b"/evm/events");
+
+    pub fn clear_events<Host>(host: &mut Host) -> anyhow::Result<()>
+    where
+        Host: StorageV1,
+    {
+        if host.store_has(&KEEP_EVENTS)?.is_some() {
+            host.store_delete(&KEEP_EVENTS)?;
+            Ok(())
+        } else {
+            let index = IndexableStorage::new(&EVENTS)?;
+            index.clear(host).map_err(Into::into)
+        }
     }
 }
 
-fn migrate_to<Host: Runtime>(
+fn migrate_to<Host>(
     host: &mut Host,
     version: StorageVersion,
-) -> anyhow::Result<MigrationStatus> {
-    log!(host, Info, "Migrating to {:?}", version);
+) -> anyhow::Result<MigrationStatus>
+where
+    Host: StorageV1 + IsEvmNode,
+{
+    log!(Info, "Migrating to {:?}", version);
     match version {
         StorageVersion::V11 => anyhow::bail!(Error::UpgradeError(
             UpgradeProcessError::InternalUpgrade("V11 has no predecessor"),
@@ -396,13 +438,13 @@ fn migrate_to<Host: Runtime>(
         StorageVersion::V21 => {
             if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
                 host.store_write_all(
-                    &DELAYED_BRIDGE,
+                    &legacy::DELAYED_BRIDGE,
                     b"KT1Vocor3bL5ZSgsYH9ztt42LNhqFK64soR4",
                 )?;
                 Ok(MigrationStatus::Done)
             } else if is_etherlink_network(host, TESTNET_CHAIN_ID)? {
                 host.store_write_all(
-                    &DELAYED_BRIDGE,
+                    &legacy::DELAYED_BRIDGE,
                     b"KT1X1M4ywyz9cHvUgBLTUUdz3GTiYJhPcyPh",
                 )?;
                 Ok(MigrationStatus::Done)
@@ -433,11 +475,11 @@ fn migrate_to<Host: Runtime>(
             let next_blueprint_number = legacy::read_next_blueprint_number(host)?;
             let blueprint_path = blueprint_path(next_blueprint_number)?;
             allow_path_not_found(
-                host.store_move(&blueprint_path, &TMP_NEXT_BLUEPRINT_PATH),
+                host.store_move(&blueprint_path, &legacy::TMP_NEXT_BLUEPRINT_PATH),
             )?;
             clear_all_blueprints(host)?;
             allow_path_not_found(
-                host.store_move(&TMP_NEXT_BLUEPRINT_PATH, &blueprint_path),
+                host.store_move(&legacy::TMP_NEXT_BLUEPRINT_PATH, &blueprint_path),
             )?;
             Ok(MigrationStatus::Done)
         }
@@ -456,9 +498,9 @@ fn migrate_to<Host: Runtime>(
                 const SEQUENCER_GOVERNANCE_KT: &[u8] =
                     b"KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U";
 
-                host.store_write_all(&KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
                 host.store_write_all(
-                    &KERNEL_SECURITY_GOVERNANCE,
+                    &legacy::KERNEL_SECURITY_GOVERNANCE,
                     SECURITY_GOVERNANCE_KT,
                 )?;
                 host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
@@ -474,11 +516,7 @@ fn migrate_to<Host: Runtime>(
         }
         StorageVersion::V27 => {
             // Initialize the next_blueprint_info field
-            match legacy::read_current(
-                host,
-                &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-                &crate::chains::ChainFamily::Evm,
-            ) {
+            match legacy::read_current_etherlink_block(host) {
                 Ok(block) => {
                     store_current_block_header(host, &block.into())?;
                     Ok(MigrationStatus::Done)
@@ -544,9 +582,9 @@ fn migrate_to<Host: Runtime>(
                 const SEQUENCER_GOVERNANCE_KT: &[u8] =
                     b"KT1NnH9DCAoY1pfPNvb9cw9XPKQnHAFYFHXa";
 
-                host.store_write_all(&KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
                 host.store_write_all(
-                    &KERNEL_SECURITY_GOVERNANCE,
+                    &legacy::KERNEL_SECURITY_GOVERNANCE,
                     SECURITY_GOVERNANCE_KT,
                 )?;
                 host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
@@ -575,9 +613,9 @@ fn migrate_to<Host: Runtime>(
                 const SEQUENCER_GOVERNANCE_KT: &[u8] =
                     b"KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf";
 
-                host.store_write_all(&KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
                 host.store_write_all(
-                    &KERNEL_SECURITY_GOVERNANCE,
+                    &legacy::KERNEL_SECURITY_GOVERNANCE,
                     SECURITY_GOVERNANCE_KT,
                 )?;
                 host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
@@ -624,7 +662,7 @@ fn migrate_to<Host: Runtime>(
                     &hash_path,
                 )?)?;
                 let block_from_bytes =
-                    L2Block::try_from_bytes(&crate::chains::ChainFamily::Evm, &block)?;
+                    L2Block::Etherlink(Box::new(EthBlock::from_bytes(&block)?));
                 allow_path_not_found(host.store_delete(&concat(
                     &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                     &RefPath::assert_from(b"/blocks"),
@@ -673,6 +711,383 @@ fn migrate_to<Host: Runtime>(
             // Dummy migration for the new gas price
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V45 => {
+            // Re-inject locked FA deposit 0x82f507bc5aba0f3f6088c087c2fcd87fc7b7f33c9445e331ec3d1fdf45e4be38,
+            // affected by the regression introduced by Farfadet
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? && !evm_node_flag(host) {
+                legacy::clear_events(host)?;
+                host.store_write(&legacy::KEEP_EVENTS, &[], 0)?;
+                let mut delayed_inbox = DelayedInbox::new(host)?;
+                let previous_timestamp = read_last_info_per_level_timestamp(host)?;
+                let level = read_l1_level(host)?;
+                let fa_deposit = FaDeposit {
+                    amount: U256::from_dec_str("3125423349").unwrap(),
+                    receiver: H160::from_slice(&[
+                        0x94, 0x6a, 0x4f, 0x7a, 0x4e, 0xc4, 0x40, 0x77, 0xc6, 0x8b, 0x5a,
+                        0x1b, 0x00, 0xfb, 0xe0, 0xb9, 0x61, 0x0c, 0xf6, 0x87,
+                    ]),
+                    proxy: Some(H160::from_slice(&[
+                        0x19, 0x41, 0x8d, 0x0a, 0xf0, 0xf3, 0x68, 0x65, 0xcd, 0xfb, 0xb2,
+                        0x43, 0x7d, 0xfe, 0xd2, 0x9b, 0xa3, 0x4d, 0x31, 0x90,
+                    ])),
+                    ticket_hash: H256::from_slice(&[
+                        0x23, 0x06, 0x44, 0xd9, 0xa1, 0xc4, 0x5d, 0x22, 0xfb, 0xe4, 0x66,
+                        0x61, 0xc0, 0xf5, 0xf8, 0x65, 0x8c, 0x45, 0x31, 0xbd, 0xb1, 0xa8,
+                        0xe9, 0x73, 0x1a, 0xad, 0x38, 0x6a, 0xdd, 0xb6, 0x1d, 0xff,
+                    ]),
+                    inbox_level: 11228700,
+                    inbox_msg_id: 4,
+                };
+                let tx_hash = fa_deposit.hash(&[0u8; 20]).into();
+                let tx = Transaction {
+                    tx_hash,
+                    content: TransactionContent::FaDeposit(fa_deposit),
+                };
+                delayed_inbox.save_transaction(
+                    host,
+                    tx.into(),
+                    previous_timestamp,
+                    level,
+                )?;
+            }
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V46 => {
+            // Clean remaining leftover block indexes from V41.
+            if let Ok(current_number) =
+                read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
+            {
+                let last_to_keep = current_number.as_u64().saturating_sub(BLOCKS_STORED);
+                let paths_indexed_blocks = concat(
+                    &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                    &RefPath::assert_from(b"/indexes/blocks"),
+                )?;
+                // We keep the last BLOCKS_STORED block hashes.
+                let mut block_hashes: Vec<(OwnedPath, Vec<u8>)> =
+                    Vec::with_capacity(BLOCKS_STORED.try_into().unwrap_or(256));
+                for i in last_to_keep..=current_number.as_u64() {
+                    let path: Vec<u8> = format!("/{i}").into();
+                    let owned_path = RefPath::assert_from(&path);
+                    let read_path = concat(&paths_indexed_blocks, &owned_path)?;
+                    match host.store_read_all(&read_path) {
+                        Ok(hash) => {
+                            block_hashes.push((read_path, hash));
+                            Ok(())
+                        }
+                        Err(RuntimeError::PathNotFound) => Ok(()),
+                        Err(err) => Err(err),
+                    }?;
+                }
+
+                // We dump all the remaining block hashes.
+                allow_path_not_found(host.store_delete(&paths_indexed_blocks))?;
+
+                // We rewrite the last BLOCKS_STORED block hashes.
+                for (path, hash) in block_hashes {
+                    host.store_write_all(&path, &hash)?;
+                }
+            }
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V47 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
+                const REGULAR_GOVERNANCE_KT: &[u8] =
+                    b"KT1NM6cpM5BPTmYPszjv6LRDAMRZXPET9DmH";
+                const SECURITY_GOVERNANCE_KT: &[u8] =
+                    b"KT1JGCdHEyvE3RkmzR7hRYK7vC42QF6zK34H";
+                const SEQUENCER_GOVERNANCE_KT: &[u8] =
+                    b"KT1CSqkafD5ZCHFvmsozrCBeSy2XJQzutJRn";
+
+                host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(
+                    &legacy::KERNEL_SECURITY_GOVERNANCE,
+                    SECURITY_GOVERNANCE_KT,
+                )?;
+                host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
+
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
+        StorageVersion::V48 => {
+            // Starting version 48, blueprints from the sequencer can
+            // have a version field
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V49 => {
+            // Starting version 49, the kernel produce blocks for Michelson Runtime
+            // when TezosX feature is activated.
+
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V50 => {
+            // Starting version 50, the sequencer upgrade is stored in the world state, and the sequencer key
+            // is also stored in the world state. We move them from their legacy location to the new one.
+            let legacy_sequencer_upgrade =
+                RefPath::assert_from(b"/evm/sequencer_upgrade");
+            let legacy_sequencer_key = RefPath::assert_from(b"/evm/sequencer");
+
+            // Both paths are optional: the sequencer upgrade only exists when a
+            // governance upgrade is pending, and the sequencer key is absent in
+            // proxy mode or after a governance removal.
+            allow_path_not_found(host.store_move(
+                &legacy_sequencer_upgrade,
+                &RefPath::assert_from(b"/evm/world_state/sequencer_upgrade"),
+            ))?;
+            allow_path_not_found(host.store_move(
+                &legacy_sequencer_key,
+                &RefPath::assert_from(b"/evm/world_state/sequencer"),
+            ))?;
+
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V51 => {
+            // Phase 1 of the durable storage reorganization: move IPC
+            // paths from root-level locations to /base/ prefix.
+            // Note: tezosx paths (__simulation, tezosx_entrypoints) are
+            // not in production and do not need migration.
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/__evm_node"),
+                &RefPath::assert_from(b"/base/__evm_node"),
+            ))?;
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/__delayed_input"),
+                &RefPath::assert_from(b"/base/__delayed_input"),
+            ))?;
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/__backup_kernel"),
+                &RefPath::assert_from(b"/base/__backup_kernel"),
+            ))?;
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/__tmp"),
+                &RefPath::assert_from(b"/base/__tmp"),
+            ))?;
+
+            // Clean up dead migration artifact from V23.
+            allow_path_not_found(host.store_delete(&legacy::TMP_NEXT_BLUEPRINT_PATH))?;
+
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V52 => {
+            // Starting version 52, the EVM node uses the TezosX
+            // envelope format (List [runtime_id, inner_transaction]).
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V53 => {
+            // Phase 2 of the durable storage reorganization: move
+            // governance / sequencing / config paths from /evm/ to
+            // /base/.
+            //
+            // Move paths from /evm/ to /base/. /base/blueprints is kept as
+            // a pure blueprint subtree (no config scalars nested inside),
+            // so that a future wholesale delete of /base/blueprints (e.g.
+            // Irmin slim-commit) can safely discard it.
+            let moves: &[(&[u8], &[u8])] = &[
+                (b"/evm/blueprints", b"/base/blueprints"),
+                (
+                    b"/evm/max_blueprint_lookahead_in_seconds",
+                    b"/base/max_blueprint_lookahead_in_seconds",
+                ),
+                (
+                    b"/evm/max_delayed_inbox_blueprint_length",
+                    b"/base/max_delayed_inbox_blueprint_length",
+                ),
+                (b"/evm/kernel_version", b"/base/kernel_version"),
+                (b"/evm/kernel_root_hash", b"/base/kernel_root_hash"),
+                (b"/evm/kernel_upgrade", b"/base/kernel_upgrade"),
+                (b"/evm/logging_verbosity", b"/base/logging_verbosity"),
+                (b"/evm/l1_level", b"/base/l1_level"),
+                (b"/evm/messages", b"/base/messages"),
+                (b"/evm/admin", b"/base/admin"),
+                (b"/evm/kernel_governance", b"/base/kernel_governance"),
+                (
+                    b"/evm/kernel_security_governance",
+                    b"/base/kernel_security_governance",
+                ),
+                (b"/evm/delayed_bridge", b"/base/delayed_bridge"),
+                (b"/evm/remove_whitelist", b"/base/remove_whitelist"),
+                (
+                    b"/evm/maximum_allowed_ticks",
+                    b"/base/maximum_allowed_ticks",
+                ),
+                (b"/evm/dal_slots", b"/base/dal_slots"),
+                (
+                    b"/evm/dal_publishers_whitelist",
+                    b"/base/dal_publishers_whitelist",
+                ),
+                (
+                    b"/evm/delayed_inbox_timeout",
+                    b"/base/delayed_inbox_timeout",
+                ),
+                (
+                    b"/evm/delayed_inbox_min_levels",
+                    b"/base/delayed_inbox_min_levels",
+                ),
+                (b"/evm/current_block_header", b"/base/current_block_header"),
+                // Subtrees
+                (b"/evm/delayed-inbox", b"/base/delayed-inbox"),
+                (b"/evm/info_per_level", b"/base/info_per_level"),
+                (b"/evm/chain_configurations", b"/base/chain_configurations"),
+                // Renamed: events -> rollup_events
+                (b"/evm/events", b"/base/rollup_events"),
+                (b"/evm/keep_events", b"/base/keep_rollup_events"),
+            ];
+            for (old, new) in moves {
+                allow_path_not_found(
+                    host.store_move(
+                        &RefPath::assert_from(old),
+                        &RefPath::assert_from(new),
+                    ),
+                )?;
+            }
+
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V54 => {
+            // Phase 3 of the durable storage reorganization: consolidate
+            // all feature flags under /base/feature_flags/.
+            //
+            // - Move the 5 flags at /evm/feature_flags/* (outside safe
+            //   storage) by moving the whole subtree.
+            // - Drop the 3 flags at /evm/world_state/feature_flags/
+            //   (enable_revm, enable_fast_withdrawal,
+            //   enable_fast_fa_withdrawal): none is read by
+            //   kernel_latest. revm and the fast-withdrawal code paths
+            //   became unconditional in pre-Farfadet kernels, so there
+            //   is no live data worth migrating.
+
+            // Move the /evm/feature_flags subtree wholesale.
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/evm/feature_flags"),
+                &RefPath::assert_from(b"/base/feature_flags"),
+            ))?;
+
+            // Drop dead flags rather than migrating them.
+            let legacy_drops: &[&[u8]] = &[
+                b"/evm/world_state/feature_flags/enable_revm",
+                b"/evm/world_state/feature_flags/enable_fast_withdrawal",
+                b"/evm/world_state/feature_flags/enable_fast_fa_withdrawal",
+            ];
+            for path in legacy_drops {
+                allow_path_not_found(host.store_delete(&RefPath::assert_from(path)))?;
+            }
+
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V55 => {
+            // L2-1296: clear the persisted balance of TEZOSX_CALLER_ADDRESS
+            // (0x7e20580000000000000000000000000000000001) on networks that
+            // run the Michelson runtime.
+            //
+            // Earlier kernels funded the internal TezosX caller used by
+            // `ensure_alias` by writing `U256::MAX` to durable storage,
+            // because they assumed REVM's pre-flight balance check would
+            // require a positive balance. The surrounding `run_transaction`
+            // is `TransactionOrigin::CrossRuntime` so its EVM journal is
+            // never committed: only the manual storage write persisted, and
+            // the address ended up showing balance ≈ 2^256 - 1 on
+            // Blockscout. The funding has been removed (gas_price = 0 and
+            // value = 0 mean no balance is required); this migration
+            // discards the residue from networks that already imprinted it.
+            //
+            // We restrict the cleanup to TezosX networks because
+            // TEZOSX_CALLER_ADDRESS is only ever written to by
+            // `init_tezosx_alias`, which is unreachable when
+            // `enable_tezos_runtime` is unset.
+            if crate::storage::enable_tezos_runtime(host) {
+                use revm_etherlink::precompiles::constants::TEZOSX_CALLER_ADDRESS;
+                use revm_etherlink::storage::world_state_handler::StorageAccount;
+
+                // The internal caller has no nonce / code / storage to
+                // preserve — only the manually-written `info` (and a
+                // possible legacy `/balance` path). Drop the whole subtree
+                // so subsequent reads fall back to `AccountInfo::default()`
+                // (balance = 0, nonce = 0, empty code).
+                let mut account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS)
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "TEZOSX_CALLER_ADDRESS account_path failed: {e:?}"
+                        )
+                    })?;
+                account.delete_info(host).map_err(|e| {
+                    anyhow::anyhow!("delete_info on TEZOSX_CALLER_ADDRESS failed: {e:?}")
+                })?;
+                // Legacy per-field layout used by very old kernels.
+                let legacy_balance_path = OwnedPath::try_from(format!(
+                    "/evm/world_state/eth_accounts/{TEZOSX_CALLER_ADDRESS:x}/balance"
+                ))?;
+                allow_path_not_found(host.store_delete(&legacy_balance_path))?;
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
+        StorageVersion::V56 => {
+            // NB:
+            // * Required for Previewnet, this migration will be a no-op
+            // on Mainnet.
+            // * Although the node does not key off the storage
+            // version, the kernel bump to V56 coincides with the
+            // `TezBlock` RLP layout switching to VERSION = 2 (see
+            // `tezos/src/block.rs`), which adds the `state_root`
+            // field. New blocks produced after this migration are
+            // encoded with the V2 layout.
+
+            // Phase 5 of the durable storage reorganization: unify all
+            // Tezos account state under /tez/tez_accounts/, with a flat
+            // layout (no intermediate `tezlink/` segment).
+            //
+            // - Michelson contract state:
+            //     /tezlink/context/contracts/* -> /tez/tez_accounts/contracts/*
+            //     /tezlink/context/big_map/*   -> /tez/tez_accounts/big_map/*
+            // - TezosX projected accounts (info, aliases, native/ethereum):
+            //     /evm/world_state/eth_accounts/tezos/*
+            //                                  -> /tez/tez_accounts/tezosx/*
+            //
+            // SafeStorage root set changes from
+            //   [/evm/world_state, /tezlink, /tez/world_state]
+            // to
+            //   [/evm/world_state, /tez/world_state, /tez/tez_accounts]
+            // (see chains.rs::storage_root_paths). The /tezlink root is
+            // removed.
+            //
+            // The moves use store_move on the raw host (migration runs
+            // outside the SafeStorage wrapper), so crossing safe-root
+            // boundaries is fine. allow_path_not_found makes each step
+            // idempotent: on a network that never wrote at the legacy
+            // locations the moves are no-ops and the migration still
+            // completes. Only `contracts/` and `big_map/` ever lived
+            // under `/tezlink/context/` so moving those two children
+            // covers the whole subtree.
+            if crate::storage::enable_tezos_runtime(host) {
+                allow_path_not_found(host.store_move(
+                    &RefPath::assert_from(b"/tezlink/context/contracts"),
+                    &RefPath::assert_from(b"/tez/tez_accounts/contracts"),
+                ))?;
+                allow_path_not_found(host.store_move(
+                    &RefPath::assert_from(b"/tezlink/context/big_map"),
+                    &RefPath::assert_from(b"/tez/tez_accounts/big_map"),
+                ))?;
+                allow_path_not_found(host.store_move(
+                    &RefPath::assert_from(b"/evm/world_state/eth_accounts/tezos"),
+                    &RefPath::assert_from(b"/tez/tez_accounts/tezosx"),
+                ))?;
+
+                // /tezlink is no longer a SafeStorage root and has no active
+                // readers after the moves above. Drop the leftover subtree
+                // (including any bootstrap placeholder written at /tezlink
+                // by pre-Phase-5 kernels when /tezlink was a safe root) so
+                // we don't leak dead state.
+                allow_path_not_found(
+                    host.store_delete(&RefPath::assert_from(b"/tezlink")),
+                )?;
+
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
     }
 }
 
@@ -695,7 +1110,10 @@ fn migrate_to<Host: Runtime>(
 //     in an inconsistent storage.
 // /!\
 //
-fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> {
+fn migration<Host>(host: &mut Host) -> anyhow::Result<MigrationStatus>
+where
+    Host: StorageV1 + IsEvmNode,
+{
     match read_storage_version(host)?.next() {
         Some(next_version) => {
             let status = migrate_to(host, next_version)?;
@@ -715,9 +1133,108 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
     }
 }
 
-pub fn storage_migration<Host: Runtime>(
-    host: &mut Host,
-) -> Result<MigrationStatus, Error> {
+pub fn storage_migration<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
+where
+    Host: StorageV1 + IsEvmNode,
+{
     let migration_result = migration(host);
     migration_result.map_err(|_| Error::UpgradeError(UpgradeProcessError::Fallback))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use revm::primitives::U256 as AlloyU256;
+    use revm::state::AccountInfo;
+    use revm_etherlink::precompiles::constants::TEZOSX_CALLER_ADDRESS;
+    use revm_etherlink::storage::world_state_handler::StorageAccount;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+
+    /// L2-1296: the V55 migration must drop the persisted balance of
+    /// [`TEZOSX_CALLER_ADDRESS`] on networks where the Michelson runtime
+    /// has been enabled.
+    #[test]
+    fn v55_migration_clears_tezosx_caller_balance_on_tezosx_networks() {
+        let mut host = MockKernelHost::default();
+
+        // Mark this host as a TezosX network — the migration is gated on
+        // [`enable_tezos_runtime`] reading [`ValueType::Value`] at this
+        // path.
+        host.store_write_all(&crate::storage::ENABLE_TEZOS_RUNTIME, &[1u8])
+            .unwrap();
+
+        // Reproduce the bug state: write a `U256::MAX` balance to the
+        // internal caller's `info` path the way pre-fix kernels did via
+        // `set_info_without_code`.
+        let mut account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS).unwrap();
+        account
+            .set_info_without_code(
+                &mut host,
+                AccountInfo {
+                    balance: AlloyU256::MAX,
+                    nonce: 0,
+                    code_hash: revm::primitives::B256::ZERO,
+                    account_id: None,
+                    code: None,
+                },
+            )
+            .unwrap();
+        // Sanity: the bug state is observable before the migration.
+        let info_before = account.info(&mut host).unwrap();
+        assert_eq!(info_before.balance, AlloyU256::MAX);
+
+        // Run the V55 step directly. We dispatch via `migrate_to` rather
+        // than the full `migration` pipeline so the assertion is scoped
+        // to V55's behaviour and is not affected by other version steps.
+        let status = migrate_to(&mut host, StorageVersion::V55).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        // After migration the `info` path is gone: reading it must fall
+        // back to `AccountInfo::default()` (balance 0, nonce 0, empty
+        // code), which is what RPC consumers see as a "non-existent"
+        // account.
+        let info_after = account.info(&mut host).unwrap();
+        assert_eq!(info_after.balance, AlloyU256::ZERO);
+        assert_eq!(info_after.nonce, 0);
+    }
+
+    /// L2-1296: the V55 migration must be a no-op on non-TezosX networks
+    /// (TEZOSX_CALLER_ADDRESS is only ever written by code that runs
+    /// under `enable_tezos_runtime`, so there is nothing to clean up
+    /// elsewhere — and we don't want to touch unrelated state).
+    #[test]
+    fn v55_migration_is_a_no_op_on_non_tezosx_networks() {
+        let mut host = MockKernelHost::default();
+        // Do NOT set ENABLE_TEZOS_RUNTIME.
+
+        let status = migrate_to(&mut host, StorageVersion::V55).unwrap();
+        assert!(matches!(status, MigrationStatus::None));
+
+        // The caller account info path must remain absent (the migration
+        // must not have created one as a side effect of the no-op).
+        let account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS).unwrap();
+        assert!(account.info_without_migration(&host).unwrap().is_none());
+    }
+
+    /// Sanity: the cleanup is safe even if the bug state was never
+    /// imprinted (fresh TezosX network that activated post-fix).
+    #[test]
+    fn v55_migration_is_safe_when_no_bug_state_exists() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&crate::storage::ENABLE_TEZOS_RUNTIME, &[1u8])
+            .unwrap();
+
+        // No prior `set_info_without_code` write here — the account info
+        // path doesn't exist before the migration runs.
+        let account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS).unwrap();
+        assert!(account.info_without_migration(&host).unwrap().is_none());
+
+        let status = migrate_to(&mut host, StorageVersion::V55).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        // Still no info path — `delete_info`'s PathNotFound is swallowed
+        // by `StorageAccount::delete_info`, and the legacy `/balance`
+        // delete is wrapped in `allow_path_not_found`.
+        assert!(account.info_without_migration(&host).unwrap().is_none());
+    }
 }

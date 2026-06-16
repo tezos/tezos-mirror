@@ -1,0 +1,31 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_libcrux_ml_dsa)
+ (public_name octez-libcrux-ml-dsa)
+ (instrumentation (backend bisect_ppx))
+ (flags
+  (:standard)
+  -w -9-27-66)
+ (foreign_archives octez_libcrux_ml_dsa))
+
+(rule
+ (targets liboctez_libcrux_ml_dsa.a dlloctez_libcrux_ml_dsa.so)
+ (deps
+  (glob_files *.rs)
+  (file ../Cargo.toml)
+  (file ../Cargo.lock)
+  (file ../../../rust-toolchain)
+  (source_tree ../.cargo))
+ (action
+  (progn
+   (run sh -c "cargo build --release")
+   (run
+    sh
+    -c
+    "mv ../target/release/liboctez_libcrux_ml_dsa.so ./dlloctez_libcrux_ml_dsa.so 2> /dev/null || mv ../target/release/liboctez_libcrux_ml_dsa.dylib ./dlloctez_libcrux_ml_dsa.so")
+   (run
+    mv
+    ../target/release/liboctez_libcrux_ml_dsa.a
+    liboctez_libcrux_ml_dsa.a))))

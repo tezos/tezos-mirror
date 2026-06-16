@@ -27,6 +27,7 @@ module Hex = TzHex
 module Lwt_dropbox = Lwt_dropbox
 module Lwt_idle_waiter = Lwt_idle_waiter
 module Lwt_pipe = Lwt_pipe
+module Lwt_rwlock = Lwt_rwlock
 module Lwt_utils = Lwt_utils
 module Memory = Memory
 module Pretty_printing = Pretty_printing

@@ -619,8 +619,7 @@ let prepare_initial_context_params ?consensus_committee_size
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
     ?nonce_revelation_threshold ?dal ?adaptive_issuance ?consensus_rights_delay
-    ?allow_tz4_delegate_enable ?aggregate_attestation ?native_contracts_enable
-    () =
+    ?native_contracts_enable ?tz5_account_enable () =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
@@ -698,22 +697,21 @@ let prepare_initial_context_params ?consensus_committee_size
       ~default:constants.consensus_rights_delay
       consensus_rights_delay
   in
-  let allow_tz4_delegate_enable =
-    Option.value
-      ~default:constants.allow_tz4_delegate_enable
-      allow_tz4_delegate_enable
-  in
-  let aggregate_attestation =
-    Option.value ~default:constants.aggregate_attestation aggregate_attestation
-  in
   let native_contracts_enable =
     Option.value
       ~default:constants.native_contracts_enable
       native_contracts_enable
   in
+  let tz5_account_enable =
+    Option.value ~default:constants.tz5_account_enable tz5_account_enable
+  in
   let cache_sampler_state_cycles =
     consensus_rights_delay + Constants_repr.slashing_delay + 2
   and cache_stake_distribution_cycles =
+    consensus_rights_delay + Constants_repr.slashing_delay + 2
+  and cache_stake_info_cycles =
+    consensus_rights_delay + Constants_repr.slashing_delay + 2
+  and cache_swrr_selected_distribution_cycles =
     consensus_rights_delay + Constants_repr.slashing_delay + 2
   in
   let constants =
@@ -747,9 +745,10 @@ let prepare_initial_context_params ?consensus_committee_size
       consensus_rights_delay;
       cache_sampler_state_cycles;
       cache_stake_distribution_cycles;
-      allow_tz4_delegate_enable;
-      aggregate_attestation;
+      cache_stake_info_cycles;
+      cache_swrr_selected_distribution_cycles;
       native_contracts_enable;
+      tz5_account_enable;
     }
   in
   let* () = check_constants_consistency constants in
@@ -783,9 +782,9 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold_size
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
-    ?nonce_revelation_threshold ?dal ?adaptive_issuance
-    ?allow_tz4_delegate_enable ?aggregate_attestation ?native_contracts_enable
-    (bootstrap_accounts : Parameters.bootstrap_account list) =
+    ?nonce_revelation_threshold ?dal ?adaptive_issuance ?native_contracts_enable
+    ?tz5_account_enable (bootstrap_accounts : Parameters.bootstrap_account list)
+    =
   let open Lwt_result_syntax in
   let* constants, shell, hash =
     prepare_initial_context_params
@@ -808,9 +807,8 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold_size
       ?nonce_revelation_threshold
       ?dal
       ?adaptive_issuance
-      ?allow_tz4_delegate_enable
-      ?aggregate_attestation
       ?native_contracts_enable
+      ?tz5_account_enable
       ()
   in
   let* () =

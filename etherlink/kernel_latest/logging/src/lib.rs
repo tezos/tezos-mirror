@@ -1,13 +1,41 @@
 // SPDX-FileCopyrightText: 2023-2025 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2026 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
-#[doc(hidden)]
-pub use tezos_smart_rollup_debug::debug_str;
+use std::cell::Cell;
 
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+
+cfg_if::cfg_if! {
+    if #[cfg(not(pvm_kind = "none"))] {
+        #[doc(hidden)]
+        pub use tezos_smart_rollup_debug::debug_str;
+    } else if #[cfg(feature = "capture-logs")] {
+        use std::cell::RefCell;
+
+        thread_local! {
+            /// Capture of all calls to `debug_str` that occurred in the current thread.
+            pub static DEBUG_LOG: RefCell<Vec<u8>> = RefCell::default();
+        }
+
+        #[macro_export]
+        macro_rules! debug_str {
+            ($msg: expr) => {{
+                $crate::DEBUG_LOG.with_borrow_mut(|log| log.extend_from_slice($msg.as_bytes()));
+            }};
+        }
+    } else {
+        #[macro_export]
+        macro_rules! debug_str {
+            ($msg: expr) => {{
+                eprint!("{}", $msg);
+            }};
+        }
+    }
+}
 
 #[repr(u8)]
 #[derive(PartialEq, Clone, Copy, PartialOrd, FromPrimitive)]
@@ -52,30 +80,42 @@ impl std::fmt::Display for Level {
     }
 }
 
-pub trait Verbosity {
-    fn verbosity(&self) -> Level;
+std::thread_local! {
+    /// Globally set verbosity level
+    static VERBOSITY: Cell<Level> = Cell::new(Level::default());
+}
+
+/// Set the global logging verbosity level.
+pub fn set_global_verbosity(level: Level) {
+    VERBOSITY.set(level)
+}
+
+/// Get the globally set verbosity level.
+#[doc(hidden)]
+pub fn get_verbosity_level() -> Level {
+    VERBOSITY.get()
 }
 
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! log {
-    ($host: expr, $level: expr, $fmt: expr $(, $arg:expr)*)  => {
-        if $host.verbosity() >= $level {
+    ($level: expr, $fmt: expr $(, $arg:expr)*)  => {{
+        if $crate::get_verbosity_level() >= $level {
             let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
-            $crate::debug_str!($host, &msg);
+            $crate::debug_str!(&msg);
         }
-    };
+    }};
 }
 
 #[cfg(all(feature = "tracing", feature = "alloc"))]
 #[macro_export]
 macro_rules! __trace_kernel {
-    ($host:expr, $name:expr, $expr:expr) => {{
+    ($name:expr, $expr:expr) => {{
         let msg = format!("[{}] [start] {}", tezos_evm_logging::Level::OTel, $name);
-        $crate::debug_str!($host, &msg);
+        $crate::debug_str!(&msg);
         let __otel_result = { $expr };
         let msg = format!("[{}] [end] {}", tezos_evm_logging::Level::OTel, $name);
-        $crate::debug_str!($host, &msg);
+        $crate::debug_str!(&msg);
         __otel_result
     }};
 }
@@ -95,7 +135,7 @@ pub enum OTelAttrValue {
 #[cfg(all(feature = "tracing", feature = "alloc"))]
 #[macro_export]
 macro_rules! __trace_kernel_add_attrs {
-    ($host:expr, $attrs:expr) => {{
+    ($attrs:expr) => {{
         use $crate::OTelAttrValue;
 
         let attrs_str = $attrs
@@ -113,23 +153,22 @@ macro_rules! __trace_kernel_add_attrs {
             .join(" ");
 
         let msg = format!("[{}] [attrs] {}", tezos_evm_logging::Level::OTel, attrs_str);
-        $crate::debug_str!($host, &msg);
+        $crate::debug_str!(&msg);
     }};
 }
 
 // Must only be used by the procedural macro for kernel tracing.
 #[cfg(feature = "tracing")]
-pub fn internal_trace_kernel<H, F, R>(host: &mut H, name: &str, f: F) -> R
+pub fn internal_trace_kernel<F, R>(name: &str, f: F) -> R
 where
-    H: tezos_smart_rollup_host::runtime::Runtime,
-    F: FnOnce(&mut H) -> R,
+    F: FnOnce() -> R,
 {
     let msg = format!("[{}] [start] {}", crate::Level::OTel, name);
-    crate::debug_str!(host, &msg);
-    let res = f(host);
+    debug_str!(&msg);
+    let res = f();
 
     let msg = format!("[{}] [end] {}", crate::Level::OTel, name);
-    crate::debug_str!(host, &msg);
+    debug_str!(&msg);
 
     res
 }
@@ -137,13 +176,13 @@ where
 #[cfg(not(feature = "tracing"))]
 #[macro_export]
 macro_rules! __trace_kernel_add_attrs {
-    ($host:expr, $attrs:expr) => {{}};
+    ($attrs:expr) => {{}};
 }
 
 #[cfg(not(feature = "tracing"))]
 #[macro_export]
 macro_rules! __trace_kernel {
-    ($host:expr, $name:expr, $expr:expr) => {{
+    ($name:expr, $expr:expr) => {{
         $expr
     }};
 }

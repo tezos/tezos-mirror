@@ -120,6 +120,39 @@ let can_contain_preattestations mode =
       in
       return (Option.is_some locked_round)
 
+let delegate_to_shard_count ctxt ~attested_levels =
+  let open Lwt_result_syntax in
+  let open Alpha_context in
+  let lags = Constants.dal_attestation_lags ctxt in
+  (* We are using a set here to de-duplicate the committee levels across
+     different attested levels and attestation lags. Indeed, repetition may
+     occur; for instance, if [attested_level] contains levels 10 and 11, and
+     [attestation_lags = [2;3;5]], then committee level 12 can be obtained as
+     both [10-2 + 5-1] and [11-3 + 5-1]. *)
+  let committee_levels =
+    List.fold_left
+      (fun acc attested_level ->
+        let attested_level = attested_level.Level.level in
+        let new_levels =
+          List.filter_map
+            (fun lag ->
+              let raw_level_opt =
+                Dal.committee_level_of ctxt ~attested_level ~lag
+              in
+              Option.map (Level.from_raw ctxt) raw_level_opt)
+            lags
+        in
+        Level.Set.union acc (Level.Set.of_list new_levels))
+      Level.Set.empty
+      attested_levels
+  in
+  Level.Set.fold_es
+    (fun committee_level (ctxt, dal_map) ->
+      let* ctxt, counts = Baking.delegate_to_shard_count ctxt committee_level in
+      return (ctxt, Raw_level.Map.add committee_level.level counts dal_map))
+    committee_levels
+    (ctxt, Raw_level.Map.empty)
+
 (** Initialize the consensus rights by first slot for modes that are
     about the validation/application of a block: application, partial
     validation, and full construction.
@@ -133,15 +166,22 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
     Baking.attesting_rights_by_first_slot ctxt ~attested_level:predecessor_level
   in
   let*? can_contain_preattestations = can_contain_preattestations mode in
-  let* ctxt, allowed_preattestations =
-    if can_contain_preattestations then
-      let* ctxt, preattestations_map =
-        Baking.attesting_rights_by_first_slot
-          ctxt
-          ~attested_level:(Level.current ctxt)
-      in
-      return (ctxt, Some preattestations_map)
-    else return (ctxt, None)
+  let current_level = Level.current ctxt in
+  (* Always compute preattestation rights for current_level, even when the block
+     cannot contain preattestations. This ensures the cache domain (specifically
+     `stake_info` for current_cycle) is populated deterministically regardless
+     of the application mode (Construction vs Application). Without this,
+     Construction mode always computes these rights while Application mode may
+     skip them when there is no locked round, causing divergent cache domains
+     and context hashes. *)
+  let* ctxt, preattestations_map =
+    Baking.attesting_rights_by_first_slot ctxt ~attested_level:current_level
+  in
+  let allowed_preattestations =
+    if can_contain_preattestations then Some preattestations_map else None
+  in
+  let* ctxt, delegate_to_shard_count =
+    delegate_to_shard_count ctxt ~attested_levels:[current_level]
   in
   let ctxt =
     Consensus.initialize_consensus_operation
@@ -149,6 +189,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
       ~allowed_attestations:(Some attestations_map)
       ~allowed_preattestations
       ~allowed_consensus:None
+      ~delegate_to_shard_count
   in
   return ctxt
 
@@ -181,6 +222,11 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
       (ctxt, Level.Map.empty)
       allowed_levels
   in
+  let* ctxt, delegate_to_shard_count =
+    delegate_to_shard_count
+      ctxt
+      ~attested_levels:(List.map (Level.succ ctxt) allowed_levels)
+  in
   let ctxt =
     (* Store the resulting map in the context as [allowed_consensus]. *)
     Consensus.initialize_consensus_operation
@@ -188,6 +234,7 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
       ~allowed_attestations:None
       ~allowed_preattestations:None
       ~allowed_consensus:(Some minimal_slots)
+      ~delegate_to_shard_count
   in
   return ctxt
 

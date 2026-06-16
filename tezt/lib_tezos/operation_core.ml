@@ -114,14 +114,14 @@ let bls_mode_raw t client : Hex.t Lwt.t =
   t.raw <- Some (`Hex inject_bytes) ;
   return (`Hex sign_bytes)
 
-(* Same hash module as [src/proto_alpha/lib_protocol/dal_attestation_repr.ml] *)
+(* Same hash module as [src/proto_alpha/lib_protocol/dal_attestations_repr.ml] *)
 module HashModule =
   Tezos_crypto.Blake2B.Make
     (Tezos_crypto.Base58)
     (struct
-      let name = "Dal attestation hash"
+      let name = "Dal attestations hash"
 
-      let title = "Dal attestation hash"
+      let title = "Dal attestations hash"
 
       let b58check_prefix = "\056\012\165" (* dba(53) *)
 
@@ -216,21 +216,15 @@ let sign ?protocol ({kind; signer; contents; _} as t) client =
               (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
           in
           let is_tz4 = String.starts_with ~prefix:"tz4" in
-          (* Under [aggregate_attestation] feature flag, consensus operations
-             signed by tz4 keys are signed using a specific encoding. Moreover,
-             attestions with DAL have their signature aggregated with the
-             companion key signature. *)
-          let* bls_mode =
+          (* Consensus operations signed by tz4 keys use a specific encoding.
+             Moreover, attestations with DAL have their signature aggregated
+             with the companion key signature. *)
+          let bls_mode =
             match protocol with
             | Some p
               when Protocol.number p >= 023 && is_tz4 signer.public_key_hash ->
-                let* constants =
-                  Client.RPC.call_via_endpoint client
-                  @@ RPC.get_chain_block_context_constants ()
-                in
-                return
-                @@ JSON.(constants |-> "aggregate_attestation" |> as_bool)
-            | _ -> return false
+                true
+            | _ -> false
           in
           let* hex =
             if bls_mode then bls_mode_raw t client else hex ?protocol t client
@@ -406,7 +400,7 @@ module Consensus = struct
     block_payload_hash : string;
   }
 
-  type dal_content = {attestation : bool array}
+  type dal_content = {attestation : string}
 
   type t =
     | CPreattestation of {consensus : consensus_content}
@@ -433,13 +427,6 @@ module Consensus = struct
     let consensus = {slot; level; round; block_payload_hash} in
     CPreattestation {consensus}
 
-  let string_of_bool_vector dal_attestation =
-    let aux (acc, n) b =
-      let bit = if b then 1 else 0 in
-      (acc lor (bit lsl n), n + 1)
-    in
-    Array.fold_left aux (0, 0) dal_attestation |> fst |> string_of_int
-
   let kind_to_string kind =
     match kind with
     | Attestation {with_dal; _} ->
@@ -464,10 +451,7 @@ module Consensus = struct
           match dal with
           | None -> []
           | Some {attestation} ->
-              [
-                ( "dal_attestation",
-                  Ezjsonm.string (string_of_bool_vector attestation) );
-              ])
+              [("dal_attestation", Ezjsonm.string attestation)])
     | CPreattestation {consensus} ->
         `O
           [
@@ -639,6 +623,7 @@ module Anonymous = struct
         attestation : t * Tezos_crypto.Signature.t;
         consensus_slot : int;
         slot_index : int;
+        lag_index : int option;
         shard : Tezos_crypto_dal.Cryptobox.shard;
         proof : Tezos_crypto_dal.Cryptobox.shard_proof;
         protocol : Protocol.t;
@@ -668,7 +653,7 @@ module Anonymous = struct
     double_consensus_evidence ~kind:Double_preattestation_evidence
 
   let dal_entrapment_evidence_standalone_attestation ~protocol ~attestation
-      ~slot_index shard proof =
+      ~slot_index ?lag_index shard proof =
     let {kind = op_kind; contents; _}, _ = attestation in
     match op_kind with
     | Consensus {kind = Attestation _; _} ->
@@ -676,7 +661,15 @@ module Anonymous = struct
           JSON.(annotate ~origin:__LOC__ contents |=> 0 |-> "slot" |> as_int)
         in
         Dal_entrapment_evidence
-          {attestation; consensus_slot; slot_index; shard; proof; protocol}
+          {
+            attestation;
+            consensus_slot;
+            slot_index;
+            lag_index;
+            shard;
+            proof;
+            protocol;
+          }
     | _ ->
         Test.fail
           "wrong kind of denounced operation for \
@@ -718,7 +711,15 @@ module Anonymous = struct
             ("op2", op2);
           ]
     | Dal_entrapment_evidence
-        {attestation; consensus_slot; slot_index; shard; proof; protocol} ->
+        {
+          attestation;
+          consensus_slot;
+          slot_index;
+          lag_index;
+          shard;
+          proof;
+          protocol;
+        } ->
         let attestation = denunced_op_json attestation in
         `O
           ([
@@ -728,8 +729,13 @@ module Anonymous = struct
           @ (if Protocol.(number protocol > 22) then
                [("consensus_slot", json_of_int consensus_slot)]
              else [])
+          @ [("slot_index", json_of_int slot_index)]
+          @ (if Protocol.(number protocol > 24) then
+               match lag_index with
+               | None -> []
+               | Some lag_index -> [("lag_index", json_of_int lag_index)]
+             else [])
           @ [
-              ("slot_index", json_of_int slot_index);
               ( "shard_with_proof",
                 `O
                   [
@@ -1211,9 +1217,13 @@ let inject_error_check_recommended_fee ~loc ~rex ~expected_fee op client =
       ~error_msg:("The recommended fee is %L but expected %R at " ^ loc)) ;
   unit
 
-let dal_data_availibility_attester_not_in_committee =
-  rex
-    {|The attester (tz[\w\d]+), with slot ([\d]+), is not part of the DAL committee for the level ([\d]+)\.|}
+let dal_data_availibility_attester_not_in_committee protocol =
+  if Protocol.number protocol >= 025 then
+    rex
+      {|The attester (tz[\w\d]+) is not part of the DAL committee for the committee level ([\d]+) and included a non-empty DAL attestation at attested level ([\d]+) and lag index ([\d]+)\.|}
+  else
+    rex
+      {|The attester (tz[\w\d]+), with slot ([\d]+), is not part of the DAL committee for the level ([\d]+)\.|}
 
 let already_denounced =
   rex
@@ -1237,6 +1247,24 @@ let injection_error_unknown_branch =
 let dal_entrapment_wrong_commitment =
   rex {|DAL shard proof error: Invalid shard \(for commitment = ([\w\d]+)\).|}
 
-let dal_entrapment_of_not_published_commitment =
+let dal_entrapment_of_not_published_commitment protocol =
+  if Protocol.number protocol >= 025 then
+    rex
+      {|Invalid accusation for delegate ([\w\d]+), level ([\d]+), lag_index ([\d]+), and DAL slot index ([\d]+): the DAL slot was not published.|}
+  else
+    rex
+      {|Invalid accusation for delegate ([\w\d]+), level ([\d]+), and DAL slot index ([\d]+): the DAL slot was not published.|}
+
+let dal_entrapment_invalid_lag_index ~lag_index ~max_bound =
   rex
-    {|Invalid accusation for delegate ([\w\d]+), level ([\d]+), and DAL slot index ([\d]+): the DAL slot was not published.|}
+    (sf
+       "The given lag index %d is out of range of representable lag indices \
+        \\[0, %d\\]"
+       lag_index
+       max_bound)
+
+let dal_entrapment_slot_not_attested =
+  rex {|Invalid accusation .*: (the delegate did not attest the DAL slot)\.|}
+
+let dal_entrapment_wrong_shard_owner =
+  rex {|Invalid accusation .*: .* not the attester\.|}

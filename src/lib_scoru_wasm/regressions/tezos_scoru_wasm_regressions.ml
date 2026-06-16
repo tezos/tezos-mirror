@@ -32,10 +32,6 @@ open Tezos_scoru_wasm_helpers.Wasm_utils
 
 module Prover = Pvm_in_memory.Wasm
 
-module Verifier =
-  Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Wasm_2_0_0PVM
-  .Protocol_implementation
-
 let version_name = function
   | Wasm_pvm_state.V0 -> "v0"
   | V1 -> "v1"
@@ -44,6 +40,7 @@ let version_name = function
   | V4 -> "v4"
   | V5 -> "v5"
   | V6 -> "v6"
+  | VExperimental -> "v_experimental"
 
 let capture_hash_of tree =
   Regression.capture @@ Context_hash.to_b58check
@@ -191,7 +188,7 @@ let register_gen ~from_binary ~fail_on_stuck ?ticks_per_snapshot ~tag ~inputs
         (fun () ->
           let context = Prover.make_empty_context () in
           let* tree =
-            initial_tree ~from_binary ~version ?ticks_per_snapshot kernel
+            initial_state ~from_binary ~version ?ticks_per_snapshot kernel
           in
           let* tree = set_full_input_step inputs 0l tree in
           let* tree = eval context tree in

@@ -70,3 +70,13 @@ class unix_proxy :
   mode:Tezos_proxy.Proxy_services.mode ->
   unit ->
   Client_context.full
+
+(** Create a new client context with a different RPC endpoint.
+
+    Returns a new context that inherits from the given [cctxt] but uses
+    the specified [endpoint] for RPC calls. *)
+val with_endpoint :
+  Client_context.full ->
+  Tezos_rpc_http_client_unix.RPC_client_unix.config ->
+  Uri.t ->
+  Client_context.full

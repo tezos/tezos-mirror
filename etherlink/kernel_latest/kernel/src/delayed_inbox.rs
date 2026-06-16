@@ -3,6 +3,7 @@
 
 use crate::{
     bridge::Deposit,
+    chains::TezosXTransaction,
     event::Event,
     linked_list::LinkedList,
     storage::{self, read_last_info_per_level_timestamp},
@@ -17,14 +18,16 @@ use tezos_ethereum::{
     tx_common::EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::read_u16_le_default;
+use tezos_tezlink::operation::Operation;
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedInboxItem>);
 
-pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/evm/delayed-inbox");
+pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/base/delayed-inbox");
 
 // Maximum number of transaction included in a blueprint when
 // forcing timed-out transactions from the delayed inbox.
@@ -32,7 +35,7 @@ pub const DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH: u16 = 1000;
 
 // Path to override the default value.
 pub const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_PATH: RefPath =
-    RefPath::assert_from(b"/evm/max_delayed_inbox_blueprint_length");
+    RefPath::assert_from(b"/base/max_delayed_inbox_blueprint_length");
 
 // Tag that indicates the delayed transaction is a eth transaction.
 pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;
@@ -42,6 +45,9 @@ pub const DELAYED_DEPOSIT_TAG: u8 = 0x02;
 
 // Tag that indicates the delayed transaction is a FA deposit.
 pub const DELAYED_FA_DEPOSIT_TAG: u8 = 0x03;
+
+// Tag that indicates the delayed transaction is a Tezos operation.
+pub const DELAYED_TEZOS_OPERATION_TAG: u8 = 0x04;
 
 /// Hash of a transaction
 ///
@@ -84,6 +90,7 @@ pub enum DelayedTransaction {
     Ethereum(EthereumTransactionCommon),
     Deposit(Deposit),
     FaDeposit(FaDeposit),
+    Tezos(Operation),
 }
 
 impl Encodable for DelayedTransaction {
@@ -101,6 +108,13 @@ impl Encodable for DelayedTransaction {
             DelayedTransaction::FaDeposit(delayed_fa_deposit) => {
                 stream.append(&DELAYED_FA_DEPOSIT_TAG);
                 stream.append(delayed_fa_deposit);
+            }
+            DelayedTransaction::Tezos(op) => {
+                stream.append(&DELAYED_TEZOS_OPERATION_TAG);
+                // We don't want the kernel to panic if there's an error
+                // and we can't print a log as we don't have access to
+                // the host. So we just ignore the result.
+                let _ = op.rlp_append(stream);
             }
         }
     }
@@ -130,6 +144,10 @@ impl Decodable for DelayedTransaction {
             DELAYED_FA_DEPOSIT_TAG => {
                 let fa_deposit = FaDeposit::decode(&payload)?;
                 Ok(DelayedTransaction::FaDeposit(fa_deposit))
+            }
+            DELAYED_TEZOS_OPERATION_TAG => {
+                let op = Operation::decode(&payload)?;
+                Ok(DelayedTransaction::Tezos(op))
             }
             _ => Err(DecoderError::Custom("unknown tag")),
         }
@@ -182,41 +200,54 @@ impl Decodable for DelayedInboxItem {
 }
 
 impl DelayedInbox {
-    pub fn new<Host: Runtime>(host: &mut Host) -> Result<Self> {
+    pub fn new<Host>(host: &mut Host) -> Result<Self>
+    where
+        Host: StorageV1,
+    {
         let linked_list = LinkedList::new(&DELAYED_INBOX_PATH, host)?;
         Ok(Self(linked_list))
     }
 
-    pub fn save_transaction<Host: Runtime>(
+    pub fn save_transaction<Host>(
         &mut self,
         host: &mut Host,
-        tx: Transaction,
+        tx: TezosXTransaction,
         timestamp: Timestamp,
         level: u32,
-    ) -> Result<()> {
-        let Transaction { tx_hash, content } = tx.clone();
-        let transaction = match content {
+    ) -> Result<()>
+    where
+        Host: StorageV1 + IsEvmNode,
+    {
+        match tx {
+            TezosXTransaction::Ethereum(tx) => {
+                let Transaction { tx_hash, content } = *tx.clone();
+                let transaction = match content {
             TransactionContent::Ethereum(_) => anyhow::bail!("Non-delayed evm transaction should not be saved to the delayed inbox. {:?}", tx.tx_hash),
             TransactionContent::EthereumDelayed(tx) => DelayedTransaction::Ethereum(tx),
             TransactionContent::Deposit(deposit) => DelayedTransaction::Deposit(deposit),
-            TransactionContent::FaDeposit(fa_deposit) => DelayedTransaction::FaDeposit(fa_deposit)
+            TransactionContent::FaDeposit(fa_deposit) => DelayedTransaction::FaDeposit(fa_deposit),
+            TransactionContent::TezosDelayed(op) => DelayedTransaction::Tezos(op),
         };
-        let item = DelayedInboxItem {
-            transaction,
-            timestamp,
-            level,
-        };
+                let item = DelayedInboxItem {
+                    transaction,
+                    timestamp,
+                    level,
+                };
 
-        Event::NewDelayedTransaction(Box::new(tx)).store(host)?;
+                Event::NewDelayedTransaction(tx).store(host)?;
 
-        self.0.push(host, &Hash(tx_hash), &item)?;
-        log!(
-            host,
-            Info,
-            "Saved transaction {} in the delayed inbox",
-            hex::encode(tx_hash)
-        );
-        Ok(())
+                self.0.push(host, &Hash(tx_hash), &item)?;
+                log!(
+                    Info,
+                    "Saved transaction {} in the delayed inbox",
+                    hex::encode(tx_hash)
+                );
+                Ok(())
+            }
+            TezosXTransaction::Tezos(op) => {
+                anyhow::bail!("Non-delayed Tezos operation should not be saved to the delayed inbox. {:?}", op.tx_hash)
+            }
+        }
     }
 
     pub fn transaction_from_delayed(
@@ -236,12 +267,16 @@ impl DelayedInbox {
                 tx_hash: tx_hash.0,
                 content: TransactionContent::FaDeposit(fa_deposit),
             },
+            DelayedTransaction::Tezos(op) => Transaction {
+                tx_hash: tx_hash.0,
+                content: TransactionContent::TezosDelayed(op),
+            },
         }
     }
 
-    pub fn find_transaction<Host: Runtime>(
+    pub fn find_transaction(
         &mut self,
-        host: &mut Host,
+        host: &mut impl StorageV1,
         tx_hash: Hash,
     ) -> Result<Option<(Transaction, Timestamp)>> {
         let tx = self.0.find(host, &tx_hash)?.map(
@@ -262,14 +297,17 @@ impl DelayedInbox {
 
     // Returns the oldest tx in the delayed inbox (and its hash) if it
     // timed out
-    fn first_if_timed_out<Host: Runtime>(
+    fn first_if_timed_out<Host>(
         &mut self,
         host: &mut Host,
         now: Timestamp,
         timeout: u64,
         current_level: u32,
         min_levels: u32,
-    ) -> Result<Option<(Hash, DelayedTransaction)>> {
+    ) -> Result<Option<(Hash, DelayedTransaction)>>
+    where
+        Host: StorageV1,
+    {
         let to_pop = self.0.first_with_id(host)?.and_then(
             |(
                 tx_hash,
@@ -283,7 +321,6 @@ impl DelayedInbox {
                     && current_level - level >= min_levels
                 {
                     log!(
-                        host,
                         Info,
                         "Delayed transaction {} timed out",
                         hex::encode(tx_hash)
@@ -298,15 +335,12 @@ impl DelayedInbox {
     }
 
     #[cfg(test)]
-    pub fn is_empty<Host: Runtime>(&self, host: &mut Host) -> Result<bool> {
+    pub fn is_empty(&self, host: &mut impl StorageV1) -> Result<bool> {
         let first = self.0.first_with_id(host)?;
         Ok(first.is_none())
     }
 
-    fn pop_first<Host: Runtime>(
-        &mut self,
-        host: &mut Host,
-    ) -> Result<Option<Transaction>> {
+    fn pop_first(&mut self, host: &mut impl StorageV1) -> Result<Option<Transaction>> {
         let to_pop = self.0.first_with_id(host)?;
         match to_pop {
             None => Ok(None),
@@ -320,10 +354,10 @@ impl DelayedInbox {
     }
 
     /// Returns whether the oldest tx in the delayed inbox has timed out.
-    pub fn first_has_timed_out<Host: Runtime>(
-        &mut self,
-        host: &mut Host,
-    ) -> Result<bool> {
+    pub fn first_has_timed_out<Host>(&mut self, host: &mut Host) -> Result<bool>
+    where
+        Host: StorageV1,
+    {
         let now = read_last_info_per_level_timestamp(host)?;
         let timeout = storage::delayed_inbox_timeout(host)?;
         let current_level = storage::read_l1_level(host)?;
@@ -338,9 +372,9 @@ impl DelayedInbox {
     /// signal that we're done.
     /// Note that this function assumes we're on a "timeout" state,
     /// which should be checked before calling it.
-    pub fn next_delayed_inbox_blueprint<Host: Runtime>(
+    pub fn next_delayed_inbox_blueprint(
         &mut self,
-        host: &mut Host,
+        host: &mut impl StorageV1,
     ) -> Result<Option<Vec<Transaction>>> {
         let max_delayed_inbox_blueprint_length = read_u16_le_default(
             host,
@@ -367,13 +401,11 @@ impl DelayedInbox {
     /// a transaction is removed or not. The only property ensured by the
     /// function is that the transaction is not part of the delayed inbox
     /// after the call.
-    pub fn delete<Host: Runtime>(
-        &mut self,
-        host: &mut Host,
-        tx_hash: Hash,
-    ) -> Result<()> {
+    pub fn delete<Host>(&mut self, host: &mut Host, tx_hash: Hash) -> Result<()>
+    where
+        Host: StorageV1,
+    {
         log!(
-            host,
             Info,
             "Removing transaction {} from the delayed inbox",
             hex::encode(tx_hash)
@@ -438,7 +470,7 @@ mod tests {
         let timestamp: Timestamp =
             read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
         delayed_inbox
-            .save_transaction(&mut host, tx.clone(), timestamp, 0)
+            .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
             .expect("Tx should be saved in the delayed inbox");
 
         let mut delayed_inbox =
@@ -464,7 +496,7 @@ mod tests {
 
         let timestamp: Timestamp =
             read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
-        let res = delayed_inbox.save_transaction(&mut host, tx, timestamp, 0);
+        let res = delayed_inbox.save_transaction(&mut host, tx.into(), timestamp, 0);
 
         assert!(res.is_err());
     }

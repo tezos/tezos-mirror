@@ -74,13 +74,13 @@ module Dal = struct
     match simulation_arg with
     | Network_simulation.Disabled -> (
         match stake_arg with
-        | Custom distrib -> return distrib
+        | Custom distrib -> return (List.map Int64.of_int distrib)
         | Mimic {network; max_nb_bakers} ->
             let network_string =
               match network with
-              | `Mainnet | `Ghostnet | `Seoulnet | `Tallinnnet ->
+              | `Mainnet | `Ghostnet | `Shadownet | `Tallinnnet | `Ushuaianet ->
                   to_string network
-              | _ ->
+              | `Nextnet _ | `Weeklynet _ ->
                   failwith
                     (Format.sprintf
                        "Cannot get stake distribution for %s"
@@ -113,7 +113,7 @@ module Dal = struct
               JSON.(
                 (stake |-> "frozen" |> as_int)
                 + (stake |-> "delegated" |> as_int))
-              / 1_000_000_000
+              |> fun x -> Int64.div (Int64.of_int x) 1_000_000_000L
             in
             let decoder json =
               json |> JSON.as_list

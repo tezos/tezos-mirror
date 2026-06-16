@@ -22,7 +22,13 @@ val net_port : t -> int
 val terminate : ?timeout:float -> t -> unit Lwt.t
 
 (** See [Daemon.Make.wait_for]. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** Wait until the P2P node is ready.
 

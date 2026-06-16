@@ -642,7 +642,7 @@ module Consensus = struct
     let (Single (Preattestation consensus_content)) =
       operation.protocol_data.contents
     in
-    let* {consensus_key; attesting_power; dal_power = _} =
+    let* {consensus_key; attesting_power} =
       match vi.mode with
       | Application block_info | Partial_validation block_info ->
           let* () =
@@ -680,7 +680,7 @@ module Consensus = struct
       match vi.mode with
       | Application _ | Partial_validation _ | Construction _ -> (
           match consensus_key.consensus_pk with
-          | Bls _ when Constants.aggregate_attestation vi.ctxt ->
+          | Bls _ ->
               (* A preattestation with a BLS signature must be included in a
                  Preattestations_aggregate, even if there is only one in the
                  block. *)
@@ -796,15 +796,16 @@ module Consensus = struct
     let*? () = check_payload_hash kind expected_payload_hash bph in
     return_unit
 
-  let check_dal_content vi level slot consensus_key = function
+  let check_dal_content vi ~attestation_level consensus_key =
+    let open Result_syntax in
+    function
     | None -> return_unit
-    | Some {attestation} ->
-        Dal_apply.validate_attestation
+    | Some {attestations} ->
+        Dal_apply.validate_attestations
           vi.ctxt
-          level
-          slot
+          ~attestation_level
           consensus_key
-          attestation
+          attestations
 
   let check_attestation_signature vi consensus_key
       (operation : Kind.attestation operation) =
@@ -814,8 +815,7 @@ module Consensus = struct
     in
     let* dal_dependent_pk =
       match (consensus_key.Consensus_key.consensus_pk, dal_content) with
-      | Bls consensus_bls_pk, Some {attestation = dal_attestation}
-        when Constants.aggregate_attestation vi.ctxt -> (
+      | Bls consensus_bls_pk, Some {attestations = dal_attestation} -> (
           match consensus_key.companion_pk with
           | None ->
               tzfail
@@ -829,7 +829,7 @@ module Consensus = struct
                     operation)
               in
               let dal_dependent_bls_pk_opt =
-                Dal.Attestation.Dal_dependent_signing.aggregate_pk
+                Dal.Attestations.Dal_dependent_signing.aggregate_pk
                   ~subgroup_check:false
                     (* We disable subgroup check (for better
                        performances) because the context only contains
@@ -848,15 +848,13 @@ module Consensus = struct
                     (Signature.Bls dal_dependent_bls_pk
                       : Signature.Public_key.t)))
       | _ ->
-          (* When the feature flag is not set or the consensus key is
-             non-BLS, we use the old behavior: the signed content
-             (which includes the dal_content if any) is signed by the
-             consensus key alone.
+          (* When the consensus key is non-BLS, we use the old behavior: the
+             signed content (which includes the dal_content if any) is signed by
+             the consensus key alone.
 
-             When the dal_content is None (even with enabled feature
-             flag and BLS consensus key), it is represented by
-             [dal_dependent_pk = consensus_pk]. Notably, this allows a
-             BLS consensus key without any associated companion key to
+             When the dal_content is None (even with BLS consensus key), it is
+             represented by [dal_dependent_pk = consensus_pk]. Notably, this
+             allows a BLS consensus key without any associated companion key to
              still issue an attestation without DAL. *)
           return consensus_key.consensus_pk
     in
@@ -873,7 +871,7 @@ module Consensus = struct
     let (Single (Attestation {consensus_content; dal_content})) =
       operation.protocol_data.contents
     in
-    let* {consensus_key; attesting_power; dal_power = _} =
+    let* {consensus_key; attesting_power} =
       match vi.mode with
       | Application _ | Partial_validation _ | Construction _ -> (
           let* () =
@@ -886,7 +884,7 @@ module Consensus = struct
               consensus_content.slot
           in
           match details.consensus_key.consensus_pk with
-          | Bls _ when Constants.aggregate_attestation vi.ctxt ->
+          | Bls _ ->
               (* An attestation with a BLS signature must be included in an
                  Attestations_aggregate, even if there is only one in the block.
               *)
@@ -903,11 +901,10 @@ module Consensus = struct
                consensus_content
     in
     let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
-    let* () =
+    let*? () =
       check_dal_content
         vi
-        consensus_content.level
-        consensus_content.slot
+        ~attestation_level:consensus_content.level
         consensus_key
         dal_content
     in
@@ -1276,12 +1273,6 @@ module Consensus = struct
            propagated between mempools. *)
         tzfail Validate_errors.Consensus.Aggregate_in_mempool
     | Application _ | Partial_validation _ | Construction _ ->
-        let*? () =
-          (* Aggregates are currently under feature flag *)
-          error_unless
-            (Constants.aggregate_attestation info.ctxt)
-            Validate_errors.Consensus.Aggregate_disabled
-        in
         let*? consensus_info =
           Option.value_e
             ~error:(trace_of_error Consensus_operation_not_allowed)
@@ -1322,7 +1313,7 @@ module Consensus = struct
           List.fold_left_es
             (fun (public_keys, total_attesting_power) slot ->
               (* Lookup the slot owner *)
-              let*? {consensus_key; attesting_power; dal_power = _} =
+              let*? {consensus_key; attesting_power} =
                 get_delegate_details
                   consensus_info.preattestation_slot_map
                   Preattestation
@@ -1382,12 +1373,6 @@ module Consensus = struct
            should not be propagated between mempools. *)
         tzfail Validate_errors.Consensus.Aggregate_in_mempool
     | Application _ | Partial_validation _ | Construction _ ->
-        let*? () =
-          (* Attestations_aggregates are currently under feature flag *)
-          error_unless
-            (Constants.aggregate_attestation info.ctxt)
-            Validate_errors.Consensus.Aggregate_disabled
-        in
         let*? consensus_info =
           Option.value_e
             ~error:(trace_of_error Consensus_operation_not_allowed)
@@ -1429,7 +1414,7 @@ module Consensus = struct
           List.fold_left_es
             (fun (pks, weighted_pks, total_power) (slot, dal) ->
               (* Lookup the slot owner *)
-              let*? {consensus_key; attesting_power; dal_power = _} =
+              let*? {consensus_key; attesting_power} =
                 get_delegate_details
                   consensus_info.attestation_slot_map
                   Attestation
@@ -1438,7 +1423,13 @@ module Consensus = struct
               let* () =
                 check_delegate_is_not_forbidden info.ctxt consensus_key.delegate
               in
-              let* () = check_dal_content info level slot consensus_key dal in
+              let*? () =
+                check_dal_content
+                  info
+                  ~attestation_level:level
+                  consensus_key
+                  dal
+              in
               let total_power =
                 Attesting_power.add attesting_power total_power
               in
@@ -1447,13 +1438,13 @@ module Consensus = struct
                   let pks = consensus_pk :: pks in
                   match (dal, consensus_key.companion_pk) with
                   | None, _ -> return (pks, weighted_pks, total_power)
-                  | Some {attestation = dal_attestation}, Some companion_pk ->
+                  | Some {attestations = dal_attestations}, Some companion_pk ->
                       let weight =
-                        Dal.Attestation.Dal_dependent_signing.weight
+                        Dal.Attestations.Dal_dependent_signing.weight
                           ~consensus_pk
                           ~companion_pk
                           ~op:serialized_op
-                          dal_attestation
+                          dal_attestations
                       in
                       if Z.(equal weight one) then
                         return (companion_pk :: pks, weighted_pks, total_power)
@@ -2010,9 +2001,9 @@ module Anonymous = struct
                   let pks = consensus_pk :: pks in
                   match (dal, consensus_key.companion_pk) with
                   | None, _ -> return (ctxt, pks, weighted_pks)
-                  | Some {attestation = dal_attestation}, Some companion_pk ->
+                  | Some {attestations = dal_attestation}, Some companion_pk ->
                       let weight =
-                        Dal.Attestation.Dal_dependent_signing.weight
+                        Dal.Attestations.Dal_dependent_signing.weight
                           ~consensus_pk
                           ~companion_pk
                           ~op:serialized_op
@@ -2389,13 +2380,21 @@ module Anonymous = struct
       (Invalid_shard_index
          {given = shard_index; min = 0; max = number_of_shards - 1})
 
+  let check_lag_index_is_in_range ~number_of_lags = function
+    | None -> Result_syntax.return_unit
+    | Some lag_index ->
+        error_unless
+          Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)
+          (Invalid_lag_index
+             {given = lag_index; min = 0; max = number_of_lags - 1})
+
   (* This function validates an entrapment evidence by doing the following checks:
      - the included attestation is either a standalone attestation for
        the included consensus_slot, or an attestations_aggregate whose
        committee contains the included consensus_slot
      - the included attestation contains a dal_content for
        consensus_slot, in which the included slot index is attested
-     - the included slot index and shard index are within bounds
+     - the included slot index, lag_index, and shard index are within bounds
      - the level of the faulty attestation is within the slashing period
      - the included shard is a trap
      - the delegate has not already been denounced for the same level and slot index
@@ -2407,10 +2406,16 @@ module Anonymous = struct
     let open Lwt_result_syntax in
     let (Single
            (Dal_entrapment_evidence
-              {attestation; consensus_slot; slot_index; shard_with_proof})) =
+              {
+                attestation;
+                consensus_slot;
+                slot_index;
+                lag_index_opt;
+                shard_with_proof;
+              })) =
       operation.protocol_data.contents
     in
-    let*? level, dal_content =
+    let*? raw_level, dal_content =
       let open Result_syntax in
       match attestation.protocol_data.contents with
       | Single (Attestation {consensus_content = {slot; level; _}; dal_content})
@@ -2434,25 +2439,33 @@ module Anonymous = struct
     | None ->
         tzfail
           (Invalid_accusation_no_dal_content
-             {tb_slot = consensus_slot; level; slot_index})
+             {
+               tb_slot = consensus_slot;
+               level = raw_level;
+               slot_index;
+               lag_index_opt;
+             })
     | Some dal_content -> (
-        let number_of_slots = Constants.dal_number_of_slots vi.ctxt in
-        let*? () =
-          Dal.Slot_index.check_is_in_range ~number_of_slots slot_index
+        let* dal_params = Dal.Past_parameters.parameters vi.ctxt raw_level in
+        let*? attestation_lag =
+          Option.fold
+            ~none:(ok dal_params.attestation_lag)
+            ~some:(fun lag_index ->
+              Option.fold
+                ~none:
+                  (error
+                  @@ Invalid_lag_index
+                       {
+                         given = lag_index;
+                         min = 0;
+                         max = List.length dal_params.attestation_lags - 1;
+                       })
+                ~some:ok
+                (List.nth dal_params.attestation_lags lag_index))
+            lag_index_opt
         in
-        let number_of_shards = Constants.dal_number_of_shards vi.ctxt in
-        let shard_index = shard_with_proof.shard.index in
-        let*? () =
-          check_shard_index_is_in_range ~number_of_shards shard_index
-        in
-        let*? () =
-          error_unless
-            (Dal.Attestation.is_attested dal_content.attestation slot_index)
-            (Invalid_accusation_slot_not_attested
-               {tb_slot = consensus_slot; level; slot_index})
-        in
-        let*? () = check_denunciation_age vi `Dal_denounciation level in
-        let level = Level.from_raw vi.ctxt level in
+        let*? () = check_denunciation_age vi `Dal_denounciation raw_level in
+        let level = Level.from_raw vi.ctxt raw_level in
         let* ctxt, consensus_key =
           Stake_distribution.attestation_slot_owner
             vi.ctxt
@@ -2460,6 +2473,66 @@ module Anonymous = struct
             consensus_slot
         in
         let delegate = consensus_key.delegate in
+        let* published_level =
+          match Raw_level.(sub (succ raw_level) attestation_lag) with
+          | None ->
+              (* The slot couldn't have been published in this case *)
+              tzfail
+                (Invalid_accusation_slot_not_published
+                   {delegate; level = raw_level; slot_index; lag_index_opt})
+          | Some level -> return level
+        in
+        (* The parameters at attestation time are used to compute the committee level. *)
+        let committee_level =
+          Raw_level.(add published_level (dal_params.attestation_lag - 1))
+        in
+        let* dal_params =
+          Dal.Past_parameters.parameters vi.ctxt published_level
+        in
+        let number_of_slots = dal_params.number_of_slots in
+        let*? () =
+          Dal.Slot_index.check_is_in_range ~number_of_slots slot_index
+        in
+        let number_of_shards =
+          dal_params.cryptobox_parameters.number_of_shards
+        in
+        let shard_index = shard_with_proof.shard.index in
+        let*? () =
+          check_shard_index_is_in_range ~number_of_shards shard_index
+        in
+        let number_of_lags = List.length dal_params.attestation_lags in
+        let*? () = check_lag_index_is_in_range ~number_of_lags lag_index_opt in
+        let* () =
+          let* is_attested =
+            match lag_index_opt with
+            | None ->
+                tzfail
+                  (Invalid_accusation_unexpected_lag_index
+                     {
+                       tb_slot = consensus_slot;
+                       level = raw_level;
+                       slot_index;
+                       lag_index_opt;
+                     })
+            | Some lag_index ->
+                return
+                @@ Dal.Attestations.is_attested
+                     dal_content.attestations
+                     ~number_of_slots
+                     ~number_of_lags
+                     ~lag_index
+                     slot_index
+          in
+          fail_unless
+            is_attested
+            (Invalid_accusation_slot_not_attested
+               {
+                 tb_slot = consensus_slot;
+                 level = raw_level;
+                 slot_index;
+                 lag_index_opt;
+               })
+        in
         let*! already_denounced =
           Dal.Delegate.is_already_denounced ctxt delegate level slot_index
         in
@@ -2468,7 +2541,7 @@ module Anonymous = struct
             (not already_denounced)
             (Dal_already_denounced {delegate; level = level.level})
         in
-        let traps_fraction = (Constants.parametric ctxt).dal.traps_fraction in
+        let traps_fraction = dal_params.traps_fraction in
         let*? is_trap =
           Dal.Shard_with_proof.share_is_trap
             delegate
@@ -2483,12 +2556,17 @@ module Anonymous = struct
                  delegate;
                  level = level.level;
                  slot_index;
+                 lag_index_opt;
                  shard_index = shard_with_proof.shard.index;
                })
         in
         let* _ctxt, _, shard_owner =
           let*? tb_round = Round.of_int shard_index in
-          Stake_distribution.baking_rights_owner vi.ctxt level ~round:tb_round
+          let committee_level = Level.from_raw vi.ctxt committee_level in
+          Stake_distribution.baking_rights_owner
+            vi.ctxt
+            committee_level
+            ~round:tb_round
         in
         let*? () =
           error_unless
@@ -2498,24 +2576,10 @@ module Anonymous = struct
                  delegate;
                  level = level.level;
                  slot_index;
+                 lag_index_opt;
                  shard_index = shard_with_proof.shard.index;
                  shard_owner = shard_owner.delegate;
                })
-        in
-        let* attestation_lag =
-          let+ parameters =
-            Alpha_context.Dal.Past_parameters.parameters ctxt level.level
-          in
-          parameters.attestation_lag
-        in
-        let* published_level =
-          match Raw_level.(sub (succ level.level) attestation_lag) with
-          | None ->
-              (* The slot couldn't have been published in this case *)
-              tzfail
-                (Invalid_accusation_slot_not_published
-                   {delegate; level = level.level; slot_index})
-          | Some level -> return level
         in
         let* slot_headers_opt =
           Dal.Slot.find_slot_headers ctxt published_level
@@ -2526,7 +2590,7 @@ module Anonymous = struct
                the storage is updated correctly *)
             tzfail
               (Accusation_validity_error_cannot_get_slot_headers
-                 {delegate; level = level.level; slot_index})
+                 {delegate; level = level.level; slot_index; lag_index_opt})
         | Some headers -> (
             let slot_header_opt =
               List.find
@@ -2537,7 +2601,17 @@ module Anonymous = struct
             match slot_header_opt with
             | Some (header, _publisher)
               when Raw_level.equal header.id.published_level published_level ->
-                let*? _ctxt, cryptobox = Dal.make ctxt in
+                let*? cryptobox =
+                  let open Result_syntax in
+                  if
+                    Dal.Parameters.equal
+                      (Constants.parametric ctxt).dal.cryptobox_parameters
+                      dal_params.cryptobox_parameters
+                  then
+                    let* _ctxt, cryptobox = Dal.make ctxt in
+                    return cryptobox
+                  else Dal.make_cryptobox dal_params.cryptobox_parameters
+                in
                 let*? () =
                   Dal.Shard_with_proof.verify
                     cryptobox
@@ -2554,13 +2628,15 @@ module Anonymous = struct
                        delegate;
                        level = level.level;
                        slot_index;
+                       lag_index_opt;
                        accusation_published_level = published_level;
                        store_published_level = header.id.published_level;
                      })
             | None ->
                 tzfail
                   (Invalid_accusation_slot_not_published
-                     {delegate; level = level.level; slot_index})))
+                     {delegate; level = level.level; slot_index; lag_index_opt})
+            ))
 
   let check_dal_entrapment_evidence vi
       (operation : Kind.dal_entrapment_evidence operation) =
@@ -2858,6 +2934,13 @@ module Manager = struct
         let* acc = f init (Elt contents) in
         batch_fold_left_e ~f ~init:acc ~batch:tail
 
+  let check_tz5_account_enabled ctxt (contract : Contract.t) =
+    match contract with
+    | Implicit (Signature.Mldsa44 _)
+      when not (Constants.tz5_account_enable ctxt) ->
+        result_error Tz5_account_disabled
+    | _ -> Ok ()
+
   let check_source ~expected_source ~source =
     Option.iter_e
       (fun expected_source ->
@@ -2975,6 +3058,7 @@ module Manager = struct
       | Cons (Manager_operation {source; counter; _}, _) ->
           (source, counter)
     in
+    let*? () = check_tz5_account_enabled vi.ctxt (Implicit source) in
     let* balance = Contract.check_allocated_and_get_balance vi.ctxt source in
     let* () = Contract.check_counter_increment vi.ctxt source first_counter in
     let revealed_key =
@@ -3084,8 +3168,17 @@ module Manager = struct
           (Validate_errors.Manager.Missing_bls_proof
              {kind = Manager_pk; source; public_key})
     | Bls bls_public_key, Some _ ->
-        (* Compute the gas cost to encode the manager public key and
-           check the proof. *)
+        (* Check that the operation's gas budget is sufficient to cover
+           the [pop_verify] that will be performed at apply time (in
+           {!Apply.apply_manager_operation}). This is a reservation
+           check only: the actual cryptographic verification and gas
+           consumption happen during block application, following the
+           standard validate/apply split. An operation carrying an
+           invalid proof will pass validation, enter the mempool, and
+           may be included in a block, but it will fail at apply time.
+           This is harmless: failed manager operations are backtracked,
+           fees are still collected by the baker, and the block remains
+           valid. *)
         let gas_cost_for_sig_check =
           let open Saturation_repr.Syntax in
           let size = Bls.Public_key.size bls_public_key in
@@ -3102,71 +3195,93 @@ module Manager = struct
                gas_cost_for_sig_check)
         in
         return_unit
-    | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof ->
+    | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), Some _proof ->
         result_error
           (Validate_errors.Manager.Unused_bls_proof
              {kind = Manager_pk; source; public_key})
-    | (Ed25519 _ | Secp256k1 _ | P256 _), None -> return_unit
+    | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), None -> return_unit
 
-  let check_update_consensus_key vi remaining_gas source
+  let check_update_consensus_key _vi remaining_gas source
       (public_key : Signature.Public_key.t) proof
       (kind : Operation_repr.consensus_key_kind) =
     let open Result_syntax in
-    if Constants.allow_tz4_delegate_enable vi.ctxt then
-      match (public_key, proof, kind) with
-      | Bls _bls_public_key, None, kind ->
-          result_error
-            (Validate_errors.Manager.Missing_bls_proof
-               {
-                 kind = Operation_repr.consensus_to_public_key_kind kind;
-                 source;
-                 public_key;
-               })
-      | Bls bls_public_key, Some _, _kind ->
-          (* Compute the gas cost to encode the consensus public key and
-             check the proof. *)
-          let gas_cost_for_sig_check =
-            let open Saturation_repr.Syntax in
-            let size = Bls.Public_key.size bls_public_key in
-            Operation_costs.serialization_cost size
-            + Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
-                Bls
-                size
-          in
-          let* (_ : Gas.Arith.fp) =
-            record_trace
-              Insufficient_gas_for_manager
-              (Gas.consume_from
-                 (Gas.Arith.fp remaining_gas)
-                 gas_cost_for_sig_check)
-          in
-          return_unit
-      | (Ed25519 _ | Secp256k1 _ | P256 _), _, Operation_repr.Companion ->
-          result_error
-            (Validate_errors.Manager.Update_companion_key_not_tz4
-               {source; public_key})
-      | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof, Consensus ->
-          result_error
-            (Validate_errors.Manager.Unused_bls_proof
-               {kind = Consensus_pk; source; public_key})
-      | (Ed25519 _ | Secp256k1 _ | P256 _), None, Consensus -> return_unit
-    else
-      let* () = Delegate.Consensus_key.check_not_tz4 kind public_key in
-      match kind with
-      | Companion ->
-          result_error
-            (Validate_errors.Manager.Update_companion_key_not_tz4
-               {source; public_key})
-      | Consensus ->
-          if Option.is_some proof then
-            result_error
-              (Validate_errors.Manager.Unused_bls_proof
-                 {kind = Consensus_pk; source; public_key})
-          else return_unit
+    let* () = Delegate.Consensus_key.check_not_tz5 kind public_key in
+    match (public_key, proof, kind) with
+    | Bls _bls_public_key, None, kind ->
+        result_error
+          (Validate_errors.Manager.Missing_bls_proof
+             {
+               kind = Operation_repr.consensus_to_public_key_kind kind;
+               source;
+               public_key;
+             })
+    | Bls bls_public_key, Some _, _kind ->
+        (* Gas budget reservation for the [pop_verify] performed at
+           apply time. See the comment in
+           {!check_bls_proof_for_manager_pk} above for rationale. *)
+        let gas_cost_for_sig_check =
+          let open Saturation_repr.Syntax in
+          let size = Bls.Public_key.size bls_public_key in
+          Operation_costs.serialization_cost size
+          + Michelson_v1_gas.Cost_of.Interpreter.check_signature_on_algo
+              Bls
+              size
+        in
+        let* (_ : Gas.Arith.fp) =
+          record_trace
+            Insufficient_gas_for_manager
+            (Gas.consume_from
+               (Gas.Arith.fp remaining_gas)
+               gas_cost_for_sig_check)
+        in
+        return_unit
+    | ( (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _),
+        _,
+        Operation_repr.Companion ) ->
+        result_error
+          (Validate_errors.Manager.Update_companion_key_not_tz4
+             {source; public_key})
+    | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), Some _proof, Consensus ->
+        result_error
+          (Validate_errors.Manager.Unused_bls_proof
+             {kind = Consensus_pk; source; public_key})
+    | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), None, Consensus ->
+        return_unit
+
+  let validate_sc_rollup_refute ctxt source rollup opponent refutation =
+    let open Lwt_result_syntax in
+    match refutation with
+    | Sc_rollup.Game.Move _ -> return_unit
+    | Start {player_commitment_hash; opponent_commitment_hash} ->
+        let* {inbox_level; _}, _ctxt =
+          Sc_rollup.Refutation_storage.check_conflict_point
+            ctxt
+            rollup
+            ~refuter:source
+            ~defender:opponent
+            ~refuter_commitment_hash:player_commitment_hash
+            ~defender_commitment_hash:opponent_commitment_hash
+        in
+        let current_level = (Level.current ctxt).level in
+        let commitment_period_in_blocks =
+          Constants.sc_rollup_commitment_period_in_blocks ctxt
+        in
+        let earliest_start_level =
+          Raw_level.add inbox_level commitment_period_in_blocks
+        in
+        fail_unless
+          Raw_level.(current_level >= earliest_start_level)
+          (Validate_errors.Manager.Sc_rollup_refutation_game_start_too_early
+             {
+               current_level;
+               earliest_start_level;
+               conflict_inbox_level = inbox_level;
+               commitment_period_in_blocks;
+             })
 
   let check_kind_specific_content (type kind)
       (contents : kind Kind.manager contents) remaining_gas vi =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     let (Manager_operation
            {
              source;
@@ -3180,48 +3295,57 @@ module Manager = struct
     in
     match operation with
     | Reveal {public_key; proof} ->
-        let* () = Contract.check_public_key public_key source in
-        check_bls_proof_for_manager_pk remaining_gas source public_key proof
-    | Transaction {parameters; _} ->
-        let* (_ : Gas.Arith.fp) =
+        let*? () = Contract.check_public_key public_key source in
+        let*? () =
+          check_bls_proof_for_manager_pk remaining_gas source public_key proof
+        in
+        return_unit
+    | Transaction {parameters; destination; _} ->
+        let*? () = check_tz5_account_enabled vi.ctxt destination in
+        let*? (_ : Gas.Arith.fp) =
           consume_decoding_gas remaining_gas parameters
         in
         return_unit
     | Origination {script; _} ->
-        let* remaining_gas = consume_decoding_gas remaining_gas script.code in
-        let* (_ : Gas.Arith.fp) =
+        let*? remaining_gas = consume_decoding_gas remaining_gas script.code in
+        let*? (_ : Gas.Arith.fp) =
           consume_decoding_gas remaining_gas script.storage
         in
         return_unit
     | Register_global_constant {value} ->
-        let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas value in
+        let*? (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas value in
         return_unit
     | Delegation (Some pkh) ->
-        if Constants.allow_tz4_delegate_enable vi.ctxt then return_unit
-        else Delegate.check_not_tz4 pkh
+        let*? () = Delegate.check_not_tz5 pkh in
+        return_unit
     | Update_consensus_key {public_key; proof; kind} ->
         check_update_consensus_key vi remaining_gas source public_key proof kind
+        |> Lwt.return
     | Delegation None | Set_deposits_limit _ | Increase_paid_storage _ ->
         return_unit
-    | Transfer_ticket {contents; ty; _} ->
-        let* remaining_gas = consume_decoding_gas remaining_gas contents in
-        let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
+    | Transfer_ticket {contents; ty; destination; _} ->
+        let*? () = check_tz5_account_enabled vi.ctxt destination in
+        let*? remaining_gas = consume_decoding_gas remaining_gas contents in
+        let*? (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
         return_unit
-    | Sc_rollup_originate {kind; _} -> assert_pvm_kind_enabled vi kind
-    | Sc_rollup_add_messages {messages; _} -> assert_not_zero_messages messages
-    | Sc_rollup_cement _ | Sc_rollup_publish _ | Sc_rollup_refute _
-    | Sc_rollup_timeout _ | Sc_rollup_execute_outbox_message _
-    | Sc_rollup_recover_bond _ ->
+    | Sc_rollup_originate {kind; _} ->
+        assert_pvm_kind_enabled vi kind |> Lwt.return
+    | Sc_rollup_add_messages {messages; _} ->
+        assert_not_zero_messages messages |> Lwt.return
+    | Sc_rollup_cement _ | Sc_rollup_publish _ | Sc_rollup_timeout _
+    | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _ ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
            Should we successfully precheck Sc_rollup_recover_bond and any
            (simple) Sc rollup operation, or should we add some some checks to make
            the operations Branch_delayed if they cannot be successfully
            prechecked? *)
         return_unit
+    | Sc_rollup_refute {rollup; opponent; refutation} ->
+        validate_sc_rollup_refute vi.ctxt source rollup opponent refutation
     | Dal_publish_commitment slot_header ->
-        Dal_apply.validate_publish_commitment vi.ctxt slot_header
+        Dal_apply.validate_publish_commitment vi.ctxt slot_header |> Lwt.return
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
-        assert_zk_rollup_feature_enabled vi
+        assert_zk_rollup_feature_enabled vi |> Lwt.return
 
   let check_contents (type kind) vi batch_state
       (contents : kind Kind.manager contents) ~consume_gas_for_sig_check
@@ -3268,7 +3392,7 @@ module Manager = struct
         batch_state.is_allocated
         (Contract_storage.Empty_implicit_contract source)
     in
-    let*? () = check_kind_specific_content contents remaining_gas vi in
+    let* () = check_kind_specific_content contents remaining_gas vi in
     (* Gas should no longer be consumed below this point, because it
        would not take into account any gas consumed by
        {!check_kind_specific_content}. If you really need to consume gas here, then you
@@ -3326,6 +3450,26 @@ module Manager = struct
           ~consume_gas_for_sig_check:None
           remaining_gas
 
+  (** [check_manager_operation vi ~check_signature operation
+      remaining_block_gas] validates a manager operation for mempool
+      admission.
+
+      [vi] is the validation info carrying the context, chain id, and mode.
+      [remaining_block_gas] is the gas still available for the current block.
+
+      This is a lightweight precheck: it verifies structural properties
+      (counter, gas limit, source allocation, batch consistency, etc.)
+      and reserves gas budgets for expensive checks (e.g. BLS
+      [pop_verify]) that will be performed at apply time. It does {e not}
+      execute the operation's effects and does not call cryptographic
+      verification routines beyond the operation signature.
+
+      An operation that passes validation may still fail during
+      application (e.g. invalid BLS proof, script failure, insufficient
+      balance after fee payment). This is by design: failed manager
+      operations are backtracked, fees are collected, and the block
+      remains valid. See {!Apply.apply_manager_operations} for the full
+      apply-time pipeline. *)
   let check_manager_operation vi ~check_signature
       (operation : _ Kind.manager operation) remaining_block_gas =
     let open Lwt_result_syntax in

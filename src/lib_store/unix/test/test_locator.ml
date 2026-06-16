@@ -127,6 +127,7 @@ let make_empty_chain chain_store n : Block_hash.t Lwt.t =
           block_metadata = (zero, None);
           ops_metadata = Block_validation.No_metadata_hash [];
           shell_header_hash = Block_validation.Shell_header_hash.zero;
+          protocol_data = Bytes.empty;
         }
       in
       let* _ =
@@ -205,6 +206,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
           block_metadata = (zero, block_metadata_hash);
           ops_metadata = Block_validation.No_metadata_hash [];
           shell_header_hash = Block_validation.Shell_header_hash.zero;
+          protocol_data = Bytes.empty;
         }
       in
       let* o =

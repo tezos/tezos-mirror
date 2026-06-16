@@ -23,6 +23,7 @@
   octez-libs.stdlib
   octez-libs.crypto-dal
   octez-libs.scoru-wasm
+  octez-libs.smart-rollup-wasm-in-memory
   octez-l2-libs.webassembly-interpreter-extra)
  (library_flags (:standard -linkall))
  (flags
@@ -72,6 +73,8 @@
   test_local_contexts
   test_dal_slot_proof
   test_dal_past_parameters_storage
+  test_dal_attestations_repr
+  test_dal_slot_storage_bitset
   test_adaptive_issuance
   test_percentage
   test_full_staking_balance_repr

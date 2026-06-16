@@ -29,7 +29,7 @@ local profilingRate(profiling, metricId, metricType) =
 local profilingQuery(profiling, metricId, legend) =
   local sum = profilingRate(profiling, metricId, 'sum');
   local count = profilingRate(profiling, metricId, 'count');
-  query.prometheus.new('Prometheus', '(' + sum + ' / ' + count + ') * ' + msConversion)
+  query.prometheus.new(base.datasource, '(' + sum + ' / ' + count + ') * ' + msConversion)
   + query.prometheus.withLegendFormat(legend);
 
 // Helper function to create a Grafana panel

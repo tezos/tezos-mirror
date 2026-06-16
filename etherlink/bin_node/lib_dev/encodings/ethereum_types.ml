@@ -105,6 +105,11 @@ end
 
 let quantity_of_z z = Qty z
 
+(* This value must stay in sync with [MINIMUM_BASE_FEE_PER_GAS]
+   defined in the kernel, if changed it must be guarded with a
+   storage version. *)
+let default_minimum_base_fee_per_gas = Z.of_int 1_000_000_000
+
 let quantity_encoding =
   Data_encoding.conv
     (fun (Qty q) -> Helpers.z_to_hexa q)
@@ -685,7 +690,7 @@ let block_from_rlp_v0 bytes =
         transactions;
         (* Post merge: always empty. *)
         uncles = [];
-        baseFeePerGas = None;
+        baseFeePerGas = Some (Qty default_minimum_base_fee_per_gas);
         prevRandao = None;
         withdrawals = None;
         withdrawalsRoot = None;
@@ -976,6 +981,41 @@ let block_encoding transaction_object_encoding =
           (opt "excessBlobGas" hex_encoding)
           (opt "parentBeaconBlockRoot" hash_encoding)))
 
+type access = {address : address; storage_keys : hex list}
+
+let access_encoding =
+  let open Data_encoding in
+  conv
+    (fun {address; storage_keys} -> (address, storage_keys))
+    (fun (address, storage_keys) -> {address; storage_keys})
+    (obj2
+       (req "address" address_encoding)
+       (req "storageKeys" (list hex_encoding)))
+
+type authorization_item = {
+  chain_id : quantity;
+  address : address;
+  nonce : quantity;
+  y_parity : quantity;
+  r : quantity;
+  s : quantity;
+}
+
+let authorization_item_encoding =
+  let open Data_encoding in
+  conv
+    (fun {chain_id; address; nonce; y_parity; r; s} ->
+      (chain_id, address, nonce, y_parity, r, s))
+    (fun (chain_id, address, nonce, y_parity, r, s) ->
+      {chain_id; address; nonce; y_parity; r; s})
+    (obj6
+       (req "chainId" quantity_encoding)
+       (req "address" address_encoding)
+       (req "nonce" quantity_encoding)
+       (req "yParity" quantity_encoding)
+       (req "r" quantity_encoding)
+       (req "s" quantity_encoding))
+
 type call = {
   from : address option;
   to_ : address option;
@@ -983,6 +1023,8 @@ type call = {
   gasPrice : quantity option;
   value : quantity option;
   data : hash option;
+  access_list : access list;
+  authorization_list : authorization_item list;
 }
 
 let call_extendable_encoding =
@@ -991,24 +1033,62 @@ let call_extendable_encoding =
       unspecified fields from JSON. *)
   merge_objs
     (conv_with_guard
-       (fun {from; to_; gas; gasPrice; value; data} ->
-         (from, to_, gas, gasPrice, value, data, None))
+       (fun {
+              from;
+              to_;
+              gas;
+              gasPrice;
+              value;
+              data;
+              access_list;
+              authorization_list;
+            }
+          ->
+         ( (from, to_, gas, gasPrice, value, data, None),
+           (access_list, authorization_list) ))
        (function
-         | from, to_, gas, gasPrice, value, data, None
-         | from, to_, gas, gasPrice, value, None, data ->
-             Ok {from; to_; gas; gasPrice; value; data}
-         | from, to_, gas, gasPrice, value, Some _data, Some input ->
-             Ok {from; to_; gas; gasPrice; value; data = Some input})
-       (obj7
-          (dft "from" (option address_encoding) None)
-          (dft "to" (option address_encoding) None)
-          (* `call` is also used for estimateGas, which allows all fields to be
-             empty, hence `to` can be `null` or absent. *)
-          (dft "gas" (option quantity_encoding) None)
-          (dft "gasPrice" (option quantity_encoding) None)
-          (dft "value" (option quantity_encoding) None)
-          (dft "input" (option hash_encoding) None)
-          (dft "data" (option hash_encoding) None)))
+         | ( (from, to_, gas, gasPrice, value, data, None),
+             (access_list, authorization_list) )
+         | ( (from, to_, gas, gasPrice, value, None, data),
+             (access_list, authorization_list) ) ->
+             Ok
+               {
+                 from;
+                 to_;
+                 gas;
+                 gasPrice;
+                 value;
+                 data;
+                 access_list;
+                 authorization_list;
+               }
+         | ( (from, to_, gas, gasPrice, value, Some _data, Some input),
+             (access_list, authorization_list) ) ->
+             Ok
+               {
+                 from;
+                 to_;
+                 gas;
+                 gasPrice;
+                 value;
+                 data = Some input;
+                 access_list;
+                 authorization_list;
+               })
+       (merge_objs
+          (obj7
+             (dft "from" (option address_encoding) None)
+             (dft "to" (option address_encoding) None)
+             (* `call` is also used for estimateGas, which allows all fields to
+                be empty, hence `to` can be `null` or absent. *)
+             (dft "gas" (option quantity_encoding) None)
+             (dft "gasPrice" (option quantity_encoding) None)
+             (dft "value" (option quantity_encoding) None)
+             (dft "input" (option hash_encoding) None)
+             (dft "data" (option hash_encoding) None))
+          (obj2
+             (dft "accessList" (list access_encoding) [])
+             (dft "authorizationList" (list authorization_item_encoding) []))))
     unit
 
 let call_encoding =

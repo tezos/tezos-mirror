@@ -578,22 +578,60 @@ let attesting_rights_callback =
 let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) conf level
     block_hash operations =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
+  let aggregated, individual =
+    List.partition (fun op -> op.Consensus_ops.is_aggregated) operations
+  in
   let* () =
     let operations =
       List.map
         (fun {Lib_teztale_base.Consensus_ops.delegate; op; _} ->
           format_block_op level delegate op)
-        operations
+        individual
     in
     may_insert_operations (module Db) conf operations
   in
+  let* () =
+    let seen = Hashtbl.create 16 in
+    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+      (fun {Lib_teztale_base.Consensus_ops.delegate; op; _} ->
+        let* () =
+          if Hashtbl.mem seen op.hash then return_unit
+          else (
+            Hashtbl.add seen op.hash () ;
+            without_cache
+              Sql_requests.Mutex.operations
+              Sql_requests.maybe_insert_aggregated_operation
+              (module Db)
+              conf
+              [format_block_op level delegate op])
+        in
+        without_cache
+          Sql_requests.Mutex.aggregated_operations
+          Sql_requests.insert_aggregated_operation_delegate
+          (module Db)
+          conf
+          [(op.hash, delegate)])
+      aggregated
+  in
   let operation_inclusion =
-    List.map
-      (fun op ->
-        ( Lib_teztale_base.Consensus_ops.
-            (op.delegate, op.op.kind = Attestation, op.op.round),
-          (block_hash, level) ))
-      operations
+    let individual_inclusions =
+      List.map
+        (fun {Lib_teztale_base.Consensus_ops.delegate; op; _} ->
+          ((delegate, op.kind = Attestation, op.round), (block_hash, level)))
+        individual
+    in
+    let seen = Hashtbl.create 16 in
+    let aggregated_inclusions =
+      List.filter_map
+        (fun {Lib_teztale_base.Consensus_ops.delegate; op; _} ->
+          if Hashtbl.mem seen op.hash then None
+          else (
+            Hashtbl.add seen op.hash () ;
+            Some
+              ((delegate, op.kind = Attestation, op.round), (block_hash, level))))
+        aggregated
+    in
+    individual_inclusions @ aggregated_inclusions
   in
   maybe_with_metrics conf "insert_included_operations" @@ fun () ->
   without_cache
@@ -897,6 +935,20 @@ let import_callback ~logger conf db_pool g data =
                 (level, first_slot, attesting_power, delegate))
             data.Lib_teztale_base.Data.delegate_operations
         in
+        (* DAL shard assignments *)
+        let* () =
+          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+            (fun Lib_teztale_base.Data.Delegate_operations.
+                   {delegate; assigned_shard_indices; _}
+               ->
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun shard_index ->
+                  Db.exec
+                    Sql_requests.insert_dal_shard_assignment
+                    (level, delegate, shard_index))
+                assigned_shard_indices)
+            data.Lib_teztale_base.Data.delegate_operations
+        in
         (* blocks *)
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -916,15 +968,29 @@ let import_callback ~logger conf db_pool g data =
                ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                 (fun Lib_teztale_base.Data.Delegate_operations.
-                       {hash; kind; round; _}
+                       {hash; kind; round; is_aggregated; _}
                    ->
-                  Db.exec
-                    Sql_requests.maybe_insert_operation
-                    ( ( level,
-                        hash,
-                        kind = Lib_teztale_base.Consensus_ops.Attestation,
-                        round ),
-                      delegate ))
+                  if is_aggregated then
+                    let* () =
+                      Db.exec
+                        Sql_requests.maybe_insert_aggregated_operation
+                        ( ( level,
+                            hash,
+                            kind = Lib_teztale_base.Consensus_ops.Attestation,
+                            round ),
+                          delegate )
+                    in
+                    Db.exec
+                      Sql_requests.insert_aggregated_operation_delegate
+                      (hash, delegate)
+                  else
+                    Db.exec
+                      Sql_requests.maybe_insert_operation
+                      ( ( level,
+                          hash,
+                          kind = Lib_teztale_base.Consensus_ops.Attestation,
+                          round ),
+                        delegate ))
                 operations)
             data.Lib_teztale_base.Data.delegate_operations
         in
@@ -1003,6 +1069,45 @@ let import_callback ~logger conf db_pool g data =
         ~body:"Level imported"
         ())
 
+let dal_shards_callback ~logger conf db_pool g shard_assignments =
+  let level = Int32.of_string (Re.Group.get g 1) in
+  let out =
+    Caqti_lwt_unix.Pool.use
+      (fun (module Db : Caqti_lwt.CONNECTION) ->
+        let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
+        let* () =
+          let delegates =
+            List.map
+              (fun Lib_teztale_base.Data.Dal.{delegate; _} -> delegate)
+              shard_assignments
+          in
+          may_insert_delegates (module Db) conf delegates
+        in
+        let rows =
+          List.concat_map
+            (fun Lib_teztale_base.Data.Dal.{delegate; assigned_shard_indices} ->
+              List.map
+                (fun shard_index -> (level, delegate, shard_index))
+                assigned_shard_indices)
+            shard_assignments
+        in
+        maybe_with_metrics conf "insert_dal_shard_assignments" @@ fun () ->
+        without_cache
+          Sql_requests.Mutex.dal_shard_assignments
+          Sql_requests.insert_dal_shard_assignment
+          (module Db)
+          conf
+          rows)
+      db_pool
+  in
+  with_caqti_error ~logger out (fun () ->
+      Cohttp_lwt_unix.Server.respond_string
+        ~headers:
+          (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
+        ~status:`OK
+        ~body:"DAL shard assignments"
+        ())
+
 let extract_boundaries g =
   let min = Re.Group.get g 1 in
   let max = Re.Group.get g 2 in
@@ -1016,7 +1121,9 @@ let extract_boundaries g =
   - /<LEVEL>/mempool
       Used by archiver to send data about consensus operations for a given level.
   - /<LEVEL>/import
-      Use by archiver to import past data recorded locally.
+      Used by archiver to import past data recorded locally.
+  - /<LEVEL>/dal_shards
+      Used by archiver to send DAL shard assignments per delegate for a given level.
   - /timestamp/<TIMESTAMP>
       Get the levels (if any) before and after a given timestamp.
   - /ping
@@ -1082,6 +1189,13 @@ let routes :
               Lib_teztale_base.Data.encoding
               body
               (import_callback ~logger conf db_pool g)) );
+    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/dal_shards"],
+      fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
+        post_only_endpoint !users header meth (fun _source ->
+            with_data
+              Lib_teztale_base.Data.Dal.shard_assignments_encoding
+              body
+              (dal_shards_callback ~logger conf db_pool g)) );
     ( Re.seq [Re.str "/timestamp/"; Re.group (Re.rep1 Re.digit)],
       fun g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->

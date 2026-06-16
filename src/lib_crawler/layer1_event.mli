@@ -51,6 +51,11 @@ val switched_new_head : name:string -> Block_hash.t -> int32 -> unit Lwt.t
 
 val connected : name:string -> unit Lwt.t
 
+(** [reconnected ~name ~count ~elapsed] emits a notice that the connection to
+    the Tezos node has been re-established after [count] failed attempt(s) and
+    [elapsed] seconds. *)
+val reconnected : name:string -> count:int -> elapsed:float -> unit Lwt.t
+
 val stopping_old_connection : name:string -> unit Lwt.t
 
 val reconnect_connecting : name:string -> unit Lwt.t

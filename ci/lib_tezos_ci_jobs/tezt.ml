@@ -50,10 +50,10 @@ let tests_tag_selector ?(time_sensitive = false) ?(slow = false)
 
 let common_needs =
   [
-    (Cacio.Artifacts, Code_verification.job_build_x86_64_release Before_merging);
-    (Artifacts, Code_verification.job_build_x86_64_extra_exp Before_merging);
-    (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
-    (Artifacts, Code_verification.job_build_kernels Before_merging);
+    (Cacio.Artifacts, Kernels.job_build_kernels);
+    (Cacio.Artifacts, Build.job_build_released Amd64);
+    (Cacio.Artifacts, Build.job_build_extra_dev Amd64);
+    (Cacio.Artifacts, Build.job_build_exp Amd64);
   ]
 
 (* Note: before the migration to Cacio, some jobs had a job timeout of 60 minutes.
@@ -66,9 +66,10 @@ let common_needs =
 
 (* Specialization of Cacio's [tezt_job] with defaults that are specific
    to Tezt jobs defined in this module / the [Shared] component. *)
-let tezt_job ?(retry_tests = 1) ?(needs_legacy = common_needs) =
+let tezt_job ?(retry_tests = 1) ?(needs = common_needs) ?(needs_legacy = []) =
   CI.tezt_job
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~needs
     ~needs_legacy
     ~retry_tests
 
@@ -79,7 +80,6 @@ let job_tezt =
     ~__POS__
     ~pipeline
     ~description:"Run normal Tezt tests."
-    ~test_coverage:true
     ~test_selection:(tests_tag_selector [Not (Has_tag "flaky")])
     ~parallel_jobs:34
     ~parallel_tests:6
@@ -92,7 +92,6 @@ let job_tezt_time_sensitive =
     ~__POS__
     ~pipeline
     ~description:"Run Tezt tests tagged as time_sensitive."
-    ~test_coverage:true
     ~test_selection:(tests_tag_selector ~time_sensitive:true [])
     ~parallel_jobs:2
     ~retry_jobs:2
@@ -140,7 +139,6 @@ let job_tezt_flaky =
     ~__POS__
     ~pipeline
     ~description:"Run Tezt tests tagged as flaky."
-    ~test_coverage:true
     ~allow_failure:Yes
     ~test_selection:(tests_tag_selector [Has_tag "flaky"])
     ~parallel_jobs:2
@@ -156,23 +154,20 @@ let job_tezt_static_binaries =
     ~description:
       "Run Tezt tests tagged as cli and not flaky, using static executables."
     ~cpu:Normal
-    ~needs_legacy:
+    ~needs:
       [
-        (* The static job should actually be taken from Code_verification,
-           but it is only defined at toplevel in Master_branch.
-           Since we only need the name, this is fine.
-           We did the same in the docs/ci. *)
-        (Artifacts, Master_branch.job_static_x86_64);
-        (Artifacts, Code_verification.job_build_x86_64_extra_exp Before_merging);
-        (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
         (* No need for kernels for this job. *)
+        (Artifacts, Build.job_build_static_linux_released_binaries Amd64 `test);
+        (Artifacts, Build.job_build_static_linux_experimental_binaries Amd64);
+        (Artifacts, Build.job_build_extra_dev Amd64);
+        (Artifacts, Build.job_build_exp Amd64);
       ]
     ~test_selection:(tests_tag_selector [Has_tag "cli"; Not (Has_tag "flaky")])
     ~parallel_tests:3
     ~before_script:["mv octez-binaries/x86_64/octez-* ."]
 
 let register () =
-  CI.register_before_merging_jobs
+  Cacio.register_merge_request_jobs
     [
       (Auto, job_tezt `merge_request);
       (Auto, job_tezt_time_sensitive `merge_request);
@@ -182,7 +177,8 @@ let register () =
       (Manual, job_tezt_flaky `merge_request);
       (Auto, job_tezt_static_binaries `merge_request);
     ] ;
-  CI.register_schedule_extended_test_jobs
+  Cacio.register_jobs
+    Schedule_extended_test
     [
       (Auto, job_tezt `scheduled);
       (Auto, job_tezt_time_sensitive `scheduled);
@@ -192,7 +188,8 @@ let register () =
       (Auto, job_tezt_flaky `scheduled);
       (Auto, job_tezt_static_binaries `scheduled);
     ] ;
-  CI.register_custom_extended_test_jobs
+  Cacio.register_jobs
+    Custom_extended_test
     [
       (Auto, job_tezt `scheduled);
       (Auto, job_tezt_time_sensitive `scheduled);

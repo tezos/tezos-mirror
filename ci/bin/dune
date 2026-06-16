@@ -7,13 +7,13 @@
   gitlab_ci
   tezos_ci
   tezos_ci_jobs
+  release_page_ci
   grafazos_ci
   teztale_ci
   rollup_node_ci
   sdk_bindings_ci
   etherlink_ci
-  documentation_ci
-  client_libs_ci)
+  documentation_ci)
  (flags
   (:standard)
   -open Gitlab_ci.Base

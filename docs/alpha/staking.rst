@@ -206,7 +206,7 @@ or more conveniently::
 
    octez-client finalize unstake for <staker>
 
-With the activation of the Seoul protocol on mainnet, anyone can trigger ``finalize_unstake`` operations on behalf of the staker (and not just the staker themselves). In any case, the unfrozen funds always go to the staker, without any ownership transfer.
+Anyone can trigger ``finalize_unstake`` operations on behalf of the staker (and not just the staker themselves). In any case, the unfrozen funds always go to the staker, without any ownership transfer.
 
 In particular, this allows for deploying off-chain finalization bots such as `Finn <https://spotlight.tezos.com/finn-unstaking/>`__, which regularly checks finalizable unstakes on block explorers and triggers `their finalization operations <https://tzkt.io/tz1i92Eptw7UZ8JSb8j8jBFJ9Poa4TTnSQwZ/operations/>`__ automatically.
 

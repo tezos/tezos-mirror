@@ -6,11 +6,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+exception
+  Divergence of {
+    level : Ethereum_types.quantity;
+    computed_block_hash : Ethereum_types.block_hash;
+    expected_block_hash : Ethereum_types.block_hash;
+  }
+
+exception Unsync
+
 open Evm_context_types
 
 type init_status = Loaded | Created
 
 type snapshot_source = Url_legacy of string
+
+type signer_source = Sequencer | Sandbox
+
+type sequencer_key_source =
+  | Local of signer_source * Signer.map
+  | RPC_fetch of {evm_node_endpoint : Uri.t; timeout : float; keep_alive : bool}
 
 type head = {
   current_block_hash : Ethereum_types.block_hash;
@@ -19,6 +34,8 @@ type head = {
   evm_state : Evm_state.t;
   pending_upgrade : Evm_events.Upgrade.t option;
   pending_sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
+  storage_version : int;
+  tezosx_runtimes : Tezosx.runtime list;
 }
 
 type parameters = {
@@ -26,16 +43,27 @@ type parameters = {
   kernel_path : Pvm_types.kernel option;
   smart_rollup_address : string option;
   store_perm : Sqlite.perm;
-  signer : Signer.map option;
+  sequencer_key_source : sequencer_key_source option;
   snapshot_source : snapshot_source option;
-  tx_container : Services_backend_sig.ex_tx_container;
 }
 
-type future_block_state = {
-  evm_state : Evm_state.t;
+type future_block_info = {
   timestamp : Time.Protocol.t;
   next_tx_index : int32;
+  applied_sequencer_upgrade : bool;
+  da_fee_per_byte : Ethereum_types.quantity;
+  base_fee_per_gas : Z.t;
 }
+
+type future_block_info_state =
+  | Disabled
+  | Awaiting_next_block_info
+  | Executing of future_block_info
+
+type kernel_change =
+  | Force_change
+  | Kernel_upgrade of Evm_store.pending_kernel_upgrade
+  | No
 
 type session_state = {
   mutable context : Pvm.Context.rw;
@@ -43,7 +71,7 @@ type session_state = {
   mutable finalized_number : Ethereum_types.quantity;
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
-  mutable pending_upgrade : Evm_store.pending_kernel_upgrade option;
+  mutable kernel_change : kernel_change;
   mutable pending_sequencer_upgrade :
     Evm_store.pending_sequencer_upgrade option;
   mutable evm_state : Evm_state.t;
@@ -53,12 +81,13 @@ type session_state = {
       (** A function to be run by the worker at the end of the current
           {!Transaction.run} call. This can be used to delay some computation
           only once the commits in Irmin and SQlite have been confirmed. *)
-  mutable future_block_state : future_block_state option;
-      (** This value starts at None to prevent inclusion confirmation
-          handling on an incomplete stream after startup. 
-          In the case where we find a divergence between the next_blueprint_number
-          and the one received by Next_block_info, we lock single transaction executions
-          by setting this to None again. *)
+  mutable future_block_info : future_block_info_state;
+      (** Instant confirmation state machine:
+          - [Disabled]: IC is not enabled (always for sequencer, or for
+            observer when IC is not enabled)
+          - [Awaiting_next_block_info]: IC enabled, waiting for valid block info
+          - [Executing]: Actively executing transactions for IC *)
+  mutable tezosx_runtimes : Tezosx.runtime list;
 }
 
 type t = {
@@ -68,7 +97,6 @@ type t = {
   store : Evm_store.t;
   session : session_state;
   signer : Signer.map option;
-  tx_container : Services_backend_sig.ex_tx_container;
   execution_pool : Lwt_domain.pool;
 }
 
@@ -208,12 +236,13 @@ module State = struct
           finalized_number;
           next_blueprint_number;
           current_block_hash;
-          pending_upgrade;
+          kernel_change;
           pending_sequencer_upgrade;
           evm_state;
           last_split_block;
           post_transaction_run_hook;
-          future_block_state;
+          future_block_info;
+          tezosx_runtimes;
         } =
       {
         context;
@@ -221,12 +250,13 @@ module State = struct
         finalized_number;
         next_blueprint_number;
         current_block_hash;
-        pending_upgrade;
+        kernel_change;
         pending_sequencer_upgrade;
         evm_state;
         last_split_block;
         post_transaction_run_hook;
-        future_block_state;
+        future_block_info;
+        tezosx_runtimes;
       }
 
     (* [apply session session'] modifies [session] in-place to match the content of [session']. *)
@@ -237,24 +267,26 @@ module State = struct
           finalized_number;
           next_blueprint_number;
           current_block_hash;
-          pending_upgrade;
+          kernel_change;
           pending_sequencer_upgrade;
           evm_state;
           last_split_block;
           post_transaction_run_hook;
-          future_block_state;
+          future_block_info;
+          tezosx_runtimes;
         } =
       session.context <- context ;
       session.storage_version <- storage_version ;
       session.finalized_number <- finalized_number ;
       session.next_blueprint_number <- next_blueprint_number ;
       session.current_block_hash <- current_block_hash ;
-      session.pending_upgrade <- pending_upgrade ;
+      session.kernel_change <- kernel_change ;
       session.pending_sequencer_upgrade <- pending_sequencer_upgrade ;
       session.evm_state <- evm_state ;
       session.last_split_block <- last_split_block ;
       session.post_transaction_run_hook <- post_transaction_run_hook ;
-      session.future_block_state <- future_block_state
+      session.future_block_info <- future_block_info ;
+      session.tezosx_runtimes <- tezosx_runtimes
 
     let session_to_head_info session =
       {
@@ -263,13 +295,15 @@ module State = struct
         next_blueprint_number = session.next_blueprint_number;
         current_block_hash = session.current_block_hash;
         pending_upgrade =
-          Option.map
-            (fun pending_upgrade -> pending_upgrade.Evm_store.kernel_upgrade)
-            session.pending_upgrade;
+          (match session.kernel_change with
+          | Kernel_upgrade upgrade -> Some upgrade.kernel_upgrade
+          | _ -> None);
         pending_sequencer_upgrade =
           Option.map
             (fun pending_upgrade -> pending_upgrade.Evm_store.sequencer_upgrade)
             session.pending_sequencer_upgrade;
+        storage_version = session.storage_version;
+        tezosx_runtimes = session.tezosx_runtimes;
       }
 
     let run ctxt (k : t -> Sqlite.conn -> 'a tzresult Lwt.t) : 'a tzresult Lwt.t
@@ -304,15 +338,55 @@ module State = struct
       Lwt.wakeup head_info_waker first_head
   end
 
+  let execute_in_place ctxt ?wasm_entrypoint ?execution_timestamp
+      ~native_execution ~data_dir ~config inbox =
+    let open Lwt_result_syntax in
+    let* evm_state =
+      Evm_state.execute
+        ~pool:ctxt.execution_pool
+        ?wasm_entrypoint
+        ?execution_timestamp
+        ~native_execution
+        ~data_dir
+        ~config
+        ctxt.session.evm_state
+        inbox
+    in
+    ctxt.session.evm_state <- evm_state ;
+    return_unit
+
+  let modify_in_place ctxt ~key ~value =
+    let open Lwt_result_syntax in
+    let* evm_state =
+      Durable_storage.write
+        (Raw_path key)
+        (Bytes.of_string value)
+        ctxt.session.evm_state
+    in
+    ctxt.session.evm_state <- evm_state ;
+    return_unit
+
+  let delete_in_place ctxt ~kind key =
+    let open Lwt_result_syntax in
+    let delete_f =
+      match kind with
+      | Tezos_scoru_wasm.Durable.Directory ->
+          Durable_storage.delete_dir (Raw_dir key)
+      | Value -> Durable_storage.delete (Raw_path key)
+    in
+    let* evm_state = delete_f ctxt.session.evm_state in
+    ctxt.session.evm_state <- evm_state ;
+    return_unit
+
   let load ~l2_chains ~data_dir ~store_perm:perm index =
     let open Lwt_result_syntax in
-    let* store = Evm_store.init ~data_dir ~perm () in
-    Evm_store.use store @@ fun conn ->
-    let* latest = Evm_store.Context_hashes.find_latest conn in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
     let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family ~l2_chains
     in
+    let* store = Evm_store.init ~chain_family ~data_dir ~perm () in
+    Evm_store.use store @@ fun conn ->
+    let* latest = Evm_store.Context_hashes.find_latest conn in
     match latest with
     | Some (Qty latest_blueprint_number, checkpoint) ->
         let*! context = Pvm.Context.checkout_exn index checkpoint in
@@ -404,7 +478,7 @@ module State = struct
     let* history_mode = Evm_store.Metadata.get_history_mode conn in
     match history_mode with
     | Archive -> return_none
-    | Rolling gc_param | Full gc_param ->
+    | Rolling gc_param | Full gc_param | Seed gc_param ->
         let split =
           match ctxt.session.last_split_block with
           | None -> true
@@ -448,30 +522,35 @@ module State = struct
     in
     return (context, split_info)
 
-  let replace_current_commit (ctxt : t) conn evm_state =
-    let (Qty next) = ctxt.session.next_blueprint_number in
-    commit conn ctxt.session.context evm_state (Qty Z.(pred next))
-
-  let on_modified_head ctxt evm_state context =
-    ctxt.session.evm_state <- evm_state ;
-    ctxt.session.context <- context
-
-  let read_from_state evm_state path =
+  let replace_current_commit (ctxt : t) conn =
     let open Lwt_result_syntax in
-    let*! res = Evm_state.inspect evm_state path in
-    return res
+    let (Qty next) = ctxt.session.next_blueprint_number in
+    let* context =
+      commit
+        conn
+        ctxt.session.context
+        ctxt.session.evm_state
+        (Qty Z.(pred next))
+    in
+    ctxt.session.context <- context ;
+    return_unit
 
-  let on_new_delayed_transaction ~pool ~native_execution ~delayed_transaction
-      ~storage_version evm_state =
+  let on_new_delayed_transaction ctxt ~delayed_transaction =
     let open Lwt_result_syntax in
     let*! data_dir, config = execution_config in
-    if Storage_version.populate_delayed_inbox_disabled ~storage_version then
-      Evm_state.execute
-        ~pool
+    let native_execution =
+      ctxt.configuration.kernel_execution.native_execution_policy
+      = Configuration.Always
+    in
+    if
+      Storage_version.populate_delayed_inbox_disabled
+        ~storage_version:ctxt.session.storage_version
+    then
+      execute_in_place
+        ctxt
+        ~native_execution
         ~data_dir
         ~config
-        ~native_execution
-        evm_state
         (`Inbox
            [
              "\254" ^ Bytes.to_string
@@ -479,22 +558,23 @@ module State = struct
                   (Evm_events.Delayed_transaction.to_rlp delayed_transaction);
            ])
     else
-      let*! evm_state =
-        Evm_state.modify
-          ~key:"/__delayed_input"
+      let* () =
+        modify_in_place
+          ctxt
+          ~key:
+            (Durable_storage_path.delayed_input
+               ~storage_version:ctxt.session.storage_version)
           ~value:
             (Bytes.to_string
             @@ Rlp.encode
                  (Evm_events.Delayed_transaction.to_rlp delayed_transaction))
-          evm_state
       in
-      Evm_state.execute
-        ~pool
-        ~native_execution
+      execute_in_place
+        ctxt
         ~wasm_entrypoint:"populate_delayed_inbox"
+        ~native_execution
         ~data_dir
         ~config
-        evm_state
         `Skip_stage_one
 
   let background_preemptive_download config upgrade_event =
@@ -533,18 +613,18 @@ module State = struct
     (* Find the [l2_level] evm_state. *)
     let*! context = Pvm.Context.checkout_exn ctxt.index checkpoint in
     let*! evm_state = Pvm.State.get context in
-    let* storage_version = Evm_state.storage_version evm_state in
+    let* storage_version = Durable_storage.storage_version evm_state in
+    let* tezosx_runtimes = Durable_storage.list_runtimes evm_state in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
-    let* () =
-      let (Ex_tx_container tx_container) = ctxt.tx_container in
-      let (module Tx_container) =
-        Services_backend_sig.tx_container_module tx_container
-      in
-      Tx_container.clear ()
-    in
+    let* () = Tx_queue.clear () in
     (* Clear the store. *)
     let* () = Evm_store.reset_after conn ~l2_level in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
+    let kernel_change =
+      match pending_upgrade with
+      | None -> No
+      | Some upgrade -> Kernel_upgrade upgrade
+    in
     let* pending_sequencer_upgrade =
       Evm_store.Sequencer_upgrades.find_latest_pending conn
     in
@@ -559,13 +639,14 @@ module State = struct
       Evm_state.current_block_hash ~chain_family evm_state
     in
     ctxt.session.storage_version <- storage_version ;
+    ctxt.session.tezosx_runtimes <- tezosx_runtimes ;
     ctxt.session.next_blueprint_number <- next_blueprint_number ;
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.current_block_hash <- current_block_hash ;
     ctxt.session.context <- context ;
-    ctxt.session.pending_upgrade <- pending_upgrade ;
+    ctxt.session.kernel_change <- kernel_change ;
     ctxt.session.pending_sequencer_upgrade <- pending_sequencer_upgrade ;
-    return evm_state
+    return_unit
 
   let reset_to_finalized_level exit_error ctxt conn =
     let open Lwt_result_syntax in
@@ -579,14 +660,16 @@ module State = struct
         in
         tzfail exit_error
 
-  let blueprint_applied_event ctxt conn evm_state latest_finalized_level
+  let blueprint_applied_event ctxt conn
       ({number = Qty number; hash = expected_block_hash} :
         Evm_events.Blueprint_applied.t) =
     let open Lwt_result_syntax in
     (* We use [max] to not rely on the order of the EVM events (because
        it is possible to see several blueprints applied during on L1
        level). *)
-    let latest_finalized_level = Z.max latest_finalized_level number in
+    let (Qty current_finalized) = ctxt.session.finalized_number in
+    let latest_finalized_level = Z.max current_finalized number in
+    ctxt.session.finalized_number <- Qty latest_finalized_level ;
     let* block_hash_opt =
       Evm_store.Blocks.find_hash_of_number conn (Qty number)
     in
@@ -597,7 +680,7 @@ module State = struct
             Evm_events_follower_events.upstream_blueprint_applied
               (number, expected_block_hash)
           in
-          return (evm_state, latest_finalized_level)
+          return_unit
         else
           let*! () =
             Evm_events_follower_events.diverged
@@ -617,8 +700,8 @@ module State = struct
             tzfail exit_error
           else
             (* Observers needs to reset at finalized level. *)
-            let* evm_state = reset_to_finalized_level exit_error ctxt conn in
-            return (evm_state, latest_finalized_level)
+            let* () = reset_to_finalized_level exit_error ctxt conn in
+            return_unit
     | None when is_sequencer ctxt ->
         let*! () =
           Evm_events_follower_events.missing_blueprint
@@ -634,18 +717,15 @@ module State = struct
              })
     | None ->
         let*! () = Evm_events_follower_events.rollup_node_ahead (Qty number) in
-        let* () =
-          Evm_store.Pending_confirmations.insert
-            conn
-            (Qty number)
-            expected_block_hash
-        in
-        return (evm_state, latest_finalized_level)
+        Evm_store.Pending_confirmations.insert
+          conn
+          (Qty number)
+          expected_block_hash
 
   let check_pending_upgrade ctxt timestamp =
-    match ctxt.session.pending_upgrade with
-    | None -> None
-    | Some upgrade ->
+    match ctxt.session.kernel_change with
+    | No | Force_change -> None
+    | Kernel_upgrade upgrade ->
         if Time.Protocol.(upgrade.kernel_upgrade.timestamp <= timestamp) then
           Some upgrade
         else None
@@ -666,19 +746,14 @@ module State = struct
     | Some
         Evm_store.{kernel_upgrade = Evm_events.Upgrade.{hash = root_hash; _}; _}
       ->
-        let*! bytes =
-          Evm_state.inspect evm_state Durable_storage_path.kernel_root_hash
-        in
-        let new_hash_candidate =
-          Option.map
-            (fun bytes ->
-              let (`Hex hex) = Hex.of_bytes bytes in
-              Ethereum_types.hash_of_string hex)
-            bytes
+        let* new_hash_candidate =
+          Durable_storage.read_opt Kernel_root_hash evm_state
         in
 
         let*! () =
-          match new_hash_candidate with
+          match
+            Option.map (fun h -> Ethereum_types.Hash h) new_hash_candidate
+          with
           | Some current_root_hash when root_hash = current_root_hash ->
               Events.applied_upgrade
                 root_hash
@@ -691,33 +766,27 @@ module State = struct
         return_true
     | None -> return_false
 
-  let check_sequencer_upgrade ctxt evm_state
+  let check_sequencer_upgrade ctxt
       Evm_events.Sequencer_upgrade.{sequencer = new_sequencer; _} =
     let open Lwt_result_syntax in
-    let*! bytes =
-      Evm_state.inspect evm_state Durable_storage_path.sequencer_key
+    let* current_sequencer =
+      Durable_storage.read Sequencer_key ctxt.session.evm_state
     in
-    let*? current_sequencer =
-      Option.map_e
-        (fun b -> Signature.Public_key.of_b58check (String.of_bytes b))
-        bytes
-    in
-    match current_sequencer with
-    | Some current_sequencer when new_sequencer = current_sequencer ->
-        let*! () =
-          Events.applied_sequencer_upgrade
-            new_sequencer
-            ctxt.session.next_blueprint_number
-        in
-        return_true
-    | _ ->
-        let*! () =
-          Events.failed_sequencer_upgrade
-            ~new_sequencer
-            ~found_sequencer:current_sequencer
-            ctxt.session.next_blueprint_number
-        in
-        return_false
+    if new_sequencer = current_sequencer then
+      let*! () =
+        Events.applied_sequencer_upgrade
+          new_sequencer
+          ctxt.session.next_blueprint_number
+      in
+      return_true
+    else
+      let*! () =
+        Events.failed_sequencer_upgrade
+          ~new_sequencer
+          ~found_sequencer:(Some current_sequencer)
+          ctxt.session.next_blueprint_number
+      in
+      return_false
 
   let execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_ =
     let da_fees =
@@ -729,29 +798,27 @@ module State = struct
     let (Qty gas_used) = receipt.Transaction_receipt.gasUsed in
     Z.sub gas_used da_fees
 
-  let store_block_unsafe ~base_fee_per_gas ~da_fee_per_byte conn evm_state block
-      =
+  let store_block_unsafe ?tez_block ~compact_receipt_encoding ~base_fee_per_gas
+      ~da_fee_per_byte conn evm_state block =
     let open Lwt_result_syntax in
     (* Store the block itself. *)
-    let* () = Evm_store.Blocks.store conn block in
+    let* () = Evm_store.Blocks.store ?tez_block conn block in
     (* Store all transactions from the block. *)
     match block.transactions with
     | Ethereum_types.TxHash hashes ->
-        let* storage_version =
-          Durable_storage.storage_version (read_from_state evm_state)
-        in
+        let* storage_version = Durable_storage.storage_version evm_state in
         if not (Storage_version.legacy_storage_compatible ~storage_version) then
           let* receipts =
             Etherlink_durable_storage.current_transactions_receipts
               block.hash
               storage_version
-              (read_from_state evm_state)
+              evm_state
           in
           let* transaction_objects =
             Etherlink_durable_storage.current_transactions_objects
               ~block_hash:block.hash
               storage_version
-              (read_from_state evm_state)
+              evm_state
           in
           let mismatch_error =
             error_of_fmt
@@ -773,7 +840,9 @@ module State = struct
           let store_info_and_acc_gas cumulative_execution_gas (object_, receipt)
               =
             let info = Transaction_info.of_receipt_and_object receipt object_ in
-            let* () = Evm_store.Transactions.store conn info in
+            let* () =
+              Evm_store.Transactions.store ~compact_receipt_encoding conn info
+            in
             return
               ( Z.add
                   cumulative_execution_gas
@@ -797,7 +866,7 @@ module State = struct
               let* receipt =
                 let* receipt_opt =
                   Etherlink_durable_storage.transaction_receipt
-                    (read_from_state evm_state)
+                    evm_state
                     ~block_hash:block.hash
                     hash
                 in
@@ -811,9 +880,7 @@ module State = struct
               in
               let* object_ =
                 let* object_opt =
-                  Etherlink_durable_storage.transaction_object
-                    (read_from_state evm_state)
-                    hash
+                  Etherlink_durable_storage.transaction_object evm_state hash
                 in
                 match object_opt with
                 | Some object_ -> return object_
@@ -823,7 +890,9 @@ module State = struct
               let info =
                 Transaction_info.of_receipt_and_object receipt object_
               in
-              let* () = Evm_store.Transactions.store conn info in
+              let* () =
+                Evm_store.Transactions.store ~compact_receipt_encoding conn info
+              in
               return
                 ( Z.add
                     cumulative_execution_gas
@@ -889,87 +958,403 @@ module State = struct
       {l1_level; start_l2_level; end_l2_level} ;
     return_unit
 
-  let next_block_info ctxt (timestamp : Time.Protocol.t)
+  let handle_sequencer_upgrade ctxt conn ~timestamp ~data_dir ~config =
+    let open Lwt_result_syntax in
+    match check_pending_sequencer_upgrade ctxt timestamp with
+    | Some {sequencer_upgrade; _} ->
+        (* The sequencer upgrade is based on the l1 timestamp
+           found in the inbox. To activate it it's enough to
+           trigger a kernel run with a correct timestamp (>=
+           activation_timestamp) and an empty inbox. The sequencer
+           upgrade is checked in the kernel just after finishing
+           to parse the inbox, there is no need for a blueprint to
+           be applied.
+
+           Also as the application of the sequencer upgrade is
+           done after parsing the blueprint and it clears the
+           storage. If we try to do a run with a blueprint :
+
+           - For the previous sequencer, the blueprint will be
+           validated but removed when the sequencer upgrade is
+           applied.
+
+           - for the new sequencer, the blueprint will not be
+           validated.
+
+           Because of all that it's necessary to do a run with no
+           specified blueprint. *)
+        let* () =
+          execute_in_place
+            ctxt
+            ~execution_timestamp:timestamp
+            ~native_execution:
+              (ctxt.configuration.kernel_execution.native_execution_policy
+             = Configuration.Always)
+            ~data_dir
+            ~config
+            (`Inbox [])
+        in
+        let* applied_sequencer_upgrade =
+          check_sequencer_upgrade ctxt sequencer_upgrade
+        in
+        let* () =
+          when_ applied_sequencer_upgrade @@ fun () ->
+          Evm_store.Sequencer_upgrades.record_apply
+            conn
+            ctxt.session.next_blueprint_number
+        in
+        return applied_sequencer_upgrade
+    | None -> return false
+
+  let reset_future_block_info_if_enabled ctxt =
+    match ctxt.session.future_block_info with
+    | Disabled | Awaiting_next_block_info -> ()
+    | Executing _ -> ctxt.session.future_block_info <- Awaiting_next_block_info
+
+  let executing_ic_state ctxt conn ~timestamp =
+    let open Lwt_result_syntax in
+    let*! data_dir, config = execution_config in
+    let* applied_sequencer_upgrade =
+      handle_sequencer_upgrade ctxt conn ~timestamp ~data_dir ~config
+    in
+    let* da_fee_per_byte =
+      Etherlink_durable_storage.da_fee_per_byte ctxt.session.evm_state
+    in
+    let* (Ethereum_types.Qty base_fee_per_gas) =
+      Etherlink_durable_storage.base_fee_per_gas ctxt.session.evm_state
+    in
+    return
+    @@ Executing
+         {
+           timestamp;
+           next_tx_index = 0l;
+           applied_sequencer_upgrade;
+           da_fee_per_byte;
+           base_fee_per_gas;
+         }
+
+  let set_next_block_info ctxt conn (timestamp : Time.Protocol.t)
       (number : Ethereum_types.quantity) =
-    if Ethereum_types.Qty.(number = ctxt.session.next_blueprint_number) then
-      ctxt.session.future_block_state <-
-        Some {evm_state = ctxt.session.evm_state; timestamp; next_tx_index = 0l}
-    else ctxt.session.future_block_state <- None
+    let open Lwt_result_syntax in
+    match ctxt.session.future_block_info with
+    | Disabled -> return_unit
+    | Executing _
+      when Ethereum_types.Qty.(number = ctxt.session.next_blueprint_number) ->
+        let*! () =
+          Evm_context_events.ic_reset ctxt.session.next_blueprint_number
+        in
+        let*! evm_state = Pvm.State.get ctxt.session.context in
+        ctxt.session.evm_state <- evm_state ;
+        Octez_telemetry.Trace.add_attrs (fun () ->
+            [Telemetry.Attributes.Block.number number]) ;
+        let* exec_ic_state = executing_ic_state ctxt conn ~timestamp in
+        ctxt.session.future_block_info <- exec_ic_state ;
+        return_unit
+    | Executing _ ->
+        (* Defensive guard: in normal operation, [apply_blueprint] resets IC
+           to [Awaiting] before [next_blueprint_number] advances, so we should
+           never be [Executing] for a stale level when a new level's
+           [next_block_info] arrives. Reset to [Awaiting] as a safety net. *)
+        let*! () =
+          Evm_context_events.ic_reset_unexpected_level
+            ctxt.session.next_blueprint_number
+        in
+        reset_future_block_info_if_enabled ctxt ;
+        return_unit
+    | Awaiting_next_block_info ->
+        if Ethereum_types.Qty.(number = ctxt.session.next_blueprint_number) then (
+          Octez_telemetry.Trace.add_attrs (fun () ->
+              [Telemetry.Attributes.Block.number number]) ;
+          let* exec_ic_state = executing_ic_state ctxt conn ~timestamp in
+          ctxt.session.future_block_info <- exec_ic_state ;
+          return_unit)
+        else (
+          ctxt.session.future_block_info <- Awaiting_next_block_info ;
+          return_unit)
+
+  let compute_execution_gas ~tx ~da_fee_per_byte ~base_fee_per_gas ~gas_used =
+    match tx with
+    | Broadcast.Common (Evm raw_tx) -> (
+        match Transaction_object.decode raw_tx with
+        | Ok transaction_object ->
+            let input_hex = Transaction_object.input transaction_object in
+            let da_fees =
+              Fees.gas_used_for_da_fees
+                ~da_fee_per_byte
+                ~base_fee_per_gas
+                (Ethereum_types.hex_to_real_bytes input_hex)
+            in
+            Z.sub gas_used da_fees
+        | Error _ -> gas_used)
+    | Common (Michelson _) | Delayed _ ->
+        (* TODO: Update computation for Michelson case *)
+        gas_used
 
   let execute_single_transaction ctxt (tx : Broadcast.transaction) hash =
     let open Lwt_result_syntax in
-    Octez_telemetry.Trace.add_attrs (fun () ->
-        Telemetry.Attributes.[Transaction.hash hash]) ;
-    match ctxt.session.future_block_state with
-    | Some {evm_state; timestamp; next_tx_index} ->
-        let* tx =
-          match tx with
-          | Broadcast.Common (Evm tx) ->
-              let hash =
-                Ethereum_types.(hash_raw_tx tx |> hash_to_bytes)
-                |> String.to_bytes
-              in
-              let tx_bytes = String.to_bytes tx in
-              let tag = Bytes.of_string "\x01" in
-              let rlp =
-                Rlp.(List [Value hash; List [Value tag; Value tx_bytes]])
-              in
-              return rlp
-          | Broadcast.Common (Michelson _op) ->
-              failwith "Michelson operations can not be executed individually"
-          | Broadcast.Delayed tx ->
-              return (Evm_events.Delayed_transaction.to_rlp tx)
-        in
-        let rlp =
-          Rlp.List
-            [
-              tx;
-              Value (Ethereum_types.timestamp_to_bytes timestamp);
-              Value
-                (Ethereum_types.encode_u256_le
-                   ctxt.session.next_blueprint_number);
-            ]
-        in
-        let*! evm_state =
-          Evm_state.modify
-            ~key:Durable_storage_path.Single_tx.input_tx
-            ~value:(Rlp.encode rlp |> Bytes.to_string)
-            evm_state
-        in
+    match ctxt.session.future_block_info with
+    | Executing
+        ({timestamp; next_tx_index; da_fee_per_byte; base_fee_per_gas; _} as
+         future_block_info) ->
         let*! data_dir, config = execution_config in
-        let* evm_state =
-          Evm_state.execute
+        let* receipt, evm_state =
+          Evm_state.execute_single_transaction
+            ~storage_version:ctxt.session.storage_version
             ~pool:ctxt.execution_pool
-            ~native_execution:false
+            ~native_execution:
+              (ctxt.configuration.kernel_execution.native_execution_policy
+             = Always)
             ~data_dir
             ~config
-            ~wasm_entrypoint:"single_tx_execution"
-            evm_state
-            (`Inbox [])
+            ctxt.session.evm_state
+            {
+              timestamp;
+              number = ctxt.session.next_blueprint_number;
+              transactions_count = next_tx_index;
+            }
+            hash
+            tx
         in
-        let read = read_from_state evm_state in
-        let* receipt =
-          Durable_storage.inspect_durable_and_decode
-            read
-            (Durable_storage_path.Block.current_receipts
-               ~root:Durable_storage_path.etherlink_root)
-            (Transaction_receipt.decode_last_from_list
-               Ethereum_types.(Block_hash (Hex (String.make 64 '0'))))
+        let otel_attrs () =
+          let common =
+            [Telemetry.Attributes.Transaction.receipt_type receipt]
+          in
+          match receipt with
+          | L2_types.Ethereum r ->
+              let (Ethereum_types.Qty gas_used) = r.gasUsed in
+              let execution_gas =
+                compute_execution_gas
+                  ~tx
+                  ~da_fee_per_byte
+                  ~base_fee_per_gas
+                  ~gas_used
+              in
+              Telemetry.Attributes.Transaction.execution_gas execution_gas
+              :: common
+          | L2_types.Tezos -> common
         in
-        ctxt.session.future_block_state <-
-          Some {evm_state; timestamp; next_tx_index = Int32.succ next_tx_index} ;
+        Octez_telemetry.Trace.add_attrs otel_attrs ;
+        ctxt.session.evm_state <- evm_state ;
+        ctxt.session.future_block_info <-
+          Executing
+            {future_block_info with next_tx_index = Int32.succ next_tx_index} ;
+        let*! () = Events.single_tx_execution_done hash in
         return_some receipt
-    | None -> return_none
+    | Disabled -> return_none
+    | Awaiting_next_block_info ->
+        let*! () = Evm_context_events.ic_execute_skipped hash in
+        return_none
+
+  let commit_application_result ~ctxt ~conn ~timestamp ~time_processed ~payload
+      ~block ~chain_family evm_state =
+    let open Lwt_result_syntax in
+    let block_number = L2_types.block_number block in
+    let block_hash = L2_types.block_hash block in
+
+    (* Check if observer diverged *)
+    let* () =
+      if is_sequencer ctxt then return_unit
+      else
+        let* finalized_hash =
+          Evm_store.Pending_confirmations.find_with_level conn block_number
+        in
+        match finalized_hash with
+        | None -> return_unit
+        | Some expected_block_hash ->
+            if expected_block_hash = block_hash then
+              Evm_store.Pending_confirmations.delete_with_level
+                conn
+                block_number
+            else
+              let Ethereum_types.(Qty number) = block_number in
+
+              let*! () =
+                Evm_events_follower_events.diverged
+                  (number, expected_block_hash, block_hash)
+              in
+              (* If the observer cannot reset to finalized level it must exit. *)
+              let exit_error =
+                Node_error.Diverged
+                  {
+                    level = number;
+                    expected_block_hash;
+                    found_block_hash = Some block_hash;
+                    must_exit = true;
+                  }
+              in
+              let* () = reset_to_finalized_level exit_error ctxt conn in
+              (* If the observer managed to reset to finalized level it must not exit. *)
+              tzfail
+                (Node_error.Diverged
+                   {
+                     level = number;
+                     expected_block_hash;
+                     found_block_hash = Some block_hash;
+                     must_exit = false;
+                   })
+    in
+
+    (* Set metrics for the block *)
+    let () =
+      match block with
+      | Eth block ->
+          let number_of_transactions =
+            match block.transactions with
+            | TxHash l -> List.length l
+            | TxFull l -> List.length l
+          in
+          Metrics.set_block ~time_processed ~transactions:number_of_transactions ;
+          Option.iter
+            (fun baseFeePerGas ->
+              baseFeePerGas |> Ethereum_types.Qty.to_z |> Metrics.set_gas_price)
+            block.baseFeePerGas
+      | Tez _ ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+          ()
+    in
+    let* payload in
+    let* () =
+      Evm_store.Blueprints.store
+        conn
+        {number = block_number; timestamp; payload}
+    in
+
+    (* TezosX: if the Tezos runtime is active, retrieve the Tezos block
+       produced alongside the primary EVM block so we can store both in a
+       single INSERT. Only attempt to fetch the Tezos block once the sunrise
+       level has been reached (i.e. the runtime started producing Tezos
+       blocks). *)
+    let* tezosx_tez_block =
+      let* tezos_enabled =
+        Durable_storage.exists (Tezosx_feature_flag Tezos) evm_state
+      in
+      if tezos_enabled then
+        let* sunrise_level =
+          Durable_storage.read_opt Michelson_runtime_sunrise_level evm_state
+        in
+        let past_sunrise =
+          match sunrise_level with
+          | None -> false
+          | Some (Ethereum_types.Qty sunrise) ->
+              let (Ethereum_types.Qty level) = block_number in
+              Z.compare level sunrise >= 0
+        in
+        if past_sunrise then
+          let* tez_block =
+            Durable_storage.read_opt Tezosx_tezos_current_block evm_state
+          in
+          match tez_block with
+          | Some (Tez block) -> return_some block
+          | _ ->
+              if
+                Storage_version.tezosx_tezos_blocks
+                  ~storage_version:ctxt.session.storage_version
+              then
+                failwith
+                  "Expected to find a Tezos block alongside the EVM block, but \
+                   none was found."
+              else return_none
+        else return_none
+      else return_none
+    in
+
+    (* Store block and share receipts *)
+    let* evm_state, receipts, execution_gas =
+      let* execution_gas, receipts =
+        match block with
+        | Eth block ->
+            let* da_fee_per_byte =
+              Etherlink_durable_storage.da_fee_per_byte evm_state
+            in
+            let* (Qty base_fee_per_gas) =
+              Etherlink_durable_storage.base_fee_per_gas evm_state
+            in
+            store_block_unsafe
+              ?tez_block:tezosx_tez_block
+              ~compact_receipt_encoding:
+                ctxt.configuration.experimental_features
+                  .compact_receipt_encoding
+              ~da_fee_per_byte
+              ~base_fee_per_gas
+              conn
+              evm_state
+              block
+        | Tez block ->
+            let+ receipts = store_tez_block_unsafe conn block in
+            (* TODO: support extracting the execution gas *)
+            (Z.zero, receipts)
+      in
+      let* evm_state =
+        Evm_state.clear_block_storage chain_family block evm_state
+      in
+      return (evm_state, receipts, execution_gas)
+    in
+
+    List.iter (Lwt_watcher.notify receipt_watcher) receipts ;
+
+    Octez_telemetry.Trace.add_attrs (fun () ->
+        Telemetry.Attributes.
+          [
+            Block.number ctxt.session.next_blueprint_number;
+            Block.transaction_count (List.length receipts);
+            Block.execution_gas execution_gas;
+          ]) ;
+
+    (* Look for potential kernel upgrades *)
+    let upgrade_candidate = check_pending_upgrade ctxt timestamp in
+    let* applied_kernel_upgrade =
+      check_upgrade ctxt evm_state upgrade_candidate
+    in
+    let* () =
+      when_ applied_kernel_upgrade @@ fun () ->
+      Evm_store.Kernel_upgrades.record_apply
+        conn
+        ctxt.session.next_blueprint_number
+    in
+
+    let* context, split_info = commit_next_head ctxt conn timestamp evm_state in
+
+    let* evm_state =
+      if ctxt.session.storage_version >= 43 then return evm_state
+      else Evm_state.clear_events evm_state
+    in
+
+    return
+      (evm_state, context, applied_kernel_upgrade, split_info, execution_gas)
+
+  (* Helper to find Divergence or Unsync in error trace.
+    The exception emitted by `apply_blueprint_store_unsafe` is caught by
+    `Sqlite.with_transaction` and converted to `Error`, so we need to pattern match
+    on the error result rather than using `Lwt.catch` to find retry cases. *)
+  let find_divergence_or_unsync trace =
+    List.find_map
+      (function
+        | Exn
+            (Divergence
+               {
+                 level = Qty level;
+                 computed_block_hash = block_hash;
+                 expected_block_hash;
+               }) ->
+            Some (`Divergence (level, block_hash, expected_block_hash))
+        | Exn Unsync -> Some `Unsync
+        | _ -> None)
+      trace
 
   (** [apply_blueprint_store_unsafe ctxt conn timestamp chunks payload
       delayed_transactions] applies the blueprint [chunks] on the head of
       [ctxt], and commit the resulting state and the blueprint signed [payload]
       (when the promise is fulfilled) to Irmin and the node’s store.
 
+      If instant confirmations are enabled, the block is instead assembled using the
+      previously validated transactions. Resulting block hash is then matched against
+      the one provided by the sequencer. If they differ, reset the current block state
+      and apply the blueprint chunks through the standard procedure.
+
       This function expects its connection to the store [conn] to be wrapped in
       a SQL transaction. *)
   let apply_blueprint_store_unsafe ctxt conn timestamp chunks payload
-      delayed_transactions =
+      delayed_transactions sequencer_block_hash =
     let open Lwt_result_syntax in
     Evm_store.assert_in_transaction conn ;
 
@@ -988,211 +1373,96 @@ module State = struct
       Configuration.retrieve_chain_family
         ~l2_chains:ctxt.configuration.experimental_features.l2_chains
     in
-    let* evm_state, applied_sequencer_upgrade =
-      match check_pending_sequencer_upgrade ctxt timestamp with
-      | Some {sequencer_upgrade; _} ->
-          let* evm_state =
-            (* The sequencer upgrade is based on the l1 timestamp
-               found in the inbox. To activate it it's enough to
-               trigger a kernel run with a correct timestamp (>=
-               activation_timstamp) and an empty inbox. The sequencer
-               upgrade is checked in the kernel just after finishing
-               to parse the inbox, there is no need for a blueprint to
-               be applied.
 
-               Also as the application of the sequencer upgrade is
-               done after parsing the blueprint and it clears the
-               storage. If we try to do a run with a blueprint :
-
-               - For the previous sequencer, the blueprint will be
-               validated but removed when the sequencer upgrade is
-               applied.
-
-               - for the new sequencer, the blueprint will not be
-               validated.
-
-               Because of all that it's necessary to do a run with no
-               specified blueprint. *)
-            Evm_state.execute
-              ~pool:ctxt.execution_pool
-              ~execution_timestamp:timestamp
-              ~native_execution:
-                (ctxt.configuration.kernel_execution.native_execution_policy
-               = Configuration.Always)
-              ~data_dir
-              ~config
-              ctxt.session.evm_state
-              (`Inbox [])
-          in
-          let* applied_sequencer_upgrade =
-            check_sequencer_upgrade ctxt evm_state sequencer_upgrade
-          in
-          return (evm_state, applied_sequencer_upgrade)
-      | None -> return (ctxt.session.evm_state, false)
-    in
-    let* () =
-      when_ applied_sequencer_upgrade @@ fun () ->
-      Evm_store.Sequencer_upgrades.record_apply
-        conn
-        ctxt.session.next_blueprint_number
-    in
-
-    let* try_apply =
+    let* try_apply, applied_sequencer_upgrade =
       Misc.with_timing
         (fun time -> Lwt.return (time_processed := time))
         (fun () ->
-          Evm_state.apply_unsigned_chunks
-            ~pool:ctxt.execution_pool
-            ~native_execution_policy:
-              ctxt.configuration.kernel_execution.native_execution_policy
-            ~wasm_pvm_fallback:(not @@ List.is_empty delayed_transactions)
-            ~data_dir
-            ~chain_family
-            ~config
-            evm_state
-            chunks)
+          match ctxt.session.future_block_info with
+          | Executing {timestamp; applied_sequencer_upgrade; _} ->
+              let+ result =
+                Evm_state.assemble_block
+                  ~pool:ctxt.execution_pool
+                  ~native_execution:
+                    (ctxt.configuration.kernel_execution.native_execution_policy
+                   = Always)
+                  ~chain_family
+                  ~data_dir
+                  ~config
+                  ~timestamp
+                  ~number:ctxt.session.next_blueprint_number
+                  ctxt.session.evm_state
+              in
+              (result, applied_sequencer_upgrade)
+          | Disabled | Awaiting_next_block_info ->
+              let* applied_sequencer_upgrade =
+                handle_sequencer_upgrade ctxt conn ~timestamp ~data_dir ~config
+              in
+              let+ result =
+                Evm_state.apply_unsigned_chunks
+                  ~pool:ctxt.execution_pool
+                  ~native_execution_policy:
+                    ctxt.configuration.kernel_execution.native_execution_policy
+                  ~wasm_pvm_fallback:(not @@ List.is_empty delayed_transactions)
+                  ~data_dir
+                  ~chain_family
+                  ~config
+                  ctxt.session.evm_state
+                  chunks
+              in
+              (result, applied_sequencer_upgrade))
     in
 
     match try_apply with
-    | Apply_success {evm_state; block} ->
-        let block_number = L2_types.block_number block in
+    | Apply_success {evm_state; block; tezos_block} -> (
         let block_hash = L2_types.block_hash block in
-        let* () =
-          if is_sequencer ctxt then return_unit
-          else
-            let* finalized_hash =
-              Evm_store.Pending_confirmations.find_with_level conn block_number
-            in
-            match finalized_hash with
-            | None -> return_unit
-            | Some expected_block_hash ->
-                if expected_block_hash = block_hash then
-                  Evm_store.Pending_confirmations.delete_with_level
-                    conn
-                    block_number
-                else
-                  let Ethereum_types.(Qty number) = block_number in
-
-                  let*! () =
-                    Evm_events_follower_events.diverged
-                      (number, expected_block_hash, block_hash)
-                  in
-                  (* If the observer cannot reset to finalized level it must
-                     exit. *)
-                  let exit_error =
-                    Node_error.Diverged
-                      {
-                        level = number;
-                        expected_block_hash;
-                        found_block_hash = Some block_hash;
-                        must_exit = true;
-                      }
-                  in
-                  let* (_ : Evm_state.t) =
-                    reset_to_finalized_level exit_error ctxt conn
-                  in
-                  (* If the observer managed to reset to finalized level it must
-                     not exit. *)
-                  tzfail
-                    (Node_error.Diverged
-                       {
-                         level = number;
-                         expected_block_hash;
-                         found_block_hash = Some block_hash;
-                         must_exit = false;
-                       })
-        in
-        (* Set metrics for the block *)
-        let () =
-          match block with
-          | Eth block ->
-              let number_of_transactions =
-                match block.transactions with
-                | TxHash l -> List.length l
-                | TxFull l -> List.length l
-              in
-              Metrics.set_block
+        match (ctxt.session.future_block_info, sequencer_block_hash) with
+        (* When IC is executing and sequencer hash is present:
+            Node could execute txns incrementally and it received the block hash
+            for verification *)
+        | Executing _, Some sequencer_block_hash
+          when sequencer_block_hash <> block_hash ->
+            let*! () = Events.assemble_block_diverged next in
+            Lwt.fail
+              (Divergence
+                 {
+                   level = L2_types.block_number block;
+                   expected_block_hash = sequencer_block_hash;
+                   computed_block_hash = block_hash;
+                 })
+        (* When observer, future info is present but no sequencer hash was received:
+            Should not happen but if it does we re-apply the full blueprint
+            as we have no way of checking the assemble validity *)
+        | Executing _, None ->
+            let*! () = Events.seq_block_hash_missing next in
+            Lwt.fail Unsync
+        (* Any other case is standard procedure *)
+        | _ ->
+            reset_future_block_info_if_enabled ctxt ;
+            let* ( evm_state,
+                   context,
+                   applied_kernel_upgrade,
+                   split_info,
+                   execution_gas ) =
+              commit_application_result
+                ~ctxt
+                ~conn
+                ~timestamp
                 ~time_processed:!time_processed
-                ~transactions:number_of_transactions ;
-              Option.iter
-                (fun baseFeePerGas ->
-                  baseFeePerGas |> Ethereum_types.Qty.to_z
-                  |> Metrics.set_gas_price)
-                block.baseFeePerGas
-          | Tez _ ->
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
-              ()
-        in
-        let* payload in
-        let* () =
-          Evm_store.Blueprints.store
-            conn
-            {number = block_number; timestamp; payload}
-        in
-
-        let* evm_state, receipts, execution_gas =
-          let* execution_gas, receipts =
-            match block with
-            | Eth block ->
-                let* da_fee_per_byte =
-                  Etherlink_durable_storage.da_fee_per_byte
-                    (read_from_state evm_state)
-                in
-                let* (Qty base_fee_per_gas) =
-                  Etherlink_durable_storage.base_fee_per_gas
-                    (read_from_state evm_state)
-                in
-                store_block_unsafe
-                  ~da_fee_per_byte
-                  ~base_fee_per_gas
-                  conn
-                  evm_state
-                  block
-            | Tez block ->
-                let+ receipts = store_tez_block_unsafe conn block in
-                (* TODO: support extracting the execution gas *)
-                (Z.zero, receipts)
-          in
-          return (evm_state, receipts, execution_gas)
-        in
-        List.iter (Lwt_watcher.notify receipt_watcher) receipts ;
-
-        let upgrade_candidate = check_pending_upgrade ctxt timestamp in
-        let* applied_kernel_upgrade =
-          check_upgrade ctxt evm_state upgrade_candidate
-        in
-        let* () =
-          when_ applied_kernel_upgrade @@ fun () ->
-          Evm_store.Kernel_upgrades.record_apply
-            conn
-            ctxt.session.next_blueprint_number
-        in
-
-        let* context, split_info =
-          commit_next_head ctxt conn timestamp evm_state
-        in
-
-        Octez_telemetry.Trace.add_attrs (fun () ->
-            Telemetry.Attributes.
-              [
-                Block.number ctxt.session.next_blueprint_number;
-                Block.transaction_count (List.length receipts);
-                Block.execution_gas execution_gas;
-              ]) ;
-
-        let* evm_state =
-          if ctxt.session.storage_version >= 43 then return evm_state
-          else Lwt_result.ok (Evm_state.clear_events evm_state)
-        in
-
-        return
-          ( evm_state,
-            context,
-            block,
-            applied_kernel_upgrade,
-            applied_sequencer_upgrade,
-            split_info,
-            execution_gas )
+                ~payload
+                ~block
+                ~chain_family
+                evm_state
+            in
+            return
+              ( evm_state,
+                context,
+                block,
+                tezos_block,
+                applied_kernel_upgrade,
+                applied_sequencer_upgrade,
+                split_info,
+                execution_gas ))
     | Apply_failure (* Did not produce a block *) ->
         let*! () =
           if is_sequencer ctxt then
@@ -1201,8 +1471,8 @@ module State = struct
         in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
-  let on_new_head ?split_info ctxt ~applied_kernel_upgrade
-      ~applied_sequencer_upgrade evm_state context block blueprint_with_events =
+  let on_new_head ?split_info ctxt ~kernel_change ~applied_sequencer_upgrade
+      evm_state context block blueprint_with_events =
     let open Lwt_syntax in
     let block_hash = L2_types.block_hash block in
     let (Qty level) = ctxt.session.next_blueprint_number in
@@ -1226,15 +1496,20 @@ module State = struct
     if applied_sequencer_upgrade then
       ctxt.session.pending_sequencer_upgrade <- None ;
     let* () =
-      if applied_kernel_upgrade then (
-        let* storage_version = Evm_state.storage_version evm_state in
-        ctxt.session.pending_upgrade <- None ;
+      if kernel_change then (
+        let* storage_version = Durable_storage.storage_version evm_state in
+        let* tezosx_runtimes = Durable_storage.list_runtimes evm_state in
+        ctxt.session.kernel_change <- No ;
         Result.iter
           (* Etherlink kernel always set a storage version, the error case
              should never happen. *)
           (fun storage_version ->
             ctxt.session.storage_version <- storage_version)
           storage_version ;
+        Result.iter
+          (fun tezosx_runtimes ->
+            ctxt.session.tezosx_runtimes <- tezosx_runtimes)
+          tezosx_runtimes ;
         return_unit)
       else return_unit
     in
@@ -1242,6 +1517,7 @@ module State = struct
       Some
         (fun () ->
           let open Lwt_syntax in
+          Broadcast.notify_block_hash block_hash ;
           Broadcast.notify_blueprint blueprint_with_events ;
           (* We ignore failure. A failure means the prevalidator is not yet
              started, meaning the call is useless for now. *)
@@ -1281,6 +1557,10 @@ module State = struct
       Sequencer_blueprint.make_blueprint_chunks
         ~number:flushed_level
         {
+          version = Legacy;
+          (* Flushed blueprints contain no transactions so the version
+             field (which versions the format of the "transactions"
+             field) is irrelevant. *)
           parent_hash;
           delayed_transactions = hashes;
           transactions = [];
@@ -1289,29 +1569,31 @@ module State = struct
     in
 
     let* sequencer =
-      Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
+      Durable_storage.read Sequencer_key ctxt.session.evm_state
     in
     let*? signer = Signer.get_signer signer sequencer in
     return (chunks, sign ~signer chunks)
 
   let clear_head_delayed_inbox ctxt =
     let open Lwt_result_syntax in
-    let*! cleaned_evm_state =
+    let* cleaned_evm_state =
       Evm_state.clear_delayed_inbox ctxt.session.evm_state
     in
     ctxt.session.evm_state <- cleaned_evm_state ;
     return_unit
 
-  let rec apply_blueprint ?(events = []) ctxt conn timestamp chunks payload
-      delayed_transactions : 'a L2_types.block tzresult Lwt.t =
+  let rec apply_blueprint ?(events = []) ?expected_block_hash ctxt conn
+      timestamp chunks payload delayed_transactions :
+      ('a L2_types.block * L2_types.Tezos_block.t option) tzresult Lwt.t =
     let open Lwt_result_syntax in
-    let+ current_block, _execution_gas =
-      Misc.with_timing_f_e (fun (block, execution_gas) ->
+    let+ current_block, current_tezos_block, _execution_gas =
+      Misc.with_timing_f_e (fun (block, _tezos_block, execution_gas) ->
           Blueprint_events.blueprint_applied block execution_gas)
       @@ fun () ->
       let* ( evm_state,
              context,
              current_block,
+             current_tezos_block,
              applied_kernel_upgrade,
              applied_sequencer_upgrade,
              split_info,
@@ -1324,10 +1606,11 @@ module State = struct
           chunks
           payload
           delayed_transactions
+          expected_block_hash
       in
       let kernel_upgrade =
-        match ctxt.session.pending_upgrade with
-        | Some {injected_before; kernel_upgrade}
+        match ctxt.session.kernel_change with
+        | Kernel_upgrade {injected_before; kernel_upgrade}
           when injected_before = ctxt.session.next_blueprint_number ->
             Some kernel_upgrade
         | _ -> None
@@ -1357,7 +1640,8 @@ module State = struct
         on_new_head
           ?split_info
           ctxt
-          ~applied_kernel_upgrade
+          ~kernel_change:
+            (applied_kernel_upgrade || ctxt.session.kernel_change = Force_change)
           ~applied_sequencer_upgrade
           evm_state
           context
@@ -1370,29 +1654,31 @@ module State = struct
               {number = ctxt.session.next_blueprint_number; timestamp; payload};
           }
       in
-      ctxt.session.future_block_state <- None ;
-      return (current_block, execution_gas)
+      return (current_block, current_tezos_block, execution_gas)
     in
-    current_block
+    (current_block, current_tezos_block)
 
-  and apply_evm_event_unsafe ctxt conn evm_state event latest_finalized_level =
+  and apply_evm_event_unsafe ctxt conn event =
     let open Lwt_result_syntax in
     let*! () = Evm_events_follower_events.new_event event in
     match event with
     | Evm_events.Upgrade_event upgrade ->
-        ctxt.session.pending_upgrade <-
-          Some
+        ctxt.session.kernel_change <-
+          Kernel_upgrade
             {
               kernel_upgrade = upgrade;
               injected_before = ctxt.session.next_blueprint_number;
             } ;
         background_preemptive_download ctxt.configuration upgrade ;
         let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
-        let*! evm_state =
-          Evm_state.modify
-            ~key:Durable_storage_path.kernel_upgrade
+        let* storage_version =
+          Durable_storage.storage_version ctxt.session.evm_state
+        in
+        let* () =
+          modify_in_place
+            ctxt
+            ~key:(Durable_storage_path.kernel_upgrade ~storage_version)
             ~value:payload
-            evm_state
         in
         let* () =
           Evm_store.Kernel_upgrades.store
@@ -1401,7 +1687,7 @@ module State = struct
             upgrade
         in
         let*! () = Events.pending_upgrade upgrade in
-        return (evm_state, latest_finalized_level)
+        return_unit
     | Sequencer_upgrade_event sequencer_upgrade ->
         ctxt.session.pending_sequencer_upgrade <-
           Some
@@ -1413,11 +1699,13 @@ module State = struct
           Evm_events.Sequencer_upgrade.to_bytes sequencer_upgrade
           |> String.of_bytes
         in
-        let*! evm_state =
-          Evm_state.modify
-            ~key:Durable_storage_path.sequencer_upgrade
+        let* () =
+          modify_in_place
+            ctxt
+            ~key:
+              (Durable_storage_path.sequencer_upgrade
+                 ~storage_version:ctxt.session.storage_version)
             ~value:payload
-            evm_state
         in
         let* () =
           Evm_store.Sequencer_upgrades.store
@@ -1426,29 +1714,17 @@ module State = struct
             sequencer_upgrade
         in
         let*! () = Events.pending_sequencer_upgrade sequencer_upgrade in
-        return (evm_state, latest_finalized_level)
-    | Blueprint_applied event ->
-        blueprint_applied_event ctxt conn evm_state latest_finalized_level event
+        return_unit
+    | Blueprint_applied event -> blueprint_applied_event ctxt conn event
     | New_delayed_transaction delayed_transaction ->
-        let* evm_state =
-          on_new_delayed_transaction
-            ~storage_version:ctxt.session.storage_version
-            ~pool:ctxt.execution_pool
-            ~native_execution:
-              (ctxt.configuration.kernel_execution.native_execution_policy
-             = Always)
-            ~delayed_transaction
-            evm_state
-        in
-        return (evm_state, latest_finalized_level)
+        on_new_delayed_transaction ctxt ~delayed_transaction
     | Flush_delayed_inbox flushed_blueprint ->
         let*! () =
           Evm_events_follower_events.flush_delayed_inbox
             ~timestamp:flushed_blueprint.timestamp
             flushed_blueprint.level
         in
-        let* evm_state = flush_delayed_inbox ctxt conn flushed_blueprint in
-        return (evm_state, latest_finalized_level)
+        flush_delayed_inbox ctxt conn flushed_blueprint
 
   and apply_evm_events ?finalized_level conn (ctxt : t) events =
     let open Lwt_result_syntax in
@@ -1482,61 +1758,35 @@ module State = struct
                   (Node_error.Out_of_sync
                      {level_received = rollup_block_level; level_expected}))
     in
-    if needs_process then (
-      let* context, evm_state =
-        let start_finalized_number = ctxt.session.finalized_number in
-        let* evm_state, context, Qty latest_finalized_number =
-          match events with
-          | [] ->
-              (* Avoid an uncessary {!replace_current_commit} if the list is
-                 empty. *)
-              return
-                ( ctxt.session.evm_state,
-                  ctxt.session.context,
-                  ctxt.session.finalized_number )
-          | events ->
-              let* evm_state, latest_finalized_number =
-                List.fold_left_es
-                  (fun (evm_state, Ethereum_types.Qty finalized_number) event ->
-                    let* evm_state, latest_finalized_level =
-                      apply_evm_event_unsafe
-                        ctxt
-                        conn
-                        evm_state
-                        event
-                        finalized_number
-                    in
-                    return (evm_state, Ethereum_types.Qty latest_finalized_level))
-                  (ctxt.session.evm_state, ctxt.session.finalized_number)
-                  events
-              in
-              let* context = replace_current_commit ctxt conn evm_state in
-              return (evm_state, context, latest_finalized_number)
-        in
-        (* Process the new `latest_finalized_number`. *)
-        ctxt.session.finalized_number <- Qty latest_finalized_number ;
-        let* () =
-          Option.iter_es
-            (fun l1_level ->
-              let* () =
-                store_finalized_levels
-                  ctxt
-                  conn
-                  ~l1_level
-                  ~start_l2_level:start_finalized_number
-                  ~end_l2_level:(Ethereum_types.Qty latest_finalized_number)
-              in
-              let*! () =
-                Evm_context_events.processed_l1_level
-                  (l1_level, latest_finalized_number)
-              in
-              return_unit)
-            finalized_level
-        in
-        return (context, evm_state)
+    if needs_process then
+      let start_finalized_number = ctxt.session.finalized_number in
+      let* () =
+        match events with
+        | [] ->
+            (* Avoid an uncessary {!replace_current_commit} if the list is
+               empty. *)
+            return_unit
+        | events ->
+            let* () = List.iter_es (apply_evm_event_unsafe ctxt conn) events in
+            replace_current_commit ctxt conn
       in
-      on_modified_head ctxt evm_state context ;
-      return_unit)
+      let (Qty latest_finalized_number) = ctxt.session.finalized_number in
+      Option.iter_es
+        (fun l1_level ->
+          let* () =
+            store_finalized_levels
+              ctxt
+              conn
+              ~l1_level
+              ~start_l2_level:start_finalized_number
+              ~end_l2_level:(Ethereum_types.Qty latest_finalized_number)
+          in
+          let*! () =
+            Evm_context_events.processed_l1_level
+              (l1_level, latest_finalized_number)
+          in
+          return_unit)
+        finalized_level
     else return_unit
 
   and flush_delayed_inbox ctxt conn
@@ -1561,7 +1811,7 @@ module State = struct
     in
     (* The kernel has produced a block for level [flushed_level]. The first thing
        to do is go back to an EVM state before this flushed blueprint. *)
-    let* (_ : Evm_state.t) =
+    let* () =
       let* checkpoint =
         Evm_store.Context_hashes.find conn before_flushed_level
       in
@@ -1594,7 +1844,7 @@ module State = struct
       prepare_local_flushed_blueprint ctxt parent_hash flushed_blueprint
     in
     (* Apply the blueprint. *)
-    let* _block =
+    let+ _block =
       apply_blueprint
         ~events
         ctxt
@@ -1604,7 +1854,7 @@ module State = struct
         payload
         delayed_transactions
     in
-    return ctxt.session.evm_state
+    ()
 
   let () =
     register_error_kind
@@ -1673,16 +1923,26 @@ module State = struct
     let open Configuration in
     match (h1, h2) with
     | Archive, Archive -> `No_switch
-    | (Rolling gc, Rolling gc' | Full gc, Full gc')
+    | (Rolling gc, Rolling gc' | Full gc, Full gc' | Seed gc, Seed gc')
       when gc.number_of_chunks = gc'.number_of_chunks ->
         `No_switch
     (* Keep this match explicit *)
-    | Rolling _, Full _ | Rolling _, Archive | Full _, Archive -> `Cannot_switch
+    | Rolling _, Full _
+    | Rolling _, Archive
+    | Rolling _, Seed _
+    | Full _, Archive
+    | Seed _, Archive
+    | Seed _, Full _ ->
+        `Cannot_switch
     | Rolling _, Rolling _
     | Full _, Full _
     | Full _, Rolling _
+    | Full _, Seed _
+    | Seed _, Seed _
+    | Seed _, Rolling _
     | Archive, Rolling _
-    | Archive, Full _ ->
+    | Archive, Full _
+    | Archive, Seed _ ->
         `Needs_switch
 
   let check_history_mode ?(switch = false) ~store_history_mode ~history_mode ()
@@ -1753,7 +2013,13 @@ module State = struct
           in
           match history_mode with
           | Some h ->
-              let* store = Evm_store.init ~data_dir ~perm:Read_write () in
+              let* store =
+                Evm_store.init
+                  ~chain_family:L2_types.EVM
+                  ~data_dir
+                  ~perm:Read_write
+                  ()
+              in
               let* () =
                 Evm_store.use store @@ fun conn ->
                 Evm_store.Metadata.store_history_mode conn h
@@ -1764,18 +2030,154 @@ module State = struct
       | _ -> return_unit
     in
     Pvm.Context.load
-      (module Irmin_context)
+      (module Pvm.Irmin_context)
       ~cache_size:100_000
       ~async_domain:true
       Read_write
       (Evm_state.irmin_store_path ~data_dir)
 
-  let on_disk_kernel = function Pvm_types.On_disk _ -> true | _ -> false
+  let patch_sequencer_key_if_necessary ~sequencer_key_source
+      ~next_blueprint_number evm_state ~sequencer_key_path () =
+    let open Lwt_result_syntax in
+    let* patch_sequencer_key =
+      match sequencer_key_source with
+      | Some (Local (Sandbox, signer)) ->
+          let*? pk, _ = Signer.first_lexicographic_signer signer in
+          return_some pk
+      | Some (RPC_fetch {evm_node_endpoint; timeout; keep_alive}) ->
+          let (Ethereum_types.Qty next) = next_blueprint_number in
+          let current_head = Ethereum_types.Qty (Z.pred next) in
+          let* pk =
+            Batch.call
+              ~timeout
+              ~keep_alive
+              (module Rpc_encodings.Sequencer)
+              ~evm_node_endpoint
+              (Block_parameter (Number current_head))
+          in
+          return_some pk
+      | Some (Local (Sequencer, _)) | None -> return_none
+    in
+    match patch_sequencer_key with
+    | Some pk ->
+        let*! () = Events.patched_sequencer_key pk in
+        let* evm_state =
+          Durable_storage.write
+            (Raw_path sequencer_key_path)
+            (Bytes.of_string (Signature.Public_key.to_b58check pk))
+            evm_state
+        in
+        return (evm_state, true)
+    | None -> return (evm_state, false)
+
+  (** Load the existing evm_state from Irmin, read the storage_version
+      and patch the sequencer key if necessary. Used on restart when no
+      kernel execution is needed. *)
+  let load_existing_state ~sequencer_key_source ~next_blueprint_number context =
+    let open Lwt_result_syntax in
+    let*! evm_state = Pvm.State.get context in
+    let* storage_version = Durable_storage.storage_version evm_state in
+    let sequencer_key_path =
+      Durable_storage_path.sequencer_key ~storage_version
+    in
+    let* evm_state, _patched =
+      patch_sequencer_key_if_necessary
+        ~sequencer_key_source
+        ~next_blueprint_number
+        evm_state
+        ~sequencer_key_path
+        ()
+    in
+    return (evm_state, context, storage_version)
+
+  (** First start: create a fresh evm_state from [kernel], pre-write the
+      sequencer key under both possible paths (since the storage_version
+      is not yet known), execute the kernel, then clean up the stale
+      sequencer key path. *)
+  let init_kernel_and_execute ~pool ~configuration ~smart_rollup_address
+      ~sequencer_key_source ~next_blueprint_number conn context ~kernel =
+    let open Lwt_result_syntax in
+    let* evm_state = Evm_state.init ~kernel in
+    (* Pre-write the sequencer public key into durable storage before
+       the first kernel execution. Without it, the kernel has no
+       sequencer configured and immediately falls back to proxy mode,
+       which causes an unwanted block to be produced on the very first
+       run.
+
+       This is only useful for manual sandbox tests without an
+       installer. In production the installer has already written the
+       key, so this write is a no-op.
+    *)
+    (* The storage version is not yet known at this point (it
+       is determined by the first execution), so we write the
+       key under both possible paths to cover either layout. *)
+    let* evm_state, _legacy_sequencer_key_patched =
+      patch_sequencer_key_if_necessary
+        ~sequencer_key_source
+        ~next_blueprint_number
+        evm_state
+        ~sequencer_key_path:Durable_storage_path.sequencer_key_legacy
+        ()
+    in
+    let* evm_state, sequencer_key_patched =
+      patch_sequencer_key_if_necessary
+        ~sequencer_key_source
+        ~next_blueprint_number
+        evm_state
+        ~sequencer_key_path:Durable_storage_path.sequencer_key_world_state
+        ()
+    in
+    let config =
+      Pvm.Kernel.config
+        ~preimage_directory:(Configuration.preimages_path configuration)
+        ?preimage_endpoint:configuration.kernel_execution.preimages_endpoint
+        ~kernel_debug:true
+        ~trace_host_funs:configuration.opentelemetry.trace_host_functions
+        ~destination:smart_rollup_address
+        ()
+    in
+    let* evm_state =
+      Evm_state.execute
+        ~pool
+        ~data_dir:configuration.data_dir
+        ~config
+        ~native_execution:false
+        evm_state
+        (`Inbox [])
+    in
+    let* storage_version = Durable_storage.storage_version evm_state in
+    let* evm_state = Evm_state.flag_local_exec evm_state in
+    (* Now that the storage version is known, remove whichever
+       key path is not canonical for this version, so no stale
+       entry is left in the state. *)
+    let* evm_state =
+      if
+        sequencer_key_patched
+        && String.equal
+             Durable_storage_path.sequencer_key_world_state
+             (Durable_storage_path.sequencer_key ~storage_version)
+      then
+        Durable_storage.delete
+          (Raw_path Durable_storage_path.sequencer_key_legacy)
+          evm_state
+      else if sequencer_key_patched then
+        Durable_storage.delete
+          (Raw_path Durable_storage_path.sequencer_key_world_state)
+          evm_state
+      else return evm_state
+    in
+    let (Qty next) = next_blueprint_number in
+    let* context = commit conn context evm_state (Qty Z.(pred next)) in
+    return (evm_state, context, storage_version)
 
   let init ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
-      ~store_perm ?signer ?snapshot_source
-      ~(tx_container : _ Services_backend_sig.tx_container) () =
+      ~store_perm ?sequencer_key_source ?snapshot_source () =
     let open Lwt_result_syntax in
+    let signer =
+      match sequencer_key_source with
+      | Some (Local (_, signer)) -> Some signer
+      | _ -> None
+    in
     let pool =
       (* All interactions of the Evm_context worker with the kernel are purely
          sequential. As a consequence, a pool of 1 domain is enough. *)
@@ -1805,6 +2207,11 @@ module State = struct
           failwith "Store has pending confirmation, state is not final")
     in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
+    let kernel_change =
+      match pending_upgrade with
+      | None -> No
+      | Some upgrade -> Kernel_upgrade upgrade
+    in
     let* pending_sequencer_upgrade =
       Evm_store.Sequencer_upgrades.find_latest_pending conn
     in
@@ -1844,77 +2251,51 @@ module State = struct
     in
     let*! () = Evm_context_events.start_history_mode history_mode in
 
-    let* evm_state, context =
-      match kernel_path with
-      | Some kernel ->
-          if init_status = Loaded then
-            let* () =
-              when_ (on_disk_kernel kernel) @@ fun () ->
-              Lwt_result.ok (Events.ignored_kernel_arg ())
-            in
-            let*! evm_state = Pvm.State.get context in
-            return (evm_state, context)
-          else
-            let* evm_state = Evm_state.init ~kernel in
-            (* By executing the kernel with a minimal inbox, we preemptively
-               setup Etherlink (in case an installer is used). *)
-            let config =
-              Pvm.Kernel.config
-                ~preimage_directory:(Configuration.preimages_path configuration)
-                ?preimage_endpoint:
-                  configuration.kernel_execution.preimages_endpoint
-                ~kernel_debug:true
-                ~trace_host_funs:
-                  configuration.opentelemetry.trace_host_functions
-                ~destination:smart_rollup_address
-                ()
-            in
-            (* We write the expected sequencer in the state ahead of time.
-               This is necessary to support the sandbox mode, which is
-               typically not set up with an installer and therefore would
-               execute this first call in proxy mode (leading to an unwanted
-               block creation).
-
-               For production setup, the installer will rewrite this value. *)
-            let* evm_state =
-              match signer with
-              | Some signer ->
-                  let*? pk, _ = Signer.first_lexicographic_signer signer in
-                  Lwt_result.ok
-                  @@ Evm_state.modify
-                       ~key:Durable_storage_path.sequencer_key
-                       ~value:(Signature.Public_key.to_b58check pk)
-                       evm_state
-              | None -> return evm_state
-            in
-            let* evm_state =
-              Evm_state.execute
-                ~pool
-                ~data_dir:configuration.data_dir
-                ~config
-                ~native_execution:false
-                evm_state
-                (`Inbox [])
-            in
-            let (Qty next) = next_blueprint_number in
-            let* context = commit conn context evm_state (Qty Z.(pred next)) in
-            return (evm_state, context)
-      | None ->
-          if init_status = Loaded then
-            let*! evm_state = Pvm.State.get context in
-            return (evm_state, context)
-          else
-            failwith
-              "Cannot compute the initial EVM state without the path to the \
-               initial kernel"
+    let* evm_state, context, storage_version =
+      match (kernel_path, init_status) with
+      | kernel_path, Loaded ->
+          (* The data-dir was already populated or a snapshot was imported.
+             We ignore the kernel argument and just load the existing state. *)
+          let* () =
+            when_ (Option.is_some kernel_path) @@ fun () ->
+            Lwt_result.ok (Events.ignored_kernel_arg ())
+          in
+          load_existing_state
+            ~sequencer_key_source
+            ~next_blueprint_number
+            context
+      | Some kernel, Created ->
+          (* First start: initialize a fresh evm_state from the kernel and
+             execute it once (with an empty inbox) to set up Etherlink. *)
+          init_kernel_and_execute
+            ~pool
+            ~configuration
+            ~smart_rollup_address
+            ~sequencer_key_source
+            ~next_blueprint_number
+            conn
+            context
+            ~kernel
+      | None, Created ->
+          failwith
+            "Cannot compute the initial EVM state without the path to the \
+             initial kernel"
     in
 
-    let* storage_version = Evm_state.storage_version evm_state in
+    let* tezosx_runtimes = Durable_storage.list_runtimes evm_state in
 
     let* last_split_block =
       match history_mode with
-      | Rolling _ | Full _ -> Evm_store.Irmin_chunks.latest conn
+      | Rolling _ | Full _ | Seed _ -> Evm_store.Irmin_chunks.latest conn
       | Archive -> return_none
+    in
+
+    let future_block_info =
+      if
+        configuration.experimental_features.preconfirmation_stream_enabled
+        && Option.is_none signer
+      then Awaiting_next_block_info
+      else Disabled
     in
 
     let ctxt =
@@ -1929,16 +2310,16 @@ module State = struct
             finalized_number;
             next_blueprint_number;
             current_block_hash;
-            pending_upgrade;
+            kernel_change;
             pending_sequencer_upgrade;
             evm_state;
             last_split_block;
             post_transaction_run_hook = None;
-            future_block_state = None;
+            future_block_info;
+            tezosx_runtimes;
           };
         store;
         signer;
-        tx_container = Ex_tx_container tx_container;
         execution_pool = pool;
       }
     in
@@ -1946,6 +2327,7 @@ module State = struct
     let* () =
       let* ro_store =
         Evm_store.init
+          ~chain_family:L2_types.EVM
           ~data_dir:configuration.data_dir
           ~perm:(Read_only {pool_size = 1})
           ()
@@ -1976,7 +2358,9 @@ module State = struct
 
   let reset ~data_dir ~l2_level =
     let open Lwt_result_syntax in
-    let* store = Evm_store.init ~data_dir ~perm:Read_write () in
+    let* store =
+      Evm_store.init ~chain_family:L2_types.EVM ~data_dir ~perm:Read_write ()
+    in
     Evm_store.use store @@ fun conn ->
     Evm_store.with_transaction conn @@ fun store ->
     Evm_store.reset_after store ~l2_level
@@ -1998,51 +2382,67 @@ module State = struct
   let patch_state (ctxt : t) conn ?block_number ~commit ~key patch () =
     let open Lwt_result_syntax in
     let block_number = canonical_block_number ctxt block_number in
-    let* evm_state =
+    let* () =
       match block_number with
-      | None -> return ctxt.session.evm_state
+      | None -> return_unit
       | Some block_number -> (
           let* hash = Evm_store.Context_hashes.find conn block_number in
           match hash with
           | Some hash ->
               let*! context = Pvm.Context.checkout_exn ctxt.index hash in
               let*! evm_state = Pvm.State.get context in
-              return evm_state
+              ctxt.session.evm_state <- evm_state ;
+              return_unit
           | None ->
               failwith
                 "Missing context for block number %a"
                 Ethereum_types.pp_quantity
                 block_number)
     in
-    let*! previous_value = Evm_state.inspect evm_state key in
+    if key = "/kernel/boot.wasm" then ctxt.session.kernel_change <- Force_change ;
+    let* previous_value =
+      Durable_storage.read_opt (Raw_path key) ctxt.session.evm_state
+    in
     let new_value = patch (Option.map Bytes.to_string previous_value) in
-    let*! evm_state =
+    let* () =
       match new_value with
-      | Some value -> Evm_state.modify ~key ~value evm_state
+      | Some value -> modify_in_place ctxt ~key ~value
       | None when Option.is_some previous_value ->
-          Evm_state.delete ~kind:Value evm_state key
-      | None -> Lwt.return evm_state
+          delete_in_place ctxt ~kind:Value key
+      | None -> return_unit
     in
     let* (Qty number) =
       match block_number with
       | None ->
-          if commit then (
-            let* commit = replace_current_commit ctxt conn evm_state in
-            on_modified_head ctxt evm_state commit ;
-            return (current_blueprint_number ctxt))
-          else (
-            ctxt.session.evm_state <- evm_state ;
-            return (current_blueprint_number ctxt))
+          if commit then
+            let* () = replace_current_commit ctxt conn in
+            return (current_blueprint_number ctxt)
+          else return (current_blueprint_number ctxt)
       | Some block_number ->
           if commit then (
             let* context =
-              perform_commit conn ctxt.session.context evm_state block_number
+              perform_commit
+                conn
+                ctxt.session.context
+                ctxt.session.evm_state
+                block_number
             in
             ctxt.session.context <- context ;
             return block_number)
           else return block_number
     in
     let*! () = Events.patched_state key (Qty Z.(succ number)) in
+    (* Refresh tezosx_runtimes from the current evm_state so that the
+       session reflects any feature flag changes made by this patch. *)
+    let* () =
+      if commit then (
+        let* tezosx_runtimes =
+          Durable_storage.list_runtimes ctxt.session.evm_state
+        in
+        ctxt.session.tezosx_runtimes <- tezosx_runtimes ;
+        return_unit)
+      else return_unit
+    in
     return_unit
 
   let observer_apply_reorg ctxt conn blueprint_with_events pred_number =
@@ -2056,15 +2456,13 @@ module State = struct
         in
         return_none
     | Some checkpoint ->
-        let* (_ : Evm_state.t) =
-          reset_to_level ctxt conn pred_number checkpoint
-        in
+        let* () = reset_to_level ctxt conn pred_number checkpoint in
         (* Apply the blueprint. *)
         let events =
           Blueprint_types.events_of_blueprint_with_events blueprint_with_events
         in
         let* sequencer =
-          Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
+          Durable_storage.read Sequencer_key ctxt.session.evm_state
         in
         let*? chunks =
           Sequencer_blueprint.chunks_of_external_messages
@@ -2134,7 +2532,7 @@ module State = struct
          if we agree with it.
       *)
       let* sequencer =
-        Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
+        Durable_storage.read Sequencer_key ctxt.session.evm_state
       in
       let*? blueprint_parent_hash =
         Sequencer_blueprint.kernel_blueprint_parent_hash_of_payload
@@ -2208,9 +2606,8 @@ module Handlers = struct
         kernel_path;
         smart_rollup_address : string option;
         store_perm;
-        signer;
+        sequencer_key_source;
         snapshot_source;
-        tx_container = Ex_tx_container tx_container;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -2219,9 +2616,8 @@ module Handlers = struct
         ?kernel_path
         ?smart_rollup_address
         ~store_perm
-        ?signer
+        ?sequencer_key_source
         ?snapshot_source
-        ~tx_container
         ()
     in
     Lwt.wakeup execution_config_waker
@@ -2240,8 +2636,15 @@ module Handlers = struct
         let ctxt = Worker.state self in
         State.Transaction.run ctxt @@ fun ctxt conn ->
         State.apply_evm_events ?finalized_level conn ctxt events
-    | Apply_blueprint {events; timestamp; chunks; payload; delayed_transactions}
-      ->
+    | Apply_blueprint
+        {
+          events;
+          timestamp;
+          chunks;
+          payload;
+          delayed_transactions;
+          expected_block_hash;
+        } ->
         protect @@ fun () ->
         (* As defined in [blueprint_storage.rs] *)
         let maximum_number_of_chunks = 128 in
@@ -2256,16 +2659,51 @@ module Handlers = struct
              kernel"
         in
         let ctxt = Worker.state self in
-        State.Transaction.run ctxt @@ fun ctxt conn ->
-        let* block =
+        let fail_on_divergence =
+          match ctxt.configuration.observer with
+          | Some config -> config.fail_on_divergence
+          | None -> true
+        in
+        let apply_blueprint ?expected_block_hash ctxt conn =
           State.apply_blueprint
             ?events
+            ?expected_block_hash
             ctxt
             conn
             timestamp
             chunks
             payload
             delayed_transactions
+        in
+        let retry_apply_blueprint ctxt conn =
+          let*! evm_state = Pvm.State.get ctxt.session.context in
+          ctxt.session.evm_state <- evm_state ;
+          State.reset_future_block_info_if_enabled ctxt ;
+          apply_blueprint ?expected_block_hash:None ctxt conn
+        in
+        let*! result =
+          State.Transaction.run ctxt @@ fun ctxt conn ->
+          apply_blueprint ?expected_block_hash ctxt conn
+        in
+        let* block, tezos_block =
+          match result with
+          | Ok (block, tezos_block) -> return (block, tezos_block)
+          | Error trace -> (
+              match State.find_divergence_or_unsync trace with
+              | Some (`Divergence (level, block_hash, expected_block_hash)) ->
+                  if not fail_on_divergence then
+                    State.Transaction.run ctxt retry_apply_blueprint
+                  else
+                    tzfail
+                      (Node_error.Diverged
+                         {
+                           level;
+                           expected_block_hash;
+                           found_block_hash = Some block_hash;
+                           must_exit = true;
+                         })
+              | Some `Unsync -> State.Transaction.run ctxt retry_apply_blueprint
+              | None -> Lwt.return (Error trace))
         in
         let tx_hashes =
           match block with
@@ -2276,7 +2714,30 @@ module Handlers = struct
                   List.to_seq tx_objects |> Seq.map Transaction_object.hash)
           | Tez _ -> Seq.empty
         in
-        return tx_hashes
+        let* tezos_tx_hashes =
+          match tezos_block with
+          | None -> return Seq.empty
+          | Some block ->
+              let open Tezos_services in
+              let ( (module Proto : Tezlink_protocol),
+                    (module Next_proto : Tezlink_protocol) ) =
+                Tezlink_directory.protocol_for_block_or_level
+                  ~allowing_mock:false
+                  (Ok block)
+              in
+              let module Block_services =
+                Make_block_service (Proto) (Next_proto)
+              in
+              let*? op_headers =
+                Block_services.deserialize_operations_header block.operations
+              in
+              op_headers |> List.to_seq
+              |> Seq.map (fun (hash, _header, _op_and_receipt) ->
+                     hash |> Operation_hash.to_bytes
+                     |> Ethereum_types.decode_hash)
+              |> return
+        in
+        return (Seq.append tx_hashes tezos_tx_hashes)
     | Last_known_L1_level -> (
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -2314,10 +2775,11 @@ module Handlers = struct
           ~end_l2_level
     | Next_block_info {timestamp; number} ->
         let ctxt = Worker.state self in
-        State.next_block_info ctxt timestamp number ;
-        return_unit
+        State.Transaction.run ctxt @@ fun ctxt conn ->
+        State.set_next_block_info ctxt conn timestamp number
     | Execute_single_transaction {tx; hash} ->
         let ctxt = Worker.state self in
+        State.Transaction.run ctxt @@ fun ctxt _conn ->
         State.execute_single_transaction ctxt tx hash
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
@@ -2425,8 +2887,7 @@ let worker_wait_for_request req =
   return_ res
 
 let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
-    ~store_perm ?signer ?snapshot_source
-    ~(tx_container : _ Services_backend_sig.tx_container) () =
+    ~store_perm ?sequencer_key_source ?snapshot_source () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir:configuration.data_dir in
   let* worker =
@@ -2438,9 +2899,8 @@ let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
         kernel_path;
         smart_rollup_address;
         store_perm;
-        signer;
+        sequencer_key_source;
         snapshot_source;
-        tx_container = Ex_tx_container tx_container;
       }
       (module Handlers)
   in
@@ -2473,13 +2933,19 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let* rollup_node_store =
     Store.init Read_only ~data_dir:rollup_node_data_dir
   in
-  let* final_l2_block = Store.L2_blocks.find_finalized rollup_node_store in
+  let* final_l2_block =
+    Store.L2_blocks.find_last_committed_finalized rollup_node_store
+  in
   let* final_l2_block =
     match final_l2_block with
     | Some b -> return b
-    | None -> failwith "Rollup node has no finalized l2 block"
+    | None ->
+        failwith
+          "Rollup node has no finalized l2 block with a committed context"
   in
-  let checkpoint = final_l2_block.header.context in
+  let checkpoint =
+    WithExceptions.Option.get ~loc:__LOC__ final_l2_block.header.context_hash
+  in
   let rollup_node_context_dir =
     Filename.Infix.(rollup_node_data_dir // "context")
   in
@@ -2508,7 +2974,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   in
   let* evm_node_index =
     Pvm.Context.load
-      (module Irmin_context)
+      (module Pvm.Irmin_context)
       ~cache_size:100_000
       ~async_domain:true
       Read_write
@@ -2521,37 +2987,31 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
 let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
     ~irmin_context =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
   (* Tell the kernel that it is executed by an EVM node *)
-  let*! evm_state = Evm_state.flag_local_exec evm_state in
+  let* evm_state = Evm_state.flag_local_exec evm_state in
   (* We remove the delayed inbox from the EVM state. Its contents will be
      retrieved by the sequencer by inspecting the evm events. *)
-  let*! evm_state = Evm_state.clear_delayed_inbox evm_state in
+  let* evm_state = Evm_state.clear_delayed_inbox evm_state in
 
   (* For changes made to [evm_state] to take effect, we commit the result *)
   let*! evm_node_context = Pvm.State.set irmin_context evm_state in
   let*! checkpoint = Pvm.Context.commit evm_node_context in
 
   (* Assert we can read the current blueprint number *)
-  let* current_blueprint_number =
-    let*! current_blueprint_number_opt =
-      Evm_state.inspect
-        evm_state
-        (Durable_storage_path.Block.current_number ~root)
-    in
-    match current_blueprint_number_opt with
-    | Some bytes -> return (Bytes.to_string bytes |> Z.of_bits)
-    | None -> failwith "The blueprint number was not found"
+  let* (Qty current_blueprint_number) =
+    Durable_storage.read (Current_block_number chain_family) evm_state
   in
 
   (* Read the current block *)
   let* block =
     Etherlink_durable_storage.current_block
-      (Evm_state.read evm_state)
+      evm_state
       ~full_transaction_object:true
   in
   (* Init the store *)
-  let* store = Evm_store.init ~data_dir ~perm:Read_write () in
+  let* store =
+    Evm_store.init ~chain_family:L2_types.EVM ~data_dir ~perm:Read_write ()
+  in
   let* () =
     Evm_store.(
       use store @@ fun conn ->
@@ -2563,9 +3023,12 @@ let reset = State.reset
 
 let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   let open Lwt_result_syntax in
+  let* storage_version = Durable_storage.storage_version evm_state in
   let* kernel_upgrade =
-    let*! kernel_upgrade_payload =
-      Evm_state.inspect evm_state Durable_storage_path.kernel_upgrade
+    let* kernel_upgrade_payload =
+      Durable_storage.read_opt
+        (Raw_path (Durable_storage_path.kernel_upgrade ~storage_version))
+        evm_state
     in
     Option.bind kernel_upgrade_payload Evm_events.Upgrade.of_bytes
     |> Option.map (fun e -> Evm_events.Upgrade_event e)
@@ -2573,8 +3036,11 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   in
 
   let* sequencer_upgrade =
-    let*! sequencer_upgrade_payload =
-      Evm_state.inspect evm_state Durable_storage_path.sequencer_upgrade
+    let* storage_version = Durable_storage.storage_version evm_state in
+    let* sequencer_upgrade_payload =
+      Durable_storage.read_opt
+        (Raw_path (Durable_storage_path.sequencer_upgrade ~storage_version))
+        evm_state
     in
     Option.bind sequencer_upgrade_payload Evm_events.Sequencer_upgrade.of_bytes
     |> Option.map (fun e -> Evm_events.Sequencer_upgrade_event e)
@@ -2584,7 +3050,7 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   let* new_delayed_transactions =
     if omit_delayed_tx_events then return []
     else
-      let*! hashes = Evm_state.delayed_inbox_hashes evm_state in
+      let* hashes = Evm_state.delayed_inbox_hashes evm_state in
       let* events =
         List.map_es
           (fun hash ->
@@ -2607,7 +3073,7 @@ let apply_evm_events' ?finalized_level events =
   worker_wait_for_request (Apply_evm_events {finalized_level; events})
 
 let init_from_rollup_node ~(configuration : Configuration.t)
-    ~omit_delayed_tx_events ~rollup_node_data_dir ~tx_container () =
+    ~omit_delayed_tx_events ~rollup_node_data_dir () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir:configuration.data_dir in
   let* irmin_context, evm_state, finalized_level =
@@ -2633,12 +3099,7 @@ let init_from_rollup_node ~(configuration : Configuration.t)
     rollup_node_metadata ~rollup_node_data_dir
   in
   let* _loaded =
-    start
-      ~configuration
-      ~smart_rollup_address
-      ~store_perm:Read_write
-      ~tx_container
-      ()
+    start ~configuration ~smart_rollup_address ~store_perm:Read_write ()
   in
   worker_wait_for_request
     (Apply_evm_events
@@ -2649,7 +3110,8 @@ let head_info () =
   let+ head_info in
   !head_info
 
-let apply_blueprint ?events timestamp payload delayed_transactions =
+let apply_blueprint ?events ?expected_block_hash timestamp payload
+    delayed_transactions =
   let open Lwt_result_syntax in
   let*! head = head_info () in
   let* sequencer =
@@ -2669,7 +3131,7 @@ let apply_blueprint ?events timestamp payload delayed_transactions =
     | Some {sequencer; timestamp = upgrade_timestamp; _}
       when Time.Protocol.(timestamp >= upgrade_timestamp) ->
         return sequencer
-    | _ -> Durable_storage.sequencer (State.read_from_state head.evm_state)
+    | _ -> Durable_storage.read Sequencer_key head.evm_state
   in
   let*? chunks = Sequencer_blueprint.chunks_of_external_messages payload in
   let*? chunks = Sequencer_blueprint.check_signatures sequencer chunks in
@@ -2681,6 +3143,7 @@ let apply_blueprint ?events timestamp payload delayed_transactions =
          chunks;
          payload = return payload;
          delayed_transactions;
+         expected_block_hash;
        })
 
 let apply_chunks ~signer timestamp chunks delayed_transactions =
@@ -2693,7 +3156,7 @@ let apply_chunks ~signer timestamp chunks delayed_transactions =
         (* If we are this is the first block after the sequencer upgrade, the sequencer key in the state will still be the previous one. before applying the chunks, the sequencer key will change for the new one.
 In order to still be able to sign the chunks, we need to use the next sequencer key instead of the one in the state. *)
         return sequencer
-    | _ -> Durable_storage.sequencer (State.read_from_state head.evm_state)
+    | _ -> Durable_storage.read Sequencer_key head.evm_state
   in
   let*? signer = Signer.get_signer signer expected_sequencer in
   let blueprint_chunks = Sequencer_blueprint.sign ~signer ~chunks in
@@ -2711,7 +3174,14 @@ In order to still be able to sign the chunks, we need to use the next sequencer 
     let* confirmed_txs =
       worker_wait_for_request
         (Apply_blueprint
-           {events = None; timestamp; chunks; payload; delayed_transactions})
+           {
+             events = None;
+             timestamp;
+             chunks;
+             payload;
+             delayed_transactions;
+             expected_block_hash = None;
+           })
     and* blueprint_chunks
     and* payload in
     return (blueprint_chunks, payload, confirmed_txs)
@@ -2751,34 +3221,83 @@ let patch_kernel ?block_number kernel =
   in
   return_unit
 
-let patch_sequencer_key ?block_number pk =
-  worker_wait_for_request
-    (Patch_state
-       {
-         commit = false;
-         key = Durable_storage_path.sequencer_key;
-         patch = Fun.const (Some (Signature.Public_key.to_b58check pk));
-         block_number;
-       })
-
 let provision_balance ?block_number address value =
-  worker_wait_for_request
-    (Patch_state
-       {
-         commit = false;
-         key = Durable_storage_path.Accounts.balance address;
-         patch =
-           (let open Ethereum_types in
-            function
-            | Some old_balance ->
-                let (Qty v) =
-                  decode_number_le (Bytes.unsafe_of_string old_balance)
-                in
-                let (Qty u) = value in
-                Some (String.of_bytes (encode_u256_le (Qty Z.(u + v))))
-            | None -> Some (String.of_bytes (encode_u256_le value)));
-         block_number;
-       })
+  let new_info u =
+    String.of_bytes
+      (Tezosx.Tezos_runtime.encode_account_info
+         {
+           balance = Tezos_types.Tez.of_mutez_exn u;
+           nonce = 0L;
+           public_key = None;
+         })
+  in
+  let patch_requests =
+    let open Request in
+    let (Ethereum_types.Qty u) = value in
+    match address with
+    | Tezosx.Ethereum_address address ->
+        [
+          Patch_state
+            {
+              commit = false;
+              key = Durable_storage_path.Accounts.balance address;
+              patch =
+                (let open Ethereum_types in
+                 function
+                 | Some old_balance ->
+                     let (Qty v) =
+                       decode_number_le (Bytes.unsafe_of_string old_balance)
+                     in
+                     Some (String.of_bytes (encode_u256_le (Qty Z.(u + v))))
+                 | None -> Some (String.of_bytes (encode_u256_le value)));
+              block_number;
+            };
+        ]
+    | Tezos_address address ->
+        (* Mutez precision is 10^-6 while eth is 10^-18. *)
+        let u = Z.(to_int64 @@ (u / pow (of_int 10) 12)) in
+        [
+          Patch_state
+            {
+              commit = false;
+              key = Tezosx.Durable_storage_path.Accounts.Tezos.info address;
+              patch =
+                (function
+                | Some old_info -> (
+                    match
+                      Tezosx.Tezos_runtime.decode_account_info
+                        (Bytes.unsafe_of_string old_info)
+                    with
+                    | Ok old_info ->
+                        let balance =
+                          Tezos_types.Tez.(
+                            of_mutez_exn
+                            @@ Int64.add (to_mutez old_info.balance) u)
+                        in
+                        let info = {old_info with balance} in
+                        Some
+                          (String.of_bytes
+                             (Tezosx.Tezos_runtime.encode_account_info info))
+                    | Error _ -> Some (new_info u))
+                | None -> Some (new_info u));
+              block_number;
+            };
+          Patch_state
+            {
+              commit = false;
+              key =
+                Tezosx.Durable_storage_path.Accounts.Tezos.ethereum_alias
+                  address;
+              patch =
+                (fun _ ->
+                  Some
+                    (Bytes.to_string
+                       (Tezosx.Foreign_address.encode (`Tezos address))));
+              block_number;
+            };
+        ]
+  in
+  List.iter_es worker_wait_for_request patch_requests
 
 let patch_state ?block_number ~key ~value () =
   worker_wait_for_request

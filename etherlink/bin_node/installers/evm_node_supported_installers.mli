@@ -11,3 +11,7 @@ val mainnet : string
 (** The installer kernel used to originate Etherlink Shadownet on
     Shadownet *)
 val shadownet : string
+
+(** The installer kernel used to originate Tezos X Previewnet on
+    Shadownet *)
+val previewnet : string

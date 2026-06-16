@@ -25,7 +25,8 @@ let public_key () =
   in
   Lwt.return content
 
-let common_options = ["-o"; "StrictHostKeyChecking=no"]
+let common_options =
+  ["-o"; "StrictHostKeyChecking=no"; "-o"; "UserKnownHostsFile=/dev/null"]
 
 let ssh_options = common_options
 

@@ -8,6 +8,7 @@
 
 open Evm_node_lib_dev_encoding
 open Evm_node_lib_dev
+open Tezt_etherlink
 open Setup
 open Etherlink_benchmark_lib
 open Benchmark_utils
@@ -116,6 +117,8 @@ let ray_trace_scanline {infos; contract; spp; rpc_node; height; _} sender
           gasPrice = Some (Qty (Z.mul infos.base_fee_per_gas (Z.of_int 1000)));
           value = Some (Qty Z.zero);
           data = Some data;
+          authorization_list = [];
+          access_list = [];
         },
         Block_parameter Latest,
         Ethereum_types.AddressMap.empty )
@@ -223,7 +226,6 @@ let test_snailtracer () =
     ~time_between_blocks:Nothing
     ~eth_bootstrap_accounts
     ~websockets:true
-    ~use_multichain:Register_without_feature
     ~use_dal:Register_without_feature
     ~da_fee:Wei.zero
     ~minimum_base_fee_per_gas:Wei.one
@@ -240,19 +242,33 @@ let test_snailtracer () =
   let*? infos =
     Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:1000.
   in
+  let max_size = 999_999 in
+  let tx_per_addr_limit = Int64.of_int 999_999 in
+  let max_transaction_batch_length = Some 300 in
+  let max_lifespan_s = int_of_float parameters.timeout in
+  let config : Evm_node_config.Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
   let*? () =
-    Tx_queue.start
-      ~relay_endpoint:endpoint
-      ~max_transaction_batch_length:(Some 300)
-      ~inclusion_timeout:parameters.timeout
+    Evm_node_lib_dev.Tx_queue.start
+      ~config
+      ~keep_alive:true
+      ~timeout:parameters.timeout
+      ~start_injector_worker:true
       ()
   in
+  let* () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let follower =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
+      ()
   in
-  let tx_queue = Tx_queue.beacon ~tick_interval:0.5 in
+  let tx_queue =
+    Evm_node_lib_dev.Tx_queue.tx_queue_beacon
+      ~evm_node_endpoint:(Rpc endpoint)
+      ~tick_interval:0.5
+  in
   Log.report "Deploying SnailTracer contract" ;
   let bin = Contracts.Snailtracer.bin () in
   let bin = bin ^ encode_parameters width height in
@@ -275,16 +291,23 @@ let test_snailtracer () =
       spp;
     }
   in
-  monitor_gasometer sequencer @@ fun () ->
-  let* stop_profile =
-    if parameters.profiling then profile sequencer else return (fun () -> unit)
+  let* _ =
+    monitor_gasometer sequencer @@ fun () ->
+    let* stop_profile =
+      if parameters.profiling then profile sequencer
+      else return (fun () -> unit)
+    in
+    let* () =
+      with_collect_host_function_metrics env.rpc_node @@ fun () ->
+      Lwt_list.iter_s (step env) (List.init parameters.iterations succ)
+    in
+    Lwt.cancel follower ;
+    Lwt.cancel tx_queue ;
+    let*? () = Evm_node_lib_dev.Tx_queue.shutdown () in
+    let* () = Evm_node.terminate sequencer in
+    stop_profile ()
   in
-  let* () = Lwt_list.iter_s (step env) (List.init parameters.iterations succ) in
-  Lwt.cancel follower ;
-  Lwt.cancel tx_queue ;
-  let* () = Tx_queue.shutdown () in
-  let* () = Evm_node.terminate sequencer in
-  stop_profile ()
+  unit
 
 let test_full_image_raytracing () =
   let width = parameters.width in
@@ -308,7 +331,6 @@ let test_full_image_raytracing () =
     ~time_between_blocks:Nothing
     ~eth_bootstrap_accounts:[sender.address]
     ~websockets:true
-    ~use_multichain:Register_without_feature
     ~use_dal:Register_without_feature
     ~da_fee:Wei.zero
     ~minimum_base_fee_per_gas:Wei.one
@@ -325,19 +347,33 @@ let test_full_image_raytracing () =
   let*? infos =
     Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:1000.
   in
+  let max_size = 999_999 in
+  let tx_per_addr_limit = Int64.of_int 999_999 in
+  let max_transaction_batch_length = Some 300 in
+  let max_lifespan_s = int_of_float parameters.timeout in
+  let config : Evm_node_config.Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
   let*? () =
-    Tx_queue.start
-      ~relay_endpoint:endpoint
-      ~max_transaction_batch_length:(Some 300)
-      ~inclusion_timeout:parameters.timeout
+    Evm_node_lib_dev.Tx_queue.start
+      ~config
+      ~keep_alive:true
+      ~timeout:parameters.timeout
+      ~start_injector_worker:true
       ()
   in
+  let* () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let follower =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
+      ()
   in
-  let tx_queue = Tx_queue.beacon ~tick_interval:0.5 in
+  let tx_queue =
+    Evm_node_lib_dev.Tx_queue.tx_queue_beacon
+      ~evm_node_endpoint:(Rpc endpoint)
+      ~tick_interval:0.5
+  in
   Log.report "Deploying SnailTracer contract" ;
   let bin = Contracts.Snailtracer.bin () in
   let bin = bin ^ encode_parameters width height in
@@ -346,7 +382,7 @@ let test_full_image_raytracing () =
   in
   Lwt.cancel follower ;
   Lwt.cancel tx_queue ;
-  let* () = Tx_queue.shutdown () in
+  let*? () = Evm_node_lib_dev.Tx_queue.shutdown () in
   let env =
     {
       sequencer;
@@ -363,7 +399,10 @@ let test_full_image_raytracing () =
   let* stop_profile =
     if parameters.profiling then profile sequencer else return (fun () -> unit)
   in
-  let* () = ray_trace_scanlines env sender in
+  let* () =
+    with_collect_host_function_metrics env.rpc_node @@ fun () ->
+    ray_trace_scanlines env sender
+  in
   let* () = Evm_node.terminate sequencer in
   stop_profile ()
 

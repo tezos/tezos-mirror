@@ -16,9 +16,6 @@
   octez-l2-libs.smart-rollup
   octez-smart-rollup-node-lib
   octez-l2-libs.layer2_store
-  (select void_for_linking-octez_smart_rollup_node_PtNairob from
-   (octez_smart_rollup_node_PtNairob -> void_for_linking-octez_smart_rollup_node_PtNairob.empty)
-   (-> void_for_linking-octez_smart_rollup_node_PtNairob.empty))
   (select void_for_linking-octez_smart_rollup_node_Proxford from
    (octez_smart_rollup_node_Proxford -> void_for_linking-octez_smart_rollup_node_Proxford.empty)
    (-> void_for_linking-octez_smart_rollup_node_Proxford.empty))
@@ -34,8 +31,13 @@
   (select void_for_linking-octez_smart_rollup_node_PsRiotum from
    (octez_smart_rollup_node_PsRiotum -> void_for_linking-octez_smart_rollup_node_PsRiotum.empty)
    (-> void_for_linking-octez_smart_rollup_node_PsRiotum.empty))
-  octez_smart_rollup_node_PtSeouLo
+  (select void_for_linking-octez_smart_rollup_node_PtSeouLo from
+   (octez_smart_rollup_node_PtSeouLo -> void_for_linking-octez_smart_rollup_node_PtSeouLo.empty)
+   (-> void_for_linking-octez_smart_rollup_node_PtSeouLo.empty))
   octez_smart_rollup_node_PtTALLiN
+  (select void_for_linking-octez_smart_rollup_node_PsUshuai from
+   (octez_smart_rollup_node_PsUshuai -> void_for_linking-octez_smart_rollup_node_PsUshuai.empty)
+   (-> void_for_linking-octez_smart_rollup_node_PsUshuai.empty))
   (select void_for_linking-octez_smart_rollup_node_alpha from
    (octez_smart_rollup_node_alpha -> void_for_linking-octez_smart_rollup_node_alpha.empty)
    (-> void_for_linking-octez_smart_rollup_node_alpha.empty)))
@@ -53,10 +55,11 @@
 (rule
  (action
   (progn
-   (write-file void_for_linking-octez_smart_rollup_node_PtNairob.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_Proxford.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_PtParisB.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_PsParisC.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_PsQuebec.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_PsRiotum.empty "")
+   (write-file void_for_linking-octez_smart_rollup_node_PtSeouLo.empty "")
+   (write-file void_for_linking-octez_smart_rollup_node_PsUshuai.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_alpha.empty ""))))

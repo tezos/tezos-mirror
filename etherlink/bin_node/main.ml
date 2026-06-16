@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2026 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -83,6 +83,18 @@ end
 module Params = struct
   let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
 
+  let block_param =
+    Tezos_clic.parameter (fun _ s ->
+        let open Lwt_result_syntax in
+        let block =
+          Data_encoding.Json.(
+            destruct
+              Evm_node_lib_dev_encoding.Ethereum_types.Block_parameter
+              .extended_encoding)
+            (`String s)
+        in
+        return block)
+
   let hex_string =
     Tezos_clic.parameter (fun _ s ->
         match `Hex s |> Hex.to_string with
@@ -106,12 +118,31 @@ module Params = struct
         if uri = "" then return_none else return_some (Uri.of_string uri))
 
   let runtime =
-    Tezos_clic.parameter (fun _ ->
+    Tezos_clic.parameter (fun _ s ->
         let open Lwt_result_syntax in
         let open Evm_node_lib_dev.Tezosx in
-        function
-        | "tezos" -> return Tezos
-        | name ->
+        let name, raw_level =
+          match String.index_opt s ':' with
+          | None -> (s, None)
+          | Some i ->
+              let name = String.sub s 0 i in
+              let level_str = String.sub s (i + 1) (String.length s - i - 1) in
+              (name, Some level_str)
+        in
+        let* target_sunrise_level =
+          match raw_level with
+          | None -> return_none
+          | Some level_str -> (
+              match int_of_string_opt level_str with
+              | Some n -> return_some n
+              | None ->
+                  failwith
+                    "Invalid target sunrise level '%s', expected an integer"
+                    level_str)
+        in
+        match name with
+        | "tezos" -> return (Tezos, target_sunrise_level)
+        | _ ->
             let open Format in
             failwith
               "Unexpected runtime name '%s', supported values are %a"
@@ -150,6 +181,7 @@ module Params = struct
       | "mainnet" -> Lwt.return_ok Mainnet
       | "testnet" -> Lwt.return_ok Testnet
       | "braeburn" | "shadownet" -> Lwt.return_ok Shadownet
+      | "previewnet" -> Lwt.return_ok Previewnet
       | invalid_network ->
           failwith "'%s' is not a supported network" invalid_network)
 
@@ -158,6 +190,36 @@ module Params = struct
   let evm_node_endpoint = endpoint
 
   let evm_node_private_endpoint = endpoint
+
+  let kernel_root_hash k =
+    let open Tezos_clic in
+    param
+      ~name:"kernel-id"
+      ~desc:
+        "Either a root hash of the kernel to download, or the name of a \
+         supported kernel (\"bifrost\", \"calypso\", \"calypso2\", \
+         \"dionysus\", \"dionysus-r1\", \"ebisu\", \"farfadet\", \
+         \"farfadet-r1\" or \"farfadet-r2\")."
+      (parameter (fun _ str ->
+           let open Evm_node_lib_dev.Constants in
+           let open Lwt_result_syntax in
+           match kernel_from_string str with
+           | Some kernel -> (
+               match root_hash_from_released_kernel kernel with
+               | Some hex -> return hex
+               | None ->
+                   failwith
+                     "%s is a known kernel but has no fixed root hash"
+                     str)
+           | None ->
+               trace
+                 (error_of_fmt
+                    "%s is neither a known kernel nor a valid root hash"
+                    str)
+                 (let open Lwt_result_syntax in
+                  let*? hex = Evm_node_lib_dev.Misc.normalize_hex str in
+                  return hex)))
+      k
 
   let sequencer_key =
     Tezos_clic.param
@@ -186,23 +248,73 @@ module Params = struct
         in
         Lwt.return_ok time_between_blocks)
 
+  let parse_delay s =
+    let open Lwt_result_syntax in
+    let len = String.length s in
+    if len < 3 || s.[0] <> '+' then
+      tzfail
+      @@ error_of_fmt
+           "Invalid format, the delay must be formatted as `+<n><T>`, where T \
+            is a time unit `h`,`m`,`s`."
+    else
+      let number_str = String.sub s 1 (len - 2) in
+      let*? n =
+        match Int64.of_string_opt number_str with
+        | None -> Error [error_of_fmt "Invalid delay integer %S" number_str]
+        | Some n -> Ok n
+      in
+      let unit = s.[len - 1] in
+      let*? multiplier =
+        match unit with
+        | 'h' -> Ok 3600L
+        | 'm' -> Ok 60L
+        | 's' -> Ok 1L
+        | '0' .. '9' ->
+            Error [error_of_fmt "Delay must have a time unit (s, m, or h)"]
+        | _ -> Error [error_of_fmt "%c is an invalid time unit" unit]
+      in
+      return @@ Int64.mul n multiplier
+
   let timestamp =
     let open Lwt_result_syntax in
-    Tezos_clic.parameter (fun _ timestamp ->
-        let timestamp = String.trim timestamp in
-        match Time.Protocol.of_notation timestamp with
-        | Some t -> return t
-        | None -> (
-            match
-              Int64.of_string_opt timestamp
-              |> Option.map Time.Protocol.of_seconds
-            with
-            | Some t -> return t
+    Tezos_clic.parameter @@ fun _ timestamp_s ->
+    let timestamp_s = String.trim timestamp_s in
+    Client_aliases.parse_alternatives
+      [
+        ( "delay",
+          fun s ->
+            let* delay_s =
+              trace
+                (error_of_fmt
+                   "Delay must be formatted as `+<n><T>`, where `n` is an \
+                    integer and `T` a time unit `h`,`m`,`s`")
+              @@ parse_delay s
+            in
+            let now_timestamp = Time.System.to_protocol @@ Time.System.now () in
+            let timestamp = Time.Protocol.add now_timestamp delay_s in
+            return timestamp );
+        ( "rfc3399",
+          fun s ->
+            match Time.Protocol.of_notation s with
+            | Some timestamp -> return timestamp
             | None ->
-                failwith
-                  "Timestamp must be either in RFC3399 format  (e.g., \
-                   [\"1970-01-01T00:00:00Z\"]) or in number of seconds since \
-                   the {!Time.Protocol.epoch}."))
+                tzfail
+                @@ error_of_fmt
+                     "Timestamp must be in RFC3399 format (e.g. \
+                      [\"1970-01-01T00:00:00Z\"])" );
+        ( "second",
+          fun s ->
+            match
+              Int64.of_string_opt s |> Option.map Time.Protocol.of_seconds
+            with
+            | Some timestamp -> return timestamp
+            | None ->
+                tzfail
+                @@ error_of_fmt
+                     "Timestamp must be in number of seconds since the \
+                      {!Time.Protocol.epoch}" );
+      ]
+      timestamp_s
 
   let eth_address =
     Tezos_clic.parameter (fun _ address ->
@@ -217,12 +329,21 @@ module Params = struct
 
   let tez_account =
     Tezos_clic.parameter (fun _ public_key ->
-        Lwt.return (Signature.Public_key.of_b58check public_key))
+        Lwt.return (Signature.V2.Public_key.of_b58check public_key))
+
+  let tezosx_account =
+    Tezos_clic.parameter @@ fun _ address ->
+    Lwt.return (Evm_node_lib_dev.Tezosx.address_of_string address)
 
   let l2_level =
     Tezos_clic.parameter (fun () s ->
         Lwt.return_ok
         @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s))
+
+  let tx_hash =
+    Tezos_clic.parameter (fun () s ->
+        Lwt.return_ok
+        @@ Evm_node_lib_dev_encoding.Ethereum_types.hash_of_string s)
 
   let snapshot_file_or_url next =
     Tezos_clic.param
@@ -261,17 +382,41 @@ module Params = struct
     | Some mode -> return mode
     | None ->
         failwith
-          "Invalid history mode. Must be either archive, rolling:n or full:n \
-           where n is the number of days to retain history."
+          "Invalid history mode. Must be archive, full:N, rolling:N or seed:N \
+           where N is the retention period in days."
 
   let history next =
     Tezos_clic.param
       ~name:"history"
       ~desc:
-        "History mode, either archive, rolling:n or full:n where n is the \
-         number of days of history to retain."
+        "History mode for the EVM node. `archive`: keeps all data \
+         indefinitely. `full:N`: prunes Irmin context older than N days, keeps \
+         all SQL data (blocks, transactions, blueprints). `rolling:N`: prunes \
+         everything older than N days (context, blocks, transactions, \
+         blueprints). `seed:N`: minimal mode for sequencers — prunes context, \
+         blocks and transactions older than N days, keeps only blueprints and \
+         their events."
       history_param
       next
+
+  module Shell = struct
+    let pp =
+      Tezos_clic.parameter @@ fun () s ->
+      let open Lwt_result_syntax in
+      match Tezos_layer2_shell.Pp.of_string s with
+      | Some pp -> return pp
+      | _ -> failwith "Unexpected value %s" s
+  end
+end
+
+module Shell = struct
+  let pp_arg =
+    Tezos_clic.default_arg
+      ~long:"pp"
+      ~placeholder:"PP"
+      ~default:"hex"
+      ~doc:"Specify how to print the stored value"
+      Params.Shell.pp
 end
 
 let wallet_dir_arg =
@@ -302,7 +447,7 @@ let rpc_port_arg =
 let rpc_batch_limit_arg =
   Tezos_clic.arg
     ~long:"rpc-batch-limit"
-    ~placeholder:"PORT"
+    ~placeholder:"unlimited|N"
     ~doc:
       "A limit on the number of requests allowed in a single batch. Can either \
        be `unlimited` or a positive integer."
@@ -331,6 +476,15 @@ let private_rpc_port_arg =
     ~doc:"The EVM node private server rpc port."
     Params.int
 
+let sandbox_arg =
+  Tezos_clic.switch
+    ~doc:
+      "Enable sandbox mode\n\
+       At startup, the observer node will fetch the public key used by its \
+       remote EVM endpoint and patch its local state accordingly."
+    ~long:"sandbox"
+    ()
+
 let ws_arg =
   Tezos_clic.arg_or_switch
     ~long:"ws"
@@ -355,6 +509,14 @@ let block_number_arg ~doc =
       Lwt_result_syntax.return
         (Option.map (fun i -> Ethereum_types.Qty Z.(of_int i)) i))
   @@ Tezos_clic.arg ~long:"block-number" ~placeholder:"N" ~doc Params.int
+
+let block_param_arg =
+  Tezos_clic.default_arg
+    ~doc:"Block parameter as per Ethereum JSON RPC specification"
+    ~long:"block"
+    ~placeholder:"BLOCK"
+    ~default:"latest"
+    Params.block_param
 
 let maximum_blueprints_lag_arg =
   Tezos_clic.arg
@@ -412,13 +574,19 @@ let cors_allowed_origins_arg =
     ~doc:"List of accepted cors origins."
     Params.string_list
 
-let mainnet_compat_arg =
-  Tezos_clic.switch
-    ~long:"mainnet-compat"
+let kernel_compat_arg =
+  Tezos_clic.arg
+    ~long:"kernel-compat"
+    ~placeholder:"bifrost|calypso|..."
     ~doc:
-      "Generate a configuration compatible with the first Etherlink Mainnet \
-       kernel."
-    ()
+      "Generate a configuration compatible with the specified kernel version. \
+       Supported values: mainnet-beta, mainnet-gamma, bifrost, calypso, \
+       calypso2, dionysus, dionysus-r1, ebisu, farfadet, farfadet-r1, \
+       farfadet-r2, latest."
+  @@ Tezos_clic.parameter (fun _ kernel_name ->
+         match Evm_node_lib_dev.Constants.kernel_from_string kernel_name with
+         | Some kernel -> Lwt.return_ok kernel
+         | None -> failwith "Unknown kernel name: %s" kernel_name)
 
 let profile_arg =
   Tezos_clic.arg_or_switch
@@ -430,6 +598,13 @@ let profile_arg =
        flamegraph indexed on tick consumption"
     ~default:"flamegraph"
     Params.profile
+
+let simulate_instant_confirmation_arg =
+  Tezos_clic.switch
+    ~long:"simulate-instant-confirmation"
+    ~short:'I'
+    ~doc:"Simulate instant confirmation for this replay."
+    ()
 
 let disable_da_fees_arg =
   Tezos_clic.switch
@@ -452,6 +627,12 @@ let keep_everything_arg =
     ~short:'k'
     ~long:"keep-everything"
     ~doc:"Do not filter out files outside of the `/evm` directory."
+    ()
+
+let fail_on_divergence_arg =
+  Tezos_clic.switch
+    ~long:"fail-on-divergence"
+    ~doc:"Instant confirmation observer hard fails on block hash divergence"
     ()
 
 let verbose_arg =
@@ -521,6 +702,23 @@ let json_arg =
     ~short:'j'
     ~long:"json"
     ~doc:"Enables the display of json schemas."
+    ()
+
+let rollup_address_param =
+  Tezos_clic.arg
+    ~long:"rollup"
+    ~placeholder:"sr1..."
+    ~doc:
+      "A rollup address or alias used to create the string that must be passed \
+       to an admin contract"
+    Params.string
+
+let show_activation_timestamp_param =
+  Tezos_clic.switch
+    ~long:"show-activation-timestamp"
+    ~doc:
+      "Show the activation timestamp at which the kernel upgrade will be \
+       activated"
     ()
 
 let rollup_address_arg =
@@ -595,7 +793,7 @@ let supported_network_arg ?why () =
       Format.(
         asprintf
           "The network the EVM node will be connecting to. Can be `mainnet`, \
-           `testnet` or `shadownet`.%a"
+           `testnet`, `shadownet` or `previewnet`.%a"
           (pp_print_option (fun fmt why -> fprintf fmt " %s" why))
           why)
     Params.supported_network
@@ -664,10 +862,11 @@ let enable_runtime_arg =
   Tezos_clic.multiple_arg
     ~doc:
       "Enable a Tezos X experimental runtime alongside the default Ethereum \
-       runtime of Etherlink"
+       runtime of Etherlink. An optional target sunrise level can be provided \
+       with the syntax RUNTIME:TARGET_SUNRISE_LEVEL."
     ~long:"with-runtime"
     ~short:'r'
-    ~placeholder:"RUNTIME"
+    ~placeholder:"RUNTIME[:TARGET_SUNRISE_LEVEL]"
     Params.runtime
 
 let evm_node_private_endpoint_arg =
@@ -691,7 +890,7 @@ let max_number_of_chunks_arg =
   Tezos_clic.arg
     ~long:"max-number-of-chunks"
     ~doc:"Maximum number of chunks per blueprint."
-    ~placeholder:"10."
+    ~placeholder:"10"
     Params.int
 
 let keep_alive_arg =
@@ -720,7 +919,9 @@ let timestamp_arg =
   Params.timestamp
   |> Tezos_clic.default_arg
        ~long:"timestamp"
-       ~doc:""
+       ~doc:
+         "Timestamp used for the blueprint being chunked. Defaults to the \
+          epoch (i.e. 0 seconds since 1970-01-01)."
        ~placeholder:"1970-01-01T00:00:00Z"
        ~default:"0"
 
@@ -769,8 +970,8 @@ let tx_pool_addr_limit_arg =
     ~long:"tx-pool-addr-limit"
     ~placeholder:"4_000"
     ~doc:
-      "DEPRECATED and not used anymore : Use `tx-pool-max-txs` instead. \
-       Maximum allowed addresses inside the transaction pool."
+      "DEPRECATED and not used anymore: Use `tx-pool-max-txs` instead. Maximum \
+       allowed addresses inside the transaction pool."
     Params.int
 
 let tx_queue_tx_per_addr_limit_arg =
@@ -822,15 +1023,12 @@ let log_filter_chunk_size_arg =
     ~long:"chunk-size"
     ~doc:
       "Blocks to be filtered are split in chunks, which will be filtered in \
-       sequence. Within each chunk, the block filtering is done concurrently."
+       sequence. Within each chunk, the block filtering is done concurrently. \
+       DEPRECATED: this argument does not have any effect anymore. Use \
+       `--maximum-number-logs` and `--maximum-number-blocks` to bound the \
+       computations performed by the `eth_getLogs` RPC request."
     ~placeholder:"10"
     Params.int
-
-let read_only_arg =
-  Tezos_clic.switch
-    ~doc:"If the flag is set, the node refuses transactions."
-    ~long:"read-only"
-    ()
 
 let finalized_view_arg =
   Tezos_clic.switch
@@ -840,19 +1038,10 @@ let finalized_view_arg =
     ~long:"finalized-view"
     ()
 
-let ignore_block_param_arg =
-  Tezos_clic.switch
-    ~doc:
-      "If the flag is set, the node in proxy mode ignores the block parameter \
-       submitted by the client and defaults to the latest block for \
-       unsupported blocks."
-    ~long:"ignore-block-param"
-    ()
-
 let restricted_rpcs_arg =
   Tezos_clic.arg
     ~doc:
-      "Disable methods that matches the given Perl-like regular expression. \
+      "Disable methods that match the given Perl-like regular expression. \
        Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs."
     ~long:"restricted-rpcs"
     ~placeholder:"regexp"
@@ -882,6 +1071,9 @@ let blacklisted_rpcs_arg =
          Lwt_result_syntax.return
            (Configuration.Blacklist (String.split ',' raw))))
 
+(** Pick the single [--restricted-rpcs], [--whitelisted-rpcs] or
+    [--blacklisted-rpcs] argument provided on the command line. Fail when
+    more than one is used simultaneously, return [None] when none is given. *)
 let pick_restricted_rpcs r w b =
   match (r, w, b) with
   | None, None, None -> Lwt_result_syntax.return_none
@@ -891,6 +1083,14 @@ let pick_restricted_rpcs r w b =
       failwith
         "Can only use one CLI argument among --restricted-rpcs, \
          --blacklisted-rpcs and --whitelisted-rpcs"
+
+(** Translate the [--dont-track-rollup-node] switch into a configuration
+    override: [Some true] when the switch is present, [None] otherwise so
+    that the value from the configuration file is preserved when the flag
+    is omitted on the command line. *)
+let dont_track_rollup_node_from_flag = function
+  | true -> Some true
+  | false -> None
 
 let dal_slots_arg =
   Tezos_clic.arg
@@ -916,8 +1116,14 @@ let num_download_retries =
 let history_arg =
   Tezos_clic.arg
     ~long:"history"
-    ~doc:"History mode for the EVM node. ':n' means n days of history."
-    ~placeholder:"archive | rolling:n | full:n"
+    ~doc:
+      "History mode for the EVM node. `archive`: keeps all data indefinitely. \
+       `full:N`: prunes Irmin context older than N days, keeps all SQL data \
+       (blocks, transactions, blueprints). `rolling:N`: prunes everything \
+       older than N days (context, blocks, transactions, blueprints). \
+       `seed:N`: minimal mode for sequencers — prunes context, blocks and \
+       transactions older than N days, keeps only blueprints and their events."
+    ~placeholder:"archive|full:N|rolling:N|seed:N"
     Params.history_param
 
 let profiling_arg =
@@ -930,6 +1136,18 @@ let profiling_arg =
        | "true" -> Lwt_result_syntax.return_true
        | "false" -> Lwt_result_syntax.return_false
        | s -> failwith "Invalid value %S for --profiling" s)
+
+let blueprint_version_arg =
+  let open Evm_node_lib_dev.Sequencer_blueprint in
+  let open Lwt_result_syntax in
+  Tezos_clic.arg
+    ~doc:"Version of blueprint format to use."
+    ~long:"blueprint-version"
+    ~placeholder:"0"
+  @@ Tezos_clic.parameter (fun () -> function
+       | "0" -> return Legacy
+       | "1" -> return V1
+       | s -> failwith "Invalid blueprint version %S" s)
 
 let common_config_args =
   Tezos_clic.args24
@@ -1021,6 +1239,14 @@ let desync_index_dir_arg =
     ~placeholder:"path|url"
   @@ Params.string
 
+let depth_arg =
+  Tezos_clic.default_arg
+    ~long:"depth"
+    ~doc:"Depth of the tree to display."
+    ~placeholder:"nb"
+    ~default:"2"
+    Params.int
+
 module Groups = struct
   let run = Tezos_clic.{name = "run"; title = "Run commands"}
 
@@ -1037,12 +1263,17 @@ module Groups = struct
   let debug = Tezos_clic.{name = "debug"; title = "Debug commands"}
 end
 
+(** Emit a warning when websockets are enabled while the RPC server backend
+    is Dream, since Dream's websocket support is known to be unstable. *)
 let websocket_checks config =
   match (config.websockets, config.experimental_features) with
   | Some _, {rpc_server = Dream; _} ->
       Internal_event.Simple.emit Event.buggy_dream_websocket () |> Lwt_result.ok
   | _ -> Lwt_result_syntax.return_unit
 
+(** Build an internal event configuration. When [daily_logs_path] is set,
+    attach a daily log sink that filters out the noisy [rpc_server] events
+    below [Notice] and rotates after 7 days. *)
 let make_event_config ~verbosity ?daily_logs_path () =
   let open Tezos_event_logging.Internal_event in
   let open Tezos_base_unix.Internal_event_unix in
@@ -1080,6 +1311,10 @@ let make_event_config ~verbosity ?daily_logs_path () =
       add_uri_to_config uri config
   | None -> config
 
+(** Initialise the internal event logger for the running node. When
+    [daily_logs] is [true], a daily log file is written inside the data
+    directory; [rpc_mode_port] disambiguates the log directory when several
+    RPC-mode nodes share the same data directory. *)
 let init_logs ~daily_logs ?rpc_mode_port configuration =
   let open Tezos_base_unix.Internal_event_unix in
   let daily_logs_path =
@@ -1107,6 +1342,9 @@ let init_logs ~daily_logs ?rpc_mode_port configuration =
 *)
 let performance_gc_params = (8388608 (* 8M *), 120)
 
+(** Apply the OCaml GC parameters matching [config.performance_profile].
+    When the user already overrode [s=] or [o=] through [OCAMLRUNPARAM] the
+    function emits a warning and leaves the parameters untouched. *)
 let set_gc_parameters (config : Configuration.t) =
   let open Lwt_syntax in
   match
@@ -1123,61 +1361,8 @@ let set_gc_parameters (config : Configuration.t) =
           let minor_heap_size, space_overhead = performance_gc_params in
           Gc.set {params with minor_heap_size; space_overhead})
 
-let start_proxy ~data_dir ?config_file ~keep_alive ?rpc_timeout ?rpc_addr
-    ?rpc_port ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
-    ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-    ?rollup_node_endpoint ?evm_node_endpoint ?tx_queue_max_lifespan
-    ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ?restricted_rpcs ~verbose
-    ?profiling ~read_only ~finalized_view ~ignore_block_param () =
-  let open Lwt_result_syntax in
-  let* config =
-    Cli.create_or_read_config
-      ~data_dir
-      ~keep_alive
-      ?rpc_timeout
-      ?rpc_addr
-      ?rpc_port
-      ?rpc_batch_limit
-      ?cors_origins
-      ?cors_headers
-      ?enable_websocket
-      ?log_filter_max_nb_blocks
-      ?log_filter_max_nb_logs
-      ?log_filter_chunk_size
-      ?rollup_node_endpoint
-      ?evm_node_endpoint
-      ?tx_queue_max_lifespan
-      ?tx_queue_max_size
-      ?tx_queue_tx_per_addr_limit
-      ?restricted_rpcs
-      ~finalized_view
-      ~proxy_ignore_block_param:ignore_block_param
-      ~verbose
-      ?profiling
-      (config_filename ~data_dir ?config_file ())
-  in
-  (* We patch [config] to take into account the proxy-specific argument
-     [--read-only]. *)
-  let config =
-    {
-      config with
-      experimental_features =
-        {
-          config.experimental_features with
-          enable_send_raw_transaction =
-            (if read_only then false
-             else config.experimental_features.enable_send_raw_transaction);
-        };
-    }
-  in
-  let*! () = init_logs ~daily_logs:true config in
-  let*! () = set_gc_parameters config in
-  let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
-  let* () = Evm_node_lib_dev.Proxy.main config in
-  let wait, _resolve = Lwt.wait () in
-  let* () = wait in
-  return_unit
-
+(** Build an [io_wallet] rooted at [wallet_dir] and register it as the
+    default signer for the client library. *)
 let register_wallet ?password_filename ~wallet_dir () =
   let wallet_ctxt =
     new Client_context_unix.unix_io_wallet
@@ -1190,6 +1375,8 @@ let register_wallet ?password_filename ~wallet_dir () =
   in
   wallet_ctxt
 
+(** Resolve the sequencer [keys] through [wallet_ctxt], or generate a fresh
+    unencrypted Ed25519 key when [keys] is [None] or empty. *)
 let get_keys_or_generate_one wallet_ctxt keys =
   let open Lwt_result_syntax in
   let get key =
@@ -1210,6 +1397,10 @@ let get_keys_or_generate_one wallet_ctxt keys =
       [key]
   | Some keys -> List.map_es get keys
 
+(** Downgrade [native_execution_policy] from [Always] to [Rpcs_only] in
+    sequencer mode, since native execution is not supported for block
+    application. Emits a warning when the policy is effectively changed,
+    and is a no-op otherwise. *)
 let sequencer_disable_native_execution configuration =
   let open Lwt_syntax in
   match configuration.kernel_execution.native_execution_policy with
@@ -1227,6 +1418,8 @@ let sequencer_disable_native_execution configuration =
       }
   | Rpcs_only | Never -> return configuration
 
+(** Fall back to the network's bundled kernel when no explicit [kernel] was
+    provided on the command line. Returns [None] when neither is available. *)
 let kernel_from_args network kernel =
   let open Evm_node_lib_dev.Pvm_types in
   Option.either
@@ -1234,8 +1427,12 @@ let kernel_from_args network kernel =
     (Option.bind network (function
       | Mainnet -> Some (In_memory Evm_node_supported_installers.mainnet)
       | Testnet -> None
-      | Shadownet -> Some (In_memory Evm_node_supported_installers.shadownet)))
+      | Shadownet -> Some (In_memory Evm_node_supported_installers.shadownet)
+      | Previewnet -> Some (In_memory Evm_node_supported_installers.previewnet)))
 
+(** Inject a default tezlink L2 chain and [spawn_rpc] port into
+    [configuration.experimental_features], without overriding any user-provided
+    values. *)
 let add_tezlink_to_node_configuration tezlink_chain_id configuration =
   let open Configuration in
   let experimental_features =
@@ -1257,6 +1454,9 @@ let add_tezlink_to_node_configuration tezlink_chain_id configuration =
   in
   {configuration with experimental_features}
 
+(** Read or create the configuration, patch it for sequencer or sandbox
+    mode (including the tezlink sandbox), initialise the logger and GC
+    parameters, then hand control over to {!Evm_node_lib_dev.Sequencer.main}. *)
 let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_keys ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
     ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
@@ -1475,6 +1675,8 @@ let rpc_command =
         ~config
         ())
 
+(** Read or create the configuration, initialise the logger and GC
+    parameters, then hand control over to {!Evm_node_lib_dev.Observer.main}. *)
 let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?private_rpc_port ?cors_origins ?cors_headers
     ?enable_websocket ~verbose ?profiling ?preimages ?preimages_endpoint
@@ -1482,7 +1684,8 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
     ?evm_node_endpoint ?tx_queue_max_lifespan ?tx_queue_max_size
     ?tx_queue_tx_per_addr_limit ?log_filter_chunk_size ?log_filter_max_nb_logs
     ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel ~no_sync
-    ~init_from_snapshot ?history_mode ~finalized_view ?network config_file =
+    ~init_from_snapshot ?history_mode ~finalized_view ?network ~sandbox
+    config_file =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1498,10 +1701,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
       ?enable_websocket
       ?rollup_node_endpoint
       ?dont_track_rollup_node:
-        (* If `dont_track_rollup_node` is false, it means the argument was
-           omitted from the command-line. As a consequence, we default to
-           the config value by passing [None]. *)
-        (if dont_track_rollup_node then Some true else None)
+        (dont_track_rollup_node_from_flag dont_track_rollup_node)
       ~verbose
       ?profiling
       ?preimages
@@ -1531,8 +1731,12 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
     ~init_from_snapshot
     ?kernel_path:kernel
     ~config
+    ~sandbox
     ()
 
+(** Encode [data] as inbox messages, either as a signed blueprint or as
+    raw chunked transactions, depending on [kind]. Returns the hex-encoded
+    external payloads ready to be injected. *)
 let make_dev_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
@@ -1544,14 +1748,16 @@ let make_dev_messages ~kind ~smart_rollup_address data =
   in
   let* messages =
     match kind with
-    | `Blueprint (signer, timestamp, number, parent_hash) ->
+    | `Blueprint (signer, timestamp, number, parent_hash, version) ->
         let chunks =
           Sequencer_blueprint.make_blueprint_chunks
             ~number:(Ethereum_types.quantity_of_z number)
             {
+              version = Option.value ~default:Sequencer_blueprint.Legacy version;
               parent_hash = Ethereum_types.block_hash_of_string parent_hash;
               delayed_transactions = [];
-              transactions;
+              transactions =
+                List.map (fun raw -> Broadcast.Evm raw) transactions;
               timestamp;
             }
         in
@@ -1573,6 +1779,9 @@ let make_dev_messages ~kind ~smart_rollup_address data =
   in
   return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
+(** Parse a [file:PATH] or [data:RAW] CLI argument. When a file is given,
+    its content is read and split on whitespace; the raw form is returned
+    as a singleton list. *)
 let from_data_or_file data_for_file =
   let open Lwt_result_syntax in
   Client_aliases.parse_alternatives
@@ -1642,7 +1851,7 @@ let chunker_command =
     ~desc:
       "Chunk hexadecimal data according to the message representation of the \
        EVM rollup."
-    (args10
+    (args11
        config_path_arg
        data_dir_arg
        rollup_address_arg
@@ -1652,7 +1861,8 @@ let chunker_command =
        parent_hash_arg
        sequencer_key_arg
        wallet_dir_arg
-       (Client_config.password_filename_arg ()))
+       (Client_config.password_filename_arg ())
+       blueprint_version_arg)
     (prefixes ["chunk"; "data"]
     @@ seq_of_param
     @@ param
@@ -1671,7 +1881,8 @@ let chunker_command =
            blueprint_parent_hash,
            sequencer_str,
            wallet_dir,
-           password_filename )
+           password_filename,
+           blueprint_version )
          data
          ()
        ->
@@ -1694,7 +1905,8 @@ let chunker_command =
             ( signer,
               blueprint_timestamp,
               blueprint_number,
-              blueprint_parent_hash )
+              blueprint_parent_hash,
+              blueprint_version )
         else return `Transaction
       in
       let data = List.flatten data in
@@ -1709,32 +1921,62 @@ let chunker_command =
       in
       print_chunks rollup_address data)
 
+let wallet_command_args =
+  Tezos_clic.args2 (Client_config.password_filename_arg ()) wallet_dir_arg
+
 let make_upgrade_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~group:Groups.kernel
     ~desc:"Create bytes payload for the upgrade entrypoint."
-    no_options
+    (merge_options
+       wallet_command_args
+       (args2 rollup_address_param show_activation_timestamp_param))
     (prefixes ["make"; "upgrade"; "payload"; "with"; "root"; "hash"]
-    @@ param
-         ~name:"preimage_hash"
-         ~desc:"Root hash of the kernel to upgrade to."
-         Params.string
+    @@ Params.kernel_root_hash
     @@ prefixes ["at"; "activation"; "timestamp"]
     @@ param
          ~name:"activation_timestamp"
          ~desc:
-           "After activation timestamp, the kernel will upgrade to this value."
+           "After activation timestamp, the kernel will upgrade to this value.\n\
+            Must follow one of the following format:\n\
+            - An RFC3399 timestamp: \"1970-01-01T00:00:00Z\",\n\
+            - A number of second since the {!Time.Protocol.epoch},\n\
+            - A delay from now: `+<n><T>` where <n> is an integer and <T> a \
+            unit `h`,`m`, or `s`."
          Params.timestamp
     @@ stop)
-    (fun () root_hash timestamp () ->
+    (fun ( (password_filename, wallet_dir),
+           (rollup_addr_opt, show_activation_timestamp) )
+         (`Hex root_hash)
+         timestamp
+         ()
+       ->
+      if show_activation_timestamp then
+        Format.printf
+          "Activation timestamp: %a\n%!"
+          Time.Protocol.pp_hum
+          timestamp ;
       let payload =
         Evm_node_lib_dev_encoding.Evm_events.Upgrade.(
           to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
       in
-      Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
-      return_unit)
+      match rollup_addr_opt with
+      | Some rollup_id ->
+          let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
+          let* rollup_addr =
+            Smart_rollup_alias.Address.find wallet_ctxt rollup_id
+          in
+          Format.printf
+            "'Pair \"%a\" %s'\n%!"
+            Tezos_crypto.Hashed.Smart_rollup_address.pp
+            rollup_addr
+            Hex.(of_bytes payload |> show) ;
+          return_unit
+      | None ->
+          Printf.printf "%s\n%!" Hex.(of_bytes payload |> show) ;
+          return_unit)
 
 let make_sequencer_upgrade_command =
   let open Tezos_clic in
@@ -1742,7 +1984,7 @@ let make_sequencer_upgrade_command =
   command
     ~group:Groups.kernel
     ~desc:"Create bytes payload for the sequencer upgrade entrypoint."
-    (args3 config_path_arg data_dir_arg wallet_dir_arg)
+    (merge_options wallet_command_args (args2 config_path_arg data_dir_arg))
     (prefixes ["make"; "sequencer"; "upgrade"; "payload"]
     @@ prefixes ["with"; "pool"; "address"]
     @@ Tezos_clic.param
@@ -1756,7 +1998,7 @@ let make_sequencer_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value."
          Params.timestamp
     @@ prefix "for" @@ Params.sequencer_key @@ stop)
-    (fun (config_file, data_dir, wallet_dir)
+    (fun ((password_filename, wallet_dir), (config_file, data_dir))
          pool_address
          activation_timestamp
          sequencer_str
@@ -1766,7 +2008,7 @@ let make_sequencer_upgrade_command =
         Configuration.config_filename ~data_dir ?config_file ()
       in
       let* config = Cli.create_or_read_config ~data_dir config_file in
-      let wallet_ctxt = register_wallet ~wallet_dir () in
+      let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
       let* signer =
         Evm_node_lib_dev.Signer.of_string config wallet_ctxt sequencer_str
       in
@@ -1786,7 +2028,7 @@ let init_from_rollup_node_command =
   let rollup_node_data_dir_param =
     Tezos_clic.param
       ~name:"rollup-node-data-dir"
-      ~desc:(Format.sprintf "The path to the rollup node data directory.")
+      ~desc:"The path to the rollup node data directory."
       Params.string
   in
   command
@@ -1806,14 +2048,10 @@ let init_from_rollup_node_command =
       in
       let* configuration = Cli.create_or_read_config ~data_dir config_file in
       let*! () = init_logs ~daily_logs:false configuration in
-      let _start_tx_queue, tx_container =
-        Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-      in
       Evm_node_lib_dev.Evm_context.init_from_rollup_node
         ~configuration
         ~omit_delayed_tx_events
         ~rollup_node_data_dir
-        ~tx_container
         ())
 
 let dump_to_rlp_command =
@@ -1873,7 +2111,7 @@ let reset_command =
        (force_arg
           ~doc:
             "Force suppression of data to reset state of sequencer to a \
-             specified l2 level."))
+             specified L2 level."))
     (prefixes ["reset"; "at"]
     @@ Tezos_clic.param
          ~name:"level"
@@ -1891,7 +2129,7 @@ let reset_command =
            and not accidentally delete data.")
 
 let replay_args =
-  Tezos_clic.args9
+  Tezos_clic.args10
     data_dir_arg
     config_path_arg
     preimages_arg
@@ -1901,6 +2139,25 @@ let replay_args =
     kernel_verbosity_arg
     profile_arg
     disable_da_fees_arg
+    simulate_instant_confirmation_arg
+
+let tracer_arg =
+  Tezos_clic.arg
+    ~long:"tracer"
+    ~placeholder:"tracer"
+    ~doc:"Tracer to use (callTracer or structLogger). Default: callTracer."
+    (Tezos_clic.parameter (fun () s ->
+         match
+           Data_encoding.Json.destruct
+             Evm_node_lib_dev_encoding.Tracer_types.tracer_kind_encoding
+             (`String s)
+         with
+         | v -> Lwt.return_ok v
+         | exception _ ->
+             failwith "Unknown tracer %S, expected callTracer or structLogger" s))
+
+let trace_args =
+  Tezos_clic.merge_options replay_args (Tezos_clic.args1 tracer_arg)
 
 let replay_many_command =
   let open Tezos_clic in
@@ -1919,7 +2176,8 @@ let replay_many_command =
            kernel,
            kernel_verbosity,
            profile,
-           disable_da_fees )
+           disable_da_fees,
+           simulate_instant_confirmation )
          l2_level
          ()
        ->
@@ -1937,7 +2195,9 @@ let replay_many_command =
       in
       let*! () = init_logs ~daily_logs:false configuration in
       let*! () = set_gc_parameters configuration in
-      Evm_node_lib_dev.Replay.main
+      Evm_node_lib_dev.Replay.replay_blueprint
+        ~strategy:
+          (if simulate_instant_confirmation then Assemble else Blueprint)
         ~disable_da_fees
         ?kernel
         ?kernel_verbosity
@@ -1970,7 +2230,8 @@ let replay_command =
            kernel,
            kernel_verbosity,
            profile,
-           disable_da_fees )
+           disable_da_fees,
+           simulate_instant_confirmation )
          l2_level
          upto
          ()
@@ -1989,13 +2250,120 @@ let replay_command =
       in
       let*! () = init_logs ~daily_logs:false configuration in
       let*! () = set_gc_parameters configuration in
-      Evm_node_lib_dev.Replay.main
+      Evm_node_lib_dev.Replay.replay_blueprint
+        ~strategy:
+          (if simulate_instant_confirmation then Assemble else Blueprint)
         ~disable_da_fees
         ?kernel
         ?kernel_verbosity
         ~number:l2_level
         ?profile
         ~upto
+        configuration)
+
+let trace_block_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Trace all transactions in a specific block level."
+    trace_args
+    (prefixes ["trace"; "block"]
+    @@ Tezos_clic.param ~name:"level" ~desc:"Level to trace." Params.l2_level
+    @@ stop)
+    (fun ( ( data_dir,
+             config_file,
+             preimages,
+             preimages_endpoint,
+             native_execution_policy,
+             kernel,
+             kernel_verbosity,
+             profile,
+             disable_da_fees,
+             _simulate_instant_confirmation ),
+           tracer_kind )
+         l2_level
+         ()
+       ->
+      let open Lwt_result_syntax in
+      let config_file =
+        Configuration.config_filename ~data_dir ?config_file ()
+      in
+      let* configuration =
+        Cli.create_or_read_config
+          ~data_dir
+          ?preimages
+          ?preimages_endpoint
+          ?native_execution_policy
+          config_file
+      in
+      let*! () = init_logs ~daily_logs:false configuration in
+      let*! () = set_gc_parameters configuration in
+      let tracer_kind =
+        Option.value
+          ~default:Evm_node_lib_dev_encoding.Tracer_types.CallTracer
+          tracer_kind
+      in
+      Evm_node_lib_dev.Replay.trace_block
+        ~tracer_kind
+        ~disable_da_fees
+        ?kernel
+        ?kernel_verbosity
+        ~number:l2_level
+        ?profile
+        configuration)
+
+let trace_transaction_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Trace a specific transaction."
+    trace_args
+    (prefixes ["trace"; "transaction"]
+    @@ Tezos_clic.param
+         ~name:"hash"
+         ~desc:"Transaction hash to trace."
+         Params.tx_hash
+    @@ stop)
+    (fun ( ( data_dir,
+             config_file,
+             preimages,
+             preimages_endpoint,
+             native_execution_policy,
+             kernel,
+             kernel_verbosity,
+             profile,
+             disable_da_fees,
+             _simulate_instant_confirmation ),
+           tracer_kind )
+         tx_hash
+         ()
+       ->
+      let open Lwt_result_syntax in
+      let config_file =
+        Configuration.config_filename ~data_dir ?config_file ()
+      in
+      let* configuration =
+        Cli.create_or_read_config
+          ~data_dir
+          ?preimages
+          ?preimages_endpoint
+          ?native_execution_policy
+          config_file
+      in
+      let*! () = init_logs ~daily_logs:false configuration in
+      let*! () = set_gc_parameters configuration in
+      let tracer_kind =
+        Option.value
+          ~default:Evm_node_lib_dev_encoding.Tracer_types.CallTracer
+          tracer_kind
+      in
+      Evm_node_lib_dev.Replay.trace_transaction
+        ~tracer_kind
+        ~disable_da_fees
+        ?kernel
+        ?kernel_verbosity
+        ~tx_hash
+        ?profile
         configuration)
 
 let patch_kernel_command =
@@ -2032,15 +2400,8 @@ let patch_kernel_command =
          to interact with an upstream EVM node. *)
       let configuration = {configuration with observer = None} in
       if force then
-        let _start_tx_queue, tx_container =
-          Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-        in
         let* _status =
-          Evm_context.start
-            ~configuration
-            ~store_perm:Read_write
-            ~tx_container
-            ()
+          Evm_context.start ~configuration ~store_perm:Read_write ()
         in
         Evm_context.patch_kernel ?block_number (On_disk kernel_path)
       else
@@ -2069,13 +2430,12 @@ let init_config_command =
     ~group:Groups.config
     ~desc:
       "Create an initial config with default value.\n\
-       If the <rollup-node-endpoint> is set then adds the configuration for \
-       the proxy mode. If the  <sequencer-key> is set,then adds the \
-       configuration for the sequencer mode. If the <evm-node-endpoint> is set \
-       then adds the configuration for the observer mode."
+       If the <sequencer-key> is set, then adds the configuration for the \
+       sequencer mode. If the <evm-node-endpoint> is set, then adds the \
+       configuration for the observer mode."
     (merge_options
        common_config_args
-       (args19
+       (args20
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -2090,7 +2450,8 @@ let init_config_command =
           catchup_cooldown_arg
           evm_node_endpoint_arg
           history_arg
-          (* others option *)
+          fail_on_divergence_arg
+          (* other options *)
           dont_track_rollup_node_arg
           wallet_dir_arg
           (Tezos_clic.switch
@@ -2143,6 +2504,7 @@ let init_config_command =
              catchup_cooldown,
              evm_node_endpoint,
              history_mode,
+             fail_on_divergence,
              dont_track_rollup_node,
              wallet_dir,
              force,
@@ -2182,10 +2544,7 @@ let init_config_command =
           ?rpc_timeout
           ?rollup_node_endpoint
           ?dont_track_rollup_node:
-            (* If `dont_track_rollup_node` is false, it means the argument was
-               omitted from the command-line. As a consequence, we default to
-               the config value by passing [None]. *)
-            (if dont_track_rollup_node then Some true else None)
+            (dont_track_rollup_node_from_flag dont_track_rollup_node)
           ?tx_queue_max_lifespan
           ?tx_queue_max_size
           ?tx_queue_tx_per_addr_limit
@@ -2209,6 +2568,7 @@ let init_config_command =
           ?network
           ?history_mode
           ?sunset_sec:sequencer_sunset_sec
+          ~fail_on_divergence
           config_file
       in
       let*! () = init_logs ~daily_logs:false config in
@@ -2246,6 +2606,8 @@ let check_config_command =
       else Format.printf "Configuration has been parsed successfully.\n" ;
       return_unit)
 
+(** Build a CLI argument that maps [--name-with-dashes VALUE] to the
+    [(name, VALUE)] tuple used by the installer config machinery. *)
 let config_key_arg ~name ~placeholder =
   let open Lwt_result_syntax in
   let long = String.mapi (fun _ c -> if c = '_' then '-' else c) name in
@@ -2253,6 +2615,8 @@ let config_key_arg ~name ~placeholder =
   Tezos_clic.arg ~long ~doc ~placeholder
   @@ Tezos_clic.parameter (fun _ s -> return (name, s))
 
+(** Build a CLI switch that maps [--name-with-dashes] to the [(name, "")]
+    tuple used to enable boolean flags in the installer config. *)
 let config_key_flag ~name =
   let open Lwt_result_syntax in
   let long = String.mapi (fun _ c -> if c = '_' then '-' else c) name in
@@ -2263,16 +2627,12 @@ let config_key_flag ~name =
 
 let eth_bootstrap_account_arg =
   let long = "eth-bootstrap-account" in
-  let doc =
-    Format.sprintf "Add an etherlink bootstrap account in the installer config."
-  in
+  let doc = "Add an etherlink bootstrap account in the installer config." in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.eth_address
 
 let tez_bootstrap_account_arg =
   let long = "tez-bootstrap-account" in
-  let doc =
-    Format.sprintf "Add a tezlink bootstrap account in the installer config."
-  in
+  let doc = "Add a tezlink bootstrap account in the installer config." in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"edp..." Params.tez_account
 
 let tez_bootstrap_contract_arg =
@@ -2310,9 +2670,19 @@ let tez_bootstrap_balance_arg =
          Lwt.return @@ Error_monad.catch
          @@ fun () -> Evm_node_lib_dev_tezlink.Tezos_types.Tez.of_string_exn s)
 
+let michelson_runtime_chain_id_arg =
+  Tezos_clic.arg
+    ~long:"michelson-runtime-chain-id"
+    ~doc:"Chain id used for the Michelson runtime, in the usual base58 format"
+    ~placeholder:"NetXH12DFfBVHi4"
+  @@ Tezos_clic.parameter (fun () s ->
+         let open Lwt_result_syntax in
+         let*? chain_id = Chain_id.of_b58check s in
+         return chain_id)
+
 let set_account_code =
   let long = "set-code" in
-  let doc = Format.sprintf "Add code to an account in the installer config." in
+  let doc = "Add code to an account in the installer config." in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x...,0x...."
   @@ Tezos_clic.parameter (fun _ address_code ->
          let open Lwt_result_syntax in
@@ -2326,13 +2696,15 @@ let set_account_code =
 
 let evm_version_arg =
   let long = "evm-version" in
-  let doc = Format.sprintf "Value for evm_version in the installer config." in
-  Tezos_clic.arg ~long ~doc ~placeholder:"cancun|shanghai"
+  let doc = "Value for evm_version in the installer config." in
+  Tezos_clic.arg ~long ~doc ~placeholder:"cancun|shanghai|prague|osaka"
   @@ Tezos_clic.parameter (fun _ evm_version ->
          let open Lwt_result_syntax in
          match evm_version with
          | "shanghai" -> return Evm_node_lib_dev.Kernel_config.Shanghai
          | "cancun" -> return Evm_node_lib_dev.Kernel_config.Cancun
+         | "prague" -> return Evm_node_lib_dev.Kernel_config.Prague
+         | "osaka" -> return Evm_node_lib_dev.Kernel_config.Osaka
          | _ -> failwith "Parsing error for evm-version")
 
 let make_l2_kernel_config_command =
@@ -2344,7 +2716,8 @@ let make_l2_kernel_config_command =
     ~desc:
       "Produce a file containing the part of the kernel configuration \
        instructions related to a particular L2 chain."
-    (args13
+    (args14
+       kernel_compat_arg
        (config_key_arg ~name:"minimum_base_fee_per_gas" ~placeholder:"111...")
        (config_key_arg ~name:"da_fee_per_byte" ~placeholder:"111...")
        (config_key_arg ~name:"sequencer_pool_address" ~placeholder:"0x...")
@@ -2378,7 +2751,8 @@ let make_l2_kernel_config_command =
          ~desc:"File path where the config will be written to."
          Params.string
     @@ stop)
-    (fun ( minimum_base_fee_per_gas,
+    (fun ( kernel_compat,
+           minimum_base_fee_per_gas,
            da_fee_per_byte,
            sequencer_pool_address,
            maximum_gas_per_transaction,
@@ -2403,6 +2777,7 @@ let make_l2_kernel_config_command =
         | Some l2_chain_id -> return (Chain_id.to_string l2_chain_id)
       in
       Evm_node_lib_dev.Kernel_config.make_l2
+        ?kernel_compat
         ~eth_bootstrap_balance
         ~tez_bootstrap_balance
         ?eth_bootstrap_accounts
@@ -2435,7 +2810,7 @@ let make_kernel_config_command =
     ~desc:"Create a configuration for the kernel installer."
     (merge_options
        (args24
-          mainnet_compat_arg
+          kernel_compat_arg
           (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
           (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
           (config_key_arg ~name:"sequencer" ~placeholder:"edpk...")
@@ -2469,8 +2844,12 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_revm")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args11
+       (args17
+          (config_key_arg
+             ~name:"dal_publishers_whitelist"
+             ~placeholder:"tz1...,tz2...,...")
           (config_key_flag ~name:"enable_dal")
+          (config_key_flag ~name:"disable_legacy_dal_signals")
           (config_key_flag ~name:"enable_multichain")
           l2_chain_ids_arg
           (config_key_arg
@@ -2482,14 +2861,20 @@ let make_kernel_config_command =
           set_account_code
           enable_runtime_arg
           tez_bootstrap_balance_arg
-          tez_bootstrap_account_arg))
+          tez_bootstrap_account_arg
+          tez_bootstrap_contract_arg
+          michelson_runtime_chain_id_arg
+          (config_key_arg
+             ~name:"michelson_to_evm_gas_multiplier"
+             ~placeholder:"10")
+          (config_key_flag ~name:"enable_michelson_gas_refund")))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
          ~desc:"File path where the config will be written to."
          Params.string
     @@ stop)
-    (fun ( ( mainnet_compat,
+    (fun ( ( kernel_compat,
              kernel_root_hash,
              chain_id,
              sequencer,
@@ -2513,7 +2898,9 @@ let make_kernel_config_command =
              enable_fa_bridge,
              enable_revm,
              dal_slots ),
-           ( enable_dal,
+           ( dal_publishers_whitelist,
+             enable_dal,
+             disable_legacy_dal_signals,
              enable_multichain,
              l2_chain_ids,
              max_delayed_inbox_blueprint_length,
@@ -2523,16 +2910,21 @@ let make_kernel_config_command =
              set_account_code,
              with_runtimes,
              tez_bootstrap_balance,
-             tez_bootstrap_accounts ) )
+             tez_bootstrap_accounts,
+             tez_bootstrap_contracts,
+             michelson_runtime_chain_id,
+             michelson_to_evm_gas_multiplier,
+             enable_michelson_gas_refund ) )
          output
          ()
        ->
       Evm_node_lib_dev.Kernel_config.make
-        ~mainnet_compat
+        ?kernel_compat
         ~eth_bootstrap_balance
         ?l2_chain_ids
         ?kernel_root_hash
         ?chain_id
+        ?michelson_runtime_chain_id
         ?sequencer
         ?delayed_bridge
         ?ticketer
@@ -2542,6 +2934,7 @@ let make_kernel_config_command =
         ?kernel_security_governance
         ?evm_version
         ?minimum_base_fee_per_gas
+        ?michelson_to_evm_gas_multiplier
         ?da_fee_per_byte
         ?delayed_inbox_timeout
         ?delayed_inbox_min_levels
@@ -2555,7 +2948,10 @@ let make_kernel_config_command =
         ?enable_dal
         ?enable_revm
         ?dal_slots
+        ?dal_publishers_whitelist
+        ?disable_legacy_dal_signals
         ?enable_multichain
+        ?enable_michelson_gas_refund
         ?set_account_code
         ?max_delayed_inbox_blueprint_length
         ?enable_fast_withdrawal
@@ -2563,74 +2959,8 @@ let make_kernel_config_command =
         ?with_runtimes
         ?tez_bootstrap_accounts
         ~tez_bootstrap_balance
+        ?tez_bootstrap_contracts
         ~output
-        ())
-
-let proxy_command =
-  let open Tezos_clic in
-  command
-    ~group:Groups.run
-    ~desc:"Start the EVM node in proxy mode."
-    (merge_options
-       common_config_args
-       (args3 read_only_arg ignore_block_param_arg evm_node_endpoint_arg))
-    (prefixes ["run"; "proxy"] @@ stop)
-    (fun ( ( data_dir,
-             config_file,
-             rpc_addr,
-             rpc_port,
-             rpc_batch_limit,
-             cors_origins,
-             cors_headers,
-             enable_websocket,
-             log_filter_max_nb_blocks,
-             log_filter_max_nb_logs,
-             log_filter_chunk_size,
-             keep_alive,
-             rpc_timeout,
-             rollup_node_endpoint,
-             _tx_pool_addr_limit,
-             tx_queue_max_lifespan,
-             tx_queue_max_size,
-             tx_queue_tx_per_addr_limit,
-             verbose,
-             restricted_rpcs,
-             blacklisted_rpcs,
-             whitelisted_rpcs,
-             finalized_view,
-             profiling ),
-           (read_only, ignore_block_param, evm_node_endpoint) )
-         ()
-       ->
-      let open Lwt_result_syntax in
-      let* restricted_rpcs =
-        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
-      in
-      start_proxy
-        ~data_dir
-        ?config_file
-        ~keep_alive
-        ?rpc_timeout
-        ?rpc_addr
-        ?rpc_port
-        ?rpc_batch_limit
-        ?cors_origins
-        ?cors_headers
-        ?enable_websocket
-        ?log_filter_max_nb_blocks
-        ?log_filter_max_nb_logs
-        ?log_filter_chunk_size
-        ?rollup_node_endpoint
-        ?evm_node_endpoint
-        ?tx_queue_max_lifespan
-        ?tx_queue_max_size
-        ?tx_queue_tx_per_addr_limit
-        ?restricted_rpcs
-        ~verbose
-        ?profiling
-        ~read_only
-        ~finalized_view
-        ~ignore_block_param
         ())
 
 let sequencer_config_args =
@@ -2658,7 +2988,11 @@ let fund_arg =
     "The address of an account to provide with funds in the sandbox (can be \
      repeated to fund multiple accounts)."
   in
-  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.eth_address
+  Tezos_clic.multiple_arg
+    ~long
+    ~doc
+    ~placeholder:"0x...|tz..."
+    Params.tezosx_account
 
 let sandbox_config_args =
   Tezos_clic.args13
@@ -2679,9 +3013,8 @@ let sandbox_config_args =
 let tezlink_fund_arg =
   let long = "fund" in
   let doc =
-    Format.sprintf
-      "The address of an account to provide with funds in Tezlink sandbox (can \
-       be repeated to fund multiple accounts)"
+    "The address of an account to provide with funds in Tezlink sandbox (can \
+     be repeated to fund multiple accounts)"
   in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"edp..." Params.tez_account
 
@@ -2930,6 +3263,8 @@ let sandbox_command =
         ~finalized_view
         config_file)
 
+(* Default L2 chain id assigned to the tezlink sandbox when no other
+   chain id is provided. *)
 let tezlink_sandbox_chain_id = 12
 
 let tezlink_sandbox_command =
@@ -3056,7 +3391,7 @@ let tezlink_sandbox_command =
         config_file)
 
 let observer_run_args =
-  Tezos_clic.args11
+  Tezos_clic.args12
     private_rpc_port_arg
     evm_node_endpoint_arg
     preimages_arg
@@ -3071,6 +3406,7 @@ let observer_run_args =
        ~why:
          "If set, additional sanity checks are performed on the node’s startup."
        ())
+    sandbox_arg
 
 let observer_command =
   let open Tezos_clic in
@@ -3113,7 +3449,8 @@ let observer_command =
              no_sync,
              init_from_snapshot,
              history_mode,
-             network ) )
+             network,
+             sandbox ) )
          ()
        ->
       let open Lwt_result_syntax in
@@ -3156,6 +3493,7 @@ let observer_command =
         ?history_mode
         ~finalized_view
         ?network
+        ~sandbox
         config_file)
 
 let export_snapshot
@@ -3222,6 +3560,8 @@ let import_snapshot_command =
       in
       return_unit)
 
+(** Pretty-print the Etherlink network name corresponding to
+    [rollup_address], or nothing when the address is not recognised. *)
 let pp_snapshot_rollup fmt rollup_address =
   let open Evm_node_lib_dev in
   match
@@ -3235,6 +3575,8 @@ let pp_snapshot_rollup fmt rollup_address =
       Format.fprintf fmt "Etherlink:       %s@," (Constants.network_name net)
   | None -> ()
 
+(** Pretty-print a snapshot's history mode together with the earliest
+    block it retains. A no-op when no history information is provided. *)
 let pp_snapshot_history fmt history_info =
   match history_info with
   | None -> ()
@@ -3244,7 +3586,7 @@ let pp_snapshot_history fmt history_info =
         "@,History mode:    %s@,First level:     %a"
         (match history_mode with
         | Archive -> "Archive"
-        | Rolling gc | Full gc ->
+        | Rolling gc | Full gc | Seed gc ->
             let hist_span =
               Ptime.Span.of_int_s
                 (gc.split_frequency_in_seconds * gc.number_of_chunks)
@@ -3297,9 +3639,13 @@ let snapshot_info_command =
         history_info ;
       return_unit)
 
+(** Default location of the desync snapshot store, inside the node's data
+    directory. *)
 let default_desync_store_dir ~data_dir =
   Filename.concat data_dir ".snapshots_store"
 
+(** Pretty-print a size in bytes using an automatically chosen SI-like
+    unit (B, KB, MB, GB or TB). *)
 let pp_size fmt bytes =
   let bytes = float_of_int bytes in
   let units = [|"B"; "KB"; "MB"; "GB"; "TB"|] in
@@ -3467,7 +3813,11 @@ let switch_history_mode_command =
       in
 
       let* store =
-        Evm_store.init ~data_dir:config.data_dir ~perm:Read_write ()
+        Evm_store.init
+          ~chain_family:Evm_node_lib_dev_encoding.L2_types.EVM
+          ~data_dir:config.data_dir
+          ~perm:Read_write
+          ()
       in
       let* () =
         Evm_store.use store @@ fun conn ->
@@ -3523,15 +3873,8 @@ let patch_state_command =
         (* We remove the [observer] configuration. This [patch] should not need
            to interact with an upstream EVM node. *)
         let configuration = {configuration with observer = None} in
-        let _start_tx_queue, tx_container =
-          Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-        in
         let* _status =
-          Evm_context.start
-            ~configuration
-            ~store_perm:Read_write
-            ~tx_container
-            ()
+          Evm_context.start ~configuration ~store_perm:Read_write ()
         in
         Evm_context.patch_state ?block_number ~key ~value ()
       else
@@ -3545,38 +3888,20 @@ let preemptive_kernel_download_command =
   command
     ~group:Groups.kernel
     ~desc:"Preemptively download a kernel before running the EVM node."
-    (args5
+    (args6
        data_dir_arg
        config_path_arg
        preimages_arg
        preimages_endpoint_arg
-       num_download_retries)
-    (prefixes ["download"; "kernel"]
-    @@ param
-         ~name:"kernel-id"
-         ~desc:
-           "Either a root hash of the kernel to download, or the name of a \
-            supported kernel (\"bifrost\", \"calypso\", \"calypso2\", \
-            \"dionysus\", \"dionysus-r1\", \"ebisu\" or \"farfadet\")."
-         (Tezos_clic.parameter (fun _ str ->
-              let open Evm_node_lib_dev.Constants in
-              let open Lwt_result_syntax in
-              match kernel_from_string str with
-              | Some kernel -> return (root_hash_from_kernel kernel)
-              | None ->
-                  trace
-                    (error_of_fmt
-                       "%s in neither a known kernel nor a valid root hash"
-                       str)
-                    (let open Lwt_result_syntax in
-                     let*? hex = Evm_node_lib_dev.Misc.normalize_hex str in
-                     return hex)))
-    @@ stop)
+       num_download_retries
+       (supported_network_arg ()))
+    (prefixes ["download"; "kernel"] @@ Params.kernel_root_hash @@ stop)
     (fun ( data_dir,
            config_file,
            preimages,
            preimages_endpoint,
-           num_download_retries )
+           num_download_retries,
+           network )
          root_hash
          ()
        ->
@@ -3589,6 +3914,7 @@ let preemptive_kernel_download_command =
           ~data_dir
           ?preimages
           ?preimages_endpoint
+          ?network
           config_file
       in
       let*! () = init_logs ~daily_logs:false configuration in
@@ -3619,7 +3945,13 @@ let debug_print_store_schemas_command =
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
       Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
-      let* store = Evm_store.init ~data_dir ~perm:Read_write () in
+      let* store =
+        Evm_store.init
+          ~chain_family:Evm_node_lib_dev_encoding.L2_types.EVM
+          ~data_dir
+          ~perm:Read_write
+          ()
+      in
       let* schemas = Evm_store.(use store Schemas.get_all) in
       let output = String.concat ";\n\n" schemas in
       Format.printf "%s\n" output ;
@@ -3637,6 +3969,84 @@ let list_metrics_command =
       let*! metrics = Evm_node_lib_dev.Metrics.listing () in
       Format.printf "%s\n" metrics ;
       return_unit)
+
+let shell_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:
+      "Interactive environment to explore the content of the durable storage"
+    (args3 data_dir_arg config_path_arg block_param_arg)
+    (prefixes ["shell"] stop)
+    (fun (data_dir, config_file, block) () ->
+      let open Lwt_result_syntax in
+      let* config =
+        Cli.create_or_read_config
+          ~data_dir
+          (config_filename ~data_dir ?config_file ())
+      in
+      Evm_node_lib_dev.Shell.main ~config block)
+
+let shell_cat_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Print a value stored in the durable storage"
+    (args4 data_dir_arg config_path_arg block_param_arg Shell.pp_arg)
+    (prefixes ["shell"; "cat"]
+    @@ param ~name:"PATH" ~desc:"The path of the value to print" Params.string
+    @@ stop)
+    (fun (data_dir, config_file, block, pp) path () ->
+      let open Lwt_result_syntax in
+      let* config =
+        Cli.create_or_read_config
+          ~data_dir
+          (config_filename ~data_dir ?config_file ())
+      in
+      Evm_node_lib_dev.Shell.cat ~config block pp path)
+
+let shell_ls_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Print a value stored in the durable storage"
+    (args3 data_dir_arg config_path_arg block_param_arg)
+    (prefixes ["shell"; "ls"]
+    @@ param
+         ~name:"PATH"
+         ~desc:"The path of the directory whose entries need to be listed"
+         Params.string
+    @@ stop)
+    (fun (data_dir, config_file, block) path () ->
+      let open Lwt_result_syntax in
+      let* config =
+        Cli.create_or_read_config
+          ~data_dir
+          (config_filename ~data_dir ?config_file ())
+      in
+      Evm_node_lib_dev.Shell.ls ~config block path)
+
+let shell_tree_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Print the tree structure of the durable storage"
+    (args4 data_dir_arg config_path_arg block_param_arg depth_arg)
+    (prefixes ["shell"; "tree"]
+    @@ param
+         ~name:"PATH"
+         ~desc:
+           "The path of the directory whose tree structure needs to be printed"
+         Params.string
+    @@ stop)
+    (fun (data_dir, config_file, block, depth) path () ->
+      let open Lwt_result_syntax in
+      let* config =
+        Cli.create_or_read_config
+          ~data_dir
+          (config_filename ~data_dir ?config_file ())
+      in
+      Evm_node_lib_dev.Shell.tree ~config block path depth)
 
 let list_events_command =
   let open Tezos_clic in
@@ -3700,7 +4110,6 @@ let commands =
   [
     sandbox_command;
     tezlink_sandbox_command;
-    proxy_command;
     sequencer_command;
     observer_command;
     rpc_command;
@@ -3720,6 +4129,8 @@ let commands =
     reset_command;
     replay_command;
     replay_many_command;
+    trace_block_command;
+    trace_transaction_command;
     patch_kernel_command;
     check_config_command;
     describe_config_command;
@@ -3731,13 +4142,22 @@ let commands =
     debug_print_store_schemas_command;
     list_metrics_command;
     list_events_command;
+    shell_command;
+    shell_cat_command;
+    shell_ls_command;
+    shell_tree_command;
   ]
 
 let global_options = Tezos_clic.no_options
 
 let executable_name = Filename.basename Sys.executable_name
 
-let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
+let argv () =
+  match Array.to_list Sys.argv with
+  | _ :: args -> args
+  | [] ->
+      (* [Sys.argv] always contains at least the executable name. *)
+      assert false
 
 let dispatch args =
   let open Lwt_result_syntax in

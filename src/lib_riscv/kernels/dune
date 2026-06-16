@@ -1,0 +1,24 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_riscv_kernels)
+ (package octez-riscv-pvm-test)
+ (instrumentation (backend bisect_ppx))
+ (modules))
+
+(dirs :standard .cargo (not target))
+
+(rule
+ (targets riscv-echo riscv-echo.checksum)
+ (mode (fallback))
+ (deps
+  (source_tree .cargo)
+  (source_tree echo)
+  (file Cargo.toml)
+  (file Cargo.lock)
+  (file Makefile)
+  (file rust-toolchain.toml))
+ (action (progn (run sh -c "make build"))))
+
+(alias (name default) (deps riscv-echo riscv-echo.checksum))

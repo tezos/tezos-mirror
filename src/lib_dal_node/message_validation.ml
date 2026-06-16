@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler =
+  (val Tezos_profiler.Profiler.wrap Gossipsub.Profiler.gossipsub_profiler)
+
 let string_of_validation_error = function
   | `Invalid_degree_strictly_less_than_expected Cryptobox.{given; expected} ->
       Format.sprintf
@@ -108,7 +111,7 @@ let gossipsub_message_id_commitment_validation ctxt proto_parameters message_id
       else `Invalid
 
 let gossipsub_message_id_topic_validation ctxt proto_parameters message_id =
-  let attestation_level =
+  let committee_level =
     Int32.(
       pred
       @@ add
@@ -119,11 +122,11 @@ let gossipsub_message_id_topic_validation ctxt proto_parameters message_id =
     Node_context.get_fetched_assigned_shard_indices
       ctxt
       ~pkh:message_id.Types.Message_id.pkh
-      ~level:attestation_level
+      ~level:committee_level
   in
   match shard_indices_opt with
   | None ->
-      (* If DAL committees of [attestation_level] are fetched each time the
+      (* If DAL committees of [committee_level] are fetched each time the
          corresponding published/finalized_level is processed, this should not
          happen. *)
       `Unknown
@@ -162,55 +165,50 @@ let gossipsub_app_messages_validation ctxt cryptobox ~head_level
        happens, received data are considered as spam (invalid), and the remote
        peer might be punished, depending on the Gossipsub implementation. *)
     `Invalid
-  else
-    (* Have some slack for outdated messages. *)
-    let slack = 4 in
-    if
-      Int32.(
-        sub head_level message_id.Types.Message_id.level
-        > of_int (proto_parameters.Types.attestation_lag + slack))
-    then
-      (* 2. Nodes don't care about messages whose ids are too old. Gossipsub
+  else if
+    Int32.(
+      sub head_level message_id.Types.Message_id.level
+      > of_int
+          (proto_parameters.Types.attestation_lag + Constants.validation_slack))
+  then
+    (* 2. Nodes don't care about messages whose ids are too old. Gossipsub
          should only be used for the dissemination of fresh data. Old data could
          be retrieved using another method. *)
-      `Outdated
-    else
-      match
-        gossipsub_message_id_validation ctxt proto_parameters message_id
-      with
-      | `Valid ->
-          (* 3. Only check for message validity if the message_id is valid. *)
-          let res =
-            Option.fold
-              message
-              ~none:`Valid
-              ~some:
-                (gossipsub_app_message_payload_validation
-                   ~disable_shard_validation:
-                     (Node_context.get_disable_shard_validation ctxt)
-                   cryptobox
-                   message_id)
-          in
-          (if res = `Valid then
-             let store = Node_context.get_store ctxt in
-             let traps_store = Store.traps store in
-             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
-                The [proto_parameters] are those for the last known finalized
-                level, which may differ from those of the slot level. This
-                will be an issue when the value of the [traps_fraction]
-                changes. (We cannot use {!Node_context.get_proto_parameters},
-                as it is not monad-free; we'll need to use mapping from levels
-                to parameters.) *)
-             Option.iter
-               (Slot_manager.maybe_register_trap
-                  traps_store
-                  ~traps_fraction:proto_parameters.traps_fraction
-                  message_id)
-               message) ;
-          res
-      | other ->
-          (* 4. In the case the message_id is not valid. *)
-          other
+    `Outdated
+  else
+    match gossipsub_message_id_validation ctxt proto_parameters message_id with
+    | `Valid ->
+        (* 3. Only check for message validity if the message_id is valid. *)
+        let res =
+          Option.fold
+            message
+            ~none:`Valid
+            ~some:
+              (gossipsub_app_message_payload_validation
+                 ~disable_shard_validation:
+                   (Node_context.get_disable_shard_validation ctxt)
+                 cryptobox
+                 message_id)
+        in
+        (if res = `Valid then
+           let store = Node_context.get_store ctxt in
+           let traps_store = Store.traps store in
+           let traps_fraction =
+             Node_context.get_traps_fraction
+               ctxt
+               ~published_level:message_id.level
+               ~default:Q.one
+           in
+           Option.iter
+             (Slot_manager.maybe_register_trap
+                traps_store
+                ~traps_fraction
+                message_id)
+             message) ;
+        res
+    | other ->
+        (* 4. In the case the message_id is not valid. *)
+        other
 
 type batch_identifier = {level : int32; slot_index : int}
 
@@ -251,12 +249,12 @@ let triage ctxt head_level proto_parameters batch =
              message,
              _peers )
          ->
-        (* Have some slack for outdated messages. *)
-        let slack = 4 in
         if
           Int32.(
             sub head_level level
-            > of_int (proto_parameters.Types.attestation_lag + slack))
+            > of_int
+                (proto_parameters.Types.attestation_lag
+               + Constants.validation_slack))
         then (index, `Outdated) :: not_valid
         else
           match gossipsub_message_id_validation ctxt proto_parameters id with
@@ -388,8 +386,6 @@ let round_robin_seq n seq =
   in
   loop [] (Stdlib.List.init n (fun _ -> [])) seq
 
-exception Bee_task_worker_error of string
-
 let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     =
   if Node_context.is_bootstrap_node ctxt then
@@ -402,7 +398,11 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     let batch_size = List.length batch in
     let result = Array.init batch_size (fun _ -> `Unknown) in
     let {to_check_in_batch; not_valid} =
-      triage ctxt head_level proto_parameters batch
+      (triage
+         ctxt
+         head_level
+         proto_parameters
+         batch [@profiler.record_f {verbosity = Notice} "triage"])
     in
     List.iter (fun (index, error) -> result.(index) <- error) not_valid ;
 
@@ -461,16 +461,15 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
               List.iter
                 (fun {index; id; message} ->
                   (* We register traps only if the message is valid. *)
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
-                      The [proto_parameters] are those for the last known finalized
-                      level, which may differ from those of the slot level. This
-                      will be an issue when the value of the [traps_fraction]
-                      changes. (We cannot use {!Node_context.get_proto_parameters},
-                      as it is not monad-free; we'll need to use mapping from levels
-                      to parameters.) *)
+                  let traps_fraction =
+                    Node_context.get_traps_fraction
+                      ctxt
+                      ~published_level:id.level
+                      ~default:Q.one
+                  in
                   Slot_manager.maybe_register_trap
                     traps_store
-                    ~traps_fraction:proto_parameters.traps_fraction
+                    ~traps_fraction
                     id
                     message ;
                   result.(index) <- `Valid)
@@ -537,21 +536,7 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
         sub_batches
     in
     (* Ensure that all tasks are successful. *)
-    let () =
-      List.iter
-        (function
-          | Ok () -> ()
-          | Error (Tezos_bees.Task_worker.Closed (Some err)) ->
-              raise
-                (Bee_task_worker_error
-                   (Format.asprintf "%a" Error_monad.pp_print_trace err))
-          | Error (Tezos_bees.Task_worker.Closed None)
-          | Error (Tezos_bees.Task_worker.Request_error _) ->
-              raise (Bee_task_worker_error "Unknown task_worker error")
-          | Error (Tezos_bees.Task_worker.Any exn) ->
-              raise (Bee_task_worker_error (Printexc.to_string exn)))
-        results
-    in
+    let _ : unit list = Tezos_bees.Task_worker.bind_and_raise_all results in
     let duration = Unix.gettimeofday () -. s in
     update_batches_stats
       proto_parameters.number_of_slots

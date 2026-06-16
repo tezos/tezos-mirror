@@ -1,0 +1,7 @@
+# A no-op contract: accepts unit, returns immediately without emitting
+# any internal operations.  Used in tests that need a Michelson CRAC
+# target that succeeds but never calls %collect_result, so the HTTP
+# response body remains empty and the EVM caller gets empty bytes.
+parameter unit;
+storage unit;
+code { DROP; UNIT; NIL operation; PAIR };

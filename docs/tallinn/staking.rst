@@ -62,6 +62,7 @@ unfrozen by stakers. This is a two-step process that spans at least
 ``UNSTAKE_FINALIZATION_DELAY`` cycles (cf. :ref:`Staked funds
 management <staked_funds_management_tallinn>`).
 
+.. _pseudo_operations:
 .. _pseudo_operations_tallinn:
 
 A user interface is provided for delegates and stakers to interact
@@ -77,6 +78,7 @@ custodians, exchanges, and other parties to support the functionality.
 stakers. In other words, smart contracts cannot stake funds (they can
 of course still delegate them).
 
+.. _staking_policy_configuration:
 .. _staking_policy_configuration_tallinn:
 
 Staking policy configuration
@@ -134,6 +136,7 @@ stake) nor its consequence on voting and baking powers. That is,
 overdelegated funds are not counted towards a delegate baking power, but
 they do increase their voting power.
 
+.. _staked_funds_management:
 .. _staked_funds_management_tallinn:
 
 Staked funds management
@@ -206,7 +209,7 @@ or more conveniently::
 
    octez-client finalize unstake for <staker>
 
-With the activation of the Seoul protocol on mainnet, anyone can trigger ``finalize_unstake`` operations on behalf of the staker (and not just the staker themselves). In any case, the unfrozen funds always go to the staker, without any ownership transfer.
+Since the Seoul protocol, anyone can trigger ``finalize_unstake`` operations on behalf of the staker (and not just the staker themselves). In any case, the unfrozen funds always go to the staker, without any ownership transfer.
 
 In particular, this allows for deploying off-chain finalization bots such as `Finn <https://spotlight.tezos.com/finn-unstaking/>`__, which regularly checks finalizable unstakes on block explorers and triggers `their finalization operations <https://tzkt.io/tz1i92Eptw7UZ8JSb8j8jBFJ9Poa4TTnSQwZ/operations/>`__ automatically.
 

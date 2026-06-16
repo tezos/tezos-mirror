@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-tracing-farfadet-r1"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+tezos-evm-logging.workspace = true
+syn.workspace = true
+quote.workspace = true
+
+[features]
+tracing = []

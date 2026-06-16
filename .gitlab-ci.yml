@@ -7,7 +7,7 @@ workflow:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^tezos-sdk-v\d+\.\d+\.\d+$/
     variables:
-      PIPELINE_TYPE: publish_sdk_bindings_releases
+      PIPELINE_TYPE: sdk_bindings.release
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "grafazos.daily"
     variables:
@@ -55,16 +55,26 @@ workflow:
     variables:
       PIPELINE_TYPE: documentation.update
     when: always
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
+    variables:
+      PIPELINE_TYPE: etherlink.release
+    when: always
+  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
+    variables:
+      PIPELINE_TYPE: etherlink.test_release
+    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "etherlink.daily"
     variables:
       PIPELINE_TYPE: etherlink.daily
     when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "client-libs.daily"
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "tezos_x.build"
     variables:
-      PIPELINE_TYPE: client-libs.daily
+      PIPELINE_TYPE: tezos_x.build
     when: always
-  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
-      && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE
+      != "merge_train"
     variables:
       PIPELINE_TYPE: before_merging
     when: always
@@ -122,10 +132,6 @@ workflow:
     variables:
       PIPELINE_TYPE: octez_beta_release_tag_test
     when: always
-  - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
-    variables:
-      PIPELINE_TYPE: octez_evm_node_release_tag
-    when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^octez-v\d+\.\d+\-\d+$/
     variables:
@@ -141,22 +147,20 @@ workflow:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
+      && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
       && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/ && $CI_COMMIT_TAG
-      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/
-      && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+\.\d+$/ && $CI_COMMIT_TAG
-      !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
+      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: non_release_tag
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
+      && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
       && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/ && $CI_COMMIT_TAG
-      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/
-      && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+\.\d+$/ && $CI_COMMIT_TAG
-      !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
+      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: non_release_tag_test
     when: always
@@ -180,10 +184,6 @@ workflow:
     variables:
       PIPELINE_TYPE: base_images.daily
     when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "opam.daily"
-    variables:
-      PIPELINE_TYPE: opam.daily
-    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_RPC_TESTS"
     variables:
       PIPELINE_TYPE: schedule_extended_rpc_test
@@ -204,25 +204,9 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_test_release
     when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "schedule_docker_master_snapshot"
     variables:
-      PIPELINE_TYPE: schedule_container_scanning_master
-    when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RELEASES"
-    variables:
-      PIPELINE_TYPE: schedule_container_scanning_octez_releases
-    when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_EVM_NODE_RELEASES"
-    variables:
-      PIPELINE_TYPE: schedule_container_scanning_evm_node_releases
-    when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RC"
-    variables:
-      PIPELINE_TYPE: schedule_container_scanning_octez_rc
-    when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "SECURITY_SCANS"
-    variables:
-      PIPELINE_TYPE: schedule_security_scans
+      PIPELINE_TYPE: schedule_docker_master_snapshot
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCKER_FRESH_IMAGE_BUILD"
     variables:
@@ -247,17 +231,16 @@ default:
     when:
     - stuck_or_timeout_failure
     - runner_system_failure
+    - api_failure
+    - unknown_failure
+    - scheduler_failure
 
 variables:
   ci_image_name: ${GCP_REGISTRY}/${CI_PROJECT_PATH}/ci
   ci_image_name_protected: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/ci
   rust_toolchain_image_name: ${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain
-  rust_toolchain_image_name_protected: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain
   rust_sdk_bindings_image_name: ${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings
   rust_sdk_bindings_image_name_protected: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings
-  jsonnet_image_name: ${GCP_REGISTRY}/${CI_PROJECT_PATH}/jsonnet
-  jsonnet_image_name_protected: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/jsonnet
-  client_libs_dependencies_image_name: ${GCP_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
   GET_SOURCES_ATTEMPTS: "2"
@@ -279,7 +262,7 @@ dummy_job:
   - echo "This job will never execute"
 
 include:
-- local: .gitlab/ci/pipelines/publish_sdk_bindings_releases.yml
+- local: .gitlab/ci/pipelines/sdk_bindings.release.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^tezos-sdk-v\d+\.\d+\.\d+$/
@@ -330,18 +313,28 @@ include:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "documentation.update"
     when: always
+- local: .gitlab/ci/pipelines/etherlink.release.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
+    when: always
+- local: .gitlab/ci/pipelines/etherlink.test_release.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
+    when: always
 - local: .gitlab/ci/pipelines/etherlink.daily.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "etherlink.daily"
     when: always
-- local: .gitlab/ci/pipelines/client-libs.daily.yml
+- local: .gitlab/ci/pipelines/tezos_x.build.yml
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "client-libs.daily"
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "tezos_x.build"
     when: always
 - local: .gitlab/ci/pipelines/before_merging.yml
   rules:
-  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
-      && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE
+      != "merge_train"
     when: always
 - local: .gitlab/ci/pipelines/merge_train.yml
   rules:
@@ -393,10 +386,6 @@ include:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^octez-v\d+\.\d+\-beta\d*$/
     when: always
-- local: .gitlab/ci/pipelines/octez_evm_node_release_tag.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
-    when: always
 - local: .gitlab/ci/pipelines/octez_packaging_revision.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
@@ -412,22 +401,20 @@ include:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
+      && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
       && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/ && $CI_COMMIT_TAG
-      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/
-      && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+\.\d+$/ && $CI_COMMIT_TAG
-      !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
+      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     when: always
 - local: .gitlab/ci/pipelines/non_release_tag_test.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
+      && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
       && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/ && $CI_COMMIT_TAG
-      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/
-      && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+\.\d+$/ && $CI_COMMIT_TAG
-      !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
+      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     when: always
 - local: .gitlab/ci/pipelines/schedule_extended_test.yml
   rules:
@@ -449,10 +436,6 @@ include:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "base_images.daily"
     when: always
-- local: .gitlab/ci/pipelines/opam.daily.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "opam.daily"
-    when: always
 - local: .gitlab/ci/pipelines/schedule_extended_rpc_test.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_RPC_TESTS"
@@ -473,25 +456,9 @@ include:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
     when: always
-- local: .gitlab/ci/pipelines/schedule_container_scanning_master.yml
+- local: .gitlab/ci/pipelines/schedule_docker_master_snapshot.yml
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
-    when: always
-- local: .gitlab/ci/pipelines/schedule_container_scanning_octez_releases.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RELEASES"
-    when: always
-- local: .gitlab/ci/pipelines/schedule_container_scanning_evm_node_releases.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_EVM_NODE_RELEASES"
-    when: always
-- local: .gitlab/ci/pipelines/schedule_container_scanning_octez_rc.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_OCTEZ_RC"
-    when: always
-- local: .gitlab/ci/pipelines/schedule_security_scans.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "SECURITY_SCANS"
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "schedule_docker_master_snapshot"
     when: always
 - local: .gitlab/ci/pipelines/schedule_docker_build_pipeline.yml
   rules:

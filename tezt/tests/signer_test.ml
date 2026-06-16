@@ -285,17 +285,17 @@ let signer_highwatermark_test =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      [
-        (["consensus_committee_size"], `Int consensus_committee_size);
-        (["consensus_threshold_size"], `Int 200);
-        (["minimal_block_delay"], `String "2");
-        (["delay_increment_per_round"], `String "0");
-        (["blocks_per_cycle"], `Int 2);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      ]
+      ([
+         (["consensus_committee_size"], `Int consensus_committee_size);
+         (["consensus_threshold_size"], `Int 200);
+         (["minimal_block_delay"], `String "2");
+         (["delay_increment_per_round"], `String "0");
+         (["blocks_per_cycle"], `Int 4);
+         (["nonce_revelation_threshold"], `Int 1);
+       ]
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol
@@ -357,7 +357,7 @@ let signer_highwatermark_test =
       ]
   in
   Log.info "Bake until BLS consensus keys are activated" ;
-  let* _ = Client.bake_for_and_wait ~keys ~count:8 client in
+  let* _ = Client.bake_for_and_wait ~keys ~count:10 client in
 
   Log.info "Preattest with all the keys to update the highwatermarks" ;
   let* _ = Client.preattest_for ~key:keys client in
@@ -454,6 +454,44 @@ let signer_highwatermark_test =
 
   unit
 
+let signer_bls_proof_command_test () =
+  Test.register
+    ~__FILE__
+    ~title:"Signer: create bls proof command"
+    ~tags:[team; "signer"; "bls"; "proof"; "command"]
+    ~uses:[Constant.octez_signer]
+  @@ fun () ->
+  let* signer = Signer.create ~keys:[Constant.tz4_account] () in
+  let sk_uri =
+    match Constant.tz4_account.secret_key with
+    | Unencrypted sk -> "unencrypted:" ^ sk
+    | _ -> Test.fail "Expected unencrypted BLS secret key"
+  in
+  Log.info "Creating BLS proof of possession" ;
+  let* proof = Signer.bls_prove_possession ~sk_uri signer in
+  let expected =
+    Operation.Manager.create_proof_of_possession ~signer:Constant.tz4_account
+  in
+  let expected =
+    match expected with
+    | Some proof -> proof
+    | None -> Test.fail "Expected a BLS proof of possession"
+  in
+  Check.((proof = expected) ~__LOC__ string)
+    ~error_msg:"Expected BLS proof %R, got %L" ;
+  Log.info "BLS proof of possession: %s" proof ;
+  Log.info "Creating BLS proof of possession with --override-public-key" ;
+  let override_pk =
+    "BLpk1xXdveUYh7YFsyf6LwGWfv5zAfLvnMG71byiMFDZc4CkXzZPVko3Dz4sD43Ln5uFNvdjiQJY"
+  in
+  let* proof_with_override =
+    Signer.bls_prove_possession ~override_pk ~sk_uri signer
+  in
+  Log.info "BLS proof with override: %s" proof_with_override ;
+  Check.((proof_with_override <> proof) ~__LOC__ string)
+    ~error_msg:"Expected proof with override to differ from default proof" ;
+  unit
+
 let register ~protocols =
   signer_simple_test protocols ;
   signer_magic_bytes_test protocols ;
@@ -461,4 +499,5 @@ let register ~protocols =
   signer_known_remote_keys_test protocols ;
   signer_prove_possession_test
     (List.filter (fun p -> Protocol.number p > 022) protocols) ;
-  signer_highwatermark_test protocols
+  signer_highwatermark_test protocols ;
+  signer_bls_proof_command_test ()

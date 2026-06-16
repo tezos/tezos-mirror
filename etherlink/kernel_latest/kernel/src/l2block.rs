@@ -1,15 +1,9 @@
 use primitive_types::{H256, U256};
-use rlp::DecoderError;
-use tezos_data_encoding::enc::{BinError, BinWriter};
-use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::{block::EthBlock, rlp_helpers::VersionedEncoding};
 use tezos_smart_rollup::types::Timestamp;
 use tezos_tezlink::block::TezBlock;
 
-use crate::{
-    blueprint_storage::{BlockHeader, ChainHeader},
-    chains::ChainFamily,
-};
+use crate::blueprint_storage::{BlockHeader, ChainHeader};
 
 #[derive(PartialEq, Debug)]
 pub enum L2Block {
@@ -39,7 +33,7 @@ impl L2Block {
     pub fn number_of_transactions(&self) -> usize {
         match &self {
             Self::Etherlink(block) => block.transactions.len(),
-            Self::Tezlink(block) => block.operations.len(),
+            Self::Tezlink(block) => block.operations.list.len(),
         }
     }
 
@@ -60,39 +54,14 @@ impl L2Block {
     pub fn hash(&self) -> H256 {
         match self {
             Self::Etherlink(block) => block.hash,
-            Self::Tezlink(block) => block.hash.0,
+            Self::Tezlink(block) => H256(*block.hash),
         }
     }
 
-    pub fn to_bytes(&self) -> Result<Vec<u8>, BinError> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         match self {
-            Self::Etherlink(block) => Ok(block.to_bytes()),
-            Self::Tezlink(block) => Ok(block.to_bytes()?),
-        }
-    }
-
-    #[cfg(test)]
-    pub fn base_fee_per_gas(&self) -> U256 {
-        use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
-        match self {
-            Self::Etherlink(block) => block.base_fee_per_gas,
-            Self::Tezlink(_) => MINIMUM_BASE_FEE_PER_GAS.into(),
-        }
-    }
-
-    pub fn try_from_bytes(
-        chain_family: &ChainFamily,
-        bytes: &[u8],
-    ) -> Result<L2Block, DecoderError> {
-        match chain_family {
-            ChainFamily::Evm => {
-                Ok(L2Block::Etherlink(Box::new(EthBlock::from_bytes(bytes)?)))
-            }
-            ChainFamily::Michelson => {
-                let block = TezBlock::nom_read_exact(bytes)
-                    .map_err(|_| DecoderError::Custom("Binary decoding error"))?;
-                Ok(L2Block::Tezlink(block))
-            }
+            Self::Etherlink(block) => block.to_bytes(),
+            Self::Tezlink(block) => block.to_bytes(),
         }
     }
 }

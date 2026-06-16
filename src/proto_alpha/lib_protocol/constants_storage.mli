@@ -117,6 +117,8 @@ val sc_rollup_max_number_of_parallel_games : Raw_context.t -> int
 
 val sc_rollup_riscv_pvm_enable : Raw_context.t -> bool
 
+val canonical_rollup : Raw_context.t -> Smart_rollup.Address.t option
+
 val max_number_of_stored_cemented_commitments : Raw_context.t -> int
 
 val sc_rollup_timeout_period_in_blocks : Raw_context.t -> int
@@ -131,6 +133,10 @@ val dal_number_of_slots : Raw_context.t -> int
 val dal_number_of_shards : Raw_context.t -> int
 
 val dal_attestation_lag : Raw_context.t -> int
+
+val dal_attestation_lags : Raw_context.t -> int list
+
+val dal_number_of_lags : Raw_context.t -> int
 
 val dal_enable : Raw_context.t -> bool
 
@@ -155,14 +161,11 @@ val max_slashing_per_block : Raw_context.t -> Percentage.t
 
 val direct_ticket_spending_enable : Raw_context.t -> bool
 
-val allow_tz4_delegate_enable : Raw_context.t -> bool
+val tz5_account_enable : Raw_context.t -> bool
 
 (** Tolerated period of inactivity, in cycles, before a delegate is
     deactivated *)
 val tolerated_inactivity_period : Raw_context.t -> int
-
-(* attestation aggregation feature flag *)
-val aggregate_attestation : Raw_context.t -> bool
 
 val all_bakers_attest_activation_threshold : Raw_context.t -> Ratio_repr.t
 
@@ -173,6 +176,9 @@ val round_durations : Raw_context.t -> Round_repr.Durations.t
 
 (** Native contracts feature flag *)
 val native_contracts_enable : Raw_context.t -> bool
+
+(** SWRR new baker lottery feature flag *)
+val swrr_new_baker_lottery_enable : Raw_context.t -> bool
 
 (** Builds a representation of all constants (fixed and parametric)
     from the context. *)

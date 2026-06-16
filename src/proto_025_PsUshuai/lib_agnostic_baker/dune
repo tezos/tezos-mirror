@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_agnostic_baker_025_PsUshuai)
+ (public_name octez-protocol-025-PsUshuai-libs.agnostic-baker)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-protocol-025-PsUshuai-libs.client
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.baking
+  octez-protocol-025-PsUshuai-libs.baking-commands
+  octez-baker-lib)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_025_PsUshuai
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_baking_025_PsUshuai
+  -open Tezos_baking_025_PsUshuai_commands
+  -open Octez_agnostic_baker))

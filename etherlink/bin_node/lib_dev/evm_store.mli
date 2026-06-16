@@ -18,6 +18,7 @@ include module type of Sqlite
     fail. With [Read_write], they will succeed as expected. *)
 val init :
   ?max_conn_reuse_count:int ->
+  chain_family:_ L2_types.chain_family ->
   data_dir:string ->
   perm:perm ->
   unit ->
@@ -25,12 +26,6 @@ val init :
 
 (** name of the sqlite file *)
 val sqlite_file_name : string
-
-module Schemas : sig
-  (** [get_all conn] returns the list of SQL statements allowing to recreate
-      the tables in the current store. *)
-  val get_all : conn -> string list tzresult Lwt.t
-end
 
 module Blueprints : sig
   val store : conn -> Blueprint_types.t -> unit tzresult Lwt.t
@@ -166,6 +161,7 @@ end
 
 module Blocks : sig
   val store :
+    ?tez_block:L2_types.Tezos_block.t ->
     conn ->
     Ethereum_types.legacy_transaction_object Ethereum_types.block ->
     unit tzresult Lwt.t
@@ -209,12 +205,39 @@ module Blocks : sig
     Ethereum_types.quantity ->
     Ethereum_types.block_hash option tzresult Lwt.t
 
+  val find_tez_hash_of_number :
+    conn ->
+    Ethereum_types.quantity ->
+    Ethereum_types.block_hash option tzresult Lwt.t
+
   val find_number_of_hash :
     conn ->
     Ethereum_types.block_hash ->
     Ethereum_types.quantity option tzresult Lwt.t
 
+  val find_number_of_tez_hash :
+    conn ->
+    Ethereum_types.block_hash ->
+    Ethereum_types.quantity option tzresult Lwt.t
+
+  (** [find_hashes_of_number conn level] returns, for the block stored at
+      [level], a pair [(hash, tez_hash)] where [hash] is the EVM block hash
+      and [tez_hash] is the hash of the associated Tezos block produced by
+      the TezosX runtime. [tez_hash] is [None] when no Tezos block is
+      associated with [level] — in particular, for levels before the
+      Michelson runtime sunrise level. Returns [None] if no block is
+      stored at [level]. *)
+  val find_hashes_of_number :
+    conn -> Ethereum_types.quantity -> Meta_block.hashes option tzresult Lwt.t
+
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  (** [tezosx_find_tez_block_with_level conn level] returns the Tezos block
+      produced by the TezosX runtime at the given level, if present. *)
+  val tezosx_find_tez_block_with_level :
+    conn ->
+    Ethereum_types.quantity ->
+    L2_types.Tezos_block.t option tzresult Lwt.t
 end
 
 module Block_storage_mode : sig
@@ -232,7 +255,17 @@ val context_hash_of_block_hash :
   conn -> Ethereum_types.block_hash -> Pvm.Context.hash option tzresult Lwt.t
 
 module Transactions : sig
-  val store : conn -> Transaction_info.t -> unit tzresult Lwt.t
+  (** [store ~compact_receipt_encoding conn info] persists [info] in the
+      [transactions] table. When [compact_receipt_encoding] is [true], the
+      receipt fields are written using the compact encoding (empty-bytes
+      logs_bloom for all-zero blooms, per-log context fields stripped). When
+      [false], rows are written in the legacy format readable by node releases
+      that predate the compact encoding. *)
+  val store :
+    compact_receipt_encoding:bool ->
+    conn ->
+    Transaction_info.t ->
+    unit tzresult Lwt.t
 
   val find_receipt :
     conn -> Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
@@ -245,10 +278,12 @@ module Transactions : sig
   val receipts_of_block_number :
     conn -> Ethereum_types.quantity -> Transaction_receipt.t list tzresult Lwt.t
 
-  (** [receipts_of_block_range conn block_number len] returns all the receipts
-      found in [len] blocks, starting from level [block_number]. The function does
-      not check if these blocks exist. *)
+  (** [receipts_of_block_range ?mask conn block_number len] returns all the
+      receipts found in [len] blocks, starting from level [block_number]. The
+      function does not check if these blocks exist. [mask] can be provided to
+      filter only receipts which include this bloom filter. *)
   val receipts_of_block_range :
+    ?mask:Ethbloom.t ->
     conn ->
     Ethereum_types.quantity ->
     int ->

@@ -10,9 +10,8 @@
 
 use crate::apply::revm_run_transaction;
 use crate::block_storage;
-use crate::chains::{ChainFamily, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
+use crate::chains::ExperimentalFeatures;
 use crate::fees::simulation_add_gas_for_fees;
-use crate::l2block::L2Block;
 use crate::storage::{
     read_last_info_per_level_timestamp, read_or_set_maximum_gas_per_transaction,
     read_sequencer_pool_address, read_tracer_input,
@@ -26,11 +25,10 @@ use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
 use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
 use revm_etherlink::{
-    helpers::legacy::u256_to_alloy, inspectors::TracerInput, Error as RevmError,
-    ExecutionOutcome,
+    helpers::legacy::u256_to_alloy, inspectors::TracerInput, EvmKernelError as RevmError,
+    ExecutionOutcome, TransactionOrigin,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
-use tezos_ethereum::access_list::empty_access_list;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
@@ -38,8 +36,12 @@ use tezos_ethereum::rlp_helpers::{
 };
 use tezos_ethereum::transaction::TransactionObject;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+
 use tezos_smart_rollup::types::Timestamp;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
+use tezosx_interfaces::Registry;
+use tezosx_journal::TezosXJournal;
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;
@@ -373,24 +375,32 @@ impl Evaluation {
         }
     }
 
-    /// Execute the simulation
-    pub fn run<Host: Runtime>(
+    /// Execute the simulation, returning both the result and the HTTP
+    /// traces captured during cross-runtime execution.
+    pub fn run<Host>(
         &self,
         host: &mut Host,
+        registry: &impl Registry,
         tracer_input: Option<TracerInput>,
         spec_id: &SpecId,
-    ) -> Result<SimulationResult<CallResult, String>, Error> {
+    ) -> Result<
+        (
+            SimulationResult<CallResult, String>,
+            Vec<tezosx_journal::HttpTrace>,
+        ),
+        Error,
+    >
+    where
+        Host: StorageV1,
+    {
         let chain_id = retrieve_chain_id(host)?;
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
         let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
+        let experimental_features = ExperimentalFeatures::read_from_storage(host);
 
-        let constants = match block_storage::read_current(
-            host,
-            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-            &ChainFamily::Evm,
-        ) {
-            Ok(L2Block::Etherlink(block)) => {
+        let constants = match block_storage::read_current_etherlink_block(host) {
+            Ok(block) => {
                 // Timestamp is taken from the simulation caller if provided.
                 // If the timestamp is missing, because of an older evm-node,
                 // default to last block timestamp.
@@ -404,25 +414,18 @@ impl Evaluation {
                     block.base_fee_per_gas,
                     da_fee,
                 );
+                let next_block_number = block.number + 1;
                 BlockConstants {
-                    number: block.number + 1,
+                    number: next_block_number,
                     coinbase,
                     timestamp,
                     gas_limit: crate::block::GAS_LIMIT,
+                    tezos_experimental_features: experimental_features
+                        .is_tezos_runtime_enabled(next_block_number),
                     block_fees,
                     chain_id,
                     prevrandao: None,
                 }
-            }
-            Ok(L2Block::Tezlink(_block)) => {
-                log!(
-                    host,
-                    Fatal,
-                    "Read a tezlink block when expecting an etherlink block"
-                );
-                return Err(Error::Simulation(RevmError::Custom(
-                    "Should not have found a Tezlink block".to_string(),
-                )));
             }
             Err(_) => {
                 // Timestamp is taken from the simulation caller if provided.
@@ -490,8 +493,11 @@ impl Evaluation {
         info.balance = info.balance.saturating_add(u256_to_alloy(&max_gas_to_pay));
         simulation_caller.set_info_without_code(host, info)?;
 
-        match revm_run_transaction(
+        let mut journal = TezosXJournal::default();
+        let sim_result = match revm_run_transaction(
             host,
+            registry,
+            &mut journal,
             &constants,
             None,
             from,
@@ -501,12 +507,14 @@ impl Evaluation {
             gas,
             gas_price,
             max_gas_limit,
-            // TODO: Replace this by the decoded access lists if any.
-            empty_access_list(),
             None,
             spec_id,
             tracer_input,
             true,
+            // TODO: Replace this by the decoded access lists if any.
+            TransactionOrigin::UserInput {
+                access_list: revm::context::transaction::AccessList::default(),
+            },
         ) {
             Ok(outcome) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
@@ -520,7 +528,7 @@ impl Evaluation {
                     &constants.block_fees,
                     &self.data,
                 )
-                .map_err(Error::Simulation)?;
+                .map_err(Error::from)?;
 
                 let result: SimulationResult<CallResult, String> =
                     Result::Ok(outcome).into();
@@ -528,7 +536,9 @@ impl Evaluation {
                 Ok(result)
             }
             Err(err) => Ok(SimulationResult::Err(err.to_string())),
-        }
+        };
+        let traces = journal.into_http_traces();
+        sim_result.map(|r| (r, traces))
     }
 }
 
@@ -607,10 +617,7 @@ impl Input {
     }
 }
 
-fn read_chunks<Host: Runtime>(
-    host: &mut Host,
-    num_chunks: u16,
-) -> Result<Message, Error> {
+fn read_chunks(host: &mut impl WasmHost, num_chunks: u16) -> Result<Message, Error> {
     let mut buffer: Vec<u8> = Vec::new();
     for n in 0..num_chunks {
         match read_input(host)? {
@@ -627,14 +634,14 @@ fn read_chunks<Host: Runtime>(
     Ok(buffer.as_slice().try_into()?)
 }
 
-fn read_input<Host: Runtime>(host: &mut Host) -> Result<Input, Error> {
+fn read_input(host: &mut impl WasmHost) -> Result<Input, Error> {
     match host.read_input()? {
         Some(input) => Ok(Input::parse(input.as_ref())),
         None => Ok(Input::Unparsable),
     }
 }
 
-fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Message, Error> {
+fn parse_inbox(host: &mut impl WasmHost) -> Result<Message, Error> {
     // we just received simulation tag
     // next message is either a simulation or the nb of chunks needed
     match read_input(host)? {
@@ -657,16 +664,22 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
     }
 }
 
-pub fn start_simulation_mode<Host: Runtime>(
+pub fn start_simulation_mode<Host>(
     host: &mut Host,
+    registry: &impl Registry,
     spec_id: &SpecId,
-) -> Result<(), anyhow::Error> {
-    log!(host, Debug, "Starting simulation mode ");
+) -> Result<(), anyhow::Error>
+where
+    Host: StorageV1 + WasmHost,
+{
+    log!(Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     match simulation {
         Message::Evaluation(simulation) => {
             let tracer_input = read_tracer_input(host)?;
-            let outcome = simulation.run(host, tracer_input, spec_id)?;
+            let (outcome, traces) =
+                simulation.run(host, registry, tracer_input, spec_id)?;
+            storage::store_simulation_http_traces(host, &traces)?;
             storage::store_simulation_result(host, outcome)
         }
     }
@@ -683,6 +696,7 @@ mod tests {
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
 
+    use crate::registry_impl::RegistryImpl;
     use crate::{retrieve_block_fees, retrieve_chain_id};
 
     use super::*;
@@ -755,7 +769,10 @@ mod tests {
     // call: get (public view)
     const STORAGE_CONTRACT_CALL_GET: &str = "6d4ce63c";
 
-    fn create_contract<Host: Runtime>(host: &mut Host) -> H160 {
+    fn create_contract<Host>(host: &mut Host) -> H160
+    where
+        Host: StorageV1,
+    {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
@@ -786,8 +803,12 @@ mod tests {
         let gas_limit = 300_000;
         let gas_price = block.base_fee_per_gas() + 1;
         // create contract
+        let registry = RegistryImpl::default();
+        let mut journal = TezosXJournal::default();
         let outcome = run_transaction(
             host,
+            &registry,
+            &mut journal,
             revm::primitives::hardfork::SpecId::SHANGHAI,
             &block,
             None,
@@ -796,10 +817,12 @@ mod tests {
             call_data.into(),
             GasData::new(gas_limit, gas_price.try_into().unwrap(), gas_limit),
             revm::primitives::U256::ZERO,
-            vec![].into(),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: revm::context::transaction::AccessList::default(),
+            },
         );
         assert!(
             outcome.is_ok(),
@@ -817,6 +840,7 @@ mod tests {
     fn simulation_result() {
         // setup
         let mut host = MockKernelHost::default();
+        let registry = RegistryImpl::default();
         let new_address = create_contract(&mut host);
 
         // run evaluation num
@@ -830,10 +854,10 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, &SpecId::default());
+        let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
-        let outcome = outcome.unwrap();
+        let (outcome, _traces) = outcome.unwrap();
 
         if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
             value,
@@ -856,10 +880,10 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, &SpecId::default());
+        let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
-        let outcome = outcome.unwrap();
+        let (outcome, _traces) = outcome.unwrap();
         if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
             value,
             gas_used: _,
@@ -875,6 +899,7 @@ mod tests {
     fn evaluation_result_no_gas() {
         // setup
         let mut host = MockKernelHost::default();
+        let registry = RegistryImpl::default();
         let new_address = create_contract(&mut host);
 
         // run evaluation num
@@ -888,10 +913,10 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, &SpecId::default());
+        let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
-        let outcome = outcome.unwrap();
+        let (outcome, _traces) = outcome.unwrap();
         if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
             value,
             gas_used: _,
@@ -1022,7 +1047,7 @@ mod tests {
                     block_number: U256::from(532532),
                     from: address_of_str("3535353535353535353535353535353535353535")
                         .unwrap(),
-                    gas_used: U256::from(32523),
+                    gas: U256::from(32523),
                     gas_price: U256::from(100432432),
                     hash: [5; 32],
                     input: vec![],

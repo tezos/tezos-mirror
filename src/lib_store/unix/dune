@@ -23,8 +23,7 @@
   aches
   aches-lwt
   camlzip
-  tar
-  tar-unix
+  octez-tar-helpers
   octez-libs.prometheus)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
@@ -41,7 +40,8 @@
   -open Tezos_protocol_updater
   -open Tezos_stdlib_unix
   -open Tezos_stdlib
-  -open Tezos_crypto)
+  -open Tezos_crypto
+  -open Octez_tar_helpers)
  (modules
   block_repr_unix
   block_store

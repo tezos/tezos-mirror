@@ -82,9 +82,13 @@ end
 val headless : Profiler.verbosity Profiler.driver
 
 (** Driver printing its report in plain text to a file whenever a toplevel
-    section ends. *)
-val auto_write_as_txt_to_file : (string * Profiler.verbosity) Profiler.driver
+    section ends. The config is [(base_path, verbosity, days_kept)] where
+    [base_path] is the file path without the date suffix, and [days_kept]
+    controls how many daily profiling files are retained. *)
+val auto_write_as_txt_to_file :
+  (string * Profiler.verbosity * int) Profiler.driver
 
 (** Driver printing its report in JSON to a file whenever a toplevel
-    section ends. *)
-val auto_write_as_json_to_file : (string * Profiler.verbosity) Profiler.driver
+    section ends. Same config as {!auto_write_as_txt_to_file}. *)
+val auto_write_as_json_to_file :
+  (string * Profiler.verbosity * int) Profiler.driver

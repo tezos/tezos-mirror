@@ -35,6 +35,7 @@
   octez-l2-libs.smart-rollup
   octez-l2-libs.octez-smart-rollup-node-lib.store
   octez-evm-node-libs.evm_node_migrations
+  octez-evm-node-libs.tezlink_node_migrations
   octez-libs.prometheus-app
   tezos-dal-node-services
   octez-evm-node-libs.evm_node_supported_installers
@@ -42,7 +43,9 @@
   octez-performance-metrics
   opentelemetry-lwt
   octez-libs.octez-telemetry
-  octez-lwt-domain)
+  octez-lwt-domain
+  octez-l2-libs.layer2_shell
+  octez-evm-node-libs.sqlite_receipt_bloom)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

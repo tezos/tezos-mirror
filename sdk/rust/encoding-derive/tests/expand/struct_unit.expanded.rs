@@ -7,8 +7,7 @@ impl tezos_data_encoding::encoding::HasEncoding for StructUnit {
         tezos_data_encoding::encoding::Encoding::Obj(
             "StructUnit",
             <[_]>::into_vec(
-                #[rustc_box]
-                ::alloc::boxed::Box::new([
+                ::alloc::boxed::box_new([
                     tezos_data_encoding::encoding::Field::new(
                         "a",
                         tezos_data_encoding::encoding::Encoding::Unit,

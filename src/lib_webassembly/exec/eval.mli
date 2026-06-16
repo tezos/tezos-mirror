@@ -1,6 +1,12 @@
 open Values
 open Instance
 
+(** Raised when an [Nds_host_func] is dispatched against
+    [Eval_storage.Durable_only] storage.  This is a PVM-level
+    invariant violation — NDS host functions must only be linked when
+    storage is [Dual]. *)
+exception Nds_host_func_without_nds_storage
+
 (* Kontinuation *)
 
 type ('a, 'b) map_kont = {
@@ -259,21 +265,21 @@ val invoke :
   caller:module_key ->
   ?input:Input_buffer.t ->
   ?output:Output_buffer.t ->
-  ?durable:Durable_storage.t ->
+  ?storage:Eval_storage.t ->
   ?init:bool ->
   Host_funcs.registry ->
   func_inst ->
   value list ->
-  (Durable_storage.t * value list) Lwt.t (* raises Trap *)
+  (Eval_storage.t * value list) Lwt.t (* raises Trap *)
 
 val step :
   ?init:bool ->
-  ?durable:Durable_storage.t ->
+  ?storage:Eval_storage.t ->
   host_funcs:Host_funcs.registry ->
   module_reg ->
   config ->
   buffers ->
-  (Durable_storage.t * config) Lwt.t
+  (Eval_storage.t * config) Lwt.t
 
 (* Possible errors raised during the reveal ticks handling. *)
 type reveal_error =

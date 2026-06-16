@@ -251,7 +251,9 @@ module Scripts = struct
 
     let run_code =
       RPC_service.post_service
-        ~description:"Run a Michelson script in the current context"
+        ~description:
+          "Run a Michelson script in the current context. The gas used is \
+           bounded by the protocol's hard gas limit per operation."
         ~query:RPC_query.empty
         ~input:run_code_input_encoding
         ~output:run_code_output_encoding
@@ -354,7 +356,8 @@ module Scripts = struct
     let normalize_data =
       RPC_service.post_service
         ~description:
-          "Normalizes some data expression using the requested unparsing mode"
+          "Normalizes some data expression using the requested unparsing mode, \
+           input data does not need to be well-typed."
         ~input:
           (obj6
              (req "data" Script.expr_encoding)
@@ -370,7 +373,8 @@ module Scripts = struct
     let normalize_stack =
       RPC_service.post_service
         ~description:
-          "Normalize a Michelson stack using the requested unparsing mode"
+          "Normalize a Michelson stack using the requested unparsing mode, \
+           input stack does not need to be well-typed."
         ~query:RPC_query.empty
         ~input:normalize_stack_input_encoding
         ~output:normalize_stack_output_encoding
@@ -701,7 +705,353 @@ module Scripts = struct
       | Chest_key_t -> return (T_chest_key, [], [])
   end
 
+  module Normalize_data = struct
+    (** This module defines a normalizing function for Michelson data,
+        which is compatible with the normalization strategy of the
+        protocol: parsing then unparsing.
+
+        The key differences are that:
+
+        - This implementation does not fail on ill-typed data and in
+          particular does not require a context containing all the big
+          maps and contracts referenced in the data to normalize.
+
+        - There is no gas accounting for the normalization. *)
+
+    (* "timestamp" is the only Michelson type using Micheline.Int for
+       its optimized representation; all other atomic types with a
+       particular optimized representation use Micheline.Bytes. *)
+
+    let normalize_timestamp
+        ~(unparsing_mode : Script_ir_unparser.unparsing_mode) e =
+      match (e, unparsing_mode) with
+      | Micheline.Int (loc, v), Readable -> (
+          match Script_timestamp.to_notation (Script_timestamp.of_zint v) with
+          | None -> e
+          | Some s -> String (loc, s))
+      | String (loc, s), (Optimized | Optimized_legacy) -> (
+          match Script_timestamp.of_string s with
+          | None -> e
+          | Some t -> Int (loc, Script_timestamp.to_zint t))
+      | String (loc, s), Readable -> (
+          (* Script_timestamp.of_strings allows more than one
+             representations; we roundtrip through int to ensure we
+               get the canonical representation. *)
+          match Script_timestamp.of_string s with
+          | None -> e
+          | Some t -> (
+              match Script_timestamp.to_notation t with
+              | None -> e
+              | Some s -> String (loc, s)))
+      | _, _ -> e
+
+    module type BASE58_ENCODABLE = sig
+      type t
+
+      val to_b58check : t -> string
+
+      val of_b58check_opt : string -> t option
+
+      val encoding : t Data_encoding.t
+    end
+
+    module Normalize_base58 (M : BASE58_ENCODABLE) = struct
+      let normalize ~(unparsing_mode : Script_ir_unparser.unparsing_mode) e =
+        match (e, unparsing_mode) with
+        | Micheline.Bytes (loc, bytes), Readable -> (
+            match Data_encoding.Binary.of_bytes_opt M.encoding bytes with
+            | None -> e
+            | Some k -> String (loc, M.to_b58check k))
+        | String (loc, s), (Optimized | Optimized_legacy) -> (
+            match M.of_b58check_opt s with
+            | None -> e
+            | Some k ->
+                Bytes (loc, Data_encoding.Binary.to_bytes_exn M.encoding k))
+        | _, _ -> e
+    end
+
+    module Normalize_key = Normalize_base58 (Signature.Public_key)
+    module Normalize_key_hash = Normalize_base58 (Signature.Public_key_hash)
+    module Normalize_signature = Normalize_base58 (Signature)
+    module Normalize_chain_id =
+      Normalize_base58 (Script_typed_ir.Script_chain_id)
+
+    module Normalize_address = Normalize_base58 (struct
+      type t = Destination.t * Entrypoint.t
+
+      let to_b58check (destination, entrypoint) =
+        Destination.to_b58check destination
+        ^ Entrypoint.to_address_suffix entrypoint
+
+      let of_b58check_opt s =
+        let addr_entrypoint_opt =
+          match String.index_opt s '%' with
+          | None -> Some (s, Entrypoint.default)
+          | Some pos -> (
+              let len = String.length s - pos - 1 in
+              let name = String.sub s (pos + 1) len in
+              match Entrypoint.of_string_strict ~loc:0 name with
+              | Error _ -> None
+              | Ok entrypoint -> Some (String.sub s 0 pos, entrypoint))
+        in
+        match addr_entrypoint_opt with
+        | None -> None
+        | Some (addr, entrypoint) -> (
+            match Destination.of_b58check addr with
+            | Error _ -> None
+            | Ok destination -> Some (destination, entrypoint))
+
+      let encoding =
+        Data_encoding.(tup2 Destination.encoding Entrypoint.value_encoding)
+    end)
+
+    let normalize_or ~normalize_l ~normalize_r ctxt =
+      let open Michelson_v1_primitives in
+      let open Micheline in
+      function
+      | Prim (loc, D_Left, [v], annot) ->
+          let v = normalize_l ctxt v in
+          Prim (loc, D_Left, [v], annot)
+      | Prim (loc, D_Right, [v], annot) ->
+          let v = normalize_r ctxt v in
+          Prim (loc, D_Right, [v], annot)
+      | e -> e
+
+    let normalize_option ~normalize_data ctxt =
+      let open Michelson_v1_primitives in
+      let open Micheline in
+      function
+      | Prim (loc, D_Some, [v], annot) ->
+          let v = normalize_data ctxt v in
+          Prim (loc, D_Some, [v], annot)
+      | e -> e
+
+    let normalize_ticket ~normalize_data ~unparsing_mode ctxt =
+      let open Michelson_v1_primitives in
+      let open Micheline in
+      function
+      | Prim (loc, D_Ticket, [ticketer; _; contents; amount], [])
+      | Prim (loc, D_Pair, [ticketer; contents; amount], [])
+      | Prim
+          (loc, D_Pair, [ticketer; Prim (_, D_Pair, [contents; amount], [])], [])
+      | Seq (loc, [ticketer; contents; amount]) -> (
+          let ticketer = Normalize_address.normalize ~unparsing_mode ticketer in
+          let contents = normalize_data ctxt contents in
+          match unparsing_mode with
+          | Readable -> Prim (loc, D_Pair, [ticketer; contents; amount], [])
+          | Optimized | Optimized_legacy ->
+              Prim
+                ( loc,
+                  D_Pair,
+                  [ticketer; Prim (loc, D_Pair, [contents; amount], [])],
+                  [] ))
+      | e -> e
+
+    let normalize_pair (type a ac) ~(rty : (a, ac) Script_typed_ir.ty)
+        ~normalize_l ~normalize_r
+        ~(unparsing_mode : Script_ir_unparser.unparsing_mode) ctxt e =
+      let open Michelson_v1_primitives in
+      let open Micheline in
+      let open Script_typed_ir in
+      let decomposed =
+        match e with
+        | Prim (loc, D_Pair, [l; r], []) | Seq (loc, [l; r]) -> Some (loc, l, r)
+        | Prim (loc, D_Pair, l :: r, []) ->
+            Some (loc, l, Prim (loc, D_Pair, r, []))
+        | Seq (loc, l :: r) -> Some (loc, l, Seq (loc, r))
+        | _ -> None
+      in
+      match decomposed with
+      | None -> e
+      | Some (loc, l, r) -> (
+          let l = normalize_l ctxt l in
+          let r = normalize_r ctxt r in
+          match (l, r, unparsing_mode, rty) with
+          | a, Prim (_, D_Pair, b, []), Readable, Pair_t _ ->
+              (* In Readable mode, always use n-ary Pair, except if
+                 the right part is not a pair (for instance if it is a
+                 ticket). *)
+              Prim (loc, D_Pair, a :: b, [])
+          | ( a,
+              Seq (_, b),
+              Optimized,
+              Pair_t (_, Pair_t (_, Pair_t _, _, _), _, _) ) ->
+              (* In Optimized mode, if the right part normalizes to a
+                 Seq and its type is an n-ary pair for n >= 4, keep
+                 using a Seq. *)
+              Seq (loc, a :: b)
+          | ( a,
+              Prim (_, D_Pair, [b; Prim (_, D_Pair, [c; d], [])], []),
+              Optimized,
+              Pair_t (_, Pair_t _, _, _) ) ->
+              (* In Optimized mode, switch from nested binary pairs to Seq
+                 when we reach length 4. *)
+              Seq (loc, [a; b; c; d])
+          | a, Prim (_, D_Pair, [b; c], []), Optimized, Pair_t _ ->
+              (* In Optimized mode, use nested pairs for length 3. *)
+              Prim (loc, D_Pair, [a; Prim (loc, D_Pair, [b; c], [])], [])
+          | a, b, _, _ ->
+              (* In all other cases, use a binary pair. This covers the
+                 following cases:
+                 - in any mode, keep annotations on the Pair constructor,
+                 - in any mode, use Pair instead of Seq for length 2,
+                 - in Optimized_legacy mode, always use nested binary pairs. *)
+              Prim (loc, D_Pair, [a; b], []))
+
+    let normalize_seq ~normalize_data ctxt =
+      let open Micheline in
+      function
+      | Seq (loc, l) ->
+          let l =
+            List.fold_left
+              (fun acc v ->
+                let v = normalize_data ctxt v in
+                v :: acc)
+              []
+              l
+          in
+          Seq (loc, List.rev l)
+      | e -> e
+
+    let normalize_map ~normalize_key ~normalize_val ctxt e =
+      let open Micheline in
+      let open Michelson_v1_primitives in
+      let normalize_data ctxt = function
+        | Prim (loc, D_Elt, [key; value], annot) ->
+            let key = normalize_key ctxt key in
+            let value = normalize_val ctxt value in
+            Prim (loc, D_Elt, [key; value], annot)
+        | e -> e
+      in
+      normalize_seq ~normalize_data ctxt e
+
+    let normalize_big_map ~normalize_key ~normalize_val ctxt =
+      let open Micheline in
+      let open Michelson_v1_primitives in
+      function
+      | Seq _ as m -> normalize_map ~normalize_key ~normalize_val ctxt m
+      | Prim (loc, D_Pair, [id; diffs], annot) ->
+          let diffs =
+            normalize_map
+              ~normalize_key
+              ~normalize_val:(normalize_option ~normalize_data:normalize_val)
+              ctxt
+              diffs
+          in
+          Prim (loc, D_Pair, [id; diffs], annot)
+      | e -> e
+
+    let rec normalize_code ~unparsing_mode ctxt =
+      let open Micheline in
+      let open Michelson_v1_primitives in
+      function
+      | Prim (loc, I_PUSH, [ty; data], annot) as e -> (
+          let ctxt = Alpha_context.Gas.set_unlimited ctxt in
+          match Script_ir_translator.parse_packable_ty ctxt ~legacy:true ty with
+          | Error _ -> e
+          | Ok (Ex_ty tyd, _ctxt) ->
+              let data = normalize_data ~unparsing_mode tyd ctxt data in
+              Prim (loc, I_PUSH, [ty; data], annot))
+      | Seq (loc, items) ->
+          let items =
+            List.fold_left
+              (fun acc item ->
+                let item = normalize_code ~unparsing_mode ctxt item in
+                item :: acc)
+              []
+              items
+          in
+          Seq (loc, List.rev items)
+      | Prim (loc, prim, items, annot) ->
+          let items =
+            List.fold_left
+              (fun acc item ->
+                let item = normalize_code ~unparsing_mode ctxt item in
+                item :: acc)
+              []
+              items
+          in
+          Prim (loc, prim, List.rev items, annot)
+      | (Int _ | String _ | Bytes _) as e -> e
+
+    and normalize_data : type a ac.
+        unparsing_mode:Script_ir_unparser.unparsing_mode ->
+        (a, ac) Script_typed_ir.ty ->
+        context ->
+        Script.node ->
+        Script.node =
+     fun ~unparsing_mode ty ctxt e ->
+      let open Script_typed_ir in
+      match ty with
+      | Unit_t | Int_t | Nat_t | String_t | Bytes_t | Bool_t | Mutez_t
+      | Operation_t | Never_t | Sapling_transaction_t _
+      | Sapling_transaction_deprecated_t _ | Sapling_state_t _ | Bls12_381_g1_t
+      | Bls12_381_g2_t | Bls12_381_fr_t | Chest_key_t | Chest_t ->
+          e
+      | Timestamp_t -> normalize_timestamp ~unparsing_mode e
+      | Address_t -> Normalize_address.normalize ~unparsing_mode e
+      | Contract_t _ ->
+          (* Contract_t uses exactly the same syntax as Address_t *)
+          Normalize_address.normalize ~unparsing_mode e
+      | Signature_t -> Normalize_signature.normalize ~unparsing_mode e
+      | Key_t -> Normalize_key.normalize ~unparsing_mode e
+      | Key_hash_t -> Normalize_key_hash.normalize ~unparsing_mode e
+      | Chain_id_t -> Normalize_chain_id.normalize ~unparsing_mode e
+      | Pair_t (a, b, _, _) ->
+          let normalize_l = normalize_data ~unparsing_mode a in
+          let normalize_r = normalize_data ~unparsing_mode b in
+          normalize_pair ~rty:b ~normalize_l ~normalize_r ~unparsing_mode ctxt e
+      | Or_t (a, b, _, _) ->
+          let normalize_l = normalize_data ~unparsing_mode a in
+          let normalize_r = normalize_data ~unparsing_mode b in
+          normalize_or ~normalize_l ~normalize_r ctxt e
+      | Option_t (a, _, _) ->
+          let normalize_data = normalize_data ~unparsing_mode a in
+          normalize_option ~normalize_data ctxt e
+      | List_t (a, _) ->
+          let normalize_data = normalize_data ~unparsing_mode a in
+          normalize_seq ~normalize_data ctxt e
+      | Set_t (a, _) ->
+          let normalize_data = normalize_data ~unparsing_mode a in
+          normalize_seq ~normalize_data ctxt e
+      | Map_t (a, b, _) ->
+          let normalize_key = normalize_data ~unparsing_mode a in
+          let normalize_val = normalize_data ~unparsing_mode b in
+          normalize_map ~normalize_key ~normalize_val ctxt e
+      | Big_map_t (a, b, _) ->
+          let normalize_key = normalize_data ~unparsing_mode a in
+          let normalize_val = normalize_data ~unparsing_mode b in
+          normalize_big_map ~normalize_key ~normalize_val ctxt e
+      | Ticket_t (a, _) ->
+          let normalize_data = normalize_data ~unparsing_mode a in
+          normalize_ticket ~normalize_data ~unparsing_mode ctxt e
+      | Lambda_t _ -> normalize_code ~unparsing_mode ctxt e
+  end
+
   module Normalize_stack = struct
+    let normalize_stack ctxt ~unparsing_mode ~legacy stack =
+      let open Result_syntax in
+      List.map_e
+        (fun (ty_node, data_node) ->
+          let* Ex_ty ty, ctxt =
+            Script_ir_translator.parse_ty
+              ctxt
+              ~legacy
+              ~allow_lazy_storage:true
+              ~allow_operation:true
+              ~allow_contract:true
+              ~allow_ticket:true
+              ty_node
+          in
+          let* ty_node, ctxt = Script_ir_unparser.unparse_ty ~loc:() ctxt ty in
+          let normalized =
+            Normalize_data.normalize_data ~unparsing_mode ty ctxt data_node
+          in
+          return
+            ( Micheline.strip_locations ty_node,
+              Micheline.strip_locations normalized ))
+        stack
+
     type ex_stack =
       | Ex_stack : ('a, 's) Script_typed_ir.stack_ty * 'a * 's -> ex_stack
 
@@ -1046,6 +1396,30 @@ module Scripts = struct
   (* 4_000_000 ꜩ *)
   let default_balance = Tez.of_mutez_exn 4_000_000_000_000L
 
+  let pack_data_impl ?(allow_forged_lazy_storage_id = true) ctxt ~gas ~data ~ty
+      =
+    let open Lwt_result_syntax in
+    let open Script_ir_translator in
+    let ctxt =
+      match gas with
+      | None -> Gas.set_unlimited ctxt
+      | Some gas -> Gas.set_limit ctxt gas
+    in
+    let*? Ex_ty typ, ctxt =
+      parse_packable_ty ctxt ~legacy:true (Micheline.root ty)
+    in
+    let* data, ctxt =
+      parse_data
+        ctxt
+        ~elab_conf:(elab_conf ~legacy:true ())
+        ~allow_forged_tickets:true
+        ~allow_forged_lazy_storage_id
+        typ
+        (Micheline.root data)
+    in
+    let+ bytes, ctxt = Script_ir_translator.pack_data ctxt typ data in
+    (bytes, Gas.level ctxt)
+
   let register () =
     let open Lwt_result_syntax in
     let originate_dummy_contract ctxt script balance =
@@ -1181,7 +1555,8 @@ module Scripts = struct
         ~chain_id ~sender_opt ~payer_opt ~self_opt ~now_opt ~level_opt =
       let gas =
         match gas_opt with
-        | Some gas -> gas
+        | Some gas ->
+            Gas.Arith.min gas (Constants.hard_gas_limit_per_operation ctxt)
         | None -> Constants.hard_gas_limit_per_operation ctxt
       in
       let ctxt = Gas.set_limit ctxt gas in
@@ -1211,14 +1586,8 @@ module Scripts = struct
         ~now_opt
         ~level_opt
     in
-    let script_entrypoint_type ctxt expr entrypoint =
-      let ctxt = Gas.set_unlimited ctxt in
-      let legacy = false in
+    let entrypoint_type ctxt arg_type entrypoint entrypoints =
       let open Script_ir_translator in
-      let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
-      let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
-        parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-      in
       let*? r, _ctxt =
         Gas_monad.run ctxt
         @@ Script_ir_translator.find_entrypoint
@@ -1229,6 +1598,24 @@ module Scripts = struct
       in
       let*? (Ex_ty_cstr {original_type_expr; _}) = r in
       return @@ Micheline.strip_locations original_type_expr
+    in
+    let script_entrypoint_type ctxt expr entrypoint =
+      let open Script_ir_translator in
+      let ctxt = Gas.set_unlimited ctxt in
+      let* {arg_type; _}, ctxt =
+        Script_ir_translator.parse_toplevel ctxt expr
+      in
+      let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
+        parse_parameter_ty_and_entrypoints ctxt ~legacy:false arg_type
+      in
+      entrypoint_type ctxt arg_type entrypoint entrypoints
+    in
+    let native_entrypoint_type ctxt native entrypoint =
+      let ctxt = Gas.set_unlimited ctxt in
+      let*? (Ex_kind_and_types (_, {arg_type; entrypoints; _})) =
+        Script_native_types.get_typed_kind_and_types native
+      in
+      entrypoint_type ctxt arg_type entrypoint entrypoints
     in
     let script_view_type ctxt contract expr view =
       let ctxt = Gas.set_unlimited ctxt in
@@ -1241,6 +1628,36 @@ module Scripts = struct
             (View_helpers.View_not_found (contract, view))
       | Some Script_typed_ir.{input_ty; output_ty; _} ->
           return (input_ty, output_ty)
+    in
+    let native_view_type ctxt contract kind view =
+      let*? (Ex_kind_and_types (kind, _)) =
+        Script_native_types.get_typed_kind_and_types kind
+      in
+      let*? views = Script_native.get_views kind in
+      let*? view_name = Script_string.of_string view in
+      match Script_map.get view_name views with
+      | None ->
+          Environment.Error_monad.tzfail
+            (View_helpers.View_not_found (contract, view))
+      | Some
+          (Script_native_types.Ex_view
+             {
+               ty = {input_ty = Ty_ex_c input_ty; output_ty = Ty_ex_c output_ty};
+               _;
+             }) ->
+          let*? unparsed_input_ty, _ctxt =
+            Script_ir_unparser.unparse_ty
+              ~loc:Micheline.dummy_location
+              ctxt
+              input_ty
+          in
+          let*? unparsed_output_ty, _ctxt =
+            Script_ir_unparser.unparse_ty
+              ~loc:Micheline.dummy_location
+              ctxt
+              output_ty
+          in
+          return (unparsed_input_ty, unparsed_output_ty)
     in
     Registration.register0
       ~chunked:true
@@ -1295,6 +1712,7 @@ module Scripts = struct
                  ticket_diffs = _;
                  ticket_receipt = _;
                  address_registry_diff = _;
+                 balance_updates = _;
                },
                _ ) =
           Script_interpreter.execute
@@ -1367,6 +1785,7 @@ module Scripts = struct
                    ticket_diffs = _;
                    ticket_receipt = _;
                    address_registry_diff = _;
+                   balance_updates = _;
                  },
                  _ctxt ),
                trace ) =
@@ -1412,17 +1831,13 @@ module Scripts = struct
                  View_helpers.Viewed_contract_has_no_script)
             script_opt
         in
-        (* The native case will be handled in a later MR (!19583). *)
-        let script =
+        let* view_ty =
           match script with
-          | Script.Script s -> s
-          | Native _ ->
-              Stdlib.failwith
-                "Tzip4 views are not implemented yet for native contracts"
+          | Script.Native n -> native_entrypoint_type ctxt n.kind entrypoint
+          | Script.Script s ->
+              let*? decoded_script = Script_repr.(force_decode s.code) in
+              script_entrypoint_type ctxt decoded_script entrypoint
         in
-        (* let*? script = Environment.Error_monad.Result_syntax wrap_tzresult script in *)
-        let*? decoded_script = Script_repr.(force_decode script.code) in
-        let* view_ty = script_entrypoint_type ctxt decoded_script entrypoint in
         let*? ty = View_helpers.extract_view_output_type entrypoint view_ty in
         let contract = Contract.Originated contract_hash in
         let* balance = Contract.get_balance ctxt contract in
@@ -1465,13 +1880,14 @@ module Scripts = struct
                  ticket_diffs = _;
                  ticket_receipt = _;
                  address_registry_diff = _;
+                 balance_updates = _;
                },
                _ctxt ) =
           Script_interpreter.execute
             ctxt
             unparsing_mode
             step_constants
-            ~script:(Script.Script script)
+            ~script
             ~cached_script:None
             ~entrypoint
             ~parameter
@@ -1511,19 +1927,15 @@ module Scripts = struct
             ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
             script_opt
         in
-        (* The native case will be handled in a later MR (!19583). *)
-        let script =
-          match script with
-          | Script.Script s -> s
-          | Script.Native _ ->
-              Stdlib.failwith
-                "Views are not implemented yet for native contracts"
-        in
-        let*? decoded_script = Script_repr.(force_decode script.code) in
-        let contract = Contract.Originated contract_hash in
         let* input_ty, output_ty =
-          script_view_type ctxt contract_hash decoded_script view
+          match script with
+          | Script.Native {kind; _} ->
+              native_view_type ctxt contract_hash kind view
+          | Script.Script {code; _} ->
+              let*? decoded_script = Script_repr.(force_decode code) in
+              script_view_type ctxt contract_hash decoded_script view
         in
+        let contract = Contract.Originated contract_hash in
         let* balance = Contract.get_balance ctxt contract in
         let ctxt, step_constants =
           compute_step_constants
@@ -1572,6 +1984,7 @@ module Scripts = struct
                  ticket_diffs = _;
                  ticket_receipt = _;
                  address_registry_diff = _;
+                 balance_updates = _;
                },
                _ctxt ) =
           Script_interpreter.execute
@@ -1616,7 +2029,6 @@ module Scripts = struct
                       implementation;
                       arg_type;
                       storage_type;
-                      views;
                       entrypoints;
                       code_size;
                     }),
@@ -1639,7 +2051,6 @@ module Scripts = struct
                  implementation;
                  arg_type;
                  storage_type;
-                 views;
                  entrypoints;
                  code_size;
                  storage;
@@ -1663,27 +2074,7 @@ module Scripts = struct
     Registration.register0
       ~chunked:true
       S.pack_data
-      (fun ctxt () (expr, typ, maybe_gas) ->
-        let open Script_ir_translator in
-        let ctxt =
-          match maybe_gas with
-          | None -> Gas.set_unlimited ctxt
-          | Some gas -> Gas.set_limit ctxt gas
-        in
-        let*? Ex_ty typ, ctxt =
-          parse_packable_ty ctxt ~legacy:true (Micheline.root typ)
-        in
-        let* data, ctxt =
-          parse_data
-            ctxt
-            ~elab_conf:(elab_conf ~legacy:true ())
-            ~allow_forged_tickets:true
-            ~allow_forged_lazy_storage_id:true
-            typ
-            (Micheline.root expr)
-        in
-        let+ bytes, ctxt = Script_ir_translator.pack_data ctxt typ data in
-        (bytes, Gas.level ctxt)) ;
+      (fun ctxt () (data, ty, gas) -> pack_data_impl ctxt ~gas ~data ~ty) ;
     Registration.register0
       ~chunked:true
       S.normalize_data
@@ -1692,7 +2083,6 @@ module Scripts = struct
         ()
         (expr, typ, unparsing_mode, legacy, other_contracts, extra_big_maps)
       ->
-        let open Script_ir_translator in
         let other_contracts = Option.value ~default:[] other_contracts in
         let* ctxt = originate_dummy_contracts ctxt other_contracts in
         let extra_big_maps = Option.value ~default:[] extra_big_maps in
@@ -1701,19 +2091,15 @@ module Scripts = struct
         let*? Ex_ty typ, ctxt =
           Script_ir_translator.parse_any_ty ctxt ~legacy (Micheline.root typ)
         in
-        let* data, ctxt =
-          parse_data
-            ctxt
-            ~elab_conf:(elab_conf ~legacy ())
-            ~allow_forged_tickets:true
-            ~allow_forged_lazy_storage_id:true
-            typ
-            (Micheline.root expr)
+        let normalized =
+          Micheline.strip_locations
+          @@ Normalize_data.normalize_data
+               ~unparsing_mode
+               typ
+               ctxt
+               (Micheline.root expr)
         in
-        let+ normalized, _ctxt =
-          Script_ir_translator.unparse_data ctxt unparsing_mode typ data
-        in
-        normalized) ;
+        return normalized) ;
     Registration.register0
       ~chunked:true
       S.normalize_stack
@@ -1730,13 +2116,10 @@ module Scripts = struct
         let* ctxt = originate_dummy_contracts ctxt other_contracts in
         let extra_big_maps = Option.value ~default:[] extra_big_maps in
         let* ctxt = initialize_big_maps ctxt extra_big_maps in
-        let* Normalize_stack.Ex_stack (st_ty, x, st), ctxt =
-          Normalize_stack.parse_stack ctxt ~legacy nodes
+        let*? normalized =
+          Normalize_stack.normalize_stack ctxt ~unparsing_mode ~legacy nodes
         in
-        let+ normalized, _ctxt =
-          Normalize_stack.unparse_stack ctxt unparsing_mode st_ty x st
-        in
-        normalized) ;
+        return normalized) ;
     Registration.register0
       ~chunked:true
       S.normalize_script
@@ -2212,22 +2595,28 @@ module Contract = struct
       (fun ctxt contract () (unparsing_mode, normalize_types) ->
         get_contract contract @@ fun contract ->
         let* ctxt, script = Contract.get_script ctxt contract in
+        let parse_and_unparse ctxt script =
+          let ctxt = Gas.set_unlimited ctxt in
+          let+ script, _ctxt =
+            Script_ir_translator.parse_and_unparse_michelson_script_unaccounted
+              ctxt
+              ~legacy:true
+              ~allow_forged_tickets_in_storage:true
+              ~allow_forged_lazy_storage_id_in_storage:true
+              unparsing_mode
+              ~normalize_types
+              script
+          in
+          Some script
+        in
         match script with
-        | None | Some (Script.Native _) -> return_none
-        | Some (Script.Script script) ->
-            let ctxt = Gas.set_unlimited ctxt in
-            let+ script, _ctxt =
-              Script_ir_translator
-              .parse_and_unparse_michelson_script_unaccounted
-                ctxt
-                ~legacy:true
-                ~allow_forged_tickets_in_storage:true
-                ~allow_forged_lazy_storage_id_in_storage:true
-                unparsing_mode
-                ~normalize_types
-                script
+        | None -> return_none
+        | Some (Script.Native {kind; storage}) ->
+            let*? script =
+              Script_native_synthesis.of_native ctxt kind ~storage
             in
-            Some script) ;
+            parse_and_unparse ctxt script
+        | Some (Script.Script script) -> parse_and_unparse ctxt script) ;
     Registration.register1
       ~chunked:false
       S.get_used_storage_space
@@ -3123,6 +3512,33 @@ module Dal = struct
         ~query:RPC_query.empty
         ~output
         RPC_path.(path / "skip_list_cells_of_level")
+
+    let decode_dal_attestation =
+      RPC_service.get_service
+        ~description:
+          "Decodes a DAL attestation bitset into an explicit representation of \
+           attested slots per lag, using the current protocol parameters \
+           (number_of_slots and number_of_lags)."
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(
+            list Dal.Attestations.unfolded_lag_attestation_encoding)
+        RPC_path.(
+          open_root / "helpers" / "decode_dal_attestation"
+          /: Dal.Attestations.rpc_arg)
+
+    let encode_dal_attestation =
+      RPC_service.post_service
+        ~description:
+          "Encodes an explicit representation of attested slots per lag into a \
+           DAL attestation bitset, using the current protocol parameters \
+           (number_of_slots and number_of_lags)."
+        ~query:RPC_query.empty
+        ~input:
+          Data_encoding.(
+            list Dal.Attestations.unfolded_lag_attestation_encoding)
+        ~output:Dal.Attestations.encoding
+        RPC_path.(open_root / "helpers" / "encode_dal_attestation")
   end
 
   let register_dal_commitments_history () =
@@ -3197,12 +3613,58 @@ module Dal = struct
     let* result = Dal.Slots_storage.find_level_histories ctxt in
     match result with Some l -> return l | None -> return []
 
+  let register_decode_dal_attestation () =
+    Registration.register1
+      ~chunked:false
+      S.decode_dal_attestation
+      (fun ctxt attestation () () ->
+        let number_of_slots = Constants.dal_number_of_slots ctxt in
+        let number_of_lags = Constants.dal_number_of_lags ctxt in
+        Lwt.return
+          (Dal.Attestations.decode attestation ~number_of_slots ~number_of_lags))
+
+  let register_encode_dal_attestation () =
+    Registration.register0
+      ~chunked:false
+      S.encode_dal_attestation
+      (fun ctxt () attestations ->
+        let open Lwt_result_syntax in
+        let number_of_slots = Constants.dal_number_of_slots ctxt in
+        let number_of_lags = Constants.dal_number_of_lags ctxt in
+        let*? result =
+          List.fold_left_e
+            (fun acc
+                 (Dal.Attestations.{lag_index; slot_indices} :
+                   Dal.Attestations.unfolded_lag_attestation)
+               ->
+              List.fold_left_e
+                (fun acc slot ->
+                  let open Result_syntax in
+                  let* slot_index =
+                    Dal.Slot_index.of_int ~number_of_slots slot
+                  in
+                  return
+                    (Dal.Attestations.commit
+                       acc
+                       ~number_of_slots
+                       ~number_of_lags
+                       ~lag_index
+                       slot_index))
+                acc
+                slot_indices)
+            Dal.Attestations.empty
+            attestations
+        in
+        return result)
+
   let register () =
     register_dal_commitments_history () ;
     register_shards () ;
     register_past_parameters () ;
     register_published_slot_headers () ;
-    register_skip_list_cells_of_level ()
+    register_skip_list_cells_of_level () ;
+    register_decode_dal_attestation () ;
+    register_encode_dal_attestation ()
 end
 
 module Forge = struct
@@ -3448,13 +3910,19 @@ module Forge = struct
       (Double_consensus_operation_evidence {slot; op1; op2})
 
   let dal_entrapment_evidence ctxt block ~branch ~attestation ~consensus_slot
-      ~slot_index ~shard_with_proof =
+      ~slot_index ~lag_index ~shard_with_proof =
     operation
       ctxt
       block
       ~branch
       (Dal_entrapment_evidence
-         {attestation; consensus_slot; slot_index; shard_with_proof})
+         {
+           attestation;
+           consensus_slot;
+           slot_index;
+           lag_index_opt = Some lag_index;
+           shard_with_proof;
+         })
 
   let empty_proof_of_work_nonce =
     Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
@@ -3927,7 +4395,6 @@ module Attestation_rights = struct
                     companion_pkh = _;
                   };
                 attesting_power;
-                dal_power = _;
               } :
                Consensus_key.power)
              acc
@@ -4136,7 +4603,6 @@ module Validators = struct
   let attestation_slots_at_level ctxt attested_level =
     let open Lwt_result_syntax in
     let* ctxt, rights = Baking.attesting_rights ctxt ~attested_level in
-    let aggregate_attestation = Constants.aggregate_attestation ctxt in
     return
       ( ctxt,
         Signature.Public_key_hash.Map.fold
@@ -4152,9 +4618,7 @@ module Validators = struct
                acc
              ->
             let companion_key =
-              match consensus_key with
-              | Bls _ when aggregate_attestation -> companion_key
-              | _ -> None
+              match consensus_key with Bls _ -> companion_key | _ -> None
             in
             {
               delegate;
@@ -4259,6 +4723,15 @@ let get_blocks_preservation_cycles ~get_context =
   in
   return constants_parametrics.blocks_preservation_cycles
 
+type swrr_credit_entry = {delegate : Signature.Public_key_hash.t; credit : Z.t}
+
+let swrr_credit_entry_encoding =
+  let open Data_encoding in
+  conv
+    (fun {delegate; credit} -> (delegate, credit))
+    (fun (delegate, credit) -> {delegate; credit})
+    (obj2 (req "delegate" Signature.Public_key_hash.encoding) (req "credit" z))
+
 module S = struct
   open Data_encoding
 
@@ -4329,6 +4802,33 @@ module S = struct
   let cycle_query : Cycle.t option RPC_query.t =
     let open RPC_query in
     query Fun.id |+ opt_field "cycle" Cycle.rpc_arg Fun.id |> seal
+
+  let swrr_selected_bakers =
+    RPC_service.get_service
+      ~description:
+        "Returns the selected bakers for the round 0 of the cycle, selected \
+         via the SWRR algorithm. If the 'cycle' parameter is not provided, \
+         defaults to the current cycle. Returns 'null' if the baking rights \
+         for this cycle have not been computed yet or have already been \
+         cleaned from the context. Fails with a 'non_activated_feature' error \
+         if the 'swrr_new_baker_lottery_enable' feature flag is not enabled."
+      ~query:cycle_query
+      ~output:
+        Data_encoding.(
+          option (FallbackArray.encoding Raw_context.consensus_pk_encoding))
+      RPC_path.(path / "swrr_selected_bakers")
+
+  let swrr_credits =
+    RPC_service.get_service
+      ~description:
+        "Returns the current SWRR state which contains the remaining credits \
+         for all the active delegates. Delegates whose credits have not been \
+         initialized yet are returned with a credit of zero. Fails with a \
+         'non_activated_feature' error if the 'swrr_new_baker_lottery_enable' \
+         feature flag is not enabled."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.(list swrr_credit_entry_encoding)
+      RPC_path.(path / "swrr_credits")
 
   let tz4_baker_number_ratio =
     RPC_service.get_service
@@ -4412,25 +4912,58 @@ let register () =
     ~chunked:false
     S.baking_power_distribution_for_current_cycle
     (fun ctxt () () ->
-      let* (_ctxt : t), total_stake, stake_info_list =
+      let* (_ctxt : t), {total_stake_weight; delegates = stake_info_list} =
         Stake_distribution.stake_info ctxt (Level.current ctxt)
       in
       let stake_info_list =
-        List.map (fun (x, y) -> (Consensus_key.pkh x, y)) stake_info_list
+        List.map
+          (fun Stake_distribution.{consensus_pk; stake_weight} ->
+            (Consensus_key.pkh consensus_pk, stake_weight))
+          stake_info_list
       in
-      return (total_stake, stake_info_list)) ;
+      return (total_stake_weight, stake_info_list)) ;
+  Registration.register0 ~chunked:false S.swrr_selected_bakers (fun ctxt q () ->
+      if not (Constants.parametric ctxt).swrr_new_baker_lottery_enable then
+        Environment.Error_monad.tzfail
+          (Contract_services.Non_activated_feature SWRR)
+      else
+        let cycle =
+          Option.value ~default:(Cycle.current ctxt) q
+          |> Cycle.to_int32 |> Cycle_repr.of_int32_exn
+        in
+        let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+        Storage.Stake.Selected_bakers.find ctxt cycle) ;
+  Registration.register0 ~chunked:false S.swrr_credits (fun ctxt () () ->
+      if not (Constants.parametric ctxt).swrr_new_baker_lottery_enable then
+        Environment.Error_monad.tzfail
+          (Contract_services.Non_activated_feature SWRR)
+      else
+        let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+        Stake_storage.fold_on_active_delegates_with_minimal_stake_es
+          ctxt
+          ~order:`Undefined
+          ~init:[]
+          ~f:(fun pkh acc ->
+            let* credit_opt =
+              Storage.Contract.SWRR_credit.find
+                ctxt
+                (Contract_repr.Implicit pkh)
+            in
+            let credit = Option.value ~default:Z.zero credit_opt in
+            let entry = {delegate = pkh; credit} in
+            return (entry :: acc))) ;
   Registration.register0
     ~chunked:false
     S.tz4_baker_number_ratio
     (fun ctxt q () ->
       let cycle = Option.value ~default:(Level.current ctxt).cycle q in
-      let* _, _total_stake, stake_info_list =
+      let* _, {total_stake_weight = _; delegates = stake_info_list} =
         Stake_distribution.stake_info_for_cycle ctxt cycle
       in
       let tz4_bakers =
         List.fold_left
-          (fun acc (x, _) ->
-            match x.Consensus_key.consensus_pk with
+          (fun acc Stake_distribution.{consensus_pk; _} ->
+            match consensus_pk.Consensus_key.consensus_pk with
             | Bls _ -> acc + 1
             | _ -> acc)
           0

@@ -1047,7 +1047,7 @@ impl TryFrom<&Vec<Vec<Operation>>> for ComputePathRequest {
         for inner_ops in ops {
             let mut iophs = Vec::with_capacity(inner_ops.len());
             for op in inner_ops {
-                iophs.push(OperationHash::try_from(op.message_hash()?)?);
+                iophs.push(OperationHash::from(op.message_hash()?));
             }
             operation_hashes.push(iophs);
         }

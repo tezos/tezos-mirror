@@ -21,16 +21,16 @@ depends: [
   "logs" {with-test}
   "octez-alcotezt" {with-test}
   "octez-shell-libs" {with-test}
-  "octez-smart-rollup-node-PtSeouLo" {with-test}
   "octez-smart-rollup-node-PtTALLiN" {with-test}
 ]
 depopts: [
-  "octez-smart-rollup-node-PtNairob" {with-test}
   "octez-smart-rollup-node-Proxford" {with-test}
   "octez-smart-rollup-node-PtParisB" {with-test}
   "octez-smart-rollup-node-PsParisC" {with-test}
   "octez-smart-rollup-node-PsQuebec" {with-test}
   "octez-smart-rollup-node-PsRiotum" {with-test}
+  "octez-smart-rollup-node-PtSeouLo" {with-test}
+  "octez-smart-rollup-node-PsUshuai" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}
 ]
 build: [

@@ -50,7 +50,9 @@ fn compare_typed_stacks(
 ) -> bool {
     t1 == t2
         && s1.len() == s2.len()
-        && std::iter::zip(s1, s2).all(|(v1, v2)| compare_typed_values(v1, v2))
+        && std::iter::zip(s1, s2).all(|(v1, v2)| {
+            compare_typed_values(TypedValue::unwrap_rc(v1), TypedValue::unwrap_rc(v2))
+        })
 }
 
 fn unify_interpreter_error<'a>(
@@ -73,7 +75,7 @@ fn unify_interpreter_error<'a>(
         (MutezOverflow(_, _), InterpretError::MutezOverflow) => true,
         (Overflow, InterpretError::Overflow) => true,
         (GeneralOverflow(_, _), _) => todo!("General overflow is unsupported on interpreter"),
-        (OutOfGas(_), InterpretError::OutOfGas(gas::OutOfGas)) => true,
+        (OutOfGas, InterpretError::OutOfGas) => true,
         (_, _) => false, //Some error that we didn't expect happened.
     }
 }

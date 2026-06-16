@@ -219,7 +219,7 @@ pub struct ParsedBatch<'a> {
 
 impl<'a> ParsedBatch<'a> {
     /// Parse a batch, where each transaction is *verifiable*.
-    pub fn parse(input: &'a [u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+    pub fn parse(input: &'a [u8]) -> tezos_data_encoding::nom::NomResult<'a, Self> {
         map(dynamic(many0(VerifiableOperation::parse)), |operations| {
             ParsedBatch { operations }
         })(input)

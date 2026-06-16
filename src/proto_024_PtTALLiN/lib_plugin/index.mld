@@ -5,6 +5,7 @@ This is a package containing some libraries related to the Tezos 024-PtTALLiN pr
 It contains the following libraries:
 
 - {{!module-Tezos_024_PtTALLiN_test_helpers}Tezos_024_PtTALLiN_test_helpers}: Protocol testing framework
+- {{!module-Tezos_024_PtTALLiN_test_migration}Tezos_024_PtTALLiN_test_migration}: Protocol migration testing checks
 - {{!module-Tezos_agnostic_baker_024_PtTALLiN}Tezos_agnostic_baker_024_PtTALLiN}: Protocol specific library for the Agnostic Baker
 - {{!module-Tezos_baking_024_PtTALLiN}Tezos_baking_024_PtTALLiN}: Base library for `tezos-baker/accuser`
 - {{!module-Tezos_baking_024_PtTALLiN_commands}Tezos_baking_024_PtTALLiN_commands}: Protocol-specific commands for baking

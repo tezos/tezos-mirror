@@ -3,50 +3,41 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::Error;
+use crate::error::EvmDbError;
 use num_bigint::{BigInt, Sign};
 use revm::primitives::{alloy_primitives::Keccak256, B256, U256};
-use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup_host::{
-    path::{concat as host_concat, OwnedPath, Path},
-    runtime::RuntimeError,
-};
-
-pub fn concat(prefix: &impl Path, suffix: &impl Path) -> Result<OwnedPath, Error> {
-    host_concat(prefix, suffix).map_err(|err| Error::Custom(err.to_string()))
-}
+use tezos_smart_rollup_host::{path::Path, runtime::RuntimeError, storage::StorageV1};
 
 #[cfg(test)]
-pub fn read_u64_le(host: &impl Runtime, path: &impl Path) -> Result<u64, RuntimeError> {
+pub fn read_u64_le(host: &impl StorageV1, path: &impl Path) -> Result<u64, RuntimeError> {
     let mut bytes = [0; std::mem::size_of::<u64>()];
     host.store_read_slice(path, 0, bytes.as_mut_slice())?;
     Ok(u64::from_le_bytes(bytes))
 }
 
 pub fn read_u64_le_default(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     default: u64,
-) -> Result<u64, Error> {
+) -> Result<u64, EvmDbError> {
     match host.store_read(path, 0, std::mem::size_of::<u64>()) {
         Ok(bytes) if bytes.len() == std::mem::size_of::<u64>() => {
-            let bytes_array: [u8; std::mem::size_of::<u64>()] = match bytes.try_into() {
-                Ok(bytes) => bytes,
-                Err(err) => {
-                    return Err(Error::Custom(format!(
-                        "Bytes array conversion failed with {err:?}",
-                    )))
-                }
-            };
+            let actual = bytes.len();
+            let bytes_array: [u8; std::mem::size_of::<u64>()] = bytes
+                .try_into()
+                .map_err(|_| EvmDbError::UnexpectedBytesLength {
+                    expected: std::mem::size_of::<u64>(),
+                    actual,
+                })?;
             Ok(u64::from_le_bytes(bytes_array))
         }
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(err) => Err(Error::Runtime(err)),
+        Err(err) => Err(EvmDbError::Runtime(err)),
     }
 }
 
 pub fn read_u256_le_default(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     default: U256,
 ) -> Result<U256, RuntimeError> {
@@ -58,7 +49,7 @@ pub fn read_u256_le_default(
 }
 
 pub fn read_u256_be_default(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     default: U256,
 ) -> Result<U256, RuntimeError> {
@@ -70,7 +61,7 @@ pub fn read_u256_be_default(
 }
 
 pub fn read_b256_be_opt(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
 ) -> Result<Option<B256>, RuntimeError> {
     match host.store_read(path, 0, 32) {
@@ -81,7 +72,7 @@ pub fn read_b256_be_opt(
 }
 
 pub fn read_b256_be_default(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     default: B256,
 ) -> Result<B256, RuntimeError> {
@@ -92,7 +83,7 @@ pub fn read_b256_be_default(
 }
 
 pub fn write_u64_le(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     path: &impl Path,
     value: u64,
 ) -> Result<(), RuntimeError> {
@@ -100,7 +91,7 @@ pub fn write_u64_le(
 }
 
 pub fn write_u256_le(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     path: &impl Path,
     value: U256,
 ) -> Result<(), RuntimeError> {

@@ -20,3 +20,5 @@ val setup :
   ?sections:(Internal_event.Section.t * Internal_event.level) list ->
   Opentelemetry_config.t ->
   (unit -> unit Lwt.t) tzresult Lwt.t
+
+val is_enabled : unit -> bool

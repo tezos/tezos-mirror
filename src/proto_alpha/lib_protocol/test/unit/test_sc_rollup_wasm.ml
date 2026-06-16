@@ -88,8 +88,14 @@ module Wasm_context = struct
   let proof_encoding = Proof_encoding.V2.Tree2.tree_proof_encoding
 end
 
-module Full_Wasm =
-  Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
+module Full_Wasm = Sc_rollup_wasm.V2_0_0.Make_pvm (struct
+  include
+    (val Tezos_smart_rollup_wasm_in_memory.wasm_pvm_machine
+           ~config:Tezos_scoru_wasm.Wasm_pvm_config.empty)
+
+  let compute_step =
+    compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+end)
 
 let test_metadata_size () =
   let address = Sc_rollup_repr.Address.of_bytes_exn (Bytes.make 20 '\000') in
@@ -214,7 +220,7 @@ let test_output () =
 
   let*! dummy = Context.init "/tmp" in
   let dummy_context = Context.empty dummy in
-  let (empty_tree : Wasm.tree) = Context.Tree.empty dummy_context in
+  let (empty_tree : Wasm.state) = Context.Tree.empty dummy_context in
   let parsed = Parse.string_to_module modul in
   let parsed =
     match parsed.it with Script.Textual m -> m | _ -> assert false
@@ -397,7 +403,7 @@ let test_reveal_host_function_can_request_dal_pages () =
   let payload_value, kernel =
     request_dal_module 10l Dal.Slot_index.zero 4 100l 200l 4_096l
   in
-  let* tree = Wasm_utils.initial_tree ~version:V3 kernel in
+  let* tree = Wasm_utils.initial_state ~version:V3 kernel in
   let* tree = Wasm_utils.set_empty_inbox_step 0l tree in
   let* tree =
     Wasm_utils.eval_until_input_requested ~reveal_builtins:None tree

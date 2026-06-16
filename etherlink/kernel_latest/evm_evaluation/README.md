@@ -11,7 +11,15 @@ To prevent that run the following command:
 $ ulimit -s 20000
 ```
 
-**NB:** The suite must be run on **[branch: v14.1@etherlink]** `d144093d375a75102180f3688ee6fedfb441e768` as we only support tests up to **Cancun**.
+**NB:**
+* The suite must be run on **[branch: v14.1@etherlink]** `d144093d375a75102180f3688ee6fedfb441e768` as we only support tests up to **Cancun**.
+* Another framework was used to test EVM versions after **Cancun**, another binary must be run to test the versions that comes after. For more information, see the `README` located at `etherlink/kernel_latest/revm_evaluation/README.md`.
+
+## Compile the binary
+
+```
+$ make -f etherlink.mk evm-evaluation-assessor
+```
 
 ## Execute the assessor
 

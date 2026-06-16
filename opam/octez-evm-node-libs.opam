@@ -23,15 +23,17 @@ depends: [
   "octez-lwt-domain"
   "opentelemetry-lwt"
   "crunch" { >= "3.3.0" }
-  "caqti-lwt" { >= "2.0.1" }
-  "re" { >= "1.10.0" }
+  "sqlite3" { = "5.3.1" }
   "octez-smart-rollup-wasm-debugger-plugin"
+  "re" { >= "1.10.0" }
   "uuidm" { >= "0.9.9" }
-  "octez-protocol-023-PtSeouLo-libs"
-  "tezos-protocol-023-PtSeouLo"
-  "octez-protocol-000-Ps9mPmXa-libs"
   "octez-shell-libs"
   "lwt-watcher" { = "0.2" }
+  "octez-protocol-000-Ps9mPmXa-libs"
+  "octez-protocol-023-PtSeouLo-libs"
+  "tezos-protocol-023-PtSeouLo"
+  "octez-protocol-024-PtTALLiN-libs"
+  "tezos-protocol-024-PtTALLiN"
   "dream" { >= "1.0.0~alpha8-octez" }
   "octez-connpool"
   "octez-version"

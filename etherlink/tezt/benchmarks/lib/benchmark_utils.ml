@@ -317,9 +317,11 @@ let rec pp_evm_value fmt (v : Efunc_core.Types.evm_value) =
            pp_evm_value)
         l
 
-let call infos rpc_node contract sender ?gas_limit ?nonce ?(value = Z.zero)
-    ?name ?(check_success = false) abi params =
+let call infos rpc_node contract sender ?gas_limit ?nonce ?total_confirmed
+    ?(value = Z.zero) ?name ?(check_success = false) abi params :
+    [> `Confirmed | `Dropped | `Refused] Lwt.t =
   let open Evm_node_lib_dev_encoding.Ethereum_types in
+  let open Tezos_error_monad.Error_monad in
   let pp_tx fmt () =
     Format.fprintf
       fmt
@@ -358,70 +360,129 @@ let call infos rpc_node contract sender ?gas_limit ?nonce ?(value = Z.zero)
         Log.debug " - Gas limit: %a" Z.pp_print g ;
         return g
   in
-  let tx_hash = ref (Hash (Hex "")) in
-  let* () =
-    Tx_queue.transfer
-      ~gas_limit
-      ~infos
-      ~to_:(Efunc_core.Private.a contract)
-      ?data
-      ~value
-      ~from:sender
+
+  let*? raw_tx, transaction_object =
+    Craft.transfer_with_obj_exn
       ?nonce
+      ~infos
+      ~from:sender
+      ~to_:(Efunc_core.Private.a contract)
+      ~gas_limit
+      ~value
+      ?data
       ()
-      ~callback:(function
-      | `Accepted h ->
-          tx_hash := h ;
-          unit
-      | (`Refused | `Dropped | `Confirmed) as status ->
-          let c =
-            match status with
-            | `Refused -> nb_refused
-            | `Dropped -> nb_dropped
-            | `Confirmed -> nb_confirmed
-          in
-          incr c ;
-          Lwt.wakeup waker status ;
-          if check_success then
-            Lwt.async (fun () ->
-                let*? receipt =
-                  Floodgate.get_transaction_receipt
-                    (Evm_node.endpoint rpc_node |> Uri.of_string)
-                    !tx_hash
-                in
-                let tx_status = Qty.to_z receipt.status in
-                if Z.(equal tx_status one) then unit
-                else
-                  let (Hash (Hex h)) = !tx_hash in
-                  Test.fail
-                    "Transaction %s was included as failed:\n%a"
-                    h
-                    pp_tx
-                    ()) ;
-          unit)
+  in
+  let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
+  let callback status =
+    match status with
+    | `Accepted -> unit
+    | (`Refused | `Dropped | `Confirmed) as status ->
+        let c =
+          match status with
+          | `Refused -> nb_refused
+          | `Dropped -> nb_dropped
+          | `Confirmed ->
+              Account.debit sender Z.(value + fees) ;
+              Account.increment_nonce sender ;
+              Option.iter incr total_confirmed ;
+              nb_confirmed
+        in
+        incr c ;
+        Lwt.wakeup waker status ;
+        if check_success then
+          Lwt.async (fun () ->
+              let tx_hash =
+                Evm_node_lib_dev.Transaction_object.hash transaction_object
+              in
+              let* res =
+                Floodgate.get_transaction_receipt
+                  (Evm_node.endpoint rpc_node |> Uri.of_string)
+                  tx_hash
+              in
+              match res with
+              | Ok receipt ->
+                  let tx_status = Qty.to_z receipt.status in
+                  if Z.(equal tx_status one) then unit
+                  else
+                    let (Hash (Hex h)) = tx_hash in
+                    Test.fail
+                      "Transaction %s was included as failed:\n%a"
+                      h
+                      pp_tx
+                      ()
+              | Error trace ->
+                  Test.fail "Error fetching receipt: %a" pp_print_trace trace) ;
+        unit
+  in
+  let next_nonce = quantity_of_z sender.nonce in
+  let*? add_res =
+    Evm_node_lib_dev.Tx_queue.add
+      ~callback
+      ~next_nonce
+      (Evm_node_lib_dev.Tx_queue_types.Evm transaction_object)
+      ~raw_tx
+  in
+  let* () =
+    match add_res with
+    | Ok (_ : hash) -> unit
+    | Error e -> Test.fail "Error adding to the tx_queue: %s" e
   in
   confirmed
 
-type gasometer = {mutable gas : Z.t; mutable time : Ptime.Span.t}
+type gas_info = {level : int; timestamp : float; gas : Z.t; gas_per_sec : float}
 
-let empty_gasometer () = {gas = Z.zero; time = Ptime.Span.zero}
+type gasometer = {mutable datapoints : gas_info list; mutable total_gas : Z.t}
 
-let capacity_mgas_sec {gas; time} =
+let empty_gasometer () = {datapoints = []; total_gas = Z.zero}
+
+let capacity_mgas_sec ~gas ~time =
   let s = Ptime.Span.to_float_s time in
-  let mega_gas = Z.to_float gas /. 1_000_000. in
-  mega_gas /. s
+  if s > 0. then
+    let mega_gas = Z.to_float gas /. 1_000_000. in
+    mega_gas /. s
+  else 0.
 
-let pp_capacity fmt g = Format.fprintf fmt "%.3f MGas/s" (capacity_mgas_sec g)
+let pp_capacity fmt capacity = Format.fprintf fmt "%.3f MGas/s" capacity
+
+let current_target =
+  (* Use max int to always get the latest gas constants independently of what is
+   set by the kernel. *)
+  let c = Evm_node_lib_dev.Gas_price.gas_constants ~storage_version:max_int in
+  Z.to_float c.target /. 1_000_000.
+
+let capacity_color ~bg capacity =
+  if capacity < current_target then
+    if bg then Log.Color.BG.red else Log.Color.FG.red
+  else if capacity < 2. *. current_target (* current capacity *) then
+    if bg then Log.Color.BG.yellow else Log.Color.FG.yellow
+  else if bg then Log.Color.BG.green
+  else Log.Color.FG.green
+
+let get_percentile p data =
+  let sorted_data = List.sort Float.compare data in
+  let data_array = Array.of_list sorted_data in
+  let n = Array.length data_array in
+  if n = 0 then 0.0
+  else
+    let index = p /. 100.0 *. float_of_int (n - 1) in
+    let i = int_of_float index in
+    let f = index -. float_of_int i in
+    if i >= n - 1 then data_array.(n - 1)
+    else (data_array.(i) *. (1. -. f)) +. (data_array.(i + 1) *. f)
+
+(** We measure capacity percentiles as the proportion of blocks which execute
+    with a speed in MGas/s above the returned value.  *)
+let get_capacity_percentile p = get_percentile (100. -. p)
 
 let blueprint_application_event = "blueprint_application.v0"
 
 let install_gasometer evm_node =
   let gasometer = empty_gasometer () in
   let () =
-    Evm_node.on_event evm_node @@ fun {name; value; _} ->
+    Evm_node.on_event evm_node @@ fun {name; value; timestamp; _} ->
     if name = blueprint_application_event then (
       let open JSON in
-      let level = value |-> "level" |> as_string in
+      let level_str = value |-> "level" |> as_string in
       let process_time =
         value |-> "process_time" |> as_float |> Ptime.Span.of_float_s
         |> Option.get
@@ -430,45 +491,143 @@ let install_gasometer evm_node =
         value |-> "execution_gas" |> as_string |> Z.of_string
       in
       let ignored = execution_gas < Z.of_int 100_000 in
-      let block_speed = {gas = execution_gas; time = process_time} in
+      let block_capacity =
+        capacity_mgas_sec ~gas:execution_gas ~time:process_time
+      in
       Log.info
         "Level %s: %a gas consumed in %a: %a"
-        level
+        level_str
         Z.pp_print
         execution_gas
         Ptime.Span.pp
         process_time
-        (fun fmt (ignored, speed) ->
+        (fun fmt (ignored, capacity) ->
           if ignored then Format.pp_print_string fmt "(ignored)"
-          else pp_capacity fmt speed)
-        (ignored, block_speed) ;
+          else pp_capacity fmt capacity)
+        (ignored, block_capacity) ;
       if not ignored then (
-        gasometer.gas <- Z.add gasometer.gas execution_gas ;
-        gasometer.time <- Ptime.Span.add gasometer.time process_time ;
-        let capacity = capacity_mgas_sec gasometer in
-        let color =
-          if capacity < 10. then Log.Color.FG.red else Log.Color.FG.green
+        let level = int_of_string level_str in
+        let info =
+          {level; gas = execution_gas; timestamp; gas_per_sec = block_capacity}
         in
-        Log.info ~color ~prefix:"Current capacity" "%a" pp_capacity gasometer))
+        gasometer.datapoints <- info :: gasometer.datapoints ;
+        gasometer.total_gas <- Z.add gasometer.total_gas execution_gas ;
+        let capacities =
+          List.map (fun {gas_per_sec; _} -> gas_per_sec) gasometer.datapoints
+        in
+        let median = get_capacity_percentile 50. capacities in
+        let color = capacity_color ~bg:false median in
+        Log.info
+          ~color
+          ~prefix:"Current median capacity"
+          "%a"
+          pp_capacity
+          median))
   in
   gasometer
 
-let monitor_gasometer evm_node f =
-  let gasometer = install_gasometer evm_node in
-  let* () = f () in
-  let capacity = capacity_mgas_sec gasometer in
-  let color =
-    if capacity < 10. then Log.Color.BG.red
-    else if capacity < 12. then Log.Color.BG.yellow
-    else Log.Color.BG.green
-  in
+let log_capcity evm_node what capacity =
+  let color = capacity_color ~bg:true capacity in
   Log.report
     ~color
-    ~prefix:(Format.sprintf "Capacity of %s" (Evm_node.name evm_node))
+    ~prefix:(Format.sprintf "%s capacity of %s" what (Evm_node.name evm_node))
     "%a"
     pp_capacity
-    gasometer ;
-  unit
+    capacity
+
+type monitor_result = {
+  median : float;
+  p90 : float;
+  wall : float;
+  gasometer : gasometer;
+}
+
+let monitor_gasometer evm_node f =
+  let gasometer = install_gasometer evm_node in
+  let start_time = Ptime_clock.now () in
+  let* () = f () in
+  let end_time = Ptime_clock.now () in
+  let wall_time = Ptime.diff end_time start_time in
+  let capacities =
+    List.map (fun {gas_per_sec; _} -> gas_per_sec) gasometer.datapoints
+  in
+  let median = get_capacity_percentile 50. capacities in
+  let p90 = get_capacity_percentile 90. capacities in
+  let wall_clock_capacity =
+    capacity_mgas_sec ~gas:gasometer.total_gas ~time:wall_time
+  in
+  log_capcity evm_node "Median" median ;
+  log_capcity evm_node "90th percentile" p90 ;
+  log_capcity evm_node "Wall clock" wall_clock_capacity ;
+  return {median; p90; wall = wall_clock_capacity; gasometer}
+
+let save_capacity ~csv_filename capacity =
+  let y, m, d = Ptime.to_date @@ Ptime_clock.now () in
+  let date_str = Printf.sprintf "%04d-%02d-%02d" y m d in
+  let csv_line = Printf.sprintf "%s,%.2f\n" date_str capacity in
+  let oc = open_out_gen [Open_append; Open_creat] 0o644 csv_filename in
+  output_string oc csv_line ;
+  close_out oc
+
+let plot_capacity ~csv_filename ~network ~kernel output_filename =
+  let gnuplot_script =
+    Printf.sprintf
+      {|
+      set terminal pngcairo size 1024,768 enhanced font 'Verdana,10';
+      set output '%s';
+      set title 'Capacity over Time for %s with %s kernel';
+      set xlabel 'Date';
+      set ylabel 'Capacity (MGas/s)';
+      set timefmt '%%Y-%%m-%%d';
+      set xdata time;
+      set xtics rotate by -45;
+      set grid;
+      set datafile separator ',';
+      plot '%s' using 1:2 with linespoints title 'capacity';
+      |}
+      output_filename
+      network
+      kernel
+      csv_filename
+  in
+  Process.run "gnuplot" ["-e"; gnuplot_script]
+
+let plot_gas_and_capacity ~gasometer ~output_filename =
+  let data_filename = Temp.file "gas_data.dat" in
+  let oc = open_out data_filename in
+  (* The datapoints are stored in reverse order of arrival. *)
+  let datapoints = List.rev gasometer.datapoints in
+  List.iter
+    (fun {level; gas; gas_per_sec; _} ->
+      Printf.fprintf
+        oc
+        "%d %.3f %.3f\n"
+        level
+        (Z.to_float gas /. 1_000_000.)
+        gas_per_sec)
+    datapoints ;
+  close_out oc ;
+  let gnuplot_script =
+    Printf.sprintf
+      {|
+      set terminal pngcairo size 1024,768 enhanced font 'Verdana,10';
+      set output '%s';
+      set title 'Gas and Capacity per Block';
+      set xlabel 'Block Number';
+      set ylabel 'Capacity (MGas/s)';
+      set y2label 'Gas/Block (MGas)';
+      set ytics nomirror;
+      set y2tics;
+      set y2range [0:*];
+      set grid;
+      set key top left;
+      plot '%s' using 1:3 with linespoints title 'Capacity' axes x1y1,
+           '' using 1:2 with linespoints title 'Gas/Block' axes x1y2;
+      |}
+      output_filename
+      data_filename
+  in
+  Process.run "gnuplot" ["-e"; gnuplot_script]
 
 let get_mem_mb pid =
   Lwt_process.with_process_in ("ps", [|"ps"; "-p"; pid; "-o"; "rss="|])
@@ -588,3 +747,45 @@ let profile evm_node =
   match String.trim os with
   | "Darwin" -> return (MacOS.profile evm_node)
   | _ -> return (Linux.profile evm_node)
+
+let host_fun_metrics_re =
+  rex "octez_evm_node_host_function_calls\\{host_function=\"([^\"]*)\"} (\\d+)"
+
+module StringTable = Hashtbl.Make (String)
+
+let collect_host_function_metrics evm_node =
+  let* metrics = Rpc.metrics evm_node in
+  let metrics = String.split_on_char '\n' metrics in
+  List.fold_left
+    (fun acc line ->
+      match line =~** host_fun_metrics_re with
+      | None -> acc
+      | Some (f_name, count_s) ->
+          let count = try int_of_string count_s with _ -> 0 in
+          (f_name, count) :: acc)
+    []
+    metrics
+  |> List.rev |> return
+
+let log_host_function_calls metrics =
+  let total = List.fold_left (fun acc (_, c) -> c + acc) 0 metrics in
+  Log.report
+    ~color:Log.Color.bold
+    "Total number of host function calls: %#d"
+    total ;
+  List.iter (fun (n, c) -> Log.info " - %-18s %#8d" n c) metrics
+
+let with_collect_host_function_metrics evm_node f =
+  let* metrics_before = collect_host_function_metrics evm_node in
+  let* res = f () in
+  let* metrics_after = collect_host_function_metrics evm_node in
+  let metrics =
+    List.map
+      (fun (name, count_aft) ->
+        match List.assoc_opt name metrics_before with
+        | None -> (name, count_aft)
+        | Some count_bef -> (name, count_aft - count_bef))
+      metrics_after
+  in
+  log_host_function_calls metrics ;
+  return res

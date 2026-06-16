@@ -110,6 +110,11 @@ val pp_quantity : Format.formatter -> quantity -> unit
 
 val quantity_of_z : Z.t -> quantity
 
+(** Default minimum base fee per gas, set to 1 Gwei.
+    This value must stay in sync with [MINIMUM_BASE_FEE_PER_GAS] defined in
+    the kernel (etherlink/kernel_latest/kernel/src/fees.rs). *)
+val default_minimum_base_fee_per_gas : Z.t
+
 val decode_number_le : bytes -> quantity
 
 val decode_number_be : bytes -> quantity
@@ -238,6 +243,21 @@ type transaction_log = {
   removed : bool option;
 }
 
+type access = {address : address; storage_keys : hex list}
+
+val access_encoding : access Data_encoding.t
+
+type authorization_item = {
+  chain_id : quantity;
+  address : address;
+  nonce : quantity;
+  y_parity : quantity;
+  r : quantity;
+  s : quantity;
+}
+
+val authorization_item_encoding : authorization_item Data_encoding.t
+
 type call = {
   from : address option;
   to_ : address option;
@@ -245,6 +265,8 @@ type call = {
   gasPrice : quantity option;
   value : quantity option;
   data : hash option;
+  access_list : access list;
+  authorization_list : authorization_item list;
 }
 
 val call_encoding : call Data_encoding.t

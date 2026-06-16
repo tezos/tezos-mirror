@@ -96,7 +96,7 @@ val prepare :
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) T024 (* Alpha predecessor *)
+  | (* Alpha predecessor *) U025 (* Alpha predecessor *)
 
 (** Prepares the context for the first block of the protocol.
 
@@ -296,31 +296,6 @@ val sampler_for_cycle :
   Cycle_repr.t ->
   (t * Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t
 
-(** [init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk] caches the stakes
-    of the active delegates for [cycle] in memory for quick access.
-
-    @return [Error Stake_info_already_set] if the info was already
-    cached. *)
-val init_stake_info_for_cycle :
-  t ->
-  Cycle_repr.t ->
-  total_stake:Int64.t ->
-  (consensus_pk * Int64.t) list ->
-  t tzresult
-
-(** [stake_info_for_cycle ~read ctxt cycle] returns the stakes
-    for [cycle]. The stake info is read in memory if
-    [init_stake_info_for_cycle] or [stake_info_for_cycle] was previously
-    called for the same [cycle]. Otherwise, it is read "on-disk" with
-    the [read] function and then cached in [ctxt] like
-    [init_stake_info_for_cycle].
-    The list follows a lexicographical order on the delegate pkh. *)
-val stake_info_for_cycle :
-  read:(t -> (t * Int64.t * (consensus_pk * int64) list) tzresult Lwt.t) ->
-  t ->
-  Cycle_repr.t ->
-  (t * Int64.t * (consensus_pk * int64) list) tzresult Lwt.t
-
 (* The stake distribution is stored both in [t] and in the cache. It
    may be sufficient to only store it in the cache. *)
 val stake_distribution_for_current_cycle :
@@ -333,6 +308,17 @@ val find_stake_distribution_for_current_cycle :
 
 val init_stake_distribution_for_current_cycle :
   t -> Stake_repr.t Signature.Public_key_hash.Map.t -> t
+
+type delegate_stake_info = {consensus_pk : consensus_pk; stake_weight : Int64.t}
+
+type stake_info = {
+  total_stake_weight : Int64.t;
+  delegates : delegate_stake_info list;
+}
+
+val delegate_stake_info_encoding : delegate_stake_info Data_encoding.encoding
+
+val stake_info_encoding : stake_info Data_encoding.encoding
 
 (** Returns the reward coefficient for the current cycle
     This value is equal to the value in {!Storage.Issuance_coeff} if it exists,
@@ -360,7 +346,6 @@ end
 type consensus_power = {
   consensus_key : consensus_pk;
   attesting_power : Attesting_power_repr.t;
-  dal_power : int;
 }
 
 module type CONSENSUS = sig
@@ -369,6 +354,8 @@ module type CONSENSUS = sig
   type 'value slot_map
 
   type 'value level_map
+
+  type 'value raw_level_map
 
   type slot_set
 
@@ -395,6 +382,17 @@ module type CONSENSUS = sig
       (minimal_slot, voting_power, dal_power). See {!allowed_attestations} *)
   val allowed_consensus : t -> consensus_power slot_map level_map option
 
+  val delegate_to_shard_count :
+    t -> int Signature.Public_key_hash.Map.t raw_level_map
+
+  (** [shard_count_map ctxt ~committee_level] returns the
+      delegate-to-shard-count map for the given [committee_level],
+      or [None] if the level is not present in the pre-computed map. *)
+  val shard_count_map :
+    t ->
+    committee_level:Raw_level_repr.t ->
+    int Signature.Public_key_hash.Map.t option
+
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
       due to a previous slashing. *)
@@ -415,6 +413,7 @@ module type CONSENSUS = sig
     allowed_attestations:consensus_power slot_map option ->
     allowed_preattestations:consensus_power slot_map option ->
     allowed_consensus:consensus_power slot_map level_map option ->
+    delegate_to_shard_count:int Signature.Public_key_hash.Map.t raw_level_map ->
     t
 
   (** [record_attestation ctx ~initial_slot ~power] records an
@@ -475,6 +474,7 @@ module Consensus :
      and type slot := Slot_repr.t
      and type 'a slot_map := 'a Slot_repr.Map.t
      and type 'a level_map := 'a Level_repr.Map.t
+     and type 'a raw_level_map := 'a Raw_level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
      and type attesting_power := Attesting_power_repr.t
@@ -490,45 +490,54 @@ end
 module Dal : sig
   type cryptobox = Dal.t
 
+  val make_cryptobox : Dal.parameters -> cryptobox tzresult
+
   val make : t -> (t * cryptobox) tzresult
 
-  (** [record_number_of_attested_shards ctxt attestation number_of_shards]
-      records that the [number_of_shards] shards were attested (declared
-      available by some attester). *)
-  val record_number_of_attested_shards : t -> Dal_attestation_repr.t -> int -> t
+  (** [committee_level_of ctxt ~attested_level ~lag] computes the shard
+      assignment level, aka as committee level, for the slots published at
+      [attested_level - lag], referred to as [published_level].
 
-  (** [register_slot_header ctxt slot_header ~source] returns a new context
-      where the new candidate [slot] published by [source] has been taken into
-      account. Returns [Some (ctxt,updated)] where [updated=true] if the
-      candidate is registered. [Some (ctxt,false)] if another candidate was
-      already registered previously. Returns an error if the slot is invalid. *)
-  val register_slot_header :
-    t -> Dal_slot_repr.Header.t -> source:Contract_repr.t -> t tzresult
+      The committee level for a given [published_level] is defined
+      as [published_level + attestation_lag - 1].
+
+      It returns [None] if [published_level] is negative. *)
+  val committee_level_of :
+    t -> attested_level:Raw_level_repr.t -> lag:int -> Raw_level_repr.t option
+
+  (** [slot_accountability ctxt] returns the current DAL slot accountability
+      tracker from [ctxt].
+
+      The accountability structure keeps track of which shards have been
+      attested by which delegates for each slot index, allowing the protocol to
+      determine whether a slot has received enough attestations to be considered
+      available. *)
+  val slot_accountability : t -> Dal_attestations_repr.Accountability.t
+
+  (** [record_slot_accountability ctxt accountability] stores the given
+      [accountability] state in [ctxt] and returns the updated context. *)
+  val record_slot_accountability :
+    t -> Dal_attestations_repr.Accountability.t -> t
+
+  (** [slot_fee_market ctxt] returns the current DAL slot fee market tracker from [ctxt].
+
+      The tracker registers slot candidates during block application. *)
+  val slot_fee_market : t -> Dal_slot_repr.Slot_market.t
+
+  (** [record_slot_fee_market ctxt slot_fee_market] returns the context updated with the the given [slot_fee_market]. *)
+  val record_slot_fee_market : t -> Dal_slot_repr.Slot_market.t -> t
 
   (** [record_attestation ctxt ~tb_slot attestation] records that the delegate
       with Tenderbake slot [tb_slot] emitted [attestation]. *)
   val record_attestation :
-    t -> tb_slot:Slot_repr.t -> Dal_attestation_repr.t -> t
+    t -> tb_slot:Slot_repr.t -> Dal_attestations_repr.t -> t
 
   (** [attestations] returns the recorded attestations *)
-  val attestations : t -> Dal_attestation_repr.t Slot_repr.Map.t
+  val attestations : t -> Dal_attestations_repr.t Slot_repr.Map.t
 
-  (** [candidates ctxt] returns the current list of slot for which there is at
-      least one candidate alongside the addresses that published them. *)
-  val candidates : t -> (Dal_slot_repr.Header.t * Contract_repr.t) list
-
-  (** [is_slot_index_attested ctxt slot_index] returns [true] if the
-      [slot_index] is declared available by the protocol. [false] otherwise. If
-      the [index] is out of the interval [0;number_of_slots - 1], returns
-      [false].
-
-      Whether the slot is attested by the protocol or not, the function also
-      returns the ratio of attested shards w.r.t. total shards, as a rational
-      number. *)
-  val is_slot_index_attested :
-    t ->
-    Dal_slot_index_repr.t ->
-    Dal_attestation_repr.Accountability.attestation_status
+  (** [get_accountability ctxt] returns the current block's accountability data,
+      which contains the attestation information accumulated during this block. *)
+  val get_accountability : t -> Dal_attestations_repr.Accountability.t
 
   (* Check whether the DAL feature flag is set and return the error
      {!Dal_feature_disabled} if not. *)
@@ -545,6 +554,14 @@ module Dal : sig
   (* [only_if_dal_incentives_enabled ctxt ~default f] executes [f ctxt] if the
      DAL incentives flag is enabled and otherwise [default ctxt]. *)
   val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+
+  (* Check whether the DAL dynamic lag flag is set and return the error
+     {!Dal_dynamic_lag_disabled} if not. *)
+  val assert_dynamic_lag_enabled : t -> unit tzresult
+
+  (* [only_if_dal_dynamic_lag_enabled ctxt ~default f] executes [f ctxt] if the
+     DAL dynamic flag is enabled and otherwise [default ctxt]. *)
+  val only_if_dynamic_lag_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 end
 
 module Address_registry : sig

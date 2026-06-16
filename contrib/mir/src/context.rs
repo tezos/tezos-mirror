@@ -19,6 +19,52 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
 use typed_arena::Arena;
 
+/// Errors that can surface from
+/// [`CtxTrait::lookup_view_storage_balance`]. "View does not exist on
+/// this contract" is **not** an error variant — that case is signalled
+/// by `Ok(None)`. Any `Err` here means the lookup itself could not be
+/// fulfilled (corruption, I/O failure, serialization failure, balance
+/// overflow), and the caller should surface it as a hard runtime
+/// failure rather than collapsing it back to `V::Option(None)`.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum LookupViewError {
+    /// Encoding the view's storage bytes failed. **Test-only in
+    /// practice**: only reachable from the in-memory [`Ctx`] (which
+    /// encodes a stored `Micheline` value on demand). The production
+    /// `Ctx` in `etherlink_tezos_execution::mir_ctx` reads
+    /// already-encoded bytes directly from durable storage and never
+    /// re-encodes, so this variant is unreachable on the hot path.
+    /// Kept on the trait so test contexts that synthesize Micheline
+    /// can surface zarith encode failures faithfully.
+    ///
+    /// `Rc` because [`tezos_data_encoding::enc::BinError`] is not
+    /// `Clone` (its `IOError` variant carries a non-`Clone`
+    /// `std::io::Error`).
+    #[error("encoding view storage failed: {0}")]
+    Encode(std::rc::Rc<tezos_data_encoding::enc::BinError>),
+    /// Decoding the contract's serialized code from durable storage
+    /// failed.
+    #[error("decoding contract code failed: {0}")]
+    Decode(#[from] crate::serializer::DecodeError),
+    /// The decoded code does not split into a valid script shape.
+    #[error("splitting contract script failed: {0}")]
+    SplitScript(#[from] crate::typechecker::TcError),
+    /// Host-layer error: durable storage read or path failure on
+    /// behalf of the originated contract being looked up. Stringified
+    /// at the trait boundary because MIR is host-agnostic.
+    #[error("host error during view lookup: {0}")]
+    HostError(String),
+    /// The contract's balance does not fit in `i64`.
+    #[error("contract balance overflows i64")]
+    BalanceOverflow,
+}
+
+impl From<tezos_data_encoding::enc::BinError> for LookupViewError {
+    fn from(err: tezos_data_encoding::enc::BinError) -> Self {
+        LookupViewError::Encode(std::rc::Rc::new(err))
+    }
+}
+
 #[allow(missing_docs)]
 pub trait TypecheckingCtx<'a> {
     fn gas(&mut self) -> &mut Gas;
@@ -87,7 +133,7 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
 
     fn total_voting_power(&self) -> BigUint;
 
-    fn operation_group_hash(&self) -> [u8; 32];
+    fn operation_group_hash(&self) -> &OperationHash;
 
     fn origination_counter(&mut self) -> u32;
 
@@ -95,16 +141,46 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>>;
 
-    fn lookup_view_and_storage(
+    /// Looks up a view definition together with the contract's storage and balance.
+    ///
+    /// Returns the view named `name` from `contract`, along with:
+    /// - the Micheline storage type,
+    /// - the packed (serialized) storage,
+    /// - the contract balance in mutez.
+    ///
+    /// Returns [`Ok(None)`] iff the contract is not originated, or it
+    /// is originated but does not declare a view named `name`. Both
+    /// cases match L1 VIEW semantics, which pushes `V::Option(None)`
+    /// on the stack so the caller can `IF_NONE` over it. Every other
+    /// failure mode — host I/O, corrupted contract code/storage,
+    /// balance overflow, encoding failure — surfaces as a typed
+    /// [`LookupViewError`]; implementations must not collapse those
+    /// into [`Ok(None)`], as that would silently impersonate a
+    /// missing view.
+    fn lookup_view_storage_balance(
         &self,
-        contract: ContractKt1Hash,
+        contract: &ContractKt1Hash,
         name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))>;
+    ) -> Result<
+        Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
+        LookupViewError,
+    >;
+
+    /// Override the execution context for a view call.
+    /// Sets `self_address`, `sender`, `amount`, and `balance`.
+    fn set_view_context(
+        &mut self,
+        self_address: AddressHash,
+        sender: AddressHash,
+        amount: i64,
+        balance: i64,
+    );
 }
 
-/// [Ctx] includes "outer context" required for typechecking and interpreting
-/// Michelson.
+/// Standalone implementation of the MIR execution context, used for tests,
+/// examples, and the TZT runner. For the real Etherlink kernel context, see
+/// `tezos_execution::mir_ctx::Ctx`.
 pub struct Ctx<'a> {
     /// [Gas] counter. Defaults to [`Gas::default()`]
     pub gas: Gas,
@@ -132,38 +208,36 @@ pub struct Ctx<'a> {
     /// Address of the contract being executed. The result of the `SELF_ADDRESS`
     /// instruction. Defaults to `KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi`.
     pub self_address: AddressHash,
-    /// A function that maps contract addresses to their entrypoints. It only
-    /// needs to work with smart contract and smart rollup addresses, as
-    /// implicit accounts don't really have entrypoints. For a given address,
-    /// the function must return either [None], meaning the contract doesn't
-    /// exist, or [`Some(entrypoints)`] with the map of its entrypoints. See
-    /// also [Self::set_known_contracts]. Defaults to returning [None] for any
-    /// address.
-    pub lookup_entrypoints: Box<dyn Fn(&AddressHash) -> Option<Entrypoints>>,
+    /// A map of contract addresses to their entrypoints. It only needs to
+    /// work with smart contract and smart rollup addresses, as implicit
+    /// accounts don't really have entrypoints. For a given address, the map
+    /// returns either [None], meaning the contract doesn't exist, or
+    /// [`Some(entrypoints)`] with the map of its entrypoints. See also
+    /// [Self::set_known_contracts]. Defaults to empty.
+    lookup_entrypoints: HashMap<AddressHash, Entrypoints>,
     /// A map of contract addresses to their views. It only
     /// needs to work with smart contract, defaulting to [None] otherwise.
     pub views: HashMap<AddressHash, HashMap<String, View<'a>>>,
     /// A map of contract addresses to their storage. It only
     /// needs to work with smart contract, defaulting to [None] otherwise.
     pub storage: HashMap<AddressHash, (Type, TypedValue<'a>)>,
-    /// A function that maps public key hashes (i.e. effectively implicit
-    /// account addresses) to their corresponding voting powers. Note that if
-    /// you provide a custom function here, you also must define
-    /// [Self::total_voting_power] to be consistent with your function! See also
-    /// [Self::set_voting_powers]. Defaults to returning `0` for any address.
-    pub voting_powers: Box<dyn Fn(&PublicKeyHash) -> BigUint>,
+    /// A map of public key hashes (i.e. effectively implicit account
+    /// addresses) to their corresponding voting powers. If a given key hash
+    /// is absent, its voting power is assumed to be `0`. See also
+    /// [Self::set_voting_powers], which also sets [Self::total_voting_power]
+    /// consistently. Defaults to empty.
+    voting_powers: HashMap<PublicKeyHash, BigUint>,
     /// The minimal injection time for the current block, as a unix timestamp
     /// (in seconds). Defaults to `0`.
     pub now: BigInt,
-    /// Total voting power. Note that if you are setting this manually, you must
-    /// also provide a consistent implementation for [Self::voting_powers]. See
-    /// also [Self::set_voting_powers]. Defaults to `0`.
-    pub total_voting_power: BigUint,
+    /// Total voting power. Automatically set by [Self::set_voting_powers] to
+    /// the sum of all values in [Self::voting_powers]. Defaults to `0`.
+    total_voting_power: BigUint,
     /// Hash for the current operation group. This will be used to generate
     /// contract addresses for newly-created contracts (via `CREATE_CONTRACT`
     /// instruction). Defaults to
     /// `onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D`.
-    pub operation_group_hash: [u8; 32],
+    pub operation_group_hash: OperationHash,
     // NB: lifetime is mandatory if we want to use types implementing with
     // references inside for LazyStorage, and we do due to how Runtime is passed
     // as &mut
@@ -171,54 +245,41 @@ pub struct Ctx<'a> {
     /// admit a custom implementation of [LazyStorage] trait. Defaults to a new,
     /// empty, [InMemoryLazyStorage].
     pub big_map_storage: InMemoryLazyStorage<'a>,
+    /// Origination counter. Incremented for each `CREATE_CONTRACT`. Defaults to `0`.
     origination_counter: u32,
+    /// Operation counter used as a nonce for operations. Defaults to `0`.
     operation_counter: u128,
+    /// A map of contract KT1 addresses to their balances (in mutez).
+    /// Used by [`lookup_view_storage_balance`](CtxTrait::lookup_view_storage_balance) to
+    /// return the target contract's balance during view execution. Defaults to empty.
+    pub balances: HashMap<ContractKt1Hash, i64>,
 }
 
 impl<'a> Ctx<'a> {
-    /// Increment the internal operation counter and return it. Used as a nonce
-    /// for operations.
-    pub fn operation_counter(&mut self) -> u128 {
-        self.operation_counter += 1;
-        self.operation_counter
-    }
-
     /// Forcibly set the operation counter. This is mostly useful for testing purposes.
     pub fn set_operation_counter(&mut self, v: u128) {
         self.operation_counter = v;
     }
 
-    /// Set a reasonable implementation for [Self::lookup_contract] by providing
-    /// something that can convert to [`HashMap<AddressHash, Entrypoints>`].
+    /// Set [Self::lookup_entrypoints] by providing something that can convert
+    /// to [`HashMap<AddressHash, Entrypoints>`].
     pub fn set_known_contracts(&mut self, v: impl Into<HashMap<AddressHash, Entrypoints>>) {
-        let map = v.into();
-        self.lookup_entrypoints = Box::new(move |ah| map.get(ah).cloned());
+        self.lookup_entrypoints = v.into();
     }
 
-    /// Set a resonable implementation for [Self::big_map_storage] by providing
-    /// something that implements the [LazyStorage] trait.
+    /// Set [Self::big_map_storage] by providing an [InMemoryLazyStorage].
     pub fn set_big_map_storage(&mut self, v: InMemoryLazyStorage<'a>) {
         self.big_map_storage = v;
     }
 
-    /// Set a reasonable implementation for [Self::voting_powers] and a
-    /// consistent value for [Self::total_voting_power] by providing something
-    /// that converts into  [`HashMap<PublicKeyHash, BigUint>`], mapping key hashes to
-    /// voting powers. If a given key hash is unspecified, its voting power is
-    /// assumed to be `0`. [Self::total_voting_power] is set to the sum of all
-    /// values.
+    /// Set [Self::voting_powers] and a consistent value for
+    /// [Self::total_voting_power] by providing something that converts into
+    /// [`HashMap<PublicKeyHash, BigUint>`]. [Self::total_voting_power] is set
+    /// to the sum of all values.
     pub fn set_voting_powers(&mut self, v: impl Into<HashMap<PublicKeyHash, BigUint>>) {
         let map: HashMap<PublicKeyHash, BigUint> = v.into();
         self.total_voting_power = map.values().sum();
-        self.voting_powers = Box::new(move |x| map.get(x).unwrap_or(&0u32.into()).clone());
-    }
-
-    /// Increment origination counter and return its new value. Used as a nonce
-    /// to generate unique contract addresses for the `CREATE_CONTRACT`
-    /// instruction.
-    pub fn origination_counter(&mut self) -> u32 {
-        self.origination_counter += 1;
-        self.origination_counter
+        self.voting_powers = map;
     }
 
     /// Forcibly set an origination counter. Mostly useful in tests.
@@ -242,8 +303,8 @@ impl Default for Ctx<'_> {
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
-            lookup_entrypoints: Box::new(|_| None),
-            voting_powers: Box::new(|_| 0u32.into()),
+            lookup_entrypoints: HashMap::new(),
+            voting_powers: HashMap::new(),
             total_voting_power: 0u32.into(),
             big_map_storage: InMemoryLazyStorage::new(),
             views: HashMap::new(),
@@ -253,11 +314,9 @@ impl Default for Ctx<'_> {
                 "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
                 // "2EouXpxkPGxAvVKCpdCJnfp2wEMWR7Up5DERRZ1Yo99xCLjkCVuq",
             )
-            .unwrap()
-            .as_ref()
-            .try_into()
             .unwrap(),
             origination_counter: 0,
+            balances: HashMap::new(),
         }
     }
 }
@@ -271,7 +330,7 @@ impl<'a> TypecheckingCtx<'a> for Ctx<'a> {
         &self,
         address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
-        (self.lookup_entrypoints)(address)
+        self.lookup_entrypoints.get(address).cloned()
     }
 
     fn big_map_get_type(
@@ -316,7 +375,10 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
     }
 
     fn voting_power(&self, pkh: &PublicKeyHash) -> BigUint {
-        (self.voting_powers)(pkh)
+        self.voting_powers
+            .get(pkh)
+            .cloned()
+            .unwrap_or(BigUint::ZERO)
     }
 
     fn now(&self) -> BigInt {
@@ -327,8 +389,8 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         self.total_voting_power.clone()
     }
 
-    fn operation_group_hash(&self) -> [u8; 32] {
-        self.operation_group_hash
+    fn operation_group_hash(&self) -> &OperationHash {
+        &self.operation_group_hash
     }
 
     fn origination_counter(&mut self) -> u32 {
@@ -345,14 +407,19 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         Box::new(&mut self.big_map_storage)
     }
 
-    fn lookup_view_and_storage(
+    fn lookup_view_storage_balance(
         &self,
-        contract: ContractKt1Hash,
+        contract: &ContractKt1Hash,
         view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))> {
-        let addr = AddressHash::Kt1(contract);
-        let contract_view = self.views.get(&addr)?.get(view_name)?;
+    ) -> Result<
+        Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
+        LookupViewError,
+    > {
+        let addr = AddressHash::Kt1(contract.clone());
+        let Some(contract_view) = self.views.get(&addr).and_then(|m| m.get(view_name)) else {
+            return Ok(None);
+        };
         let view = MichelineView {
             input_type: contract_view
                 .input_type
@@ -362,9 +429,26 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
                 .into_micheline_optimized_legacy(arena),
             code: contract_view.code.clone(),
         };
-        let (storage_ty, storage) = self.storage.get(&addr)?;
+        let Some((storage_ty, storage)) = self.storage.get(&addr) else {
+            return Ok(None);
+        };
         let mich_storage_ty = storage_ty.into_micheline_optimized_legacy(arena);
         let mich_storage = storage.clone().into_micheline_optimized_legacy(arena);
-        Some((view, (mich_storage_ty, mich_storage.encode())))
+        let view_balance = self.balances.get(contract).cloned().unwrap_or(0);
+        let encoded = mich_storage.encode()?;
+        Ok(Some((view, mich_storage_ty, encoded, view_balance)))
+    }
+
+    fn set_view_context(
+        &mut self,
+        self_address: AddressHash,
+        sender: AddressHash,
+        amount: i64,
+        balance: i64,
+    ) {
+        self.self_address = self_address;
+        self.sender = sender;
+        self.amount = amount;
+        self.balance = balance;
     }
 }

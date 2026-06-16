@@ -1120,7 +1120,7 @@ dependencies = [
  "primitive-types",
  "proptest",
  "revm",
- "revm-etherlink",
+ "revm-etherlink-farfadet",
  "rlp",
  "sha3",
  "softfloat",
@@ -2388,7 +2388,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "revm-etherlink"
+name = "revm-etherlink-farfadet"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types",

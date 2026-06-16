@@ -551,12 +551,17 @@ module Simple = struct
               trace ;
             Lwt.return_unit)
       (fun exc ->
-        (* For the same reason we also just print exceptions *)
-        Format.eprintf
-          "@[<hv 2>Failed to send event '%s':@ %s@]@."
-          simple_event.name
-          (Printexc.to_string exc) ;
-        Lwt.return_unit)
+        (* Cancellation during shutdown is expected — the fiber tree is being
+           torn down and in-flight event emissions get cancelled. Printing
+           Lwt.Canceled as an error would make it appear as a crash. *)
+        match exc with
+        | Lwt.Canceled -> Lwt.return_unit
+        | exc ->
+            Format.eprintf
+              "@[<hv 2>Failed to send event '%s':@ %s@]@."
+              simple_event.name
+              (Printexc.to_string exc) ;
+            Lwt.return_unit)
 
   let emit_at_top_level simple_event parameters =
     simple_event.emit_at_top_level parameters

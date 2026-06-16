@@ -4,16 +4,20 @@
 
 //! Utilities and types for representing a stack.
 
-use std::ops::{Index, IndexMut};
-use std::slice::SliceIndex;
+use std::rc::Rc;
 
 use crate::ast::*;
+
+/// Error returned when a stack index is out of bounds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("stack index out of bounds")]
+pub struct StackOob;
 
 /// Stack of [Type]s.
 pub type TypeStack = Stack<Type>;
 
 /// Stack of [TypedValue]s. Named `IStack` for "interpeter stack".
-pub type IStack<'a> = Stack<TypedValue<'a>>;
+pub type IStack<'a> = Stack<Rc<TypedValue<'a>>>;
 
 /// Possibly failed type stack. Stacks are considered failed after
 /// always-failing instructions. A failed stack can be unified (in terms of
@@ -74,21 +78,25 @@ impl<T> Stack<T> {
         Stack(data)
     }
 
+    /// Construct a `Stack` from elements.
+    fn stack_from_elems(data: Vec<T>) -> Self {
+        Stack::stack_from_vec(data)
+    }
+
     /// Convert stack index to vec index.
-    fn vec_index(&self, i: usize) -> usize {
+    fn vec_index_checked(&self, i: usize) -> Result<usize, StackOob> {
         let len = self.len();
-        len.checked_sub(i + 1).expect("out of bounds stack access")
+        len.checked_sub(i + 1).ok_or(StackOob)
     }
 
     /// Removes and returns the element at position `i` within the stack, where
     /// 0 corresponds to the top, shifting all elements below it up. This has
     /// worst-case complexity of O(n).
     ///
-    /// # Panics
-    ///
-    /// When `i` is larger or equal to the length of the stack.
-    pub fn remove(&mut self, i: usize) -> T {
-        self.0.remove(self.vec_index(i))
+    /// Returns `Err(StackOob)` if `i` is out of bounds.
+    pub fn remove(&mut self, i: usize) -> Result<T, StackOob> {
+        let vi = self.vec_index_checked(i)?;
+        Ok(self.0.remove(vi))
     }
 
     /// Insert an element at i'th stack index, such that after the call there
@@ -98,30 +106,43 @@ impl<T> Stack<T> {
     /// This has to move elements of the stack after insertion, so worst-case
     /// complexity is O(n).
     ///
-    /// # Panics
-    ///
-    /// If `i` is larger than the length of the stack.
-    pub fn insert(&mut self, i: usize, e: T) {
+    /// Returns `Err(StackOob)` if `i` is out of bounds.
+    pub fn insert(&mut self, i: usize, e: impl Into<T>) -> Result<(), StackOob> {
+        let e = e.into();
         if i > 0 {
             // We subtract one from the index because since our stack is inverted, the insertion
             // point is to the right of the index, instead of the left of it, as considered by the
             // `insert` method of the `Vec`. So, we have to use an index that is one element further
             // to the right, which in terms of stack index, means substracting one from the input
             // index.
-            self.0.insert(self.vec_index(i - 1), e)
+            let vi = self.vec_index_checked(i - 1)?;
+            self.0.insert(vi, e);
         } else {
-            self.push(e)
+            self.push(e);
         }
+        Ok(())
     }
 
     /// Push an element onto the top of the stack.
-    pub fn push(&mut self, elt: T) {
-        self.0.push(elt)
+    pub fn push(&mut self, elt: impl Into<T>) {
+        self.0.push(elt.into())
     }
 
     /// Pop an element off the top of the stack.
     pub fn pop(&mut self) -> Option<T> {
         self.0.pop()
+    }
+
+    /// Borrow an element by stack index, where `0` corresponds to the top.
+    pub fn get(&self, index: usize) -> Result<&T, StackOob> {
+        let i = self.vec_index_checked(index)?;
+        self.0.get(i).ok_or(StackOob)
+    }
+
+    /// Mutably borrow an element by stack index, where `0` corresponds to the top.
+    pub fn get_mut(&mut self, index: usize) -> Result<&mut T, StackOob> {
+        let i = self.vec_index_checked(index)?;
+        self.0.get_mut(i).ok_or(StackOob)
     }
 
     /// Get the stack's element count.
@@ -164,10 +185,10 @@ impl<T> Stack<T> {
         self.0.reserve(additional)
     }
 
-    /// Borrow the stack content as an immutable slice. Note that stack top is
+    /// Borrow the stack content as immutable references. Note that stack top is
     /// the _rightmost_ element.
-    pub fn as_slice(&self) -> &[T] {
-        self.0.as_slice()
+    pub fn as_slice(&self) -> Vec<&T> {
+        self.0.iter().collect()
     }
 
     /// Split off the top `size` elements of the stack into a new `Stack`.
@@ -191,10 +212,13 @@ impl<T> Stack<T> {
 
     /// Swap two elements in the stack, identified by their index from the top,
     /// with `0` being the top.
-    pub fn swap(&mut self, i1: usize, i2: usize) {
-        let i1v = self.vec_index(i1);
-        let i2v = self.vec_index(i2);
-        self.0.swap(i1v, i2v)
+    ///
+    /// Returns `Err(StackOob)` if either index is out of bounds.
+    pub fn swap(&mut self, i1: usize, i2: usize) -> Result<(), StackOob> {
+        let i1v = self.vec_index_checked(i1)?;
+        let i2v = self.vec_index_checked(i2)?;
+        self.0.swap(i1v, i2v);
+        Ok(())
     }
 
     /// Iterator over the stack content, starting from the top.
@@ -223,13 +247,30 @@ pub struct TopIsLast<T>(pub Stack<T>);
 impl<T> From<Vec<T>> for TopIsFirst<T> {
     fn from(mut data: Vec<T>) -> Self {
         data.reverse();
-        Self(Stack::stack_from_vec(data))
+        Self(Stack::stack_from_elems(data))
+    }
+}
+
+impl<T> From<Vec<T>> for TopIsFirst<Rc<T>> {
+    fn from(mut data: Vec<T>) -> Self {
+        data.reverse();
+        Self(Stack::stack_from_vec(
+            data.into_iter().map(Rc::new).collect(),
+        ))
     }
 }
 
 impl<T> From<Vec<T>> for TopIsLast<T> {
     fn from(data: Vec<T>) -> Self {
-        Self(Stack::stack_from_vec(data))
+        Self(Stack::stack_from_elems(data))
+    }
+}
+
+impl<T> From<Vec<T>> for TopIsLast<Rc<T>> {
+    fn from(data: Vec<T>) -> Self {
+        Self(Stack::stack_from_vec(
+            data.into_iter().map(Rc::new).collect(),
+        ))
     }
 }
 
@@ -264,25 +305,6 @@ impl<T> Default for Stack<T> {
     }
 }
 
-impl<T> Index<usize> for Stack<T> {
-    type Output = <usize as SliceIndex<[T]>>::Output;
-
-    /// Index into the stack. The top's index is `0`. Returns an immutable
-    /// reference to the element.
-    fn index(&self, index: usize) -> &Self::Output {
-        self.0.index(self.vec_index(index))
-    }
-}
-
-impl<T> IndexMut<usize> for Stack<T> {
-    /// Index into the stack. The top's index is `0`. Returns a mutable
-    /// reference to the element.
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        let i = self.vec_index(index);
-        self.0.index_mut(i)
-    }
-}
-
 /// Owning [Stack] iterator.
 pub struct IntoIter<T>(std::iter::Rev<std::vec::IntoIter<T>>);
 
@@ -312,24 +334,28 @@ impl<T> IntoIterator for Stack<T> {
 mod tests {
     use super::*;
 
+    type IntStack = Stack<i32>;
+
     #[test]
     fn stk_macro() {
-        assert_eq!(stk![1, 2, 3, 4].as_slice(), [1, 2, 3, 4]);
-        assert_eq!(stk![1; 5].as_slice(), [1, 1, 1, 1, 1]);
+        let stk: IntStack = stk![1, 2, 3, 4];
+        assert_eq!(stk.as_slice(), vec![&1, &2, &3, &4]);
+        let stk: IntStack = stk![1; 5];
+        assert_eq!(stk.as_slice(), vec![&1; 5]);
     }
 
     #[test]
     fn conversion_from_vec() {
         assert_eq!(
-            TopIsLast::from(vec![1, 2, 3, 4]).0.as_slice(),
-            [1, 2, 3, 4] // NB: top is right
+            TopIsLast::<i32>::from(vec![1, 2, 3, 4]).0.as_slice(),
+            vec![&1, &2, &3, &4] // NB: top is right
         );
-        assert_eq!(TopIsLast::from(vec![1, 2, 3, 4]).0.pop(), Some(4));
+        assert_eq!(TopIsLast::<i32>::from(vec![1, 2, 3, 4]).0.pop(), Some(4));
         assert_eq!(
-            TopIsFirst::from(vec![1, 2, 3, 4]).0.as_slice(),
-            [4, 3, 2, 1] // NB: top is right
+            TopIsFirst::<i32>::from(vec![1, 2, 3, 4]).0.as_slice(),
+            vec![&4, &3, &2, &1] // NB: top is right
         );
-        assert_eq!(TopIsFirst::from(vec![1, 2, 3, 4]).0.pop(), Some(1));
+        assert_eq!(TopIsFirst::<i32>::from(vec![1, 2, 3, 4]).0.pop(), Some(1));
     }
 
     #[test]
@@ -337,11 +363,11 @@ mod tests {
         let s: &[u32] = &[1, 2, 3, 4];
         assert_eq!(
             TopIsLast::from(s).0.as_slice(),
-            [1, 2, 3, 4] // NB: top is right
+            vec![&1, &2, &3, &4] // NB: top is right
         );
         assert_eq!(
             TopIsFirst::from(s).0.as_slice(),
-            [4, 3, 2, 1] // NB: top is right
+            vec![&4, &3, &2, &1] // NB: top is right
         );
     }
 
@@ -350,11 +376,11 @@ mod tests {
         let a: [u32; 4] = [1, 2, 3, 4];
         assert_eq!(
             TopIsLast::from(a).0.as_slice(),
-            [1, 2, 3, 4] // NB: top is right
+            vec![&1, &2, &3, &4] // NB: top is right
         );
         assert_eq!(
             TopIsFirst::from(a).0.as_slice(),
-            [4, 3, 2, 1] // NB: top is right
+            vec![&4, &3, &2, &1] // NB: top is right
         );
     }
 
@@ -363,17 +389,17 @@ mod tests {
         let it = 1..=4;
         assert_eq!(
             TopIsLast::from_iter(it.clone()).0.as_slice(),
-            [1, 2, 3, 4] // NB: top is right
+            vec![&1, &2, &3, &4] // NB: top is right
         );
         assert_eq!(
             TopIsFirst::from_iter(it).0.as_slice(),
-            [4, 3, 2, 1] // NB: top is right
+            vec![&4, &3, &2, &1] // NB: top is right
         );
     }
 
     #[test]
     fn push() {
-        let mut stk = Stack::new();
+        let mut stk: IntStack = Stack::new();
         stk.push(1);
         stk.push(2);
         stk.push(3);
@@ -382,7 +408,7 @@ mod tests {
 
     #[test]
     fn pop() {
-        let mut stk = stk![1, 2, 3];
+        let mut stk: IntStack = stk![1, 2, 3];
         assert_eq!(stk.pop(), Some(3));
         assert_eq!(stk.pop(), Some(2));
         assert_eq!(stk.pop(), Some(1));
@@ -391,35 +417,40 @@ mod tests {
 
     #[test]
     fn remove() {
-        let mut stk = stk![1, 2, 3, 4];
-        stk.remove(1);
+        let mut stk: IntStack = stk![1, 2, 3, 4];
+        assert_eq!(stk.remove(1), Ok(3));
         assert_eq!(stk, stk![1, 2, 4]);
 
-        stk.remove(2);
+        assert_eq!(stk.remove(2), Ok(1));
         assert_eq!(stk, stk![2, 4]);
 
-        stk.remove(0);
+        assert_eq!(stk.remove(0), Ok(4));
         assert_eq!(stk, stk![2]);
+
+        assert_eq!(stk.remove(5), Err(StackOob));
     }
 
     #[test]
     fn insert() {
-        let mut stk = stk![1, 2, 3];
-        stk.insert(2, 10);
+        let mut stk: IntStack = stk![1, 2, 3];
+        assert_eq!(stk.insert(2, 10), Ok(()));
         assert_eq!(stk, stk![1, 10, 2, 3]);
 
-        let mut stk = stk![];
-        stk.insert(0, 10);
+        let mut stk: IntStack = stk![];
+        assert_eq!(stk.insert(0, 10), Ok(()));
         assert_eq!(stk, stk![10]);
 
-        let mut stk = stk![1, 2, 3];
-        stk.insert(3, 10);
+        let mut stk: IntStack = stk![1, 2, 3];
+        assert_eq!(stk.insert(3, 10), Ok(()));
         assert_eq!(stk, stk![10, 1, 2, 3]);
+
+        let mut stk: IntStack = stk![1, 2, 3];
+        assert_eq!(stk.insert(10, 42), Err(StackOob));
     }
 
     #[test]
     fn len() {
-        let mut stk = stk![1, 2, 3];
+        let mut stk: IntStack = stk![1, 2, 3];
         assert_eq!(stk.len(), 3);
         stk.push(42);
         assert_eq!(stk.len(), 4);
@@ -427,14 +458,14 @@ mod tests {
 
     #[test]
     fn drop_top() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         stk.drop_top(3);
         assert_eq!(stk, stk![1]);
     }
 
     #[test]
     fn drain_top() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         let drained = stk.drain_top(3);
         assert_eq!(drained.collect::<Vec<_>>(), vec![4, 3, 2]);
         assert_eq!(stk, stk![1]);
@@ -442,7 +473,7 @@ mod tests {
 
     #[test]
     fn drain_top_0() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         let drained = stk.drain_top(0);
         assert!(drained.collect::<Vec<_>>().is_empty());
         assert_eq!(stk, stk![1, 2, 3, 4]);
@@ -451,26 +482,26 @@ mod tests {
     #[test]
     #[should_panic(expected = "size too large in drop_top")]
     fn drop_top_out_of_bounds() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         stk.drop_top(42);
     }
 
     #[test]
     #[should_panic(expected = "size too large in drain_top")]
     fn drain_top_out_of_bounds() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         let _ = stk.drain_top(42);
     }
 
     #[test]
     fn as_slice() {
-        let stk = stk![1, 2, 3, 4];
-        assert!(matches!(stk.as_slice(), [1, 2, 3, 4]));
+        let stk: IntStack = stk![1, 2, 3, 4];
+        assert_eq!(stk.as_slice(), vec![&1, &2, &3, &4]);
     }
 
     #[test]
     fn split_off() {
-        let mut stk = stk![1, 2, 3, 4, 5];
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
         let stk2 = stk.split_off(3);
         assert_eq!(stk2, stk![3, 4, 5]);
         assert_eq!(stk, stk![1, 2]);
@@ -479,38 +510,41 @@ mod tests {
     #[test]
     #[should_panic(expected = "size too large in split_off")]
     fn split_off_out_of_bounds() {
-        let mut stk = stk![1, 2, 3, 4, 5];
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
         stk.split_off(42);
     }
 
     #[test]
     fn append() {
-        let mut stk1 = stk![1, 2, 3];
-        let mut stk2 = stk![4, 5];
+        let mut stk1: IntStack = stk![1, 2, 3];
+        let mut stk2: IntStack = stk![4, 5];
         stk1.append(&mut stk2);
         assert_eq!(stk1, stk![1, 2, 3, 4, 5]);
         assert_eq!(stk2, stk![]);
     }
 
     #[test]
-    fn index() {
-        let stk = stk![1, 2, 3, 4, 5];
-        assert_eq!(stk[0], 5);
-        assert_eq!(stk[4], 1);
+    fn get() {
+        let stk: IntStack = stk![1, 2, 3, 4, 5];
+        assert_eq!(stk.get(0), Ok(&5));
+        assert_eq!(stk.get(4), Ok(&1));
+        assert_eq!(stk.get(7), Err(StackOob));
     }
 
     #[test]
-    #[should_panic(expected = "out of bounds stack access")]
-    fn index_out_of_bounds() {
-        let stk = stk![1, 2, 3, 4, 5];
-        assert_eq!(stk[7], 5); // panics
-    }
-
-    #[test]
-    fn index_mut() {
-        let mut stk = stk![1, 2, 3, 4, 5];
-        stk[2] = 42;
+    fn get_mut() {
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
+        *stk.get_mut(2).unwrap() = 42;
         assert_eq!(stk, stk![1, 2, 42, 4, 5]);
+        assert_eq!(stk.get_mut(7), Err(StackOob));
+    }
+
+    #[test]
+    fn swap() {
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
+        assert_eq!(stk.swap(0, 1), Ok(()));
+        assert_eq!(stk, stk![1, 2, 3, 5, 4]);
+        assert_eq!(stk.swap(0, 10), Err(StackOob));
     }
 
     #[test]

@@ -10,7 +10,7 @@ use std::path::Path;
 use tezos_smart_rollup::core_unsafe::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup::dac::pages::prepare_preimages;
 use tezos_smart_rollup::dac::PreimageHash;
-use tezos_smart_rollup::host::Runtime;
+use tezos_smart_rollup::host::StorageV1;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_installer::config::{

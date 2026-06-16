@@ -33,21 +33,33 @@ let no_0x s =
 
 let normalize s = String.lowercase_ascii @@ no_0x s
 
+let base rst = sf "/base%s" rst
+
 let evm rst = sf "/evm%s" rst
 
 let world_state rst = evm (sf "/world_state%s" rst)
 
-let delayed_inbox = evm "/delayed-inbox"
+let delayed_inbox = function
+  | Kernel.Latest -> base "/delayed-inbox"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/delayed-inbox"
 
 let kernel rst = sf "/kernel%s" rst
 
-let kernel_root_hash = evm "/kernel_root_hash"
+let kernel_root_hash = function
+  | Kernel.Latest -> base "/kernel_root_hash"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/kernel_root_hash"
+
+let kernel_version = function
+  | Kernel.Latest -> base "/kernel_version"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/kernel_version"
 
 let indexes = world_state "/indexes"
 
 let eth_accounts = world_state "/eth_accounts"
 
 let eth_account addr = sf "%s/%s" eth_accounts (normalize addr)
+
+let account_info addr = sf "%s/info" (eth_account addr)
 
 let balance addr = sf "%s/balance" (eth_account addr)
 
@@ -61,42 +73,72 @@ let storage addr ?key () =
     (eth_account addr)
     (match key with None -> "" | Some key -> "/" ^ key)
 
-let admin = evm "/admin"
+let admin = function
+  | Kernel.Latest -> base "/admin"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/admin"
 
-let kernel_governance = evm "/kernel_governance"
+let kernel_governance = function
+  | Kernel.Latest -> base "/kernel_governance"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/kernel_governance"
 
-let kernel_security_governance = evm "/kernel_security_governance"
+let kernel_security_governance = function
+  | Kernel.Latest -> base "/kernel_security_governance"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
+      evm "/kernel_security_governance"
 
 let sequencer_governance = evm "/sequencer_governance"
 
 let ticketer = evm "/ticketer"
 
-let sequencer = evm "/sequencer"
+let sequencer = function
+  | Kernel.Latest -> world_state "/sequencer"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/sequencer"
 
 let sequencer_pool_address = evm "/sequencer_pool_address"
 
+let dal_publishers_whitelist = function
+  | Kernel.Latest -> base "/dal_publishers_whitelist"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/dal_publishers_whitelist"
+
 let kernel_boot_wasm = kernel "/boot.wasm"
 
-let delayed_bridge_path = evm "/delayed_bridge"
+let delayed_bridge_path = function
+  | Kernel.Latest -> base "/delayed_bridge"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/delayed_bridge"
 
 let da_fee_per_byte_path = world_state "/fees/da_fee_per_byte"
 
 let minimum_base_fee_per_gas = world_state "/fees/minimum_base_fee_per_gas"
 
-let delayed_inbox_timeout = evm "/delayed_inbox_timeout"
+let delayed_inbox_timeout = function
+  | Kernel.Latest -> base "/delayed_inbox_timeout"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/delayed_inbox_timeout"
 
-let delayed_inbox_min_levels = evm "/delayed_inbox_min_levels"
+let delayed_inbox_min_levels = function
+  | Kernel.Latest -> base "/delayed_inbox_min_levels"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/delayed_inbox_min_levels"
 
-let reveal_config = "/__tmp/reveal_config"
+let reveal_config = function
+  | Kernel.Latest -> base "/__tmp/reveal_config"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> "/__tmp/reveal_config"
 
-let enable_fa_bridge = evm "/feature_flags/enable_fa_bridge"
+let enable_fa_bridge = function
+  | Kernel.Latest -> base "/feature_flags/enable_fa_bridge"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
+      evm "/feature_flags/enable_fa_bridge"
 
-let enable_multichain = evm "/feature_flags/enable_multichain"
+let enable_fast_withdrawal = function
+  | Kernel.Latest -> base "/feature_flags/enable_fast_withdrawal"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
+      evm "/world_state/feature_flags/enable_fast_withdrawal"
 
-let enable_fast_withdrawal =
-  evm "/world_state/feature_flags/enable_fast_withdrawal"
+let storage_version = function
+  | Kernel.Latest -> base "/storage_version"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/storage_version"
 
-let storage_version = evm "/storage_version"
+let evm_node_flag = function
+  | Kernel.Latest -> base "/__evm_node"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> "/__evm_node"
 
 module Ticket_table = struct
   let ticket_table =

@@ -91,13 +91,9 @@ val check_block_info :
   expected_operations:string list list ->
   unit
 
-(** [next_evm_level ~evm_node ~sc_rollup_node ~client] moves
-    [evm_node] to the next L2 level. *)
-val next_evm_level :
-  evm_node:Evm_node.t ->
-  sc_rollup_node:Sc_rollup_node.t ->
-  client:Client.t ->
-  unit Lwt.t
+(** [next_evm_level ~evm_node] moves [evm_node] to the next L2
+    level. *)
+val next_evm_level : evm_node:Evm_node.t -> unit Lwt.t
 
 (** [check_chain_id ~expected_chain_id ~chain_id] checks that
     the value received for chain_id is correct using the appropriate
@@ -150,6 +146,20 @@ val check_block_consistency :
 val check_head_consistency :
   left:Evm_node.t -> right:Evm_node.t -> ?error_msg:string -> unit -> unit Lwt.t
 
+(** [rollup_level sc_rollup_node] returns the current level of the
+    rollup node, or [None] if it has not processed any level yet. *)
+val rollup_level : Sc_rollup_node.t -> (int32, Rpc.error) result Lwt.t
+
+(** [check_rollup_head_consistency ~evm_node ~sc_rollup_node ?error_msg ()]
+    checks that the latest block of [evm_node] and the block at the level
+    of the rollup node are equal. Fails if they are not with [error_msg] *)
+val check_rollup_head_consistency :
+  evm_node:Evm_node.t ->
+  sc_rollup_node:Sc_rollup_node.t ->
+  ?error_msg:string ->
+  unit ->
+  unit Lwt.t
+
 (** [sequencer_upgrade ~sc_rollup_address ~sequencer_admin
     ~sequencer_admin_contract ~client ~upgrade_to
     ~activation_timestamp] prepares the sequencer upgrade payload and
@@ -179,7 +189,7 @@ val bake_until :
   unit ->
   'b Lwt.t
 
-(** [bake_until_sync ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy ~sequencer
+(** [bake_until_sync ?timeout_in_blocks ?timeout ~sc_rollup_node ~sequencer
     ~client] bakes blocks until the rollup node is synced with
     evm_node. Uses {!bake_until} *)
 val bake_until_sync :
@@ -187,8 +197,20 @@ val bake_until_sync :
   ?timeout_in_blocks:int ->
   ?timeout:float ->
   sc_rollup_node:Sc_rollup_node.t ->
-  proxy:Evm_node.t ->
   sequencer:Evm_node.t ->
+  client:Client.t ->
+  unit ->
+  unit Lwt.t
+
+(** [bake_until_blueprint_forced ?timeout_in_blocks ?timeout
+    ~sc_rollup_node ~evm_node ~client] bakes blocks until a blueprint
+    is forced by the kernel. *)
+val bake_until_blueprint_forced :
+  ?__LOC__:string ->
+  ?timeout_in_blocks:int ->
+  ?timeout:float ->
+  sc_rollup_node:Sc_rollup_node.t ->
+  evm_node:Evm_node.t ->
   client:Client.t ->
   unit ->
   unit Lwt.t
@@ -251,7 +273,7 @@ val default_bootstrap_account_balance : Wei.t
 val l1_timestamp : Client.t -> Tezos_base.Time.Protocol.t Lwt.t
 
 (** [find_and_execute_withdrawal ~withdrawal_level ~commitment_period ~challenge_window
-    ~evm_node ~sc_rollup_node ~sc_rollup_address ~client] bakes enough levels to have
+    ~sc_rollup_node ~sc_rollup_address ~client] bakes enough levels to have
     a commitment and cement it, then constructs outbox proof
     and executes the outbox message *)
 val find_and_execute_withdrawal :
@@ -259,7 +281,6 @@ val find_and_execute_withdrawal :
   withdrawal_level:int ->
   commitment_period:int ->
   challenge_window:int ->
-  evm_node:Evm_node.t ->
   sc_rollup_node:Sc_rollup_node.t ->
   sc_rollup_address:string ->
   client:Client.t ->
@@ -281,12 +302,15 @@ val init_sequencer_sandbox :
   ?history_mode:Evm_node.history_mode ->
   ?patch_config:(JSON.t -> JSON.t) ->
   ?websockets:bool ->
-  ?kernel:Uses.t ->
+  ?kernel:Kernel.t ->
   ?evm_version:Evm_version.t ->
+  ?sequencer_pool_address:string ->
+  ?chain_id:int ->
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer_keys:Account.key list ->
   ?with_runtimes:Tezosx_runtime.t list ->
+  ?enable_michelson_gas_refund:bool ->
   unit ->
   Evm_node.t Lwt.t
 
@@ -326,20 +350,31 @@ val deposit :
   Client.t ->
   unit Lwt.t
 
-(** [check_operations ~client ~block ~expected] fetches the list of hashes of
-    the manager operations of [block] and check it's equal to [expected]. *)
+(** [check_operations ~__LOC__ ~client ?endpoint ~block ~expected ()]
+    fetches the list of hashes of the manager operations of [block]
+    and check it's equal to [expected]. *)
 val check_operations :
-  client:Client.t -> block:string -> expected:string list -> unit Lwt.t
+  __LOC__:string ->
+  client:Client.t ->
+  ?endpoint:Client.endpoint ->
+  block:string ->
+  expected:string list ->
+  unit ->
+  unit Lwt.t
 
-(** [produce_block_and_wait_for ~sequencer n] Produces a block and wait for
+(** [produce_block_and_wait_for ?timestamp ~sequencer n]
+    Produces a block at [timestamp] and wait for
     blueprint [n] to be applied. *)
-val produce_block_and_wait_for : sequencer:Evm_node.t -> int -> unit Lwt.t
+val produce_block_and_wait_for :
+  ?timestamp:string -> sequencer:Evm_node.t -> int -> unit Lwt.t
 
 val register_sandbox :
   __FILE__:string ->
+  ?uses_client:bool ->
   ?kernel:Kernel.t ->
   ?tx_queue_tx_per_addr_limit:int ->
   title:string ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?set_account_code:(string * string) list ->
   ?da_fee_per_byte:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
@@ -347,7 +382,10 @@ val register_sandbox :
   ?patch_config:(JSON.t -> JSON.t) ->
   ?websockets:bool ->
   ?sequencer_keys:Account.key list ->
+  ?regression:bool ->
   ?with_runtimes:Tezosx_runtime.t list ->
+  ?chain_id:int ->
+  ?enable_michelson_gas_refund:bool ->
   (Evm_node.t -> unit Lwt.t) ->
   unit
 
@@ -355,15 +393,21 @@ type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
 
 val register_sandbox_with_observer :
   __FILE__:string ->
+  ?uses_client:bool ->
   ?kernel:Kernel.t ->
   ?tx_queue_tx_per_addr_limit:int ->
   title:string ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?set_account_code:(string * string) list ->
   ?da_fee_per_byte:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
   tags:string list ->
   ?patch_config:(JSON.t -> JSON.t) ->
+  ?fail_on_divergence:bool ->
   ?websockets:bool ->
+  ?genesis_timestamp:Client.timestamp ->
   ?sequencer_keys:Account.key list ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   (sandbox_test -> unit Lwt.t) ->
   unit

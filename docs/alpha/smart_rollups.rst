@@ -166,7 +166,7 @@ A rollup can do the following requests through the reveal data channel:
 
 Information passing through the reveal data channel does not have to
 be considered by the Layer 1: for this reason, the volume of
-information is not limited by the bandwidth of the Layer 1. Thus, the
+information is not constrained by Layer 1 on-chain data throughput. Thus, the
 reveal data channel can be used to upload large volumes of data to the
 rollup.
 

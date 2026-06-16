@@ -9,7 +9,12 @@
 val agnostic_baker_profiler : Profiler.profiler
 
 (** Plug the agnostic baker profiler given its name and Profiler instance option. *)
-val init : (name:string -> Profiler.instance option) -> unit
+val init :
+  profiling_config:Profiler.profiling_config ->
+  (profiling_config:Profiler.profiling_config ->
+  name:string ->
+  Profiler.instance option) ->
+  unit
 
 (** Creates a function to reset the block section *)
 val create_reset_block_section :

@@ -7,9 +7,9 @@ use num_bigint::{BigUint, TryFromBigIntError};
 use rlp::DecoderError;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Error;
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_storage::StorageError;
 use tezos_storage::{error::Error as GenStorageError, read_u64_le, write_u64_le};
 use thiserror::Error;
@@ -26,7 +26,7 @@ pub struct IndexableStorage {
     pub path: OwnedPath,
 }
 
-#[derive(Error, Debug, Eq, PartialEq)]
+#[derive(Error, Debug, Eq, PartialEq, Clone)]
 pub enum IndexableStorageError {
     #[error(transparent)]
     Path(#[from] PathError),
@@ -103,9 +103,9 @@ impl IndexableStorage {
         concat(&self.path, &index_subkey)
     }
 
-    fn store_index<Host: Runtime>(
+    fn store_index(
         &self,
-        host: &mut Host,
+        host: &mut impl StorageV1,
         index: u64,
         value_repr: &[u8],
     ) -> Result<(), IndexableStorageError> {
@@ -114,9 +114,9 @@ impl IndexableStorage {
             .map_err(IndexableStorageError::from)
     }
 
-    fn get_length_and_increment<Host: Runtime>(
+    fn get_length_and_increment(
         &self,
-        host: &mut Host,
+        host: &mut impl StorageV1,
     ) -> Result<u64, IndexableStorageError> {
         let path = concat(&self.path, &LENGTH)?;
         let length = read_u64_le(host, &path).unwrap_or(0);
@@ -127,10 +127,10 @@ impl IndexableStorage {
     #[allow(dead_code)]
     /// `length` returns the number of keys in the storage. If `/length` does
     /// not exists, the storage is considered as empty and returns '0'.
-    pub fn length<Host: Runtime>(
-        &self,
-        host: &Host,
-    ) -> Result<u64, IndexableStorageError> {
+    pub fn length<Host>(&self, host: &Host) -> Result<u64, IndexableStorageError>
+    where
+        Host: StorageV1,
+    {
         let path = concat(&self.path, &LENGTH)?;
         match read_u64_le(host, &path) {
             Ok(l) => Ok(l),
@@ -147,7 +147,7 @@ impl IndexableStorage {
                 // bounds since the value has never been allocated before
             ) => Ok(0_u64),
             Err(e) => {
-                log!(host, Error, "Error in indexable storage: {}", e);
+                log!(Error, "Error in indexable storage: {}", e);
                 Err(e.into())
             }
         }
@@ -155,9 +155,9 @@ impl IndexableStorage {
 
     #[allow(dead_code)]
     /// Same as `get_value`, but doesn't check for bounds.
-    pub fn unsafe_get_value<Host: Runtime>(
+    pub fn unsafe_get_value(
         &self,
-        host: &Host,
+        host: &impl StorageV1,
         index: u64,
     ) -> Result<Vec<u8>, StorageError> {
         let key_path = self.value_path(index)?;
@@ -166,11 +166,14 @@ impl IndexableStorage {
 
     /// Returns the value a the given index. Fails if the index is greater or
     /// equal to the length.
-    pub fn get_value<Host: Runtime>(
+    pub fn get_value<Host>(
         &self,
         host: &Host,
         index: u64,
-    ) -> Result<Vec<u8>, IndexableStorageError> {
+    ) -> Result<Vec<u8>, IndexableStorageError>
+    where
+        Host: StorageV1,
+    {
         let length = self.length(host)?;
         if index >= length {
             return Err(IndexableStorageError::IndexOutOfBounds);
@@ -180,19 +183,39 @@ impl IndexableStorage {
     }
 
     /// Push a value at index `length`, and increments the length.
-    pub fn push_value<Host: Runtime>(
+    pub fn push_value(
         &self,
-        host: &mut Host,
+        host: &mut impl StorageV1,
         value: &[u8],
     ) -> Result<(), IndexableStorageError> {
         let new_index = self.get_length_and_increment(host)?;
         self.store_index(host, new_index, value)
     }
 
-    pub fn clear<Host: Runtime>(
+    /// Push multiple values in batch, reading and writing the length only once.
+    /// This reduces storage operations from 3*N to N+2 compared to calling
+    /// `push_value` N times.
+    pub fn push_values(
         &self,
-        host: &mut Host,
+        host: &mut impl StorageV1,
+        values: &[Vec<u8>],
     ) -> Result<(), IndexableStorageError> {
+        if values.is_empty() {
+            return Ok(());
+        }
+        let length_path = concat(&self.path, &LENGTH)?;
+        let base_index = read_u64_le(host, &length_path).unwrap_or(0);
+        for (i, value) in values.iter().enumerate() {
+            self.store_index(host, base_index + i as u64, value)?;
+        }
+        write_u64_le(host, &length_path, base_index + values.len() as u64)?;
+        Ok(())
+    }
+
+    pub fn clear<Host>(&self, host: &mut Host) -> Result<(), IndexableStorageError>
+    where
+        Host: StorageV1,
+    {
         let length = self.length(host)?;
         for index in 0..length {
             let key_path = self.value_path(index)?;
@@ -257,5 +280,56 @@ mod tests {
             storage.get_value(&host, 1),
             Err(IndexableStorageError::IndexOutOfBounds)
         )
+    }
+
+    #[test]
+    fn test_push_values_batch() {
+        let mut host = MockKernelHost::default();
+        let values = RefPath::assert_from(b"/values");
+        let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
+
+        let batch = vec![b"first".to_vec(), b"second".to_vec(), b"third".to_vec()];
+        storage
+            .push_values(&mut host, &batch)
+            .expect("Batch push failed");
+
+        assert_eq!(storage.length(&host), Ok(3));
+        assert_eq!(storage.get_value(&host, 0), Ok(b"first".to_vec()));
+        assert_eq!(storage.get_value(&host, 1), Ok(b"second".to_vec()));
+        assert_eq!(storage.get_value(&host, 2), Ok(b"third".to_vec()));
+    }
+
+    #[test]
+    fn test_push_values_appends_to_existing() {
+        let mut host = MockKernelHost::default();
+        let values = RefPath::assert_from(b"/values");
+        let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
+
+        storage
+            .push_value(&mut host, b"existing")
+            .expect("Push failed");
+
+        let batch = vec![b"new1".to_vec(), b"new2".to_vec()];
+        storage
+            .push_values(&mut host, &batch)
+            .expect("Batch push failed");
+
+        assert_eq!(storage.length(&host), Ok(3));
+        assert_eq!(storage.get_value(&host, 0), Ok(b"existing".to_vec()));
+        assert_eq!(storage.get_value(&host, 1), Ok(b"new1".to_vec()));
+        assert_eq!(storage.get_value(&host, 2), Ok(b"new2".to_vec()));
+    }
+
+    #[test]
+    fn test_push_values_empty_is_noop() {
+        let mut host = MockKernelHost::default();
+        let values = RefPath::assert_from(b"/values");
+        let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
+
+        storage
+            .push_values(&mut host, &[])
+            .expect("Empty batch push failed");
+
+        assert_eq!(storage.length(&host), Ok(0));
     }
 }

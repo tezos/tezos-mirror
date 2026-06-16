@@ -8,16 +8,11 @@
 
 ### RPCs changes
 
-- Fix issue when connecting to nodes behind a proxy that can rearrange
-  chunks. (!20057)
-
 ### Monitoring changes
 
 ### Command-line interface changes
 
 ### Execution changes
-
-- Supports executing Farfadet natively. (!20065)
 
 ### Storage changes
 
@@ -29,6 +24,400 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.58 (2026-05-06)
+
+This release mainly adds compatibility for the EVM node to the latest version
+of Tezos X Previewnet testnet. Operators running nodes for this network will
+have to upgrade their node to be able to apply latest blocks.
+
+This release will not apply any migration to the node’s store (version 24),
+meaning it is possible to downgrade to previous version).
+
+### RPCs changes
+
+- Include `injectTezlinkOperation` in the list of supported EVM
+  methods used by the RPC node. (!21785)
+- Add an optional block parameter to `tez_kernelVersion` and
+  `tez_kernelRootHash`. Omitting it preserves the previous behavior
+  (returns the value at the latest block). (!21786)
+
+### Storage changes
+
+- Read Michelson contract state from `/tez/tez_accounts/contracts/`
+  and `/tez/tez_accounts/big_map/`, and TezosX projected accounts,
+  aliases and cross-runtime alias resolution from
+  `/tez/tez_accounts/tezosx/`. The installer is updated accordingly.
+  Michelson block reads (including standalone Tezlink) now share the
+  `/tez/world_state/tez_blocks/` root with TezosX-mode.
+  Decode `Tezos_block` V2 blocks: adds a `state_root : bytes` field
+  (fixed 32 bytes). V1 legacy blocks are still decoded, with
+  `state_root` zero-filled on upgrade. (!21716)
+
+## Version 0.57 (2026-04-27)
+
+This release mainly adds compatibility for the EVM node to the Tezos X
+Previewnet testnet.
+
+For instance, starting a new observer node in rolling mode for this network is
+now as simple as
+
+```
+octez-evm-node run observer --network previewnet \
+    --dont-track-rollup-node \
+    --init-from-snapshot \
+    --data-dir previewnet
+```
+
+This release will not apply any migration to the node’s store (version 24),
+meaning it is possible to downgrade to previous version).
+
+### Configuration changes
+
+- Add a new `seed` history mode (`--history seed:<days>`), letting the node
+  retain only blueprints with their associated events (deposits, kernel
+  upgrades, sequencer upgrades). Blocks, transactions, and context are pruned
+  by the GC. Intended for nodes that only need to serve blueprints to
+  observers. (!21317)
+
+### RPCs changes
+
+- Change `eth_sendRawTransaction` to no longer rejects EIP-7702 transactions
+  with invalid authorizations (e.g., stale nonce). Per the EIP-7702
+  specification, invalid authorizations are silently skipped during execution.
+  (!21395)
+- Fix early Etherlink blocks returned by `eth_getBlock*` RPCs that were missing
+  `baseFeePerGas`. The default 1 Gwei value is now set when decoding these
+  blocks, matching the kernel behavior. `eth_feeHistory` now reports 1 Gwei
+  (instead of 0) for these blocks. (!21553)
+
+### Command-line interface changes
+
+- Add support for Tezos X Previewnet testnet with the `--network` CLI argument.
+  (!21735)
+
+### Storage changes
+
+- Add support for kernel migrations up to V54. (!21668 !21565)
+- Store all-zero `logs_bloom` of EVM transactions as empty bytes instead of the
+  full 514-byte ASCII hex representation. (!21299)
+- Store EVM transactions’ `logs` stripped of redundant infos to reduce stored
+  data. (!21299)
+
+## Version 0.56 (2026-03-27)
+
+This is a bugfix release addressing two issues affecting the EVM node, notably
+under-approximations in `eth_estimateGas` for transactions including
+authorization or access lists. Operators are strongly encouraged to upgrade.
+
+This release will not apply any migration to the node’s store (version 23),
+meaning it is possible to downgrade to previous version).
+
+### RPCs changes
+
+- `eth_estimateGas` RPC takes into account the authorization
+  lists and access lists fields in the gas estimation. (!21388)
+- Fix `eth_sendRawTransaction` leaving the node in a degraded state if
+  ill-formed type-4 transactions are submitted. (!21387)
+
+## Version 0.55 (2026-03-26)
+
+This is a bugfix release addressing compatibility issues between the latest
+Etherlink upgrade (6.2) and the node. Operators are strongly encouraged to
+upgrade.
+
+This release will not apply migration to the node’s store (version 24),
+meaning it is possible to downgrade to previous version.
+
+### RPCs changes
+
+- `eth_estimateGas` correctly takes into account the authorization lists when
+  computing the gas used to pay DA fees. Also add the gas consumed by access
+  lists and authorization lists to the simulator. (!21339)
+
+### Execution changes
+
+- Supports executing `farfadet-r2` natively. (!21338 !21350)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Fixes instant confirmation for networks with Etherlink 6.2 deployed (notably
+  Etherlink Mainnet). (!21338)
+
+## Version 0.54 (2026-03-06)
+
+This release includes fixes for `debug_traceBlockByNumber` trace count
+mismatches affecting some blocks of the Calypso kernel, and for the instant
+confirmation gas price computation.
+
+Additionally, we have removed the `proxy` mode of the EVM node. This mode was
+an artifact of the past, at a time where Etherlink did not have a sequencer,
+and the only way to know the state of the chain was to use a rollup node.
+Nowadays, a node in `proxy` mode was not providing any services of note that a
+node in `observer` mode cannot provide.
+
+This release will apply two migrations to the node’s store (version 24),
+meaning it is not possible downgrade to a previous version.
+
+### Breaking changes
+
+- Replace `--mainnet-compat` switch with `--kernel-compat <kernel_name>` in
+  `octez-evm-node make kernel installer config`. The new argument accepts a
+  named kernel version (e.g., `mainnet-beta`, `bifrost`, `latest`) to generate
+  a compatible installer configuration. (!20894)
+- `octez-evm-node run proxy` has been removed. (!20786 !20756)
+
+### RPCs changes
+
+- Fix the `debug_traceBlockByNumber` traces count mismatch error affecting some
+  blocks of the Calypso kernel. (!20855)
+
+### Monitoring changes
+
+- Export metrics for the number of host function calls during kernel
+  execution. (!19228)
+
+### Command-line interface changes
+
+- Add `trace block <level>` and `trace transaction <hash>` subcommands to
+  `octez-evm-node`. These commands trace blocks and transactions offline against
+  the node's local store, without requiring the RPC server. Both default to
+  `callTracer` and support `--tracer structLogger`. (!20851)
+- Add `--dal-publishers-whitelist` argument to `octez-evm-node make kernel
+  installer config` command. Accepts a comma-separated list of Tezos public key
+  hashes (e.g., `tz1abc...,tz1def...`) to configure which DAL publishers
+  (batching operators) are authorized to have their slots processed by the
+  kernel. The whitelist is stored in kernel durable storage using RLP
+  encoding. (!20143)
+- Add `--disable-legacy-dal-signals` flag to `octez-evm-node make kernel
+  installer config` command. When enabled, the kernel ignores legacy external
+  DAL slot import signals and relies exclusively on `DalAttestedSlots` internal
+  inbox messages for importing DAL data (requires protocol U). (!20143)
+
+### Bug fixes
+
+- Fix `shell` (and children subcommands) failing with "No store found"
+  when the EVM node is running on the same data directory. (!21067)
+
+### Execution changes
+
+- The observer nodes now preserve the order of transactions they receive more
+  strictly. (!20553)
+- `replay blueprints` now passes the resulting EVM state from one blueprint
+  directly into the execution of the next, rather than fetching the state from
+  the storage at the start of every level. (!20963)
+
+### Storage changes
+
+- The node now reads and writes the sequencer key and sequencer upgrade from
+  their world state paths (`/evm/world_state/sequencer` and
+  `/evm/world_state/sequencer_upgrade`) for kernels >= V50, falling back to
+  legacy paths (`/evm/sequencer` and `/evm/sequencer_upgrade`) for older
+  kernels.
+
+### Snapshot changes
+
+- Skip the SQLite `VACUUM INTO` step when exporting legacy snapshots in archive
+  mode. The original database files are included directly in the archive,
+  avoiding the expensive vacuum operation on large databases. (!21037)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Fix the instant confirmation logic to correctly compute the gas price
+  changes. (!20964)
+
+## Version 0.53 (2026-01-28)
+
+This release includes an important memory leak fix for EVM nodes
+running in observer and RPC mode. We strongly recommend that all
+operators upgrade as soon as possible, as this issue affects every
+node deployment except the sequencer.
+
+This release will not apply any migration to the node’s store (version 22),
+meaning it is possible to downgrade to previous version).
+
+### Execution changes
+
+- Fix memory leak in blueprints follower caused by telemetry context
+  accumulation in recursive stream loop. (!20616)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.52 (2026-01-16)
+
+This is a bug fix release release for addressing several issues with the
+instant confirmation experimental feature. This version is required for
+providers wanting to enable this instant confirmation, but does not provide any
+changes compared to 0.51 otherwise.
+
+This release will not apply any migration to the node’s store (version 22),
+meaning it is possible to downgrade to previous version).
+
+### Execution changes
+
+- Fix transaction objects submitted several times remaining in the tx queue
+  past their lifespan. (!20445)
+- Fix the native execution wrongfully overwriting the kernel version stored in
+  the context of the chain, which resulted in an incorrect result for the
+  `tez_kernelVersion` RPC. Only nodes with the native execution policy set to
+  `always` were affected. (!20432)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Rework the incremental execution of included transactions in `farfadet-r1`
+  native execution to align it more closely to the execution path of regular
+  blueprints . (!20459)
+
+## Version 0.51 (2026-01-13)
+
+This release improves RPC performance with up to 10x faster
+`eth_getLogs` queries through direct SQLite bloom filter checks. It
+also adds a new Etherlink-specific RPC method for retrieving sequencer
+public keys and includes several bug fixes.
+
+This release is also the last one before the stabilization of the
+instant confirmation feature. As such, it brings a number of bug fixes
+and improvements that are necessary for making sure the initial
+activation of the feature is a success on Etherlink Mainnet. Users
+wanting to test it will need to have an observer node with the
+experimental feature enabled.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- Deprecate now irrelevant `log_filter.chunk_size`. (!20332)
+
+### RPCs changes
+
+- Optimize `eth_getLogs` with up to 10x latency improvement when filtering on
+  addresses or topics by implementing bloom filter checks in SQLite
+  directly. (!20366, !20332)
+- Add a new Etherlink-specific JSONRPC method `tez_sequencer` to retreive the
+  sequencer’s public key for a given block. (!20365)
+
+### Metrics changes
+
+- Fix the status of traces for our workers’ handlers remaining unset. (!20379)
+- Traceparents are now propagated by nodes via `/evm/messages` when `?otel` is
+  set to `true` (it is `false` by default). (!20389)
+
+### Command-line interface changes
+
+- Update the command that creates an upgrade payload with a delay, it
+  can also takes a smart rollup alias or address as a argument.
+  (!20302)
+- Deprecate now irrelevant argument `--chunk-size`. (!20332)
+- Add a new CLI argument `--sandbox` to `run observer` to make it easier to
+  start an observer for a sandbox setup. (!20365)
+- Support using a kernel name instead of a root hash in `make upgrade payload`.
+  (!20410)
+
+### Execution changes
+
+- Fix the kernel upgrade detection of the node’s execution runtime, which would
+  prevent the node to progress correctly under certain edge cases. (!20135)
+- Fix a race condition in the tx queue of the observer node, which could lead
+  to transient inconsistent changes. (!20385)
+- Remove kernel debug log file generation from trace RPC operations to
+  prevent unnecessary disk usage. This affects `trace_transaction_*`
+  and `replay_*` files in the `kernel_logs` directory. (!20388)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Observers that have instant confirmations enabled can use the results of
+  transactions executed individually to assemble blocks instead of re-applying
+  the full blueprint. (!20101)
+- Rework  instant confirmation messages sent through `/evm/messages` to reduce
+  their number and verbosity. (!20310)
+- Fix inclusion of delayed transactions even in the absence of transactions in
+  the tx queue. (!20250)
+- Fix JSON encoding for transaction inclusion messages in `/evm/messages`.
+  (!20391)
+- Add the attribute `etherlink.block.number` to OpenTelemetry traces related to
+  instant preconfirmations. (!20369)
+- Backport several fixes related to incremental execution of blocks by
+  observers in Farfadet first revision. (!20419 !20406 !20411 !20396)
+- Force native execution for block execution when using instant confirmation
+  in an Observer node. (!20404)
+
+## Version 0.50 (2025-12-19)
+
+This release most notably adds support for [Etherlink 6.1] native execution. In
+the event of a successful governance vote, this version will be required to
+preserve RPC performances. As a consequence, we strongly advise node operators
+to upgrade to this version ahead of the activation of Etherlink 6.1.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+[Etherlink 6.1]: https://medium.com/@etherlink/announcing-etherlink-6-1-a-bugfix-proposal-for-fa-token-deposits-2cc08ffd6fad
+
+### Command-line interface changes
+
+- Add a collection of command to inspect the contents of an Etherlink instance
+  durable storage: `shell cat PATH` to print the contents stored under the
+  given `PATH`, `shell ls PATH` to list the subdirectories living under `PATH`,
+  `shell tree` to list contents stored living under `PATH` directories in a
+  tree-like format, and `shell` to start a REPL allowing users to use `ls` and
+  `cat` interactively. See `man shell` for more information. (!20183 !20221)
+- Adds support for `--network` to `download kernel` to fallback to default
+  per-network preimages endpoint when `--preimages-endpoint` is omitted.
+  (!20241)
+
+### Execution changes
+
+- Supports executing Farfadet-r1 natively. (!20285)
+
+## Version 0.49 (2025-12-04)
+
+This release of the EVM node makes it ready for the instant confirmation feature
+(also known as sub-block latency) which is not activated by default. It also
+improves performance of `eth_sendRawTransactionSync` and adds support for
+executing the Farfadet kernel (Etherlink 6.0) natively.
+
+### RPCs changes
+
+- Fix issue when connecting to nodes behind a proxy that can rearrange
+  chunks. (!20057)
+
+- Enable concurrent waiting for transaction confirmation in batched
+  `eth_sendRawTransactionSync` calls for improved throughput. (!20064)
+
+### Command-line interface changes
+
+- The `download kernel` command now allows to download the upcoming kernel
+  Farfadet by its alias `farfadet`. (!20065)
+
+### Execution changes
+
+- Supports executing Farfadet natively. (!20065)
 
 ## Version 0.48 (2025-11-24)
 

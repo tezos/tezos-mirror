@@ -1,4 +1,4 @@
-Version 23.2
+Version 23.3
 ============
 
 Changes
@@ -13,13 +13,15 @@ Version 23 introduces the following changes or new features:
   (3) BLS support (See :ref:`the BLS support section <bls_v23>`)
   (4) New snapshot version (See :ref:`the snapshot version section <snapshot_v23>`)
 
-Octez v23.1 addresses an issue with Ubuntu and Debian packages distribution, where an expired PGP key prevented users from updating to v23.0 using apt.
+**Octez v23.1** addresses an issue with Ubuntu and Debian packages distribution, where an expired PGP key prevented users from updating to v23.0 using apt.
 
-Octez v23.2 fixes an issue affecting ``systemd`` services of Debian and Ubuntu packages that could lead to having two baking binaries running at the same time.
+**Octez v23.2** fixes an issue affecting ``systemd`` services of Debian and Ubuntu packages that could lead to having two baking binaries running at the same time.
 
 In some cases, this issue could cause bakers to lose consensus rewards or, in certain conditions, could result in double-signing. Consequently, v23.0 and v23.1 Ubuntu and Debian packages were made unavailable via ``apt`` and ``dnf``. The release of v23.2 restores the availability of these distribution packages.
 
 **For all other distributions, this version is the same as Octez v23.1**
+
+**Octez v23.3** increases performance of DAL nodes and improves baker stability. It prevents the baker from running in a degraded mode.
 
 An overview of breaking changes and deprecations introduced in Octez
 v23 can be found :ref:`here<v23_breaking_changes>`.
@@ -107,6 +109,8 @@ Ubuntu and Debian packages
       sudo apt-get update
       sudo apt-get upgrade octez-baker
 
+then restart the services (see :ref:`services_upgrade`).
+
 See the :ref:`install instructions for Ubuntu and Debian packages <installing_deb>` for details, or if you are installing Ubuntu and Debian packages from scratch.
 
 .. warning::
@@ -128,18 +132,19 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v23.2
+  git checkout octez-v23.3
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v23.2`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v23.3`` Docker images of Octez.
 
 Changelog
 ---------
 
+- `Version 23.3 <../CHANGES.html#version-23-3>`_
 - `Version 23.2 <../CHANGES.html#version-23-2>`_
 - `Version 23.1 <../CHANGES.html#version-23-1>`_
 - `Version 23.0 <../CHANGES.html#version-23-0>`_

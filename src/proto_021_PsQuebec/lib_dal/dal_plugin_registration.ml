@@ -33,7 +33,9 @@ module Plugin = struct
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
-  type dal_attestation = Bitset.t
+  type dal_attestations = Bitset.t
+
+  type slot_availability = Bitset.t
 
   type attestation_operation = Kind.attestation Alpha_context.operation
 
@@ -62,8 +64,10 @@ module Plugin = struct
       {
         Tezos_dal_node_services.Types.feature_enable;
         incentives_enable;
+        dynamic_lag_enable = false;
         number_of_slots;
         attestation_lag;
+        attestation_lags = [attestation_lag];
         attestation_threshold;
         traps_fraction = Q.(1 // 1000);
         (* not used in proto_021 *)
@@ -109,7 +113,7 @@ module Plugin = struct
       (fun () -> DAL_publication_not_available)
 
   let inject_entrapment_evidence _cctxt ~attested_level:_ _attestation
-      ~slot_index:_ ~shard:_ ~proof:_ ~tb_slot:_ =
+      ~slot_index:_ ~lag_index:_ ~shard:_ ~proof:_ ~tb_slot:_ =
     let open Lwt_result_syntax in
     (* This is supposed to be dead code, but we implement a fallback to be defensive. *)
     fail [DAL_accusation_not_available]
@@ -200,9 +204,9 @@ module Plugin = struct
                  }
                in
                let tb_slot = Slot.to_int attestation.consensus_content.slot in
-               let dal_attestation : dal_attestation option =
+               let dal_attestation : dal_attestations option =
                  Option.map
-                   (fun x -> (x.attestation :> dal_attestation))
+                   (fun x -> (x.attestation :> dal_attestations))
                    attestation.dal_content
                in
                Some (tb_slot, packed_operation, dal_attestation)
@@ -239,7 +243,7 @@ module Plugin = struct
       Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
-  let dal_attestation (block : block_info) =
+  let slot_availability (block : block_info) =
     let open Result_syntax in
     let* metadata =
       Option.to_result
@@ -249,8 +253,22 @@ module Plugin = struct
     in
     return (metadata.protocol_data.dal_attestation :> Bitset.t)
 
-  let is_attested attestation slot_index =
+  let is_baker_attested attestation ~number_of_slots:_ ~number_of_lags:_
+      ~lag_index:_ slot_index =
     match Bitset.mem attestation slot_index with Ok b -> b | Error _ -> false
+
+  let decode_baker_attestations attestation ~number_of_slots:_ ~number_of_lags:_
+      =
+    let open Result_syntax in
+    match Bitset.to_list attestation with
+    | [] -> return []
+    | slot_indices -> return [{Dal_plugin.lag_index = 0; slot_indices}]
+
+  let is_protocol_attested slot_availability ~number_of_slots:_
+      ~number_of_lags:_ ~lag_index:_ slot_index =
+    match Bitset.mem slot_availability slot_index with
+    | Ok b -> b
+    | Error _ -> false
 
   let number_of_attested_slots attestation = Bitset.hamming_weight attestation
 
@@ -265,6 +283,9 @@ module Plugin = struct
       Plugin.Alpha_services.Delegate.deactivated cpctxt (`Main, `Head 0) pkh
     in
     return @@ match res with Ok _deactivated -> true | Error _ -> false
+
+  let is_migration_pending _ctxt =
+    Lwt_result_syntax.return (false, Int32.max_int)
 
   (* Section of helpers for Skip lists *)
 

@@ -29,6 +29,7 @@ module Baker = struct
     in
     Baking_scheduling.run
       cctxt
+      ~extra_nodes:[]
       ~canceler
       ~stop_on_event
       ~on_error

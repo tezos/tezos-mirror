@@ -20,8 +20,8 @@ use tezos_data_encoding::nom::Hasher;
 
 pub struct TezosHasher;
 
-impl Hasher for TezosHasher {
-    fn hash(&self, input: &[u8]) -> Vec<u8> {
+impl Hasher<32> for TezosHasher {
+    fn hash(&self, input: &[u8]) -> [u8; 32] {
         self::blake2b::digest_256(input)
     }
 }
@@ -68,19 +68,24 @@ mod prefix_bytes {
     pub const NONCE_HASH: [u8; 3] = [69, 220, 169];
     pub const OPERATION_LIST_HASH: [u8; 2] = [133, 233];
     pub const SMART_ROLLUP_HASH: [u8; 3] = [6, 124, 117];
+    pub const SMART_ROLLUP_COMMITMENT_HASH: [u8; 4] = [17, 165, 134, 138];
+    pub const SMART_ROLLUP_STATE_HASH: [u8; 4] = [17, 165, 235, 240];
     pub const SCRIPT_EXPR_HASH: [u8; 4] = [13, 44, 64, 27];
 }
 
-pub type Hash = Vec<u8>;
-
-pub trait HashTrait: Into<Hash> + AsRef<[u8]> {
+pub trait HashTrait<const N: usize>:
+    Into<Vec<u8>>
+    + Into<[u8; N]>
+    + AsRef<[u8]>
+    + std::ops::Deref<Target = [u8; N]>
+    + From<[u8; N]>
+    + Default
+{
     /// Returns this hash type.
     fn hash_type() -> HashType;
 
-    /// Returns the size of this hash.
-    fn hash_size() -> usize {
-        Self::hash_type().size()
-    }
+    /// The size of this hash in bytes.
+    const SIZE: usize = N;
 
     /// Tries to create this hash from the `bytes`.
     fn try_from_bytes(bytes: &[u8]) -> Result<Self, FromBytesError>;
@@ -88,6 +93,8 @@ pub trait HashTrait: Into<Hash> + AsRef<[u8]> {
     fn from_b58check(data: &str) -> Result<Self, FromBase58CheckError>;
 
     fn to_b58check(&self) -> String;
+
+    fn zero() -> Self;
 }
 
 /// Error creating hash from bytes
@@ -104,12 +111,12 @@ pub enum FromBytesError {
 macro_rules! define_hash {
     ($name:ident) => {
         #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        pub struct $name(pub(crate) Hash);
+        pub struct $name(pub(crate) [u8; { HashType::$name.size() }]);
 
         impl $name {
             fn from_bytes(data: &[u8]) -> Result<Self, FromBytesError> {
                 if data.len() == HashType::$name.size() {
-                    Ok($name(data.into()))
+                    Ok($name(data.try_into().unwrap()))
                 } else {
                     Err(FromBytesError::InvalidSize)
                 }
@@ -117,7 +124,7 @@ macro_rules! define_hash {
 
             fn from_vec(hash: Vec<u8>) -> Result<Self, FromBytesError> {
                 if hash.len() == HashType::$name.size() {
-                    Ok($name(hash))
+                    Ok($name(hash.try_into().unwrap()))
                 } else {
                     Err(FromBytesError::InvalidSize)
                 }
@@ -158,7 +165,13 @@ macro_rules! define_hash {
             }
         }
 
-        impl HashTrait for $name {
+        impl Default for $name {
+            fn default() -> Self {
+                Self::zero()
+            }
+        }
+
+        impl HashTrait<{ HashType::$name.size() }> for $name {
             fn hash_type() -> HashType {
                 HashType::$name
             }
@@ -168,7 +181,15 @@ macro_rules! define_hash {
             }
 
             fn from_b58check(data: &str) -> Result<Self, FromBase58CheckError> {
-                HashType::$name.b58check_to_hash(data).map(Self)
+                let hash = HashType::$name.b58check_to_hash(data)?;
+                if hash.len() == HashType::$name.size() {
+                    Ok($name(hash.try_into().unwrap()))
+                } else {
+                    Err(FromBase58CheckError::MismatchedLength {
+                        expected: HashType::$name.size(),
+                        actual: hash.len(),
+                    })
+                }
             }
 
             fn to_b58check(&self) -> String {
@@ -179,6 +200,18 @@ macro_rules! define_hash {
                         unreachable!("Typed hash should always be representable in base58")
                     })
             }
+
+            fn zero() -> Self {
+                $name([0u8; HashType::$name.size()])
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = [u8; { HashType::$name.size() }];
+
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
         }
 
         impl std::convert::AsRef<[u8]> for $name {
@@ -187,9 +220,15 @@ macro_rules! define_hash {
             }
         }
 
-        impl std::convert::From<$name> for Hash {
+        impl std::convert::From<$name> for [u8; { HashType::$name.size() }] {
             fn from(typed_hash: $name) -> Self {
                 typed_hash.0
+            }
+        }
+
+        impl std::convert::From<$name> for Vec<u8> {
+            fn from(typed_hash: $name) -> Self {
+                typed_hash.0.to_vec()
             }
         }
 
@@ -200,9 +239,9 @@ macro_rules! define_hash {
             }
         }
 
-        impl std::convert::TryFrom<Hash> for $name {
+        impl std::convert::TryFrom<Vec<u8>> for $name {
             type Error = FromBytesError;
-            fn try_from(h: Hash) -> Result<Self, Self::Error> {
+            fn try_from(h: Vec<u8>) -> Result<Self, Self::Error> {
                 Self::from_vec(h)
             }
         }
@@ -214,6 +253,12 @@ macro_rules! define_hash {
             }
         }
 
+        impl std::convert::From<[u8; { HashType::$name.size() }]> for $name {
+            fn from(h: [u8; { HashType::$name.size() }]) -> Self {
+                $name(h)
+            }
+        }
+
         impl Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
@@ -222,7 +267,7 @@ macro_rules! define_hash {
                 if serializer.is_human_readable() {
                     serializer.serialize_str(&self.to_base58_check())
                 } else {
-                    serializer.serialize_newtype_struct(stringify!($name), &self.0)
+                    self.0.to_vec().serialize(serializer)
                 }
             }
         }
@@ -232,63 +277,12 @@ macro_rules! define_hash {
             where
                 D: serde::de::Deserializer<'de>,
             {
-                struct HashVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for HashVisitor {
-                    type Value = $name;
-
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                        formatter
-                            .write_str("eigher sequence of bytes or base58 encoded data expected")
-                    }
-
-                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        Self::Value::from_b58check(v).map_err(|e| {
-                            E::custom(format!("error constructing hash from base58check: {}", e))
-                        })
-                    }
-
-                    fn visit_newtype_struct<E>(self, e: E) -> Result<Self::Value, E::Error>
-                    where
-                        E: serde::Deserializer<'de>,
-                    {
-                        let field0: Vec<u8> = match <Vec<u8> as serde::Deserialize>::deserialize(e)
-                        {
-                            Ok(val) => val,
-                            Err(err) => {
-                                return Err(err);
-                            }
-                        };
-                        Ok($name(field0))
-                    }
-
-                    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-                    where
-                        A: serde::de::SeqAccess<'de>,
-                    {
-                        let hash = match seq.next_element::<Vec<u8>>() {
-                            Ok(Some(val)) => val,
-                            Ok(None) => {
-                                return Err(serde::de::Error::custom("no hash bytes".to_string()))
-                            }
-                            Err(err) => return Err(err),
-                        };
-                        Self::Value::try_from_bytes(&hash).map_err(|e| {
-                            serde::de::Error::custom(format!(
-                                "error constructing hash from bytes: {}",
-                                e
-                            ))
-                        })
-                    }
-                }
-
                 if deserializer.is_human_readable() {
-                    deserializer.deserialize_str(HashVisitor)
+                    let s = <&str>::deserialize(deserializer)?;
+                    Self::from_b58check(s).map_err(serde::de::Error::custom)
                 } else {
-                    deserializer.deserialize_newtype_struct(stringify!($name), HashVisitor)
+                    let bytes = Vec::<u8>::deserialize(deserializer)?;
+                    Self::try_from(bytes).map_err(serde::de::Error::custom)
                 }
             }
         }
@@ -332,6 +326,8 @@ define_hash!(BlsSignature);
 define_hash!(NonceHash);
 define_hash!(OperationListHash);
 define_hash!(SmartRollupHash);
+define_hash!(SmartRollupCommitmentHash);
+define_hash!(SmartRollupStateHash);
 define_hash!(ScriptExprHash);
 
 macro_rules! unknown_sig {
@@ -432,6 +428,10 @@ pub enum HashType {
     OperationListHash,
     // "\006\124\117" (* sr1(36) *)
     SmartRollupHash,
+    // "\017\165\134\138" (* src1(54) *)
+    SmartRollupCommitmentHash,
+    // "\017\165\235\240" (* srs1(54) *)
+    SmartRollupStateHash,
     // "\013\044\064\027" (* expr(54) *)
     ScriptExprHash,
 }
@@ -478,6 +478,8 @@ impl HashType {
             HashType::NonceHash => &NONCE_HASH,
             HashType::OperationListHash => &OPERATION_LIST_HASH,
             HashType::SmartRollupHash => &SMART_ROLLUP_HASH,
+            HashType::SmartRollupCommitmentHash => &SMART_ROLLUP_COMMITMENT_HASH,
+            HashType::SmartRollupStateHash => &SMART_ROLLUP_STATE_HASH,
             HashType::ScriptExprHash => &SCRIPT_EXPR_HASH,
         }
     }
@@ -497,6 +499,8 @@ impl HashType {
             | HashType::OperationMetadataListListHash
             | HashType::PublicKeyEd25519
             | HashType::NonceHash
+            | HashType::SmartRollupCommitmentHash
+            | HashType::SmartRollupStateHash
             | HashType::OperationListHash => 32,
             HashType::CryptoboxPublicKeyHash => 16,
             HashType::ContractKt1Hash
@@ -540,7 +544,7 @@ impl HashType {
     }
 
     /// Convert string representation of the hash to bytes form.
-    pub fn b58check_to_hash(&self, data: &str) -> Result<Hash, FromBase58CheckError> {
+    pub fn b58check_to_hash(&self, data: &str) -> Result<Vec<u8>, FromBase58CheckError> {
         let mut hash = data.from_base58check()?;
 
         if !hash.starts_with(self.base58check_prefix()) {
@@ -578,7 +582,7 @@ macro_rules! pk_with_hash {
                 let hash = blake2b::digest_160(&self.0);
                 // hash size is 20 bytes (160 bits), exactly how many
                 // ContractTz*Hash expect, safe to unwrap
-                Self::Hash::from_bytes(&hash).unwrap()
+                Self::Hash::from(hash)
             }
         }
 
@@ -625,8 +629,8 @@ impl SeedEd25519 {
         let sk = SigningKey::from_bytes(&secret_key);
         let pk = sk.verifying_key();
         Ok((
-            PublicKeyEd25519(pk.to_bytes().to_vec()),
-            SecretKeyEd25519(sk.to_bytes().to_vec()),
+            PublicKeyEd25519(pk.to_bytes()),
+            SecretKeyEd25519(sk.to_bytes()),
         ))
     }
 }
@@ -641,9 +645,8 @@ pub enum PublicKeyError {
 
 impl PublicKeyEd25519 {
     /// Generates public key hash for public key ed25519
-    pub fn public_key_hash(&self) -> Result<CryptoboxPublicKeyHash, PublicKeyError> {
-        CryptoboxPublicKeyHash::try_from(crate::blake2b::digest_128(self.0.as_ref()))
-            .map_err(Into::into)
+    pub fn public_key_hash(&self) -> CryptoboxPublicKeyHash {
+        CryptoboxPublicKeyHash(self::blake2b::digest_128(self.as_ref()))
     }
 }
 
@@ -667,7 +670,7 @@ impl SecretKeyEd25519 {
 
         let payload = crate::blake2b::digest_256(data.as_ref());
         let signature = sk.sign(&payload);
-        Ok(Ed25519Signature(signature.to_bytes().to_vec()))
+        Ok(Ed25519Signature(signature.to_bytes()))
     }
 }
 
@@ -681,11 +684,7 @@ impl PublicKeySignatureVerifier for PublicKeyEd25519 {
         signature: &Self::Signature,
         bytes: &[u8],
     ) -> Result<bool, Self::Error> {
-        let signature = signature
-            .as_ref()
-            .try_into()
-            .map(ed25519_dalek::Signature::from_bytes)
-            .map_err(|_| CryptoError::InvalidSignature)?;
+        let signature = ed25519_dalek::Signature::from_bytes(signature);
 
         let pk = ed25519_dalek::VerifyingKey::try_from(self)
             .map_err(|_| CryptoError::InvalidPublicKey)?;
@@ -704,6 +703,14 @@ impl PublicKeySignatureVerifier for PublicKeySecp256k1 {
     type Error = CryptoError;
 
     /// Verifies the correctness of `bytes` signed by Secp256k1 as the `signature`.
+    ///
+    /// High-S signatures are rejected. This mirrors the verification behaviour of
+    /// Octez's `src/lib_crypto`, which binds to the Bitcoin Core C library function
+    /// `secp256k1_ecdsa_verify`.
+    ///
+    /// It also matches the convention established for ECDSA by:
+    /// [EIP-2]: https://eips.ethereum.org/EIPS/eip-2
+    /// [BIP-146]: https://github.com/bitcoin/bips/blob/master/bip-0146.mediawiki
     fn verify_signature(
         &self,
         signature: &Self::Signature,
@@ -716,6 +723,10 @@ impl PublicKeySignatureVerifier for PublicKeySecp256k1 {
         .map_err(|_| CryptoError::InvalidPublicKey)?;
         let sig = libsecp256k1::Signature::parse_standard_slice(signature.as_ref())
             .map_err(|_| CryptoError::InvalidSignature)?;
+
+        if sig.s.is_high() {
+            return Ok(false);
+        }
 
         let payload = crate::blake2b::digest_256(bytes);
 
@@ -784,10 +795,10 @@ impl PublicKeySignatureVerifier for PublicKeyP256 {
 
         let pk = p256::ecdsa::VerifyingKey::from_sec1_bytes(&self.0)
             .map_err(|_| CryptoError::InvalidPublicKey)?;
-        let r: [u8; 32] = signature.as_ref()[..32]
+        let r: [u8; 32] = signature.0[..32]
             .try_into()
             .map_err(|_| CryptoError::InvalidSignature)?;
-        let s: [u8; 32] = signature.as_ref()[32..]
+        let s: [u8; 32] = signature.0[32..]
             .try_into()
             .map_err(|_| CryptoError::InvalidSignature)?;
         let sig = p256::ecdsa::Signature::from_scalars(r, s)
@@ -825,14 +836,14 @@ impl BlockPayloadHash {
         predecessor: &BlockHash,
         round: u32,
         operation_list_hash: &OperationListHash,
-    ) -> Result<Self, Blake2bError> {
+    ) -> Self {
         let round = round.to_be_bytes();
         let input = [
             predecessor.0.as_ref(),
             round.as_ref(),
             operation_list_hash.0.as_ref(),
         ];
-        blake2b::digest_all(input, 32).map(BlockPayloadHash)
+        BlockPayloadHash(blake2b::digest_all_256(input))
     }
 }
 
@@ -1161,7 +1172,7 @@ mod tests {
     proptest! {
         #[test]
         fn test_ed255519_signature_verification_roundtrip(seed in any::<[u8; 32]>(), message in any::<Vec<u8>>()) {
-            let seed = super::SeedEd25519(seed.to_vec());
+            let seed = super::SeedEd25519(seed);
 
             let (pk, sk) = seed.keypair().unwrap();
 
@@ -1184,6 +1195,23 @@ mod tests {
 
         let result = pk.verify_signature(&sig, msg).unwrap();
         assert!(result);
+    }
+
+    #[test]
+    fn test_secp256k1_high_s_signature_rejected() {
+        let pk = PublicKeySecp256k1::from_base58_check(
+            "sppk7a2WEfU54QzcQZ2EMjihtcxLeRtNTVxHw4FW2e8W5kEJ8ZargSb",
+        )
+        .unwrap();
+        let sig = Secp256k1Signature::from_base58_check("spsig1QLf7cczTbt4UHFGQKUrB2pS3ZTu9wdXR29zKxVPQkhBaiLez6hRcM142ms7HagQa3vuPstvMtYq44y4x4RPcrLu76ZuQ7").unwrap();
+        let msg = b"hello, test";
+
+        // Flip s -> n - s to produce the high-S twin
+        let mut parsed = libsecp256k1::Signature::parse_standard_slice(sig.as_ref()).unwrap();
+        parsed.s = -parsed.s;
+        let high_s = Secp256k1Signature::try_from(parsed.serialize().to_vec()).unwrap();
+
+        assert!(!pk.verify_signature(&high_s, msg).unwrap());
     }
 
     #[test]
@@ -1426,6 +1454,18 @@ mod tests {
         );
 
         test!(
+            smart_rollup_commitment_hash,
+            SmartRollupCommitmentHash,
+            ["src12UJzB8mg7yU6nWPzicH7ofJbFjyJEbHvwtZdfRXi8DQHNp1LY8",]
+        );
+
+        test!(
+            smart_rollup_state_hash,
+            SmartRollupStateHash,
+            ["srs11ZWE34ur1d8j81Eqt68v2P5gFkP3hHms6kQ9Qo26j7ktDeu85y",]
+        );
+
+        test!(
             script_expr_hash,
             ScriptExprHash,
             [
@@ -1468,8 +1508,7 @@ mod tests {
             &BlockHash::from_base58_check(predecessor).unwrap(),
             53,
             &operation_list_hash,
-        )
-        .unwrap();
+        );
         assert_eq!(
             payload_hash.to_base58_check(),
             "vh3Ed4mvDcNYVtskGLCYKKk1aBxJTpQNc46Hyi4EedpGCmgZ4LiG",

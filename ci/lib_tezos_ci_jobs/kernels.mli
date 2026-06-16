@@ -5,5 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Job [oc.build_kernels]. *)
+val job_build_kernels : Cacio.job
+
 (** Register kernel jobs. *)
 val register : unit -> unit

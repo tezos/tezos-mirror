@@ -402,10 +402,7 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
             State.find_account_from_pkh manager_pkh state
           in
           let state = update_activity delegate_name block state in
-          if
-            state.constants.aggregate_attestation
-            && Signature.Public_key_hash.is_bls consensus_pkh
-          then
+          if Signature.Public_key_hash.is_bls consensus_pkh then
             (* Just add the delegate to the committee; aggregation and
                metadata check will be handled below. *)
             return (state, delegate_rights :: bls_committee)
@@ -622,10 +619,7 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
           let state =
             update_activity delegate_name (Incremental.predecessor incr) state
           in
-          if
-            state.constants.aggregate_attestation
-            && Signature.Public_key_hash.is_bls consensus_pkh
-          then
+          if Signature.Public_key_hash.is_bls consensus_pkh then
             (* Just add the delegate to the committee; aggregation and
                metadata check will be handled below. *)
             return (incr, state, delegate_rights :: bls_committee)

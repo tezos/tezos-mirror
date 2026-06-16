@@ -23,6 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Minimal valid WASM module with an exported memory and a no-op kernel_run.
+   Compiled from:
+     (module
+       (memory 1)
+       (export "memory" (memory 0))
+       (func (export "kernel_run")))
+*)
+let noop_wasm_boot_sector =
+  "\x00\x61\x73\x6d\x01\x00\x00\x00\x01\x04\x01\x60\x00\x00\x03\x02\x01\x00\x05\x03\x01\x00\x01\x07\x17\x02\x06\x6d\x65\x6d\x6f\x72\x79\x02\x00\x0a\x6b\x65\x72\x6e\x65\x6c\x5f\x72\x75\x6e\x00\x00\x0a\x04\x01\x02\x00\x0b"
+
+(* Same as [noop_wasm_boot_sector] but with 2 initial memory pages instead of
+   1, producing a different PVM state hash. Useful when tests need two distinct
+   valid boot sectors.
+   Compiled from:
+     (module
+       (memory 2)
+       (export "memory" (memory 0))
+       (func (export "kernel_run")))
+*)
+let noop_wasm_boot_sector_2 =
+  "\x00\x61\x73\x6d\x01\x00\x00\x00\x01\x04\x01\x60\x00\x00\x03\x02\x01\x00\x05\x03\x01\x00\x02\x07\x17\x02\x06\x6d\x65\x6d\x6f\x72\x79\x02\x00\x0a\x6b\x65\x72\x6e\x65\x6c\x5f\x72\x75\x6e\x00\x00\x0a\x04\x01\x02\x00\x0b"
+
 let uid = ref 0
 
 (* Create a block hash that depends deterministically on the level and messages
@@ -59,6 +81,8 @@ let default_constants =
             {
               feature_enable;
               attestation_lag;
+              attestation_lags;
+              dynamic_lag_enable;
               number_of_slots;
               cryptobox_parameters;
               _;
@@ -84,11 +108,24 @@ let default_constants =
           max_active_outbox_levels = Int32.to_int max_active_outbox_levels;
         };
       dal =
-        {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
+        {
+          feature_enable;
+          attestation_lag;
+          attestation_lags;
+          dynamic_lag_enable;
+          number_of_slots;
+          cryptobox_parameters;
+        };
     }
 
-let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
+let add_l2_genesis_block ?boot_sector (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
+  let boot_sector =
+    match (boot_sector, node_ctxt.kind) with
+    | Some b, _ -> b
+    | None, Wasm_2_0_0 -> noop_wasm_boot_sector
+    | None, (Example_arith | Riscv) -> ""
+  in
   let head =
     Layer1.{hash = Block_hash.zero; level = node_ctxt.genesis_info.level}
   in
@@ -121,14 +158,13 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
     Node_context.save_messages node_ctxt inbox_witness ~level:head.level []
   in
   let ctxt = Context.empty node_ctxt.context in
+  let state = Context.PVMState.empty node_ctxt.context in
   let num_ticks = 0L in
   let initial_tick = Z.zero in
-  let*! initial_state = Plugin.Pvm.initial_state node_ctxt.kind in
-  let*! state =
-    Plugin.Pvm.install_boot_sector node_ctxt.kind initial_state boot_sector
-  in
+  let*! () = Plugin.Pvm.set_initial_state node_ctxt.kind ~empty:state in
+  let*! () = Plugin.Pvm.install_boot_sector node_ctxt.kind state boot_sector in
   let*! genesis_state_hash = Plugin.Pvm.state_hash node_ctxt.kind state in
-  let*! ctxt = Context.PVMState.set ctxt state in
+  let*! () = Context.PVMState.set ctxt state in
   let*! context_hash = Context.commit ctxt in
   let commitment =
     Commitment.genesis_commitment
@@ -145,20 +181,28 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
         predecessor = predecessor.hash;
         commitment_hash = Some commitment_hash;
         previous_commitment_hash;
-        context = context_hash;
+        context_hash = Some context_hash;
         inbox_witness;
         inbox_hash;
       }
   in
   let l2_block =
-    Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+    Sc_rollup_block.
+      {
+        header;
+        content = ();
+        num_ticks;
+        initial_tick;
+        state_hash = None;
+        pvm_status = None;
+      }
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
   let* () = Node_context.set_l2_head node_ctxt l2_block in
   return l2_block
 
 let initialize_node_context ?data_dir protocol ?(constants = default_constants)
-    kind ~boot_sector =
+    ?boot_sector kind =
   let open Lwt_result_syntax in
   incr uid ;
   (* To avoid any conflict with previous runs of this test. *)
@@ -193,7 +237,7 @@ let initialize_node_context ?data_dir protocol ?(constants = default_constants)
       ~data_dir
       kind
   in
-  let* genesis = add_l2_genesis_block ctxt ~boot_sector in
+  let* genesis = add_l2_genesis_block ctxt ?boot_sector in
   let commitment_hash =
     WithExceptions.Option.get ~loc:__LOC__ genesis.header.commitment_hash
   in
@@ -202,10 +246,10 @@ let initialize_node_context ?data_dir protocol ?(constants = default_constants)
   in
   return (ctxt, genesis)
 
-let with_node_context ?data_dir ?constants kind protocol ~boot_sector f =
+let with_node_context ?data_dir ?constants kind protocol ?boot_sector f =
   let open Lwt_result_syntax in
   let* node_ctxt, genesis =
-    initialize_node_context ?data_dir protocol ?constants kind ~boot_sector
+    initialize_node_context ?data_dir protocol ?constants kind ?boot_sector
   in
   Lwt.finalize (fun () -> f node_ctxt ~genesis) @@ fun () ->
   let open Lwt_syntax in
@@ -342,7 +386,7 @@ module Assert = struct
   module State_hash = Make_with_encoding (State_hash)
 end
 
-let alcotest ?name speed ?constants kind protocol ~boot_sector f =
+let alcotest ?name speed ?constants kind protocol ?boot_sector f =
   let name =
     Format.asprintf
       "%s%a %a"
@@ -354,7 +398,7 @@ let alcotest ?name speed ?constants kind protocol ~boot_sector f =
   in
   Alcotest_lwt.test_case name speed @@ fun _lwt_switch () ->
   let open Lwt_result_syntax in
-  let*! r = with_node_context ?constants kind protocol ~boot_sector f in
+  let*! r = with_node_context ?constants kind protocol ?boot_sector f in
   match r with
   | Ok () -> Lwt.return_unit
   | Error err ->

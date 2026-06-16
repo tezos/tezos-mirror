@@ -70,7 +70,7 @@ let empty () =
   let open Lwt_syntax in
   let* tree =
     Irmin_context.Tree.add
-      (Irmin_context.PVMState.empty ())
+      (Irmin_context.Tree.empty ())
       ["length"]
       Data_encoding.(Binary.to_bytes_exn int64 0L)
   in

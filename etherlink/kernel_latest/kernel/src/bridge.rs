@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -9,35 +9,50 @@ use std::fmt::Display;
 
 use alloy_sol_types::SolEvent;
 use primitive_types::{H160, H256, U256};
-use revm::context::result::{ExecutionResult, Output, SuccessReason};
-use revm::primitives::{Address, Bytes, Log, LogData, B256};
-use revm_etherlink::helpers::legacy::{h160_to_alloy, u256_to_alloy};
-use revm_etherlink::storage::world_state_handler::StorageAccount;
-use revm_etherlink::ExecutionOutcome;
+use revm::primitives::hardfork::SpecId;
+use revm::primitives::{Address, Log, LogData, B256};
+use revm_etherlink::helpers::legacy::{alloy_to_h160, h160_to_alloy, u256_to_alloy};
+use revm_etherlink::inspectors::TracerInput;
+use revm_etherlink::precompiles::constants::FEED_DEPOSIT_ADDR;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
+use tezos_crypto_rs::hash::{BlockHash, HashTrait};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
+use tezos_data_encoding::types::Narith;
+use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::rlp_helpers::{decode_field_u256_le, decode_option_explicit};
+use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
 use tezos_ethereum::wei::mutez_from_wei;
 use tezos_ethereum::{
     rlp_helpers::{decode_field, next},
     wei::eth_from_mutez,
 };
 use tezos_evm_logging::{log, Level::Error, Level::Info};
-use tezos_evm_runtime::runtime::Runtime;
-use tezos_execution::account_storage::{TezlinkAccount, TezlinkImplicitAccount};
+use tezos_execution::account_storage::{TezlinkAccount, TezosImplicitAccount};
 use tezos_execution::context::Context;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
-use tezos_tezlink::operation::TransferContent;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_tezlink::block::AppliedOperation;
+use tezos_tezlink::operation::{
+    ManagerOperation, ManagerOperationContent, Parameters, TransferContent,
+};
 use tezos_tezlink::operation_result::{
-    ApplyOperationErrors, BalanceUpdate, ContentResult, TransferError, TransferSuccess,
-    TransferTarget,
+    ApplyOperationErrors, BalanceUpdate, ContentResult, EventContent, EventSuccess,
+    InternalContentWithMetadata, InternalOperationSum, OperationBatchWithMetadata,
+    OperationDataAndMetadata, OperationResult, OperationResultSum, OperationWithMetadata,
+    TransferError, TransferSuccess, TransferTarget,
 };
 use tezos_tracing::trace_kernel;
+use tezosx_interfaces::{Registry, RuntimeId};
+use tezosx_tezos_runtime::TezosRuntime;
 
-use crate::tick_model::constants::TICKS_FOR_DEPOSIT;
+use crate::apply::{
+    pure_xtz_deposit, EthereumTransactionResult, ExecutionResult,
+    RuntimeTransactionResult,
+};
+use crate::chains::EvmLimits;
 
 /// Keccak256 of Deposit(uint256,address,uint256,uint256)
 /// This is main topic (non-anonymous event): https://docs.soliditylang.org/en/latest/abi-spec.html#events
@@ -45,13 +60,6 @@ pub const DEPOSIT_EVENT_TOPIC: [u8; 32] = [
     211, 106, 47, 103, 208, 109, 40, 87, 134, 246, 26, 50, 176, 82, 185, 172, 230, 176,
     183, 171, 239, 81, 119, 181, 67, 88, 171, 220, 131, 160, 182, 155,
 ];
-
-// NB: The following value was obtain via:
-// `revm::interpreter::gas::call_cost(spec_id, true, StateLoad::default())`
-// which was available in { revm <= v29.0.0 }.
-// The value was an approximation and still remains one.
-// TODO: estimate how emitting an event influenced tick consumption
-const DEPOSIT_EXECUTION_GAS_COST: u64 = 9100;
 
 /// Native token bridge error
 #[derive(Debug, thiserror::Error)]
@@ -160,7 +168,14 @@ impl rlp::Decodable for DepositReceiver {
                             "Can't decode Tezos receiver using NomReader",
                         )
                     })?;
-                    Ok(Self::Tezos(contract))
+
+                    if contract.is_implicit() {
+                        Ok(Self::Tezos(contract))
+                    } else {
+                        Err(DecoderError::Custom(
+                            "Deposit to smart contracts are disabled",
+                        ))
+                    }
                 }
                 _ => Err(DecoderError::Custom("Unknown receiver tag.")),
             }
@@ -188,6 +203,10 @@ pub struct DepositInfo {
 
 impl DepositInfo {
     fn decode(bytes: &[u8]) -> Result<Self, DecoderError> {
+        if bytes.is_empty() {
+            return Err(DecoderError::Custom("Unexpected empty deposit info"));
+        }
+
         let version = bytes[0];
         let decoder = Rlp::new(&bytes[1..]);
         if version == 1u8 {
@@ -375,70 +394,233 @@ impl Decodable for Deposit {
 
 pub struct DepositResult<Outcome> {
     pub outcome: Outcome,
-    pub estimated_ticks_used: u64,
+    #[allow(dead_code)]
+    pub runtime: RuntimeId,
 }
 
-#[trace_kernel]
-pub fn execute_etherlink_deposit<Host: Runtime>(
-    host: &mut Host,
-    deposit: &Deposit,
-) -> Result<DepositResult<ExecutionOutcome>, BridgeError> {
-    // We should be able to obtain an account for arbitrary H160 address
-    // otherwise it is a fatal error.
-    let receiver = deposit.receiver.to_h160()?;
-    let mut to_account = StorageAccount::from_address(&h160_to_alloy(&receiver))
-        .map_err(|_| BridgeError::InvalidDepositReceiver(receiver.as_bytes().to_vec()))?;
+/// Builds a Michelson `deposit` event carrying the inbox level and message
+/// id of the originating shared-inbox message, so indexers can correlate a
+/// Tezos-address deposit with the L1 inbox slot that produced it.
+///
+/// Type:    `pair (nat %inbox_level) (nat %inbox_msg_id)`
+/// Payload: `Pair <inbox_level> <inbox_msg_id>`
+fn build_deposit_event(
+    sender: Contract,
+    inbox_level: u32,
+    inbox_msg_id: u32,
+) -> Result<InternalOperationSum, crate::Error> {
+    use mir::ast::annotations::{Annotation, Annotations, NO_ANNS};
+    use mir::ast::micheline::Micheline;
+    use mir::ast::Entrypoint;
+    use mir::lexer::Prim;
+    use std::borrow::Cow;
+    use typed_arena::Arena;
 
-    let result = match to_account.add_balance(host, u256_to_alloy(&deposit.amount)) {
-        Ok(()) => ExecutionResult::Success {
-            reason: SuccessReason::Return,
-            gas_used: DEPOSIT_EXECUTION_GAS_COST,
-            gas_refunded: 0,
-            logs: vec![deposit.event_log()?],
-            output: Output::Call(Bytes::from_static(&[1u8])),
+    let arena = Arena::new();
+
+    let payload = Micheline::prim2(
+        &arena,
+        Prim::Pair,
+        Micheline::from(i128::from(inbox_level)),
+        Micheline::from(i128::from(inbox_msg_id)),
+    )
+    .encode()
+    .map_err(|e| {
+        crate::Error::BridgeError(format!("Failed to encode deposit event payload: {e}"))
+    })?;
+
+    let level_annots: Annotations =
+        Annotations::from([Annotation::Field(Cow::Borrowed("inbox_level"))]);
+    let msg_id_annots: Annotations =
+        Annotations::from([Annotation::Field(Cow::Borrowed("inbox_msg_id"))]);
+
+    let ty = Micheline::App(
+        Prim::pair,
+        arena.alloc_extend([
+            Micheline::App(Prim::nat, &[], level_annots),
+            Micheline::App(Prim::nat, &[], msg_id_annots),
+        ]),
+        NO_ANNS,
+    )
+    .encode()
+    .map_err(|e| {
+        crate::Error::BridgeError(format!("Failed to encode deposit event type: {e}"))
+    })?;
+
+    Ok(InternalOperationSum::Event(InternalContentWithMetadata {
+        content: EventContent {
+            tag: Some(Entrypoint::from_string_unchecked("deposit".into())),
+            payload: Some(payload.into()),
+            ty: ty.into(),
         },
-        Err(e) => {
-            log!(host, Info, "Deposit failed because of {e}");
-            ExecutionResult::Revert {
-                gas_used: DEPOSIT_EXECUTION_GAS_COST,
-                output: Bytes::from_static(&[0u8]),
-            }
+        sender,
+        nonce: 0,
+        result: ContentResult::Applied(EventSuccess {
+            consumed_milligas: Narith(0u64.into()),
+        }),
+    }))
+}
+
+#[allow(clippy::too_many_arguments)]
+#[trace_kernel]
+pub fn apply_tezosx_xtz_deposit<Host>(
+    host: &mut Host,
+    registry: &impl Registry,
+    deposit: &Deposit,
+    block_constants: &BlockConstants,
+    transaction_hash: [u8; TRANSACTION_HASH_SIZE],
+    tracer_input: Option<TracerInput>,
+    spec_id: &SpecId,
+    limits: &EvmLimits,
+) -> Result<ExecutionResult<RuntimeTransactionResult>, crate::Error>
+where
+    Host: StorageV1,
+{
+    match &deposit.receiver {
+        DepositReceiver::Ethereum(_) => {
+            let execution_outcome = pure_xtz_deposit(
+                host,
+                registry,
+                deposit,
+                block_constants,
+                transaction_hash,
+                limits.maximum_gas_limit,
+                spec_id,
+                tracer_input,
+            )?;
+
+            // A specific address is allocated for queue call
+            // System address can only be used as caller for simulations
+            let transaction_result =
+                RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
+                    caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
+                    execution_outcome,
+                    crac_receipts: vec![],
+                });
+
+            Ok(ExecutionResult::Valid(transaction_result))
         }
-    };
+        DepositReceiver::Tezos(Contract::Implicit(pkh)) => {
+            let amount = mutez_from_wei(deposit.amount)
+                .map_err(|_| crate::Error::InvalidConversion)?;
 
-    let outcome = ExecutionOutcome {
-        result,
-        withdrawals: vec![],
-    };
+            let receiver = Contract::Implicit(pkh.clone());
+            let content = TransferContent {
+                amount: amount.into(),
+                destination: receiver.clone(),
+                parameters: Parameters::default(),
+            };
 
-    Ok(DepositResult {
-        outcome,
-        estimated_ticks_used: TICKS_FOR_DEPOSIT,
-    })
+            let source = tezos_crypto_rs::public_key_hash::PublicKeyHash::nom_read_exact(
+                &TEZLINK_DEPOSITOR[1..],
+            )
+            .map_err(|_| crate::Error::InvalidConversion)?;
+            let dummy_signature =
+                tezos_crypto_rs::hash::UnknownSignature::nom_read_exact(&[0u8; 64])
+                    .map_err(|_| crate::Error::InvalidConversion)?;
+
+            let depositor = Contract::Implicit(source.clone());
+
+            let (result, internal_operation_results) =
+                match TezosRuntime::add_balance(host, pkh, U256::from(amount)) {
+                    Ok(()) => {
+                        let event = build_deposit_event(
+                            depositor.clone(),
+                            deposit.inbox_level,
+                            deposit.inbox_msg_id,
+                        )?;
+                        let success = TransferSuccess {
+                            balance_updates: BalanceUpdate::transfer(
+                                depositor, receiver, amount,
+                            ),
+                            ..TransferSuccess::default()
+                        };
+                        (
+                            ContentResult::Applied(TransferTarget::ToContrat(success)),
+                            vec![event],
+                        )
+                    }
+                    Err(err) => {
+                        log!(Info, "Deposit failed because of {err}");
+                        (
+                            ContentResult::Failed(ApplyOperationErrors {
+                                errors: vec![],
+                            }),
+                            vec![],
+                        )
+                    }
+                };
+
+            let applied_operation = AppliedOperation {
+                hash: transaction_hash.into(),
+                branch: BlockHash::from([0u8; BlockHash::SIZE]),
+                op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                    OperationBatchWithMetadata {
+                        operations: vec![OperationWithMetadata {
+                            content: ManagerOperationContent::Transaction(
+                                ManagerOperation {
+                                    source,
+                                    fee: 0.into(),
+                                    counter: 0.into(),
+                                    gas_limit: 0.into(),
+                                    storage_limit: 0.into(),
+                                    operation: content,
+                                },
+                            ),
+                            receipt: OperationResultSum::Transfer(OperationResult {
+                                balance_updates: vec![],
+                                result,
+                                internal_operation_results,
+                            }),
+                        }],
+                        signature: dummy_signature,
+                    },
+                ),
+            };
+
+            Ok(ExecutionResult::Valid(RuntimeTransactionResult::Tezos {
+                op: applied_operation,
+                etherlink_withdrawals: vec![],
+                cross_runtime_effects: vec![],
+                // Deposits bypass the Michelson interpreter — no gas consumed.
+                consumed_milligas: 0,
+            }))
+        }
+        DepositReceiver::Tezos(Contract::Originated(kt1)) => Err(
+            crate::Error::BridgeError(format!("Invalid deposit receiver: {kt1}")),
+        ),
+    }
 }
 
 pub const TEZLINK_DEPOSITOR: [u8; 22] = [0u8; 22];
 
-fn tezlink_deposit<Host: Runtime>(
+fn tezlink_deposit<Host, C: Context>(
     host: &mut Host,
-    context: &Context,
+    context: &C,
     amount: u64,
     receiver: Contract,
-) -> Result<TransferSuccess, TransferError> {
-    let to_account = TezlinkImplicitAccount::from_contract(context, &receiver)
+) -> Result<TransferSuccess, TransferError>
+where
+    Host: StorageV1,
+{
+    let to_account = context
+        .implicit_from_contract(&receiver)
         .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+
+    let _was_allocated = to_account
+        .allocate(host)
+        .map_err(|_| TransferError::FailedToAllocateDestination)?;
 
     match to_account.add_balance(host, amount) {
         Ok(()) => {
             let mut success = TransferSuccess::default();
-            let depositor = Contract::nom_read_exact(&TEZLINK_DEPOSITOR)
-                .map_err(|e| TransferError::DepositError(format!("{e:?}")))?;
+            let depositor = Contract::nom_read_exact(&TEZLINK_DEPOSITOR).unwrap();
             let balance_updates = BalanceUpdate::transfer(depositor, receiver, amount);
             success.balance_updates = balance_updates;
             Ok(success)
         }
         Err(e) => {
-            log!(host, Error, "Deposit failed because of {e}");
+            log!(Error, "Deposit failed because of {e}");
             Err(TransferError::DepositError(e.to_string()))
         }
     }
@@ -446,11 +628,14 @@ fn tezlink_deposit<Host: Runtime>(
 
 type TezlinkOutcome = (ContentResult<TransferContent>, TransferContent);
 
-pub fn execute_tezlink_deposit<Host: Runtime>(
+pub fn execute_tezlink_deposit<Host, C: Context>(
     host: &mut Host,
-    context: &Context,
+    context: &C,
     deposit: &Deposit,
-) -> Result<DepositResult<TezlinkOutcome>, BridgeError> {
+) -> Result<DepositResult<TezlinkOutcome>, BridgeError>
+where
+    Host: StorageV1,
+{
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
     let receiver = deposit.receiver.to_contract()?;
@@ -461,7 +646,7 @@ pub fn execute_tezlink_deposit<Host: Runtime>(
     let content = TransferContent {
         amount: amount.into(),
         destination: receiver.clone(),
-        parameters: None,
+        parameters: Parameters::default(),
     };
 
     let result = match tezlink_deposit(host, context, amount, receiver) {
@@ -473,7 +658,7 @@ pub fn execute_tezlink_deposit<Host: Runtime>(
 
     let result = DepositResult {
         outcome: (result, content),
-        estimated_ticks_used: TICKS_FOR_DEPOSIT,
+        runtime: RuntimeId::Tezos,
     };
 
     Ok(result)
@@ -481,12 +666,19 @@ pub fn execute_tezlink_deposit<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
+    use crate::registry_impl::RegistryImpl;
     use alloy_sol_types::SolEvent;
     use num_bigint::BigInt;
     use primitive_types::{H160, U256};
+    use revm::primitives::hardfork::SpecId;
+    use revm_etherlink::precompiles::initializer::init_precompile_bytecodes;
     use rlp::{Decodable, RlpStream};
     use tezos_crypto_rs::hash::ContractKt1Hash;
-    use tezos_ethereum::rlp_helpers::{append_option_explicit, append_u256_le};
+    use tezos_ethereum::{
+        block::{BlockConstants, BlockFees},
+        rlp_helpers::{append_option_explicit, append_u256_le},
+        transaction::TRANSACTION_HASH_SIZE,
+    };
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::michelson::{
@@ -494,13 +686,15 @@ mod tests {
     };
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
 
-    use crate::bridge::{
-        DepositInfo, DepositReceiver, DepositResult, DEPOSIT_EVENT_TOPIC,
+    use crate::{
+        apply::{EthereumTransactionResult, ExecutionResult, RuntimeTransactionResult},
+        bridge::{DepositInfo, DepositReceiver, DEPOSIT_EVENT_TOPIC},
+        chains::EvmLimits,
     };
 
-    use super::{execute_etherlink_deposit, Deposit};
+    use super::{apply_tezosx_xtz_deposit, Deposit};
 
-    mod events {
+    mod xtz_events {
         alloy_sol_types::sol! {
             event Deposit (
                 uint256 amount,
@@ -537,7 +731,7 @@ mod tests {
 
     #[test]
     fn deposit_event_topic() {
-        assert_eq!(events::Deposit::SIGNATURE_HASH.0, DEPOSIT_EVENT_TOPIC);
+        assert_eq!(xtz_events::Deposit::SIGNATURE_HASH.0, DEPOSIT_EVENT_TOPIC);
     }
 
     #[test]
@@ -696,16 +890,48 @@ mod tests {
     #[test]
     fn deposit_execution_outcome_contains_event() {
         let mut host = MockKernelHost::default();
+        let registry = &RegistryImpl::default();
+        init_precompile_bytecodes(&mut host, true).unwrap();
 
         let deposit = dummy_deposit();
 
-        let DepositResult { outcome, .. } =
-            execute_etherlink_deposit(&mut host, &deposit).unwrap();
+        let limits = EvmLimits::default();
+        let execution_result = apply_tezosx_xtz_deposit(
+            &mut host,
+            registry,
+            &deposit,
+            &BlockConstants::first_block(
+                U256::zero(),
+                U256::zero(),
+                BlockFees::new(
+                    limits.minimum_base_fee_per_gas,
+                    U256::zero(),
+                    U256::zero(),
+                ),
+                limits.maximum_gas_limit,
+                H160::zero(),
+            ),
+            [0; TRANSACTION_HASH_SIZE],
+            None,
+            &SpecId::default(),
+            &limits,
+        )
+        .unwrap();
+        let outcome = if let ExecutionResult::Valid(RuntimeTransactionResult::Ethereum(
+            EthereumTransactionResult {
+                execution_outcome, ..
+            },
+        )) = execution_result
+        {
+            execution_outcome
+        } else {
+            panic!("Deposit is invalid")
+        };
         let logs = outcome.result.logs();
         assert!(outcome.result.is_success());
         assert_eq!(logs.len(), 1);
 
-        let event = events::Deposit::decode_log_data(&logs[0].data).unwrap();
+        let event = xtz_events::Deposit::decode_log_data(&logs[0].data).unwrap();
         assert_eq!(event.amount, alloy_primitives::U256::from(1));
         assert_eq!(
             event.receiver,
@@ -718,16 +944,77 @@ mod tests {
     #[test]
     fn deposit_execution_fails_due_to_balance_overflow() {
         let mut host = MockKernelHost::default();
+        let registry = &RegistryImpl::default();
+        init_precompile_bytecodes(&mut host, true).unwrap();
 
         let mut deposit = dummy_deposit();
         deposit.amount = U256::MAX;
 
-        let DepositResult { outcome, .. } =
-            execute_etherlink_deposit(&mut host, &deposit).unwrap();
+        let limits = EvmLimits::default();
+        let execution_result = apply_tezosx_xtz_deposit(
+            &mut host,
+            registry,
+            &deposit,
+            &BlockConstants::first_block(
+                U256::zero(),
+                U256::zero(),
+                BlockFees::new(
+                    limits.minimum_base_fee_per_gas,
+                    U256::zero(),
+                    U256::zero(),
+                ),
+                limits.maximum_gas_limit,
+                H160::zero(),
+            ),
+            [0; TRANSACTION_HASH_SIZE],
+            None,
+            &SpecId::default(),
+            &limits,
+        )
+        .unwrap();
+        let outcome = if let ExecutionResult::Valid(RuntimeTransactionResult::Ethereum(
+            EthereumTransactionResult {
+                execution_outcome, ..
+            },
+        )) = execution_result
+        {
+            execution_outcome
+        } else {
+            panic!("Deposit is invalid")
+        };
         assert!(outcome.result.is_success());
 
-        let DepositResult { outcome, .. } =
-            execute_etherlink_deposit(&mut host, &deposit).unwrap();
+        let execution_result = apply_tezosx_xtz_deposit(
+            &mut host,
+            registry,
+            &deposit,
+            &BlockConstants::first_block(
+                U256::zero(),
+                U256::zero(),
+                BlockFees::new(
+                    limits.minimum_base_fee_per_gas,
+                    U256::zero(),
+                    U256::zero(),
+                ),
+                limits.maximum_gas_limit,
+                H160::zero(),
+            ),
+            [0; TRANSACTION_HASH_SIZE],
+            None,
+            &SpecId::default(),
+            &limits,
+        )
+        .unwrap();
+        let outcome = if let ExecutionResult::Valid(RuntimeTransactionResult::Ethereum(
+            EthereumTransactionResult {
+                execution_outcome, ..
+            },
+        )) = execution_result
+        {
+            execution_outcome
+        } else {
+            panic!("Deposit is invalid")
+        };
         assert!(!outcome.result.is_success());
         assert!(outcome.result.logs().is_empty());
     }

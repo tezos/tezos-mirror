@@ -43,6 +43,12 @@ module type S = sig
 
   val load_bytes : memory -> address -> int -> string Lwt.t (* raises Bounds *)
 
+  (** [load_bytes_to_bytes mem addr n] is [load_bytes mem addr n] but
+      returns a fresh [bytes] without going through an intermediate
+      [string], saving one copy on the hot read path. *)
+  val load_bytes_to_bytes :
+    memory -> address -> int -> bytes Lwt.t (* raises Bounds *)
+
   val store_bytes :
     memory -> address -> string -> unit Lwt.t (* raises Bounds *)
 

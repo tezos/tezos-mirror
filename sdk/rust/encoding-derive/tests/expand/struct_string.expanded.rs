@@ -9,8 +9,7 @@ impl tezos_data_encoding::encoding::HasEncoding for StructString {
         tezos_data_encoding::encoding::Encoding::Obj(
             "StructString",
             <[_]>::into_vec(
-                #[rustc_box]
-                ::alloc::boxed::Box::new([
+                ::alloc::boxed::box_new([
                     tezos_data_encoding::encoding::Field::new(
                         "a",
                         tezos_data_encoding::encoding::Encoding::String,

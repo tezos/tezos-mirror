@@ -9,11 +9,15 @@
 use super::{Runtime, RuntimeError, ValueType};
 #[cfg(feature = "alloc")]
 use crate::input::Message;
+use crate::reveal::HostReveal;
+use crate::storage::StorageV1;
+use crate::wasm::WasmHost;
 use crate::{dal_parameters::RollupDalParameters, metadata::RollupMetadata, path::Path};
 use alloc::rc::Rc;
 use core::panic::{RefUnwindSafe, UnwindSafe};
 use std::sync::RwLock;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_core::STORE_HASH_SIZE;
 
 extern crate alloc;
 extern crate std;
@@ -54,12 +58,9 @@ impl<R> UnwindableRuntime<R> {
 
     /// Write a debug message. This won't panic if the runtime wrapper is poisoned.
     #[inline]
-    pub fn unreliably_write_debug(&self, msg: &str)
-    where
-        R: Runtime,
-    {
-        if let Ok(runtime) = self.runtime.read() {
-            runtime.write_debug(msg);
+    pub fn unreliably_write_debug(&self, msg: &str) {
+        if !self.runtime.is_poisoned() {
+            std::eprint!("{msg}");
         }
     }
 }
@@ -68,20 +69,44 @@ impl<R> UnwindSafe for UnwindableRuntime<R> {}
 
 impl<R> RefUnwindSafe for UnwindableRuntime<R> {}
 
-impl<R: Runtime> Runtime for UnwindableRuntime<R> {
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.runtime.write().unwrap().write_output(from)
+impl<R: HostReveal> HostReveal for UnwindableRuntime<R> {
+    fn reveal_metadata(&self) -> RollupMetadata {
+        self.runtime.read().unwrap().reveal_metadata()
     }
 
-    fn write_debug(&self, msg: &str) {
-        self.runtime.read().unwrap().write_debug(msg)
+    fn reveal_preimage(
+        &self,
+        hash: &[u8; PREIMAGE_HASH_SIZE],
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.runtime
+            .read()
+            .unwrap()
+            .reveal_preimage(hash, destination)
     }
 
     #[cfg(feature = "alloc")]
-    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        self.runtime.write().unwrap().read_input()
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.runtime.read().unwrap().reveal_dal_page(
+            published_level,
+            slot_index,
+            page_index,
+            destination,
+        )
     }
 
+    fn reveal_dal_parameters(&self) -> RollupDalParameters {
+        self.runtime.read().unwrap().reveal_dal_parameters()
+    }
+}
+
+impl<R: StorageV1> StorageV1 for UnwindableRuntime<R> {
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         self.runtime.read().unwrap().store_has(path)
     }
@@ -164,47 +189,30 @@ impl<R: Runtime> Runtime for UnwindableRuntime<R> {
         self.runtime.write().unwrap().store_copy(from_path, to_path)
     }
 
-    fn reveal_preimage(
-        &self,
-        hash: &[u8; PREIMAGE_HASH_SIZE],
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.runtime
-            .read()
-            .unwrap()
-            .reveal_preimage(hash, destination)
-    }
-
-    #[cfg(feature = "alloc")]
-    fn reveal_dal_page(
-        &self,
-        published_level: i32,
-        slot_index: u8,
-        page_index: i16,
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.runtime.read().unwrap().reveal_dal_page(
-            published_level,
-            slot_index,
-            page_index,
-            destination,
-        )
-    }
-
-    fn reveal_dal_parameters(&self) -> RollupDalParameters {
-        self.runtime.read().unwrap().reveal_dal_parameters()
-    }
-
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
         self.runtime.read().unwrap().store_value_size(path)
     }
 
-    fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
-        self.runtime.write().unwrap().mark_for_reboot()
+    fn store_get_hash(
+        &self,
+        path: &impl Path,
+    ) -> Result<[u8; STORE_HASH_SIZE], RuntimeError> {
+        self.runtime.read().unwrap().store_get_hash(path)
+    }
+}
+
+impl<R: WasmHost> WasmHost for UnwindableRuntime<R> {
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.runtime.write().unwrap().write_output(from)
     }
 
-    fn reveal_metadata(&self) -> RollupMetadata {
-        self.runtime.read().unwrap().reveal_metadata()
+    #[cfg(feature = "alloc")]
+    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
+        self.runtime.write().unwrap().read_input()
+    }
+
+    fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
+        self.runtime.write().unwrap().mark_for_reboot()
     }
 
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
@@ -228,3 +236,5 @@ impl<R: Runtime> Runtime for UnwindableRuntime<R> {
         self.runtime.read().unwrap().runtime_version()
     }
 }
+
+impl<R: Runtime> Runtime for UnwindableRuntime<R> {}

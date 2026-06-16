@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -e
+set -ex
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
@@ -25,6 +25,7 @@ rust_toolchain_image_name="us-central1-docker.pkg.dev/nl-gitlab-runner/protected
 rust_toolchain_image_tag="master"
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
+sccache_bucket=""
 
 # usage and help
 usage() {
@@ -42,6 +43,7 @@ Usage:  $(basename "$0") [-h|--help]
   [--commit-short-sha <COMMIT_SHA> ]
   [--commit-datetime <DATETIME> ]
   [--commit-tag <COMMIT_TAG> ]
+  [--sccache-bucket <BUCKET> ]
 
 DESCRIPTION
     Builds the Octez Docker distribution.
@@ -125,6 +127,12 @@ OPTIONS
         --commit-tag COMMIT_TAG
             Git tags for the Octez version string.
 
+    Compilation cache
+        --sccache-bucket BUCKET
+            GCS bucket for sccache Rust compilation caching. When set,
+            RUSTC_WRAPPER=sccache is activated in build.Dockerfile,
+            caching Rust artifacts in GCS across builds.
+
 CURRENT VALUES
     IMAGE_NAME: $image_name
     IMAGE_VERSION: $image_version
@@ -138,6 +146,7 @@ CURRENT VALUES
     COMMIT_SHORT_SHA: $commit_short_sha
     COMMIT_DATETIME: $commit_datetime
     COMMIT_TAG: $commit_tag
+    SCCACHE_BUCKET: $sccache_bucket
 
 SEE ALSO
     For more information, see 'images/README.md' and
@@ -146,7 +155,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,ci-image-name:,ci-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image-name:,rust-toolchain-image-tag:,commit-datetime:,commit-tag: -- "$@")
+  -l help,image-name:,image-version:,ci-image-name:,ci-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image-name:,rust-toolchain-image-tag:,commit-datetime:,commit-tag:,sccache-bucket: -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -209,6 +218,10 @@ while true; do
     shift
     commit_tag="$1"
     ;;
+  --sccache-bucket)
+    shift
+    sccache_bucket="$1"
+    ;;
   -h | --help)
     usage
     exit 1
@@ -248,17 +261,29 @@ if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
     echo "Failed to pull CI image $image_test."
     echo "If you have modified any inputs to the CI images, then you have to rebuild them locally through ./images/create_ci_images.sh."
     exit 1
+  else
+    echo "Pull of $image_test succeeded"
   fi
 fi
 
+# ${BASE_IMAGE}/${BASE_IMAGE_VERSION} is the CI image that is built on master
+# using the latest tag from ./images/image_tag.sh images/ci  that corresponds
+# to the state of the repo specified in version.sh .
+#
+# $GIT_SHORTREF / $GIT_DATETIME / $GIT_VERSION are used by libversion to assign
+# the correct version to the octez binaries at compile time
+#
+# ${RUST_TOOLCHAIN_IMAGE_NAME}:${RUST_TOOLCHAIN_IMAGE_TAG} is the master image
+# to build L2 binaries.
+#
+# [--allow network.host] is unconditional even though it is only
+# needed for [sccache]. Indeed build.Dockerfile has [RUN
+# --network=host]. Cf. also the matching comment in build.Dockerfile
+# for more details.
+#
 echo "### Building tezos..."
 
-docker build \
-  --network host \
-  -t "$build_image_name:$image_version" \
-  -f build.Dockerfile \
-  --target "$docker_target" \
-  --cache-from "$build_image_name:$image_version" \
+docker buildx build \
   --build-arg "BASE_IMAGE=$ci_image_name" \
   --build-arg "BASE_IMAGE_VERSION=build:$ci_image_version" \
   --build-arg "OCTEZ_EXECUTABLES=${executables}" \
@@ -267,6 +292,11 @@ docker build \
   --build-arg "GIT_VERSION=${commit_tag}" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_NAME=$rust_toolchain_image_name" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_TAG=$rust_toolchain_image_tag" \
+  ${sccache_bucket:+--build-arg "SCCACHE_GCS_BUCKET=${sccache_bucket}"} \
+  --allow network.host \
+  --target "$docker_target" \
+  --tag "$build_image_name:$image_version" \
+  -f build.Dockerfile \
   "$src_dir"
 
 echo "### Successfully built docker image: $build_image_name:$image_version"
@@ -274,48 +304,60 @@ echo "### Successfully built docker image: $build_image_name:$image_version"
 for variant in $variants; do
   case "$variant" in
   debug)
-    docker build \
-      --network host \
-      -t "${image_name}debug:$image_version" \
+    docker buildx build \
       --build-arg "BASE_IMAGE=$ci_image_name" \
       --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
       --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
+      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
+      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
+      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
+      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
       --target=debug \
+      --tag "${image_name}debug:$image_version" \
       "$src_dir"
 
     echo "### Successfully built docker image: ${image_name}debug:$image_version"
     ;;
 
   bare)
-    docker build \
-      --network host \
-      -t "${image_name}bare:$image_version" \
+    docker buildx build \
       --build-arg "BASE_IMAGE=$ci_image_name" \
       --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
       --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
+      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
+      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
+      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
+      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
       --target=bare \
+      --tag "${image_name}bare:$image_version" \
       "$src_dir"
 
     echo "### Successfully built docker image: ${image_name}bare:$image_version"
     ;;
 
   minimal)
-    docker build \
-      --network host \
-      -t "${image_name%?}:$image_version" \
+    docker buildx build \
       --build-arg "BASE_IMAGE=$ci_image_name" \
       --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
       --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
+      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
+      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
+      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
+      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
       --target=minimal \
+      --tag "${image_name%?}:$image_version" \
       "$src_dir"
 
     echo "### Successfully built docker image: ${image_name%?}:$image_version"

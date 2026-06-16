@@ -46,7 +46,7 @@ val isolated_args : private_mode:bool -> string list -> Node.argument list
 val may_add_migration_offset_to_config :
   Node.t ->
   string ->
-  migration_offset:int option ->
+  migration_offset:Protocol_migration.offset option ->
   network:Network.t ->
   unit Lwt.t
 
@@ -56,7 +56,7 @@ val init :
   ?identity_file:string ->
   ?dal_config:Tezos_crypto_dal_octez_dal_config.Dal_config.t ->
   ?env:string String_map.t ->
-  ?migration_offset:int ->
+  ?migration_offset:Protocol_migration.offset ->
   rpc_external:bool ->
   name:string ->
   Network.t ->

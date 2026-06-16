@@ -33,10 +33,36 @@ The script lists the assets by reading the contents of directories in
 
 Currently, the release page uses S3 buckets for asset storage.
 
-As mentioned in the usage documentation , you should use the `--bucket BUCKET` and `--path PATH` arguments to specify the bucket and path where the release page assets are stored. `BUCKET` is the address of the bucket, and `PATH` is the location within the bucket where the assets are kept.
+As mentioned in the usage documentation, you should use the `--bucket BUCKET` and `--path PATH` arguments to specify the bucket and path where the release page assets are stored. `BUCKET` is the address of the bucket, and `PATH` is the location within the bucket where the assets are kept.
 The `PATH` argument is optional; if not provided, the root of the bucket will be used.
 
-The script makes the following assumptions:
+The `version_manager` tool operates on a local `versions.json` file specified by `--file`. To interact with remote storage, use the `download` and `upload` subcommands with `--path`:
+
+```shell
+# Download versions.json from remote storage
+version_manager --file versions.json download --path BUCKET/PATH
+
+# Operate on local file (no remote access needed)
+version_manager --file versions.json add --major 25 --minor 0
+version_manager --file versions.json set-latest --major 25 --minor 0
+
+# Upload versions.json back to remote storage
+version_manager --file versions.json upload --path BUCKET/PATH
+```
+
+### RSS Feed
+
+The `version_manager` tool can generate an RSS feed for the releases:
+
+```shell
+version_manager --file versions.json generate-rss --path octez.tezos.com/releases --output feed.xml
+```
+
+- `--path PATH` (required): used to construct the default feed link (`https://PATH`) unless `--base-url` is provided.
+- `--base-url URL` (optional): overrides the base URL used for feed links.
+- `--output FILE` (optional): path to write the RSS feed to. Defaults to `feed.xml` in the current directory.
+
+The `release_page` script makes the following assumptions:
 
   - Each component `COMPONENT` has a base path of `BUCKET/PATH/COMPONENT`, which we refer to as `COMPONENT_LOCATION`.
     The only exception is component `octez`, for which the base path is `BUCKET/PATH`.
@@ -88,8 +114,20 @@ This file is a JSON file with the following schema:
       "major": { "type": "integer" },
       "minor": { "type": "integer" },
       "rc": { "type": "integer" },
+      "revisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "buildNumber": { "type": "integer" },
+            "revisionDate": { "type": "number" }
+          },
+          "required": ["buildNumber", "revisionDate"]
+        }
+      },
       "latest": { "type": "boolean" },
-      "announcement": { "type": "string" }
+      "announcement": { "type": "string" },
+      "pubDate": { "type": "number" }
     },
     "required": ["major", "minor"]
   }
@@ -98,6 +136,10 @@ This file is a JSON file with the following schema:
 
 Each item of the array represents a version `<major>.<minor>[~rc]`.
 If `latest` is `true`, the version will be identified as "latest" in the generated page, for instance by appending "(latest)" to its section title. Only one version should be identified as latest, although this is not enforced by the script.
+
+The `revisions` field is an optional array that tracks packaging revisions. Each time a packaging revision tag (e.g. `octez-v20.0-1`, `octez-v20.0-2`) is processed, a new entry is appended with the revision's `buildNumber` and `revisionDate`. This preserves the full history of packaging revisions. The version string and S3 paths are not affected. The RSS feed generates a distinct entry for each revision alongside the original release entry.
+
+For backward compatibility, the parser also accepts the legacy flat fields `buildNumber` (integer) and `revisionDate` (number) and converts them into a single-element `revisions` list.
 
 For instance, a valid JSON would look like:
 
@@ -118,6 +160,10 @@ For instance, a valid JSON would look like:
     "major": 23,
     "minor": 0,
     "latest": true,
+    "revisions": [
+      { "buildNumber": 1, "revisionDate": 1740000000.0 },
+      { "buildNumber": 2, "revisionDate": 1741000000.0 }
+    ],
     "announcement": "https://octez.tezos.com/docs/releases/version-23.html"
   }
 ]

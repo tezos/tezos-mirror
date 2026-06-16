@@ -1,0 +1,9 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_ml_dsa)
+ (public_name octez-ml-dsa)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libcrux-ml-dsa))

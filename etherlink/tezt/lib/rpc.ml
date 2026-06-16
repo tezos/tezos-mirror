@@ -92,6 +92,16 @@ module Request = struct
     let parameters = `O (with_delayed_transactions @ timestamp) in
     {method_ = "produceBlock"; parameters}
 
+  let proposeNextBlockTimestamp ~timestamp =
+    let parameters = `String timestamp in
+    {method_ = "proposeNextBlockTimestamp"; parameters}
+
+  let lockBlockProduction =
+    {method_ = "lockBlockProduction"; parameters = `O []}
+
+  let unlockBlockProduction =
+    {method_ = "unlockBlockProduction"; parameters = `O []}
+
   let stateValue ?block path =
     let parameters =
       match block with
@@ -117,12 +127,14 @@ module Request = struct
   let eth_sendRawTransaction ~raw_tx =
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
 
-  let eth_sendRawTransactionSync ~raw_tx ~timeout ~block =
-    {
-      method_ = "eth_sendRawTransactionSync";
-      parameters =
-        `A [`String raw_tx; `String timeout; block_param_to_json block];
-    }
+  let eth_sendRawTransactionSync ~raw_tx ?timeout ~block () =
+    let parameters =
+      `A
+        ([`String raw_tx]
+        @ Option.(to_list (map Ezjsonm.string timeout))
+        @ [block_param_to_json block])
+    in
+    {method_ = "eth_sendRawTransactionSync"; parameters}
 
   let eth_getTransactionReceipt ~tx_hash =
     {method_ = "eth_getTransactionReceipt"; parameters = `A [`String tx_hash]}
@@ -167,9 +179,24 @@ module Request = struct
 
   let net_version = {method_ = "net_version"; parameters = `A []}
 
-  let tez_kernelVersion = {method_ = "tez_kernelVersion"; parameters = `Null}
+  let tez_kernelVersion ?block () =
+    let parameters =
+      match block with
+      | None -> `Null
+      | Some block -> `A [block_param_to_json block]
+    in
+    {method_ = "tez_kernelVersion"; parameters}
 
-  let tez_kernelRootHash = {method_ = "tez_kernelRootHash"; parameters = `Null}
+  let tez_kernelRootHash ?block () =
+    let parameters =
+      match block with
+      | None -> `Null
+      | Some block -> `A [block_param_to_json block]
+    in
+    {method_ = "tez_kernelRootHash"; parameters}
+
+  let tez_getMichelsonActivationLevel =
+    {method_ = "tez_getMichelsonActivationLevel"; parameters = `Null}
 
   let eth_call ~block ~to_ ~data =
     {
@@ -345,6 +372,67 @@ module Request = struct
         ]
     in
     {method_ = "eth_getLogs"; parameters}
+
+  let tez_getTezosEthereumAddress tezos_address =
+    {
+      method_ = "tez_getTezosEthereumAddress";
+      parameters = `A [`String tezos_address];
+    }
+
+  let tez_getEthereumTezosAddress ethereum_address =
+    {
+      method_ = "tez_getEthereumTezosAddress";
+      parameters = `A [`String ethereum_address];
+    }
+
+  let http_traceCall_evm ~to_ ~data ?gas ?block () =
+    let call =
+      let fields = [("to", `String to_); ("data", `String data)] in
+      let fields =
+        match gas with Some g -> ("gas", `String g) :: fields | None -> fields
+      in
+      `O fields
+    in
+    let block =
+      match block with Some b -> `String b | None -> `String "latest"
+    in
+    let input =
+      `O [("type", `String "evm"); ("call", call); ("block", block)]
+    in
+    {method_ = "http_traceCall"; parameters = `A [input]}
+
+  let http_traceCall_michelson ~operation ?skip_signature ?block () =
+    let skip_sig =
+      match skip_signature with Some b -> `Bool b | None -> `Bool true
+    in
+    let block =
+      match block with Some b -> `String b | None -> `String "latest"
+    in
+    let input =
+      `O
+        [
+          ("type", `String "michelson");
+          ("operation", `String operation);
+          ("skipSignatureCheck", skip_sig);
+          ("block", block);
+        ]
+    in
+    {method_ = "http_traceCall"; parameters = `A [input]}
+
+  let http_traceTransaction ~tx_hash =
+    {method_ = "http_traceTransaction"; parameters = `A [`String tx_hash]}
+
+  let http_traceBlockByNumber ~block =
+    {method_ = "http_traceBlockByNumber"; parameters = `A [`String block]}
+
+  let http_traceBlockByHash ~block_hash =
+    {method_ = "http_traceBlockByHash"; parameters = `A [`String block_hash]}
+
+  let tez_getMetaBlockByNumber ~block =
+    {method_ = "tez_getMetaBlockByNumber"; parameters = `A [`String block]}
+
+  let tez_getMetaBlockByHash ~hash =
+    {method_ = "tez_getMetaBlockByHash"; parameters = `A [`String hash]}
 end
 
 let net_version ?websocket evm_node =
@@ -520,6 +608,51 @@ let produce_block ?websocket ?with_delayed_transactions ?timestamp evm_node =
        (fun json -> Evm_node.extract_result json |> JSON.as_int)
        json
 
+let propose_next_block_timestamp ?websocket ~timestamp evm_node =
+  let* json =
+    Evm_node.jsonrpc
+      ?websocket
+      ~private_:true
+      evm_node
+      (Request.proposeNextBlockTimestamp ~timestamp)
+  in
+  return
+  @@ decode_or_error
+       (fun json ->
+         Evm_node.extract_result json |> fun json ->
+         if JSON.is_null json then () else ())
+       json
+
+let lock_block_production ?websocket evm_node =
+  let* json =
+    Evm_node.jsonrpc
+      ?websocket
+      ~private_:true
+      evm_node
+      Request.lockBlockProduction
+  in
+  return
+  @@ decode_or_error
+       (fun json ->
+         Evm_node.extract_result json |> fun json ->
+         if JSON.is_null json then () else ())
+       json
+
+let unlock_block_production ?websocket evm_node =
+  let* json =
+    Evm_node.jsonrpc
+      ?websocket
+      ~private_:true
+      evm_node
+      Request.unlockBlockProduction
+  in
+  return
+  @@ decode_or_error
+       (fun json ->
+         Evm_node.extract_result json |> fun json ->
+         if JSON.is_null json then () else ())
+       json
+
 let produce_proposal ?websocket ?timestamp evm_node =
   let* json =
     Evm_node.jsonrpc
@@ -585,7 +718,8 @@ let eth_send_raw_transaction_sync ?websocket ~raw_tx ?(timeout = 0)
       (Request.eth_sendRawTransactionSync
          ~raw_tx
          ~timeout:(string_of_int timeout)
-         ~block)
+         ~block
+         ())
   in
   return
   @@ decode_or_error
@@ -655,22 +789,33 @@ let get_transaction_count ?websocket ?(block = "latest") ~address evm_node =
        (fun response -> Evm_node.extract_result response |> JSON.as_int64)
        response
 
-let tez_kernelVersion ?websocket evm_node =
+let tez_kernelVersion ?websocket ?block evm_node =
   let* response =
-    Evm_node.jsonrpc ?websocket evm_node Request.tez_kernelVersion
+    Evm_node.jsonrpc ?websocket evm_node (Request.tez_kernelVersion ?block ())
   in
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response
 
-let tez_kernelRootHash ?websocket evm_node =
+let tez_kernelRootHash ?websocket ?block evm_node =
   let* response =
-    Evm_node.jsonrpc ?websocket evm_node Request.tez_kernelRootHash
+    Evm_node.jsonrpc ?websocket evm_node (Request.tez_kernelRootHash ?block ())
   in
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string_opt)
+       response
+
+let tez_getMichelsonActivationLevel ?websocket evm_node =
+  let* response =
+    Evm_node.jsonrpc ?websocket evm_node Request.tez_getMichelsonActivationLevel
+  in
+  return
+  @@ decode_or_error
+       (fun response ->
+         Evm_node.extract_result response
+         |> JSON.as_opt |> Option.map JSON.as_int64)
        response
 
 let call ?websocket ~to_ ~data ?(block = Latest) evm_node =
@@ -825,3 +970,99 @@ let coinbase ?websocket evm_node =
 
 let configuration evm_node =
   Curl.get (Evm_node.endpoint evm_node ^ "/configuration") |> Runnable.run
+
+let metrics evm_node =
+  Curl.get_raw (Evm_node.endpoint evm_node ^ "/metrics") |> Runnable.run
+
+module Tezosx = struct
+  let tez_getTezosEthereumAddress ?websocket tezos_address evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.tez_getTezosEthereumAddress tezos_address)
+    in
+    let decode_result response = JSON.(response |-> "result" |> as_string) in
+    return @@ decode_or_error decode_result response
+
+  let tez_getEthereumTezosAddress ?websocket ethereum_address evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.tez_getEthereumTezosAddress ethereum_address)
+    in
+    let decode_result response = JSON.(response |-> "result" |> as_string) in
+    return @@ decode_or_error decode_result response
+
+  let http_traceCall_evm ?websocket ~to_ ~data ?gas ?block evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.http_traceCall_evm ~to_ ~data ?gas ?block ())
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let http_traceCall_michelson ?websocket ~operation ?skip_signature ?block
+      evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.http_traceCall_michelson ~operation ?skip_signature ?block ())
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let http_traceTransaction ?websocket ~tx_hash evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.http_traceTransaction ~tx_hash)
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let http_traceBlockByNumber ?websocket ~block evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.http_traceBlockByNumber ~block)
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let http_traceBlockByHash ?websocket ~block_hash evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.http_traceBlockByHash ~block_hash)
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let tez_getMetaBlockByNumber ?websocket ~block evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.tez_getMetaBlockByNumber ~block)
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let tez_getMetaBlockByHash ?websocket ~hash evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.tez_getMetaBlockByHash ~hash)
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+end

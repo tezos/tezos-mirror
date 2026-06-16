@@ -231,7 +231,7 @@ module Dune = struct
       ?(preprocessor_deps = Stdlib.List.[]) ?(virtual_modules = Stdlib.List.[])
       ?default_implementation ?implements ?modules
       ?modules_without_implementation ?modes
-      ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags
+      ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags_sexp
       ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?wrapped ?enabled_if
       (names : string list) =
     [
@@ -337,7 +337,7 @@ module Dune = struct
               | dirs -> S "include_dirs" :: of_atom_list dirs);
               S "names" :: of_atom_list x.names;
             ] );
-          (opt c_library_flags @@ fun x -> [S "c_library_flags"; of_atom_list x]);
+          (opt c_library_flags_sexp @@ fun x -> [S "c_library_flags"; x]);
           ctypes;
           (opt enabled_if @@ fun enabled_if -> [S "enabled_if"; enabled_if]);
         ];
@@ -1257,6 +1257,7 @@ module Target = struct
     extra_authors : string list;
     ctypes : Ctypes.t option;
     with_macos_security_framework : bool;
+    with_cpp_stdlib : bool;
     product : string;
     dep_files : string list;
     dep_globs : string list;
@@ -1528,6 +1529,7 @@ module Target = struct
     ?license:string ->
     ?extra_authors:string list ->
     ?with_macos_security_framework:bool ->
+    ?with_cpp_stdlib:bool ->
     path:string ->
     ?enabled_if:Dune.s_expr ->
     'a ->
@@ -1548,8 +1550,8 @@ module Target = struct
       ?synopsis ?description ?(time_measurement_ppx = false)
       ?(available : available = Always) ?(virtual_modules = [])
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
-      ?(with_macos_security_framework = false) ?(source = []) ~path ?enabled_if
-      names =
+      ?(with_macos_security_framework = false) ?(with_cpp_stdlib = false)
+      ?(source = []) ~path ?enabled_if names =
     let kind = make_kind names in
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
@@ -1944,6 +1946,7 @@ module Target = struct
         extra_authors;
         ctypes;
         with_macos_security_framework;
+        with_cpp_stdlib;
         tests_deps;
         product;
         dep_files;
@@ -2510,6 +2513,7 @@ module Sub_lib = struct
        ?license
        ?extra_authors
        ?with_macos_security_framework
+       ?with_cpp_stdlib
        ~path
        ?enabled_if
        public_name ->
@@ -2600,6 +2604,7 @@ module Sub_lib = struct
       ?license
       ?extra_authors
       ?with_macos_security_framework
+      ?with_cpp_stdlib
       ?source
       ?enabled_if
 end
@@ -2771,12 +2776,34 @@ let generate_dune (internal : Target.internal) =
         [Dune.[S ":include"; S "%{workspace_root}/macos-link-flags.sexp"]]
       else []
     in
+    let cpp_stdlib_link_flags =
+      if internal.with_cpp_stdlib && not is_lib then
+        [Dune.[S ":include"; S "%{workspace_root}/c++-stdlib-link-flags.sexp"]]
+      else []
+    in
     let linkall_flags = if linkall then [Dune.[S "-linkall"]] else [] in
     List.concat
-      [static_flags; macos_link_flags; linkall_flags; internal.link_flags]
+      [
+        static_flags;
+        macos_link_flags;
+        cpp_stdlib_link_flags;
+        linkall_flags;
+        internal.link_flags;
+      ]
     |> function
     | [] -> None
     | link_flags -> Some (Dune.[S ":standard"] :: link_flags)
+  in
+  let c_library_flags_sexp =
+    if internal.with_cpp_stdlib && is_lib then
+      let include_flag =
+        Dune.[S ":include"; S "%{workspace_root}/c++-stdlib-link-flags.sexp"]
+      in
+      Some
+        (match internal.c_library_flags with
+        | None -> Dune.[include_flag]
+        | Some flags -> Dune.[of_atom_list flags; include_flag])
+    else Option.map Dune.of_atom_list internal.c_library_flags
   in
   let open_flags : Dune.s_expr list =
     internal.opens |> List.map (fun m -> Dune.(H [S "-open"; S m]))
@@ -2964,7 +2991,7 @@ let generate_dune (internal : Target.internal) =
       ?modes:internal.modes
       ?foreign_archives:internal.foreign_archives
       ?foreign_stubs:internal.foreign_stubs
-      ?c_library_flags:internal.c_library_flags
+      ?c_library_flags_sexp
       ?ctypes
       ~private_modules:internal.private_modules
       ?wrapped:internal.wrapped
@@ -3985,77 +4012,6 @@ let ( packages_dir,
     !dep_graph_without,
     !opam_dep_graph )
 
-let generate_opam_ci_input opam_release_graph =
-  (* We only need to test released packages, since those are the only one
-     that will need to pass the public Opam CI. *)
-  let contain_executables package =
-    match String_map.find_opt package opam_release_graph with
-    | None -> false
-    | Some node -> node.contain_executables
-  in
-  let released_packages, unreleased_packages =
-    List.partition
-      (fun (_, node) ->
-        match node.release_status with
-        | Explicitly_unreleased _ | Auto -> false
-        | Explicitly_released _ | Transitively_released _ -> true)
-      (String_map.bindings opam_release_graph)
-  in
-  (* Due to technical limitations of the CI, we want to avoid starting
-     all opam package tests at the same time. Instead, we start them by batch,
-     with a delay between each batch. To this end we sort jobs by height
-     in the dependency tree, then split the resulting list. The idea is that
-     the higher in the dependency tree a job is, the longer it takes to run,
-     and the sooner we want it to start. *)
-  let released_packages =
-    let by_height_and_name (name1, node1) (name2, node2) =
-      (* Smaller heights first, to put them in the first batches. *)
-      let c = Int.compare node2.height node1.height in
-      if c <> 0 then c
-      else
-        (* For more stability (better diffs) we also sort by name. *)
-        String.compare name1 name2
-    in
-    List.sort by_height_and_name released_packages
-  in
-  let batch_count = 7 in
-  let package_count = List.length released_packages in
-  let released_packages =
-    (* We want each batch to contain about [package_count / batch_count].
-       But we want to round up so that we don't have more than [batch_count] batches. *)
-    let batch_size = (package_count + batch_count - 1) / batch_count in
-    List.mapi (fun i (pkg, _) -> (1 + (i / batch_size), pkg)) released_packages
-  in
-  let unreleased_packages =
-    List.map (fun (pkg, _) -> (0, pkg)) unreleased_packages
-  in
-  (* Merge and sort by name for nicer diffs. *)
-  let packages =
-    let l =
-      List.map
-        (fun (a, name) ->
-          if contain_executables name then (a, name, true) else (a, name, false))
-        (released_packages @ unreleased_packages)
-    in
-    let by_name (_, a, _) (_, b, _) = String.compare a b in
-    List.sort by_name l
-  in
-  (* Now [packages] is a list of [batch_index, package_name]
-     where [batch_index] is 0 for packages that we do not need to test.
-     Write the set of packages and whether they are executables to [script-inputs],
-     for consumption by the CI generator. *)
-  write "script-inputs/ci-opam-package-tests" @@ fun fmt ->
-  let output_job (batch_index, package_name, is_executable) =
-    if batch_index > 0 then
-      Format.fprintf
-        fmt
-        "%s\t%s\t%d\n"
-        package_name
-        (if is_executable then "exec" else "all")
-        batch_index
-  in
-  List.iter output_job packages
-
 let generate_profiles ~default_profile =
   let deps : Version.constraints String_map.t String_map.t ref =
     (* [!deps |> String_map.find profile |> String_map.find pkg]
@@ -4790,7 +4746,6 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
          ~without:dep_graph_without
          opam_release_graph)
       opam_dep_graph ;
-    generate_opam_ci_input opam_release_graph ;
     generate_executable_list "script-inputs/" Released ;
     generate_executable_list "script-inputs/" Experimental ;
     generate_profiles ~default_profile ;

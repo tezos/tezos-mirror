@@ -58,7 +58,7 @@ module Public_key_hash = struct
     | P256 of P256.Public_key_hash.t
     | Bls of Bls.Public_key_hash.t
 
-  let name = "Signature.Public_key_hash"
+  let name = "Signature.V1.Public_key_hash"
 
   let title = "A Ed25519, Secp256k1, P256, or BLS public key hash"
 
@@ -280,7 +280,7 @@ module Public_key = struct
     | P256 of P256.Public_key.t
     | Bls of Bls.Public_key.t
 
-  let name = "Signature.Public_key"
+  let name = "Signature.V1.Public_key"
 
   let title = "A Ed25519, Secp256k1, or P256 public key"
 
@@ -431,7 +431,7 @@ module Secret_key = struct
     | P256 of P256.Secret_key.t
     | Bls of Bls.Secret_key.t
 
-  let name = "Signature.Secret_key"
+  let name = "Signature.V1.Secret_key"
 
   let title = "A Ed25519, Secp256k1 or P256 secret key"
 

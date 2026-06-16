@@ -27,6 +27,11 @@
 
 (** Helpers built upon the Sc_rollup_node and Sc_rollup_client *)
 
+(** [replace_variables string] sanitizes non-deterministic values in smart rollup
+    output (external messages, proofs, contract addresses), then applies standard
+    Tezos regression sanitizations. *)
+val replace_variables : string -> string
+
 (** Hooks that handles hashes specific to smart rollups. *)
 val hooks : Tezt.Process.hooks
 
@@ -154,6 +159,7 @@ val setup_l1 :
   ?minimal_block_delay:int ->
   ?dal_incentives:bool ->
   ?dal_rewards_weight:int ->
+  ?dal_attested_slots_validity_lag:int ->
   Protocol.t ->
   (Node.t * Client.t) Lwt.t
 
@@ -329,6 +335,7 @@ val get_staked_on_commitment :
   sc_rollup:string -> staker:string -> Client.t -> string Lwt.t
 
 val forge_and_publish_commitment :
+  ?keys:string list ->
   ?compressed_state:string ->
   ?number_of_ticks:int ->
   inbox_level:int ->
@@ -339,6 +346,7 @@ val forge_and_publish_commitment :
   (RPC.smart_rollup_commitment * string) Lwt.t
 
 val bake_period_then_publish_commitment :
+  ?keys:string list ->
   ?compressed_state:string ->
   ?number_of_ticks:int ->
   sc_rollup:string ->
@@ -356,9 +364,14 @@ val cement_commitment :
   unit Lwt.t
 
 val bake_operation_via_rpc :
-  __LOC__:string -> Client.t -> Operation_core.Manager.t -> unit Lwt.t
+  __LOC__:string ->
+  ?keys:string list ->
+  Client.t ->
+  Operation_core.Manager.t ->
+  unit Lwt.t
 
 val start_refute :
+  ?keys:string list ->
   Client.t ->
   source:Account.key ->
   opponent:string ->
@@ -401,9 +414,9 @@ val reveal_hash : protocol:'a -> kind:string -> string -> reveal_hash
 val test_refutation_scenario_aux :
   mode:Sc_rollup_node.mode ->
   kind:string ->
-  ?with_dal:(Node.t -> Client.t -> Dal_node.t option Lwt.t) ->
+  ?with_dal:(Protocol.t -> Node.t -> Client.t -> Dal_node.t option Lwt.t) ->
   refutation_scenario_parameters ->
-  'a ->
+  Protocol.t ->
   Sc_rollup_node.t ->
   string ->
   Node.t ->

@@ -3,10 +3,10 @@
 
 stages:
 - start
-- images
+- build
 
 datadog_pipeline_trace:
-  image: datadog/ci:v4.1.0
+  image: datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2
   stage: start
   tags:
   - gcp
@@ -27,17 +27,13 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.base-images.debian:
+images.debian:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
-  - changes:
-    - images/base-images/Dockerfile.debian
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
+  - when: on_success
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -56,26 +52,21 @@ oc.base-images.debian:
   variables:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: debian
-    IMAGE_PATH: debian
+    IMAGE_PATH: debian:$RELEASE
     PLATFORM: linux/amd64,linux/arm64
   parallel:
     matrix:
     - RELEASE:
-      - unstable
       - bookworm
       - trixie
 
-oc.base-images.ubuntu:
+images.ubuntu:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
-  - changes:
-    - images/base-images/Dockerfile.debian
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
+  - when: on_success
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -94,101 +85,24 @@ oc.base-images.ubuntu:
   variables:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: ubuntu
-    IMAGE_PATH: ubuntu
+    IMAGE_PATH: ubuntu:$RELEASE
     PLATFORM: linux/amd64,linux/arm64
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
-      - plucky
+      - "22.04"
+      - "24.04"
+      - "26.04"
 
-oc.base-images.fedora:
+images.debian-rust:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - changes:
-    - images/base-images/Dockerfile.rpm
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.rpm
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    DISTRIBUTION: fedora
-    IMAGE_PATH: fedora
-    PLATFORM: linux/amd64,linux/arm64
-  parallel:
-    matrix:
-    - RELEASE:
-      - "39"
-      - "41"
-      - "42"
-
-oc.base-images.rockylinux:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - changes:
-    - images/base-images/Dockerfile.rpm
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.rpm
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    DISTRIBUTION: rockylinux
-    IMAGE_PATH: rockylinux/rockylinux
-    PLATFORM: linux/amd64,linux/arm64
-  parallel:
-    matrix:
-    - RELEASE:
-      - "9.3"
-      - "9.6"
-      - "10.0"
-
-oc.base-images.rust:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - $TAGS
   rules:
-  - changes: []
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
+  - when: on_success
+  needs:
+  - images.debian
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -207,7 +121,7 @@ oc.base-images.rust:
   variables:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: debian-rust
-    IMAGE_PATH: debian
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
   parallel:
     matrix:
@@ -217,13 +131,15 @@ oc.base-images.rust:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.base-images.rust.merge:
+images.debian-rust.merge:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp
+  rules:
+  - when: on_success
   needs:
-  - oc.base-images.rust
+  - images.debian-rust
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -244,17 +160,15 @@ oc.base-images.rust.merge:
     RELEASE: trixie
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
 
-oc.base-images.debian-homebrew:
+images.debian-homebrew:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
-  - changes:
-    - images/base-images/Dockerfile.debian-homebrew
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
+  - when: on_success
+  needs:
+  - images.debian
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -273,7 +187,324 @@ oc.base-images.debian-homebrew:
   variables:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: debian-homebrew
-    IMAGE_PATH: debian
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
+
+images.alpine-docker-ci:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - images/scripts/install-gcloud-apk.sh
+  - export PATH=$PATH:/google-cloud-sdk/bin
+  - scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.alpine-docker-ci
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    RELEASE: 28.5.1
+    DISTRIBUTION: alpine-docker-ci
+    IMAGE_PATH: ""
+    GCLOUD_VERSION: 543.0.0
+    HADOLINT_VERSION: 2.10.0
+    DOCKER_VERSION: 28.5.1
+    REGCTL_VERSION: v0.4.3
+    PLATFORM: linux/amd64,linux/arm64
+    CI_DOCKER_HUB: "false"
+
+images.debian-build:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - $TAGS
+  rules:
+  - when: on_success
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-build
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: debian-build
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: ""
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+      TAGS:
+      - gcp_very_high_cpu
+      - gcp_arm64
+
+images.debian-build.merge:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - images.debian-build
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-build
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+
+images.ubuntu-build:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - $TAGS
+  rules:
+  - when: on_success
+  needs:
+  - images.ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-build
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: ubuntu-build
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: ""
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "26.04"
+      TAGS:
+      - gcp_very_high_cpu
+      - gcp_arm64
+
+images.ubuntu-build.merge:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - images.ubuntu-build
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/ubuntu-build
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "26.04"
+
+images.debian-systemd:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - when: on_success
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-systemd
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: debian-systemd
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+
+images.ubuntu-systemd:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - when: on_success
+  needs:
+  - images.ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-systemd
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: ubuntu-systemd
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "26.04"
+
+images.debian-jsonnet:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - when: on_success
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-jsonnet
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: debian-jsonnet
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
+
+images.ci-release:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - when: on_success
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-release
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: ci-release
+    IMAGE_PATH: debian:$RELEASE
     PLATFORM: linux/amd64
   parallel:
     matrix:

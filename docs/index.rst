@@ -196,8 +196,8 @@ You may also access this whole documentation as a single `text file <https://oct
    :caption: Protocol Reference Manuals
    :hidden:
 
-   Seoul Protocol Reference <active/index>
-   Tallinn Protocol Reference <tallinn/index>
+   Tallinn Protocol Reference <active/index>
+   U025 Protocol Reference <u025/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -215,7 +215,8 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    releases/releases
-   releases/version-23
+   releases/packaging_revisions
+   releases/version-25
    releases/version-24
    releases/history
 
@@ -225,8 +226,8 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    protocols/naming
-   protocols/023_seoul
    protocols/024_tallinn
+   protocols/025_u025
    protocols/alpha
    protocols/history
 

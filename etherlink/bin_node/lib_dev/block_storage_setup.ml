@@ -70,7 +70,7 @@ let enable ~keep_alive ~timeout ?evm_node_endpoint store =
     let enable_fallback =
       match
         Lwt_domain.run_in_main @@ fun () ->
-        Evm_state.storage_version evm_node_state
+        Durable_storage.storage_version evm_node_state
       with
       | Ok storage_version ->
           Storage_version.kernel_has_txs_in_storage ~storage_version
@@ -84,10 +84,15 @@ let enable ~keep_alive ~timeout ?evm_node_endpoint store =
     if enable_fallback && key = tmp_world_state_path ^ "/transactions_receipts"
     then
       Lwt_domain.run_in_main @@ fun () ->
-      let* pred =
-        Evm_state.current_block_height
-          ~root:Durable_storage_path.etherlink_root
-          evm_node_state
+      let* pred_result =
+        Evm_state.current_block_height ~chain_family:EVM evm_node_state
+      in
+      let pred =
+        match pred_result with
+        | Ok v -> v
+        | Error trace ->
+            Stdlib.failwith
+              Format.(asprintf "%a" Error_monad.pp_print_trace trace)
       in
       let n = Ethereum_types.Qty.next pred in
       let+ block = get_block_exn n in
@@ -97,10 +102,15 @@ let enable ~keep_alive ~timeout ?evm_node_endpoint store =
       enable_fallback && key = tmp_world_state_path ^ "/transactions_objects"
     then
       Lwt_domain.run_in_main @@ fun () ->
-      let* pred =
-        Evm_state.current_block_height
-          ~root:Durable_storage_path.etherlink_root
-          evm_node_state
+      let* pred_result =
+        Evm_state.current_block_height ~chain_family:EVM evm_node_state
+      in
+      let pred =
+        match pred_result with
+        | Ok v -> v
+        | Error trace ->
+            Stdlib.failwith
+              Format.(asprintf "%a" Error_monad.pp_print_trace trace)
       in
       let n = Ethereum_types.Qty.next pred in
       let+ block = get_block_exn n in

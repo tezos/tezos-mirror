@@ -8,6 +8,9 @@ default:
     when:
     - stuck_or_timeout_failure
     - runner_system_failure
+    - api_failure
+    - unknown_failure
+    - scheduler_failure
 
 workflow:
   rules:
@@ -16,13 +19,12 @@ workflow:
 
 stages:
 - start
-- images
 - build
 - publish
 - publishing_tests
 
 datadog_pipeline_trace:
-  image: datadog/ci:v4.1.0
+  image: datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2
   stage: start
   tags:
   - gcp
@@ -42,160 +44,42 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.docker-systemd_tests_debian:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - $TAGS
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: debian
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-v24-release-2642faac
-  parallel:
-    matrix:
-    - RELEASE:
-      - bookworm
-      - trixie
-      TAGS:
-      - gcp_very_high_cpu
-
-oc.docker-systemd-merge-manifest.debian:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  needs:
-  - oc.docker-systemd_tests_debian
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/docker-merge-base-images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: debian
-    IMAGE_NAME: $DEP_IMAGE
-  parallel:
-    matrix:
-    - RELEASE:
-      - bookworm
-      - trixie
-      TAGS:
-      - gcp_very_high_cpu
-
-oc.docker-build-debian-dependencies:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - $TAGS
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: debian
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-v24-release-2642faac
-  parallel:
-    matrix:
-    - RELEASE:
-      - bookworm
-      - trixie
-      TAGS:
-      - gcp_very_high_cpu
-
-oc.docker-build-merge-manifest.debian:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  needs:
-  - oc.docker-build-debian-dependencies
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/docker-merge-base-images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: debian
-    IMAGE_NAME: $DEP_IMAGE
-  parallel:
-    matrix:
-    - RELEASE:
-      - bookworm
-      - trixie
-      TAGS:
-      - gcp_very_high_cpu
-
-oc.build-debian:
-  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+oc.build-data_packages:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
   stage: build
   tags:
   - $TAGS
-  needs:
-  - oc.docker-build-merge-manifest.debian
+  needs: []
   dependencies: []
   timeout: 60 minutes
-  cache:
-    key: sccache-$CI_JOB_NAME_SLUG
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh zcash
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DISTRIBUTION: debian
+    RELEASE: trixie
+    TAGS: gcp
+  artifacts:
     paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    - packages/$DISTRIBUTION/$RELEASE
+
+oc.build-debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
+  stage: build
+  tags:
+  - $TAGS
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -209,12 +93,13 @@ oc.build-debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: debian
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
@@ -227,55 +112,26 @@ oc.build-debian:
       TAGS:
       - gcp_very_high_cpu_ramfs
 
-oc.build-data_packages:
-  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
-  stage: build
-  tags:
-  - $TAGS
-  needs:
-  - oc.docker-build-merge-manifest.debian
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages.sh zcash
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: debian
-    RELEASE: trixie
-    TAGS: gcp
-  artifacts:
-    paths:
-    - packages/$DISTRIBUTION/$RELEASE
-
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-v24-release-2642faac
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp
   needs:
-  - oc.build-debian
   - oc.build-data_packages
+  - oc.build-debian
   dependencies:
-  - oc.build-debian
   - oc.build-data_packages
+  - oc.build-debian
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - apt-get install -y --update apt-utils debsigs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - . ./scripts/version.sh
+  - apt-get install -y --update apt-utils debsigs
   - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -289,33 +145,8 @@ apt_repo_debian:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-v24-release-2642faac
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - oc.build-debian
-  dependencies:
-  - oc.build-debian
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - export DEBIAN_FRONTEND=noninteractive
-  - apt-get update
-  - apt-get install lintian parallel -y
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/lintian_debian_packages.sh debian bookworm
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables: {}
-
-oc.install_bin_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-v24-release-2642faac
+oc.upgrade_bin_debian_bookworm-systemd:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -323,6 +154,67 @@ oc.install_bin_debian_bookworm:
   - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-05e36a5c
+    PREFIX: ""
+    DISTRIBUTION: debian
+    RELEASE: bookworm
+
+oc.install_bin_debian_bookworm_systemd:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-05e36a5c
+    PREFIX: ""
+    DISTRIBUTION: debian
+    RELEASE: bookworm
+
+oc.install_bin_debian_bookworm:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-05e36a5c
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -335,66 +227,27 @@ oc.install_bin_debian_bookworm:
   variables:
     PREFIX: ""
 
-oc.install_bin_debian_bookworm_systemd_test:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+oc.lintian_debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-05e36a5c
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd-merge-manifest.debian
-  - apt_repo_debian
-  dependencies: []
+  - oc.build-debian
+  dependencies:
+  - oc.build-debian
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
-    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/version.sh
+  - export DEBIAN_FRONTEND=noninteractive
+  - apt-get update
+  - apt-get install lintian parallel -y
+  - ./scripts/ci/lintian_debian_packages.sh debian bookworm
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    PREFIX: ""
-    DISTRIBUTION: debian
-    RELEASE: bookworm
-
-oc.upgrade_bin_debian_bookworm-systemd:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - oc.docker-systemd_tests_debian
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    PREFIX: ""
-    DISTRIBUTION: debian
-    RELEASE: bookworm

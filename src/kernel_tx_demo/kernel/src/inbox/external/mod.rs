@@ -48,7 +48,7 @@ impl<'a> ParsedExternalInboxMessage<'a> {
     const PARSED_BATCH_TAG: u8 = 1;
 
     /// Parse an external inbox message.
-    pub fn parse(input: &'a [u8]) -> NomResult<Self> {
+    pub fn parse(input: &'a [u8]) -> NomResult<'a, Self> {
         alt((
             map(
                 preceded(tag([Self::PARSED_BATCH_TAG]), v1::ParsedBatch::parse),

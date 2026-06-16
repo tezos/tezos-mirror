@@ -19,7 +19,9 @@ use crate::MAX_ENVELOPE_CONTENT_SIZE;
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::path::Path;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use thiserror::Error;
 
 use super::external_inbox::reveal_and_store_dac_message;
@@ -30,10 +32,13 @@ use super::store::PROGRESS_KEY;
 use super::store::TRANSACTIONS_PER_KERNEL_RUN;
 use super::utils::read_large_store_chunk;
 
-pub(crate) fn execute_one_operation<Host: Runtime>(
+pub(crate) fn execute_one_operation<Host>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
-) -> Result<(), CachedTransactionError> {
+) -> Result<(), CachedTransactionError>
+where
+    Host: StorageV1 + WasmHost + HostReveal,
+{
     let progress = if host
         .store_has(&PROGRESS_KEY)
         .map_err(CachedTransactionError::Store)?
@@ -81,16 +86,19 @@ pub(crate) enum Decision {
     MessageNextStage(MessageStage),
 }
 
-fn cleanup(host: &mut impl Runtime) -> Result<(), CachedTransactionError> {
+fn cleanup<Host: StorageV1>(host: &mut Host) -> Result<(), CachedTransactionError> {
     host.store_delete(&KERNEL_PRIVATE_STATE)
         .map_err(CachedTransactionError::Store)
 }
 
-fn message_next_stage(
-    host: &mut impl Runtime,
+fn message_next_stage<Host>(
+    host: &mut Host,
     stage_path: &impl Path,
     stage: MessageStage,
-) -> Result<(), CachedTransactionError> {
+) -> Result<(), CachedTransactionError>
+where
+    Host: WasmHost + StorageV1,
+{
     host.mark_for_reboot()
         .map_err(CachedTransactionError::Reboot)?;
 
@@ -98,10 +106,10 @@ fn message_next_stage(
         .map_err(CachedTransactionError::Store)
 }
 
-fn next_message_or_next_level(
-    host: &mut impl Runtime,
-    idx: u32,
-) -> Result<(), CachedTransactionError> {
+fn next_message_or_next_level<Host>(host: &mut Host, idx: u32) -> Result<(), CachedTransactionError>
+where
+    Host: WasmHost + StorageV1,
+{
     let next = idx + 1;
     let has_next_message = host
         .store_has(&cached_message_path(next).map_err(CachedTransactionError::Path)?)
@@ -119,11 +127,14 @@ fn next_message_or_next_level(
     }
 }
 
-pub(crate) fn make_decision<Host: Runtime>(
+pub(crate) fn make_decision<Host>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
     idx: u32,
-) -> Result<(), CachedTransactionError> {
+) -> Result<(), CachedTransactionError>
+where
+    Host: StorageV1 + WasmHost + HostReveal,
+{
     let stage_path = cached_message_stage_path(idx).map_err(CachedTransactionError::Path)?;
 
     let stage: MessageStage = {
@@ -139,45 +150,51 @@ pub(crate) fn make_decision<Host: Runtime>(
         }
     };
     #[cfg(feature = "debug")]
-    debug_msg!(host, "message@{} stage {:?}\n", idx, stage);
+    debug_msg!("message@{} stage {:?}\n", idx, stage);
     let decision = match stage {
         MessageStage::Start => process_at_start(host, account_storage, idx)?,
         MessageStage::Verified => process_verified(host, idx)?,
         MessageStage::Revealed => process_revealed(host, account_storage, idx)?,
     };
     #[cfg(feature = "debug")]
-    debug_msg!(host, "message@{} decision {:?}\n", idx, decision);
+    debug_msg!("message@{} decision {:?}\n", idx, decision);
     match decision {
         Decision::NextMessage => next_message_or_next_level(host, idx),
         Decision::MessageNextStage(stage) => message_next_stage(host, &stage_path, stage),
     }
 }
 
-fn get_cached_message<'a, Host: Runtime>(
+fn get_cached_message<'a, Host>(
     host: &mut Host,
     idx: u32,
     payload: &'a mut [u8; MAX_ENVELOPE_CONTENT_SIZE],
-) -> Result<ParsedExternalInboxMessage<'a>, CachedTransactionError> {
+) -> Result<ParsedExternalInboxMessage<'a>, CachedTransactionError>
+where
+    Host: StorageV1,
+{
     let message = read_large_store_chunk(
         host,
         &cached_message_path(idx).map_err(CachedTransactionError::Path)?,
         payload,
     )
     .map_err(CachedTransactionError::Store)?;
-    external_inbox::parse_external(host, message).ok_or(CachedTransactionError::MessageUnparsable)
+    external_inbox::parse_external(message).ok_or(CachedTransactionError::MessageUnparsable)
 }
 
-fn process_at_start<Host: Runtime>(
+fn process_at_start<Host>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
     idx: u32,
-) -> Result<Decision, CachedTransactionError> {
+) -> Result<Decision, CachedTransactionError>
+where
+    Host: StorageV1 + WasmHost,
+{
     let mut payload = [0; MAX_ENVELOPE_CONTENT_SIZE];
     let message = match get_cached_message(host, idx, &mut payload) {
         Ok(message) => message,
         Err(_e) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "cached message: {}\n", _e);
+            debug_msg!("cached message: {}\n", _e);
             return Ok(Decision::NextMessage);
         }
     };
@@ -193,14 +210,13 @@ fn process_at_start<Host: Runtime>(
                 .map_err(CachedTransactionError::ProcessExternalMessage)?;
             #[cfg(feature = "debug")]
             tezos_smart_rollup_debug::debug_msg!(
-                host,
                 "Verifying dac certificate {parsed_dac_message:?}. Have committee: {dac_committee:?}"
             );
             match parsed_dac_message.verify(&dac_committee, dac_committee.len() as u8) {
                 Ok(_) => Ok(Decision::MessageNextStage(MessageStage::Verified)),
                 Err(_e) => {
                     #[cfg(feature = "debug")]
-                    debug_msg!(host, "failed to verify signature {} for cert {parsed_dac_message:?} and committee {dac_committee:?}\n", _e);
+                    debug_msg!("failed to verify signature {} for cert {parsed_dac_message:?} and committee {dac_committee:?}\n", _e);
                     Ok(Decision::NextMessage)
                 }
             }
@@ -215,16 +231,16 @@ fn process_at_start<Host: Runtime>(
     }
 }
 
-fn process_verified<Host: Runtime>(
-    host: &mut Host,
-    idx: u32,
-) -> Result<Decision, CachedTransactionError> {
+fn process_verified<Host>(host: &mut Host, idx: u32) -> Result<Decision, CachedTransactionError>
+where
+    Host: StorageV1 + HostReveal,
+{
     let mut payload = [0; MAX_ENVELOPE_CONTENT_SIZE];
     let message = match get_cached_message(host, idx, &mut payload) {
         Ok(message) => message,
         Err(_e) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "cached message: {}\n", _e);
+            debug_msg!("cached message: {}\n", _e);
             return Ok(Decision::NextMessage);
         }
     };
@@ -237,7 +253,7 @@ fn process_verified<Host: Runtime>(
                 Ok(()) => Ok(Decision::MessageNextStage(MessageStage::Revealed)),
                 Err(_e) => {
                     #[cfg(feature = "debug")]
-                    debug_msg!(host, "cached message: {}\n", _e);
+                    debug_msg!("cached message: {}\n", _e);
                     Ok(Decision::NextMessage)
                 }
             }
@@ -248,11 +264,14 @@ fn process_verified<Host: Runtime>(
     }
 }
 
-fn process_revealed(
-    host: &mut impl Runtime,
+fn process_revealed<Host>(
+    host: &mut Host,
     account_storage: &mut AccountStorage,
     idx: u32,
-) -> Result<Decision, CachedTransactionError> {
+) -> Result<Decision, CachedTransactionError>
+where
+    Host: StorageV1 + WasmHost,
+{
     let mut tx_per_kernel_run_buffer = [0; core::mem::size_of::<i32>()];
     let read_tx_per_kernel_run_result = host.store_read_slice(
         &TRANSACTIONS_PER_KERNEL_RUN,
@@ -263,7 +282,7 @@ fn process_revealed(
         Ok(_) => i32::from_le_bytes(tx_per_kernel_run_buffer),
         Err(_e) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Could not read transactions per kernel run value: {}\nSetting a default value of 150", _e);
+            debug_msg!("Could not read transactions per kernel run value: {}\nSetting a default value of 150", _e);
             150
         }
     };
@@ -271,7 +290,7 @@ fn process_revealed(
         Ok(iterator) => iterator,
         Err(_e) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "iterator state error: {:?}\n", _e);
+            debug_msg!("iterator state error: {:?}\n", _e);
             return Ok(Decision::NextMessage);
         }
     };
@@ -284,18 +303,18 @@ fn process_revealed(
                     }
                     Err(_e) => {
                         #[cfg(feature = "debug")]
-                        debug_msg!(host, "Process transactions error: {:?}\n", _e);
+                        debug_msg!("Process transactions error: {:?}\n", _e);
                     }
                 };
             }
             Ok(None) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "Finished parsing DAC payload\n");
+                debug_msg!("Finished parsing DAC payload\n");
                 return Ok(Decision::NextMessage);
             }
             Err(_e) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "iterator state error: {:?}\n", _e);
+                debug_msg!("iterator state error: {:?}\n", _e);
                 return Ok(Decision::NextMessage);
             }
         };
@@ -303,12 +322,12 @@ fn process_revealed(
     match dac_iterator.persist(host) {
         Ok(()) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Batch of messages executed. Iterator state has been persisted. Kernel will reboot before processing the rest of the DAC payload\n");
+            debug_msg!("Batch of messages executed. Iterator state has been persisted. Kernel will reboot before processing the rest of the DAC payload\n");
             Ok(Decision::MessageNextStage(MessageStage::Revealed))
         }
         Err(_e) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Failed to persist the iterator state: {:?}\n", _e);
+            debug_msg!("Failed to persist the iterator state: {:?}\n", _e);
             Ok(Decision::NextMessage)
         }
     }

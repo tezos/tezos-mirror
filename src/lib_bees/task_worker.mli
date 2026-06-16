@@ -46,6 +46,16 @@ val launch_tasks_and_wait :
   'a list ->
   ('b, 'c message_error) result list
 
+(** [join_and_raise] is a very simple error wrapper that aims to raise any error
+    that occurred during the evaluation of a task.
+    Usually works in pair with [launch_task_and_wait].*)
+val bind_and_raise : ('a, 'b message_error) result -> 'a
+
+(** [join_and_raise_all] same as [join_and_raise] but operates on list of
+    promises. If no error, returns the list of values.
+    Usually works in pair with [launch_tasks_and_wait]. *)
+val bind_and_raise_all : ('a, 'b message_error) result list -> 'a list
+
 (** [launch_task name func ?on_completion arg] create a request named [name] and
     executing [func args], and push it to [worker] queue, true if the request
     has been pushed successfully and false otherwise. An optional callback

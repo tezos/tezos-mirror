@@ -11,7 +11,10 @@ open Profiler
 val dal_profiler : profiler
 
 (** Plug the DAL node profiler given its name and Profiler instance option. *)
-val init : (name:string -> instance option) -> unit
+val init :
+  profiling_config:profiling_config ->
+  (profiling_config:profiling_config -> name:string -> instance option) ->
+  unit
 
 (** Creates a function to reset the block section *)
 val create_reset_block_section : profiler -> Block_hash.t * metadata -> unit

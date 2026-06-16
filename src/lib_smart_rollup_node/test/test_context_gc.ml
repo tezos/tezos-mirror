@@ -23,7 +23,7 @@ let commit_new_state context key =
   let* state =
     Context.Internal_for_tests.get_a_tree (module Irmin_context) key
   in
-  let* context = Context.PVMState.set context state in
+  let* () = Context.PVMState.set context state in
   let* hash = Context.commit context in
   Lwt.return (context, hash)
 

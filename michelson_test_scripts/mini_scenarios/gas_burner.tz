@@ -1,0 +1,9 @@
+parameter (unit %run) ;
+storage unit ;
+# Burns all available gas by looping forever.
+# Exposes %run for compatibility with the CRAC runner framework.
+code
+  { DROP ;
+    PUSH bool True ;
+    LOOP { PUSH bool True } ;
+    UNIT ; NIL operation ; PAIR } ;

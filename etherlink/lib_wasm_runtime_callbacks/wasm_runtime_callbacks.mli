@@ -15,6 +15,10 @@ val register : unit -> unit
 val store_get_hash :
   Irmin_context.tree -> string -> (bytes, Error_code.t) result
 
+module Metrics : sig
+  val set_inc_host_function_call : (string -> unit) -> unit
+end
+
 module Internal_for_tests : sig
   val read_durable_value :
     Irmin_context.tree -> string -> (bytes, Error_code.t) result

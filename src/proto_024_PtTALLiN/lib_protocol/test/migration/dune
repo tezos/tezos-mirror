@@ -1,0 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_024_PtTALLiN_test_migration)
+ (public_name octez-protocol-024-PtTALLiN-libs.test-migration)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt-migration-registry
+  octez-alcotezt
+  octez-libs.base
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.test-helpers
+  octez-libs.base-test-helpers
+  tezos-protocol-024-PtTALLiN.parameters
+  octez-protocol-024-PtTALLiN-libs.plugin)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Octez_alcotezt
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_024_PtTALLiN_test_helpers
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_024_PtTALLiN_parameters
+  -open Tezos_protocol_plugin_024_PtTALLiN))

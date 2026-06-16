@@ -188,6 +188,24 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         assert (Int32.of_int round = hd.round) ;
         return (hd.delegate, baking_rights)
 
+  let dal_shards_of cctxt level =
+    let raw_level = Protocol.Alpha_context.Raw_level.of_int32_exn level in
+    let* shard_assignments =
+      Plugin.RPC.Dal.dal_shards
+        cctxt
+        (cctxt#chain, `Level level)
+        ~level:raw_level
+        ()
+    in
+    return
+    @@ List.map
+         (fun Plugin.RPC.Dal.S.{delegate; indexes} ->
+           let delegate =
+             Tezos_crypto.Signature.Of_V2.public_key_hash delegate
+           in
+           Data.Dal.{delegate; assigned_shard_indices = indexes})
+         shard_assignments
+
   let raw_block_round shell_header =
     let wrap = Environment.wrap_tzresult in
     let open Result_syntax in
@@ -243,6 +261,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
             delegate = Tezos_crypto.Signature.Of_V2.public_key_hash ck.delegate;
             power =
               Protocol.Alpha_context.Attesting_power.get_slots_from_result power;
+            is_aggregated = true;
           }
         :: acc)
       acc
@@ -282,6 +301,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                      Protocol.Alpha_context.Attesting_power
                      .get_slots_from_result
                        consensus_power;
+                   is_aggregated = false;
                  }
                :: acc
         | Receipt
@@ -307,6 +327,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                      Protocol.Alpha_context.Attesting_power
                      .get_slots_from_result
                        consensus_power;
+                   is_aggregated = false;
                  }
                :: acc
         | Receipt

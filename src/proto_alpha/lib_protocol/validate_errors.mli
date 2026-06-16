@@ -84,7 +84,6 @@ module Consensus : sig
         conflict : operation_conflict;
       }
     | Missing_companion_key_for_bls_dal of Consensus_key.t
-    | Aggregate_disabled
     | Aggregate_in_mempool
     | Aggregate_not_implemented
     | Non_bls_key_in_aggregate
@@ -175,6 +174,7 @@ module Anonymous : sig
     | Too_early_dal_denunciation of {level : Raw_level.t; current : Raw_level.t}
     | Outdated_dal_denunciation of {level : Raw_level.t; last_cycle : Cycle.t}
     | Invalid_shard_index of {given : int; min : int; max : int}
+    | Invalid_lag_index of {given : int; min : int; max : int}
     | Dal_already_denounced of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
@@ -183,22 +183,32 @@ module Anonymous : sig
         tb_slot : Slot.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
+      }
+    | Invalid_accusation_unexpected_lag_index of {
+        tb_slot : Slot.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Invalid_accusation_slot_not_attested of {
         tb_slot : Slot.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Invalid_accusation_shard_is_not_trap of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
         shard_index : int;
       }
     | Invalid_accusation_wrong_shard_owner of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
         shard_index : int;
         shard_owner : Signature.Public_key_hash.t;
       }
@@ -206,16 +216,19 @@ module Anonymous : sig
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Accusation_validity_error_cannot_get_slot_headers of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Accusation_validity_error_levels_mismatch of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
         accusation_published_level : Raw_level.t;
         store_published_level : Raw_level.t;
       }
@@ -283,6 +296,13 @@ module Manager : sig
     | Sc_rollup_arith_pvm_disabled
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
+    | Tz5_account_disabled
+    | Sc_rollup_refutation_game_start_too_early of {
+        current_level : Raw_level.t;
+        earliest_start_level : Raw_level.t;
+        conflict_inbox_level : Raw_level.t;
+        commitment_period_in_blocks : int;
+      }
 end
 
 type error += Failing_noop_error

@@ -33,6 +33,8 @@ type operation_application_result =
 
 type slot_index = int
 
+type lag_index = int
+
 type attestation_lag = int
 
 (** Information extracted from DAL slots headers operations included in L1
@@ -44,12 +46,18 @@ type slot_header = {
   commitment : Cryptobox.Verifier.commitment;
 }
 
+type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
+
 module type T = sig
   module Proto : Registered_protocol.T
 
   type block_info
 
-  type dal_attestation
+  (* The DAL content an attester includes in its attestation operation. *)
+  type dal_attestations
+
+  (* The slot availability information from a block's metadata. *)
+  type slot_availability
 
   type attestation_operation
 
@@ -88,7 +96,7 @@ module type T = sig
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (tb_slot * attestation_operation * dal_attestation option) list tzresult
+    (tb_slot * attestation_operation * dal_attestations option) list tzresult
     Lwt.t
 
   (** [get_committees ctxt ~level] retrieves the DAL and Tenderbake attestation
@@ -102,20 +110,45 @@ module type T = sig
     level:int32 ->
     (int list * int) Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-  (** [dal_attestation block_info] returns the metadata of the given
-      [block_info] as an abstract value of type [dal_attestation] to be passed
-      to the [is_attested] function.
+  (** [slot_availability block_info] returns the metadata of the given
+      [block_info] as an abstract value of type [slot_availability] to be passed
+      to the [is_protocol_attested] function.
 
       Fails with [Cannot_read_block_metadata] if [block_info]'s metadata are
       stripped.  *)
-  val dal_attestation : block_info -> dal_attestation tzresult
+  val slot_availability : block_info -> slot_availability tzresult
 
-  (** [is_attested dal_attestation index] returns [true] if [index]
-      is one of the [dal_attestation] and [false] otherwise.  *)
-  val is_attested : dal_attestation -> slot_index -> bool
+  (** [is_baker_attested dal_attestations ~number_of_slots ~number_of_lags
+      ~lag_index slot_index] returns [true] if [slot_index] is set in the bitset
+      of the [dal_attestation] at the given [lag_index] and [false] otherwise.  *)
+  val is_baker_attested :
+    dal_attestations ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    lag_index:int ->
+    slot_index ->
+    bool
 
-  (** [number_of_attested_slots] returns the number of slots attested in the [dal_attestation]. *)
-  val number_of_attested_slots : dal_attestation -> int
+  (** [decode_baker_attestations attestation ~number_of_slots ~number_of_lags]
+      returns the content of the attestation as a list of
+      [{lag_index; slot_indices}]. *)
+  val decode_baker_attestations :
+    dal_attestations ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    unfolded_lag_attestation list tzresult
+
+  (** [is_protocol_attested slot_availability ~number_of_slots ~number_of_lags
+      ~lag_index slot_index] returns [true] if [slot_index] is one of the
+      attested slots in [slot_availability] at the given [lag_index] and [false]
+      otherwise. *)
+  val is_protocol_attested :
+    slot_availability ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    lag_index:int ->
+    slot_index ->
+    bool
 
   (** [get_round fitness] returns the block round contained in [fitness]. *)
   val get_round : Fitness.t -> int32 tzresult
@@ -131,6 +164,7 @@ module type T = sig
     attested_level:Int32.t ->
     attestation_operation ->
     slot_index:slot_index ->
+    lag_index:lag_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->
     tb_slot:tb_slot ->
@@ -154,6 +188,12 @@ module type T = sig
     Tezos_rpc.Context.generic ->
     pkh:Signature.Public_key_hash.t ->
     bool tzresult Lwt.t
+
+  (** [is_migration_pending cctxt] queries the current voting period and returns
+      a tuple containing whether the migration is pending (we are in adoption) and
+      the level at which the current period ends. *)
+  val is_migration_pending :
+    Tezos_rpc.Context.generic -> (bool * int32) tzresult Lwt.t
 
   (* Section of helpers for Skip lists *)
 

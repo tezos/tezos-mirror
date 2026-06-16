@@ -36,13 +36,20 @@ tezos-smart-rollup-storage.workspace = true
 tezos-smart-rollup-encoding.workspace = true
 tezos-smart-rollup-mock.workspace = true
 
+[build-dependencies]
+tezos-smart-rollup-build-utils.workspace = true
+
 [features]
 default = ["tx-kernel"]
 dal = [
+  "proto-alpha",
+]
+proto-alpha = [
   "tezos-smart-rollup/proto-alpha",
   "tezos-smart-rollup-core/proto-alpha",
   "tezos-smart-rollup-host/proto-alpha",
   "tezos-smart-rollup-mock/proto-alpha",
+  "tezos-smart-rollup-encoding/proto-alpha",
 ]
 debug = []
 testing = [

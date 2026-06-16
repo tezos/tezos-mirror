@@ -17,8 +17,9 @@ use num_bigint::{BigInt, TryFromBigIntError};
 use tezos_smart_rollup_encoding::michelson::ticket::StringTicket;
 use tezos_smart_rollup_encoding::michelson::ticket::{TicketHash, TicketHashError};
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::runtime::RuntimeError::*;
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::Error::*;
 use tezos_smart_rollup_storage::storage::Storage;
 use thiserror::Error;
@@ -131,7 +132,7 @@ const PUBLIC_KEY_PATH: RefPath = RefPath::assert_from(b"/public.key");
 
 /// Find the path where account information is stored from the account address.
 pub fn account_path(address: &ContractTz1Hash) -> Result<OwnedPath, AccountStorageError> {
-    let address_name: Vec<u8> = alloc::format!("/{}", address).into();
+    let address_name: Vec<u8> = alloc::format!("/{address}").into();
     OwnedPath::try_from(address_name).map_err(AccountStorageError::from)
 }
 
@@ -148,7 +149,7 @@ impl Account {
     ///
     /// If there is not value in durable storage for this account and the
     /// ticket identified by the hash, then the value defaults to zero.
-    pub fn ticket_amount<Host: Runtime>(
+    pub fn ticket_amount<Host: StorageV1>(
         &self,
         host: &Host,
         ticket: u64,
@@ -168,7 +169,10 @@ impl Account {
     }
 
     /// Get or set the account id
-    pub fn get_or_set_id(&mut self, host: &mut impl Runtime) -> Result<u16, AccountStorageError> {
+    pub fn get_or_set_id<Host: StorageV1>(
+        &mut self,
+        host: &mut Host,
+    ) -> Result<u16, AccountStorageError> {
         let path = concat(&self.path, &ID_PATH)?;
 
         let mut buffer = [0_u8; 2];
@@ -192,7 +196,7 @@ impl Account {
     /// transactions are given as unsigned 64 bit integers for the amount transferred,
     /// so such transactions require two calls: one for the debit and one for the credit).
     /// This function is for the credit.
-    pub fn remove_ticket<Host: Runtime>(
+    pub fn remove_ticket<Host: StorageV1>(
         &mut self,
         host: &mut Host,
         ticket: u64,
@@ -246,7 +250,7 @@ impl Account {
     /// transactions are given as unsigned 64 bit integers for the amount transferred,
     /// so such transactions require two calls: one for the debit and one for the
     /// credit). This function is for the debit.
-    pub fn add_ticket<Host: Runtime>(
+    pub fn add_ticket<Host: StorageV1>(
         &mut self,
         host: &mut Host,
         ticket_index: u64,
@@ -282,7 +286,7 @@ impl Account {
     ///
     /// If the store doesn't hold a counter value for the account,
     /// then the counter value is assumed to be zero.
-    pub fn counter<Host: Runtime>(&self, host: &Host) -> Result<i64, AccountStorageError> {
+    pub fn counter<Host: StorageV1>(&self, host: &Host) -> Result<i64, AccountStorageError> {
         let path = concat(&self.path, &COUNTER_PATH)?;
 
         let mut buffer = [0_u8; 8];
@@ -300,7 +304,7 @@ impl Account {
     /// If the store doesn't hold a value for the counter it is assumed to be
     /// zero before increment, so it will be stored as one after this call. Otherwise
     /// increment the value stored by one. This may overflow, at least in theory.
-    pub fn increment_counter<Host: Runtime>(
+    pub fn increment_counter<Host: StorageV1>(
         &mut self,
         host: &mut Host,
     ) -> Result<(), AccountStorageError> {
@@ -331,7 +335,7 @@ impl Account {
     /// This is a use case function, that both increments and checks the counter.
     /// It only increments the counter if the check passes. This is a use case for
     /// the TX kernel.
-    pub fn check_and_inc_counter<Host: Runtime>(
+    pub fn check_and_inc_counter<Host: StorageV1>(
         &mut self,
         host: &mut Host,
         counter: i64,
@@ -373,7 +377,7 @@ impl Account {
     /// In case the account already has a key, the new key will replace it.
     /// No check is performed to see if the public key corresponds to the
     /// account address.
-    pub fn link_public_key<Host: Runtime>(
+    pub fn link_public_key<Host: StorageV1>(
         &mut self,
         host: &mut Host,
         pk: &PublicKeyEd25519,
@@ -388,7 +392,7 @@ impl Account {
     ///
     /// In case the account has no key associated with it, nothing happens.
     /// Othwerise any previously created link will be removed.
-    pub fn unlink_public_key<Host: Runtime>(
+    pub fn unlink_public_key<Host: StorageV1>(
         &mut self,
         host: &mut Host,
     ) -> Result<(), AccountStorageError> {
@@ -404,7 +408,7 @@ impl Account {
     /// Get the public key for an account if it exists
     ///
     /// An account doesn't necessarily have a public key associated with it.
-    pub fn public_key<Host: Runtime>(
+    pub fn public_key<Host: StorageV1>(
         &self,
         host: &Host,
     ) -> Result<Option<PublicKeyEd25519>, AccountStorageError> {
@@ -429,8 +433,8 @@ impl From<OwnedPath> for Account {
 }
 
 /// Record ticket
-pub fn get_or_set_ticket_id(
-    host: &mut impl Runtime,
+pub fn get_or_set_ticket_id<Host: StorageV1>(
+    host: &mut Host,
     ticket: &TicketHash,
 ) -> Result<u64, AccountStorageError> {
     const SIZE: usize = std::mem::size_of::<u64>();
@@ -471,12 +475,15 @@ pub fn init_account_storage() -> Result<AccountStorage, AccountStorageError> {
 ///
 /// This function both deposits the ticket to the account _and_ adds the amount
 /// to the total rollup ledger (last part is still TODO).
-pub fn deposit_ticket_to_storage<Host: Runtime>(
+pub fn deposit_ticket_to_storage<Host>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
     destination: &ContractTz1Hash,
     ticket: &StringTicket,
-) -> Result<(), AccountStorageError> {
+) -> Result<(), AccountStorageError>
+where
+    Host: StorageV1,
+{
     let path = account_path(destination)?;
 
     let mut account = account_storage.get_or_create(host, &path)?;
@@ -489,13 +496,13 @@ pub fn deposit_ticket_to_storage<Host: Runtime>(
     account.get_or_set_id(host)?;
 
     #[cfg(feature = "debug")]
-    tezos_smart_rollup_debug::debug_msg!(host, "Depositing {ticket:?} to {destination}\n");
+    tezos_smart_rollup_debug::debug_msg!("Depositing {ticket:?} to {destination}\n");
 
     Ok(())
 }
 
 /// Current acount counter
-fn next_account_id(host: &mut impl Runtime) -> Result<u16, RuntimeError> {
+fn next_account_id<Host: StorageV1>(host: &mut Host) -> Result<u16, RuntimeError> {
     const NEXT_ID: RefPath = RefPath::assert_from(b"/next_account_id");
 
     let mut buffer = [0_u8; 2];
@@ -507,7 +514,7 @@ fn next_account_id(host: &mut impl Runtime) -> Result<u16, RuntimeError> {
 }
 
 /// Current ticket counter
-fn next_ticket_id(host: &mut impl Runtime) -> Result<u64, RuntimeError> {
+fn next_ticket_id<Host: StorageV1>(host: &mut Host) -> Result<u64, RuntimeError> {
     const NEXT_ID: RefPath = RefPath::assert_from(b"/next_ticket_id");
 
     let mut buffer = [0_u8; 8];
@@ -524,8 +531,8 @@ pub mod dal {
     use super::Error;
     use super::OwnedPath;
     use super::RefPath;
-    use super::Runtime;
     use tezos_smart_rollup_host::runtime::ValueType;
+    use tezos_smart_rollup_host::storage::StorageV1;
 
     /// All errors that may happen as result of using this DAL storage
     /// interface.
@@ -580,8 +587,9 @@ pub mod dal {
     }
 
     /// Set
-    fn set<T, U>(host: &mut impl Runtime, path: &OwnedPath, value: T) -> Result<(), StorageError>
+    fn set<Host, T, U>(host: &mut Host, path: &OwnedPath, value: T) -> Result<(), StorageError>
     where
+        Host: StorageV1,
         T: num_traits::ops::bytes::ToBytes<Bytes = U>,
         U: TryInto<Vec<u8>>,
         <U as TryInto<Vec<u8>>>::Error: std::fmt::Debug,
@@ -598,8 +606,9 @@ pub mod dal {
     }
 
     /// Get
-    fn get<T, U>(host: &mut impl Runtime, path: &OwnedPath) -> Result<T, StorageError>
+    fn get<Host, T, U>(host: &mut Host, path: &OwnedPath) -> Result<T, StorageError>
     where
+        Host: StorageV1,
         U: TryFrom<Vec<u8>>,
         <U as TryFrom<Vec<u8>>>::Error: std::fmt::Debug,
         T: num_traits::ops::bytes::FromBytes<Bytes = U>,
@@ -612,12 +621,18 @@ pub mod dal {
     }
 
     /// Set slot index
-    pub fn set_slot_index(host: &mut impl Runtime, slot_index: u8) -> Result<(), StorageError> {
+    pub fn set_slot_index<Host: StorageV1>(
+        host: &mut Host,
+        slot_index: u8,
+    ) -> Result<(), StorageError> {
         set(host, &slot_index_path(), slot_index)
     }
 
     /// Get slot index
-    pub fn get_or_set_slot_index(host: &mut impl Runtime, default: u8) -> Result<u8, StorageError> {
+    pub fn get_or_set_slot_index<Host: StorageV1>(
+        host: &mut Host,
+        default: u8,
+    ) -> Result<u8, StorageError> {
         let path = slot_index_path();
         if let Ok(Some(ValueType::Value)) = host.store_has(&path) {
             get(host, &path)
@@ -628,48 +643,54 @@ pub mod dal {
     }
 
     /// Set number of slots
-    pub fn set_number_of_slots(
-        host: &mut impl Runtime,
+    pub fn set_number_of_slots<Host: StorageV1>(
+        host: &mut Host,
         number_of_slots: u16,
     ) -> Result<(), StorageError> {
         set(host, &number_of_slots_path(), number_of_slots)
     }
 
     /// Get number of slots
-    pub fn get_number_of_slots(host: &mut impl Runtime) -> Result<u16, StorageError> {
+    pub fn get_number_of_slots<Host: StorageV1>(host: &mut Host) -> Result<u16, StorageError> {
         get(host, &number_of_slots_path())
     }
 
     /// Set page size
-    pub fn set_page_size(host: &mut impl Runtime, page_size: u16) -> Result<(), StorageError> {
+    pub fn set_page_size<Host: StorageV1>(
+        host: &mut Host,
+        page_size: u16,
+    ) -> Result<(), StorageError> {
         set(host, &page_size_path(), page_size)
     }
 
     /// Get page size
-    pub fn get_page_size(host: &mut impl Runtime) -> Result<u16, StorageError> {
+    pub fn get_page_size<Host: StorageV1>(host: &mut Host) -> Result<u16, StorageError> {
         get(host, &page_size_path())
     }
 
     /// Set slot size
-    pub fn set_slot_size(host: &mut impl Runtime, slot_size: u32) -> Result<(), StorageError> {
+    pub fn set_slot_size<Host: StorageV1>(
+        host: &mut Host,
+        slot_size: u32,
+    ) -> Result<(), StorageError> {
         set(host, &slot_size_path(), slot_size)
     }
 
     /// Get slot size
-    pub fn get_slot_size(host: &mut impl Runtime) -> Result<u32, StorageError> {
+    pub fn get_slot_size<Host: StorageV1>(host: &mut Host) -> Result<u32, StorageError> {
         get(host, &slot_size_path())
     }
 
     /// Attestation lag
-    pub fn set_attestation_lag(
-        host: &mut impl Runtime,
+    pub fn set_attestation_lag<Host: StorageV1>(
+        host: &mut Host,
         attestation_lag: u16,
     ) -> Result<(), StorageError> {
         set(host, &attestation_lag_path(), attestation_lag)
     }
 
     /// Get attestation lag
-    pub fn get_attestation_lag(host: &mut impl Runtime) -> Result<u16, StorageError> {
+    pub fn get_attestation_lag<Host: StorageV1>(host: &mut Host) -> Result<u16, StorageError> {
         get(host, &attestation_lag_path())
     }
 }

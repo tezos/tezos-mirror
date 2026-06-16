@@ -6,6 +6,8 @@ set -e
 . /usr/share/debconf/confmodule
 
 db_version 2.0
+db_input high octez-smart-rollup-node/deprecation_notice || true
+db_go || true
 
 # work directory to store temporary files associated to this package
 mkdir -p /run/octez-smart-rollup-node

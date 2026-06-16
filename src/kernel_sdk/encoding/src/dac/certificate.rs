@@ -18,6 +18,8 @@ use super::SlicePageError;
 use super::V0SliceContentPage;
 use super::V0SliceHashPage;
 use super::MAX_PAGE_SIZE;
+use host::reveal::HostReveal;
+use host::storage::StorageV1;
 use tezos_crypto_rs::hash::BlsSignature;
 #[cfg(feature = "bls")]
 use tezos_crypto_rs::hash::PublicKeyBls;
@@ -28,7 +30,6 @@ use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::Zarith;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::path::Path;
-use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
@@ -163,9 +164,11 @@ impl Certificate {
     /// and to perform your own benchmarking.
     ///
     /// If `reveal_to_store` returns an error, any content succesfully revealed
-    /// up until the error occurred will remain in storage; use [Runtime::store_value_size] to
+    /// up until the error occurred will remain in storage; use [StorageV1::store_value_size] to
     /// determine the size of this value.
-    pub fn reveal_to_store<Host: Runtime>(
+    ///
+    /// [StorageV1::store_value_size]: tezos_smart_rollup_host::storage::StorageV1::store_value_size
+    pub fn reveal_to_store<Host: StorageV1 + HostReveal>(
         &self,
         host: &mut Host,
         path: &impl Path,
@@ -233,7 +236,7 @@ impl Certificate {
 }
 
 fn fetch_page<'a>(
-    host: &impl Runtime,
+    host: &impl HostReveal,
     hash: &[u8; PREIMAGE_HASH_SIZE],
     buffer: &'a mut [u8],
 ) -> Result<(SlicePage<'a>, &'a mut [u8]), CertificateError> {

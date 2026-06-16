@@ -5,6 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type constants = {target : Z.t; alpha : float}
+
+(** Returns the gas constants depending on the storage version set by the
+    kernel. *)
+val gas_constants : storage_version:int -> constants
+
 (** [price_from_backlog ~version ~minimum backlog] mimics the computation
     performed by the kernel in order to compute the base fee per gas for the
     next block.

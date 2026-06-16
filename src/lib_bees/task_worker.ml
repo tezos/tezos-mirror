@@ -193,6 +193,25 @@ let launch_tasks_and_wait ?(max_fibers = max_int) name func ?on_completion args
       launch_task_and_wait name ?on_completion func arg |> Eio.Promise.await)
     args
 
+exception Bee_task_worker_error of string
+
+let bind_and_raise p =
+  let error_wrapper = Format.sprintf "Task worker error: %s" in
+  match p with
+  | Ok v -> v
+  | Error (Closed (Some err)) ->
+      raise
+        (Bee_task_worker_error
+           (error_wrapper (Format.asprintf "%a" Error_monad.pp_print_trace err)))
+  | Error (Closed None) ->
+      raise (Bee_task_worker_error (error_wrapper "closed error"))
+  | Error (Request_error _) ->
+      raise (Bee_task_worker_error (error_wrapper "request error"))
+  | Error (Any exn) ->
+      raise (Bee_task_worker_error (error_wrapper (Printexc.to_string exn)))
+
+let bind_and_raise_all l = List.map bind_and_raise l
+
 let launch_task name on_request ?on_completion param =
   let r = Request.Task {name; on_request; param; on_completion} in
   Worker.Queue.push_request_eio (get_worker ()) r

@@ -1,0 +1,52 @@
+parameter (or (unit %run) (unit %_noop)) ;
+storage unit ;
+# Michelson gas burner with internal operations.
+#
+# Burns significant gas via a KECCAK hashing loop (5000 iterations),
+# then emits a self-call to %_noop.
+#
+# The self-call creates an internal operation which triggers the
+# get_and_reset_milligas_consumed() baseline reset in the Michelson
+# server.  This is the mechanism that caused the X-Tezos-Gas-Consumed
+# header to report ~0: by the time build_response was called, the
+# baseline had been reset by the internal operation, so the delta
+# was near zero.
+#
+# The header must report the true cumulative gas (via
+# total_milligas_consumed) regardless of internal-operation resets.
+#
+# Uses KECCAK (1614 milligas per 32-byte call in MIR) in a LOOP
+# with 20000 iterations to burn ~32M milligas (~320K EVM gas).
+#
+# Exposes %run for compatibility with the CRAC runner framework.
+code
+  { UNPAIR ;
+    IF_LEFT
+      { # %run: burn gas via KECCAK loop, then emit self-call
+        DROP ;
+        # storage (unit) is now on top of stack
+        # Burn gas: 20000 iterations of KECCAK on a 32-byte hash chain.
+        PUSH bytes 0x00 ;
+        PUSH int 20000 ;
+        DUP ; GT ;
+        LOOP
+          { # int(n) : bytes : unit
+            DIP { KECCAK } ;
+            PUSH int 1 ; SWAP ; SUB ;
+            DUP ; GT
+          } ;
+        # int(0) : bytes : unit
+        DROP ; DROP ;
+        # unit (storage)
+        # Emit self-call to %_noop.  This internal operation is
+        # what triggers the baseline reset bug.
+        SELF %_noop ;
+        PUSH mutez 0 ; UNIT ; TRANSFER_TOKENS ;
+        NIL operation ; SWAP ; CONS ;
+        PAIR
+      }
+      { # %_noop: do nothing
+        DROP ;
+        NIL operation ; PAIR
+      }
+  } ;

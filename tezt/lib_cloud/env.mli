@@ -86,6 +86,11 @@ val keep_alive : bool
 (** Equivalent to [Cli.vms]. *)
 val vms : int option
 
+(** Base port for Netdata reverse-proxy endpoints on the orchestrator.
+    Agent [i] is proxied on port [netdata_proxy_base_port + i].
+    Hardcoded to 20001. *)
+val netdata_proxy_base_port : int
+
 (** Equivalent to [Cli.vm_base_port]. *)
 val vm_base_port : int
 
@@ -158,6 +163,17 @@ val artifacts_dir : string option
 (** Equivalent to [Cli.teztale_artifacts] *)
 val teztale_artifacts : bool
 
+type auth_infos = {username : string; password : string}
+
+(** [auth_enabled] is [Some {username; password}] when both [auth_username] and
+    [auth_password] are set.
+    The username is resolved from CLI flag [--auth-username], then config file,
+    then env var [TEZT_CLOUD_AUTH_USERNAME].
+    The password is resolved from CLI flag [--auth-password], then env var
+    [TEZT_CLOUD_AUTH_PASSWORD] (config file is excluded for security).
+    When enabled, monitoring services are protected by nginx basic auth. *)
+val auth_enabled : auth_infos option
+
 (** Notification backend, slack_channel_id and slack_bot_token *)
 val notifier : Types.notifier
 
@@ -187,7 +203,11 @@ val wait_process :
 (** [run_command ?cmd_wrapper cmd args] can wrap the command given by [cmd] and [args] with
     a [Gcloud] wrapper, depending on the value of [?cmd_wrapper]. *)
 val run_command :
-  ?cmd_wrapper:Gcloud.cmd_wrapper -> string -> string list -> Process.t
+  ?runner:Runner.t ->
+  ?cmd_wrapper:Gcloud.cmd_wrapper ->
+  string ->
+  string list ->
+  Process.t
 
 (** [dns_domains ()] returns a list of fully qualified domain names (FQDNs) based on current
     configuration (given by [Cli.dns_domains]) and [mode] of operation. *)

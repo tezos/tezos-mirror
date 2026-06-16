@@ -633,8 +633,8 @@ let test_two_attestations_with_same_attester () =
   let* _genesis, attested_block = init_genesis ~dal_enable:true () in
   let* op1 = Op.raw_attestation attested_block in
   let dal_content =
-    let attestation = Dal_helpers.dal_attestation [Dal.Slot_index.zero] in
-    {attestation}
+    let attestations = Dal_helpers.dal_attestations [Dal.Slot_index.zero] in
+    {attestations}
   in
   let* op2 = Op.raw_attestation ~dal_content attested_block in
   let*! res =
@@ -656,8 +656,8 @@ let test_two_attestations_with_same_attester () =
   in
   Assert.proto_error ~loc:__LOC__ res error
 
-(* Check that if an attester includes some DAL content but they have no assigned
-   shards, then an error is returned at block validation.
+(* Check that if an attester includes some non-empty DAL content but they have
+   no assigned shards, then an error is returned at block validation.
 
    Note that we change the value of [consensus_committee_size] because with the
    default test parameters, [consensus_committee_size = 25 < 64 =
@@ -703,7 +703,21 @@ let test_attester_with_no_assigned_shards () =
     in
     let* has_assigned_shards = Dal_helpers.has_assigned_shards (B b) pkh in
     if in_committee && not has_assigned_shards then
-      let dal_content = {attestation = Dal.Attestation.empty} in
+      let slot_index =
+        Stdlib.Option.get
+          (Dal.Slot_index.of_int_opt ~number_of_slots:dal.number_of_slots 0)
+      in
+      let number_of_lags = List.length dal.attestation_lags in
+      let attestations =
+        Dal.Attestations.(
+          commit
+            empty
+            ~number_of_slots:dal.number_of_slots
+            ~number_of_lags
+            ~lag_index:(number_of_lags - 1)
+            slot_index)
+      in
+      let dal_content = {attestations} in
       let* op = Op.attestation ~manager_pkh:pkh ~dal_content b in
       let* ctxt = Incremental.begin_construction b in
       let expect_apply_failure = function
@@ -711,10 +725,12 @@ let test_attester_with_no_assigned_shards () =
             Environment.Ecoproto_error
               (Alpha_context.Dal_errors
                .Dal_data_availibility_attester_not_in_committee
-                 {attester; level; slot = _});
+                 {attester; committee_level; attested_level; lag_index});
           ]
           when Signature.Public_key_hash.equal attester pkh
-               && Raw_level.to_int32 level = b.header.shell.level ->
+               && Raw_level.to_int32 committee_level = b.header.shell.level
+               && attested_level = Raw_level.succ committee_level
+               && lag_index = number_of_lags - 1 ->
             return_unit
         | errs ->
             failwith
@@ -732,6 +748,9 @@ let test_attester_with_no_assigned_shards () =
       else iter b (i + 1)
   in
   let* b = Block.bake genesis in
+  (* We bake a few blocks so that there is a published level for all tested
+     attested levels. *)
+  let* b = Block.bake_n dal.attestation_lag b in
   let* _ = iter b 0 in
   return_unit
 
@@ -746,6 +765,7 @@ let test_dal_attestation_threshold () =
              dal =
                {
                  attestation_lag;
+                 attestation_lags;
                  attestation_threshold;
                  cryptobox_parameters = {number_of_shards; _};
                  _;
@@ -766,8 +786,8 @@ let test_dal_attestation_threshold () =
   let* b = Block.bake genesis ~operation:op in
   let* b = Block.bake_n (attestation_lag - 1) b in
   let* dal_committee = Context.Dal.shards (B b) () in
-  let attestation = Dal_helpers.dal_attestation [slot_index] in
-  let dal_content = {attestation} in
+  let attestations = Dal_helpers.dal_attestations [slot_index] in
+  let dal_content = {attestations} in
   let min_power = attestation_threshold * number_of_shards / 100 in
   Log.info "Number of minimum required attested shards: %d" min_power ;
   let* _ =
@@ -782,8 +802,15 @@ let test_dal_attestation_threshold () =
           Block.bake_with_metadata ~operations:ops b
         in
         let attested_expected = power >= min_power in
+        let number_of_slots = genesis.constants.dal.number_of_slots in
+        let number_of_lags = List.length attestation_lags in
         let attested =
-          Dal.Attestation.is_attested metadata.dal_attestation slot_index
+          Dal.Slot_availability.is_attested
+            metadata.dal_slot_availability
+            ~number_of_slots
+            ~number_of_lags
+            ~lag_index:(number_of_lags - 1)
+            slot_index
         in
         Log.info "With %d power, the slot is attested: %b " power attested ;
         Check.(attested = attested_expected)
@@ -796,12 +823,98 @@ let test_dal_attestation_threshold () =
   in
   return_unit
 
+(** This test would catch a former a bug where a slot that becomes
+    protocol-attested would be added to the skip list again when the attestation
+    window closes.
+
+    Scenario:
+    1. Publish a slot at level L
+    2. Have enough bakers attest at L+lag to make it protocol-attested
+       - Slot is added to skip list with is_proto_attested = true
+    3. Continue baking until L + attestation_lag (attestation window closes)
+       - code was trying to process ALL published slots
+*)
+let test_dal_attestations_skip_list_insertion_scenario () =
+  let open Lwt_result_wrap_syntax in
+  let attestation_lags = [2; 3] in
+  let attestation_lag = 3 in
+  let dal =
+    let base =
+      Tezos_protocol_alpha_parameters.Default_parameters.constants_test.dal
+    in
+    {base with attestation_lags; attestation_lag}
+  in
+  let* genesis, contracts =
+    Context.init_n ~dal_enable:true ~dal ~consensus_threshold_size:0 5 ()
+  in
+  let contract = Stdlib.List.hd contracts in
+  let* {parametric = {dal = dal_params; _}; _} =
+    Context.get_constants (B genesis)
+  in
+  let number_of_slots = dal_params.number_of_slots in
+  let number_of_lags = List.length dal_params.attestation_lags in
+
+  (* Bake a block so that attestations are not "emptied" as considered just
+     after migration. *)
+  let* b = Block.bake_n 1 genesis in
+
+  (* Publish a slot *)
+  let slot_index = Dal.Slot_index.zero in
+  let commitment = Alpha_context.Dal.Slot.Commitment.zero in
+  let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
+  let slot_header =
+    Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
+  in
+  let* op = Op.dal_publish_commitment (B b) contract slot_header in
+  let* b_published = Block.bake b ~operation:op in
+  let published_level = b_published.header.shell.level in
+  Log.info "Published slot at level %ld" published_level ;
+
+  let* b = Block.bake b_published in
+
+  let attestations =
+    Dal.Attestations.commit
+      Dal.Attestations.empty
+      ~number_of_slots
+      ~number_of_lags
+      ~lag_index:0
+      slot_index
+  in
+  let dal_content = {attestations} in
+  let* ops =
+    List.map_es
+      (fun attester -> Op.attestation ~manager_pkh:attester ~dal_content b)
+      (List.map Context.Contract.pkh contracts)
+  in
+  let* b, (metadata, _ops_results) =
+    Block.bake_with_metadata b ~operations:ops
+  in
+  let is_attested =
+    Dal.Slot_availability.is_attested
+      metadata.dal_slot_availability
+      ~number_of_slots
+      ~number_of_lags
+      ~lag_index:0
+      slot_index
+  in
+  let* () =
+    if not is_attested then
+      failwith "Expected slot to be attested at lag_index=0"
+    else return_unit
+  in
+  (* Now bake one more block so that the attestation window closes for the
+     published slot. *)
+  let* _b, (metadata, _ops_results) = Block.bake_with_metadata b in
+  let is_empty = Dal.Slot_availability.empty = metadata.dal_slot_availability in
+  Check.is_true ~__LOC__ is_empty ~error_msg:"Expected no slot to be attested" ;
+  return_unit
+
 (* The BLS mode encoding differs from the regular attestation encoding
    in that slots are omitted. This test verifies that an attestation's signature
    check remains valid even after replacing its slot with a different one. *)
 let slot_substitution_do_not_affect_signature_check () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* genesis, _contracts = Context.init_n 5 () in
   let* b = Block.bake genesis in
   let* {Context.consensus_key = consensus_pkh; _} =
     Context.get_attester (B b)
@@ -850,7 +963,7 @@ let slot_substitution_do_not_affect_signature_check () =
     (* attestation with dal signed with slot zero *)
     Op.raw_attestation
       ~attesting_slot:{slot = Slot.zero; consensus_pkh}
-      ~dal_content:{attestation = Dal.Attestation.empty}
+      ~dal_content:{attestations = Dal.Attestations.empty}
       b
   in
   let* () =
@@ -865,7 +978,7 @@ let slot_substitution_do_not_affect_signature_check () =
    be mismatched between signing and verification. *)
 let encoding_incompatibility () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* genesis, _contracts = Context.init_n 5 () in
   let* b = Block.bake genesis in
   let* attester = Context.get_attester (B b) in
   let* signer = Account.find attester.consensus_key in
@@ -933,10 +1046,193 @@ let encoding_incompatibility () =
   let* raw_attestation_with_dal =
     Op.raw_attestation
       ~attesting_slot
-      ~dal_content:{attestation = Dal.Attestation.empty}
+      ~dal_content:{attestations = Dal.Attestations.empty}
       b
   in
   let* () = check_encodings_incompatibily raw_attestation_with_dal in
+  return_unit
+
+(** Test DAL rewards distribution based on participation.
+
+    We assume:
+    - 3 attestation lags;
+    - 1 published slot;
+    - 3 bakers
+    - [attestation_threshold = 50%]
+    So we need two bakers for the slot to be attested.
+
+    Scenario:
+    - Initialize with DAL enabled and 3 bakers
+    - Publish slots and have bakers attest with different participation rates:
+      * Baker 1: attests with 1st lag
+      * Baker 2: attests with 2nd lag (slot becomes attested)
+      * Baker 3: attests with 3rd lag
+    - At the end of the cycle, check DAL participation info for each baker
+
+    We should obtain that bakers 1-3 obtain their DAL rewards, even if the baker
+    1 and 3 attested before, respectively after the slot is attested.
+*)
+let test_dal_rewards () =
+  let open Lwt_result_wrap_syntax in
+  let attestation_lags = [2; 3; 4] in
+  let attestation_lag = 4 in
+  let attestation_threshold = 50 in
+  let constants =
+    Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+  in
+  let dal =
+    {
+      constants.dal with
+      attestation_lags;
+      attestation_lag;
+      attestation_threshold;
+    }
+  in
+  let* b, contracts =
+    Context.init_n ~dal_enable:true ~dal ~consensus_threshold_size:0 3 ()
+  in
+  let contract1 =
+    WithExceptions.Option.get ~loc:__LOC__ (List.nth_opt contracts 0)
+  in
+  let baker1, baker2, baker3 =
+    let bakers =
+      List.map
+        (fun index ->
+          let contract =
+            WithExceptions.Option.get
+              ~loc:__LOC__
+              (List.nth_opt contracts index)
+          in
+          Context.Contract.pkh contract)
+        [0; 1; 2]
+    in
+    match bakers with [a; b; c] -> (a, b, c) | _ -> Test.fail "unreachable"
+  in
+  let number_of_slots = dal.number_of_slots in
+  let number_of_lags = 3 in
+
+  (* Publish a slot *)
+  let slot_index = Dal.Slot_index.zero in
+  let commitment = Alpha_context.Dal.Slot.Commitment.zero in
+  let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
+  let slot_header =
+    Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
+  in
+
+  Log.info "Level %ld: publishing slot" b.header.shell.level ;
+  let* op = Op.dal_publish_commitment (B b) contract1 slot_header in
+  let* b = Block.bake b ~operation:op in
+  Log.info "Slot published at level %ld" b.header.shell.level ;
+
+  (* Bake one more block to reach attestation time *)
+  let* b = Block.bake b in
+
+  let create_attestation_op block baker ~lag_index =
+    let attestations =
+      Dal.Attestations.commit
+        Dal.Attestations.empty
+        ~number_of_slots
+        ~number_of_lags
+        ~lag_index
+        slot_index
+    in
+    let dal_content = {attestations} in
+    Op.attestation ~manager_pkh:baker ~dal_content block
+  in
+
+  Log.info "Attesting at level %ld" b.header.shell.level ;
+  let* op = create_attestation_op b baker1 ~lag_index:0 in
+  let* b = Block.bake b ~operations:[op] in
+  Log.info "Attesting at level %ld" b.header.shell.level ;
+  let* op = create_attestation_op b baker2 ~lag_index:1 in
+  let* b, (metadata, _) = Block.bake_with_metadata b ~operations:[op] in
+  Log.info "Attesting at level %ld" b.header.shell.level ;
+  let* op = create_attestation_op b baker3 ~lag_index:2 in
+  let* b = Block.bake b ~operations:[op] in
+
+  let slot_attested =
+    Dal.Slot_availability.is_attested
+      metadata.dal_slot_availability
+      ~number_of_slots
+      ~number_of_lags
+      ~lag_index:1
+      slot_index
+  in
+  Check.(
+    is_true slot_attested ~__LOC__ ~error_msg:"expected slot to be attested") ;
+
+  Log.info "Level %ld: Attested" b.header.shell.level ;
+
+  let blocks_per_cycle = constants.blocks_per_cycle in
+
+  let* b =
+    Block.bake_n
+      Int32.(to_int @@ sub (sub blocks_per_cycle 2l) b.header.shell.level)
+      b
+  in
+  Log.info
+    "Level %ld, cycle %a"
+    b.header.shell.level
+    Cycle.pp
+    (Block.current_cycle b) ;
+  let* b_end = Block.bake b in
+  assert (Block.last_block_of_cycle b_end) ;
+
+  (* Check DAL participation info for each baker *)
+  let* dal_info1 = Context.Delegate.dal_participation (B b) baker1 in
+  let* dal_info2 = Context.Delegate.dal_participation (B b) baker2 in
+  let* dal_info3 = Context.Delegate.dal_participation (B b) baker3 in
+
+  let show_participation dal_info baker baker_name =
+    Log.info "Baker %s (%a)" baker_name Signature.Public_key_hash.pp baker ;
+    Log.info
+      "  Attestable slots: %d"
+      dal_info.Delegate.For_RPC.delegate_attestable_dal_slots ;
+    Log.info "  Attested slots: %d" dal_info.delegate_attested_dal_slots ;
+    Log.info
+      "  Sufficient participation: %b"
+      dal_info.sufficient_dal_participation ;
+    Log.info "  Expected DAL rewards: %a" Tez.pp dal_info.expected_dal_rewards
+  in
+  let () = show_participation dal_info1 baker1 "baker1" in
+  let () = show_participation dal_info2 baker2 "baker2" in
+  let () = show_participation dal_info3 baker3 "baker3" in
+
+  let check_participation dal_info baker_name expected_sufficient_participation
+      =
+    let prefix = sf "Baker %s" baker_name in
+    Check.(
+      (dal_info.Delegate.For_RPC.sufficient_dal_participation
+     = expected_sufficient_participation)
+        bool
+        ~error_msg:
+          (prefix
+         ^ ": unexpected sufficient DAL participation, got %L, expected %R")) ;
+
+    Check.(
+      (Tez.(dal_info.expected_dal_rewards > zero)
+      = expected_sufficient_participation)
+        bool
+        ~error_msg:
+          (prefix ^ ": unexpected non-zero DAL rewards: got %L, expected %R")) ;
+
+    Check.(
+      (dal_info.delegate_attestable_dal_slots = 1)
+        int
+        ~error_msg:
+          (prefix ^ ": unexpected # attestable DAL slots: got %L, expected %R")) ;
+
+    Check.(
+      (dal_info.delegate_attested_dal_slots = 1)
+        int
+        ~error_msg:
+          (prefix ^ ": unexpected # attested DAL slots: got %L, expected %R"))
+  in
+
+  let () = check_participation dal_info1 "baker1" true in
+  let () = check_participation dal_info2 "baker2" true in
+  let () = check_participation dal_info3 "baker3" true in
+
   return_unit
 
 let tests =
@@ -1001,6 +1297,11 @@ let tests =
       "DAL attestation_threshold"
       `Quick
       test_dal_attestation_threshold;
+    Tztest.tztest
+      "DAL attestations - skip-list insertion scenario"
+      `Quick
+      test_dal_attestations_skip_list_insertion_scenario;
+    Tztest.tztest "DAL rewards distribution" `Quick test_dal_rewards;
     (* slots are not part of the signed payload *)
     Tztest.tztest
       "slot substitution do not affect signature check"

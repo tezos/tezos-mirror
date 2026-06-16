@@ -47,8 +47,6 @@ let changeset_images_rust_sdk_bindings =
       "scripts/version.sh";
     ]
 
-let changeset_images = Changeset.make ["images/**/*"]
-
 (** Only if octez source code has changed *)
 let changeset_octez =
   let octez_source_content =
@@ -67,66 +65,6 @@ let changeset_octez =
           "tzt_reference_test_suite/**/*";
         ])
 
-(** Only if MIR code has changed. *)
-let changeset_mir =
-  Changeset.make
-    [
-      "contrib/mir/**/*.rs";
-      "contrib/mir/**/*.lalrpop";
-      (* Cargo.toml, clippy.toml *)
-      "contrib/mir/**/*.toml";
-      "contrib/mir/**/Cargo.lock";
-    ]
-
-(** Only if octez source code has changed, if the images has changed or
-        if kernels.mk changed. *)
-let changeset_octez_or_kernels_or_mir =
-  Changeset.(
-    changeset_base @ changeset_octez @ changeset_images @ changeset_mir
-    @ make ["scripts/ci/**/*"; "kernels.mk"; "etherlink.mk"])
-
-(** Only if documentation has changed *)
-
-let octez_docs_base_folders =
-  [
-    "src";
-    "tezt";
-    "brassaia";
-    "irmin";
-    "client-libs";
-    "etherlink";
-    "data-encoding";
-    "vendors";
-  ]
-
-let changeset_octez_docs =
-  Changeset.(
-    changeset_base
-    (* TODO refine scripts *)
-    @ make ["scripts/**/*/"; "script-inputs/**/*/"]
-    @ make
-        (octez_docs_base_folders |> List.map (fun x -> String.cat x "/**/*.ml*"))
-    @ make
-        [
-          "dune";
-          "dune-project";
-          "dune-workspace";
-          "**/*.rst";
-          (* Nota: stays as it is, many non-rst files in this folder *)
-          "docs/**/*";
-          "grafazos/doc/**/*";
-        ])
-
-(* Job [documentation:manuals] requires the build jobs, because it needs
-   to run Octez executables to generate the man pages.
-   So the build jobs need to be included if the documentation changes. *)
-let changeset_octez_or_doc = Changeset.(changeset_octez @ changeset_octez_docs)
-
-let changeset_octez_or_kernels_or_mir_or_doc =
-  Changeset.(changeset_octez_or_kernels_or_mir @ changeset_octez_docs)
-
-let changeset_docker_files = Changeset.make ["build.Dockerfile"; "Dockerfile"]
-
 let changeset_debian_packages =
   Changeset.(
     make
@@ -135,9 +73,7 @@ let changeset_debian_packages =
         "scripts/packaging/build-deb-local.sh";
         "scripts/packaging/Release.conf";
         "scripts/packaging/octez/debian/*";
-        "debian-deps-build.Dockerfile";
         "scripts/ci/build-debian-packages_current.sh";
-        "scripts/ci/build-packages-dependencies.sh";
         "scripts/ci/build-debian-packages.sh";
         "scripts/ci/prepare-apt-repo.sh";
         "scripts/ci/create_debian_repo.sh";
@@ -170,57 +106,12 @@ let changeset_homebrew =
         ".gitlab/ci/pipelines/homebrew_auto.yml";
         "scripts/packaging/test_homebrew_install.sh";
         "scripts/packaging/homebrew_release.sh";
-        "images/scripts/install-gcloud-apt.sh";
+        "images/scripts/install-gcloud.sh";
         "scripts/packaging/homebrew_install.sh";
         "scripts/packaging/octez/homebrew/Formula/*";
         "scripts/version.sh";
         "manifest/**/*.ml*";
       ])
-
-(** Set of OCaml files for type checking ([dune build @check]). *)
-let changeset_ocaml_check_files =
-  Changeset.(
-    changeset_base
-    @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"])
-
-(* The linting job runs over the set of [source_directories]
-   defined in [scripts/lint.sh] that must be included here: *)
-let changeset_lint_files =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "src/**/*";
-          "tezt/**/*";
-          "devtools/**/*";
-          "scripts/**/*";
-          "docs/**/*";
-          "contrib/**/*";
-          "client-libs/**/*";
-          "etherlink/**/*";
-        ])
-
-(** Set of Rust files for formatting ([cargo fmt --check]). *)
-let changeset_rust_fmt_files = Changeset.(changeset_base @ make ["**/*.rs"])
-
-(** Set of OCaml files for formatting ([dune build @fmt]). *)
-let changeset_ocaml_fmt_files =
-  Changeset.(changeset_base @ make ["**/.ocamlformat"; "**/*.ml"; "**/*.mli"])
-
-let changeset_semgrep_files =
-  Changeset.(
-    changeset_base
-    @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "scripts/semgrep/**/*"])
-
-(** Set of Jsonnet files for formatting ([jsonnetfmt --test]). *)
-let changeset_jsonnet_fmt_files = Changeset.(make ["**/*.jsonnet"])
-
-let changeset_test_sdk_rust =
-  Changeset.(
-    changeset_base
-    @ changeset_images_rust_toolchain
-      (* Run if the [rust-toolchain] image is updated *)
-    @ make ["sdk/rust/**/*"])
 
 let changeset_test_sdk_bindings =
   Changeset.(

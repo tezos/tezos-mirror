@@ -96,3 +96,12 @@ let with_timeout t k =
       (let*! () = Lwt_unix.sleep (float_of_int t) in
        fail_with_exn Timeout);
     ]
+
+let background_task ~name f =
+  let open Lwt_syntax in
+  Lwt.async @@ fun () ->
+  Lwt.catch
+    (fun () -> unwrap_error_monad f)
+    (fun exn ->
+      let* () = Events.background_task_error ~name exn in
+      Lwt_exit.exit_and_raise Node_error.exit_code_when_background_task_fails)

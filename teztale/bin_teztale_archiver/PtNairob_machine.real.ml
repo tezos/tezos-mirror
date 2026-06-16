@@ -183,6 +183,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         assert (Int32.of_int round = hd.round) ;
         return (hd.delegate, baking_rights)
 
+  let dal_shards_of _cctxt _level = return_nil
+
   let raw_block_round shell_header =
     let wrap = Environment.wrap_tzresult in
     let open Result_syntax in
@@ -241,6 +243,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                   };
                 delegate = Tezos_crypto.Signature.Of_V1.public_key_hash delegate;
                 power = preendorsement_power;
+                is_aggregated = false;
               }
             :: acc
         | Receipt
@@ -261,6 +264,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                   };
                 delegate = Tezos_crypto.Signature.Of_V1.public_key_hash delegate;
                 power = endorsement_power;
+                is_aggregated = false;
               }
             :: acc
         | _ -> acc)

@@ -28,13 +28,33 @@ let all_profilers =
     ("baker", [baker_profiler; environment_profiler]);
   ]
 
-let activate_all ~profiler_maker =
+let activate_all ~profiling_config ~profiler_maker =
   List.iter
     (fun (name, profilers) ->
       Option.iter
         (fun instance -> List.iter (fun p -> plug p instance) profilers)
-        (profiler_maker ~name))
+        (profiler_maker ~profiling_config ~name))
     all_profilers
 
 let create_reset_block_section =
   Profiler.section_maker Block_hash.equal Block_hash.to_b58check
+
+module Baker_profiler = (val Profiler.wrap baker_profiler)
+
+module Node_rpc_Profiler = struct
+  include (val Profiler.wrap node_rpc_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    create_reset_block_section node_rpc_profiler
+end
+
+module RPC_profiler = struct
+  include (val Tezos_profiler.Profiler.wrap RPC_profiler.rpc_client_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    RPC_profiler.create_reset_block_section RPC_profiler.rpc_client_profiler
+end
+
+module Operation_worker_profiler = (val Profiler.wrap operation_worker_profiler)
+
+module Nonce_profiler = (val Profiler.wrap nonce_profiler)

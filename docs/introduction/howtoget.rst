@@ -21,9 +21,6 @@ There are several options for getting the binaries, depending on how you plan to
 - :ref:`using homebrew <using_homebrew>`.
   For macOS (and also Linux) you can use our Homebrew formula to compile and
   install octez.
-- :ref:`building the binaries via the OPAM source package manager <building_with_opam>`.
-  Take this way to install the latest stable release in your native OS
-  environment, automatically built from sources.
 - :doc:`Building Octez <howtobuild>` by
   compiling the sources like developers do.
   This is the way to take if you plan to contribute to the source code.
@@ -62,16 +59,16 @@ When it comes to installing software, especially for critical
 applications like Tezos/Octez, it’s crucial to ensure a secure and
 stable environment. While compiling from source can provide
 customization options, it often introduces complexities and risks.
-Instead, opting for binary packages such as Deb or RPM packages from a trusted source simplifies
+Instead, opting for binary packages such as Deb packages from a trusted source simplifies
 installation and enhances security.
 
-Deb or RPM packages compiled for a specific platform should be always preferred
-over statically compiled binaries. Deb or RPM packages can also be used to
+Deb packages compiled for a specific platform should be always preferred
+over statically compiled binaries. Deb packages can also be used to
 simplify the creation of `OCI <https://opencontainers.org/>`__ images or simply
 deployed on bare metal using provisioning tools such as
 `Ansible <https://docs.ansible.com/>`__.
 
-Using the official Deb or RPM packages offers several advantages:
+Using the official Deb packages offers several advantages:
 
 -  **Security**: Packages are pre-compiled and thoroughly tested,
    reducing the risk of vulnerabilities introduced during compilation.
@@ -110,8 +107,11 @@ We support the following distribution/releases:
 
 - ``debian/trixie``
 - ``debian/bookworm``
-- ``ubuntu/noble``
-- ``ubuntu/jammy``
+- ``ubuntu/noble`` (Up to Octez version 24 included)
+- ``ubuntu/jammy`` (Up to Octez version 24 included)
+- ``ubuntu/22.04`` (Starting from Octez version 25)
+- ``ubuntu/24.04`` (Starting from Octez version 25)
+- ``ubuntu/26.04`` (Starting from Octez version 25)
 
 both on ``amd64`` and ``arm64`` architectures.
 
@@ -139,8 +139,8 @@ Then, to install the binaries, run the following command to install the octez-ba
 
   sudo apt install octez-baker
 
-Once the Octez binary packages are installed, they can be set up as services
-as explained in :doc:`./services`.
+Once the Octez binary packages are installed, you may want to :ref:`start a node <quickstart_node>`, and then perhaps :ref:`start a baker <quickstart_baker>`.
+Alternatively, they can be set up as services as explained in :doc:`./services`.
 
 To remove the Octez packages you can simply run the following command.
 
@@ -158,6 +158,11 @@ If runnning Octez as services, see also how to :ref:`restart them <services_upgr
 
 RPM Octez packages
 ~~~~~~~~~~~~~~~~~~
+
+.. warning::
+
+	RPM packages are no longer provided starting with Octez version 24.
+	Please choose another installation method.
 
 If you're using Fedora or Rocky Linux, you can install RPM packages with Octez binaries from the
 Octez from our DNF repository. Currently we support the latest LTS release for
@@ -217,7 +222,7 @@ To remove the Octez packages you can simply run the following command.
                 octez-dal-node octez-smart-rollup-node
 
 To upgrade packages, use ``dnf update``.
-If runnning Octez as services, see also how to :ref:`restart them <services_upgrade>`.
+If running Octez as services, see also how to :ref:`restart them <services_upgrade>`.
 
 
 .. _getting_static_binaries:
@@ -264,9 +269,14 @@ For ``RC`` versions, do rather::
 
     curl -q "https://packages.nomadic-labs.com/homebrew/RC/Formula/octez.rb" -O
 
-Install Octez using the downloaded formula with the following command::
+Install Octez using the downloaded formula, creating a new tap if necessary, with the following commands::
 
-    brew install -v ./octez.rb
+	# Create a local tap if not having one already:
+	brew tap-new octez-user/octeztap
+	# Move formula to the newly created tap:
+	mv octez.rb $(brew --repository)/Library/Taps/octez-user/homebrew-octeztap/Formula/
+	# Install formula from tap
+	brew install octez-user/octeztap/octez
 
 Depending on the speed of your system, the build can take more than 10
 minutes. We regularly test the build in our CI using macOS 14 (Sonoma) with Xcode 15 on an ARM-based Mac.
@@ -296,26 +306,26 @@ To make sure you use the most recent version of Octez, run::
 
     docker pull tezos/tezos-bare:latest
 
-For instance, to run a node on the Ghostnet :doc:`test network <../user/multinetwork>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
+For instance, to run a node on :ref:`currentnet <network_aliases>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
 
     mkdir $HOME/rolling-data-directory
     docker run -it --rm \
       --volume "$HOME/rolling-data-directory:/home/tezos/.tezos-node" \
       tezos/tezos-bare:latest \
-      octez-node config init --network ghostnet --rpc-addr 127.0.0.1 \
+      octez-node config init --network https://teztnets.com/currentnet --rpc-addr 127.0.0.1 \
         --history-mode rolling
 
 (You may use another location than ``$HOME``, but note that option ``--volume`` requires absolute paths.)
 
 Then, download and import a snapshot, and finally run the node::
 
-    wget -O $HOME/rolling <snapshot-url>
+    wget -O $HOME/rolling https://snapshots.tzinit.org/currentnet/rolling
     docker run -it --rm \
       --volume "$HOME/rolling-data-directory:/home/tezos/.tezos-node" \
       --volume "$HOME/rolling:/rolling:ro" \
       tezos/tezos-bare:latest \
       octez-node snapshot import /rolling
-    docker run --name octez-local-node -d \
+    docker run --name octez-local-node -it \
       --volume "$HOME/rolling-data-directory:/home/tezos/.tezos-node" \
       tezos/tezos-bare:latest \
       octez-node run
@@ -335,26 +345,33 @@ Docker compose files
 ~~~~~~~~~~~~~~~~~~~~
 
 Another way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
-``docker-compose`` files are available for all active
-protocols in directory :src:`scripts/docker`.
-Each compose file is able to launch services for a node, a baker, and an accuser for the given protocol.
+A working example of a simple Docker compose file is available at :src:`scripts/docker/bake.yml`.
+The compose file is able to launch services for an Octez node, a DAL node, a baker, and an accuser.
 
 First, you have to make some choices:
 
-- choose one of the above protocols and download its compose file
-- choose a :doc:`network <../user/multinetwork>` to connect to (a testnet name, ``sandbox``,  or ``mainnet``); that network must currently run your protocol
+- choose a :doc:`network <../user/multinetwork>` to connect to (a testnet name, ``sandbox``,  or ``mainnet``)
 - choosing the desired :doc:`history mode <../user/history_modes>` (``rolling``, ``full``, or ``archive``)
 - specify a vote for the :doc:`liquidity baking <../active/liquidity_baking>` feature (``on``, ``pass``, or ``off``)
 
-For instance, to configure and run the node on the active protocol on Ghostnet, in Rolling history mode::
+For instance, to configure and run the node on the active protocol on :ref:`currentnet <network_aliases>` from a snapshot, in Rolling history mode::
 
-    export PROTO=parisC
-    wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/$PROTO.yml
+    wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/bake.yml
     export LIQUIDITY_BAKING_VOTE=pass
-    docker compose -f $PROTO.yml run --rm -it \
-      octez-node octez-node --network ghostnet --history-mode rolling
+    docker compose -f bake.yml run --rm -it node octez-node config init \
+       --network https://teztnets.com/currentnet --history-mode rolling \
+       --data-dir /var/run/tezos/node/data \
+       --rpc-addr '[::]:8732' --allow-all-rpc '[::]:8732'
+    wget -O $HOME/rolling https://snapshots.tzinit.org/currentnet/rolling
+    docker compose -f bake.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
+      node octez-node snapshot import --data-dir /var/run/tezos/node/data /snapshot
+    docker compose -f bake.yml up node
 
-(Note in the command above that ``octez-node`` is the name of both the container and executable.)
+Note in the commands above that ``node`` is the name of the service running the ``octez-node`` executable.
+You may ignore possible warnings about environment variable ``BAKER_ADDRESS``, that we will set later on for the DAL node.
+
+The client and node data are stored in local subdirectories of your current directory, respectively ``./client_data/`` and ``./node_data/``.
+You may want to start with empty (or non-existent) directories in the beginning, then reuse them to restart the services.
 
 .. note::
 
@@ -362,35 +379,39 @@ For instance, to configure and run the node on the active protocol on Ghostnet, 
 
     ::
 
-        docker compose -f $PROTO.yml run --rm \
-          --entrypoint='sh -c "rm /var/run/tezos/node/data/config.json"' \
-          octez-node
-
-The node is now configured and started correctly, but may take a very long time to bootstrap.
-In most practical cases, you have to restart it from a :doc:`snapshot file <../user/snapshots>`. For that, you have to stop the node by hitting ^C (or executing in another terminal ``docker compose -f $PROTO.yml stop octez-node``), then clean up its data directory and import a snapshot that you previously downloaded::
-
-    docker compose -f $PROTO.yml run --rm \
-      --entrypoint='sh -c "cd /var/run/tezos/node/data/; \
-        rm -fr lock store context daily_logs"' \
-      octez-node
-    wget -O $HOME/rolling <snapshot-url>
-    docker compose -f $PROTO.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
-      octez-node octez-snapshot-import
-
-Now you can start all the services::
-
-    docker compose -f $PROTO.yml up
+        rm ./node_data/data/config.json
 
 You may check when your node is bootstrapped by running ``octez-client`` inside the node's container::
 
-    docker compose -f $PROTO.yml exec octez-node octez-client bootstrapped
+    docker compose -f bake.yml exec node octez-client bootstrapped
 
 You may stop and restart the node as needed. For instance if the Octez version you are using requires to upgrade the version of the storage, you can restart the node after upgrading the storage::
 
-    docker compose -f $PROTO.yml stop octez-node
-    docker compose -f $PROTO.yml run octez-node octez-upgrade-storage
-    docker compose -f $PROTO.yml up octez-node
+    docker compose -f bake.yml stop node
+    docker compose -f bake.yml run --rm node octez-node upgrade storage --data-dir /var/run/tezos/node/data
+    docker compose -f bake.yml up node
 
+To run the baker, you must configure a baking key (if you have one you may skip this step.
+While the node is running, do (in another window if needed)::
+
+    docker compose -f bake.yml exec node sh
+
+and in the shell do::
+
+    export TEZOS_CLIENT_DIR=/var/run/tezos/client
+    octez-client gen keys mybaker
+    octez-client show address mybaker
+    # Note down the address of mybaker
+    # Fund mybaker with > 6000 tez, e.g. at https://faucet.currentnet.teztnets.com
+    octez-client register key mybaker as delegate
+    octez-client stake 6000 for mybaker
+
+Once the baking key is configured, stop the node and then run all the services::
+
+    export BAKER_ADDRESS=tz...
+    docker compose -f bake.yml up
+
+Now you should have running together: the node, the DAL node, the baker and the accuser.
 
 Building Docker Images Locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -470,172 +491,6 @@ There are several packages:
 - ``octez-baker``: the Octez baking and VDF daemons
 - ``octez-smartrollup``: the Octez Smart Rollup daemons
 - ``octez-signer``: the remote signer, to hold keys on (and sign from) a different machine from the baker or client
-
-.. _building_with_opam:
-
-Building from sources via OPAM
-------------------------------
-
-The easiest way to build the binaries from the source code is to use the OPAM
-source package manager for OCaml.
-
-This is easier than setting up a complete development environment as described in :doc:`howtobuild`, like developers do.
-However, this method is recommended for expert users as it requires basic
-knowledge of the OPAM package manager and the OCaml packages
-workflow. In particular, upgrading Octez from release to
-release might require tinkering with different options of the OPAM
-package manager to adjust the local environment for the new
-dependencies.
-
-
-.. _build_environment:
-
-Environment
-~~~~~~~~~~~
-
-Currently Octez is being developed for Linux x86_64, mostly for
-Ubuntu and Fedora Linux. The following OSes are also reported to
-work: macOS (x86_64), Arch Linux ARM (aarch64), Debian Linux (x86_64). A Windows port is feasible and might be
-developed in the future.
-
-.. note::
-
-    If you build the binaries by using the following instructions inside a
-    Docker container, you have to give extended privileges to this container,
-    by passing option ``--privileged`` to the ``docker run`` command.
-
-.. warning::
-
-   Mixing LLVM and GNU binutils toolchains can cause issues when building Octez. If you encounter
-   an error like this, it may be that you have tools from both LLVM and GNU in scope.
-
-   ::
-
-     Error: ExternalToolError { reason: "Failed to create archive index with `ranlib`", tool: "ranlib", args: ["liboctez_rust_deps.a"], stdout: "", stderr: "LLVM ERROR: Invalid encoding\n" }
-
-   In this case, refer to :ref:`Mixing LLVM and GNU binutils <mixing_llvm_gnu_binutils>`.
-
-Install OPAM
-~~~~~~~~~~~~
-
-First, you need to install the `OPAM <https://opam.ocaml.org/>`__
-package manager, at least version 2.1, that you can get by following the `install instructions <https://opam.ocaml.org/doc/Install.html>`__.
-
-After the first install of OPAM, use ``opam init --bare`` to set it up
-while avoiding to compile an OCaml compiler now, as this will be done in
-the next step.
-
-.. _install_opam_packages:
-
-Install Octez OPAM packages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The latest Octez release is available (as soon as possible after the
-release) directly as OPAM packages in a specific repository (defined below).
-
-.. note::
-
-   Every file related to OPAM is (by default) in ``$HOME/.opam`` which
-   means that, first, OPAM installs are user-specific and, second, you
-   can get rid of everything by removing this directory (+ updating
-   your rc files (``$HOME/.bashrc``, ``$HOME/.profile``,
-   ``$HOME/.zshrc``, ``$HOME/.emacs``, ...) if you asked/allowed OPAM
-   to add some lines in them).
-
-The binaries need a specific version of the OCaml and Rust compilers (see the values
-of variables ``$ocaml_version`` and ``$recommended_rust_version`` in file ``scripts/version.sh``). To get an environment with them do:
-
-.. literalinclude:: install-opam.sh
-  :language: shell
-  :start-after: [install ocaml compiler]
-  :end-before: [add octez repository]
-
-.. note::
-
-   The ``opam switch create`` command may fail if the switch already exists;
-   you are probably re-installing or upgrading an existing installation.
-   If the required compiler version has not changed since the last time, you
-   may simply ignore this error. Otherwise, you are upgrading to a new compiler,
-   so look at the :ref:`relevant section below <updating_with_opam>`.
-
-   The command ``eval $(opam env)`` sets up required environment
-   variables. OPAM will suggest to add it in your rc file. If, at any
-   point, you get an error like ``octez-something: command not
-   found``, first thing to try is to (re)run ``eval $(opam
-   env --switch $ocaml_version)`` (replace ``$ocaml_version`` with its value
-   in ``scripts/version.sh``) to see if it fixes the problem.
-
-.. note::
-
-   If an OPAM commands times out, you may allocate it more time for its
-   computation by setting the OPAMSOLVERTIMEOUT environment variable (to a
-   number of seconds), e.g. by adding ``OPAMSOLVERTIMEOUT=1200`` before the
-   command. If no timeout occurs, you may omit this part.
-
-The Octez packages are distributed in their own Opam repository, which you have to add:
-
-.. literalinclude:: install-opam.sh
-  :language: shell
-  :start-after: [add octez repository]
-  :end-before: [install tezos]
-
-Now, install all the binaries by:
-
-.. literalinclude:: install-opam.sh
-  :language: shell
-  :start-after: [install tezos]
-  :end-before: [test executables]
-
-You can be more specific and only ``opam install octez-node``, ``opam
-install octez-baker``, ...
-
-.. warning::
-
-   Note that ``opam install octez-client`` and ``opam install
-   octez-signer`` are "minimal" and do not install the support for
-   Ledger Nano devices. To enable it, run ``opam install
-   ledgerwallet-tezos`` in addition to installing the binaries. (The
-   macro meta-package ``tezos`` installs ``ledgerwallet-tezos``.)
-
-.. _updating_with_opam:
-
-Updating via OPAM
-~~~~~~~~~~~~~~~~~
-
-Installation via OPAM is especially convenient for updating to newer
-versions. Once some libraries/binaries are installed and new versions
-released, you can update by:
-
-::
-
-   opam update
-   opam upgrade
-
-It is recommended to also run the command ``opam remove -a`` in order
-to remove the dependencies installed automatically and not needed
-anymore. Beware not uninstall too much though.
-
-Identified situations where it will be more tricky are:
-
-* When the OCaml compiler version requirement changes. In this case,
-  you have several possibilities:
-
-  - Be explicit about the "upgrade" and do ``opam upgrade --unlock-base
-    ocaml.$new_version tezos``. Note that starting from OPAM version 2.1,
-    this option is replaced by ``--update-invariant`` (see the `opam-switch
-    manual <https://opam.ocaml.org/doc/man/opam-switch.html>`_).
-  - Remove the existing switch (e.g., ``opam switch remove for_tezos``, but
-    be aware that this will delete the previous installation), and replay
-    :ref:`the installation instructions <install_opam_packages>`.
-  - Replay :ref:`the installation instructions <install_opam_packages>` while
-    creating a different switch (e.g. ``ocaml_${ocaml_version}_for_tezos``), but
-    be aware that each switch consumes a significant amount of disk space.
-
-* When there are Rust dependencies involved. The way to go is still
-  unclear.
-  The solution will be defined when delivering the first release with Rust
-  dependencies.
-
 
 Appendix
 --------

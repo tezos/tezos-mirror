@@ -1,19 +1,19 @@
 use getset::{CopyGetters, Getters};
 
 use nom::{
+    Finish,
     branch::alt,
     bytes::complete::{tag, take},
     combinator::{all_consuming, complete, flat_map, into, map, success, verify},
     multi::many_till,
     sequence::preceded,
-    Finish,
 };
 
 use serde::{Deserialize, Serialize};
 
 use tezos_crypto_rs::{
     blake2b::{self, Blake2bError},
-    hash::{BlockHash, Hash, HashType},
+    hash::{BlockHash, HashType},
 };
 
 use tezos_data_encoding::{
@@ -22,7 +22,7 @@ use tezos_data_encoding::{
     enc::{BinError, BinWriter},
     encoding::{Encoding, HasEncoding},
     has_encoding,
-    nom::{error::convert_error, NomError, NomInput, NomReader, NomResult},
+    nom::{NomError, NomInput, NomReader, NomResult, error::convert_error},
     types::Bytes,
 };
 
@@ -137,15 +137,15 @@ impl From<Blake2bError> for MessageHashError {
 
 /// Trait for getting hash of the message.
 pub trait MessageHash {
-    fn message_hash(&self) -> Result<Hash, MessageHashError>;
+    fn message_hash(&self) -> Result<[u8; 32], MessageHashError>;
     fn message_typed_hash<H>(&self) -> Result<H, MessageHashError>
     where
-        H: tezos_crypto_rs::hash::HashTrait;
+        H: tezos_crypto_rs::hash::HashTrait<32>;
 }
 
 impl<T: BinaryMessage> MessageHash for T {
     #[inline]
-    fn message_hash(&self) -> Result<Hash, MessageHashError> {
+    fn message_hash(&self) -> Result<[u8; 32], MessageHashError> {
         let bytes = self.as_bytes()?;
         Ok(blake2b::digest_256(&bytes))
     }
@@ -153,11 +153,10 @@ impl<T: BinaryMessage> MessageHash for T {
     #[inline]
     fn message_typed_hash<H>(&self) -> Result<H, MessageHashError>
     where
-        H: tezos_crypto_rs::hash::HashTrait,
+        H: tezos_crypto_rs::hash::HashTrait<32>,
     {
         let bytes = self.as_bytes()?;
-        let digest = blake2b::digest_256(&bytes);
-        H::try_from_bytes(&digest).map_err(|e| e.into())
+        Ok(H::from(blake2b::digest_256(&bytes)))
     }
 }
 
@@ -237,11 +236,11 @@ impl From<OperationsForBlocksMessage> for Vec<Operation> {
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug, Getters)]
 pub struct PathRight {
     #[get = "pub"]
-    left: Hash,
+    left: [u8; 32],
 }
 
 impl PathRight {
-    pub fn new(left: Hash) -> Self {
+    pub fn new(left: [u8; 32]) -> Self {
         Self { left }
     }
 }
@@ -250,11 +249,11 @@ impl PathRight {
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug, Getters)]
 pub struct PathLeft {
     #[get = "pub"]
-    right: Hash,
+    right: [u8; 32],
 }
 
 impl PathLeft {
-    pub fn new(right: Hash) -> Self {
+    pub fn new(right: [u8; 32]) -> Self {
         Self { right }
     }
 }
@@ -267,10 +266,10 @@ pub enum PathItem {
 }
 
 impl PathItem {
-    pub fn right(left: Hash) -> PathItem {
+    pub fn right(left: [u8; 32]) -> PathItem {
         PathItem::Right(PathRight::new(left))
     }
-    pub fn left(right: Hash) -> PathItem {
+    pub fn left(right: [u8; 32]) -> PathItem {
         PathItem::Left(PathLeft::new(right))
     }
 }
@@ -341,19 +340,19 @@ has_encoding!(Path, PATH_ENCODING, { Encoding::Custom });
 #[derive(Clone)]
 enum DecodePathNode {
     Left,
-    Right(Hash),
+    Right([u8; 32]),
 }
 
-impl From<Vec<u8>> for DecodePathNode {
-    fn from(bytes: Vec<u8>) -> Self {
+impl From<[u8; 32]> for DecodePathNode {
+    fn from(bytes: [u8; 32]) -> Self {
         DecodePathNode::Right(bytes)
     }
 }
 
-fn hash(input: &[u8]) -> NomResult<Vec<u8>> {
+fn hash(input: &[u8]) -> NomResult<[u8; 32]> {
     map(
         take(HashType::OperationListListHash.size()),
-        |slice: &[u8]| slice.to_vec(),
+        |slice: &[u8]| slice.try_into().expect("correct hash size"),
     )(input)
 }
 

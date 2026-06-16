@@ -390,6 +390,11 @@ module Sc_rollup : sig
     Lwt.t
 end
 
+module CLST : sig
+  val redeemed_frozen_balance :
+    t -> Alpha_context.Contract.t -> Tez.t option tzresult Lwt.t
+end
+
 type (_, _) tup =
   | T1 : ('a, 'a) tup
   | T2 : ('a, 'a * 'a) tup
@@ -424,9 +429,8 @@ type 'accounts init :=
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
-  ?allow_tz4_delegate_enable:bool ->
-  ?aggregate_attestation:bool ->
   ?native_contracts_enable:bool ->
+  ?tz5_account_enable:bool ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 

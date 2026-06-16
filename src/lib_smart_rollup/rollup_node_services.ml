@@ -1114,6 +1114,14 @@ module Block = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Encodings.committed_status
       (path / "committed_status")
+
+  module Helpers = struct
+    type nonrec prefix = prefix
+
+    let prefix = prefix
+
+    let path = path / "helpers"
+  end
 end
 
 module Local = struct

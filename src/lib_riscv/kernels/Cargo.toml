@@ -1,0 +1,14 @@
+[workspace]
+resolver = "3"
+members = ["echo"]
+
+[workspace.lints.clippy]
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+private_intra_doc_links = "allow"
+
+[workspace.dependencies]
+tezos-smart-rollup = { path = "../../kernel_sdk/sdk", default-features = false }

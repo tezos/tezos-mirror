@@ -29,6 +29,7 @@
 (* Testing
    -------
    Component:    Smart Optimistic Rollups
+   Requirements: make -f kernels.mk riscv-echo
    Invocation:   dune exec tezt/tests/main.exe -- --file sc_rollup.ml
 *)
 
@@ -42,7 +43,10 @@ open Sc_rollup_helpers
 
 *)
 
-let default_wasm_pvm_revision = function _ -> "2.0.0-r5"
+let default_wasm_pvm_revision = function
+  | Protocol.T024 | S023 -> "2.0.0-r5"
+  | Alpha -> "2.0.0-r6"
+  | U025 -> "2.0.0-r6"
 
 let max_nb_ticks = 50_000_000_000_000
 
@@ -142,6 +146,24 @@ let gen_keys_then_transfer_tez ?(giver = Constant.bootstrap1.alias)
   let* _ = Client.bake_for_and_wait client in
   return keys
 
+let make_read_outbox_echo_kernel kind () =
+  match kind with
+  | "wasm_2_0_0" -> read_kernel "echo"
+  | "riscv" -> (
+      let kernel = "riscv-echo" in
+      try
+        read_riscv_kernel
+          (Uses.make ~tag:"riscv" ~path:kernel ())
+          (Uses.make ~tag:"riscv" ~path:(kernel ^ ".checksum") ())
+      with Sys_error e ->
+        Test.fail
+          ~__LOC__
+          "Could not read RISC-V echo kernel (%s). If absent, run `make -f \
+           kernels.mk riscv-echo` then try again"
+          e)
+  | kind ->
+      Test.fail ~__LOC__ "read_outbox_echo_kernel: unsupported PVM kind %s" kind
+
 let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     ?whitelist_enable ?whitelist ?commitment_period ?challenge_window ?timeout
     ?(src = Constant.bootstrap1.alias) ?rpc_external ?uses ?dal_rewards_weight
@@ -156,6 +178,7 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     ?uses
     ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
+  let boot_sector = Option.map (fun f -> f ()) boot_sector in
   let* tezos_node, tezos_client =
     setup_l1
       ?commitment_period
@@ -172,11 +195,27 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
   in
   scenario protocol sc_rollup tezos_node tezos_client
 
+let maybe_setup_preimages_dir rollup_node kind preimages_dir =
+  match preimages_dir with
+  | None -> Lwt.return ()
+  | Some src_dir ->
+      let data_dir = Sc_rollup_node.data_dir rollup_node in
+      let dest_dir = Filename.concat data_dir kind in
+      (* Copying used here instead of softlink to avoid tampering of artefact
+         when debugging from the temp test directory *)
+      Process.run "cp" ["-R"; Uses.path src_dir; dest_dir]
+
+(* [boot_sector] is a thunk [(unit -> string) option] rather than a plain string
+   so that callers can defer [Uses.path] calls to test execution time. The Tezt
+   framework warns when a dependency declared in [~uses] is not consumed via
+   [Uses.path] during execution; without the thunk, the path would be resolved
+   eagerly at registration time and the framework would never see it. *)
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?timestamp ?rollup_node_name ?whitelist_enable ?whitelist ?operator
     ?operators ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
-    ?kernel_debug_log ?preimages_dir {variant; tags; description} scenario =
+    ?kernel_debug_log ?preimages_dir ?dal_attested_slots_validity_lag
+    {variant; tags; description} scenario =
   let uses protocol =
     (Constant.octez_smart_rollup_node :: Option.to_list preimages_dir)
     @ uses protocol
@@ -191,6 +230,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ~uses
     ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
+  let boot_sector = Option.map (fun f -> f ()) boot_sector in
   let riscv_pvm_enable = kind = "riscv" in
   let* tezos_node, tezos_client =
     setup_l1
@@ -201,6 +241,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?timestamp
       ?whitelist_enable
       ~riscv_pvm_enable
+      ?dal_attested_slots_validity_lag
       protocol
   in
   let operator =
@@ -231,15 +272,13 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
         if name = "kernel_debug.v0" then
           Regression.capture
             (Tezos_regression.replace_variables (JSON.as_string value))) ;
+  let* () = maybe_setup_preimages_dir rollup_node kind preimages_dir in
   let* () =
-    match preimages_dir with
-    | None -> Lwt.return_unit
-    | Some src_dir ->
-        let data_dir = Sc_rollup_node.data_dir rollup_node in
-        let dest_dir = Filename.concat data_dir kind in
-        (* Copying used here instead of softlink to avoid tampering of artefact
-           when debugging from the temp test directory *)
-        Process.run "cp" ["-R"; Uses.path src_dir; dest_dir]
+    if Sc_rollup_node.monitors_finalized rollup_node then
+      (* For rollup nodes that only monitor finalized blocks we start by baking
+         two blocks so that they can see the origination block. *)
+      repeat 2 (fun () -> Client.bake_for_and_wait tezos_client)
+    else unit
   in
   scenario protocol rollup_node sc_rollup tezos_node tezos_client
 
@@ -289,6 +328,7 @@ let test_rollup_node_configuration ~kind =
       ~default_operator:Constant.bootstrap2.alias
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ~config_file
   in
   let* _filename = Sc_rollup_node.config_init rollup_node sc_rollup in
@@ -651,6 +691,135 @@ let sc_rollup_node_disconnects_scenario sc_rollup_node sc_rollup node client =
        Test.fail "Refutation loop did not process after reconnection");
     ]
 
+let test_rollup_node_l1_behind ~kind =
+  test_full_scenario
+    {
+      variant = None;
+      tags = ["l1_behind"];
+      description = "rollup node skips reorg when L1 is behind on same chain";
+    }
+    ~kind
+  @@ fun _protocol sc_rollup_node sc_rollup node client ->
+  (* Create a second L1 node and keep it connected so both share the same
+     chain throughout. *)
+  let nodes_args =
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
+  in
+  let* node2, client2 = Client.init_with_node ~nodes_args `Client () in
+  let* () = Client.Admin.trust_address client ~peer:node2
+  and* () = Client.Admin.trust_address client2 ~peer:node in
+  let* () = Client.Admin.connect_address client ~peer:node2 in
+  (* Start the rollup node and bake some blocks *)
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () = send_messages 1 client in
+  let* level_ahead = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+  (* Ensure node2 has synced all blocks *)
+  let* _ = Node.wait_for_level node2 level_ahead in
+  Log.info
+    "Both nodes synced, rollup node has processed up to level %d"
+    level_ahead ;
+  (* Now disconnect node2 so it stops receiving new blocks *)
+  let* identity2 = Node.wait_for_identity node2 in
+  let* () = Client.Admin.kick_peer client ~peer:identity2 in
+  (* Bake more blocks on node1 only, rollup node processes them *)
+  let* () = send_messages 3 client in
+  let* level_final = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+  Log.info
+    "Rollup node has processed up to level %d, node2 stuck at %d"
+    level_final
+    level_ahead ;
+  (* Switch rollup node to node2 which is behind but on the same chain *)
+  let* () =
+    Sc_rollup_node.change_node_and_restart sc_rollup_node sc_rollup node2
+  in
+  Log.info "Switched rollup node to node2 (behind at level %d)" level_ahead ;
+  (* Register event handlers after restart (terminate clears them) *)
+  let reorg_seen = ref false in
+  Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; _} ->
+      if name = "smart_rollup_node_daemon_reorg.v0" then reorg_seen := true) ;
+  let* l1_level, l2_level =
+    Sc_rollup_node.wait_for
+      sc_rollup_node
+      ~timeout:30.
+      "smart_rollup_node_daemon_l1_behind.v0"
+    @@ fun json ->
+    let l1_level = JSON.(json |-> "l1_level" |> as_int) in
+    let l2_level = JSON.(json |-> "l2_level" |> as_int) in
+    Some (l1_level, l2_level)
+  in
+  Log.info "Got l1_behind event: l1_level=%d, l2_level=%d" l1_level l2_level ;
+  Check.((l1_level = level_ahead) int)
+    ~error_msg:"l1_level should be %R but got %L" ;
+  Check.((l2_level = level_final) int)
+    ~error_msg:"l2_level should be %R but got %L" ;
+  (* No reorg should have been computed while L1 was behind *)
+  if !reorg_seen then
+    Test.fail "No reorg should have been emitted while L1 was behind" ;
+  (* Reconnect node2 to node1 so it syncs the missing blocks (same chain),
+     then bake more so the rollup node resumes processing. *)
+  let* () = Client.Admin.connect_address client2 ~peer:node in
+  let* _ = Node.wait_for_level node2 level_final in
+  let num_messages = 2 in
+  let* () = send_messages num_messages client in
+  let* _ = Node.wait_for_level node2 (level_final + num_messages) in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+  Log.info "Rollup node resumed processing after L1 caught up" ;
+  (* Still no reorg since the chain is the same *)
+  if !reorg_seen then
+    Test.fail "No reorg should have been emitted (L1 is on the same chain)" ;
+  unit
+
+let test_rollup_node_l1_unavailable_at_startup ~kind =
+  test_full_scenario
+    {
+      variant = None;
+      tags = ["startup"; "l1_unavailable"];
+      description =
+        "rollup node retries when L1 RPC is unreachable at startup, then \
+         connects when L1 comes back";
+    }
+    ~kind
+  @@ fun _protocol sc_rollup_node sc_rollup node client ->
+  let level_before = Node.get_last_seen_level node in
+  Log.info
+    "Stopping L1 node (last seen level %d) before starting rollup node"
+    level_before ;
+  let* () = Node.terminate node in
+  Log.info "Starting rollup node while L1 is down" ;
+  (* Lower the reconnection delay so the test does not need to wait the
+     default backoff and observe at least one cannot_connect event. *)
+  let* () =
+    Sc_rollup_node.run
+      ~event_level:`Debug
+      ~wait_ready:false
+      sc_rollup_node
+      sc_rollup
+      []
+  in
+  let cannot_connect =
+    Sc_rollup_node.wait_for sc_rollup_node "l1_crawler_cannot_connect.v0"
+    @@ fun _json -> Some ()
+  in
+  let failure =
+    let* () =
+      Sc_rollup_node.process sc_rollup_node
+      |> Option.get
+      |> Process.check ~expect_failure:true
+    in
+    Test.fail "Rollup node exited while L1 was unreachable"
+  in
+  let* () = Lwt.pick [failure; cannot_connect] in
+  Log.info "Rollup node observed at least one connection failure as expected" ;
+  Log.info "Rollup node still alive; restarting L1" ;
+  let* () = Node.run node Node.[Connections 0; Synchronisation_threshold 0] in
+  let* () = Node.wait_for_ready node in
+  let* () = Sc_rollup_node.wait_for_ready sc_rollup_node in
+  Log.info "Rollup node became ready after L1 came back" ;
+  let* () = Client.bake_for_and_wait client in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+  Log.info "Rollup node synced after recovery" ;
+  unit
+
 let setup_reorg node client =
   let nodes_args =
     Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
@@ -894,16 +1063,6 @@ let wait_for_included_and_map_ops_content rollup_node node ~timeout
         | Lwt_unix.Timeout ->
             Test.fail "Timeout %fs waiting for included operations." timeout
         | e -> raise e)
-  in
-  map_manager_op_from_block node ~block ~find_map_op_content
-
-let wait_for_get_messages_and_map_ops_content rollup_node node
-    ~find_map_op_content =
-  let* block =
-    Sc_rollup_node.wait_for
-      rollup_node
-      "smart_rollup_node_layer_1_get_messages.v0"
-    @@ fun json -> Some JSON.(json |-> "hash" |> as_string)
   in
   map_manager_op_from_block node ~block ~find_map_op_content
 
@@ -1185,7 +1344,7 @@ let test_gc variant ?(tags = []) ~challenge_window ~commitment_period
    - we ensure they are all synchronized
    - we also try to import invalid snapshots to make sure they are rejected. *)
 let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
-    ~commitment_period ~history_mode ~compact =
+    ~commitment_period ~history_mode ~compact ?preimages_dir =
   let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
 
   let whitelist =
@@ -1210,6 +1369,7 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
     ~kind
     ~challenge_window
     ~commitment_period
+    ?preimages_dir
   @@ fun _protocol sc_rollup_node sc_rollup node client ->
   (* Originate another rollup for sanity checks *)
   let* other_rollup = originate_sc_rollup ~alias:"other_rollup" ~kind client in
@@ -1247,22 +1407,26 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   in
   (* We run the other nodes in mode observer because we only care if they can
      catch up. *)
-  let rollup_node_2 =
-    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+  let create_observer_node dir =
+    let new_rollup_node =
+      Sc_rollup_node.create
+        Observer
+        node
+        ~kind
+        ~base_dir:(Client.base_dir client)
+    in
+    let* () = maybe_add_unsafe_pvm_patches_in_config new_rollup_node in
+    let* () = maybe_setup_preimages_dir new_rollup_node kind dir in
+    Lwt.return new_rollup_node
   in
-  let rollup_node_3 =
-    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
-  in
-  let rollup_node_4 =
-    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
-  in
-  let rollup_node_5 =
-    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
-  in
-  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_2 in
-  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_3 in
-  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_4 in
-  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_5 in
+  (* rollup_node_5 needs the preimages dir for the Archive test, the
+     others are better without preimages as this will test that
+     imported snapshots includes the preimage as well *)
+  let* rollup_node_2 = create_observer_node None in
+  let* rollup_node_3 = create_observer_node None in
+  let* rollup_node_4 = create_observer_node None in
+  let* rollup_node_5 = create_observer_node preimages_dir in
+  let* rollup_node_6 = create_observer_node None in
   let* () =
     Sc_rollup_node.run
       rollup_node_2
@@ -1290,12 +1454,18 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
         let* (_ : int) = Sc_rollup_node.wait_sync rollup_node_5 ~timeout:3. in
         Sc_rollup_node.terminate rollup_node_5
   in
+  (* Keep L1 node and operator rollup node in sync when progressing. *)
+  let rollup_sync_hook _ =
+    let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:10. in
+    unit
+  in
+  let bake_sync n = bake_levels n client ~hook:rollup_sync_hook in
   let rollup_node_processing =
-    let* () = bake_levels stop_rollup_node_2_levels client in
+    let* () = bake_sync stop_rollup_node_2_levels in
     Log.info "Stopping rollup node 2 and 4 before snapshot is made." ;
     let* () = Sc_rollup_node.terminate rollup_node_2 in
     let* () = Sc_rollup_node.terminate rollup_node_4 in
-    let* () = bake_levels (total_blocks - stop_rollup_node_2_levels) client in
+    let* () = bake_sync (total_blocks - stop_rollup_node_2_levels) in
     let* (_ : int) = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:3. in
     unit
   in
@@ -1376,12 +1546,14 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   Log.info "Bake until next commitment." ;
   let* () =
     let event_name = "smart_rollup_node_new_commitment.v0" in
-    bake_until_event client ~event_name
+    bake_until_event ~timeout:60. client ~event_name ~hook:rollup_sync_hook
     @@ Sc_rollup_node.wait_for sc_rollup_node event_name (Fun.const (Some ()))
   in
-  let* _ = Sc_rollup_node.wait_sync ~timeout:30.0 sc_rollup_node in
+  let* level = Sc_rollup_node.wait_sync ~timeout:30.0 sc_rollup_node in
   let*! snapshot_file =
-    Sc_rollup_node.export_snapshot ~compact sc_rollup_node dir
+    (* Use head for snapshot to makes sure it includes the unpublished
+       commitment. *)
+    Sc_rollup_node.export_snapshot ~compact ~level:"head" sc_rollup_node dir
   in
   (* The rollup node should not have published its commitment yet *)
   Log.info "Try importing snapshot without published commitment." ;
@@ -1393,6 +1565,28 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
     Process.check_error
       ~msg:(rex "Commitment of snapshot is not published on L1.")
       unpublished
+  in
+  Log.info
+    "Retry importing snapshot with --level %d (before unpublished commitment)."
+    level_snapshot ;
+  let*! () =
+    Sc_rollup_node.import_snapshot
+      ~force:true
+      ~level:(string_of_int (level - 5))
+      rollup_node_2
+      ~snapshot_file
+  in
+  Log.info "Export snapshot at earlier level." ;
+  let*! snapshot_file =
+    Sc_rollup_node.export_snapshot
+      ~compact
+      ~level:(string_of_int (level - 10))
+      sc_rollup_node
+      dir
+  in
+  Log.info "Import snapshot created at earlier level." ;
+  let*! () =
+    Sc_rollup_node.import_snapshot ~force:true rollup_node_6 ~snapshot_file
   in
   unit
 
@@ -1544,9 +1738,19 @@ let test_rollup_node_boots_into_initial_state ?supports ~kind =
     ~error_msg:"Unexpected PVM status (%L = %R)" ;
   unit
 
+(* `inbox_file` is expected to be in the format produced by the Etherlink
+ * benchmarking tool *)
+let read_riscv_test_inbox inbox_file =
+  let inbox =
+    JSON.(
+      Uses.path inbox_file |> parse_file |> as_list |> List.map as_list
+      |> List.concat)
+  in
+  List.map (fun m -> JSON.(m |-> "external" |> as_string)) inbox
+
 (* Originate a rollup with the given boot sector, then send 1 message per level
  * and record the output of the kernel debug log. *)
-let test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages =
+let test_advances_state_with_kernel ~title ~boot_sector ~kind ~inbox_file =
   test_full_scenario
     ~regression:true
     ~kernel_debug_log:true
@@ -1574,24 +1778,16 @@ let test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages =
       ~error_msg:"State hash has not changed (%L <> %R)" ;
     unit
   in
-  Lwt_list.iter_s test_message messages
-
-(* `inbox_file` is expected to be in the format produced by the `inbox_bench` tool
- * in `src/riscv/jstz` *)
-let read_jstz_inbox inbox_file =
-  let inbox =
-    JSON.(
-      Uses.path inbox_file |> parse_file |> as_list |> List.map as_list
-      |> List.concat)
-  in
-  List.map (fun m -> JSON.(m |-> "external" |> as_string)) inbox
-
-let test_advances_state_with_inbox ~title ~boot_sector ~kind ~inbox_file =
-  let messages = read_jstz_inbox inbox_file in
-  test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages
+  let* () = Lwt_list.iter_s test_message (read_riscv_test_inbox inbox_file) in
+  if Sc_rollup_node.monitors_finalized sc_rollup_node then
+    (* Allow RISC-V rollup node to see latest messages for regression *)
+    let* () = bake_levels 2 client in
+    let* _ = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+    unit
+  else unit
 
 let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
-    ?boot_sector ~internal ~kind ?preimages_dir =
+    ?boot_sector ~internal ~kind ?preimages_dir ?(node_args = []) =
   test_full_scenario
     ?regression
     ?kernel_debug_log
@@ -1606,7 +1802,7 @@ let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
     ~kind
     ?preimages_dir
   @@ fun protocol sc_rollup_node sc_rollup _tezos_node client ->
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup node_args in
   let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
   let* forwarder =
     if not internal then return None
@@ -1643,6 +1839,11 @@ let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
               ~arg:(sf "Pair 0x%s %S" message sc_rollup)
           in
           Client.bake_for_and_wait client
+    in
+    let* () =
+      if Sc_rollup_node.monitors_finalized sc_rollup_node then
+        bake_levels 2 client
+      else unit
     in
     let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
 
@@ -1704,12 +1905,14 @@ let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
 
   unit
 
-let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal =
+let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal
+    ?(node_args = []) =
   test_rollup_node_advances_pvm_state
     ~title:(Format.sprintf "runs with kernel - %s" kernel_name)
-    ~boot_sector:(read_kernel kernel_name)
+    ~boot_sector:(fun () -> read_kernel kernel_name)
     ~internal
     ~kind
+    ~node_args
 
 (* Ensure the PVM is transitioning upon incoming messages.
       -------------------------------------------------------
@@ -1916,6 +2119,7 @@ let mode_publish mode publishes _protocol sc_rollup_node sc_rollup node client =
       mode
       node'
       ~base_dir:(Client.base_dir client')
+      ~kind:(Sc_rollup_node.kind sc_rollup_node)
       ~operators
       ~default_operator:Constant.bootstrap3.alias
   in
@@ -2131,6 +2335,7 @@ let commitment_stored_robust_to_failures _protocol sc_rollup_node sc_rollup node
       Operator
       node
       ~base_dir:(Client.base_dir client')
+      ~kind:(Sc_rollup_node.kind sc_rollup_node)
       ~default_operator:bootstrap2_key
   in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
@@ -2624,6 +2829,7 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup node
       Operator
       node
       ~base_dir:(Client.base_dir client')
+      ~kind:(Sc_rollup_node.kind sc_rollup_node)
       ~default_operator:bootstrap2_key
   in
   let* () = Sc_rollup_node.run sc_rollup_node' sc_rollup [] in
@@ -2742,6 +2948,7 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup node
       Operator
       node
       ~base_dir:(Client.base_dir client')
+      ~kind:(Sc_rollup_node.kind sc_rollup_node)
       ~default_operator:bootstrap2_key
   in
   let* () =
@@ -2855,7 +3062,7 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
       ~alias:"rollup2"
       ~hooks
       ~kind
-      ~boot_sector:boot_sector2
+      ~boot_sector:(boot_sector2 ())
       ~src:Constant.bootstrap2.alias
       tezos_client
   in
@@ -3143,6 +3350,7 @@ let test_can_stake ~kind =
       Operator
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
   in
   let* () =
     Client.transfer
@@ -3178,22 +3386,45 @@ let test_can_stake ~kind =
   let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:20. in
   unit
 
-let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
-    ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp ?boot_sector
-    ?(extra_tags = []) ?with_dal ({allow_degraded; _} as scenario) =
+let test_refutation_scenario ?regression ?commitment_period ?challenge_window
+    ~variant ~mode ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp
+    ?boot_sector ?(extra_tags = []) ?with_dal ?dal_attested_slots_validity_lag
+    ?monitor_rollup_node ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
        flakyness. *)
-    List.compare_length_with scenario.loser_modes 1 <= 0
+    if Option.is_some regression then regression
+    else Some (List.compare_length_with scenario.loser_modes 1 <= 0)
   in
   let tags =
     ["refutation"] @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
   in
   let tags = if ci_disabled then Tag.ci_disabled :: tags else tags in
   let variant = variant ^ if mode = Accuser then "+accuser" else "" in
+  let base_scenario =
+    test_refutation_scenario_aux ?with_dal ~mode ~kind scenario
+  in
+  let scenario =
+    match monitor_rollup_node with
+    | None -> base_scenario
+    | Some monitor_fn ->
+        fun protocol sc_rollup_node sc_rollup_address node client ->
+          let monitor_promise = monitor_fn sc_rollup_node in
+          Lwt.finalize
+            (fun () ->
+              base_scenario
+                protocol
+                sc_rollup_node
+                sc_rollup_address
+                node
+                client)
+            (fun () ->
+              Lwt.cancel monitor_promise ;
+              Lwt.return_unit)
+  in
   test_full_scenario
-    ~regression
+    ?regression
     ?hooks:None (* We only want to capture dissections manually *)
     ?commitment_period
     ~kind
@@ -3205,12 +3436,13 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ?challenge_window
     ~rollup_node_name:"honest"
     ~allow_degraded
+    ?dal_attested_slots_validity_lag
     {
       tags = tags @ extra_tags;
       variant = Some variant;
       description = "refutation games winning strategies";
     }
-    (test_refutation_scenario_aux ?with_dal ~mode ~kind scenario)
+    scenario
 
 let test_refutation protocols ~kind =
   let challenge_window = 10 in
@@ -3424,6 +3656,109 @@ let test_refutation protocols ~kind =
         protocols)
     tests
 
+(* Test that a rollup node can publish commitments when DAL attestation
+   lags produce published levels before the rollup's genesis level.
+
+   A DAL slot is published, then a rollup is originated before the slot
+   is attested. When attestation happens (at published_level +
+   attestation_lag), DAL skip list cells are created referencing the
+   published_level, which is before the rollup's genesis. *)
+let test_dal_commitment_with_pre_genesis_attested_levels =
+  register_test
+    ~__FILE__
+    ~tags:["dal"; "commitment"]
+    ~uses:(fun _protocol ->
+      [Constant.octez_dal_node; Constant.octez_smart_rollup_node])
+    ~title:"sc_rollup_dal_commitment_pre_genesis_levels"
+  @@ fun protocol ->
+  let commitment_period = 10 in
+  let* node, client = Sc_rollup_helpers.setup_l1 ~commitment_period protocol in
+  (* Start a DAL node to publish slot data. *)
+  let dal_node = Dal_node.create ~node () in
+  let* () = Dal_node.init_config ~operator_profiles:[0] dal_node in
+  let* () = Dal_node.run dal_node ~wait_ready:true in
+  let* dal_parameters = Dal_common.Parameters.from_client client in
+  let attestation_lag = dal_parameters.attestation_lag in
+  let slot_size = dal_parameters.cryptobox.slot_size in
+  let* _commitment =
+    Dal_common.Helpers.publish_and_store_slot
+      client
+      dal_node
+      Constant.bootstrap1
+      ~index:0
+      (Dal_common.Helpers.make_slot ~slot_size (String.make slot_size 'x'))
+  in
+  (* Bake to include the DAL publish operation before originating. *)
+  let* () = Client.bake_for_and_wait client in
+  (* Originate the rollup before the slot is attested. The published_level is
+     now before the rollup's genesis. *)
+  let* sc_rollup =
+    Sc_rollup_helpers.originate_sc_rollup
+      ~kind:"wasm_2_0_0"
+      ~parameters_ty:"string"
+      client
+  in
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      Operator
+      node
+      ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
+      ~default_operator:Constant.bootstrap1.alias
+  in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* genesis_info =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
+  in
+  (* Bake through the attestation lag so the DAL slot is attested and finalized.
+    The rollup node will see DAL cells referencing a published_level before its
+    genesis. The attestation must happen exactly at published_level + attestation_lag.
+    We already baked 2 blocks since publish (one for the publish inclusion, one for
+    origination), so we bake attestation_lag - 2 more, then inject attestations. *)
+  let* () =
+    repeat (attestation_lag - 2) (fun () -> Client.bake_for_and_wait client)
+  in
+  let* () =
+    Dal_helpers.inject_dal_attestations_and_bake
+      ~protocol
+      node
+      client
+      (Slots [0])
+      dal_parameters
+  in
+  (* Bake past the commitment period + finality, then bake extra blocks so the
+     publish operation is injected and included. *)
+  let target_level = init_level + commitment_period in
+  let* current_level = Node.get_level node in
+  let remaining = max 0 (target_level - current_level) in
+  let* () = bake_levels (remaining + block_finality_time + 1) client in
+  let* _ = wait_for_current_level node sc_rollup_node in
+  (* Bake a few more blocks for the publish operation to be injected
+     and included on L1, then sync the rollup node. *)
+  let* () = bake_levels 3 client in
+  let* _ = wait_for_current_level node sc_rollup_node in
+  (* Verify the commitment was published on L1. *)
+  let* published_commitment =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_local_last_published_commitment ()
+  in
+  Check.(
+    published_commitment.commitment_and_hash.commitment.inbox_level
+    >= target_level)
+    Check.int
+    ~error_msg:"Expected published commitment at level >= %R, got %L" ;
+  check_published_commitment_in_l1
+    ~force_new_level:false
+    sc_rollup
+    client
+    published_commitment
+
 let test_invalid_dal_parameters protocols =
   test_refutation_scenario
     ~uses:(fun _protocol ->
@@ -3436,17 +3771,623 @@ let test_invalid_dal_parameters protocols =
     ~timeout:160
     ~commitment_period:10
     ~variant:"invalid_dal_parameters"
-    ~boot_sector:
-      (read_kernel
-         ~base:""
-         ~suffix:""
-         (Uses.path Constant.WASM.echo_dal_reveal_parameters))
+    ~boot_sector:(fun () ->
+      read_kernel
+        ~base:""
+        ~suffix:""
+        (Uses.path Constant.WASM.echo_dal_reveal_parameters))
     (refutation_scenario_parameters
        ~loser_modes:["reveal_dal_parameters 6 6 6 6"]
        (inputs_for 10)
        ~final_level:160
        ~priority:`Priority_honest)
     protocols
+
+(* kernel_imported_publish_level is the imported published level hardcoded in
+   the [Constant.WASM.echo_dal_reveal_pages] kernel. *)
+let with_dal_ready_for_echo_dal_reveal_pages ~operator_profiles
+    ~kernel_imported_publish_level ~may_publish_and_attest_slot
+    ~expected_attestation_lag =
+ fun protocol tezos_node tezos_client ->
+  (* We create and start a DAL node with the given producer profile. *)
+  let dal_node = Dal_node.create ~node:tezos_node () in
+  let* () = Dal_node.init_config ~operator_profiles dal_node in
+  let* () = Dal_node.run dal_node ~wait_ready:true in
+  let* () =
+    match may_publish_and_attest_slot with
+    | None ->
+        (* No slot to publish and atest *)
+        unit
+    | Some (published_level, slot_index) ->
+        (* We want to publish a slot at the given level and index, and then attest it. *)
+        let* curr_level = Node.get_level tezos_node in
+        if curr_level > published_level then
+          Test.fail
+            "publish level (%d) smaller than current level (%d)@."
+            published_level
+            curr_level ;
+        (* Advance the L1 chain until [published_level - 1]. *)
+        let* () =
+          Client.bake_for ~count:(published_level - curr_level - 1) tezos_client
+        in
+        let* _lvl = Node.wait_for_level tezos_node (published_level - 1) in
+        let* dal_parameters = Dal_common.Parameters.from_client tezos_client in
+        let attestation_lag = dal_parameters.attestation_lag in
+        let slot_size = dal_parameters.cryptobox.slot_size in
+        if expected_attestation_lag <> attestation_lag then
+          Test.fail
+            "Expected attestation_lag %d, got %d@."
+            expected_attestation_lag
+            attestation_lag ;
+        Dal_helpers.publish_store_and_attest_slot
+          ~protocol
+          tezos_client
+          tezos_node
+          dal_node
+          Constant.bootstrap1
+          ~index:slot_index
+          ~content:
+            (Dal_common.Helpers.make_slot
+               ~slot_size
+               (String.make slot_size 'T'))
+          dal_parameters
+  in
+  (* Whether we published and attested a slot or not, we advance the L1 chain
+     until [kernel_imported_publish_level + expected_attestation_lag] is
+     finalized to ensure that the DAL node can answer the rollup's requests
+     about the slot 1 published at level [kernel_imported_publish_level]. *)
+  let target_final_l1_level =
+    kernel_imported_publish_level + expected_attestation_lag
+  in
+  let* curr_level = Node.get_level tezos_node in
+  let block_finality = 2 in
+  let num_blocks_to_bake =
+    target_final_l1_level + block_finality - curr_level
+  in
+  let* () =
+    if num_blocks_to_bake <= 0 then unit
+    else
+      let wait_for_target_final_l1_level =
+        Dal_node.wait_for dal_node "dal_new_L1_final_block.v0" (fun e ->
+            if JSON.(e |-> "level" |> as_int) = target_final_l1_level then
+              Some ()
+            else None)
+      in
+      let* () =
+        (* [Client.bake_for ~count] doesn't work here / is flaky. *)
+        repeat num_blocks_to_bake (fun () -> Client.bake_for tezos_client)
+      in
+      wait_for_target_final_l1_level
+  in
+  (* Ensure that in case we wanted an attested slot, it's indeed attested
+     (otherwise, we'd not test the desired configuration). *)
+  let* () =
+    match may_publish_and_attest_slot with
+    | None -> unit
+    | Some (published_level, slot_index) ->
+        let open Dal_common.RPC in
+        let open Dal_common.RPC.Local in
+        let* slot_status =
+          call dal_node
+          @@ get_level_slot_status ~slot_level:published_level ~slot_index
+        in
+        Check.(slot_status = Attested expected_attestation_lag)
+          ~__LOC__
+          Dal_common.Check.slot_id_status_typ
+          ~error_msg:
+            "The value of the fetched status should match the expected one \
+             (current = %L, expected = %R)" ;
+        Log.info
+          "Slot published at level %d and index %d is attested as expected"
+          published_level
+          slot_index ;
+        unit
+  in
+  Lwt.return_some dal_node
+
+(* Like [with_dal_ready_for_echo_dal_reveal_pages], but attests the slot at a
+   specific lag (identified by [lag_index] into [attestation_lags]) rather than
+   at the max lag. This is used to test refutation scenarios where the actual
+   attestation lag differs from the max. *)
+let with_dal_ready_for_echo_dal_reveal_pages_at_lag ~operator_profiles
+    ~kernel_imported_publish_level ~published_level ~slot_index ~target_lag
+    ~target_lag_index =
+ fun protocol tezos_node tezos_client ->
+  let dal_node = Dal_node.create ~node:tezos_node () in
+  let* () = Dal_node.init_config ~operator_profiles dal_node in
+  let* () = Dal_node.run dal_node ~wait_ready:true in
+  let* curr_level = Node.get_level tezos_node in
+  if curr_level > published_level then
+    Test.fail
+      "publish level (%d) smaller than current level (%d)@."
+      published_level
+      curr_level ;
+  let* () =
+    Client.bake_for ~count:(published_level - curr_level - 1) tezos_client
+  in
+  let* _lvl = Node.wait_for_level tezos_node (published_level - 1) in
+  let* dal_parameters = Dal_common.Parameters.from_client tezos_client in
+  Check.(
+    (target_lag = List.nth dal_parameters.attestation_lags target_lag_index)
+      int
+      ~__LOC__
+      ~error_msg:
+        "target_lag and target_lag_index don't match: got %L, expected %R") ;
+  let slot_size = dal_parameters.cryptobox.slot_size in
+  let* () =
+    Dal_helpers.publish_store_and_attest_slot_at_lag
+      ~protocol
+      ~lag_index:target_lag_index
+      ~lag:target_lag
+      tezos_client
+      tezos_node
+      dal_node
+      Constant.bootstrap1
+      ~index:slot_index
+      ~content:
+        (Dal_common.Helpers.make_slot ~slot_size (String.make slot_size 'T'))
+      dal_parameters
+  in
+  let target_final_l1_level =
+    kernel_imported_publish_level + dal_parameters.attestation_lag
+  in
+  let* curr_level = Node.get_level tezos_node in
+  let block_finality = 2 in
+  let num_blocks_to_bake =
+    target_final_l1_level + block_finality - curr_level
+  in
+  let* () =
+    if num_blocks_to_bake <= 0 then unit
+    else
+      let wait_for_target_final_l1_level =
+        Dal_node.wait_for dal_node "dal_new_L1_final_block.v0" (fun e ->
+            if JSON.(e |-> "level" |> as_int) = target_final_l1_level then
+              Some ()
+            else None)
+      in
+      let* () =
+        repeat num_blocks_to_bake (fun () -> Client.bake_for tezos_client)
+      in
+      wait_for_target_final_l1_level
+  in
+  let open Dal_common.RPC in
+  let open Dal_common.RPC.Local in
+  let* slot_status =
+    call dal_node
+    @@ get_level_slot_status ~slot_level:published_level ~slot_index
+  in
+  Check.(slot_status = Attested target_lag)
+    ~__LOC__
+    Dal_common.Check.slot_id_status_typ
+    ~error_msg:
+      "The value of the fetched status should match the expected one (current \
+       = %L, expected = %R)" ;
+  Log.info
+    "Slot published at level %d and index %d is attested at lag %d as \
+     expected@."
+    published_level
+    slot_index
+    target_lag ;
+  Lwt.return_some dal_node
+
+type case = {
+  inbox_level : int;
+  player_priority : [`Priority_loser | `Priority_honest];
+  attestation_status : [`Attested | `Unattested];
+      (* TODO: We might want to distinguish "Published | Unpublished" for the
+         Unattested case in the future. *)
+}
+
+let player_priority_to_string = function
+  | `Priority_loser -> "Priority_loser"
+  | `Priority_honest -> "Priority_honest"
+
+let attestation_status_to_string = function
+  | `Attested -> "Attested"
+  | `Unattested -> "Unattested"
+
+let test_refutation_with_dal_page_import protocols =
+  (* This is the published level for which the toy kernel
+     [Constant.WASM.echo_dal_reveal_pages] asks to import page 2 of slot 1. *)
+  let published_level = 15 in
+  (* This is the test's attestation lag (checked in the scenario). *)
+  let dal_lag = 5 in
+  (* This is the slot index at which we'll possibly publish a slot. *)
+  let slot_index = 1 in
+  (* Once a slot is attested, its import is valid for this number of
+     blocks. After that, any import is considered invalid. *)
+  let dal_ttl = 50 in
+
+  (* First dimension of the tests: we vary inbox_level at which the divergence
+     between the honest and loser rollups will happen. This stress-tests various
+     corner cases regarding the level at which the import request is sent
+     w.r.t. published level.  *)
+  let dimension_inbox_level =
+    [
+      (* Test import around published_level. Nothing should be imported *)
+      published_level - 1;
+      published_level + 0;
+      published_level + 1;
+      (* Test import around attested_level. Nothing should be imported for the
+         first level below. For the two others, the page should be imported if
+         the slot is attested. *)
+      published_level + dal_lag - 1;
+      published_level + dal_lag + 0;
+      published_level + dal_lag + 1;
+      (* Test import attested_level + TLL. The slot's page should not be
+         imported for the third case below, even if it is attested, because its
+         TTL expired.  *)
+      published_level + dal_ttl + dal_lag - 1;
+      published_level + dal_ttl + dal_lag + 0;
+      published_level + dal_ttl + dal_lag + 1;
+    ]
+  in
+
+  (* Second dimension of the tests: Which player will start the game. This will
+     have an impact on which one will provide the final proof. *)
+  let dimension_player_priority = [`Priority_loser; `Priority_honest] in
+
+  (* Third dimension of the tests: We will test both with attested an unattested
+     slots. *)
+  let dimension_attested = [`Attested; `Unattested] in
+
+  (* The list of tests, as a cartesian product of 3 dimensions above. *)
+  let all_cases =
+    List.fold_left
+      (fun accu inbox_level ->
+        List.fold_left
+          (fun accu player_priority ->
+            List.fold_left
+              (fun accu attestation_status ->
+                {inbox_level; player_priority; attestation_status} :: accu)
+              accu
+              dimension_attested)
+          accu
+          dimension_player_priority)
+      []
+      dimension_inbox_level
+  in
+
+  List.iter
+    (fun {inbox_level; attestation_status; player_priority} ->
+      (* One test name for each dimensions combination. *)
+      let variant =
+        Format.sprintf
+          "dal_page_published_at_level_%d_flipped_at_inbox_level_%d_dal_lag_is_%d_%s_%s"
+          published_level
+          inbox_level
+          dal_lag
+          (player_priority_to_string player_priority)
+          (attestation_status_to_string attestation_status)
+      in
+      (* The behaviour of the loser mode is parameterized by the inbox level at
+         which the payload of imported page is flipped. *)
+      let loser_modes =
+        (* See src/lib_smart_rollup_node/loser_mode.mli for the semantics of this
+            loser mode. *)
+        [
+          Format.sprintf
+            "reveal_dal_page published_level:15 slot_index:1 page_index:2 \
+             strategy:flip inbox_level:%d"
+            inbox_level;
+        ]
+      in
+      let may_publish_and_attest_slot =
+        if attestation_status = `Unattested then None
+        else Some (published_level, slot_index)
+      in
+      let with_dal =
+        with_dal_ready_for_echo_dal_reveal_pages
+          ~operator_profiles:[slot_index]
+          ~kernel_imported_publish_level:published_level
+          ~expected_attestation_lag:dal_lag
+          ~may_publish_and_attest_slot
+      in
+      let priority =
+        (player_priority :> [`No_priority | `Priority_honest | `Priority_loser])
+      in
+      test_refutation_scenario
+        ~uses:(fun _protocol ->
+          [Constant.WASM.echo_dal_reveal_pages; Constant.octez_dal_node])
+        ~kind:"wasm_2_0_0"
+        ~mode:Operator
+        ~challenge_window:150
+        ~timeout:120
+        ~commitment_period:10
+        ~dal_attested_slots_validity_lag:dal_ttl
+        ~variant
+        ~boot_sector:(fun () ->
+          read_kernel
+            ~base:""
+            ~suffix:""
+            (Uses.path Constant.WASM.echo_dal_reveal_pages))
+        (refutation_scenario_parameters
+           ~loser_modes
+           (inputs_for 10)
+           ~final_level:100
+           ~priority)
+        protocols
+        ~regression:false
+        ~with_dal)
+    all_cases
+
+let test_refutation_with_dal_page_import_id_far_in_the_future protocols =
+  (* This is the published level for which the toy kernel
+     [Constant.WASM.echo_dal_reveal_pages_high_target_pub_level] asks to import
+     page 2 of slot 1. *)
+  let published_level = 3000 in
+  (* This is the test's attestation lag (checked in the scenario). *)
+  let dal_lag = 5 in
+  (* This is the slot index at which we'll possibly publish a slot. *)
+  let slot_index = 1 in
+  (* Once a slot is attested, its import is valid for this number of
+     blocks. After that, any import is considered invalid. *)
+  let dal_ttl = 50 in
+
+  (* This inbox level is too small w.r.t. to target published level to import.
+     The rollup node should be able to progress even without knowing the status
+     of that slot whose id is far in the future.   *)
+  let inbox_level = 5 in
+
+  (* Which player will start the game. This will have an impact on which one
+     will provide the final proof. *)
+  let dimension_player_priority = [`Priority_loser; `Priority_honest] in
+
+  (* The list of tests, as a cartesian product of 3 dimensions above. *)
+  let all_cases =
+    List.fold_left
+      (fun accu player_priority ->
+        {inbox_level; player_priority; attestation_status = `Unattested} :: accu)
+      []
+      dimension_player_priority
+  in
+
+  List.iter
+    (fun {inbox_level; attestation_status; player_priority} ->
+      (* One test name for each dimensions combination. *)
+      let variant =
+        Format.sprintf
+          "dal_page_with_id_far_in_the_future_flipped_at_inbox_level_%d_%s_%s"
+          inbox_level
+          (player_priority_to_string player_priority)
+          (attestation_status_to_string attestation_status)
+      in
+      (* The behaviour of the loser mode is parameterized by the inbox level at
+         which the payload of imported page is flipped. *)
+      let loser_modes =
+        (* See src/lib_smart_rollup_node/loser_mode.mli for the semantics of this
+            loser mode. *)
+        [
+          Format.sprintf
+            "reveal_dal_page published_level:%d slot_index:1 page_index:2 \
+             strategy:flip inbox_level:%d"
+            published_level
+            inbox_level;
+        ]
+      in
+      let may_publish_and_attest_slot =
+        if attestation_status = `Unattested then None
+        else Some (published_level, slot_index)
+      in
+      let with_dal =
+        with_dal_ready_for_echo_dal_reveal_pages
+          ~operator_profiles:[slot_index]
+          ~kernel_imported_publish_level:inbox_level
+            (* We'll not progress until published_level on purpose. *)
+          ~expected_attestation_lag:dal_lag
+          ~may_publish_and_attest_slot
+      in
+      let priority =
+        (player_priority :> [`No_priority | `Priority_honest | `Priority_loser])
+      in
+      test_refutation_scenario
+        ~uses:(fun _protocol ->
+          [Constant.WASM.echo_dal_reveal_pages; Constant.octez_dal_node])
+        ~kind:"wasm_2_0_0"
+        ~mode:Operator
+        ~challenge_window:150
+        ~timeout:120
+        ~commitment_period:10
+        ~dal_attested_slots_validity_lag:dal_ttl
+        ~variant
+        ~boot_sector:(fun () ->
+          read_kernel
+            ~base:""
+            ~suffix:""
+            (Uses.path
+               Constant.WASM.echo_dal_reveal_pages_high_target_pub_level))
+        (refutation_scenario_parameters
+           ~loser_modes
+           (inputs_for 10)
+           ~final_level:100
+           ~priority)
+        protocols
+        ~regression:false
+        ~with_dal)
+    all_cases
+
+(* Honest rollup imports the page at the actual attestation lag (the first
+   in the protocol's [attestation_lags]). The refutation game runs and the
+   honest wins when the loser flips page content — the protocol uses the
+   cell's lag in proofs, not the max lag.
+
+   Contrast with [test_refutation_with_dal_import_too_early], where the
+   faulty imports before the slot is attested.
+
+   Also, in contrast to [test_refutation_with_dal_page_import], in which the
+   slot is attested at the maximum lag, in this test the slot is attested at the
+   minimal lag. *)
+let test_refutation_with_dal_honest_at_actual_lag protocols =
+  let published_level = 15 in
+  let slot_index = 1 in
+  let dal_ttl = 50 in
+  let actual_lag = 1 in
+  let actual_lag_index = 0 in
+
+  let all_cases =
+    List.concat_map
+      (fun inbox_level ->
+        List.map
+          (fun player_priority ->
+            {inbox_level; player_priority; attestation_status = `Attested})
+          [`Priority_loser; `Priority_honest])
+      [published_level + actual_lag; published_level + actual_lag + 2]
+  in
+
+  List.iter
+    (fun {inbox_level; player_priority; attestation_status = _} ->
+      let variant =
+        Format.sprintf
+          "dal_honest_at_actual_lag_attested_at_%d_flipped_at_%d_%s"
+          actual_lag
+          inbox_level
+          (player_priority_to_string player_priority)
+      in
+      let loser_modes =
+        [
+          Format.sprintf
+            "reveal_dal_page published_level:%d slot_index:%d page_index:2 \
+             strategy:flip inbox_level:%d"
+            published_level
+            slot_index
+            inbox_level;
+        ]
+      in
+      let with_dal =
+        with_dal_ready_for_echo_dal_reveal_pages_at_lag
+          ~operator_profiles:[slot_index]
+          ~kernel_imported_publish_level:published_level
+          ~published_level
+          ~slot_index
+          ~target_lag:actual_lag
+          ~target_lag_index:actual_lag_index
+      in
+      let priority =
+        (player_priority :> [`No_priority | `Priority_honest | `Priority_loser])
+      in
+      test_refutation_scenario
+        ~uses:(fun _protocol ->
+          [Constant.WASM.echo_dal_reveal_pages; Constant.octez_dal_node])
+        ~kind:"wasm_2_0_0"
+        ~mode:Operator
+        ~challenge_window:150
+        ~timeout:120
+        ~commitment_period:10
+        ~dal_attested_slots_validity_lag:dal_ttl
+        ~variant
+        ~boot_sector:(fun () ->
+          read_kernel
+            ~base:""
+            ~suffix:""
+            (Uses.path Constant.WASM.echo_dal_reveal_pages))
+        (refutation_scenario_parameters
+           ~loser_modes
+           (inputs_for 10)
+           ~final_level:100
+           ~priority)
+        protocols
+        ~regression:false
+        ~with_dal)
+    all_cases
+
+(* Faulty rollup "imports" the page at an inbox level where the slot is not
+   yet attested (level + lag1), while the slot is attested at a larger lag
+   (lag2). The faulty cannot win: the post-check uses the cell's Exact_lag
+   (lag2) and rejects the too-early import level. *)
+let test_refutation_with_dal_import_too_early protocols =
+  let published_level = 15 in
+  let slot_index = 1 in
+  let dal_ttl = 50 in
+  (* Must match lag1 so that too_early_inbox_level is correct; asserted in
+     [with_dal]. *)
+  let lag1_value = 1 in
+  let too_early_inbox_level = published_level + lag1_value in
+
+  let all_cases =
+    List.map
+      (fun player_priority ->
+        {
+          inbox_level = too_early_inbox_level;
+          player_priority;
+          attestation_status = `Attested;
+        })
+      [`Priority_loser; `Priority_honest]
+  in
+
+  List.iter
+    (fun {inbox_level; player_priority; attestation_status = _} ->
+      let variant =
+        Format.sprintf
+          "dal_import_too_early_1st_2nd_lag_flipped_at_%d_%s"
+          inbox_level
+          (player_priority_to_string player_priority)
+      in
+      let loser_modes =
+        [
+          Format.sprintf
+            "reveal_dal_page published_level:%d slot_index:%d page_index:2 \
+             strategy:flip inbox_level:%d"
+            published_level
+            slot_index
+            inbox_level;
+        ]
+      in
+      let with_dal protocol tezos_node tezos_client =
+        let* dal_parameters = Dal_common.Parameters.from_client tezos_client in
+        let attestation_lags = dal_parameters.attestation_lags in
+        if List.length attestation_lags < 2 then
+          Test.fail
+            "This test needs at least 2 attestation lags; got %d"
+            (List.length attestation_lags)
+        else
+          let lag1 = List.hd attestation_lags in
+          let lag2_index = 1 in
+          let lag2 = List.nth attestation_lags lag2_index in
+          if lag1 <> lag1_value then
+            Test.fail
+              "This test uses too_early_inbox_level = published_level + \
+               lag1_value; first lag must be %d, got %d"
+              lag1_value
+              lag1
+          else
+            with_dal_ready_for_echo_dal_reveal_pages_at_lag
+              ~operator_profiles:[slot_index]
+              ~kernel_imported_publish_level:published_level
+              ~published_level
+              ~slot_index
+              ~target_lag:lag2
+              ~target_lag_index:lag2_index
+              protocol
+              tezos_node
+              tezos_client
+      in
+      let priority =
+        (player_priority :> [`No_priority | `Priority_honest | `Priority_loser])
+      in
+      test_refutation_scenario
+        ~uses:(fun _protocol ->
+          [Constant.WASM.echo_dal_reveal_pages; Constant.octez_dal_node])
+        ~kind:"wasm_2_0_0"
+        ~mode:Operator
+        ~challenge_window:150
+        ~timeout:120
+        ~commitment_period:10
+        ~dal_attested_slots_validity_lag:dal_ttl
+        ~variant
+        ~boot_sector:(fun () ->
+          read_kernel
+            ~base:""
+            ~suffix:""
+            (Uses.path Constant.WASM.echo_dal_reveal_pages))
+        (refutation_scenario_parameters
+           ~loser_modes
+           (inputs_for 10)
+           ~final_level:100
+           ~priority)
+        protocols
+        ~regression:false
+        ~with_dal)
+    all_cases
 
 (** Run one of the refutation tests with an accuser instead of a full operator. *)
 let test_accuser protocols =
@@ -3498,6 +4439,7 @@ let bailout_mode_fail_to_start_without_operator ~kind =
       Bailout
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ~operators:
         [
           (Sc_rollup_node.Cementing, Constant.bootstrap1.alias);
@@ -3628,6 +4570,7 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
       Bailout
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ~default_operator:operator
       ~operators:[(Recovering, Constant.bootstrap2.public_key_hash)]
       ~data_dir:(Sc_rollup_node.data_dir sc_rollup_node)
@@ -3954,9 +4897,10 @@ let test_timeout =
    The rollup node must be able to catch up from the genesis
    of the rollup when paired with a node in archive mode.
 *)
-let test_late_rollup_node =
+let test_late_rollup_node ~kind =
   test_full_scenario
     ~commitment_period:3
+    ~kind
     {
       tags = ["late"];
       variant = None;
@@ -3973,6 +4917,7 @@ let test_late_rollup_node =
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:
         Constant.bootstrap1.alias (* Same as other rollup_node *)
   in
@@ -4003,10 +4948,11 @@ let test_late_rollup_node =
    on the given rollup. This same alternative rollup node must be able to
    catch up a second time when it is stopped midway.
 *)
-let test_late_rollup_node_2 =
+let test_late_rollup_node_2 ~kind =
   test_full_scenario
     ~commitment_period:3
     ~challenge_window:10
+    ~kind
     {
       tags = ["late"; "gc"];
       variant = None;
@@ -4023,6 +4969,7 @@ let test_late_rollup_node_2 =
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:Constant.bootstrap2.alias
   in
   Log.info
@@ -4074,7 +5021,7 @@ let test_interrupt_rollup_node =
 let remote_signer_uri signer ~yes =
   if yes then Some (Signer.uri signer) else None
 
-let test_remote_signer ~hardcoded_remote_signer =
+let test_remote_signer ~hardcoded_remote_signer ~kind =
   let default_operator = Constant.bootstrap2 in
   let operators =
     [
@@ -4093,6 +5040,7 @@ let test_remote_signer ~hardcoded_remote_signer =
           (if hardcoded_remote_signer then "hardcoded" else "relocatable");
     }
     ~uses:(fun _ -> [Constant.octez_signer])
+    ~kind
     ~commitment_period:3
     ~challenge_window:5
     ~mode:Operator
@@ -4121,6 +5069,7 @@ let test_remote_signer ~hardcoded_remote_signer =
         (List.map (fun (p, k) -> (p, k.Account.public_key_hash)) operators)
       ?remote_signer:client_remote_signer
       ~base_dir
+      ~kind
       Operator
       node
   in
@@ -4295,6 +5244,12 @@ let test_refutation_reward_and_punishment ~kind =
   let module M = Operation.Manager in
   (* [operator1] starts a dispute, but will never play. *)
   let* () =
+    let* () =
+      (* Bake one commitment period before starting the refutation game. *)
+      let* constants = get_sc_rollup_constants client in
+      let commitment_period_in_blocks = constants.commitment_period_in_blocks in
+      Client.bake_for_and_wait ~count:(commitment_period_in_blocks - 1) client
+    in
     start_refute
       client
       ~source:operator1
@@ -4544,7 +5499,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
                 ~amount:Tez.(of_int 100)
                 ~burn_cap:Tez.(of_int 100)
                 ~storage_limit:100000
-                ~giver:Constant.bootstrap1.alias
+                ~giver:Constant.bootstrap3.alias
                 ~receiver:source_address
                 ~arg:(sf "Pair %s %S" payload sc_rollup)
                 client
@@ -4555,6 +5510,14 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
       unit
     in
     let* () =
+      if kind = "riscv" then
+        (* RISC-V commits the context to disk only on commitments. Bake an extra
+           level so the outbox is on a commitment block and thus so all outbox
+           queries work. *)
+        Client.bake_for_and_wait client
+      else unit
+    in
+    let* () =
       match reorg with
       | None -> trigger_output_message client
       | Some (divergence, _) ->
@@ -4562,7 +5525,18 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
             ~branch1:trigger_output_message
             ~branch2:(trigger_output_message ~extra_empty_messages:2)
     in
-    let* outbox_level = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    let* outbox_level =
+      let* () =
+        if kind = "riscv" then
+          (* When running the RISC-V PVM, Sc_rollup_node.wait_sync waits until
+            the current finalized block. Since the transfer operation gets
+            injected at head, the chain must be progressed twice before we
+            can see its effect *)
+          bake_levels 2 client
+        else Lwt.return_unit
+      in
+      Sc_rollup_node.wait_sync rollup_node ~timeout:10.
+    in
     let* () =
       match reorg with
       | None -> unit
@@ -4770,8 +5744,8 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
           return @@ wrap payload
         in
         (None, input_message, outbox_parameters)
-    | "wasm_2_0_0" ->
-        let bootsector = read_kernel "echo" in
+    | "wasm_2_0_0" | "riscv" ->
+        let bootsector = make_read_outbox_echo_kernel kind in
         let input_message protocol contract_address =
           let parameters_json = `O [("int", `String outbox_parameters)] in
           let transaction =
@@ -4833,11 +5807,13 @@ let test_outbox_message_reorg protocols ~kind =
 
 let test_outbox_message_reorg_disappear ~kind =
   let commitment_period = 2 and challenge_window = 2 in
+  let boot_sector = make_read_outbox_echo_kernel kind in
   test_full_scenario
     ~parameters_ty:"bytes"
     ~kind
     ~commitment_period
     ~challenge_window
+    ~boot_sector
     {
       tags = ["outbox"; "reorg"];
       variant = None;
@@ -4896,7 +5872,12 @@ let test_outbox_message_reorg_disappear ~kind =
        message on the rollup. *)
     divergence ~branch1:trigger_output_message ~branch2:Client.bake_for_and_wait
   in
-  let* outbox_level = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+  let* outbox_level =
+    let* () =
+      if kind = "riscv" then bake_levels 2 client else Lwt.return_unit
+    in
+    Sc_rollup_node.wait_sync rollup_node ~timeout:10.
+  in
   let* () = trigger_reorg () in
   let* _ =
     bake_until_lcc_updated ~timeout:100. client rollup_node ~level:outbox_level
@@ -4980,7 +5961,7 @@ let test_outbox_message protocols ~kind =
       ~auto_execute_outbox:false)
 
 let test_rpcs ~kind
-    ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind)
+    ?(boot_sector = fun () -> Sc_rollup_helpers.default_boot_sector_of ~kind)
     ?kernel_debug_log ?preimages_dir =
   test_full_scenario
     ~uses:(fun _protocol -> default_boot_sector_uses_of ~kind)
@@ -4990,6 +5971,7 @@ let test_rpcs ~kind
     ~kind
     ~boot_sector
     ~whitelist_enable:true
+    ~commitment_period:10
     ?preimages_dir
     {
       tags = ["rpc"; "api"];
@@ -5022,15 +6004,22 @@ let test_rpcs ~kind
     ~error_msg:"Injected %L messages but should have injected %R" ;
   (* Head block hash endpoint test *)
   let* level = Node.get_level node in
-  let* _ = Sc_rollup_node.wait_for_level ~timeout:10. sc_rollup_node level in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
   let* l1_block_hash = Client.RPC.call client @@ RPC.get_chain_block_hash () in
+  let* l1_finalized_block_hash =
+    Client.RPC.call client @@ RPC.get_chain_block_hash ~block:"head~2" ()
+  in
   let* l2_block_hash =
     Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_hash ()
   in
   let l2_block_hash = JSON.as_string l2_block_hash in
-  Check.((l1_block_hash = l2_block_hash) string)
-    ~error_msg:"Head on L1 is %L where as on L2 it is %R" ;
+  if Sc_rollup_node.monitors_finalized sc_rollup_node then
+    Check.((l1_finalized_block_hash = l2_block_hash) string)
+      ~error_msg:"Finalized head on L1 is %L where as head on L2 is %R"
+  else
+    Check.((l1_block_hash = l2_block_hash) string)
+      ~error_msg:"Head on L1 is %L where as on L2 it is %R" ;
   let* l1_block_hash_5 =
     Client.RPC.call client @@ RPC.get_chain_block_hash ~block:"5" ()
   in
@@ -5205,10 +6194,7 @@ let test_rpcs ~kind
   in
   let* _outbox =
     Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_outbox
-         ~block:"head"
-         ~outbox_level:l2_finalied_block_level
-         ()
+    @@ Sc_rollup_rpc.get_global_block_outbox ~block:"12" ~outbox_level:9 ()
   in
   let* _head =
     Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
@@ -5294,7 +6280,7 @@ let test_recover_bond_of_stakers =
   test_l1_scenario
     ~regression:true
     ~hooks
-    ~boot_sector:""
+    ~boot_sector:(fun () -> "")
     ~kind:"arith"
     ~challenge_window:10
     ~commitment_period:10
@@ -5373,13 +6359,14 @@ let test_recover_bond_of_stakers =
   unit
 
 let test_injector_auto_discard =
+  let kind = "arith" in
   test_full_scenario
     {
       variant = None;
       tags = ["injector"];
       description = "Injector discards repeatedly failing operations";
     }
-    ~kind:"arith"
+    ~kind
   @@ fun _protocol _sc_rollup_node sc_rollup tezos_node client ->
   let* operator = Client.gen_and_show_keys client in
   (* Change operator and only batch messages *)
@@ -5388,6 +6375,7 @@ let test_injector_auto_discard =
       Batcher
       tezos_node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~operators:[(Sc_rollup_node.Batching, operator.alias)]
   in
   let nb_attempts = 5 in
@@ -5431,8 +6419,9 @@ let test_arg_boot_sector_file ~kind =
   let hex_if_wasm s =
     match kind with "wasm_2_0_0" -> Hex.(of_string s |> show) | _ -> s
   in
-  let boot_sector =
-    hex_if_wasm "Nantes aurait été un meilleur nom de protocol"
+  let boot_sector () =
+    Octez_smart_rollup_node_test_helpers.Helpers.noop_wasm_boot_sector
+    |> hex_if_wasm
   in
   test_full_scenario
     ~supports:(Protocol.From_protocol 018)
@@ -5445,14 +6434,15 @@ let test_arg_boot_sector_file ~kind =
     }
   @@ fun _protocol rollup_node rollup _node client ->
   let invalid_boot_sector =
-    hex_if_wasm "Nairobi est un bien meilleur nom de protocol que Nantes"
+    Octez_smart_rollup_node_test_helpers.Helpers.noop_wasm_boot_sector_2
+    |> hex_if_wasm
   in
   let invalid_boot_sector_file =
     Filename.temp_file "invalid-boot-sector" ".hex"
   in
   let () = write_file invalid_boot_sector_file ~contents:invalid_boot_sector in
   let valid_boot_sector_file = Filename.temp_file "valid-boot-sector" ".hex" in
-  let () = write_file valid_boot_sector_file ~contents:boot_sector in
+  let () = write_file valid_boot_sector_file ~contents:(boot_sector ()) in
   (* Starts the rollup node with an invalid boot sector. Asserts that the
      node fails with an invalid genesis state. *)
   let* () =
@@ -5628,7 +6618,7 @@ let test_bootstrap_private_smart_rollup_originated =
       ~error_msg:"Expected %R whitelist for bootstrapped smart rollups , got %L") ;
   unit
 
-let test_rollup_node_missing_preimage_exit_at_initialisation =
+let test_rollup_node_missing_preimage_exit_at_initialisation ~kind =
   register_test
     ~supports:(From_protocol 016)
     ~__FILE__
@@ -5644,6 +6634,7 @@ let test_rollup_node_missing_preimage_exit_at_initialisation =
   let rollup_node =
     Sc_rollup_node.create
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:Constant.bootstrap1.alias
       Operator
       node
@@ -5899,6 +6890,7 @@ let test_rollup_whitelist_update ~kind =
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:Constant.bootstrap3.alias
   in
   let* () = Sc_rollup_node.run rollup_node2 rollup_addr [] in
@@ -6125,6 +7117,7 @@ let custom_mode_empty_operation_kinds ~kind =
       (Custom [])
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ~default_operator:Constant.bootstrap1.alias
   in
   let* () = Sc_rollup_node.run ~wait_ready:false sc_rollup_node sc_rollup []
@@ -6848,17 +7841,53 @@ let test_injector_uses_available_keys ~kind =
     else None
   in
   let wait_for_get_messages_and_get_batches_pkhs () =
-    wait_for_get_messages_and_map_ops_content
-      rollup_node
-      node
-      ~find_map_op_content
+    let* level, block =
+      Sc_rollup_node.wait_for
+        ~timeout:10.
+        rollup_node
+        "smart_rollup_node_layer_1_get_messages.v0"
+      @@ fun json ->
+      let hash = JSON.(json |-> "hash" |> as_string) in
+      let level = JSON.(json |-> "level" |> as_int32) in
+      Some (level, hash)
+    in
+    let* l = map_manager_op_from_block node ~block ~find_map_op_content in
+    return (level, l)
   in
-  let wait_for_included_and_get_batches_pkhs () =
-    wait_for_included_and_map_ops_content
-      rollup_node
-      node
-      ~timeout:30.
-      ~find_map_op_content
+  let wait_twice_for_included_and_get_batches_pkhs () =
+    let p1, r1 = Lwt.wait () in
+    let p2, r2 = Lwt.wait () in
+    let get_op_content p =
+      let* level, block = p in
+      let* l = map_manager_op_from_block node ~block ~find_map_op_content in
+      return (level, l)
+    in
+    let seen_blocks = ref None in
+    let listener =
+      Sc_rollup_node.wait_for rollup_node "included.v0" ~timeout:20.
+      @@ fun json ->
+      let level = JSON.(json |-> "level" |> as_int32) in
+      let block = JSON.(json |-> "block" |> as_string) in
+      let inj_ops = JSON.(json |-> "operations" |> as_list) in
+      (* Only count unique blocks where the injector included operations.
+         Note: The injector emits one "included.v0" event per operation ID,
+         so when multiple operations are included in the same block, we get
+         multiple events for that block. We deduplicate by tracking seen blocks. *)
+      if inj_ops <> [] && not (Some block = !seen_blocks) then
+        if Option.is_none !seen_blocks then (
+          seen_blocks := Some block ;
+          Lwt.wakeup_later r1 (level, block) ;
+          None (* Keep listening for 2nd unique block *))
+        else (
+          Lwt.wakeup_later r2 (level, block) ;
+          Some () (* Stop listening after 2nd unique block *))
+      else None
+      (* Skip events with no operations or duplicate blocks *)
+    in
+    (* The listener is exposed outside the scope of the function, otherwise the
+       timeout on [wait_for] is never catched and the test might run
+       indefinitely. *)
+    (listener, get_op_content p1, get_op_content p2)
   in
   Log.info "Checking that the batcher keys received are correct." ;
   let check_keys ~received ~expected =
@@ -6875,9 +7904,14 @@ let test_injector_uses_available_keys ~kind =
   let* keys = gen_keys_then_transfer_tez client nb_of_keys in
   let keys_pkh = List.map (fun k -> k.Account.public_key_hash) keys in
   let* () = reveal_key keys in
-
+  (* Arm listeners for the inclusion of the batches. *)
+  let ( listener_promise,
+        first_rollup_batch_inclusion_promise,
+        second_rollup_batch_inclusion_promise ) =
+    wait_twice_for_included_and_get_batches_pkhs ()
+  in
   (* test start here *)
-  let* _lvl = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     inject_n_msgs_batches_in_rollup_node
     (* we inject_int_of_string 2 times the number of operators so the rollup node
@@ -6886,32 +7920,60 @@ let test_injector_uses_available_keys ~kind =
       ~msg_per_batch
       ~msg_size
   in
-  let* _lvl = Client.bake_for_and_wait client
+  let* () = Client.bake_for_and_wait client
   and* () =
+    wait_until_n_batches_are_injected rollup_node ~nb_batches:nb_operators
+  in
+  let second_injection_promise =
     wait_until_n_batches_are_injected rollup_node ~nb_batches:nb_operators
   in
   Log.info "Inject enough batches to fill the block." ;
   let* () = inject_with_keys keys ~msg_per_batch ~msg_size in
-  Log.info "First block's batches are the one injected directly to the L1." ;
-  let* _lvl = Client.bake_for_and_wait client
-  and* used_pkhs = wait_for_get_messages_and_get_batches_pkhs () in
-  Log.info "Got pkhs." ;
+  let user_batch_promise = wait_for_get_messages_and_get_batches_pkhs () in
+  Log.info "We now bake 3 blocks." ;
+  let* () =
+    repeat 3 (fun () ->
+        let* () = Client.bake_for_and_wait client in
+        Lwt_unix.sleep 0.5)
+  in
+  (* The run features the expected operations*)
+  let* () = second_injection_promise and* () = listener_promise in
+
+  (* We now check that all batches are found. *)
+  Log.info
+    "One block contains the batches injected by the rollup node simultaneously \
+     with direct injection." ;
+  let* level_first_rollup_batch, used_pkhs =
+    first_rollup_batch_inclusion_promise
+  in
+  check_keys ~received:used_pkhs ~expected:operators_pkh ;
+  Log.info "Another one contains the batches injected manually to the L1." ;
+  let* level_manual_injection, used_pkhs = user_batch_promise in
   check_keys ~received:used_pkhs ~expected:keys_pkh ;
   Log.info
-    "Second block's batches found are those injected by the rollup node \
-     simultaneously with direct injection. Additionally, await the  injection \
-     of N batches." ;
-  let* _lvl = Client.bake_for_and_wait client
-  and* () =
-    wait_until_n_batches_are_injected rollup_node ~nb_batches:nb_operators
-  and* used_pkhs = wait_for_included_and_get_batches_pkhs () in
+    "Last block contains batches found are those injected by the rollup node \
+     using keys that have been utilized in block up to this point." ;
+  let* level_second_rollup_batch, used_pkhs =
+    second_rollup_batch_inclusion_promise
+  in
   check_keys ~received:used_pkhs ~expected:operators_pkh ;
-  Log.info
-    "Last block's batches found are those injected by the rollup node using \
-     keys that have been utilized in block up to this point." ;
-  let* _lvl = Client.bake_for_and_wait client
-  and* used_pkhs = wait_for_included_and_get_batches_pkhs () in
-  check_keys ~received:used_pkhs ~expected:operators_pkh ;
+
+  (* And check that all levels are different. *)
+  Log.info "Checking that all levels are different" ;
+  Check.((level_manual_injection <> level_first_rollup_batch) int32)
+    ~error_msg:
+      "Since batches are supposed to fill a block, the manually injected batch \
+       and the first batch from the rollup are expected to be included at the \
+       different levels" ;
+  Check.((level_manual_injection <> level_second_rollup_batch) int32)
+    ~error_msg:
+      "Since batches are supposed to fill a block, the manually injected batch \
+       and the second batch from the rollup are expected to be included at the \
+       different levels" ;
+  Check.((level_second_rollup_batch <> level_first_rollup_batch) int32)
+    ~error_msg:
+      "Since batches are supposed to fill a block, the batches from the rollup \
+       are expected to be included at the different levels" ;
   unit
 
 let test_batcher_dont_reinject_already_injected_messages ~kind =
@@ -7133,6 +8195,7 @@ let start_rollup_node_with_encrypted_key ~kind =
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:encrypted_account.alias
   in
   let* () = Sc_rollup_node.run ~wait_ready:false rollup_node sc_rollup [] in
@@ -7199,6 +8262,7 @@ let register_riscv ~protocols =
          ~path:"src/riscv/assets/riscv-dummy.elf.checksum"
          ())
   in
+  let boot_sector = fun () -> boot_sector in
   let preimages_dir =
     Uses.make ~tag:kind ~path:"src/riscv/assets/preimages" ()
   in
@@ -7211,23 +8275,113 @@ let register_riscv ~protocols =
     ~boot_sector
     ~internal:false
     ~kernel_debug_log:true
+    ~preimages_dir ;
+  test_snapshots
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:10
+    ~history_mode:Full
+    ~compact:false
     ~preimages_dir
+    protocols ;
+  test_snapshots
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:10
+    ~history_mode:Full
+    ~compact:true
+    ~preimages_dir
+    protocols ;
+  test_snapshots
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:10
+    ~history_mode:Archive
+    ~compact:false
+    ~preimages_dir
+    protocols
 
-let register_riscv_jstz ~protocols =
+(** [monitor_riscv_live_states ?interval sc_rollup_node] polls the metrics
+    endpoint of [sc_rollup_node] every [interval] seconds (default 2), tracking
+    the maximum number of live RISC-V PVM states (immutable and mutable). When
+    the returned promise is cancelled, it logs the observed maximums. *)
+let monitor_riscv_live_states ?(interval = 2.0) sc_rollup_node =
+  let metrics_addr, metrics_port = Sc_rollup_node.metrics sc_rollup_node in
+  let metrics_url = sf "http://%s:%d/metrics" metrics_addr metrics_port in
+  let max_immutable = ref 0 in
+  let max_mutable = ref 0 in
+  let re_immutable =
+    rex "octez_sc_rollup_node_riscv_states\\{kind=\"immutable\"\\} (\\d+)"
+  in
+  let re_mutable =
+    rex "octez_sc_rollup_node_riscv_states\\{kind=\"mutable\"\\} (\\d+)"
+  in
+  let update_max r line re =
+    match line =~* re with
+    | Some v -> r := max !r (int_of_string v)
+    | None -> ()
+  in
+  let parse_riscv_states output =
+    String.split_on_char '\n' output
+    |> List.iter (fun line ->
+           update_max max_immutable line re_immutable ;
+           update_max max_mutable line re_mutable)
+  in
+  let rec poll () =
+    let* () =
+      Lwt.catch
+        (fun () ->
+          let* output =
+            Process.spawn ~log_output:false "curl" ["-s"; metrics_url]
+            |> Process.check_and_read_stdout
+          in
+          parse_riscv_states output ;
+          Lwt.return_unit)
+        (fun _exn -> Lwt.return_unit)
+    in
+    let* () = Lwt_unix.sleep interval in
+    poll ()
+  in
+  let report () =
+    Log.info
+      "RISC-V max live PVM states: immutable=%d, mutable=%d"
+      !max_immutable
+      !max_mutable
+  in
+  let polling = poll () in
+  Lwt.on_cancel polling report ;
+  polling
+
+let register_riscv_kernel ~protocols ~kernel =
   let kind = "riscv" in
+  let variant, inbox_file =
+    match kernel with
+    | "jstz" ->
+        (* The Jstz inbox is generated using the inbox-bench tool from https://github.com/tezos/riscv-pvm
+         * `inbox-bench generate --inbox-file jstz-inbox.json --transfers 1 --address sr1N6iTfzhj2iGYfxACdy5kgHX5qzuW6xubY` *)
+        ("Jstz", "jstz-inbox.json")
+    | "etherlink" ->
+        (* The Etherlink inbox is generated using a version of the Etherlink benchmark tool
+         *  modified to address messages to sr1SboL6bEDznwdMkk2pV4i5t7L1iVHnEzDX:
+         *  `node etherlink/kernel_latest/benchmarks/scripts/benchmarks/bench_linear_erc20.js --count 1` *)
+        ("Etherlink", "etherlink-inbox.json")
+    | _ -> failwith ("Unknown kernel: " ^ kernel)
+  in
+  let inbox_path = "tezt/tests/riscv-tests/" ^ inbox_file in
   let boot_sector =
     read_riscv_kernel
-      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz" ())
-      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz.checksum" ())
+      (Uses.make ~tag:"riscv" ~path:("src/riscv/assets/" ^ kernel) ())
+      (Uses.make
+         ~tag:"riscv"
+         ~path:("src/riscv/assets/" ^ kernel ^ ".checksum")
+         ())
   in
-  (* The jstz inbox is generated using
-   * `./jstz/inbox-bench generate --inbox-file jstz-inbox.json --transfers 1 --address sr1N6iTfzhj2iGYfxACdy5kgHX5qzuW6xubY` *)
-  let jstz_inbox_path = "tezt/tests/riscv-tests/jstz-inbox.json" in
-  let inbox_file_uses = Uses.make ~tag:"riscv" ~path:jstz_inbox_path () in
-  test_advances_state_with_inbox
+  let boot_sector = fun () -> boot_sector in
+  let inbox_file_uses = Uses.make ~tag:"riscv" ~path:inbox_path () in
+  test_advances_state_with_kernel
     protocols
     ~kind
-    ~title:"node advances PVM state with jstz kernel"
+    ~title:("node advances PVM state with messages (" ^ variant ^ ")")
     ~boot_sector
     ~inbox_file:inbox_file_uses ;
   (* The refutation game scenario is too long to enable in merge pipelines and currently
@@ -7243,16 +8397,745 @@ let register_riscv_jstz ~protocols =
     ~timestamp:(Ago (Client.Time.Span.of_seconds_exn 200.))
       (* Setting the timestamp results in blocks being produced more slowly *)
     ~commitment_period:10
-    ~variant:"pvm_proof_0"
+    ~variant
     ~uses:(fun _protocol -> [inbox_file_uses])
     ~boot_sector
+    ~monitor_rollup_node:monitor_riscv_live_states
     (refutation_scenario_parameters
        ~loser_modes:["5 0 1000"]
-       (List.map (fun x -> [x]) (read_jstz_inbox inbox_file_uses))
+       (List.map (fun x -> [x]) (read_riscv_test_inbox inbox_file_uses))
        ~input_format:`Hex
        ~final_level:500
        ~priority:`No_priority)
     protocols
+
+let test_slow_vm_fallback ~kind =
+  let boot_sector () =
+    Sc_rollup_helpers.read_kernel
+      ~base:"tezt/tests/kernels"
+      "unreachable_kernel"
+  in
+  test_full_scenario
+    ~kind
+    ~boot_sector
+    {
+      variant = None;
+      tags = ["slow_vm_fallback"];
+      description =
+        "rollup node exits on fast VM panic without --slow-vm-fallback";
+    }
+  @@ fun _protocol _rollup_node sc_rollup tezos_node tezos_client ->
+  (* Node without --slow-vm-fallback: should crash on fast exec panic *)
+  let node_no_fallback =
+    Sc_rollup_node.create
+      Operator
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~kind
+      ~default_operator:Constant.bootstrap2.public_key_hash
+      ~name:"no_fallback"
+  in
+  (* Node with --slow-vm-fallback: falls back to slow VM, continues *)
+  let node_with_fallback =
+    Sc_rollup_node.create
+      Operator
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~kind
+      ~default_operator:Constant.bootstrap3.public_key_hash
+      ~name:"with_fallback"
+  in
+  let* () = Sc_rollup_node.run node_no_fallback sc_rollup []
+  and* () =
+    Sc_rollup_node.run node_with_fallback sc_rollup [Slow_vm_fallback]
+  in
+  let no_fallback_crash =
+    (* Node without fallback should crashed *)
+    Sc_rollup_node.check_error
+      ~exit_code:1
+      ~msg:(rex "Wasmer fast execution panicked")
+      node_no_fallback
+  in
+  (* Bake block to trigger PVM evaluation *)
+  let* () = Client.bake_for_and_wait tezos_client in
+  (* Node without fallback should have crashed *)
+  let* () = no_fallback_crash in
+  (* Node with fallback should still be running *)
+  let* _level =
+    Sc_rollup_node.wait_for_level ~timeout:30. node_with_fallback 3
+  in
+  unit
+
+(* Test that a kernel calling an NDS host function crashes the rollup
+   node.  The fast execution engine (Wasmer) does not know about NDS
+   imports, so it panics with [Unsatisfied_import]. *)
+let test_nds_host_func_crashes_node ~kind =
+  let boot_sector () =
+    Sc_rollup_helpers.read_kernel
+      ~base:"tezt/tests/kernels"
+      "nds_host_func_kernel"
+  in
+  test_full_scenario
+    ~kind
+    ~boot_sector
+    {
+      variant = None;
+      tags = ["nds"; "crash"];
+      description =
+        "rollup node crashes when kernel calls NDS host function without NDS \
+         storage";
+    }
+  @@ fun _protocol _rollup_node sc_rollup tezos_node tezos_client ->
+  let node =
+    Sc_rollup_node.create
+      Operator
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~kind
+      ~default_operator:Constant.bootstrap2.public_key_hash
+      ~name:"nds_crash"
+  in
+  let* () = Sc_rollup_node.run node sc_rollup [] in
+  let crash =
+    Sc_rollup_node.check_error
+      ~exit_code:1
+      ~msg:(rex "Unsatisfied_import.*nds_store_exists")
+      node
+  in
+  (* Bake a block to trigger PVM evaluation of kernel_run *)
+  let* () = Client.bake_for_and_wait tezos_client in
+  crash
+
+(* ------------------------------------------------------------------------ *)
+(* Manager-operation apply-time assertion failure                            *)
+(* ------------------------------------------------------------------------ *)
+
+(* A well-formed [Smart_rollup_state_hash] distinct from
+   [Constant.sc_rollup_compressed_state]. The exact value is arbitrary -- only
+   being well-formed and distinct from the honest state matters; this one is a
+   base58check [Smart_rollup_state_hash] ([srs1...]) obtained by encoding an
+   arbitrary 32-byte digest. *)
+let sc_rollup_compressed_state_bis =
+  "srs11Zb2dxcFEMWEAqCS6F1BSKkoGqaUyFA2d9s5SrWj9RGzjMn3BL"
+
+(* A serialized Arith-PVM proof step. Its bytes embed the PVM's [boot_sector] and
+   [status] state; the refutation verifier requires a valid [pvm_step] (it checks
+   the proof's state level) before it reaches the DAL page proof.
+
+   It is recorded here as a hex literal because it cannot be produced through the
+   client/RPC: it is the binary [Sc_rollup.Proof] encoding of a proof built with
+   the protocol's [Internal_for_tests] API. To regenerate, construct such a proof
+   in an OCaml protocol test and print its bytes as hex. *)
+let malicious_dal_overflow_pvm_step =
+  "030002db10db4d3b595f59e0b53740f164bf951bcfae9e0873fd23fbce82fac4f404e181f3368597fee1f77358b98fea989fd6a88e8ee63beaaddc09a68e79563dae34820b626f6f745f736563746f72c8baff5f78423676a25d9cd27a412dd932327b9b3e1cc26e754a36410a5efbf7b406737461747573c00100"
+
+(* A refutation [Proof] step combining [malicious_dal_overflow_pvm_step] with a
+   DAL page proof for a page at [published_level = Int32.max_int]. The
+   [dal_proof = "02000000"] is the only shape constructible without an on-chain
+   skip list ([Invalid_page_id], no target cell). The out-of-range
+   [published_level] is the only malicious part: verifying the proof during
+   [apply] computes [Raw_level_repr.add published_level lag], which overflows
+   [int32] and trips an assertion. *)
+let malicious_dal_overflow_step : Ezjsonm.value =
+  `O
+    [
+      ("pvm_step", `String malicious_dal_overflow_pvm_step);
+      ( "input_proof",
+        `O
+          [
+            ("input_proof_kind", `String "reveal_proof");
+            ( "reveal_proof",
+              `O
+                [
+                  ("reveal_proof_kind", `String "dal_page_proof");
+                  ( "dal_page_id",
+                    `O
+                      [
+                        (* Int32.max_int: the value that triggers the overflow *)
+                        ("published_level", `Float 2147483647.);
+                        ("slot_index", `Float 0.);
+                        ("page_index", `Float 0.);
+                      ] );
+                  ("dal_proof", `String "02000000");
+                ] );
+          ] );
+    ]
+
+(* Set up a single-tick refutation game between bootstrap1 (p1) and bootstrap2
+   (p2): publish two conflicting single-tick commitments and have p1 start the
+   dispute, so the next expected move is a {e proof} move. Does NOT inject the
+   malicious move. [?keys] is forwarded to every [bake_for] used to drive the
+   chain: pass all bootstrap delegates to keep round 0 always available, so the
+   setup bakes at round 0 (timestamp +1s/block) instead of bootstrap1's first
+   free -- often high -- round (which jumps the timestamp by the super-linear
+   round duration and, against a near-now genesis, stalls each [bake_for] until
+   wall-clock catches up). *)
+let setup_dal_overflow_game ?keys ~commitment_period ~sc_rollup client =
+  let p1 = Constant.bootstrap1 in
+  let p2 = Constant.bootstrap2 in
+  let* commitment, player_commitment_hash =
+    bake_period_then_publish_commitment
+      ?keys
+      ~number_of_ticks:1
+      ~sc_rollup
+      ~src:p1.public_key_hash
+      client
+  in
+  let* _commitment_bis, opponent_commitment_hash =
+    forge_and_publish_commitment
+      ?keys
+      ~compressed_state:sc_rollup_compressed_state_bis
+      ~number_of_ticks:1
+      ~inbox_level:commitment.inbox_level
+      ~predecessor:commitment.predecessor
+      ~sc_rollup
+      ~src:p2.public_key_hash
+      client
+  in
+  (* A refutation game may not start too early: wait one commitment period. *)
+  let* () =
+    repeat commitment_period (fun () -> Client.bake_for_and_wait ?keys client)
+  in
+  (* [p1] starts the dispute against [p2]. *)
+  start_refute
+    ?keys
+    client
+    ~source:p1
+    ~opponent:p2.public_key_hash
+    ~sc_rollup
+    ~player_commitment_hash
+    ~opponent_commitment_hash
+
+(* Build [p1]'s malicious proof [Move] (DAL page proof with
+   [published_level = Int32.max_int]) WITHOUT injecting. Exposed on its own for
+   the gossip test, which builds the operation on one node and injects it on
+   another. *)
+let build_dal_overflow_refute ~sc_rollup client =
+  let p1 = Constant.bootstrap1 in
+  let p2 = Constant.bootstrap2 in
+  (* A generous gas limit ensures the overflow assertion is reached before any
+     gas exhaustion. *)
+  let malicious_op =
+    Operation.Manager.(
+      make ~source:p1 ~gas_limit:200_000 ~fee:1_000_000
+      @@ sc_rollup_refute
+           ~sc_rollup
+           ~opponent:p2.public_key_hash
+           ~refutation:
+             (Move
+                {
+                  choice_tick = 0;
+                  refutation_step = Proof malicious_dal_overflow_step;
+                })
+           ())
+  in
+  Operation.Manager.operation [malicious_op] client
+
+(* Build and inject the malicious refute [Move] WITHOUT baking, then assert the
+   mempool accepts it: operation validation passes (it does not verify the proof).
+   Returns the forged operation and its hash.
+
+   The exact accepted class depends on the protocol -- they implement different
+   mitigations -- and on whether a baker is producing blocks concurrently:
+   - proto <= 025 (frozen T/U, plugin mitigation): local injection fast-paths
+     around the plugin [pre_filter], so the op is [validated] right after
+     injection. [pre_filter] (which classifies this refute op [branch_delayed])
+     re-runs on every mempool flush, i.e. on every new head, so with a baker
+     running a flush may reclassify it [branch_delayed] before we read. The plugin
+     keeps the op out of blocks, so it never leaves the mempool: we accept
+     [validated] or [branch_delayed].
+   - proto > 025 (Alpha, in-protocol fix): the overflow is a normal [tzresult], so
+     the op applies cleanly and there is no [pre_filter] -- it is [validated], and
+     never [branch_delayed]. With a baker running it may already have been baked
+     into a block by the time we read, after which it has left the mempool
+     entirely: we accept [validated] or absent (but never [branch_delayed]). *)
+let inject_dal_overflow_refute ~protocol ~sc_rollup client =
+  let* op = build_dal_overflow_refute ~sc_rollup client in
+  let* (`OpHash oph) = Operation.inject op client in
+  Log.info "Injected malicious refute operation %s" oph ;
+  let* mempool = Mempool.get_mempool client in
+  let validated = List.mem oph mempool.validated in
+  let branch_delayed = List.mem oph mempool.branch_delayed in
+  let accepted =
+    if Protocol.number protocol <= 025 then validated || branch_delayed
+    else (* Alpha: [validated], or already baked into a block (absent). *)
+      validated || not (List.mem oph mempool.refused || branch_delayed)
+  in
+  if not accepted then
+    Test.fail
+      "The malicious refute operation %s was not accepted by the mempool \
+       (operation validation must pass): expected %s. Mempool: validated=[%s] \
+       branch_delayed=[%s] refused=[%s]"
+      oph
+      (if Protocol.number protocol <= 025 then "'validated' or 'branch_delayed'"
+       else "'validated' (or already included in a block)")
+      (String.concat "," mempool.validated)
+      (String.concat "," mempool.branch_delayed)
+      (String.concat "," mempool.refused) ;
+  Log.info "OK: the operation %s passed mempool validation." oph ;
+  return (op, oph)
+
+(* Combined setup + inject. *)
+let setup_and_inject_dal_overflow_refute ?keys ~protocol ~commitment_period
+    ~sc_rollup client =
+  let* () =
+    setup_dal_overflow_game ?keys ~commitment_period ~sc_rollup client
+  in
+  inject_dal_overflow_refute ~protocol ~sc_rollup client
+
+(* A refute [Move] whose DAL page proof targets [published_level = Int32.max_int]
+   is accepted by the mempool (operation validation does not verify the proof).
+   This test checks that applying such an operation behaves normally: the
+   [preapply/operations] RPC returns it rather than aborting, and an honest baker
+   includes it in a baked block with an "applied" result. *)
+let test_refute_apply_assertion_failure =
+  let commitment_period = 5 in
+  test_l1_scenario
+    ~kind:"arith"
+    ~commitment_period
+      (* Large challenge window so commitments are not cementable during the
+         test (we never cement; this just avoids interference). *)
+    ~challenge_window:100
+    {
+      tags = ["refutation"; "game"; "dal"; "assertion"; "apply"];
+      variant = Some "dal_overflow_applies_cleanly";
+      description = "refute DAL-overflow proof applies cleanly";
+    }
+  @@ fun protocol sc_rollup node client ->
+  let* op, oph =
+    setup_and_inject_dal_overflow_refute
+      ~protocol
+      ~commitment_period
+      ~sc_rollup
+      client
+  in
+  (* Apply the op on top of head with the [preapply/operations] RPC -- the
+     block-construction apply path (it only skips the signature check, which we
+     supply). A clean application returns HTTP 200; an abort surfaces as a 500. *)
+  let* signature = Operation.sign ~protocol op client in
+  let preapply_input =
+    Operation.make_preapply_operation_input ~protocol ~signature op
+  in
+  let* response =
+    Node.RPC.(
+      call_json
+        node
+        (post_chain_block_helpers_preapply_operations
+           ~data:(Data (`A [preapply_input]))
+           ()))
+  in
+  let body = JSON.encode response.body in
+  if not (response.code = 200) then
+    Test.fail
+      "Expected preapply to return HTTP 200 (the operation applies). Got code \
+       %d with body: %s. A 500 'Assertion failed' means applying the op \
+       aborted on an uncaught assertion."
+      response.code
+      body ;
+  Log.info "OK (1): applying the operation does not abort (HTTP 200)" ;
+  (* (2) An honest baker can apply the operation, so it is
+     included in the block with an "applied" status -- not dropped. *)
+  let* level_before = Node.get_level node in
+  let* () = Client.bake_for_and_wait client in
+  let* level_after = Node.get_level node in
+  Check.((level_after = level_before + 1) int)
+    ~error_msg:"Expected a new block at level %R, got %L." ;
+  let* block = Client.RPC.call client @@ RPC.get_chain_block () in
+  let manager_ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  let op_json =
+    match
+      List.find_opt
+        (fun o -> JSON.(o |-> "hash" |> as_string) = oph)
+        manager_ops
+    with
+    | Some j -> j
+    | None ->
+        Test.fail
+          "The refute operation %s was NOT included in the baked block."
+          oph
+  in
+  let status =
+    JSON.(
+      op_json |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+      |-> "status" |> as_string)
+  in
+  if status <> "applied" then
+    Test.fail
+      "The refute operation %s was included but with operation_result status \
+       %S; expected \"applied\"."
+      oph
+      status ;
+  Log.info
+    "OK (2): the baker included the operation %s in a block (level %d)."
+    oph
+    level_after ;
+  unit
+
+(* Regression test for the frozen-protocol (T/U) mempool mitigation, in the
+   realistic gossip threat model.
+
+   [Mempool.pre_filter] runs only on operations received from PEERS, not on
+   locally-injected ones (injection is fast-pathed, see
+   [prevalidator.ml:on_inject]). So the attack and its mitigation are inter-node:
+
+   - An attacker injects the un-appliable refute operation on its own node, where
+     it is [validated] (bypassing that node's filter) and gossiped.
+   - An honest node receives it and, thanks to the plugin's [pre_filter]
+     (proto_*/lib_plugin/mempool.ml), classifies it [branch_delayed] instead of
+     [validated]; it is then neither re-gossiped nor offered to a baker.
+
+   We use two nodes: [attacker] injects the operation and we check that on the
+   honest node it is [branch_delayed] (not [validated]). That an honest baker
+   then keeps producing blocks follows generically -- a baker never selects
+   [branch_delayed] operations -- and is covered by the forging and consensus
+   tests. *)
+let test_refute_apply_assertion_gossiped_op_refused =
+  let commitment_period = 5 in
+  register_test
+    ~__FILE__
+    ~kind:"arith"
+    ~tags:["refutation"; "game"; "dal"; "assertion"; "apply"; "plugin"]
+    ~title:
+      "Sc_rollup, dal_page_level_overflow: gossiped op refused by plugin \
+       pre_filter"
+  @@ fun protocol ->
+  (* Honest node configured with the smart-rollup parameters. *)
+  let* honest_node, honest_client =
+    setup_l1 ~commitment_period ~challenge_window:100 protocol
+  in
+  (* Attacker node, which will inject the malicious operation. *)
+  let* attacker_node =
+    Node.init [Synchronisation_threshold 0; Private_mode; No_bootstrap_peers]
+  in
+  let* attacker_client = Client.init ~endpoint:(Node attacker_node) () in
+  let* () = Client.Admin.trust_address honest_client ~peer:attacker_node
+  and* () = Client.Admin.trust_address attacker_client ~peer:honest_node in
+  let* () = Client.Admin.connect_address honest_client ~peer:attacker_node in
+  let keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~keys
+      ~kind:"arith"
+      ~src:Constant.bootstrap1.alias
+      honest_client
+  in
+  (* Set up the single-tick refutation game and build the malicious move on the
+     honest node (its operations propagate to the attacker node). We build the
+     operation here but inject it on the attacker node below. *)
+  let* () =
+    setup_dal_overflow_game ~keys ~commitment_period ~sc_rollup honest_client
+  in
+  let* op = build_dal_overflow_refute ~sc_rollup honest_client in
+  (* Make sure the attacker node is synchronised before injecting (so the
+     operation's branch is known there). *)
+  let* head_level = Node.get_level honest_node in
+  let* (_ : int) = Node.wait_for_level attacker_node head_level in
+  (* Inject on the attacker node: it bypasses that node's [pre_filter] and is
+     classified [validated] there. *)
+  let* (`OpHash oph) = Operation.inject op attacker_client in
+  let* attacker_mempool = Mempool.get_mempool attacker_client in
+  if not (List.mem oph attacker_mempool.validated) then
+    Test.fail
+      "Expected the operation %s to be 'validated' on the attacker node (local \
+       injection bypasses the filter), but it was not."
+      oph ;
+  Log.info "Operation %s is 'validated' on the attacker node." oph ;
+  (* Wait for the honest node to receive the gossiped operation, then check its
+     plugin filter [refused] it (rather than 'validated'). *)
+  let is_classified mempool =
+    List.mem oph mempool.Mempool.refused
+    || List.mem oph mempool.validated
+    || List.mem oph mempool.branch_delayed
+    || List.mem oph mempool.branch_delayed
+  in
+  let rec wait_for_honest_classification n =
+    let* mempool = Mempool.get_mempool honest_client in
+    if is_classified mempool then return mempool
+    else if n <= 0 then
+      Test.fail
+        "The honest node never received the gossiped operation %s after \
+         waiting."
+        oph
+    else
+      let* () = Lwt_unix.sleep 1. in
+      wait_for_honest_classification (n - 1)
+  in
+  let* honest_mempool = wait_for_honest_classification 30 in
+  if List.mem oph honest_mempool.validated then
+    Test.fail
+      "The honest node classified the gossiped operation %s as 'validated'; \
+       the plugin filter should have refused it."
+      oph ;
+  if not (List.mem oph honest_mempool.branch_delayed) then
+    Test.fail
+      "Expected the honest node to classify the operation %s as \
+       'branch_delayed' (branch_delayed=[%s] refused=[%s])."
+      oph
+      (String.concat "," honest_mempool.branch_delayed)
+      (String.concat "," honest_mempool.refused) ;
+  Log.info
+    "OK: the honest node 'branch_delayed' the gossiped operation (plugin \
+     pre_filter)." ;
+  unit
+
+(* Forging-side counterpart to [test_refute_apply_assertion_gossiped_op_refused].
+
+   On the frozen protocols (T/U) the plugin's [check_block_operation] is wired
+   into operation selection ([lib_delegate/operation_selection.ml]), where it
+   gates each manager op BEFORE the apply simulation. So even when the
+   un-appliable refute operation is [validated] in the mempool -- here by local
+   injection, which bypasses [pre_filter] -- forging DROPS it via the plugin gate
+   instead of feeding it to the apply simulation (which would trip the
+   frozen-protocol overflow assertion).
+
+   We forge with [Client.bake_for] rather than a baker daemon: it runs the very
+   same [operation_selection] path but synchronously, so there is no daemon
+   scheduling and no concurrent mempool flush to race against. (A running daemon
+   could flush on a new head and let [pre_filter] demote the op to
+   [branch_delayed] before forging, making the drop happen mempool-side rather
+   than at forging -- a race that made the daemon version flaky on slow CI.)
+
+   The decisive observation is that the block is forged cleanly while EXCLUDING
+   our [validated] op. That is only reachable via the plugin gate: without the
+   mitigation the op would instead reach the apply simulation and raise the
+   overflow [assert] -- an uncaught exception, not a tzresult error, so it is not
+   caught as a normal operation error -- aborting the forge and failing this
+   [bake_for]. (An apply-time *drop* cannot happen for this op precisely because
+   the failure is an exception, not an [Error].)
+
+   The operation is [validated] right after injection (the fast-path of local
+   injection bypasses [pre_filter]), but once the mempool is flushed on the new
+   head it is re-validated through the full pipeline -- including [pre_filter] --
+   and reclassified [branch_delayed] by the same plugin predicate. So we end the
+   test by checking it is [branch_delayed] (no longer [validated]).
+
+   Registered only up to protocol 25: alpha's plugin [check_block_operation] is a
+   stub, so the op would not be dropped at forging there. *)
+let test_refute_apply_assertion_baker_excludes_op =
+  let commitment_period = 5 in
+  register_test
+    ~__FILE__
+    ~kind:"arith"
+    ~tags:["refutation"; "game"; "dal"; "assertion"; "apply"; "baker"; "plugin"]
+    ~title:
+      "Sc_rollup, dal_page_level_overflow: baker drops un-appliable refute op \
+       at forging (plugin)"
+  @@ fun protocol ->
+  let* node, client =
+    setup_l1 ~commitment_period ~challenge_window:100 protocol
+  in
+  let keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~keys
+      ~kind:"arith"
+      ~src:Constant.bootstrap1.alias
+      client
+  in
+  (* Local injection bypasses [pre_filter], so the operation is [validated] in
+     the baker's own mempool: the baker WILL consider it at forging. *)
+  let* _op, oph =
+    setup_and_inject_dal_overflow_refute
+      ~protocol
+      ~keys
+      ~commitment_period
+      ~sc_rollup
+      client
+  in
+  let* level_before = Node.get_level node in
+  (* Forge one block synchronously via the client. This runs the same
+     [operation_selection] path as the baker daemon: our [validated] op is a
+     candidate, the plugin's [check_block_operation] rejects it before the apply
+     simulation, and the block is produced without it. A clean bake here that
+     excludes the op is the proof that the plugin gate dropped it -- without the
+     mitigation the op would reach the apply simulation and the overflow [assert]
+     would abort this bake. *)
+  let* () = Client.bake_for_and_wait ~keys client in
+  let* level_after = Node.get_level node in
+  Check.((level_after = level_before + 1) int)
+    ~error_msg:"Expected the baker to forge a block at level %R, got %L." ;
+  (* The un-appliable op is excluded from the freshly forged block. *)
+  let* block = Client.RPC.call client @@ RPC.get_chain_block () in
+  let manager_ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  if List.exists (fun o -> JSON.(o |-> "hash" |> as_string) = oph) manager_ops
+  then
+    Test.fail
+      "The un-appliable operation %s was included in the forged block at level \
+       %d; the plugin's [check_block_operation] should have dropped it at \
+       forging."
+      oph
+      level_after ;
+  Log.info
+    "OK: the operation %s was dropped at forging (plugin \
+     [check_block_operation]) and the block was produced cleanly."
+    oph ;
+  (* On the new head the mempool was flushed and our operation re-validated
+     through the full pipeline -- including [pre_filter], bypassed only by the
+     injection fast-path -- so the same plugin predicate now reclassifies it
+     [branch_delayed]. *)
+  let* mempool = Mempool.get_mempool client in
+  if List.mem oph mempool.validated then
+    Test.fail
+      "Operation %s is unexpectedly still 'validated' after baking; expected \
+       it to be reclassified by [pre_filter] on the mempool flush."
+      oph ;
+  if not (List.mem oph mempool.branch_delayed) then
+    Test.fail
+      "Expected the un-appliable operation %s to be 'branch_delayed' after the \
+       mempool flush (re-validated through pre_filter). validated=[%s] \
+       branch_delayed=[%s] refused=[%s]"
+      oph
+      (String.concat "," mempool.validated)
+      (String.concat "," mempool.branch_delayed)
+      (String.concat "," mempool.refused) ;
+  Log.info
+    "OK: the chain advanced to level %d, the un-appliable operation was \
+     dropped at forging via the plugin filter ([check_block_operation]) and is \
+     now 'branch_delayed' in the mempool."
+    level_after ;
+  unit
+
+(* Two honest bakers (one per node) with the bootstrap delegates split across the
+   two nodes, so reaching a (pre)quorum is a genuine multi-party process. The
+   malicious refute op is injected while the bakers run; the test asserts the
+   chain keeps ADVANCING.
+
+   This guards against a consensus halt: a proposal that includes an un-appliable
+   op can reach a prequorum and the bakers lock on its payload, which can then be
+   neither applied nor abandoned (they are locked) -- a network-wide halt with no
+   malicious baker.
+
+   The head is brought close to wall-clock before the bakers start (a short
+   negative activation delay plus the catch-up below), so they run at small,
+   second-scale rounds; with the default far-past genesis they would sit at
+   hours-per-round and the chain would stall for unrelated reasons. *)
+let test_refute_apply_assertion_halts_baking_2nodes =
+  let commitment_period = 5 in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"refute DAL-overflow op does not halt two honest bakers"
+    ~tags:["refutation"; "game"; "dal"; "assertion"; "apply"; "baker"; "lock"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  (* Activate ~25s in the past (not the default ~1 year) so the bakers run at
+     small rounds; the catch-up below brings the head to ~now. *)
+  let* node1, client1 =
+    setup_l1
+      ~timestamp:(Client.Ago (Client.Time.Span.of_seconds_exn 25.))
+      ~commitment_period
+      ~challenge_window:100
+      protocol
+  in
+  (* A second, independent node. *)
+  let* node2 = Node.init [Synchronisation_threshold 0; History_mode Archive] in
+  let* client2 = Client.init ~endpoint:(Node node2) () in
+  let* () = Client.Admin.trust_address client1 ~peer:node2
+  and* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+  let* level1 = Node.get_level node1 in
+  let* _ = Node.wait_for_level node2 level1 in
+  Log.info "Two nodes connected and synced at level %d." level1 ;
+  let all_keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup = originate_sc_rollup ~keys:all_keys ~kind:"arith" client1 in
+  Log.info
+    "Originated rollup %s; setting up the single-tick refutation game."
+    sc_rollup ;
+  let* () =
+    setup_dal_overflow_game ~keys:all_keys ~commitment_period ~sc_rollup client1
+  in
+  (* Bring the head up to ~wall-clock so the bakers start at small rounds.
+     [~minimal_timestamp:false] forges each block at the current time, jumping the
+     head to ~now in one block. Done before injecting so the op's branch is fresh
+     when the bakers start. *)
+  let head_lag_s () =
+    let* header = Client.RPC.call client1 @@ RPC.get_chain_block_header () in
+    let ts_notation = JSON.(header |-> "timestamp" |> as_string) in
+    match Client.Time.of_notation_opt ts_notation with
+    | None -> Test.fail "Could not parse head timestamp %s" ts_notation
+    | Some ts ->
+        return (Ptime.diff (Client.Time.now ()) ts |> Ptime.Span.to_float_s)
+  in
+  let rec catch_up n =
+    let* lag = head_lag_s () in
+    if lag > 2. && n < 20 then
+      let* () =
+        Client.bake_for_and_wait ~minimal_timestamp:false ~keys:all_keys client1
+      in
+      catch_up (n + 1)
+    else (
+      Log.info "Head caught up to wall-clock (lag %.1fs) after %d blocks." lag n ;
+      unit)
+  in
+  let* () = catch_up 0 in
+  (* Split the bootstrap delegates across the two nodes so locking is a genuine
+     multi-party commitment (neither baker alone proposes and self-confirms).
+     Bakers run with DEFAULT configuration. *)
+  let delegates1 =
+    [
+      Constant.bootstrap1.public_key_hash;
+      Constant.bootstrap2.public_key_hash;
+      Constant.bootstrap3.public_key_hash;
+    ]
+  in
+  let delegates2 =
+    [Constant.bootstrap4.public_key_hash; Constant.bootstrap5.public_key_hash]
+  in
+  let* _baker1 =
+    Agnostic_baker.init ~event_level:`Info ~delegates:delegates1 node1 client1
+  in
+  let* _baker2 =
+    Agnostic_baker.init ~event_level:`Info ~delegates:delegates2 node2 client1
+  in
+  (* Let the bakers run first so they are actively monitoring the mempool; the op
+     we inject next is then reliably picked up in the next proposal (injecting
+     before they start raced with their initial mempool fetch). *)
+  let* start_level = Node.get_level node1 in
+  let* _ = Node.wait_for_level node1 (start_level + 2) in
+  Log.info
+    "Bakers are advancing the chain (level %d); now injecting the malicious op."
+    (start_level + 2) ;
+  let* _op, oph = inject_dal_overflow_refute ~protocol ~sc_rollup client1 in
+  let* level_before = Node.get_level node1 in
+  Log.info
+    "Malicious op %s injected at level %d; checking the chain keeps advancing."
+    oph
+    level_before ;
+  (* The op applies (does not abort), so baking proceeds; we require the chain to
+     advance by two more levels. A timeout means the bakers locked on a proposal
+     carrying the un-appliable op (a consensus halt). *)
+  let advanced =
+    let* l = Node.wait_for_level node1 (level_before + 2) in
+    return (`Advanced l)
+  in
+  let timeout =
+    let* () = Lwt_unix.sleep 90. in
+    return `Stuck
+  in
+  let* result = Lwt.pick [advanced; timeout] in
+  match result with
+  | `Advanced l ->
+      Log.info
+        "OK: the chain advanced to level %d -- the op applies and baking is \
+         not halted."
+        l ;
+      unit
+  | `Stuck ->
+      Test.fail
+        "The chain did not advance past level %d within 90s; the bakers locked \
+         on a proposal carrying the un-appliable op (a consensus halt)."
+        level_before
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
@@ -7356,6 +9239,7 @@ let register ~protocols =
      because the tezt will need to originate a rollup. However,
      the tezt will not test for PVM kind specific features. *)
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
+  test_dal_commitment_with_pre_genesis_attested_levels protocols ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_refutation_reward_and_punishment protocols ~kind:"arith" ;
   test_timeout ~kind:"arith" protocols ;
@@ -7364,16 +9248,22 @@ let register ~protocols =
     protocols ;
   test_refutation protocols ~kind:"arith" ;
   test_refutation protocols ~kind:"wasm_2_0_0" ;
+  let from_proto_v = List.filter (fun p -> Protocol.number p > 025) protocols in
+  test_refute_apply_assertion_failure from_proto_v ;
+  let before_v = List.filter (fun p -> Protocol.number p <= 025) protocols in
+  test_refute_apply_assertion_gossiped_op_refused before_v ;
+  test_refute_apply_assertion_baker_excludes_op before_v ;
+  test_refute_apply_assertion_halts_baking_2nodes protocols ;
   test_recover_bond_of_stakers protocols ;
   test_patch_durable_storage_on_commitment protocols ;
   (* Specific Arith PVM tezts *)
   test_rollup_origination_boot_sector
-    ~boot_sector:"10 10 10 + +"
+    ~boot_sector:(fun () -> "10 10 10 + +")
     ~kind:"arith"
     protocols ;
   test_boot_sector_is_evaluated
-    ~boot_sector1:"10 10 10 + +"
-    ~boot_sector2:"31"
+    ~boot_sector1:(fun () -> "10 10 10 + +")
+    ~boot_sector2:(fun () -> "31")
     ~kind:"arith"
     protocols ;
   test_reveals_4k protocols ;
@@ -7384,16 +9274,20 @@ let register ~protocols =
     protocols
     ~kind:"wasm_2_0_0"
     ~kernel_name:"no_parse_random"
-    ~internal:false ;
+    ~internal:false
+    ~node_args:[Slow_vm_fallback] ;
   test_rollup_node_run_with_kernel
     protocols
     ~kind:"wasm_2_0_0"
     ~kernel_name:"no_parse_bad_fingerprint"
-    ~internal:false ;
+    ~internal:false
+    ~node_args:[Slow_vm_fallback] ;
 
   (* Specific RISC-V PVM tezts *)
   register_riscv ~protocols:[Protocol.Alpha] ;
-  register_riscv_jstz ~protocols:[Protocol.Alpha] ;
+  register_riscv_kernel ~protocols:[Protocol.Alpha] ~kernel:"jstz" ;
+  register_riscv_kernel ~protocols:[Protocol.Alpha] ~kernel:"etherlink" ;
+  test_outbox_message ~kind:"riscv" [Protocol.Alpha] ;
   (* Shared tezts - will be executed for each PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
@@ -7421,7 +9315,7 @@ let register_protocol_independent () =
   with_kind "arith" ;
   let kind = "wasm_2_0_0" in
   start_rollup_node_with_encrypted_key protocols ~kind ;
-  test_rollup_node_missing_preimage_exit_at_initialisation protocols ;
+  test_rollup_node_missing_preimage_exit_at_initialisation protocols ~kind ;
   test_rollup_node_configuration protocols ~kind ;
   test_client_wallet protocols ~kind ;
   test_reveals_fails_on_wrong_hash protocols ;
@@ -7429,6 +9323,10 @@ let register_protocol_independent () =
   test_injector_auto_discard protocols ;
   test_accuser protocols ;
   test_invalid_dal_parameters protocols ;
+  test_refutation_with_dal_page_import protocols ;
+  test_refutation_with_dal_page_import_id_far_in_the_future protocols ;
+  test_refutation_with_dal_honest_at_actual_lag protocols ;
+  test_refutation_with_dal_import_too_early protocols ;
   test_bailout_refutation protocols ;
   test_multiple_batcher_key ~kind protocols ;
   test_batcher_order_msgs ~kind protocols ;
@@ -7448,6 +9346,8 @@ let register_protocol_independent () =
     ~variant:"disconnects"
     sc_rollup_node_disconnects_scenario
     protocols ;
+  test_rollup_node_l1_behind ~kind protocols ;
+  test_rollup_node_l1_unavailable_at_startup ~kind protocols ;
   test_rollup_node_inbox
     ~kind
     ~variant:"handles_chain_reorg"
@@ -7531,4 +9431,6 @@ let register_protocol_independent () =
   bailout_mode_fail_operator_no_stake ~kind protocols ;
   bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
   test_remote_signer ~hardcoded_remote_signer:true ~kind protocols ;
-  test_remote_signer ~hardcoded_remote_signer:false ~kind protocols
+  test_remote_signer ~hardcoded_remote_signer:false ~kind protocols ;
+  test_slow_vm_fallback ~kind:"wasm_2_0_0" protocols ;
+  test_nds_host_func_crashes_node ~kind:"wasm_2_0_0" protocols

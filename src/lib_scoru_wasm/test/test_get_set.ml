@@ -74,7 +74,7 @@ let zero =
     (Bounded.Non_negative_int32.of_value 0l)
 
 let initialise_tree () =
-  Wasm_utils.initial_tree ~from_binary:true "arbitrary boot sector"
+  Wasm_utils.initial_state ~from_binary:true "arbitrary boot sector"
 
 let make_inbox_info ~inbox_level ~message_counter =
   Wasm_pvm_state.
@@ -163,11 +163,7 @@ let test_set_input ~version () =
       "\000\000hello"
       tree
   in
-  let* buffers =
-    Tree_encoding_runner.decode
-      (Tezos_tree_encoding.option Wasm_pvm.durable_buffers_encoding)
-      tree
-  in
+  let* buffers = State.Encoding_runner.decode_buffers tree in
   let buffers =
     match buffers with Some buffers -> buffers | None -> assert false
   in

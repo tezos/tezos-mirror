@@ -114,11 +114,21 @@ module Set = struct
   let cache_sampler_state_cycles cache_sampler_state_cycles (c : t) =
     {c with cache_sampler_state_cycles}
 
+  let cache_stake_info_cycles cache_stake_info_cycles (c : t) =
+    {c with cache_stake_info_cycles}
+
+  let cache_swrr_selected_distribution_cycles
+      cache_swrr_selected_distribution_cycles (c : t) =
+    {c with cache_swrr_selected_distribution_cycles}
+
   let dal dal (c : t) = {c with dal}
 
   module Dal = struct
     let number_of_slots number_of_slots (c : t) =
       dal {c.dal with number_of_slots} c
+
+    let attestation_lags attestation_lags (c : t) =
+      dal {c.dal with attestation_lags} c
 
     let cryptobox_parameters cryptobox_parameters (c : t) =
       dal {c.dal with cryptobox_parameters} c
@@ -137,9 +147,6 @@ module Set = struct
 
   let direct_ticket_spending_enable direct_ticket_spending_enable (c : t) =
     {c with direct_ticket_spending_enable}
-
-  let allow_tz4_delegate_enable allow_tz4_delegate_enable (c : t) =
-    {c with allow_tz4_delegate_enable}
 
   let all_bakers_attest_activation_threshold
       all_bakers_attest_activation_threshold (c : t) =

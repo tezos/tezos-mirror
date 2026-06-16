@@ -98,19 +98,35 @@ let maximum_usable_space_in_blueprint chunks_count =
 
 let maximum_chunks_per_l1_level = 512 * 1024 / 4096
 
-let encode_transaction raw =
+type blueprint_version = Legacy | V1
+
+let evm_runtime_id = "\001"
+
+let michelson_runtime_id = "\000"
+
+let tag_transaction (tx : Broadcast.common_transaction) : string =
+  match tx with
+  | Evm raw -> evm_runtime_id ^ raw
+  | Michelson raw -> michelson_runtime_id ^ raw
+
+let encode_transaction ~version (tx : Broadcast.common_transaction) =
   let open Rlp in
-  Value (Bytes.of_string raw)
+  match version with
+  | Legacy ->
+      let raw = match tx with Evm raw -> raw | Michelson raw -> raw in
+      Value (Bytes.of_string raw)
+  | V1 -> Value (Bytes.of_string (tag_transaction tx))
 
 type kernel_blueprint = {
+  version : blueprint_version;
   parent_hash : block_hash;
   delayed_transactions : hash list;
-  transactions : string list;
+  transactions : Broadcast.common_transaction list;
   timestamp : Time.Protocol.t;
 }
 
 let kernel_blueprint_to_rlp
-    {parent_hash; delayed_transactions; transactions; timestamp} =
+    {version; parent_hash; delayed_transactions; transactions; timestamp} =
   let open Rlp in
   let delayed_transactions =
     List
@@ -119,14 +135,21 @@ let kernel_blueprint_to_rlp
          delayed_transactions)
   in
   let messages =
-    let m = List.map encode_transaction transactions in
+    let m = List.map (encode_transaction ~version) transactions in
     List m
   in
   let timestamp = Value (Ethereum_types.timestamp_to_bytes timestamp) in
   let parent_hash =
     Value (block_hash_to_bytes parent_hash |> Bytes.of_string)
   in
-  List [parent_hash; delayed_transactions; messages; timestamp]
+  let unversioned_blueprint =
+    [parent_hash; delayed_transactions; messages; timestamp]
+  in
+  match version with
+  | Legacy -> List unversioned_blueprint
+  | V1 ->
+      let version_char = Char.chr 1 in
+      List (Value (Bytes.make 1 version_char) :: unversioned_blueprint)
 
 let kernel_blueprint_parent_hash_of_rlp s =
   match Rlp.decode s with
@@ -134,6 +157,17 @@ let kernel_blueprint_parent_hash_of_rlp s =
       Rlp.(
         List [Value parent_hash; _delayed_transactions; _messages; _timestamp])
     ->
+      Some (decode_block_hash parent_hash)
+  | Ok
+      Rlp.(
+        List
+          [
+            _version;
+            Value parent_hash;
+            _delayed_transactions;
+            _messages;
+            _timestamp;
+          ]) ->
       Some (decode_block_hash parent_hash)
   | _ -> None
 

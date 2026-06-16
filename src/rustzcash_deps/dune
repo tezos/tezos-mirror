@@ -20,4 +20,4 @@
   (source_tree bin)
   (source_tree include)
   (source_tree src))
- (action (no-infer (bash ./build.sh))))
+ (action (no-infer (system ./build.sh))))

@@ -44,10 +44,10 @@ let all_profilers =
     ("store", store_profiler);
   ]
 
-let activate_all ~profiler_maker =
+let activate_all ~profiling_config ~profiler_maker =
   List.iter
     (fun (name, p) ->
-      match profiler_maker ~name with
+      match profiler_maker ~profiling_config ~name with
       | Some instance -> plug p instance
       | None -> ())
     all_profilers

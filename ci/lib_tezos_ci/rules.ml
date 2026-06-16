@@ -63,8 +63,6 @@ let homebrew_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "homebrew.daily"
 let base_images_daily =
   scheduled && var "TZ_SCHEDULE_KIND" == str "base_images.daily"
 
-let opam_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "opam.daily"
-
 let schedule_extended_rpc_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_RPC_TESTS"
 
@@ -101,6 +99,9 @@ let schedule_documentation =
 
 let schedule_docker_build =
   scheduled && var "TZ_SCHEDULE_KIND" == str "DOCKER_FRESH_IMAGE_BUILD"
+
+let schedule_docker_master_snapshot =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "schedule_docker_master_snapshot"
 
 let on_master = Predefined_vars.ci_commit_branch == str "master"
 

@@ -63,10 +63,6 @@ path = "../mock"
 version = "0.2.2"
 optional = true
 
-[dependencies.tezos_crypto_rs]
-workspace = true
-optional = true
-
 [dependencies.tezos_data_encoding]
 workspace = true
 optional = true
@@ -85,14 +81,12 @@ path = "../build-utils"
 [features]
 default = [
     "std",
-    "crypto",
     "dlmalloc",
     "panic-hook",
     "data-encoding",
     "storage",
     "bls",
 ]
-crypto = ["dep:tezos_crypto_rs"]
 bls = ["tezos-smart-rollup-encoding/bls"]
 debug_alloc = ["tezos-smart-rollup-debug/alloc"]
 alloc = ["tezos-smart-rollup-entrypoint/alloc", "tezos-protocol"]
@@ -106,7 +100,7 @@ data-encoding = [
 ]
 storage = ["tezos-smart-rollup-storage"]
 std = ["alloc", "debug_alloc", "tezos-smart-rollup-entrypoint/std"]
-testing = ["crypto", "tezos-smart-rollup-mock"]
+testing = ["tezos-smart-rollup-mock"]
 proto-alpha = [
   "tezos-smart-rollup-core/proto-alpha",
   "tezos-smart-rollup-host/proto-alpha",

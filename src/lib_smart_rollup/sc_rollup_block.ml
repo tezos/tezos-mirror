@@ -29,7 +29,7 @@ type header = {
   predecessor : Block_hash.t;
   commitment_hash : Commitment.Hash.t option;
   previous_commitment_hash : Commitment.Hash.t;
-  context : Smart_rollup_context_hash.t;
+  context_hash : Smart_rollup_context_hash.t option;
   inbox_witness :
     Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash.t;
   inbox_hash : Inbox.Hash.t;
@@ -47,6 +47,8 @@ type ('header, 'content) block = {
   content : 'content;
   initial_tick : Z.t;
   num_ticks : int64;
+  state_hash : State_hash.t option;
+  pvm_status : string option;
 }
 
 type t = (header, unit) block
@@ -73,7 +75,7 @@ let header_encoding =
            predecessor;
            commitment_hash;
            previous_commitment_hash;
-           context;
+           context_hash;
            inbox_witness;
            inbox_hash;
          }
@@ -83,7 +85,7 @@ let header_encoding =
         predecessor,
         commitment_hash,
         previous_commitment_hash,
-        context,
+        context_hash,
         inbox_witness,
         inbox_hash ))
     (fun ( block_hash,
@@ -91,7 +93,7 @@ let header_encoding =
            predecessor,
            commitment_hash,
            previous_commitment_hash,
-           context,
+           context_hash,
            inbox_witness,
            inbox_hash )
        ->
@@ -101,7 +103,7 @@ let header_encoding =
         predecessor;
         commitment_hash;
         previous_commitment_hash;
-        context;
+        context_hash;
         inbox_witness;
         inbox_hash;
       })
@@ -128,7 +130,7 @@ let header_encoding =
             "Previous commitment hash in the chain. If there is a commitment \
              for this block, this field contains the commitment that was \
              previously computed.")
-       (req
+       (opt
           "context"
           Smart_rollup_context_hash.encoding
           ~description:"Hash of the layer 2 context for this block.")
@@ -143,10 +145,6 @@ let header_encoding =
           "inbox_hash"
           Inbox.Hash.encoding
           ~description:"Hash of the inbox for this block.")
-
-let header_size =
-  WithExceptions.Option.get ~loc:__LOC__
-  @@ Data_encoding.Binary.fixed_length header_encoding
 
 let content_encoding =
   let open Data_encoding in
@@ -176,13 +174,13 @@ let content_encoding =
 let block_encoding header_encoding content_encoding =
   let open Data_encoding in
   conv
-    (fun {header; content; initial_tick; num_ticks} ->
-      (header, (content, (initial_tick, num_ticks))))
-    (fun (header, (content, (initial_tick, num_ticks))) ->
-      {header; content; initial_tick; num_ticks})
+    (fun {header; content; initial_tick; num_ticks; state_hash; pvm_status} ->
+      (header, (content, (initial_tick, num_ticks, state_hash, pvm_status))))
+    (fun (header, (content, (initial_tick, num_ticks, state_hash, pvm_status)))
+       -> {header; content; initial_tick; num_ticks; state_hash; pvm_status})
   @@ merge_objs header_encoding
   @@ merge_objs content_encoding
-  @@ obj2
+  @@ obj4
        (req
           "initial_tick"
           Data_encoding.n
@@ -195,6 +193,17 @@ let block_encoding header_encoding content_encoding =
           ~description:
             "Number of ticks produced by the evaluation of the messages in \
              this block.")
+       (opt
+          "state_hash"
+          State_hash.encoding
+          ~description:
+            "Hash of the PVM state after evaluation of the messages in this \
+             block.")
+       (opt
+          "pvm_status"
+          Data_encoding.string
+          ~description:
+            "Status of the PVM after evaluation of the messages in this block.")
 
 let encoding = block_encoding header_encoding Data_encoding.unit
 

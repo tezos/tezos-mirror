@@ -15,7 +15,7 @@
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V15.Make(Name)()\n")))
+   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V17.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_alpha)
@@ -80,11 +80,12 @@
   Voting_period_repr
   Ticket_hash_repr
   Manager_counter_repr
+  Contract_kind_repr
   Contract_repr
   Indexable
   Entrypoint_repr
   Dal_slot_index_repr
-  Dal_attestation_repr
+  Dal_attestations_repr
   Dal_slot_repr
   Michelson_v1_gas_costs_generated
   Michelson_v1_gas_costs
@@ -150,6 +151,7 @@
   Carbonated_map_costs
   Carbonated_map
   Staking_parameters_repr
+  Clst_delegates_parameters_repr
   Misbehaviour_repr
   Denunciations_repr
   Raw_context_intf
@@ -185,6 +187,7 @@
   Adaptive_issuance_costs
   Contract_delegate_storage
   Stake_storage
+  Clst_storage
   Unstaked_frozen_deposits_storage
   Pending_denunciations_storage
   Unstake_requests_storage
@@ -194,9 +197,11 @@
   Fees_storage
   Adaptive_issuance_storage
   Delegate_staking_parameters
+  Clst_delegates_storage
   Shared_stake
   Delegate_consensus_key
   Delegate_storage
+  Swrr_sampler
   Delegate_sampler
   Delegate_rewards
   Consensus_parameters_storage
@@ -207,6 +212,9 @@
   Slash_percentage
   Delegate_slashed_deposits_storage
   Staking
+  Clst_finalization
+  Clst_redemption_requests_storage
+  Clst_stake_allocation
   Delegate_cycles
   Vote_storage
   Ticket_storage
@@ -225,8 +233,9 @@
   Sc_rollup_whitelist_storage
   Sc_rollup_storage
   Sc_rollup_stake_storage
-  Dal_slot_storage
   Dal_storage
+  Dal_attestations_storage
+  Dal_slot_storage
   Sc_rollup_refutation_storage
   Zk_rollup_errors
   Address_registry_storage
@@ -280,8 +289,11 @@
   Ticket_operations_diff
   Ticket_accounting
   Ticket_transfer
-  Script_native
+  Clst_contract_storage
   Script_interpreter_defs
+  Script_interpreter_errors
+  Clst_events
+  Script_native
   Script_interpreter
   Sc_rollup_management_protocol
   Sc_rollup_operations
@@ -379,11 +391,12 @@
   voting_period_repr.ml voting_period_repr.mli
   ticket_hash_repr.ml ticket_hash_repr.mli
   manager_counter_repr.ml manager_counter_repr.mli
+  contract_kind_repr.ml
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
   dal_slot_index_repr.ml dal_slot_index_repr.mli
-  dal_attestation_repr.ml dal_attestation_repr.mli
+  dal_attestations_repr.ml dal_attestations_repr.mli
   dal_slot_repr.ml dal_slot_repr.mli
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
@@ -451,6 +464,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  clst_delegates_parameters_repr.ml clst_delegates_parameters_repr.mli
   misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
@@ -487,6 +501,7 @@
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
+  clst_storage.ml clst_storage.mli
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   pending_denunciations_storage.ml pending_denunciations_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
@@ -496,9 +511,11 @@
   fees_storage.ml fees_storage.mli
   adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
+  clst_delegates_storage.ml clst_delegates_storage.mli
   shared_stake.ml shared_stake.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
+  swrr_sampler.ml swrr_sampler.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
   consensus_parameters_storage.ml consensus_parameters_storage.mli
@@ -510,6 +527,9 @@
   slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
+  clst_finalization.ml clst_finalization.mli
+  clst_redemption_requests_storage.ml clst_redemption_requests_storage.mli
+  clst_stake_allocation.ml clst_stake_allocation.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli
@@ -528,8 +548,9 @@
   sc_rollup_whitelist_storage.ml sc_rollup_whitelist_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
-  dal_slot_storage.ml dal_slot_storage.mli
   dal_storage.ml dal_storage.mli
+  dal_attestations_storage.ml
+  dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
   address_registry_storage.ml address_registry_storage.mli
@@ -583,8 +604,11 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
-  script_native.ml script_native.mli
+  clst_contract_storage.ml clst_contract_storage.mli
   script_interpreter_defs.ml
+  script_interpreter_errors.ml script_interpreter_errors.mli
+  clst_events.ml clst_events.mli
+  script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
@@ -683,11 +707,12 @@
   voting_period_repr.ml voting_period_repr.mli
   ticket_hash_repr.ml ticket_hash_repr.mli
   manager_counter_repr.ml manager_counter_repr.mli
+  contract_kind_repr.ml
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
   dal_slot_index_repr.ml dal_slot_index_repr.mli
-  dal_attestation_repr.ml dal_attestation_repr.mli
+  dal_attestations_repr.ml dal_attestations_repr.mli
   dal_slot_repr.ml dal_slot_repr.mli
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
@@ -755,6 +780,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  clst_delegates_parameters_repr.ml clst_delegates_parameters_repr.mli
   misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
@@ -791,6 +817,7 @@
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
+  clst_storage.ml clst_storage.mli
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   pending_denunciations_storage.ml pending_denunciations_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
@@ -800,9 +827,11 @@
   fees_storage.ml fees_storage.mli
   adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
+  clst_delegates_storage.ml clst_delegates_storage.mli
   shared_stake.ml shared_stake.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
+  swrr_sampler.ml swrr_sampler.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
   consensus_parameters_storage.ml consensus_parameters_storage.mli
@@ -814,6 +843,9 @@
   slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
+  clst_finalization.ml clst_finalization.mli
+  clst_redemption_requests_storage.ml clst_redemption_requests_storage.mli
+  clst_stake_allocation.ml clst_stake_allocation.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli
@@ -832,8 +864,9 @@
   sc_rollup_whitelist_storage.ml sc_rollup_whitelist_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
-  dal_slot_storage.ml dal_slot_storage.mli
   dal_storage.ml dal_storage.mli
+  dal_attestations_storage.ml
+  dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
   address_registry_storage.ml address_registry_storage.mli
@@ -887,8 +920,11 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
-  script_native.ml script_native.mli
+  clst_contract_storage.ml clst_contract_storage.mli
   script_interpreter_defs.ml
+  script_interpreter_errors.ml script_interpreter_errors.mli
+  clst_events.ml clst_events.mli
+  script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
@@ -971,11 +1007,12 @@
   voting_period_repr.ml voting_period_repr.mli
   ticket_hash_repr.ml ticket_hash_repr.mli
   manager_counter_repr.ml manager_counter_repr.mli
+  contract_kind_repr.ml
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
   dal_slot_index_repr.ml dal_slot_index_repr.mli
-  dal_attestation_repr.ml dal_attestation_repr.mli
+  dal_attestations_repr.ml dal_attestations_repr.mli
   dal_slot_repr.ml dal_slot_repr.mli
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
@@ -1043,6 +1080,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  clst_delegates_parameters_repr.ml clst_delegates_parameters_repr.mli
   misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
@@ -1079,6 +1117,7 @@
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
+  clst_storage.ml clst_storage.mli
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   pending_denunciations_storage.ml pending_denunciations_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
@@ -1088,9 +1127,11 @@
   fees_storage.ml fees_storage.mli
   adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
+  clst_delegates_storage.ml clst_delegates_storage.mli
   shared_stake.ml shared_stake.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
+  swrr_sampler.ml swrr_sampler.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
   consensus_parameters_storage.ml consensus_parameters_storage.mli
@@ -1102,6 +1143,9 @@
   slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
+  clst_finalization.ml clst_finalization.mli
+  clst_redemption_requests_storage.ml clst_redemption_requests_storage.mli
+  clst_stake_allocation.ml clst_stake_allocation.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli
@@ -1120,8 +1164,9 @@
   sc_rollup_whitelist_storage.ml sc_rollup_whitelist_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
-  dal_slot_storage.ml dal_slot_storage.mli
   dal_storage.ml dal_storage.mli
+  dal_attestations_storage.ml
+  dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
   address_registry_storage.ml address_registry_storage.mli
@@ -1175,8 +1220,11 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
-  script_native.ml script_native.mli
+  clst_contract_storage.ml clst_contract_storage.mli
   script_interpreter_defs.ml
+  script_interpreter_errors.ml script_interpreter_errors.mli
+  clst_events.ml clst_events.mli
+  script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli

@@ -193,10 +193,6 @@ let conflicting_consensus_operation ?kind = function
       Option.fold ~none:true ~some:(fun kind -> kind = kind') kind
   | _ -> false
 
-let aggregate_disabled = function
-  | Validate_errors.Consensus.Aggregate_disabled -> true
-  | _ -> false
-
 let aggregate_in_mempool = function
   | Validate_errors.Consensus.Aggregate_in_mempool -> true
   | _ -> false
@@ -230,3 +226,99 @@ let wrong_slot_used_for_attestation = function
 let missing_companion_key_for_bls_dal = function
   | Validate_errors.Consensus.Missing_companion_key_for_bls_dal _ -> true
   | _ -> false
+
+let expect_clst_empty_transfer ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_native.CLST_contract.Empty_transfer :: _ ->
+        true
+    | _ -> false)
+
+let expect_clst_non_empty_transfer ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_native.CLST_contract.Non_empty_transfer _ :: _ ->
+        true
+    | _ -> false)
+
+let expect_clst_non_implicit_depositer ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_native.CLST_contract.Non_implicit_contract _ :: _ ->
+        true
+    | _ -> false)
+
+let expect_clst_balance_too_low ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_native.CLST_contract.Balance_too_low _ :: _ ->
+        true
+    | _ -> false)
+
+let expect_clst_only_owner_can_change_operator ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_native.CLST_contract.Only_owner_can_change_operator _ :: _ ->
+        true
+    | _ -> false)
+
+let expect_clst_empty_ticket ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_native.CLST_contract.Empty_ticket :: _ ->
+        true
+    | _ -> false)
+
+let expect_clst_standard_error ~loc ~str errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_interpreter_errors.Reject (_, node, _)
+      :: _ -> (
+        match Environment.Micheline.root node with
+        | String (_, str_) -> String.equal str_ str
+        | _ -> false)
+    | _ -> false)
+
+let expect_clst_contract_is_not_delegate ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_native.CLST_contract.Contract_is_not_delegate _ :: _ ->
+        true
+    | _ -> false)
+
+let expect_negative_ticket_balance ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | [Ticket_storage.Negative_ticket_balance _] -> true
+    | _ -> false)
+
+let expect_clst_unregistered_delegate ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_native.CLST_contract.Delegate_is_not_registered _ :: _ ->
+        true
+    | _ -> false)
+
+let expect_tz5_account_disabled ~loc errs =
+  Assert.expect_error ~loc errs (function
+    | [Validate_errors.Manager.Tz5_account_disabled] -> true
+    | _ -> false)

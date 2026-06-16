@@ -252,30 +252,20 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
   let* constants =
     Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
   in
-  let*? round_durations =
-    Round.Durations.create
-      ~first_round_duration:constants.parametric.minimal_block_delay
-      ~delay_increment_per_round:constants.parametric.delay_increment_per_round
-    |> Environment.wrap_tzresult
-  in
-  let*! operation_worker =
-    Operation_worker.run ?monitor_node_operations ~round_durations cctxt
-  in
-  let dal_attestable_slots_worker =
-    Dal_attestable_slots_worker.create
-      ~attestation_lag:constants.parametric.dal.attestation_lag
-      ~number_of_slots:constants.parametric.dal.number_of_slots
+  let* global_state =
+    Baking_scheduling.create_global_state
+      ~constants
+      ~chain
+      cctxt
+      config
+      delegates
   in
   Baking_scheduling.create_initial_state
     cctxt
     ?synchronize
-    ~constants
-    ~chain
-    config
-    operation_worker
-    dal_attestable_slots_worker
+    ?monitor_node_operations
+    ~global_state
     ~current_proposal
-    round_durations
     delegates
 
 let compute_current_round_duration round_durations

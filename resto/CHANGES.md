@@ -1,5 +1,11 @@
 dev
 
+* Fixed a file descriptor leak in the client when following redirects: the
+  body of each intermediate redirect response is now drained so that its
+  connection is released.
+* Enabled TCP keepalive on connections accepted by servers, so that
+  connections whose peer disappeared without closing are eventually
+  closed instead of being retained until the process restarts.
 * Fixed a file descriptor leak in the client when calling streamed RPCs.
 
 v1.2

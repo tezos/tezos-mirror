@@ -15,6 +15,113 @@ open Tezos_ci
 open Common.Helpers
 open Common.Packaging
 
+let make_variables ?(kind = "build") add =
+  ( "DEP_IMAGE",
+    sf "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/%s-$DISTRIBUTION" kind )
+  (* this second variable is for a read only registry and we want it to be
+            tezos/tezos *)
+  :: ( "DEP_IMAGE_PROTECTED",
+       sf "${GCP_PROTECTED_REGISTRY}/tezos/tezos/%s-$DISTRIBUTION" kind )
+  :: add
+
+let make_docker_build_dependencies ~__POS__ ?rules ~name ~matrix ~distribution
+    ~base_image ~script () =
+  job_docker_authenticated
+    ~__POS__
+    ~name
+    ?rules
+    ~stage:Stages.images
+    ~variables:
+      (make_variables
+         [("DISTRIBUTION", distribution); ("BASE_IMAGE", base_image)])
+    ~parallel:(Matrix matrix)
+    ~tag:Dynamic
+    script
+
+let make_job_merge_build_dependencies ~distribution ~dependencies ~matrix =
+  job_docker_authenticated
+    ~__POS__
+    ~name:(Format.sprintf "oc.docker-build-merge-manifest.%s" distribution)
+    ~stage:Stages.images
+    ~dependencies
+    ~variables:
+      (make_variables
+         [("DISTRIBUTION", distribution); ("IMAGE_NAME", "$DEP_IMAGE")])
+    ~parallel:(Matrix matrix)
+    ["scripts/ci/docker-merge-base-images.sh"]
+
+let build_dependency_image =
+  Image.mk_external
+    ~image_path:
+      "$DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+
+let make_job_build_packages ~__POS__ ?timeout ?(limit_dune_build_jobs = false)
+    ~name ~matrix ~distribution ~script ~dependencies ?(variables = []) () =
+  job
+    ~__POS__
+    ~name
+    ~image:build_dependency_image
+    ~stage:Stages.build
+    ~variables:
+      (make_variables
+         (("DISTRIBUTION", distribution)
+         ::
+         (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
+         )
+      @ variables)
+    ~parallel:(Matrix matrix)
+    ~dependencies
+    ?timeout
+    ~tag:Dynamic
+    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    [
+      (* This is a hack to enable Cargo networking for jobs in child pipelines.
+
+         Global variables of the parent pipeline
+         are passed to the child pipeline. Inside the child
+         pipeline, variables received from the parent pipeline take
+         precedence over job-level variables. It's bit strange. So
+         to override the default [CARGO_NET_OFFLINE=true], we cannot
+         just set it in the job-level variables of this job.
+
+         [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
+
+         See
+         {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
+         for more info. *)
+      "export CARGO_NET_OFFLINE=false";
+      script;
+    ]
+  |> Tezos_ci.Cache.enable_sccache
+
+let make_job_docker_systemd_tests ~__POS__ ~name ~matrix ~distribution ~script
+    ~base_image =
+  job_docker_authenticated
+    ~__POS__
+    ~name
+    ~stage:Stages.images
+    ~variables:
+      (make_variables
+         ~kind:"systemd-tests"
+         [("DISTRIBUTION", distribution); ("BASE_IMAGE", base_image)])
+    ~parallel:(Matrix matrix)
+    ~tag:Dynamic
+    script
+
+let make_job_merge_systemd_test_dependencies ~distribution ~dependencies ~matrix
+    =
+  job_docker_authenticated
+    ~__POS__
+    ~name:(Format.sprintf "oc.docker-systemd-merge-manifest.%s" distribution)
+    ~stage:Stages.images
+    ~dependencies
+    ~variables:
+      (make_variables
+         ~kind:"systemd-tests"
+         [("DISTRIBUTION", distribution); ("IMAGE_NAME", "$DEP_IMAGE")])
+    ~parallel:(Matrix matrix)
+    ["scripts/ci/docker-merge-base-images.sh"]
+
 let tag_amd64 ~ramfs =
   if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
   else Runner.Tag.show Gcp_very_high_cpu
@@ -28,10 +135,16 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let rockylinux_package_release_matrix ?(ramfs = false) = function
-  | Partial -> [[("RELEASE", ["9.3"]); ("TAGS", [tag_amd64 ~ramfs])]]
+let rockylinux_package_release_matrix ?(ramfs = false) ?(arm64 = true) =
+  function
+  | Partial -> [[("RELEASE", ["9"; "10"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
-      [[("RELEASE", ["9.3"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
+      [
+        [
+          ("RELEASE", ["9"; "10"]);
+          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
+        ];
+      ]
 
 (** These are the set of Fedora release-architecture combinations for
     which we build rpm packages in the job
@@ -103,6 +216,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~distribution:"fedora"
       ~matrix:(fedora_package_release_matrix pipeline_type)
   in
+
   let make_job_docker_build_dependencies =
     make_docker_build_dependencies
       ~base_image:
@@ -142,7 +256,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
     make_job_merge_build_dependencies
       ~distribution:"rockylinux"
       ~dependencies:(Dependent [Job job_docker_build_rockylinux_dependencies])
-      ~matrix:(rockylinux_package_release_matrix ~ramfs:true pipeline_type)
+      ~matrix:(rockylinux_package_release_matrix ~arm64:false pipeline_type)
   in
 
   let job_merge_systemd_test_fedora_dependencies =
@@ -157,7 +271,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~distribution:"rockylinux"
       ~dependencies:
         (Dependent [Job job_docker_systemd_test_rockylinux_dependencies])
-      ~matrix:(rockylinux_package_release_matrix ~ramfs:true pipeline_type)
+      ~matrix:(rockylinux_package_release_matrix ~arm64:false pipeline_type)
   in
 
   (* These jobs build the packages in a matrix using the
@@ -219,13 +333,13 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
            ])
       ~variables:(archs_variables pipeline_type)
       ~id_tokens:Tezos_ci.id_tokens
-      ~image:Images.Base_images.rockylinux_9_3
+      ~image:Images.Base_images.rockylinux_9
       ~before_script:
         (before_script
            ~source_version:true
            ["./scripts/ci/prepare-rpm-repo.sh"])
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      ["./scripts/ci/create_rpm_repo.sh rockylinux 9.3"]
+      ["./scripts/ci/create_rpm_repo.sh rockylinux 9 10"]
       ~tag:Gcp_not_interruptible
   in
   let job_rpm_repo_fedora =
@@ -307,7 +421,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_rpm_repo_fedora;
              ])
         ~variables:
-          (Common.Packaging.make_variables
+          (make_variables
              ~kind:"systemd-tests"
              [("DISTRIBUTION", "fedora"); ("RELEASE", "39")])
         [
@@ -323,13 +437,13 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       job_merge_systemd_test_rockylinux_dependencies;
       job_install_bin
         ~__POS__
-        ~name:"oc.install_bin_rockylinux_9.3.doc"
+        ~name:"oc.install_bin_rockylinux_9.doc"
         ~dependencies:(Dependent [Job job_rpm_repo_rockylinux])
-        ~image:Images.Base_images.rockylinux_9_3
-        ["./docs/introduction/install-bin-rpm.sh rockylinux 9.3"];
+        ~image:Images.Base_images.rockylinux_9
+        ["./docs/introduction/install-bin-rpm.sh rockylinux 9"];
       job_install_systemd_bin
         ~__POS__
-        ~name:"oc.install_bin_rockylinux_93_systemd"
+        ~name:"oc.install_bin_rockylinux_9_systemd"
         ~allow_failure:Yes
         ~dependencies:
           (Dependent
@@ -338,9 +452,9 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_rpm_repo_rockylinux;
              ])
         ~variables:
-          (Common.Packaging.make_variables
+          (make_variables
              ~kind:"systemd-tests"
-             [("DISTRIBUTION", "rockylinux"); ("RELEASE", "9.3")])
+             [("DISTRIBUTION", "rockylinux"); ("RELEASE", "9")])
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/rpm/rpm-install.sh \
@@ -372,34 +486,3 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       rockylinux_jobs @ fedora_jobs @ test_fedora_packages_jobs
       @ test_rockylinux_packages_jobs
   | Release -> rockylinux_jobs @ fedora_jobs
-
-let register ~auto ~description pipeline_type =
-  let pipeline_name =
-    match (pipeline_type, auto) with
-    | Partial, false -> "rpm_repository_partial"
-    | Partial, true -> "rpm_repository_partial_auto"
-    | Full, _ -> "rpm_repository_full"
-    | Release, _ -> "rpm_repository_release"
-  in
-  let jobs = jobs pipeline_type in
-  Pipeline.register_child
-    pipeline_name
-    ~description
-    ~jobs:(job_datadog_pipeline_trace :: jobs)
-
-let child_pipeline_partial =
-  register
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       Rocky Linux 9.3 .rpm packages."
-    ~auto:false
-    Partial
-
-let child_pipeline_partial_auto =
-  register
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       Rockylinux 9.3 .rpm packages. Starts automatically on certain \
-       conditions."
-    ~auto:true
-    Partial

@@ -36,9 +36,25 @@ module Wasmer : Host_funcs.Memory_access with type t = Memory.t = struct
     let address = I32.to_int_u address in
     Lwt.return (Memory.get_string memory ~address ~length)
 
+  let load_bytes_to_bytes memory address length =
+    let address = I32.to_int_u address in
+    (* [Memory.get_string] allocates a fresh string that is not aliased
+       elsewhere, so [Bytes.unsafe_of_string] avoids the redundant copy
+       that [Bytes.of_string] would perform. *)
+    Lwt.return
+      (Bytes.unsafe_of_string (Memory.get_string memory ~address ~length))
+
   let store_bytes memory address data =
     let address = I32.to_int_u address in
     Memory.set_string memory ~address ~data ;
+    Lwt.return_unit
+
+  let store_bytes_from_bytes memory address data =
+    let address = I32.to_int_u address in
+    (* [Memory.set_string] only reads from the data and copies into wasm
+       linear memory, so [Bytes.unsafe_to_string] is sound: the resulting
+       view is local to this call and never escapes. *)
+    Memory.set_string memory ~address ~data:(Bytes.unsafe_to_string data) ;
     Lwt.return_unit
 
   let to_bits (num : Tezos_webassembly_interpreter.Values.num) : int * int64 =

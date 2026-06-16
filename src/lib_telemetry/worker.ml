@@ -75,7 +75,9 @@ struct
     include Handlers
 
     let on_request self request =
-      Opentelemetry_lwt.Trace.with_
+      Trace.with_result
+        ~message_on_success:(Fun.const "Request completed successfully")
+        ~message_on_error:(Fun.const "Request returned an error")
         ~scope:(Request_with_hook.parent_scope request)
         ~service_name
         ~attrs:
@@ -90,15 +92,9 @@ struct
       @@ fun _scope -> on_request self (Request_with_hook.request request)
 
     let on_error self status request error =
-      Opentelemetry.Scope.set_status
-        (Request_with_hook.parent_scope request)
-        {message = "Request returned an error"; code = Status_code_error} ;
       on_error self status (Request_with_hook.request request) error
 
     let on_completion self request result status =
-      Opentelemetry.Scope.set_status
-        (Request_with_hook.parent_scope request)
-        {message = "Request completed successfully"; code = Status_code_ok} ;
       on_completion self (Request_with_hook.request request) result status
   end
 

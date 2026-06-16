@@ -657,6 +657,7 @@ let with_reconnect : type a. t -> (conn -> a Lwt.t) -> a Lwt.t =
       (function
         | Unix.(Unix_error (ECONNREFUSED, _, _))
         | Connection_closed | Lwt_io.Channel_closed _
+        | Websocket_lwt_unix.HTTP_Error "404 Not Found"
           when client.keep_alive ->
             client.current <- None ;
             (* We don't use a custom event here because some tests explicitly
@@ -858,4 +859,9 @@ let subscribe_l1_l2_levels ?start_l1_level ?timeout client =
   subscribe_filter ?timeout client (Etherlink (L1_L2_levels start_l1_level))
   @@ function
   | Ethereum_types.Subscription.(Etherlink (L1_l2_levels l)) -> Some l
+  | _ -> None
+
+let subscribe_newPreconfirmedReceipts ?timeout client =
+  subscribe_filter ?timeout client NewPreconfirmedReceipts @@ function
+  | Ethereum_types.Subscription.NewPreconfirmedReceipts r -> Some r
   | _ -> None

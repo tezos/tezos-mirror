@@ -25,6 +25,39 @@ let from_rlp =
           transactions
       in
       return transaction_hashes
+  | List
+      [
+        version;
+        Value _parent_hash;
+        List _delayed_transactions;
+        List transactions;
+        Value _timestamp;
+      ] -> (
+      (* V1 blueprint format with version byte *)
+      match version with
+      | Value version_bytes
+        when Bytes.length version_bytes = 1
+             && Char.code (Bytes.get version_bytes 0) = 1 ->
+          let* transaction_hashes =
+            List.map_e
+              (function
+                | Value bytes ->
+                    (* V1 transactions have a runtime tag prefix (1 byte) *)
+                    let length = Bytes.length bytes in
+                    if length = 0 then
+                      Error [Sequencer_blueprint.Not_a_blueprint]
+                    else
+                      let raw_tx =
+                        String.sub (Bytes.unsafe_to_string bytes) 1 (length - 1)
+                      in
+                      Ok (Ethereum_types.hash_raw_tx raw_tx)
+                | _ -> Error [Sequencer_blueprint.Not_a_blueprint])
+              transactions
+          in
+          return transaction_hashes
+      | _ ->
+          Format.printf "invalid blueprint version\n%!" ;
+          fail [Sequencer_blueprint.Not_a_blueprint])
   | rlp ->
       Format.printf "invalid rlp: %a\n%!" pp rlp ;
       fail [Sequencer_blueprint.Not_a_blueprint]

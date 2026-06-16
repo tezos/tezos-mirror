@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2025 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2025-2026 Functori, <contact@functori.com>                  *)
 (* Copyright (c) 2025 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -237,14 +237,14 @@ module Encodings = struct
 
   type deposit = {
     nonce : Ethereum_types.quantity;
-    proxy : Ethereum_types.Address.t;
-    ticket_hash : Ethereum_types.hash;
+    proxy : Ethereum_types.Address.t option;
+    ticket_hash : Ethereum_types.hash option;
     receiver : Ethereum_types.Address.t;
     amount : float;
     token : string option;
   }
 
-  let deposit =
+  let deposit_encoding =
     conv
       (fun {nonce; proxy; ticket_hash; receiver; amount; token} ->
         (nonce, proxy, ticket_hash, receiver, amount, token))
@@ -252,8 +252,8 @@ module Encodings = struct
         {nonce; proxy; ticket_hash; receiver; amount; token})
     @@ obj6
          (req "nonce" quantity_hum_encoding)
-         (req "proxy" Ethereum_types.address_encoding)
-         (req "ticket_hash" Ethereum_types.hash_encoding)
+         (opt "proxy" Ethereum_types.address_encoding)
+         (opt "ticket_hash" Ethereum_types.hash_encoding)
          (req "receiver" Ethereum_types.address_encoding)
          (req "amount" float)
          (opt "token" string)
@@ -314,22 +314,51 @@ module Encodings = struct
 
   let deposit_log =
     merge_objs
-      (merge_objs deposit log_info)
+      (merge_objs deposit_encoding log_info)
       (obj1 (opt "claimed" execution_info))
 end
 
-let deposit_with_token_info ctx Db.{nonce; proxy; ticket_hash; receiver; amount}
-    =
+let deposit_with_token_info ctx Db.{nonce; token; receiver; amount} =
   let open Lwt_result_syntax in
-  match ctx.ws_client with
-  | None ->
-      let (Ethereum_types.Qty amount) = amount in
-      let amount = Z.to_float amount in
+  match token with
+  | Db.XTZ ->
+      let amount = Etherlink_monitor.Craft.amount_to_float_1e6 amount in
       return
-        Encodings.{nonce; proxy; ticket_hash; receiver; amount; token = None}
-  | Some ws_client ->
-      let+ amount, token = Token_info.get_for_rpc ws_client proxy amount in
-      Encodings.{nonce; proxy; ticket_hash; receiver; amount; token}
+        Encodings.
+          {
+            nonce;
+            proxy = None;
+            ticket_hash = None;
+            receiver;
+            amount;
+            token = Some "XTZ";
+          }
+  | Db.FA {proxy; ticket_hash} -> (
+      match ctx.ws_client with
+      | None ->
+          let (Ethereum_types.Qty amount) = amount in
+          let amount = Z.to_float amount in
+          return
+            Encodings.
+              {
+                nonce;
+                proxy = Some proxy;
+                ticket_hash = Some ticket_hash;
+                receiver;
+                amount;
+                token = None;
+              }
+      | Some ws_client ->
+          let+ amount, token = Token_info.get_for_rpc ws_client proxy amount in
+          Encodings.
+            {
+              nonce;
+              proxy = Some proxy;
+              ticket_hash = Some ticket_hash;
+              receiver;
+              amount;
+              token;
+            })
 
 let () =
   register
@@ -391,7 +420,8 @@ let () =
   register
     `GET
     "/unclaimed"
-    Data_encoding.(list (merge_objs Encodings.deposit Encodings.log_info))
+    Data_encoding.(
+      list (merge_objs Encodings.deposit_encoding Encodings.log_info))
     ~description:"List unclaimed deposits"
     ~query:
       (* TODO: query parameters are reported by hand for now *)

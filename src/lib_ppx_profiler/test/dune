@@ -1,0 +1,47 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name ppx_profiler_test_compilation)
+ (package octez-libs)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  lwt)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
+ (modules static_module first_class_module))
+
+(library
+ (name src_lib_ppx_profiler_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-alcotezt)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt)
+ (modules test_runtime))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_ppx_profiler_test_tezt_lib
+  tezt)
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

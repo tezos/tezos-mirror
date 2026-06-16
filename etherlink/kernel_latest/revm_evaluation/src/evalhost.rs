@@ -2,12 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{cell::RefCell, io::Write};
-
-use tezos_evm_logging::Verbosity;
 use tezos_evm_runtime::{
     extensions::WithGas,
-    internal_runtime::{ExtendedRuntime, InternalRuntime},
     runtime::{IsEvmNode, MockKernelHost},
 };
 use tezos_smart_rollup_host::{
@@ -15,44 +11,62 @@ use tezos_smart_rollup_host::{
     input::Message,
     metadata::RollupMetadata,
     path::Path,
+    reveal::HostReveal,
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
+    storage::StorageV1,
+    wasm::WasmHost,
 };
 
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 
 pub struct EvalHost {
     pub host: MockKernelHost,
-    pub buffer: RefCell<Vec<u8>>,
 }
 
 impl EvalHost {
-    /// Create a new instance of the `MockHost`, additionally provide the buffer
-    /// where the logs will be outputed.
-    pub fn default_with_buffer(buffer: RefCell<Vec<u8>>) -> Self {
+    /// Create a new instance of the `MockHost`. Resets the global log capture -
+    /// care should therefore be taken to not have two instances of `EvalHost` in parallel.
+    pub fn default_with_buffer_reset() -> Self {
+        tezos_evm_logging::DEBUG_LOG.with_borrow_mut(|log| log.truncate(0));
         let host = MockKernelHost::default();
-        Self { host, buffer }
+        Self { host }
     }
 }
 
-impl SdkRuntime for EvalHost {
+impl HostReveal for EvalHost {
     #[inline(always)]
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.host.write_output(from)
+    fn reveal_preimage(
+        &self,
+        hash: &[u8; PREIMAGE_HASH_SIZE],
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host.reveal_preimage(hash, destination)
     }
 
     #[inline(always)]
-    fn write_debug(&self, data: &str) {
-        let mut unboxed_buffer = self.buffer.borrow_mut();
-        if let Err(e) = write!(*unboxed_buffer, "{data}") {
-            eprint!("Error due to: {e}")
-        }
+    fn reveal_metadata(&self) -> RollupMetadata {
+        self.host.reveal_metadata()
     }
 
     #[inline(always)]
-    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        self.host.read_input()
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host
+            .reveal_dal_page(published_level, slot_index, page_index, destination)
     }
 
+    #[inline(always)]
+    fn reveal_dal_parameters(&self) -> RollupDalParameters {
+        self.host.reveal_dal_parameters()
+    }
+}
+
+impl StorageV1 for EvalHost {
     #[inline(always)]
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         self.host.store_has(path)
@@ -136,44 +150,33 @@ impl SdkRuntime for EvalHost {
     }
 
     #[inline(always)]
-    fn reveal_preimage(
-        &self,
-        hash: &[u8; PREIMAGE_HASH_SIZE],
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host.reveal_preimage(hash, destination)
-    }
-
-    #[inline(always)]
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
         self.host.store_value_size(path)
     }
 
     #[inline(always)]
+    fn store_get_hash(
+        &self,
+        path: &impl Path,
+    ) -> Result<[u8; tezos_smart_rollup_core::STORE_HASH_SIZE], RuntimeError> {
+        self.host.store_get_hash(path)
+    }
+}
+
+impl WasmHost for EvalHost {
+    #[inline(always)]
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.host.write_output(from)
+    }
+
+    #[inline(always)]
+    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
+        self.host.read_input()
+    }
+
+    #[inline(always)]
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
         self.host.mark_for_reboot()
-    }
-
-    #[inline(always)]
-    fn reveal_metadata(&self) -> RollupMetadata {
-        self.host.reveal_metadata()
-    }
-
-    #[inline(always)]
-    fn reveal_dal_page(
-        &self,
-        published_level: i32,
-        slot_index: u8,
-        page_index: i16,
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host
-            .reveal_dal_page(published_level, slot_index, page_index, destination)
-    }
-
-    #[inline(always)]
-    fn reveal_dal_parameters(&self) -> RollupDalParameters {
-        self.host.reveal_dal_parameters()
     }
 
     #[inline(always)]
@@ -202,36 +205,7 @@ impl SdkRuntime for EvalHost {
     }
 }
 
-impl InternalRuntime for EvalHost {
-    fn __internal_store_get_hash<T: tezos_smart_rollup_host::path::Path>(
-        &mut self,
-        path: &T,
-    ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
-        self.host.__internal_store_get_hash(path)
-    }
-}
-
-impl ExtendedRuntime for EvalHost {
-    fn store_get_hash<T: tezos_smart_rollup_host::path::Path>(
-        &mut self,
-        path: &T,
-    ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
-        self.host.store_get_hash(path)
-    }
-
-    fn internal_store_read_all<T: Path>(
-        &self,
-        path: &T,
-    ) -> Result<Vec<u8>, RuntimeError> {
-        self.host.store_read_all(path)
-    }
-}
-
-impl Verbosity for EvalHost {
-    fn verbosity(&self) -> tezos_evm_logging::Level {
-        self.host.verbosity()
-    }
-}
+impl SdkRuntime for EvalHost {}
 
 // This is a blank implementation on purpose, as this is not useful for the
 // evaluation

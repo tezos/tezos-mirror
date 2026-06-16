@@ -70,6 +70,12 @@ let fetch_l1_chain_id cctxt =
     ~rpc:(fun x -> Chain_services.chain_id x ())
     ~requested_info:"chain id"
 
+let fetch_l1_known_protocols cctxt =
+  fetch_info_from_l1
+    cctxt
+    ~rpc:(fun x -> Chain_services.Protocols.list x ())
+    ~requested_info:"protocols"
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/7851
 
    The function below infers the DAL network name based on the L1 chain name and

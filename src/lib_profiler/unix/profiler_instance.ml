@@ -12,6 +12,7 @@ module VerbosityMap = Map.Make (String)
 type instance_maker =
   verbosity:Profiler.verbosity ->
   directory:string ->
+  profiling_config:Profiler.profiling_config ->
   name:string ->
   Profiler.instance
 
@@ -34,9 +35,14 @@ let registered_backends : instance_maker backend_infos BackendMap.t ref =
 
     where [profiler_i] is the name of the profiler that we want to be reported
     about with level of detail given by [verbosity_i]. *)
-let get_verbosity_map () : verbosity option VerbosityMap.t =
+let get_verbosity_map ~profiling_config : verbosity option VerbosityMap.t =
+  let rules_string =
+    match profiling_config.Profiler.verbosity with
+    | Some v -> Some (String.lowercase_ascii v)
+    | None -> Sys.getenv_opt "PROFILING" |> Option.map String.lowercase_ascii
+  in
   let parse_rules =
-    match Sys.getenv_opt "PROFILING" |> Option.map String.lowercase_ascii with
+    match rules_string with
     | None -> []
     | Some rules -> (
         try Tezos_stdlib_unix.Level_config_rules.parse_rules rules
@@ -64,15 +70,14 @@ let get_verbosity_map () : verbosity option VerbosityMap.t =
 
 (** [get_profiler_verbosity ~name] returns the level of detail associated to the profiler
     given by [~name], as dictated by the PROFILING environment variable. *)
-let get_profiler_verbosity =
-  let profiler_verbosity_map = get_verbosity_map () in
-  fun ~name ->
-    match VerbosityMap.find name profiler_verbosity_map with
-    | Some verbosity -> verbosity
-    | None ->
-        (* In the case that a profiler is not assigned any verbosity, we try to check whether
-           the catch-all case, represented by "", has any verbosity assigned. *)
-        Option.join @@ VerbosityMap.find "" profiler_verbosity_map
+let get_profiler_verbosity ~profiling_config ~name =
+  let profiler_verbosity_map = get_verbosity_map ~profiling_config in
+  match VerbosityMap.find name profiler_verbosity_map with
+  | Some verbosity -> verbosity
+  | None ->
+      (* In the case that a profiler is not assigned any verbosity, we try to check whether
+         the catch-all case, represented by "", has any verbosity assigned. *)
+      Option.join @@ VerbosityMap.find "" profiler_verbosity_map
 
 let register_backend : type config.
     string list -> (config driver -> instance_maker) -> config driver -> unit =
@@ -93,15 +98,19 @@ let register_backend : type config.
           !registered_backends
           env
 
-let wrap_backend_verbosity instance_maker ~directory ~name =
-  match get_profiler_verbosity ~name with
+let wrap_backend_verbosity instance_maker ~directory ~profiling_config ~name =
+  match get_profiler_verbosity ~profiling_config ~name with
   | None -> None
-  | Some verbosity -> Some (instance_maker ~verbosity ~directory ~name)
+  | Some verbosity ->
+      Some (instance_maker ~verbosity ~directory ~profiling_config ~name)
 
 type wrapped_instance_maker =
-  directory:string -> name:string -> Profiler.instance option
+  directory:string ->
+  profiling_config:Profiler.profiling_config ->
+  name:string ->
+  Profiler.instance option
 
-let selected_backends () =
+let selected_backends ~profiling_config =
   let fail s =
     Fmt.failwith
       "@[<v 2>%s.@,\
@@ -116,16 +125,22 @@ let selected_backends () =
          !registered_backends
          [])
   in
-  match
-    Sys.getenv_opt "PROFILING_BACKENDS" |> Option.map String.lowercase_ascii
-  with
+  let backends_string =
+    match profiling_config.Profiler.backends with
+    | Some backends ->
+        Some (String.lowercase_ascii (String.concat ";" backends))
+    | None ->
+        Sys.getenv_opt "PROFILING_BACKENDS" |> Option.map String.lowercase_ascii
+  in
+  match backends_string with
   | None -> (
-      match Sys.getenv_opt "PROFILING" with
-      | None -> None
-      | Some _ ->
-          Format.sprintf
-            "No backend selected but profilers were enabled in PROFILING."
-          |> fail)
+      match
+        (Sys.getenv_opt "PROFILING", profiling_config.Profiler.verbosity)
+      with
+      | Some _, _ | _, Some _ ->
+          Format.sprintf "No backend selected but profilers were enabled."
+          |> fail
+      | None, None -> None)
   | Some backends ->
       String.split_no_empty ';' backends
       |> List.fold_left
@@ -151,3 +166,28 @@ let () =
       "The profiling has been enabled with PROFILING_BACKENDS='...' but the \
        program hasn't been compiled with TEZOS_PPX_PROFILER='...'"
   else ()
+
+let profiling_config_from_config_file config_file =
+  try
+    let ic = open_in config_file in
+    let json =
+      Fun.protect
+        ~finally:(fun () -> close_in ic)
+        (fun () -> Ezjsonm.value_from_channel ic)
+    in
+    match json with
+    | `O fields -> (
+        match Stdlib.List.assoc_opt "profiling" fields with
+        | Some profiling_json ->
+            Data_encoding.Json.destruct
+              Profiler.profiling_config_encoding
+              profiling_json
+        | None -> Profiler.default_profiling_config)
+    | _ -> Profiler.default_profiling_config
+  with _ -> Profiler.default_profiling_config
+
+let read_profiling_config_from_base_dir base_dir =
+  let config_file = Filename.concat base_dir "config" in
+  if Sys.file_exists config_file then
+    profiling_config_from_config_file config_file
+  else Profiler.default_profiling_config

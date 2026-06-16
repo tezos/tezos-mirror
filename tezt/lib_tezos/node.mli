@@ -450,16 +450,16 @@ module Config_file : sig
   val set_ghostnet_sandbox_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 
-  (** Set the network config to a Seoulnet network.
-
-      [user_activated_upgrades] can be given to add user-activated upgrades. *)
-  val set_seoulnet_network :
-    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
-
   (** Set the network config to a Tallinnnet network.
 
       [user_activated_upgrades] can be given to add user-activated upgrades. *)
   val set_tallinnnet_network :
+    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
+
+  (** Set the network config to a Ushuaianet network.
+
+      [user_activated_upgrades] can be given to add user-activated upgrades. *)
+  val set_ushuaianet_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 end
 
@@ -647,10 +647,21 @@ val wait_for_request :
 
 (** See [Daemon.Make.wait_for_full]. *)
 val wait_for_full :
-  ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** See [Daemon.Make.wait_for]. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** Wait for a node to receive a given number of connections.
 
@@ -746,6 +757,10 @@ val get_version : t -> string Lwt.t
 (** Expose the RPC server address of this node as a foreign endpoint.
     See [rpc_endpoint] for a description of the [local] argument. *)
 val as_rpc_endpoint : ?local:bool -> t -> Endpoint.t
+
+(** Returns the cycle of the current head, as observed via the RPC
+    {!RPC.get_chain_block_helper_current_level}. *)
+val current_cycle : t -> int Lwt.t
 
 module RPC : sig
   include RPC_core.CALLERS with type uri_provider := t

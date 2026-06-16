@@ -35,7 +35,7 @@ let register ?(tags = []) =
     ~__FILE__
     ~tags:("vector" :: tags)
 
-let empty_tree = Irmin_context.PVMState.empty ()
+let empty_tree = !(Irmin_context.PVMState.empty ())
 
 let expect_error msg = function Ok _ -> Test.fail msg | Error err -> err
 

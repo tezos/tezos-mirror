@@ -199,7 +199,7 @@ let test_preattestation_for_next_round () =
    swapping slots produces the same bytes. *)
 let slot_substitution_does_not_affect_bytes () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* genesis, _contracts = Context.init_n 5 () in
   let* b = Block.bake genesis in
   let* attester = Context.get_attester (B b) in
   let consensus_pkh = attester.consensus_key in
@@ -229,7 +229,7 @@ let slot_substitution_does_not_affect_bytes () =
    be mismatched between signing and verification. *)
 let encoding_incompatibility () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* genesis, _contracts = Context.init_n 5 () in
   let* b = Block.bake genesis in
   let* attester = Context.get_attester (B b) in
   let* signer = Account.find attester.consensus_key in

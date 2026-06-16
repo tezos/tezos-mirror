@@ -84,17 +84,6 @@ val post_slot :
   ; query : < padding : char ; slot_index : Types.slot_index option > >
   service
 
-(** Associate a commitment to a level and a slot index. See {!val:
-    Slot_manager.associate_slot_id_with_commitment} for more details. *)
-val patch_commitment :
-  < meth : [`PATCH]
-  ; input : Types.slot_id
-  ; output : unit
-  ; prefix : unit
-  ; params : unit * Cryptobox.commitment
-  ; query : unit >
-  service
-
 (** Retrieve the content of the slot associated with the given slot id. *)
 val get_slot_content :
   < meth : [`GET]
@@ -210,7 +199,9 @@ val get_assigned_shard_indices :
 (** Return the set of currently attestable slots. A slot is attestable at level
     [l] if it is published at level [l - attestation_lag] and *all* the shards
     assigned at level [l] to the given delegate (identified by its delegate key
-    address) are available in the DAL node's store. *)
+    address) are available in the DAL node's store. This only returns the result
+    for the maximum possible lag, so the last value from the [attestation_lags]
+    list. *)
 val get_attestable_slots :
   < meth : [`GET]
   ; input : unit
@@ -224,7 +215,9 @@ val get_attestable_slots :
     A slot is attestable at level [L] if it was published at [L - attestation_lag]
     and *all* shards assigned at level [L] to [pkh] are available in the DAL
     node's store. Returns a "not in committee" message if that is the case
-    for [pkh] at level [L]. *)
+    for [pkh] at level [L]. This service provides information for all potential
+    attestation lags from the [attestation_lags] list, unlike the static
+    [get_attestable_slots] method. *)
 val monitor_attestable_slots :
   < meth : [`GET]
   ; input : unit

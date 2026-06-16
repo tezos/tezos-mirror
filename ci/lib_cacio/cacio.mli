@@ -30,12 +30,18 @@
     that they are publishing. They can also depend on test jobs to prevent
     publishing broken artifacts, and on other publish jobs if order matters.
 
+    The purpose of [Test_publication] jobs is to check the result of [Publish] jobs,
+    usually the fact that the artefacts have been published correctly.
+    In theory this should rather be done in [Publish] jobs themselves,
+    so that they can un-publish the artifacts, but some legacy jobs separate the
+    publication from the test. New jobs should avoid using [Test_publication].
+
     There is no need to include [Build] jobs explicitly in pipelines.
     One should only list [Test] and [Publish] jobs and let Cacio automatically
     include the relevant build jobs that they depend on.
     This reflects the fact that the purpose of build jobs is only to
     make artifacts for other jobs. *)
-type stage = Build | Test | Publish
+type stage = Build | Test | Publish | Test_publication
 
 (** Dependency relationships.
 
@@ -53,29 +59,11 @@ type sccache_config
 
     See {!Tezos_ci.Cache.enable_sccache}. *)
 val sccache :
-  ?key:string ->
   ?error_log:string ->
-  ?idle_timeout:string ->
   ?log:string ->
-  ?path:string ->
-  ?cache_size:string ->
-  unit ->
-  sccache_config
-
-(** Configuration of Dune's cache. *)
-type dune_cache_config
-
-(** Make a configuration for Dune's cache.
-
-    See {!Tezos_ci.Cache.enable_dune_cache}. *)
-val dune_cache :
-  ?key:string ->
-  ?path:string ->
-  ?cache_size:string ->
-  ?copy_mode:bool ->
   ?policy:Gitlab_ci.Types.cache_policy ->
   unit ->
-  dune_cache_config
+  sccache_config
 
 (** Pipeline jobs.
 
@@ -89,19 +77,12 @@ type job
     - [Immediate]: same as [Auto], but do not wait for the [trigger] job.
     - [Manual]: the job can be triggered manually once all of its dependencies succeed.
 
-    If a job [dep] with trigger [Manual]
-    is needed by a job with trigger [Auto],
-    the trigger of [dep] is automatically forced to [Auto].
+    Dependencies of [Immediate] jobs must themselves be [Immediate].
 
-    If a job [dep] with trigger [Manual] or [Auto]
-    is needed by a job with trigger [Immediate],
-    the trigger of [dep] is automatically forced to [Immediate].
-
-    If a job [dep] is added to a pipeline automatically
-    because it is the dependency of other jobs,
-    and if all those other jobs have trigger [Manual],
-    [dep] is added with trigger [Manual].
-    Otherwise it is added with trigger [Auto]. *)
+    If a job [job] is added automatically, its trigger depends on its reverse dependencies.
+    - If there is an [Immediate] reverse dependency, [job] is added as [Immediate].
+    - Else, if there is an [Auto] reverse dependency, [job] is added as [Auto].
+    - Else, all reverse dependencies are [Manual], so [job] is added as [Manual]. *)
 type trigger = Auto | Immediate | Manual
 
 (** Memoize a function.
@@ -186,7 +167,8 @@ module type COMPONENT_API = sig
       When added to the [before_merging] or [merge_train] pipeline,
       jobs are only included to the pipeline if
       any file listed in [only_if_changed] has been modified,
-      or if the merge request has any label listed in [force_if_label].
+      or if the merge request has any label listed in [force_if_label],
+      or if [force] is set to [true].
       [only_if_changed] can include glob patterns such as [dir/**/*.ml].
       Its default value is the [paths] of the current component.
 
@@ -203,16 +185,14 @@ module type COMPONENT_API = sig
       If [sccache] is specified, the resulting job is modified with
       {!Tezos_ci.Cache.enable_sccache}.
 
-      If [dune_cache] is specified, the resulting job is modified with
-      {!Tezos_ci.Cache.enable_dune_cache}.
-
-      If [test_coverage] is specified, the resulting job is modified with
-      {!Tezos_ci.Coverage.enable_instrumentation} and
-      {!Tezos_ci.Coverage.enable_output_artifact}.
+      If [dune_cache] is [true], the resulting job is modified with
+      {!Tezos_ci.Cache.enable_dune_cache}. Default is [false].
 
       [?image_dependencies] is temporary,
       it will be removed once the image feature is implemented in Cacio.
       See the Future work section for more details.
+
+      [?script] is used to specify the job's script.
 
       See {!Tezos_ci.job} for information about other arguments.
 
@@ -227,25 +207,29 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
-    image:Tezos_ci.Image.t ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
+    ?image:Tezos_ci.Image.t ->
     ?only_if_changed:string list ->
+    ?force:bool ->
     ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
+    ?cache:Gitlab_ci.Types.cache list ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
-    ?dune_cache:dune_cache_config ->
-    ?test_coverage:bool ->
+    ?dune_cache:bool ->
+    ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?timeout:Gitlab_ci.Types.time_interval ->
     ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
+    ?id_tokens:Gitlab_ci.Types.id_tokens ->
+    ?script:string list ->
     string ->
-    string list ->
     job
 
   (** Time interval for timeouts passed to {!tezt_job}. *)
@@ -296,7 +280,8 @@ module type COMPONENT_API = sig
       - Tezt's [--keep-going] is set if, and only if [pipeline] is [`scheduled].
 
       Test selection:
-      - Manifezt is active if, and only if [pipeline] is [`merge_request].
+      - Manifezt is active if, and only if [pipeline] is [`merge_request]
+        and [select_tezts] is [true] (which is the default).
         When active, it causes the job to depend on the [select_tezts] job,
         which is automatically added to the pipeline if necessary.
       - [test_selection] is a TSL expression.
@@ -313,10 +298,11 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
-    ?test_coverage:bool ->
+    ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?tezt_exe:string ->
     ?global_timeout:tezt_timeout ->
@@ -327,24 +313,9 @@ module type COMPONENT_API = sig
     ?retry_tests:int ->
     ?test_selection:Tezt_core.TSL_AST.t ->
     ?before_script:string list ->
+    ?select_tezts:bool ->
     string ->
     job
-
-  (** Register jobs to be included in [before_merging] and [merge_train] pipelines. *)
-  val register_before_merging_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in [schedule_extended_test] pipelines.
-
-      Only available in the [Shared] component. *)
-  val register_schedule_extended_test_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in [custom_extended_test] pipelines.
-
-      Only available in the [Shared] component. *)
-  val register_custom_extended_test_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in [master_branch] pipelines. *)
-  val register_master_jobs : (trigger * job) list -> unit
 
   (** Register a scheduled pipeline for this component.
 
@@ -375,36 +346,6 @@ module type COMPONENT_API = sig
       In the future, these functions may be replaced by something more abstract.
       (See the future work section at the end of the file.) *)
 
-  (** Register jobs to be included in the global release pipeline.
-
-      This pipeline is for major releases and includes all components.
-      It runs in [tezos/tezos]. *)
-  val register_global_release_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in the global test release pipeline.
-
-      This pipeline is supposed to be very close to the global release pipeline.
-      It is not run in [tezos/tezos] but in forks. *)
-  val register_global_test_release_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in the global scheduled test release pipeline.
-
-      This pipeline is supposed to be close to the global release pipeline,
-      except that it should not actually create the release.
-      It runs in [tezos/tezos]. *)
-  val register_global_scheduled_test_release_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in the publish release pages pipeline.
-
-      This pipeline is for publishing the updated release pages. *)
-  val register_global_publish_release_page_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in the publish release pages test pipeline.
-
-      This pipeline is for publishing the updated release pages on the test web page. *)
-  val register_global_test_publish_release_page_jobs :
-    (trigger * job) list -> unit
-
   (** Register jobs to be included in the release pipeline of the current component.
 
       This pipeline is for releasing this component separately.
@@ -413,23 +354,39 @@ module type COMPONENT_API = sig
       This function must be called only once per component.
 
       [tag_rex] allows to specify a custom tag regular expression.
+      It is registered to be returned by {!get_release_tag_rexes}.
 
-      Not implemented for the [Shared] component. *)
+      Not implemented for the [Shared] component.
+
+      Use [legacy_jobs] to include jobs that were not migrated to Cacio yet.
+      Cacio does not add them automatically for you even if they are dependencies
+      of Cacio jobs. *)
   val register_dedicated_release_pipeline :
-    ?tag_rex:string -> (trigger * job) list -> unit
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 
   (** Register jobs to be included in the test release pipeline of the current component.
 
       This pipeline is for testing the release of this component separately.
-      It runs in [tezos/tezos].
+      It runs in namespaces other than [tezos].
 
       This function must be called only once per component.
 
       [tag_rex] allows to specify a custom tag regular expression.
+      It is registered to be returned by {!get_release_tag_rexes}.
 
-      Not implemented for the [Shared] component. *)
+      Not implemented for the [Shared] component.
+
+      Use [legacy_jobs] to include jobs that were not migrated to Cacio yet.
+      Cacio does not add them automatically for you even if they are dependencies
+      of Cacio jobs. *)
   val register_dedicated_test_release_pipeline :
-    ?tag_rex:string -> (trigger * job) list -> unit
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 end
 
 (** The main functor of Cacio. *)
@@ -441,38 +398,72 @@ module Make (_ : COMPONENT) : COMPONENT_API
     Add a comment next to your job definitions to justify this reason. *)
 module Shared : COMPONENT_API
 
+(** {2 Global pipelines} *)
+
+(** Global pipelines.
+
+    Global pipelines are shared between components. *)
+type global_pipeline =
+  | Before_merging
+  | Merge_train
+  | Schedule_extended_test
+  | Custom_extended_test
+  | Master
+  | Scheduled_docker_build
+  | Scheduled_docker_master_snapshot
+  | Scheduled_test_release
+  | Publish_release_page
+  | Test_publish_release_page
+  (* Release tag pipelines *)
+  | Major_release_tag
+  | Major_release_tag_test
+  | Minor_release_tag
+  | Minor_release_tag_test
+  | Beta_release_tag
+  | Beta_release_tag_test
+  | Non_release_tag
+  | Non_release_tag_test
+  | Packaging_revision
+  | Packaging_revision_test
+  | Octez_latest_release
+  | Octez_latest_release_test
+  (* Debian packaging pipelines *)
+  | Debian_partial
+  | Debian_daily
+
+(** Add jobs to a given global pipeline. *)
+val register_jobs : global_pipeline -> (trigger * job) list -> unit
+
+(** Register jobs to be included in [before_merging] and [merge_train] pipelines.
+
+    This is equivalent to registering the job with both
+    [register_jobs Before_merging] and [register_jobs Merge_train]. *)
+val register_merge_request_jobs : (trigger * job) list -> unit
+
+(** Register jobs to be included in release pipelines.
+
+    This registers jobs into:
+    - [Major_release_tag]
+    - [Beta_release_tag]
+    - [Non_release_tag] *)
+val register_release_jobs : (trigger * job) list -> unit
+
+(** Register jobs to be included in test release pipelines.
+
+    This registers jobs into:
+    - [Major_release_tag_test]
+    - [Beta_release_tag_test]
+    - [Non_release_tag_test] *)
+val register_test_release_jobs : (trigger * job) list -> unit
+
 (** {2 Listing registered jobs and more} *)
 
 (** Only call these functions after all jobs are registered.
     They are meant to be called from [ci/bin/main.ml]
     when registering the pipelines with CIAO. *)
 
-(** Jobs for [before_merging]. *)
-val get_before_merging_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for [schedule_extended_test]. *)
-val get_schedule_extended_test_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for [custom_extended_test]. *)
-val get_custom_extended_test_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for [master]. *)
-val get_master_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the global release pipeline. *)
-val get_global_release_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the global test release pipeline. *)
-val get_global_test_release_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the global scheduled test release pipeline. *)
-val get_global_scheduled_test_release_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the publish release pages pipeline. *)
-val get_global_publish_release_page_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the publish release pages test pipeline. *)
-val get_global_test_publish_release_page_jobs : unit -> Tezos_ci.tezos_job list
+(** Get the list of jobs registered for a given global pipeline. *)
+val get_jobs : global_pipeline -> Tezos_ci.tezos_job list
 
 (** Regular expressions that match release tags.
 
@@ -480,8 +471,9 @@ val get_global_test_publish_release_page_jobs : unit -> Tezos_ci.tezos_job list
     and [non_release_tag_test] pipelines. *)
 val get_release_tag_rexes : unit -> string list
 
-(** Get the number of times the [job] function was called. *)
-val get_number_of_declared_jobs : unit -> int
+(** Get the names and locations of the jobs that were registered with the [job] function. *)
+val get_declared_jobs :
+  unit -> (string * int * int * int) Gitlab_ci.Base.String_map.t
 
 (** {2 Other} *)
 

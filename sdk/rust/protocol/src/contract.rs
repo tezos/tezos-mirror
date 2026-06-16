@@ -11,7 +11,7 @@ use nom::sequence::delimited;
 use nom::sequence::preceded;
 use std::fmt::Display;
 use tezos_crypto_rs::base58::{FromBase58Check, FromBase58CheckError};
-use tezos_crypto_rs::hash::{ContractKt1Hash, Hash, HashTrait, HashType};
+use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait, HashType};
 use tezos_data_encoding::enc::{self, BinResult, BinWriter};
 use tezos_data_encoding::encoding::{Encoding, HasEncoding};
 use tezos_data_encoding::has_encoding;
@@ -34,13 +34,15 @@ pub enum Contract {
 impl Display for Contract {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Implicit(pkh) => write!(f, "{}", pkh),
-            Self::Originated(kt1) => write!(f, "{}", kt1),
+            Self::Implicit(pkh) => write!(f, "{pkh}"),
+            Self::Originated(kt1) => write!(f, "{kt1}"),
         }
     }
 }
 
 impl Contract {
+    /// Size of the underlying byte array.
+    pub const SIZE: usize = PublicKeyHash::SIZE;
     /// Converts from a *base58-encoded* string, checking for the prefix.
     pub fn from_b58check(data: &str) -> Result<Self, FromBase58CheckError> {
         let bytes = data.from_base58check()?;
@@ -59,9 +61,25 @@ impl Contract {
             Self::Originated(kt1) => kt1.to_b58check(),
         }
     }
+
+    pub fn is_implicit(&self) -> bool {
+        match self {
+            Self::Implicit(_) => true,
+            Self::Originated(_) => false,
+        }
+    }
 }
 
-impl From<Contract> for Hash {
+impl From<Contract> for Vec<u8> {
+    fn from(c: Contract) -> Self {
+        match c {
+            Contract::Implicit(pkh) => pkh.into(),
+            Contract::Originated(ckt1) => ckt1.into(),
+        }
+    }
+}
+
+impl From<Contract> for [u8; Contract::SIZE] {
     fn from(c: Contract) -> Self {
         match c {
             Contract::Implicit(pkh) => pkh.into(),
@@ -111,7 +129,7 @@ impl BinWriter for Contract {
             }
             Self::Originated(originated) => {
                 enc::put_byte(&1, output);
-                let mut bytes: Hash = originated.as_ref().to_vec();
+                let mut bytes = originated.as_ref().to_vec();
                 // Originated is padded
                 bytes.push(0);
                 enc::bytes(&mut bytes, output)?;

@@ -34,6 +34,7 @@ module Parameters = struct
     cryptobox : Cryptobox.parameters;
     number_of_slots : int;
     attestation_lag : int;
+    attestation_lags : int list;
     attestation_threshold : int;
   }
 
@@ -49,6 +50,11 @@ module Parameters = struct
     let page_size = JSON.(json |-> "page_size" |> as_int) in
     let number_of_slots = JSON.(json |-> "number_of_slots" |> as_int) in
     let attestation_lag = JSON.(json |-> "attestation_lag" |> as_int) in
+    let attestation_lags =
+      let lags_json = JSON.(json |-> "attestation_lags") in
+      if JSON.is_null lags_json then [attestation_lag]
+      else JSON.(lags_json |> as_list |> List.map as_int)
+    in
     let attestation_threshold =
       JSON.(json |-> "attestation_threshold" |> as_int)
     in
@@ -65,6 +71,7 @@ module Parameters = struct
           {number_of_shards; redundancy_factor; slot_size; page_size};
       number_of_slots;
       attestation_lag;
+      attestation_lags;
       attestation_threshold;
     }
 
@@ -128,6 +135,216 @@ module Parameters = struct
       default_block_storage / blocks_per_cycle
     else 1 + (default_block_storage / blocks_per_cycle)
 end
+
+(* Encoding/decoding of the multi-lag Attestations format used in attestation
+   operations (Dal_attestations_repr.t).
+
+   Note that:
+   - [number_of_lags = List.length attestation_lags]
+   - [lag_index i] corresponds to [attestation_lags[i]]
+
+   This module handles two distinct formats used by the protocol:
+
+   1. Pre-025 format (simple bitset):
+      - Each bit i represents whether slot i is attested
+      - Example: "5" = 0b101 means slots 0 and 2 are attested
+
+   2. Post-025 format (multi-lag):
+      - Supports attestations for slots published at different levels
+      - Each lag index corresponds to a different published level:
+        * lag_index i -> slots published at (attested_level - attestation_lags[i])
+
+   Encoding format:
+   - Prefix: first [number_of_lags] bits indicate which lag indices have non-empty
+     attestations
+   - Data: for each non-empty lag (in order), a sequence of chunks. Each chunk
+     is [bits_per_chunk] bits: 1 bit [is_last] followed by [slots_per_chunk]
+     slot bits. The last chunk has [is_last]=1. *)
+module Attestations = struct
+  let bool_array_to_attestation lag_index slots_array =
+    let slot_indices =
+      Array.to_seq slots_array
+      |> Seq.mapi (fun i b -> (i, b))
+      |> Seq.filter_map (fun (i, b) -> if b then Some i else None)
+      |> List.of_seq
+    in
+    RPC.{lag_index; slot_indices}
+
+  let bool_array_array_to_attestations attestations_per_lag =
+    Array.to_seq attestations_per_lag
+    |> Seq.mapi (fun lag_index slots ->
+           bool_array_to_attestation lag_index slots)
+    |> Seq.filter (fun (a : RPC.unfolded_lag_attestation) ->
+           a.slot_indices <> [])
+    |> List.of_seq
+
+  let attestations_to_bool_array_array ~number_of_lags ~number_of_slots
+      (attestations : RPC.unfolded_lag_attestation list) =
+    let result =
+      Array.init number_of_lags (fun _ -> Array.make number_of_slots false)
+    in
+    List.iter
+      (fun RPC.{lag_index; slot_indices} ->
+        List.iter
+          (fun slot_index -> result.(lag_index).(slot_index) <- true)
+          slot_indices)
+      attestations ;
+    result
+
+  (* Pre-025 simple bitset format: bit[i] = slot i is attested *)
+  let encode_single_lag_before_025 dal_attestation =
+    let aux (acc, n) b =
+      let bit = if b then 1 else 0 in
+      (acc lor (bit lsl n), n + 1)
+    in
+    Array.fold_left aux (0, 0) dal_attestation |> fst |> string_of_int
+
+  let decode_before_025 ~number_of_slots str =
+    let attestation = Z.of_string str in
+    let array = Array.make number_of_slots false in
+    List.iter
+      (fun i -> if Z.testbit attestation i then array.(i) <- true)
+      (range 0 (number_of_slots - 1)) ;
+    array
+
+  let encode_for_one_lag protocol endpoint ?lag_index dal_parameters
+      dal_attestation =
+    if Protocol.number protocol < 025 then
+      return (encode_single_lag_before_025 dal_attestation)
+    else
+      let number_of_lags =
+        List.length dal_parameters.Parameters.attestation_lags
+      in
+      let lag_index = Option.value ~default:(number_of_lags - 1) lag_index in
+      let attestation = bool_array_to_attestation lag_index dal_attestation in
+      RPC_core.call endpoint
+      @@ RPC.post_chain_block_helpers_encode_dal_attestation [attestation]
+
+  let encode protocol endpoint attestations_per_lag =
+    if Protocol.number protocol < 025 then
+      match attestations_per_lag with
+      | [|dal_attestation|] ->
+          return (encode_single_lag_before_025 dal_attestation)
+      | _ ->
+          Test.fail
+            "Multiple lags encoding only supported for protocols >= 025."
+    else
+      let attestations =
+        bool_array_array_to_attestations attestations_per_lag
+      in
+      RPC_core.call endpoint
+      @@ RPC.post_chain_block_helpers_encode_dal_attestation attestations
+
+  let decode protocol endpoint parameters str =
+    let number_of_slots = parameters.Parameters.number_of_slots in
+    if Protocol.number protocol < 025 then
+      return [|decode_before_025 ~number_of_slots str|]
+    else
+      let number_of_lags = List.length parameters.Parameters.attestation_lags in
+      let* attestations =
+        RPC_core.call endpoint
+        @@ RPC.get_chain_block_helpers_decode_dal_attestation str
+      in
+      return
+        (attestations_to_bool_array_array
+           ~number_of_lags
+           ~number_of_slots
+           attestations)
+end
+
+module Slot_availability = struct
+  let decode = Attestations.decode
+end
+
+module IntMap = Map.Make (Int)
+
+let collect_slot_availabilities node ~attested_levels =
+  Lwt_list.fold_left_s
+    (fun map attested_level ->
+      let* metadata =
+        Node.RPC.call node
+        @@ RPC.get_chain_block_metadata ~block:(string_of_int attested_level) ()
+      in
+      return (IntMap.add attested_level metadata.RPC.dal_attestation map))
+    IntMap.empty
+    attested_levels
+
+let to_attested_levels ~protocol ~dal_parameters ~published_level =
+  List.mapi
+    (fun lag_index lag ->
+      (published_level + lag, lag_index, dal_parameters, protocol))
+    dal_parameters.Parameters.attestation_lags
+
+let is_slot_attested ~endpoint ~published_level ~slot_index ~to_attested_levels
+    slot_availabilities =
+  let attested_levels = to_attested_levels ~published_level in
+  let is_attested_at (attested_level, lag_index, dal_params, protocol) =
+    match IntMap.find attested_level slot_availabilities with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "Metadata not found for attested level %d"
+          attested_level
+    | Some slot_availability ->
+        let* attestation_array =
+          Slot_availability.decode
+            protocol
+            endpoint
+            dal_params
+            slot_availability
+        in
+        let number_of_lags = List.length dal_params.attestation_lags in
+        let attestations_at_lag =
+          if lag_index >= number_of_lags then
+            Test.fail
+              ~__LOC__
+              "Unexpected lag_index %d for attested level %d, number_of_lags = \
+               %d"
+              lag_index
+              attested_level
+              number_of_lags
+          else
+            let len = Array.length attestation_array in
+            if lag_index >= len then
+              Test.fail
+                ~__LOC__
+                "Unexpected array length %d, when lag_index is %d for attested \
+                 level %d"
+                len
+                lag_index
+                attested_level
+            else attestation_array.(lag_index)
+        in
+        return
+          (Array.length attestations_at_lag > slot_index
+          && attestations_at_lag.(slot_index))
+  in
+  let* results = Lwt_list.map_s is_attested_at attested_levels in
+  return (List.exists Fun.id results)
+
+let is_slot_attested_in_bitset ~endpoint ~protocol ~dal_parameters
+    ~attested_level ~published_level ~slot_index ~dal_attestation =
+  let* attestation_array =
+    Attestations.decode protocol endpoint dal_parameters dal_attestation
+  in
+  let lag = attested_level - published_level in
+  let lag_index_opt =
+    List.find_index
+      (fun l -> l = lag)
+      dal_parameters.Parameters.attestation_lags
+  in
+  match lag_index_opt with
+  | None ->
+      Test.fail
+        "The attested level %d is not in the attestation window for published \
+         level %d"
+        attested_level
+        published_level
+  | Some lag_index ->
+      let attestations_at_lag = attestation_array.(lag_index) in
+      return
+        (Array.length attestations_at_lag > slot_index
+        && attestations_at_lag.(slot_index))
 
 module Committee = struct
   type member = {attester : string; indexes : int list}
@@ -199,6 +416,7 @@ module Dal_RPC = struct
     | Attested of int (* of attestation lag *)
     | Unattested
     | Unpublished
+    | Not_found
 
   type slot_header = {
     slot_level : int;
@@ -212,6 +430,7 @@ module Dal_RPC = struct
     | Attested lag -> Format.fprintf fmt "Attested(lag:%d)" lag
     | Unattested -> Format.fprintf fmt "Unattested"
     | Unpublished -> Format.fprintf fmt "Unpublished"
+    | Not_found -> Format.pp_print_string fmt "Not_found"
 
   let slot_id_status_of_json =
     let legacy_attestation_lag = 8 in
@@ -537,33 +756,36 @@ module Dal_RPC = struct
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct
     let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        node rpc =
+        ?log_response_body_max node rpc =
       RPC_core.call
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         (Dal_node.as_rpc_endpoint node)
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        ?extra_headers node rpc =
+        ?log_response_body_max ?extra_headers node rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         ?extra_headers
         (Dal_node.as_rpc_endpoint node)
         rpc
 
     let call_json ?rpc_hooks ?log_request ?log_response_status
-        ?log_response_body node rpc =
+        ?log_response_body ?log_response_body_max node rpc =
       RPC_core.call_json
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         (Dal_node.as_rpc_endpoint node)
         rpc
   end
@@ -571,33 +793,36 @@ module Dal_RPC = struct
   module Remote :
     RPC_core.CALLERS with type uri_provider := remote_uri_provider = struct
     let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        endpoint rpc =
+        ?log_response_body_max endpoint rpc =
       RPC_core.call
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         endpoint
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        ?extra_headers endpoint rpc =
+        ?log_response_body_max ?extra_headers endpoint rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         ?extra_headers
         endpoint
         rpc
 
     let call_json ?rpc_hooks ?log_request ?log_response_status
-        ?log_response_body endpoint rpc =
+        ?log_response_body ?log_response_body_max endpoint rpc =
       RPC_core.call_json
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         endpoint
         rpc
   end
@@ -710,6 +935,8 @@ module Helpers = struct
           Tezos_error_monad.Error_monad.pp_print_trace
           e
     | Ok () -> unit
+
+  let init_verifier () = Cryptobox.init_verifier_dal ()
 
   let get_commitment_and_shards_with_proofs ?precomputation cryptobox ~slot =
     let res =

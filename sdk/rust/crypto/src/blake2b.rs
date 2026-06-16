@@ -15,59 +15,66 @@ pub enum Blake2bError {
 }
 
 /// Generate digest of length 256 bits (32bytes) from arbitrary binary data
-pub fn digest_256(data: &[u8]) -> Vec<u8> {
-    digest(data, 32).unwrap()
+pub fn digest_256(data: &[u8]) -> [u8; 32] {
+    digest(data)
 }
 
 // Generate digest of length 160 bits (20bytes) from arbitrary binary data
-pub fn digest_160(data: &[u8]) -> Vec<u8> {
-    digest(data, 20).unwrap()
+pub fn digest_160(data: &[u8]) -> [u8; 20] {
+    digest(data)
 }
 
 /// Generate digest of length 128 bits (16bytes) from arbitrary binary data
-pub fn digest_128(data: &[u8]) -> Vec<u8> {
-    digest(data, 16).unwrap()
+pub fn digest_128(data: &[u8]) -> [u8; 16] {
+    digest(data)
 }
 
-/// Arbitrary Blake2b digest generation from generic data.
-// Should be noted, that base Blake2b supports arbitrary digest length from 16 to 64 bytes
-pub fn digest(data: &[u8], out_len: usize) -> Result<Vec<u8>, Blake2bError> {
-    if !(16..=64).contains(&out_len) {
-        return Err(Blake2bError::InvalidLength);
-    }
-
-    let mut hasher = Blake2b::new(out_len);
-
-    hasher.input(data);
-
-    let mut result = vec![0; hasher.output_bytes()];
-
-    hasher.result(result.as_mut_slice());
-
-    Ok(result)
+fn digest<const N: usize>(data: &[u8]) -> [u8; N] {
+    compute_hash(|hasher| hasher.input(data))
 }
 
-/// Arbitrary Blake2b digest generation from pieces of generic data.
-// Should be noted, that base Blake2b supports arbitrary digest length from 16 to 64 bytes
-pub fn digest_all<T, I>(data: T, out_len: usize) -> Result<Vec<u8>, Blake2bError>
+/// Computes a BLAKE2b-256 digest of multiple data chunks.
+///
+/// Hashes all provided data items sequentially, useful for
+/// hashing compound data without manual concatenation.
+///
+/// # Examples
+/// ```
+/// use tezos_crypto_rs::blake2b::digest_all_256;
+///
+/// let parts = vec![b"hello", b"     ", b"world"];
+/// let hash = digest_all_256(parts);
+/// assert_eq!(hash.len(), 32);
+/// ```
+pub fn digest_all_256<T, I>(data: T) -> [u8; 32]
 where
     T: IntoIterator<Item = I>,
     I: AsRef<[u8]>,
 {
-    if !(16..=64).contains(&out_len) {
-        return Err(Blake2bError::InvalidLength);
+    compute_hash(|hasher| {
+        for chunk in data {
+            hasher.input(chunk.as_ref());
+        }
+    })
+}
+
+fn compute_hash<const N: usize, F>(feed_data: F) -> [u8; N]
+where
+    F: FnOnce(&mut Blake2b),
+{
+    const {
+        assert!(
+            N >= 16 && N <= 64,
+            "Unsupported digest size: must be between 16 and 64 bytes"
+        );
     }
 
-    let mut hasher = Blake2b::new(out_len);
-    for d in data.into_iter() {
-        hasher.input(d.as_ref());
-    }
+    let mut hasher = Blake2b::new(N);
+    feed_data(&mut hasher);
 
-    let mut result = vec![0; hasher.output_bytes()];
-
-    hasher.result(result.as_mut_slice());
-
-    Ok(result)
+    let mut output = [0u8; N];
+    hasher.result(&mut output);
+    output
 }
 
 /// Computes a full binary tree from the list [xs].
@@ -90,7 +97,7 @@ where
 //
 // TODO: optimize it,
 // this implementation will calculate the same hash [5, 5] two times.
-pub fn merkle_tree<Leaf>(list: &[Leaf]) -> Vec<u8>
+pub fn merkle_tree<Leaf>(list: &[Leaf]) -> [u8; 32]
 where
     Leaf: AsRef<[u8]>,
 {
@@ -142,7 +149,7 @@ where
         }
     }
 
-    fn merkle_tree_inner<Leaf>(list: &RepeatingSlice<Leaf>, degree: u32) -> Vec<u8>
+    fn merkle_tree_inner<Leaf>(list: &RepeatingSlice<Leaf>, degree: u32) -> [u8; 32]
     where
         Leaf: AsRef<[u8]>,
     {
@@ -150,14 +157,10 @@ where
             0 => digest_256(list[0].as_ref()),
             d => {
                 let middle = 1 << (d - 1);
-                digest_all(
-                    [
-                        merkle_tree_inner(&RepeatingSlice(&list[..middle]), d - 1),
-                        merkle_tree_inner(&RepeatingSlice(&list[middle..]), d - 1),
-                    ],
-                    32,
-                )
-                .unwrap() // we know length is within bounds, and that's the only error possible
+                digest_all_256([
+                    merkle_tree_inner(&RepeatingSlice(&list[..middle]), d - 1),
+                    merkle_tree_inner(&RepeatingSlice(&list[middle..]), d - 1),
+                ])
             }
         }
     }
@@ -190,22 +193,10 @@ mod tests {
     }
 
     #[test]
-    fn blake2b_less_than_128() {
-        // This should fail, as blake2b does not support hashes shorter than 16 bytes.
-        assert!(digest(b"hello world", 15).is_err())
-    }
-
-    #[test]
-    fn blake2b_more_than_512() {
-        // This should fail, as blake2b does not support hashes longer than 64 bytes.
-        assert!(digest(b"hello world", 65).is_err())
-    }
-
-    #[test]
     fn blake2b_digest() {
-        let hash = digest(b"hello world", 32).unwrap();
+        let hash = digest_256(b"hello world");
         assert_eq!(
-            hash,
+            hash.to_vec(),
             hex::decode("256c83b297114d201b30179f3f0ef0cace9783622da5974326b436178aeef610")
                 .unwrap()
         );
@@ -213,9 +204,9 @@ mod tests {
 
     #[test]
     fn blake2b_digest_all() {
-        let hash = digest_all(["hello", " ", "world"], 32).unwrap();
+        let hash: [u8; 32] = digest_all_256(["hello", " ", "world"]);
         assert_eq!(
-            hash,
+            hash.to_vec(),
             hex::decode("256c83b297114d201b30179f3f0ef0cace9783622da5974326b436178aeef610")
                 .unwrap()
         );

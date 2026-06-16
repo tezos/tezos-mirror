@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2025-2026 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -48,18 +48,22 @@ let convert_using_serialization ~name ~dst ~src value =
               (name, Format.asprintf "%a" Data_encoding.Binary.pp_read_error e))
 
 module Contract = struct
-  type t = Tezlink_imports.Alpha_context.Contract.t
+  type t = Tezlink_imports.Imported_context.Contract.t
 
-  let encoding = Tezlink_imports.Alpha_context.Contract.encoding
+  let encoding = Tezlink_imports.Imported_context.Contract.encoding
 
   let implicit_encoding =
-    Tezlink_imports.Alpha_context.Contract.implicit_encoding
+    Tezlink_imports.Imported_context.Contract.implicit_encoding
 
-  let of_implicit c = Tezlink_imports.Alpha_context.Contract.Implicit c
+  let of_implicit c = Tezlink_imports.Imported_context.Contract.Implicit c
+
+  let of_originated c = Tezlink_imports.Imported_context.Contract.Originated c
+
+  let to_b58check = Tezlink_imports.Imported_context.Contract.to_b58check
 
   let of_b58check s =
     Tezlink_imports.Imported_env.wrap_tzresult
-    @@ Tezlink_imports.Alpha_context.Contract.of_b58check s
+    @@ Tezlink_imports.Imported_context.Contract.of_b58check s
 
   let of_hex contract =
     let bytes = Hex.to_bytes_exn (`Hex contract) in
@@ -67,7 +71,17 @@ module Contract = struct
 end
 
 module Tez = struct
-  include Tezlink_imports.Alpha_context.Tez
+  include Tezlink_imports.Imported_context.Tez
+
+  type error += Conversion_error of string
+
+  (* Tez.t is an abstract type, Tez.mutez and Tez.wei are exposed
+     wrappers arount Q.t and Z.t, to be cautious about unit
+     conversions. *)
+
+  type nanotez = Nanotez of Q.t
+
+  type wei = Wei of Z.t
 
   let of_string_exn str =
     match of_string str with
@@ -76,16 +90,50 @@ module Tez = struct
     | Some s -> s
 
   let to_mutez_z t = t |> to_mutez |> Z.of_int64
+
+  let of_mutez_z mutez =
+    let open Result_syntax in
+    if Z.Compare.(mutez < Z.zero) then
+      tzfail (Conversion_error "Negative values cannot be converted to Tez.t")
+    else if not (Z.fits_int64 mutez) then
+      tzfail
+        (Conversion_error
+           "Only values fitting on int64 can be converted to Tez.t")
+    else return (of_mutez_exn (Z.to_int64 mutez))
+
+  let of_mutez_q_floor mutez = of_mutez_z (Q.to_bigint mutez)
+
+  let of_mutez_q_ceil mutez =
+    let open Result_syntax in
+    (* Same as [of_mutez_q_floor] but rounds up instead of down. *)
+    match of_mutez_q_floor mutez with
+    | Error _ as err -> err
+    | Ok floor ->
+        if Q.(mutez = of_bigint (to_mutez_z floor)) then
+          (* The division was exact, there is no rounding so floor and ceil are the same thing. *)
+          return floor
+        else
+          (* The division is not exact, we need to take the successor. *)
+          Tezlink_imports.Imported_env.wrap_tzresult @@ (floor +? one_mutez)
+
+  let of_wei (Wei wei) = of_mutez_z Z.(wei / pow (of_int 10) 12)
+
+  let nanotez_of_wei (Wei wei) = Nanotez (Q.make wei (Z.pow (Z.of_int 10) 9))
+
+  let to_wei (t : t) = Wei Z.(to_mutez_z t * pow (of_int 10) 12)
+
+  let of_nanotez_ceil (Nanotez nanotez) =
+    of_mutez_q_ceil Q.(nanotez / of_int 1000)
 end
 
 module Operation = struct
-  module ImportedOperation = Tezlink_imports.Alpha_context.Operation
+  module ImportedOperation = Tezlink_imports.Imported_context.Operation
 
   type t = {
-    source : Signature.public_key_hash;
+    source : Signature.V2.public_key_hash;
     first_counter : Z.t;
     length : int;
-    op : Tezlink_imports.Alpha_context.packed_operation;
+    op : Tezlink_imports.Imported_context.packed_operation;
     raw : bytes;
     fee : Tez.t;
     gas_limit : Z.t;
@@ -95,10 +143,10 @@ module Operation = struct
     convert_using_serialization
       ~name:"counter"
       ~dst:Data_encoding.n
-      ~src:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
+      ~src:Tezlink_imports.Imported_context.Manager_counter.encoding_for_RPCs
       counter
 
-  let gas_limit_to_z = Tezlink_imports.Alpha_context.Gas.Arith.integral_to_z
+  let gas_limit_to_z = Tezlink_imports.Imported_context.Gas.Arith.integral_to_z
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
@@ -108,10 +156,10 @@ module Operation = struct
       (fun (source, first_counter, length, op, raw, fee, gas_limit) ->
         {source; first_counter; length; op; raw; fee; gas_limit})
       (tup7
-         Signature.Public_key_hash.encoding
+         Signature.V2.Public_key_hash.encoding
          z
          int31
-         (dynamic_size Tezlink_imports.Alpha_context.Operation.encoding)
+         (dynamic_size Tezlink_imports.Imported_context.Operation.encoding)
          bytes
          Tez.encoding
          z)
@@ -131,8 +179,8 @@ module Operation = struct
     Ethereum_types.Hash (Ethereum_types.Hex hex)
 
   let minimum_operation =
-    let open Tezlink_imports.Alpha_context in
-    let open Tezlink_imports.Alpha_context.Operation in
+    let open Tezlink_imports.Imported_context in
+    let open Tezlink_imports.Imported_context.Operation in
     let open Tezlink_imports.Imported_env in
     let shell : Operation.shell_header =
       {branch = Tezos_crypto.Hashed.Block_hash.zero}
@@ -169,7 +217,7 @@ module Operation = struct
   let minimum_operation_size =
     let raw =
       Data_encoding.Binary.to_bytes_exn
-        Tezlink_imports.Alpha_context.Operation.encoding
+        Tezlink_imports.Imported_context.Operation.encoding
         minimum_operation
     in
     Bytes.length raw

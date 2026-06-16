@@ -1,0 +1,36 @@
+parameter (or (unit %run) (unit %_revert)) ;
+storage unit ;
+# Michelson contract whose %run emits a single user EMIT op then
+# triggers its own %_revert entrypoint, which FAILWITHs.
+#
+# Built shape on the receipt is [emit BackTracked, revert Failed]:
+# the runtime executes the EMIT first (Applied), then the self-call to
+# %_revert (Failed); the failure retroactively backtracks the EMIT.
+#
+# Used as the deepest target in a re-entrant CRAC chain to exercise
+# merge_crac_internals' has_event check: the failed inner CRAC's
+# internals contain the user EMIT (Event variant) but no synthetic
+# CRAC-ID event, so the merge target's has_event flips true and would
+# (without the fix) drop the outer applied CRAC's synthetic event.
+code
+  { CAR ;
+    IF_LEFT
+      { DROP ;
+        PUSH string "hello-l2-1299" ;
+        EMIT %hello_l2_1299 string ;
+        SELF %_revert ;
+        PUSH mutez 0 ;
+        UNIT ;
+        TRANSFER_TOKENS ;
+        NIL operation ;
+        SWAP ;
+        CONS ;
+        SWAP ;
+        CONS ;
+        UNIT ;
+        SWAP ;
+        PAIR }
+      { DROP ;
+        PUSH string "explicit-revert" ;
+        FAILWITH }
+  } ;

@@ -12,6 +12,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 ocaml-build = { version = "1.*", features = ["dune"] }
 
 [dependencies]
+# Pin to match alloy-consensus 1.0.x; newer 1.6.x generates code
+# incompatible with the 1.0.x TransactionEnvelope trait (semver violation).
+alloy-tx-macros = "=1.0.41"
 hex = "*"
 ocaml = { version = "1.2.1" }
 wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", default-features = false, features = [
@@ -52,3 +55,11 @@ runtime-ebisu = { package = "tezos-evm-runtime-ebisu", path = "../kernel_ebisu/r
 # Farfadet
 kernel-farfadet = { package = "evm_kernel_farfadet", path = "../kernel_farfadet/kernel", default-features = false }
 runtime-farfadet = { package = "tezos-evm-runtime-farfadet", path = "../kernel_farfadet/runtime", default-features = false }
+
+# Farfadet R1
+kernel-farfadet-r1 = { package = "evm_kernel_farfadet_r1", path = "../kernel_farfadet_r1/kernel", default-features = false }
+runtime-farfadet-r1 = { package = "tezos-evm-runtime-farfadet-r1", path = "../kernel_farfadet_r1/runtime", default-features = false }
+
+# Farfadet R2 SU
+kernel-farfadet-r2-su = { package = "evm_kernel_farfadet_r2_su", path = "../kernel_farfadet_r2_su/kernel", default-features = false }
+runtime-farfadet-r2-su = { package = "tezos-evm-runtime-farfadet-r2-su", path = "../kernel_farfadet_r2_su/runtime", default-features = false }

@@ -158,6 +158,7 @@ let initialize_accumulator_native_contract ctxt =
       ~script:(Script_native_repr.CLST_contract.with_initial_storage, None)
   in
   let* ctxt = Storage.Contract.Native_contracts.CLST.init ctxt contract_hash in
+  let* ctxt = Storage.Clst.Deposits_balance.init ctxt Tez_repr.zero in
   return (Raw_context.unset_origination_nonce ctxt)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
@@ -267,11 +268,8 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         return (ctxt, [])
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | T024 ->
-        let* ctxt =
-          let*! ctxt = Storage.Tenderbake.First_level_of_protocol.remove ctxt in
-          Storage.Protocol_activation_level.init ctxt level
-        in
+    | U025 ->
+        let* ctxt = Storage.Protocol_activation_level.update ctxt level in
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt

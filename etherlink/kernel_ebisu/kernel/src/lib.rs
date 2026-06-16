@@ -75,7 +75,7 @@ mod upgrade;
 
 extern crate alloc;
 
-const KERNEL_VERSION: &str = env!("GIT_HASH");
+const KERNEL_VERSION: &str = "7a62d6a155cc17f5d3b9f8d34b2eb0d68c6f95cc";
 
 fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     if let Some(ValueType::Value) = host.store_has(&PRIVATE_FLAG_PATH)? {

@@ -25,6 +25,7 @@
 
 (* You can only add variants to this type. You cannot remove them. *)
 type protocol =
+  | U025
   | T024
   | S023
   | Nairobi
@@ -51,6 +52,7 @@ type internal_message_kind =
   | End_of_level
   | Info_per_level
   | Protocol_migration of protocol
+  | Dal_attested_slots
 
 (* This type mimics [Sc_rollup_inbox_repr.t] and produced by reading the first
    bytes from the input:
@@ -82,6 +84,8 @@ let protocol_from_raw payload =
         Some (Protocol_migration S023)
     | payload when String.equal payload Constants.proto_t024_name ->
         Some (Protocol_migration T024)
+    | payload when String.equal payload Constants.proto_u025_name ->
+        Some (Protocol_migration U025)
     | payload when String.equal payload Constants.proto_alpha_name ->
         Some (Protocol_migration Proto_alpha)
     | _ -> None
@@ -95,6 +99,7 @@ let internal_from_raw payload =
     | '\002' when String.length payload = 2 -> Some End_of_level
     | '\003' -> Some Info_per_level
     | '\004' -> protocol_from_raw payload
+    | '\005' -> Some Dal_attested_slots
     | _ -> None
 
 let from_raw_input payload =
@@ -121,6 +126,8 @@ module Internal_for_tests = struct
         Data_encoding.(Binary.to_string_exn string Constants.parisc_name)
     | Proto_alpha ->
         Data_encoding.(Binary.to_string_exn string Constants.proto_alpha_name)
+    | U025 ->
+        Data_encoding.(Binary.to_string_exn string Constants.proto_u025_name)
     | T024 ->
         Data_encoding.(Binary.to_string_exn string Constants.proto_t024_name)
     | S023 ->
@@ -139,6 +146,7 @@ module Internal_for_tests = struct
     | Internal Info_per_level, Some info -> "\000\003" ^ info
     | Internal (Protocol_migration proto), None ->
         "\000\004" ^ proto_to_binary proto
+    | Internal Dal_attested_slots, Some payload -> "\000\005" ^ payload
     | Other, _ ->
         Stdlib.failwith
           "`Other` messages are impossible cases from the PVM perspective."
@@ -151,4 +159,6 @@ module Internal_for_tests = struct
     | Internal (Protocol_migration _), Some _ ->
         Stdlib.failwith "`Protocol_migration` does not expect a payload"
     | External, None -> Stdlib.failwith "`External` expects a payload"
+    | Internal Dal_attested_slots, None ->
+        Stdlib.failwith "`Dal_attested_slots` expects a payload"
 end

@@ -548,6 +548,47 @@ let compact : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:"Produce a compact snapshot with a single commit for the context."
     ()
 
+type snapshot_level = Head | Finalized | Cemented | Level of int32
+
+let snapshot_level_arg =
+  Tezos_clic.default_arg
+    ~long:"level"
+    ~placeholder:"head|finalized|cemented|<level>"
+    ~default:"finalized"
+    ~doc:
+      "The last level that the snapshot should contain. Accepts 'head', \
+       'finalized' (default), 'cemented', or a block level number. Data after \
+       this level will be excluded from the snapshot."
+    (Tezos_clic.parameter (fun (cctxt : Client_context.full) s ->
+         match String.lowercase_ascii s with
+         | "head" -> Lwt_result.return Head
+         | "finalized" -> Lwt_result.return Finalized
+         | "cemented" -> Lwt_result.return Cemented
+         | _ -> (
+             match Int32.of_string_opt s with
+             | Some l when Compare.Int32.(l >= 0l) ->
+                 Lwt_result.return (Level l)
+             | _ ->
+                 cctxt#error
+                   "Invalid snapshot level %S. Expected 'head', 'finalized', \
+                    'cemented', or a positive integer."
+                   s)))
+
+let import_level_arg =
+  Tezos_clic.arg
+    ~long:"level"
+    ~placeholder:"<level>"
+    ~doc:
+      "Reset the imported snapshot to this level. Data after this level will \
+       be removed from the imported store."
+    (Tezos_clic.parameter (fun (cctxt : Client_context.full) s ->
+         match Int32.of_string_opt s with
+         | Some l when Compare.Int32.(l > 0l) -> Lwt_result.return l
+         | _ ->
+             cctxt#error
+               "Invalid import level %S. Expected a positive integer."
+               s))
+
 let rollup_node_endpoint_arg =
   Tezos_clic.arg
     ~long:"rollup-node-endpoint"
@@ -621,6 +662,14 @@ let unsafe_disable_wasm_kernel_checks_switch :
        debug, do not use in production!"
     ()
 
+let slow_vm_fallback_switch : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"slow-vm-fallback"
+    ~doc:
+      "Fall back to the slow VM interpreter when the fast execution engine \
+       (Wasmer) fails instead of exiting."
+    ()
+
 let level_param next =
   Tezos_clic.param ~name:"level" ~desc:"Level" positive_int32_parameter next
 
@@ -657,8 +706,26 @@ let l1_monitor_finalized_switch :
     (bool option, Client_context.full) Tezos_clic.arg =
   Tezos_clic.switch
     ~long:"l1-monitor-finalized"
-    ~doc:"The rollup node will only monitor finalized blocks of the L1 node"
+    ~doc:
+      "The rollup node will only monitor finalized blocks of the L1 node. This \
+       option has no effect for RISC-V rollups."
     ()
   |> Tezos_clic.map_arg ~f:(fun _ -> function
        | true -> Lwt_result_syntax.return_some true
        | false -> Lwt_result_syntax.return_none)
+
+let commit_on_arg :
+    ( Configuration.commit_on_strategy option,
+      Client_context.full )
+    Tezos_clic.arg =
+  Tezos_clic.arg
+    ~long:"commit-on"
+    ~placeholder:"block|commitment"
+    ~doc:
+      (Format.sprintf
+         "Choose when to commit context to disk. Default is %S and %S for \
+          RISC-V rollups."
+         Configuration.(string_of_commit_on_strategy default_commit_on_strategy)
+         Configuration.(string_of_commit_on_strategy Commitment))
+  @@ Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
+         Lwt.return (Configuration.commit_on_strategy_of_string s))

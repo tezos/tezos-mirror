@@ -14,7 +14,7 @@
 
 (** Register a QCheck test.
 
-    [Register ~__FILE__ ?title ~tags ?seed test] is same as
+    [Register ~__FILE__ ?title ~tags ?long ?seed test] is same as
     [Tezt_core.Test.register ~__FILE__ ~title ~tags' ?seed f] with :
     - if [title] is not provided, the name of [test] is used.
     - [tags'] is ["qcheck" :: tags].*)
@@ -22,6 +22,7 @@ val register :
   __FILE__:string ->
   ?title:string ->
   tags:string list ->
+  ?long:bool ->
   ?seed:Tezt_core.Test.seed ->
   QCheck2.Test.t ->
   unit

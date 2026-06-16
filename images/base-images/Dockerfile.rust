@@ -14,37 +14,12 @@ FROM ${IMAGE}
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
-ARG DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
-
-# Setup proxy
-ARG APT_PROXY
-ENV APT_PROXY=${APT_PROXY:-false}
-RUN echo "Acquire::http::Proxy::deb.debian.org \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy && \
-    echo "Acquire::http::Proxy::security.debian.org \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
-    echo "Acquire::http::Proxy::archive.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
-    echo "Acquire::http::Proxy::ports.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
-    echo "Acquire::http::Proxy::security.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy
-
-COPY scripts/kiss-fetch.sh /usr/local/bin/
-ENV PATH=/usr/local/bin:$PATH
-
 # install static binaries
-COPY images/scripts/install_datadog_static.sh \
-     images/scripts/install_sccache_static.sh \
-     images/scripts/install-gcloud-apt.sh  /tmp/
+COPY images/scripts/install_sccache_static.sh /tmp/
 
 #hadolint ignore=DL3008,DL3015
-RUN apt-get update && \
-  apt-get -y install curl jq gpg && \
-  /tmp/install_datadog_static.sh && \
-  /tmp/install_sccache_static.sh && \
-  /tmp/install-gcloud-apt.sh && \
-  rm /tmp/install_datadog_static.sh \
-     /tmp/install_sccache_static.sh \
-     /tmp/install-gcloud-apt.sh && \
-  apt-get clean && \
-  rm -rf /var/lib/apt/lists/*
+RUN /tmp/install_sccache_static.sh && \
+    rm /tmp/install_sccache_static.sh
 
 WORKDIR /root
 
@@ -57,7 +32,7 @@ RUN apt-get update && \
     git \
     gcc \
     tzdata \
-    pkg-config autoconf automake autotools-dev libtool xutils-dev clang cmake \
+    pkg-config autoconf automake autotools-dev libtool xutils-dev clang libclang-dev cmake \
     rustup \
     musl-tools \
     wabt binutils-gold binutils-riscv64-unknown-elf gcc-riscv64-linux-gnu && \
@@ -69,7 +44,7 @@ RUN apt-get update && \
 # install rust toolchains and compilation targets
 # nightly-2025-01-30 is installed separately as it's only used for formatting
 # set the default to the last stable toolchain installed.
-RUN rustup update 1.66.0 1.68.2 1.73.0 1.76.0 1.83.0 1.88.0 && \
+RUN rustup update 1.83.0 1.88.0 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
         rustup target add --toolchain="$tc" wasm32-unknown-unknown; \
         rustup target add --toolchain="$tc" riscv64gc-unknown-none-elf; \
@@ -82,3 +57,14 @@ RUN rustup update 1.66.0 1.68.2 1.73.0 1.76.0 1.83.0 1.88.0 && \
     rustup default 1.88.0
 
 ENV PATH=/root/.cargo/bin:$PATH
+
+# Install Taplo
+RUN cargo +1.88.0 install taplo-cli --version 0.9.3 --locked && \
+    taplo --version
+
+# Install cargo-audit
+RUN cargo +1.88.0 install --locked cargo-audit --version 0.22.0 && \
+    cargo audit --version
+
+# Install cargo-expand, used to test derive macros in sdk/rust/encoding-derive/
+RUN cargo +1.88.0 install cargo-expand

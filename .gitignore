@@ -65,7 +65,6 @@ __pycache__
 /octez-accuser
 /octez-baker
 /octez-teztale-snitch
-
 /src/riscv/riscv-sandbox*
 /src/riscv/riscv-dummy.elf
 /src/riscv/riscv-dummy-linux-musl.elf
@@ -78,8 +77,6 @@ __pycache__
 /src/bin_client/test/LOG.*
 /_coverage_output/*.coverage
 /_coverage_report
-
-client-libs/kaitai-struct-files/doc
 
 # Ignore individual dockerfiles for `tezt-cloud`
 tezt/lib_cloud/dockerfiles/*.Dockerfile
@@ -135,6 +132,9 @@ sequencer.wasm
 evm_benchmark_kernel.wasm
 evm_unstripped_installer.wasm
 _evm_unstripped_installer_preimages/
+
+riscv-echo
+riscv-echo.checksum
 
 # etherlink
 /etherlink/kernels-*
@@ -211,3 +211,7 @@ node_modules/
 .cache_external
 .cargo/registry
 .cargo_targets
+
+# AI agent files
+.claude/*.local.md
+.opencode/

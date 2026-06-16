@@ -23,19 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let number_of_slots = 32
+(* Slack (in blocks) for outdated message validation. Messages older than
+   [attestation_lag + validation_slack] blocks from the head are considered
+   too old and rejected. *)
+let validation_slack = 4
 
-let number_of_shards = 512
-
-let attestation_lag = 8
-
-let traps_fraction = Q.(1 // 2000)
+let positive_capacity x = max 1 x
 
 (* Each entry in the cache maintains two open file descriptors (one via
    regular file opening and one via mmap on the bitset region).
    So the selected value should be bigger than twice the number of slots per level.
    Note that setting a too high value causes a "Too many open files" error. *)
-let shards_store_lru_size = 2 * number_of_slots
+let shards_store_lru_size ~number_of_slots =
+  positive_capacity (2 * number_of_slots)
 
 (* There is no real rationale for the slot and status parts of the
    store; we just put low-enough values to avoid consuming too many
@@ -47,6 +47,10 @@ let status_store_lru_size = 64
 (* Fewer cache sizes should be enough in practice,
    but we cache 50 since each cache entry has quite a small memory footprint. *)
 let committee_cache_size = 50
+
+(* Size of the attestation ops cache. Similar considerations as for
+   [committee_cache_size], so we use the same value. *)
+let attestation_ops_cache_size = committee_cache_size
 
 (* The size of the shard cache is chosen large enough to enable
    publishing slots on 5 slot indices.  We need to keep shards in
@@ -63,7 +67,8 @@ let not_yet_published_cache_size =
 (* This cache is being used for the validation of message ids, in particular
    messages in the future, it does not have to be big. We take the number of
    slots multiplied by the attestation lag, which sounds reasonable. *)
-let slot_id_cache_size = number_of_slots * attestation_lag
+let slot_id_cache_size ~number_of_slots ~attestation_lag =
+  positive_capacity (number_of_slots * attestation_lag)
 
 (* This cache is used for transient slot header status info.
    Permanent info is stored on disk.
@@ -74,7 +79,8 @@ let slot_id_cache_size = number_of_slots * attestation_lag
    the slots will be updated with a attested/unattested status, and you don't
    want it to erase later levels from statuses cache. Using twice the cache
    size solves this problem. *)
-let statuses_cache_size = number_of_slots * (attestation_lag + 1) * 2
+let statuses_cache_size ~number_of_slots ~attestation_lag =
+  positive_capacity (number_of_slots * (attestation_lag + 1) * 2)
 
 let shards_verification_sampling_frequency = 100
 
@@ -105,14 +111,24 @@ let bootstrap_dns_refresh_delay = 300.
    expected size when all slots are used. *)
 let traps_cache_size =
   let open Q in
-  mul (of_int 2)
-  @@ mul (of_int number_of_slots)
-  @@ mul (of_int number_of_shards)
-  @@ mul (of_int attestation_lag)
-  @@ traps_fraction
-  |> to_int
+  fun ~number_of_slots ~number_of_shards ~attestation_lag ~traps_fraction ->
+    mul (of_int 2)
+    @@ mul (of_int number_of_slots)
+    @@ mul (of_int number_of_shards)
+    @@ mul (of_int attestation_lag)
+    @@ traps_fraction
+    |> to_int |> positive_capacity
 
-(* The expected time, in seconds, sufficient to subscribe and connect to new
+(* The expected time, in level, sufficient to subscribe and connect to new
    peers on a (new) topic. This was not measured and the value is meant to be a
    gross over-approximation. *)
-let time_to_join_new_topics = 5
+let time_to_join_new_topics_in_levels ~minimal_block_delay =
+  let time_to_join_new_topics = 5 in
+  1 + (time_to_join_new_topics / minimal_block_delay)
+
+(* For observability purpose, we aim for a non-slot operator profile to keep
+   shards for about 10 minutes. 150 blocks is 10 minutes on Ghostnet, 20 minutes
+   on Mainnet. *)
+let shard_retention_period_in_levels = 150
+
+let mainnet_chain_id = Chain_id.of_b58check_exn "NetXdQprcVkpaWU"

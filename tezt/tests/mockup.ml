@@ -1133,7 +1133,9 @@ let test_create_mockup_config_show_init_roundtrip protocols =
         let n_opt = numerical_of_string ~typ value in
         `String (distinct_sample_numeric ~minimum:0 n_opt |> string_of_int)
     | "#/definitions/Signature.Public_key_hash"
-    | "#/definitions/Signature.V0.Public_key_hash" ->
+    | "#/definitions/Signature.V0.Public_key_hash"
+    | "#/definitions/Signature.V1.Public_key_hash"
+    | "#/definitions/Signature.V2.Public_key_hash" ->
         let value' =
           distinct_sample_list
             ~equal:String.equal
@@ -1154,6 +1156,31 @@ let test_create_mockup_config_show_init_roundtrip protocols =
             JSON.(value |> as_string_opt)
         in
         `String value'
+    | "#/definitions/smart_rollup_address" ->
+        let value' =
+          distinct_sample_list
+            ~equal:String.equal
+            [
+              "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf";
+              "sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg";
+            ]
+            JSON.(value |> as_string_opt)
+        in
+        `String value'
+    | "array" -> (
+        let array_items = JSON.(value |> as_list) in
+        match array_items with
+        | [] ->
+            Test.fail
+              "[distinct_sample] is not implemented for empty arrays (value: \
+               %s)"
+              (JSON.encode value)
+        | _ ->
+            let items_schema = JSON.(schema |-> "items") in
+            `A
+              (List.map
+                 (fun item -> distinct_sample item items_schema)
+                 array_items))
     | typ ->
         Test.fail
           "[distinct_sample] is not implemented for types [%s] (value: %s)"

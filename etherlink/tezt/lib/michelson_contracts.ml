@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tezlink_protocol = Protocol.S023
+let tezlink_protocol = Protocol.T024
 
 (* How to add a new contract to this list to serve as bootstrap contracts in
    Tezlink integration tests.
@@ -69,4 +69,26 @@ let big_map_counter () =
       path =
         Michelson_script.(find ["big_maps"; "counter"] tezlink_protocol |> path);
       initial_storage = "(Pair 0 { Elt 0 Unit })";
+    }
+
+let emit_events_contract () =
+  Evm_node.
+    {
+      address = "KT1M6NEENHvphszZwgzoB4ZxJNcfahqSqhxd";
+      path =
+        Michelson_script.(
+          find ["mini_scenarios"; "emit_events"] tezlink_protocol |> path);
+      initial_storage = "Unit";
+    }
+
+let storage_normalization () =
+  Evm_node.
+    {
+      address = "KT1KxwEU2qHgG7icmAyDj2u3vh8Z5UXuE7Tp";
+      path =
+        Michelson_script.(
+          find ["mini_scenarios"; "storage_normalization"] tezlink_protocol
+          |> path);
+      initial_storage =
+        sf "Pair %S Unit Unit Unit" Constant.bootstrap1.public_key_hash;
     }

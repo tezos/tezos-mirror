@@ -1,0 +1,37 @@
+# Calls the TezosX gateway's %collect_result entrypoint twice with the
+# same payload.  The second call violates the once-per-frame invariant
+# and causes the entire operation group to revert.  Used to verify that
+# the kernel enforces the invariant end-to-end.
+#
+# Storage: pair address bytes
+#   address = gateway KT1
+#   bytes   = payload deposited by both calls
+parameter unit;
+storage (pair address bytes);
+code {
+       CDR;
+       DUP;
+       CAR;
+       CONTRACT %collect_result bytes;
+       ASSERT_SOME;
+       DUP 2;
+       CDR;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       DUP 2;
+       CAR;
+       CONTRACT %collect_result bytes;
+       ASSERT_SOME;
+       DUP 3;
+       CDR;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       NIL operation;
+       SWAP;
+       CONS;
+       SWAP;
+       CONS;
+       PAIR
+     };

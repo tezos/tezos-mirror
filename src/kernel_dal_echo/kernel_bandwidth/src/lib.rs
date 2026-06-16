@@ -7,15 +7,19 @@ use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 
-fn process_slot(
-    host: &mut impl Runtime,
+fn process_slot<Host>(
+    host: &mut Host,
     published_level: i32,
     num_pages: usize,
     page_size: usize,
     slot_index: u8,
-) {
+) where
+    Host: HostReveal + StorageV1,
+{
     let mut buffer = vec![0u8; page_size * num_pages];
 
     let mut read_bytes = 0;
@@ -32,7 +36,6 @@ fn process_slot(
             Ok(0) => {
                 // Currently, we send empty pages to kernels for non-attested slots.
                 debug_msg!(
-                    host,
                     "Slot {} not attested for level {}\n",
                     slot_index,
                     published_level
@@ -40,7 +43,6 @@ fn process_slot(
             }
             Ok(num) => {
                 debug_msg!(
-                    host,
                     "Retrieved page {} for level {}, slot index {} successfully. {} bytes read\n",
                     page_index,
                     published_level,
@@ -51,7 +53,6 @@ fn process_slot(
             }
             Err(err) => {
                 debug_msg!(
-                    host,
                     "Failed to retrieve one of the pages. Slot {} not processed. Error: {}\n",
                     slot_index,
                     &err.to_string()
@@ -60,14 +61,14 @@ fn process_slot(
         }
     }
 
-    let slot_path = format!("/output/slot-{}", slot_index);
+    let slot_path = format!("/output/slot-{slot_index}");
     let path: OwnedPath = slot_path.as_bytes().to_vec().try_into().unwrap();
     host.store_write(&path, &read_bytes.to_le_bytes(), 0)
         .map_err(|_| "Error writing to storage".to_string())
         .unwrap_or_default();
 }
 
-fn get_slots_from_storage(host: &impl Runtime, number_of_slots: u64) -> Vec<u8> {
+fn get_slots_from_storage<Host: StorageV1>(host: &Host, number_of_slots: u64) -> Vec<u8> {
     let path = RefPath::assert_from("/slots".as_bytes());
     let bitvec_bytes = host.store_read_all(&path).unwrap();
 
@@ -93,9 +94,12 @@ fn get_slots_from_storage(host: &impl Runtime, number_of_slots: u64) -> Vec<u8> 
 }
 
 #[entrypoint::main]
-pub fn entry(host: &mut impl Runtime) {
+pub fn entry<Host>(host: &mut Host)
+where
+    Host: StorageV1 + WasmHost + HostReveal,
+{
     let parameters = host.reveal_dal_parameters();
-    debug_msg!(host, "Running kernel with parameters: {:?}\n", parameters);
+    debug_msg!("Running kernel with parameters: {:?}\n", parameters);
     let RollupDalParameters {
         number_of_slots,
         attestation_lag,
@@ -121,10 +125,10 @@ pub fn entry(host: &mut impl Runtime) {
             }
         }
         Ok(None) => {
-            debug_msg!(host, "Input message was empty");
+            debug_msg!("Input message was empty");
         }
         Err(_) => {
-            debug_msg!(host, "Failed to read input message");
+            debug_msg!("Failed to read input message");
         }
     }
 }

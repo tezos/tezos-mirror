@@ -39,8 +39,7 @@ where
         tezos_data_encoding::encoding::Encoding::Obj(
             "StructComposite",
             <[_]>::into_vec(
-                #[rustc_box]
-                ::alloc::boxed::Box::new([
+                ::alloc::boxed::box_new([
                     tezos_data_encoding::encoding::Field::new(
                         "a",
                         #[allow(clippy::redundant_clone)]

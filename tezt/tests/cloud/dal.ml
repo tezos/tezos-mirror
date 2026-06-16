@@ -16,12 +16,13 @@ open Yes_crypto
 
 type configuration = {
   with_dal : bool;
-  stake : int list Lwt.t;
+  stake : int64 list Lwt.t;
   bakers : string list; (* unencrypted secret keys *)
   stake_machine_type : string list;
   dal_node_producers : int list; (* slot indices *)
-  observer_slot_indices : int list;
-  observers_multi_slot_indices : int list list;
+  publish_slots_regularly : bool;
+  observers_slot_indices : int list list;
+  observer_machine_type : string list;
   archivers_slot_indices : int list list;
   observer_pkhs : string list;
   protocol : Protocol.t;
@@ -54,7 +55,9 @@ type configuration = {
   slot_size : int option;
   number_of_slots : int option;
   attestation_lag : int option;
+  attestation_lags : int list option;
   traps_fraction : Q.t option;
+  stresstest : Stresstest.t option;
 }
 
 type bootstrap = {
@@ -81,11 +84,24 @@ type t = {
   observers : Dal_node_helpers.observer list;
   archivers : Dal_node_helpers.archiver list;
   etherlink : Etherlink_helpers.etherlink option;
+  stresstesters : Stresstest.stresstester list;
   echo_rollups : Echo_rollup.operator list;
   time_between_blocks : int;
   parameters : Dal_common.Parameters.t;
   infos : (int, Metrics.per_level_info) Hashtbl.t;
   metrics : (int, Metrics.t) Hashtbl.t;
+  cumulative_protocol_attestations : (int, bool array) Hashtbl.t;
+      (* Maps published_level to per-slot cumulative attestation status.
+         For each published level P, accumulates newly-confirmed attestations
+         across all levels in the attestation window [P, P + max_lag].
+         An entry is removed once the window closes and metrics are computed. *)
+  cumulative_baker_window_status :
+    ( int,
+      (Metrics.public_key_hash, Metrics.baker_window_status) Hashtbl.t )
+    Hashtbl.t;
+      (* Maps published_level to a per-baker table of cumulative window
+         status, tracking committee membership, attestation behavior, and
+         per-slot attestation bits across the full attestation window. *)
   disconnection_state : Disconnect.t option;
   first_level : int;
   teztale : Teztale.t option;
@@ -94,8 +110,9 @@ type t = {
   otel : string option;
 }
 
+module PkhSet = Set.Make (String)
+
 let get_infos_per_level t ~level ~metadata =
-  let open Metrics in
   let client = t.bootstrap.client in
   let endpoint = t.some_node_rpc_endpoint in
   let etherlink_operators =
@@ -108,8 +125,13 @@ let get_infos_per_level t ~level ~metadata =
     let block = string_of_int level in
     RPC_core.call endpoint @@ RPC.get_chain_block_operations ~block ()
   in
-  let attested_commitments =
-    JSON.(metadata |-> "dal_attestation" |> as_string |> Z.of_string)
+  let* attested_commitments =
+    let str = JSON.(metadata |-> "dal_attestation" |> as_string) in
+    Dal_common.Attestations.decode
+      t.configuration.protocol
+      t.some_node_rpc_endpoint
+      t.parameters
+      str
   in
   let manager_operation_batches = JSON.(operations |=> 3 |> as_list) in
   let is_published_commitment operation =
@@ -122,7 +144,7 @@ let get_infos_per_level t ~level ~metadata =
   let commitment_info operation =
     let commitment = get_commitment operation in
     let publisher_pkh = get_publisher operation in
-    {commitment; publisher_pkh}
+    Metrics.{commitment; publisher_pkh}
   in
   let get_slot_index operation =
     JSON.(operation |-> "slot_header" |-> "slot_index" |> as_int)
@@ -137,70 +159,69 @@ let get_infos_per_level t ~level ~metadata =
     |> Hashtbl.of_seq
   in
   let consensus_operations = JSON.(operations |=> 0 |> as_list) in
-  let get_dal_attestations operation =
+  let* dal_committee_json =
+    let attestation_level = level - 1 in
+    RPC_core.call endpoint
+    @@ RPC.get_chain_block_context_dal_shards ~level:attestation_level ()
+  in
+  let dal_committee =
+    List.fold_left
+      (fun set json ->
+        let delegate = JSON.(json |-> "delegate" |> as_string) in
+        PkhSet.add delegate set)
+      PkhSet.empty
+      (JSON.as_list dal_committee_json)
+  in
+  let decode_dal_attestation str =
+    Dal_common.Attestations.decode
+      t.configuration.protocol
+      t.some_node_rpc_endpoint
+      t.parameters
+      str
+  in
+  (* For each attester that sent an attestation operation, record
+     whether they attached a DAL payload ([Some bits]) or not ([None]). *)
+  let get_dal_payload operation =
     let contents = JSON.(operation |-> "contents" |=> 0) in
     let kind = JSON.(contents |-> "kind" |> as_string) in
     match kind with
     | "attestation_with_dal" ->
         let pkh = JSON.(contents |-> "metadata" |-> "delegate" |> as_string) in
-        let slot = JSON.(contents |-> "slot" |> as_int) in
-        let dal =
-          if slot >= 512 then Out_of_committee
-          else
-            With_DAL
-              JSON.(contents |-> "dal_attestation" |> as_string |> Z.of_string)
-        in
-        [(PKH pkh, dal)]
+        let str = JSON.(contents |-> "dal_attestation" |> as_string) in
+        let* payload = decode_dal_attestation str in
+        return [(Metrics.PKH pkh, Some payload)]
     | "attestations_aggregate" ->
         let metadata_committee =
           JSON.(contents |-> "metadata" |-> "committee" |> as_list)
         in
         let committee_info = JSON.(contents |-> "committee" |> as_list) in
-        List.map2
-          (fun member_info committee_meta ->
-            let slot = JSON.(member_info |-> "slot" |> as_int) in
-            let dal =
-              if slot >= 512 then Out_of_committee
-              else
-                let json = JSON.(member_info |-> "dal_attestation") in
-                if JSON.is_null json then Without_DAL
-                else With_DAL (json |> JSON.as_string |> Z.of_string)
-            in
+        Lwt_list.map_s
+          (fun (member_info, committee_meta) ->
             let pkh = JSON.(committee_meta |-> "delegate" |> as_string) in
-            (PKH pkh, dal))
-          committee_info
-          metadata_committee
+            let json = JSON.(member_info |-> "dal_attestation") in
+            let* payload =
+              if JSON.is_null json then return None
+              else
+                let* decoded = decode_dal_attestation (JSON.as_string json) in
+                return (Some decoded)
+            in
+            return (Metrics.PKH pkh, payload))
+          (List.combine committee_info metadata_committee)
     | "attestation" ->
         let pkh = JSON.(contents |-> "metadata" |-> "delegate" |> as_string) in
-        let slot = JSON.(contents |-> "slot" |> as_int) in
-        let dal = if slot >= 512 then Out_of_committee else Without_DAL in
-        [(PKH pkh, dal)]
-    | _ -> []
+        return [(Metrics.PKH pkh, None)]
+    | _ -> return []
   in
-  let* attestation_rights =
-    RPC_core.call endpoint
-    @@ RPC.get_chain_block_helper_attestation_rights ~level ()
-  in
-  (* We fill the [attestations] table with [Expected_to_DAL_attest] when a baker is in the DAL committee. *)
-  let attestations =
-    JSON.(attestation_rights |-> "delegates" |> as_list |> List.to_seq)
-    |> Seq.filter_map (fun delegate ->
-           let slot = JSON.(delegate |-> "first_slot" |> as_int) in
-           if slot < 512 then
-             let pkh = PKH JSON.(delegate |-> "delegate" |> as_string) in
-             Some (pkh, Expected_to_DAL_attest)
-           else None)
-    |> Hashtbl.of_seq
-  in
-  (* And then update the [attestations] table with the attestations actually received. *)
-  let () =
-    consensus_operations
-    |> List.iter (fun operation ->
-           let dal_attestations = get_dal_attestations operation in
-           List.iter
-             (fun (pkh, dal_status) ->
-               Hashtbl.replace attestations pkh dal_status)
-             dal_attestations)
+  let baker_dal_payloads = Hashtbl.create 16 in
+  let* () =
+    Lwt_list.iter_s
+      (fun operation ->
+        let* payloads = get_dal_payload operation in
+        List.iter
+          (fun (pkh, payload) -> Hashtbl.replace baker_dal_payloads pkh payload)
+          payloads ;
+        return ())
+      consensus_operations
   in
   let* etherlink_operator_balance_sum =
     Etherlink_helpers.total_operator_balance
@@ -239,14 +260,16 @@ let get_infos_per_level t ~level ~metadata =
       ~level
   in
   Lwt.return
-    {
-      level;
-      published_commitments;
-      attestations;
-      attested_commitments;
-      etherlink_operator_balance_sum;
-      echo_rollup_fetched_data;
-    }
+    ( Metrics.
+        {
+          level;
+          published_commitments;
+          attested_commitments;
+          etherlink_operator_balance_sum;
+          echo_rollup_fetched_data;
+        },
+      baker_dal_payloads,
+      dal_committee )
 
 let init_teztale (configuration : configuration) cloud agent =
   if configuration.teztale then init_teztale cloud agent |> Lwt.map Option.some
@@ -410,6 +433,12 @@ let init_public_network cloud (configuration : configuration)
       configuration.echo_rollups
       bootstrap.client
   in
+  let* stresstesters =
+    Stresstest.create_stresstest_accounts
+      ?stresstest_config:configuration.stresstest
+      configuration.network
+      bootstrap.client
+  in
   let accounts_to_fund =
     (if configuration.producer_key = None then
        List.map (fun producer -> (producer, 10 * 1_000_000)) producer_accounts
@@ -423,6 +452,10 @@ let init_public_network cloud (configuration : configuration)
         (fun batcher -> (batcher, 10 * 1_000_000))
         etherlink_batching_operator_keys
     @ List.map (fun operator -> (operator, 11_000 * 1_000_000)) echo_rollup_keys
+    @ List.flatten
+        (List.map
+           (List.map (fun stresstester -> (stresstester, 10_000 * 1_000_000)))
+           stresstesters)
   in
   let* () =
     Dal_node_helpers.fund_producers_accounts
@@ -439,7 +472,8 @@ let init_public_network cloud (configuration : configuration)
       producer_accounts,
       etherlink_rollup_operator_key,
       etherlink_batching_operator_keys,
-      echo_rollup_keys )
+      echo_rollup_keys,
+      stresstesters )
 
 let round_robin_split m lst =
   assert (m > 0) ;
@@ -677,6 +711,12 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           (List.length configuration.dal_node_producers)
           client
   in
+  let* stresstesters =
+    Stresstest.create_stresstest_accounts
+      ?stresstest_config:configuration.stresstest
+      configuration.network
+      client
+  in
   let* etherlink_rollup_operator_key, etherlink_batching_operator_keys =
     Etherlink_helpers.init_etherlink_operators ~client etherlink_configuration
   in
@@ -699,7 +739,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
                 Some
                   {
                     Protocol.balance =
-                      Some (List.nth stake i * 1_000_000_000_000);
+                      Some (Int64.mul (List.nth stake i) 1_000_000_000_000L);
                     consensus_key = None;
                     delegate = None;
                   } ))
@@ -711,13 +751,14 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
               ( key,
                 Some
                   {
-                    Protocol.balance = Some 1_000_000_000_000;
+                    Protocol.balance = Some 1_000_000_000_000L;
                     consensus_key = None;
                     delegate = None;
                   },
                 false ))
             (producer_accounts @ etherlink_rollup_operator_key
-           @ etherlink_batching_operator_keys @ echo_rollup_keys)
+           @ etherlink_batching_operator_keys @ echo_rollup_keys
+           @ List.flatten stresstesters)
         in
         let overrides =
           (match configuration.slot_size with
@@ -728,10 +769,25 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
             | Some number_of_slots ->
                 [(["dal_parametric"; "number_of_slots"], `Int number_of_slots)]
             | None -> [])
-          @ (match configuration.attestation_lag with
-            | Some attestation_lag ->
-                [(["dal_parametric"; "attestation_lag"], `Int attestation_lag)]
-            | None -> [])
+          @ (match configuration.attestation_lags with
+            | Some attestation_lags ->
+                let max_lag = List.fold_left max 0 attestation_lags in
+                [
+                  ( ["dal_parametric"; "attestation_lags"],
+                    `A
+                      (List.map
+                         (fun l -> `Float (float_of_int l))
+                         attestation_lags) );
+                  (["dal_parametric"; "attestation_lag"], `Int max_lag);
+                ]
+            | None -> (
+                match configuration.attestation_lag with
+                | Some attestation_lag ->
+                    [
+                      ( ["dal_parametric"; "attestation_lag"],
+                        `Int attestation_lag );
+                    ]
+                | None -> []))
           @
           match configuration.traps_fraction with
           | Some {num; den} ->
@@ -815,7 +871,8 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       producer_accounts,
       etherlink_rollup_operator_key,
       etherlink_batching_operator_keys,
-      echo_rollup_keys )
+      echo_rollup_keys,
+      stresstesters )
 
 let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : Baker_helpers.baker list)
@@ -855,19 +912,11 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   in
   let* observers_slot_index_agents =
     Lwt_list.map_s
-      (fun slot_index ->
-        let name = name_of (Observer (`Indexes [slot_index])) in
-        let* agent = next_agent ~name in
-        return (`Slot_indexes [slot_index], agent))
-      configuration.observer_slot_indices
-  in
-  let* observers_multi_slot_index_agents =
-    Lwt_list.map_s
       (fun slot_indexes ->
         let name = name_of (Observer (`Indexes slot_indexes)) in
         let* agent = next_agent ~name in
         return (`Slot_indexes slot_indexes, agent))
-      configuration.observers_multi_slot_indices
+      configuration.observers_slot_indices
   in
   let* archivers_slot_index_agents =
     Lwt_list.map_s
@@ -895,7 +944,8 @@ let init ~(configuration : configuration) etherlink_configuration cloud
          producer_accounts,
          etherlink_rollup_operator_key,
          etherlink_batching_operator_keys,
-         echo_rollup_keys ) =
+         echo_rollup_keys,
+         stresstesters ) =
     match configuration.network with
     | `Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
@@ -954,6 +1004,10 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~disable_amplification:configuration.disable_amplification
           ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
           ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
+          ?publish_slots_regularly:
+            (if configuration.publish_slots_regularly then
+               Some configuration.producers_delay
+             else None)
           teztale
           account
           i
@@ -981,8 +1035,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~topic
           i
           agent)
-      (observers_slot_index_agents @ observers_multi_slot_index_agents
-     @ observers_bakers_agents)
+      (observers_slot_index_agents @ observers_bakers_agents)
   and* archivers =
     Lwt_list.mapi_p
       (fun i (topic, agent) ->
@@ -1045,6 +1098,22 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       etherlink_rollup_operator_key
       etherlink_batching_operator_keys
       etherlink_configuration
+  in
+  let* stresstesters =
+    Stresstest.init_stresstesters
+      ?seed:
+        (Option.map (fun Stresstest.{seed; _} -> seed) configuration.stresstest)
+      ~network:configuration.network
+      ~external_rpc:configuration.external_rpc
+      ~simulate_network:configuration.simulate_network
+      ~snapshot:configuration.snapshot
+      ~data_dir:configuration.data_dir
+      ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
+      ~accounts:stresstesters
+      cloud
+      next_agent
   in
   let some_node_rpc_endpoint =
     obtain_some_node_rpc_endpoint
@@ -1110,10 +1179,13 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       archivers;
       echo_rollups;
       etherlink;
+      stresstesters;
       time_between_blocks;
       parameters;
       infos;
       metrics;
+      cumulative_protocol_attestations = Hashtbl.create 101;
+      cumulative_baker_window_status = Hashtbl.create 101;
       disconnection_state;
       first_level;
       teztale;
@@ -1138,7 +1210,9 @@ let wait_for_level t level =
 
 let clean_up t level =
   Hashtbl.remove t.infos level ;
-  Hashtbl.remove t.metrics level
+  Hashtbl.remove t.metrics level ;
+  Hashtbl.remove t.cumulative_protocol_attestations level ;
+  Hashtbl.remove t.cumulative_baker_window_status level
 
 let update_bakers_infos t =
   let open Baker_helpers in
@@ -1164,16 +1238,109 @@ let on_new_level t level ~metadata =
   let* () =
     if level mod 1_000 = 0 then update_bakers_infos t else Lwt.return_unit
   in
-  let* infos_per_level = get_infos_per_level t ~level ~metadata in
+  let* infos_per_level, baker_dal_payloads, dal_committee =
+    get_infos_per_level t ~level ~metadata
+  in
   toplog "Level %d's info processed" level ;
   Hashtbl.replace t.infos level infos_per_level ;
+  (* Update cumulative attestations: for each lag, OR the newly-confirmed
+     slots into the entry for the corresponding published level. *)
+  let number_of_slots = t.parameters.number_of_slots in
+  let max_lag = List.fold_left max 0 t.parameters.attestation_lags in
+  List.iteri
+    (fun lag_index lag ->
+      let published_level = level - lag in
+      if published_level >= t.first_level then (
+        let existing =
+          match
+            Hashtbl.find_opt t.cumulative_protocol_attestations published_level
+          with
+          | Some arr -> arr
+          | None -> Array.make number_of_slots false
+        in
+        let newly_attested = infos_per_level.attested_commitments.(lag_index) in
+        Array.iteri (fun i v -> if v then existing.(i) <- true) newly_attested ;
+        Hashtbl.replace
+          t.cumulative_protocol_attestations
+          published_level
+          existing))
+    t.parameters.attestation_lags ;
+  (* Phase 1: Accumulate DAL payload information for each lag.
+     For each baker that sent an attestation, merge their per-slot bits
+     (if they attached a DAL payload) or record that they sent without DAL. *)
+  let get_or_create_status_table published_level =
+    match Hashtbl.find_opt t.cumulative_baker_window_status published_level with
+    | Some tbl -> tbl
+    | None ->
+        let tbl = Hashtbl.create 16 in
+        Hashtbl.replace t.cumulative_baker_window_status published_level tbl ;
+        tbl
+  in
+  List.iteri
+    (fun lag_index lag ->
+      let published_level = level - lag in
+      if published_level >= t.first_level then
+        let status_table = get_or_create_status_table published_level in
+        Hashtbl.iter
+          (fun pkh payload_opt ->
+            let prev = Hashtbl.find_opt status_table pkh in
+            let updated =
+              match payload_opt with
+              | Some per_lag_bits ->
+                  if lag_index < Array.length per_lag_bits then (
+                    let existing =
+                      match prev with
+                      | Some (Metrics.With_DAL arr) -> arr
+                      | _ -> Array.make number_of_slots false
+                    in
+                    let newly = per_lag_bits.(lag_index) in
+                    Array.iteri
+                      (fun i v -> if v then existing.(i) <- true)
+                      newly ;
+                    Some (Metrics.With_DAL existing))
+                  else
+                    Test.fail
+                      ~__LOC__
+                      "lag_index %d out of range of per_lag_bits array of \
+                       length %d"
+                      lag_index
+                      (Array.length per_lag_bits)
+              | None -> (
+                  match prev with
+                  | Some (Metrics.With_DAL _) -> None
+                  | _ -> Some Metrics.Without_DAL)
+            in
+            Option.iter (Hashtbl.replace status_table pkh) updated)
+          baker_dal_payloads)
+    t.parameters.attestation_lags ;
+  (* Phase 2: Finalize committee membership for the published level whose
+     committee level is the current level.  [dal_committee] was fetched at
+     [level - 1], which is [committee_published_level + max_lag - 1], i.e.
+     exactly the committee level for [committee_published_level]. *)
+  let committee_published_level = level - max_lag in
+  if committee_published_level >= t.first_level then (
+    let status_table = get_or_create_status_table committee_published_level in
+    PkhSet.iter
+      (fun pkh_str ->
+        let pkh = Metrics.PKH pkh_str in
+        if not (Hashtbl.mem status_table pkh) then
+          Hashtbl.replace status_table pkh Metrics.In_committee)
+      dal_committee ;
+    Hashtbl.filter_map_inplace
+      (fun pkh status ->
+        let (Metrics.PKH pkh_str) = pkh in
+        if PkhSet.mem pkh_str dal_committee then Some status
+        else Some Metrics.Out_of_committee)
+      status_table) ;
   let metrics =
     Metrics.get
       ~first_level:t.first_level
-      ~attestation_lag:t.parameters.attestation_lag
+      ~attestation_lags:t.parameters.attestation_lags
       ~dal_node_producers:t.configuration.dal_node_producers
-      ~number_of_slots:t.parameters.number_of_slots
+      ~number_of_slots
       ~infos:t.infos
+      ~cumulative_protocol_attestations:t.cumulative_protocol_attestations
+      ~cumulative_baker_window_status:t.cumulative_baker_window_status
       infos_per_level
       (Hashtbl.find t.metrics (level - 1))
   in
@@ -1245,6 +1412,7 @@ let rec loop t level =
     if Dal_node_helpers.producers_not_ready ~producers:t.producers then (
       toplog "Producers not ready for level %d" level ;
       Lwt.return_unit)
+    else if t.configuration.publish_slots_regularly then Lwt.return_unit
     else
       Seq.ints 0
       |> Seq.take (List.length t.configuration.dal_node_producers)
@@ -1269,13 +1437,13 @@ let yes_wallet_exe = Uses.path Constant.yes_wallet
 
 let register (module Cli : Scenarios_cli.Dal) =
   let simulate_network = Cli.simulate_network in
-  let stake =
+  let parsed_stake =
     Stake_repartition.Dal.parse_arg
       ~stake_arg:Cli.stake
       ~simulation_arg:simulate_network
   in
   let configuration, etherlink_configuration =
-    let stake_machine_type = Cli.stake_machine_type in
+    let open Cli in
     let dal_node_producers =
       let last_index = ref (-1) in
       List.init Cli.producers (fun i ->
@@ -1287,41 +1455,22 @@ let register (module Cli : Scenarios_cli.Dal) =
               last_index := index ;
               index)
     in
-    let observer_slot_indices = Cli.observer_slot_indices in
-    let observers_multi_slot_indices = Cli.observers_multi_slot_indices in
-    let archivers_slot_indices = Cli.archivers_slot_indices in
-    let observer_pkhs = Cli.observer_pkhs in
-    let protocol = Cli.protocol in
-    let producer_machine_type = Cli.producer_machine_type in
-    let etherlink = Cli.etherlink in
-    let etherlink_sequencer = Cli.etherlink_sequencer in
-    let etherlink_producers = Cli.etherlink_producers in
-    let echo_rollups = Cli.echo_rollups in
-    let disconnect = Cli.disconnect in
-    let network = Cli.network in
-    let snapshot = Cli.snapshot in
-    let bootstrap = Cli.bootstrap in
-    let etherlink_dal_slots = Cli.etherlink_dal_slots in
-    let teztale = Cli.teztale in
-    let memtrace = Cli.memtrace in
-    let data_dir = Cli.data_dir in
-    let producer_key = Cli.producer_key in
-    let producers_delay = Cli.producers_delay in
-    let ignore_pkhs = Cli.ignore_pkhs in
-    let tezlink = Cli.tezlink in
     let fundraiser =
       Option.fold
         ~none:(Sys.getenv_opt "TEZT_CLOUD_FUNDRAISER")
         ~some:Option.some
         Cli.fundraiser
     in
-    let etherlink_chain_id = Cli.etherlink_chain_id in
     let etherlink =
       if etherlink then
         Some
           Etherlink_helpers.
             {
-              etherlink_sequencer;
+              etherlink_sequencer =
+                (if etherlink_sequencer then Sequencer
+                 else
+                   (*missing option to set the evm node observer upstream node *)
+                   Observer "");
               etherlink_producers;
               etherlink_dal_slots;
               chain_id = etherlink_chain_id;
@@ -1329,26 +1478,12 @@ let register (module Cli : Scenarios_cli.Dal) =
             }
       else None
     in
-    let blocks_history = Cli.blocks_history in
-    let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
-    let bootstrap_dal_node_identity_file =
-      Cli.bootstrap_dal_node_identity_file
-    in
-    let with_dal = Cli.with_dal in
-    let bakers = Cli.bakers in
     let external_rpc = Cli.node_external_rpc_server in
-    let disable_shard_validation = Cli.disable_shard_validation in
-    let disable_amplification = Cli.disable_amplification in
-    let ppx_profiling_verbosity = Cli.ppx_profiling_verbosity in
-    let ppx_profiling_backends = Cli.ppx_profiling_backends in
     let network_health_monitoring = Cli.enable_network_health_monitoring in
     let daily_logs_destination =
       Option.map (fun dir -> dir // "daily_logs") Tezt_cloud_cli.artifacts_dir
     in
-    let slot_size = Cli.slot_size in
-    let number_of_slots = Cli.number_of_slots in
-    let attestation_lag = Cli.attestation_lag in
-    let traps_fraction = Cli.traps_fraction in
+    let stake = parsed_stake in
     let t =
       {
         with_dal;
@@ -1356,8 +1491,8 @@ let register (module Cli : Scenarios_cli.Dal) =
         stake;
         stake_machine_type;
         dal_node_producers;
-        observer_slot_indices;
-        observers_multi_slot_indices;
+        observers_slot_indices;
+        observer_machine_type;
         archivers_slot_indices;
         observer_pkhs;
         protocol;
@@ -1388,7 +1523,10 @@ let register (module Cli : Scenarios_cli.Dal) =
         slot_size;
         number_of_slots;
         attestation_lag;
+        attestation_lags;
         traps_fraction;
+        publish_slots_regularly;
+        stresstest;
       }
     in
     (t, etherlink)
@@ -1414,11 +1552,8 @@ let register (module Cli : Scenarios_cli.Dal) =
            List.init baker_daemon_count (fun i -> Baker i);
            List.map (fun i -> Producer i) configuration.dal_node_producers;
            List.map
-             (fun index -> Observer (`Indexes [index]))
-             configuration.observer_slot_indices;
-           List.map
              (fun indexes -> Observer (`Indexes indexes))
-             configuration.observers_multi_slot_indices;
+             configuration.observers_slot_indices;
            List.map
              (fun indexes -> Archiver (`Indexes indexes))
              configuration.archivers_slot_indices;
@@ -1446,6 +1581,11 @@ let register (module Cli : Scenarios_cli.Dal) =
                                Echo_rollup_dal_observer {operator; slot_index})
                              configuration.dal_node_producers))
             else []);
+           (match configuration.stresstest with
+           | None -> []
+           | Some Stresstest.{tps; _} ->
+               let n = Stresstest.nb_stresstester configuration.network tps in
+               List.init n (fun i -> Stresstest i));
          ]
   in
   let docker_image =
@@ -1458,31 +1598,44 @@ let register (module Cli : Scenarios_cli.Dal) =
   in
   let vms () =
     let* vms in
-    return
-    @@ List.map
-         (fun agent_kind ->
-           let name = name_of agent_kind in
-           match agent_kind with
-           | Bootstrap -> default_vm_configuration ~name
-           | Baker i -> (
-               try
-                 let machine_type =
-                   List.nth configuration.stake_machine_type i
-                 in
-                 Agent.Configuration.make ?docker_image ~machine_type ~name ()
-               with _ -> default_vm_configuration ~name)
-           | Producer _ ->
-               let machine_type = configuration.producer_machine_type in
-               Agent.Configuration.make ?docker_image ?machine_type ~name ()
-           | Observer _ | Archiver _ | Etherlink_dal_operator
-           | Etherlink_dal_observer _ | Echo_rollup_dal_observer _ ->
-               Agent.Configuration.make ?docker_image ~name ()
-           | Echo_rollup_operator _ -> default_vm_configuration ~name
-           | Etherlink_operator -> default_vm_configuration ~name
-           | Etherlink_producer _ -> default_vm_configuration ~name
-           | Reverse_proxy -> default_vm_configuration ~name
-           | Stresstest _ -> default_vm_configuration ~name)
-         vms
+    (* Builds a table that maps a unique observer name to an identifier. This is
+       useful to identify the observer machine types. *)
+    let observers_map =
+      List.mapi
+        (fun i obs -> (name_of obs, i))
+        (List.filter (function Observer _ -> true | _ -> false) vms)
+    in
+    List.map
+      (fun agent_kind ->
+        let name = name_of agent_kind in
+        match agent_kind with
+        | Bootstrap -> default_vm_configuration ~name
+        | Baker i -> (
+            try
+              let machine_type = List.nth configuration.stake_machine_type i in
+              Agent.Configuration.make ?docker_image ~machine_type ~name ()
+            with _ -> default_vm_configuration ~name)
+        | Producer _ ->
+            let machine_type = configuration.producer_machine_type in
+            Agent.Configuration.make ?docker_image ?machine_type ~name ()
+        | Observer _ -> (
+            try
+              let machine_type =
+                let id = List.assoc name observers_map in
+                List.nth configuration.observer_machine_type id
+              in
+              Agent.Configuration.make ?docker_image ~machine_type ~name ()
+            with _ -> default_vm_configuration ~name)
+        | Archiver _ | Etherlink_dal_operator | Etherlink_dal_observer _
+        | Echo_rollup_dal_observer _ ->
+            Agent.Configuration.make ?docker_image ~name ()
+        | Echo_rollup_operator _ -> default_vm_configuration ~name
+        | Etherlink_operator -> default_vm_configuration ~name
+        | Etherlink_producer _ -> default_vm_configuration ~name
+        | Reverse_proxy -> default_vm_configuration ~name
+        | Stresstest _ -> default_vm_configuration ~name)
+      vms
+    |> return
   in
   let endpoint, resolver_endpoint = Lwt.wait () in
   Cloud.register

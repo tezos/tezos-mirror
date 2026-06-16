@@ -347,9 +347,15 @@ type block_to_bake = {
           [baking_commands.ml]). *)
 }
 
-(** [forge_request] type used to push a concurrent forging task in the forge
-    worker. *)
-type forge_request =
+(** The validation mode specifies whether the baker (filters and) validates
+    mempool operations via an RPC to the node, or if it does so "locally", by
+    using the context. *)
+type validation_mode = Node | Local of Abstract_context_index.t
+
+(** The content of a [forge_request]: identifies what needs to be forged
+    and signed, without the node-specific context. Paired with an
+    {!automaton_state} in {!forge_request}. *)
+type forge_request_content =
   | Forge_and_sign_block of block_to_bake
   | Forge_and_sign_preattestations of {
       unsigned_preattestations : unsigned_consensus_vote_batch;
@@ -389,6 +395,29 @@ type forge_event =
 
 val pp_forge_event : Format.formatter -> forge_event -> unit
 
+(** State specific to one automaton instance (one per node). *)
+type automaton_state = {
+  name : string;
+  cctxt : Protocol_client_context.full;
+  validation_mode : validation_mode;
+  operation_worker : Operation_worker.t;
+  push_forge_event : forge_event -> unit;
+      (** [push_forge_event] and [forge_event_stream] form a paired
+          producer/consumer channel from the forge worker to a baking automaton.
+          The forge worker calls [push_forge_event] to deliver completed forging
+          results (blocks, attestations, preattestations) to an automaton
+          instance. The automaton consumes them via [forge_event_stream]. Each
+          automaton owns its own channel, ensuring that forging results are
+          delivered exclusively to the automaton that requested them. *)
+  forge_event_stream : forge_event Lwt_stream.t;
+}
+
+(** [forge_request] type used to push a concurrent forging task in the forge worker. *)
+type forge_request = {
+  automaton_state : automaton_state;
+  request : forge_request_content;
+}
+
 (** Partial encoding for {!forge_event} that omits secret keys to
     avoid leaking them in event logs; see
     {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
@@ -401,17 +430,11 @@ val forge_event_encoding_for_logging__cannot_decode :
 (** [forge_worker_hooks] type that allows interactions with the forge worker.
     Hooks are needed in order to break a circular dependency. *)
 type forge_worker_hooks = {
-  push_request : forge_request -> unit;
-  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
+  push_request : forge_request -> unit tzresult Lwt.t;
   cancel_all_pending_tasks : unit -> unit;
 }
 
 (** {2 Global_state types and functions} *)
-
-(** The validation mode specifies whether the baker (filters and) validates
-    mempool operations via an RPC to the node, or if it does so "locally", by
-    using the context. *)
-type validation_mode = Node | Local of Abstract_context_index.t
 
 val pp_validation_mode : Format.formatter -> validation_mode -> unit
 
@@ -422,17 +445,16 @@ type cache = {
 
 val create_cache : unit -> cache
 
-(** A global state contains all information related to the chain and baker
-    configuration. *)
+(** Static data shared across all automaton instances: chain identity, baker
+    configuration, round durations, and shared workers.  Node-specific context
+    (cctxt, constants, validation mode, operation worker) lives in
+    {!automaton_state}. *)
 type global_state = {
-  cctxt : Protocol_client_context.full;
   chain_id : Chain_id.t;
   config : Baking_configuration.t;
-  constants : Constants.t;
   round_durations : Round.round_durations;
-  operation_worker : Operation_worker.t;
+  constants : Constants.t;
   mutable forge_worker_hooks : forge_worker_hooks;
-  validation_mode : validation_mode;
   delegates : Key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
@@ -440,8 +462,11 @@ type global_state = {
 
 val pp_global_state : Format.formatter -> global_state -> unit
 
+val pp_automaton_state : Format.formatter -> automaton_state -> unit
+
 type state = {
   global_state : global_state;
+  automaton_state : automaton_state;
   level_state : level_state;
   round_state : round_state;
 }

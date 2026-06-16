@@ -12,13 +12,16 @@
   octez-shell-libs.p2p
   octez-libs.tezos-p2p-services
   tezos-dal-node-services
-  octez-libs.crypto)
+  octez-libs.crypto
+  octez-libs.tezos-workers)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_base
   -open Tezos_crypto_dal
   -open Tezos_gossipsub
   -open Tezos_p2p
   -open Tezos_p2p_services
   -open Tezos_dal_node_services
-  -open Tezos_crypto))
+  -open Tezos_crypto
+  -open Tezos_workers))

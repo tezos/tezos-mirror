@@ -173,9 +173,12 @@ module type LAYER1_HELPERS = sig
   val find_last_whitelist_update :
     #Client_context.full -> Address.t -> (Z.t * Int32.t) option tzresult Lwt.t
 
-  (** Retrieve a commitment published on L1. *)
+  (** Retrieve a commitment published on L1. The optional [block] argument
+      selects the L1 block at which the commitment is queried (defaults to
+      [`Head 0]). *)
   val get_commitment :
     #Client_context.full ->
+    ?block:Tezos_shell_services.Block_services.block ->
     Address.t ->
     Commitment.Hash.t ->
     Commitment.t tzresult Lwt.t
@@ -219,7 +222,7 @@ module type REFUTATION_GAME_HELPERS = sig
   val generate_proof :
     _ Node_context.rw_context ->
     Game.t ->
-    Context.pvmstate ->
+    Access_mode.rw Context.pvmstate ->
     string tzresult Lwt.t
 
   (** [make_dissection plugin node_ctxt cache ~start_state ~start_chunk
@@ -230,9 +233,13 @@ module type REFUTATION_GAME_HELPERS = sig
       dissection has [default_number_of_sections] if there are enough ticks. *)
   val make_dissection :
     (module PARTIAL) ->
-    _ Node_context.t ->
+    _ Node_context.rw_context ->
     Pvm_plugin_sig.state_cache ->
-    start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state option ->
+    start_state:
+      ( Fuel.Accounted.t,
+        Access_mode.rw Context.pvmstate )
+      Pvm_plugin_sig.eval_state
+      option ->
     start_chunk:Game.dissection_chunk ->
     our_stop_chunk:Game.dissection_chunk ->
     default_number_of_sections:int ->
@@ -273,6 +280,16 @@ module type REFUTATION_GAME_HELPERS = sig
     (Game.t * Signature.public_key_hash * Signature.public_key_hash) list
     tzresult
     Lwt.t
+
+  (** [filter_conflicts_ready_to_start ~current_level ~commitment_period_in_blocks conflicts]
+      filters conflicts to only include those that are ready to start a refutation game
+      at the given [current_level]. This implements protocol-specific rules about
+      when refutation games can begin. *)
+  val filter_conflicts_ready_to_start :
+    current_level:int32 ->
+    commitment_period_in_blocks:int ->
+    Game.conflict list ->
+    Game.conflict list tzresult Lwt.t
 end
 
 (** Signature of protocol plugins for the rollup node. NOTE: the plugins have to

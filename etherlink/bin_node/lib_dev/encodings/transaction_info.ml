@@ -99,7 +99,26 @@ let of_receipt_and_object
     object_fields;
   }
 
-let receipt_fields_encoding =
+let zero_logs_bloom = Hex (String.make 512 '0')
+
+let is_zero_logs_bloom (Hex h) =
+  let (Hex h') = zero_logs_bloom in
+  String.equal h h'
+
+(* Compact encoding for logs_bloom: an all-zero bloom (no logs) is stored as
+   an empty string instead of the full 514-byte ASCII hex representation.
+   This reduce storage for the all simple transfers transactions.
+
+   WARNING: the SQLite extension in ../sqlite_receipt_bloom depends on the
+   database storing receipts with this encoding to work. If it is ever changed,
+   the SQLite extension will also need to be adapted. *)
+let compact_bloom_encoding =
+  Data_encoding.conv
+    (fun (Hex h as bloom) -> if is_zero_logs_bloom bloom then "" else "0x" ^ h)
+    (fun s -> if s = "" then zero_logs_bloom else hex_of_string s)
+    Data_encoding.string
+
+let receipt_fields_encoding_with ~bloom_encoding =
   let open Data_encoding in
   conv
     (fun {
@@ -145,10 +164,16 @@ let receipt_fields_encoding =
        (req "effective_gas_price" quantity_encoding)
        (req "gas_used" quantity_encoding)
        (req "logs" (list transaction_log_encoding))
-       (req "logs_bloom" hex_encoding)
+       (req "logs_bloom" bloom_encoding)
        (req "type_" quantity_encoding)
        (req "status" quantity_encoding)
        (req "contract_address" (option address_encoding)))
+
+let receipt_fields_encoding =
+  receipt_fields_encoding_with ~bloom_encoding:compact_bloom_encoding
+
+let legacy_receipt_fields_encoding =
+  receipt_fields_encoding_with ~bloom_encoding:hex_encoding
 
 let object_fields_encoding =
   let open Data_encoding in

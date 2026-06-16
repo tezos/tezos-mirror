@@ -139,7 +139,10 @@ let test_write_host_fun ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      (Host_funcs.registry ~write_debug:Noop ~version)
+      (Host_funcs.registry
+         ~write_debug:Noop
+         ~version
+         ~nds_host_functions_enabled:false)
       ~input
       ~output
       Host_funcs.Internal_for_tests.read_input
@@ -151,7 +154,10 @@ let test_write_host_fun ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      (Host_funcs.registry ~write_debug:Noop ~version)
+      (Host_funcs.registry
+         ~write_debug:Noop
+         ~version
+         ~nds_host_functions_enabled:false)
       ~input
       ~output
       Host_funcs.Internal_for_tests.write_output
@@ -180,7 +186,10 @@ let test_write_host_fun ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      (Host_funcs.registry ~write_debug:Noop ~version)
+      (Host_funcs.registry
+         ~write_debug:Noop
+         ~version
+         ~nds_host_functions_enabled:false)
       ~input
       ~output
       Host_funcs.Internal_for_tests.write_output
@@ -280,7 +289,10 @@ let test_write_output_above_limit ~version () =
       Eval.invoke
         ~module_reg
         ~caller:module_key
-        (Host_funcs.registry ~write_debug:Noop ~version)
+        (Host_funcs.registry
+           ~write_debug:Noop
+           ~version
+           ~nds_host_functions_enabled:false)
         ~input
         ~output
         Host_funcs.Internal_for_tests.write_output

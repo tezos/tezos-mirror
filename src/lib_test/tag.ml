@@ -52,3 +52,5 @@ let slow = "slow"
 let extra = "extra"
 
 let memory_hungry = "memory_hungry"
+
+let add_new_script = "add_new_script"

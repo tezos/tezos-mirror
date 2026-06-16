@@ -392,15 +392,12 @@ end = struct
     in
     already_denounced __LOC__ e
 
-  (** Check that a double preattestation evidence fails under
-    aggregate_attestation feature flag when operations have distinct slots and
-    are otherwise identical. *)
+  (** Check that a double preattestation evidence fails when operations have
+    distinct slots and are otherwise identical. *)
   let different_slots_under_feature_flag () =
     let open Lwt_result_wrap_syntax in
     (* TODO ABAAB: doesn't work with ABAAB *)
-    let* genesis, _ =
-      Context.init2 ~consensus_threshold_size:0 ~aggregate_attestation:true ()
-    in
+    let* genesis, _ = Context.init2 ~consensus_threshold_size:0 () in
     let* block = Block.bake genesis in
     let* attesters = Context.get_attesters (B block) in
     let* csts = Context.get_constants (B block) in
@@ -450,9 +447,7 @@ end = struct
   let test_invalid_double_preattestation_duplicate_in_committee () =
     let open Lwt_result_syntax in
     let* _genesis, block =
-      Test_aggregate.init_genesis_with_some_bls_accounts
-        ~aggregate_attestation:true
-        ()
+      Test_aggregate.init_genesis_with_some_bls_accounts ()
     in
     let* b = Block.bake_until_cycle_end block in
     let* blk_1, blk_2 = block_fork b in

@@ -135,9 +135,23 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     do_clean_up last_processed_level head_level
   else return_unit
 
-let clean_up_store_and_catch_up_for_no_refutation_support ctxt
+let clean_up_store_and_catch_up_for_no_refutation_support ctxt cctxt
     ~last_processed_level head_level proto_parameters =
   let open Lwt_result_syntax in
+  let store_skip_list_cells ~level =
+    let*? (module Plugin) =
+      Node_context.get_plugin_for_level ctxt ~level:(Int32.pred level)
+    in
+    let*? dal_constants =
+      Node_context.get_proto_parameters ctxt ~level:(`Level level)
+    in
+    Block_handler.fetch_and_store_skip_list_cells
+      ctxt
+      cctxt
+      dal_constants
+      ~attested_level:level
+      (module Plugin : Dal_plugin.T)
+  in
   let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let storage_period =
     Profile_manager.get_attested_data_default_store_period
@@ -187,6 +201,10 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt
       let* () =
         Block_handler.remove_old_level_stored_data proto_parameters ctxt level
       in
+      let* () =
+        if Node_context.is_bootstrap_node ctxt then return_unit
+        else store_skip_list_cells ~level
+      in
       L1_crawler_status.catching_up_or_synced_status
         ~head_level
         ~last_processed_level:level
@@ -216,6 +234,7 @@ let clean_up_store_and_catch_up ctxt cctxt ~last_processed_level
   else
     clean_up_store_and_catch_up_for_no_refutation_support
       ctxt
+      cctxt
       ~last_processed_level
       head_level
       proto_parameters

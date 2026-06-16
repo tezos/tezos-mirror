@@ -1,6 +1,6 @@
 // Copyright (c) SimpleStaking, Viable Systems, Nomadic Labs and Tezedge Contributors
 // SPDX-CopyrightText: 2022-2024 TriliTech <contact@trili.tech>
-//
+// SPDX-CopyrightText: 2025 Functori <contact@functori.com>
 // SPDX-License-Identifier: MIT
 
 use bitvec::slice::BitSlice;
@@ -169,26 +169,22 @@ pub mod error {
         let mut res = String::new();
         let start = input.offset(error.input);
         let end = start + error.input.len();
-        let _ = write!(res, "Error decoding bytes [{}..{}]", start, end);
+        let _ = write!(res, "Error decoding bytes [{start}..{end}]");
         let _ = match error.kind {
-            DecodeErrorKind::Nom(kind) => write!(res, " by nom parser `{:?}`", kind),
-            DecodeErrorKind::Utf8(kind, e) => write!(res, " by nom parser `{:?}`: {}", kind, e),
+            DecodeErrorKind::Nom(kind) => write!(res, " by nom parser `{kind:?}`"),
+            DecodeErrorKind::Utf8(kind, e) => write!(res, " by nom parser `{kind:?}`: {e}"),
             DecodeErrorKind::Boundary(kind) => {
-                write!(
-                    res,
-                    " caused by boundary violation of encoding `{:?}`",
-                    kind
-                )
+                write!(res, " caused by boundary violation of encoding `{kind:?}`")
             }
             DecodeErrorKind::Field(name) => {
-                write!(res, " while decoding field `{}`", name)
+                write!(res, " while decoding field `{name}`")
             }
             DecodeErrorKind::Variant(name) => {
-                write!(res, " while decoding variant `{}`", name)
+                write!(res, " while decoding variant `{name}`")
             }
-            DecodeErrorKind::Bits(e) => write!(res, " while performing bits operation: {}", e),
-            DecodeErrorKind::UnknownTag(tag) => write!(res, " caused by unsupported tag `{}`", tag),
-            DecodeErrorKind::InvalidTag(tag) => write!(res, " caused by invalid tag `{}`", tag),
+            DecodeErrorKind::Bits(e) => write!(res, " while performing bits operation: {e}"),
+            DecodeErrorKind::UnknownTag(tag) => write!(res, " caused by unsupported tag `{tag}`"),
+            DecodeErrorKind::InvalidTag(tag) => write!(res, " caused by invalid tag `{tag}`"),
         };
 
         if let Some(other) = error.other {
@@ -328,10 +324,9 @@ where
 pub fn optional_field<'a, O, F>(parser: F) -> impl FnMut(NomInput<'a>) -> NomResult<'a, Option<O>>
 where
     F: FnMut(NomInput<'a>) -> NomResult<'a, O>,
-    O: Clone,
 {
     alt((
-        preceded(tag(0x00u8.to_be_bytes()), success(None)),
+        map(tag(0x00u8.to_be_bytes()), |_| None),
         preceded(tag(0xffu8.to_be_bytes()), map(parser, Some)),
     ))
 }
@@ -530,17 +525,16 @@ pub fn n_bignum(mut input: NomInput) -> NomResult<BigUint> {
     Ok((input, BigUint::from_bytes_be(&bitvec.into_vec())))
 }
 
-pub trait Hasher {
-    fn hash(&self, input: &[u8]) -> Vec<u8>;
+pub trait Hasher<const N: usize> {
+    fn hash(&self, input: &[u8]) -> [u8; N];
 }
 
-pub fn hashed<'a, O, F, H>(
+pub fn hashed<'a, O, F, const N: usize, H: Hasher<N>>(
     hasher: H,
     mut parser: F,
-) -> impl FnMut(NomInput<'a>) -> NomResult<'a, (O, Vec<u8>)>
+) -> impl FnMut(NomInput<'a>) -> NomResult<'a, (O, [u8; N])>
 where
     F: FnMut(NomInput<'a>) -> NomResult<'a, O>,
-    H: Hasher,
 {
     move |input| {
         let (rest, result) = parser(input)?;

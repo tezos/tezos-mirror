@@ -20,6 +20,8 @@ depends: [
   "opentelemetry" { >= "0.12" }
   "opentelemetry-client-cohttp-lwt"
   "octez-crawler" { = version }
+  "octez-tar-helpers" { = version }
+  "camlzip" { >= "1.13" }
   "octez-rust-deps" { with-test & = version }
   "ppx_hash" {with-test}
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }

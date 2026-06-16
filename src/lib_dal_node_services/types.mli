@@ -47,6 +47,8 @@ module Slot_id : sig
 
   val hash : t -> int
 
+  val pp : Format.formatter -> t -> unit
+
   module Comparable : Stdlib.Set.OrderedType with type t = t
 
   module Set : Set.S with type elt = t
@@ -271,8 +273,10 @@ type with_proof = {with_proof : bool}
 type proto_parameters = {
   feature_enable : bool;
   incentives_enable : bool;
+  dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
+  attestation_lags : int list;
   attestation_threshold : int;
   traps_fraction : Q.t;
   cryptobox_parameters : Cryptobox.Verifier.parameters;
@@ -417,8 +421,8 @@ module Attestable_event : sig
         (** All slots that should be marked attestable for this delegate *)
     trap_slot_ids : slot_id list;
         (* All slots that should be marked as traps for this delegate *)
-    no_shards_attestation_levels : level list;
-        (** All attestation levels where this delegate has no shards *)
+    no_shards_committee_levels : level list;
+        (** All committee levels where this delegate has no shards *)
   }
 
   (** DAL attestability items emitted on a per-delegate stream.
@@ -426,8 +430,8 @@ module Attestable_event : sig
   type t =
     | Attestable_slot of {slot_id : slot_id}
         (** the [slot_id] is now attestable for the delegate *)
-    | No_shards_assigned of {attestation_level : level}
-        (** the delegate has no assigned shards at [attestation_level] *)
+    | No_shards_assigned of {committee_level : level}
+        (** the delegate has no assigned shards at [committee_level] *)
     | Slot_has_trap of {slot_id : slot_id}
         (** the [slot_id] is a trap for the delegate *)
     | Backfill of {backfill_payload : backfill_payload}

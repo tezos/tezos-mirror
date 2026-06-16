@@ -133,26 +133,25 @@ let get_challenge_window =
 
 type outbox_message_index = {outbox_level : int32; message_index : int}
 
-let extract_outbox_proof_info (hex : Hex.t) =
-  let proof =
-    Hex.to_bytes_exn hex
-    |> Data_encoding.Binary.of_bytes_exn
-         Tezos_raw_protocol_alpha.Alpha_context.Sc_rollup.Wasm_2_0_0PVM
-         .Protocol_implementation
-         .output_proof_encoding
-  in
-  let info =
+let extract_outbox_proof_info =
+  let (module Protocol_implementation) =
     Tezos_raw_protocol_alpha.Alpha_context.Sc_rollup.Wasm_2_0_0PVM
-    .Protocol_implementation
-    .output_info_of_output_proof
-      proof
+    .protocol_implementation
+      ~config:[]
   in
-  {
-    outbox_level =
-      Tezos_raw_protocol_alpha.Alpha_context.Raw_level.to_int32
-        info.outbox_level;
-    message_index = Z.to_int info.message_index;
-  }
+  fun (hex : Hex.t) ->
+    let proof =
+      Hex.to_bytes_exn hex
+      |> Data_encoding.Binary.of_bytes_exn
+           Protocol_implementation.output_proof_encoding
+    in
+    let info = Protocol_implementation.output_info_of_output_proof proof in
+    {
+      outbox_level =
+        Tezos_raw_protocol_alpha.Alpha_context.Raw_level.to_int32
+          info.outbox_level;
+      message_index = Z.to_int info.message_index;
+    }
 
 type status = Applied | Not_applied
 

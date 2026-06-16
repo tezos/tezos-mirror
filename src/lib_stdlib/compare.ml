@@ -136,7 +136,7 @@ module Char = Make (Char)
 module Bool = Make (struct
   type t = bool
 
-  let compare = Stdlib.compare
+  let compare = Stdlib.Bool.compare
 end)
 
 module Int = struct
@@ -242,7 +242,7 @@ module Uint64 =
 module Float = Make (struct
   type t = float
 
-  let compare = Stdlib.compare
+  let compare = Stdlib.Float.compare
 end)
 
 module String = Make (String)

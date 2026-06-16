@@ -5,15 +5,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Zero_protocol = Tezos_shell_services.Block_services.Fake_protocol
-module Genesis_protocol = Tezos_protocol_000_Ps9mPmXa.Protocol
-module Imported_protocol = Tezos_protocol_023_PtSeouLo.Protocol
-module Imported_protocol_plugin = Tezos_protocol_plugin_023_PtSeouLo
-module Imported_protocol_parameters = Tezos_protocol_023_PtSeouLo_parameters
-module Imported_env = Tezos_protocol_environment_023_PtSeouLo
-module Alpha_context = Imported_protocol.Alpha_context
+(* SeouLo modules *)
+module SeouLo_protocol = Tezos_protocol_023_PtSeouLo.Protocol
+module SeouLo_context = SeouLo_protocol.Alpha_context
+module SeouLo_parameter = Tezos_protocol_023_PtSeouLo_parameters
+module SeouLo_env = Tezos_protocol_environment_023_PtSeouLo
+module SeouLo_plugin = Tezos_protocol_plugin_023_PtSeouLo
+module SeouLo_test_helpers = Tezos_023_PtSeouLo_test_helpers
+
+(* TALLiN modules *)
+module TALLiN_protocol = Tezos_protocol_024_PtTALLiN.Protocol
+module TALLiN_context = TALLiN_protocol.Alpha_context
+module TALLiN_parameter = Tezos_protocol_024_PtTALLiN_parameters
+module TALLiN_env = Tezos_protocol_environment_024_PtTALLiN
+module TALLiN_plugin = Tezos_protocol_plugin_024_PtTALLiN
+module TALLiN_test_helpers = Tezos_024_PtTALLiN_test_helpers
+
+(* Current Tezlink protocol *)
+module Imported_protocol = TALLiN_protocol
+module Imported_protocol_plugin = TALLiN_plugin
+module Imported_protocol_parameters = TALLiN_parameter
+module Imported_env = TALLiN_env
+module Imported_context = TALLiN_context
 
 (* This is code only intended for testing. So this import is
    to be used sparingly, for temporary code. We import it to implement a
    temporary quick and dirty `list_entrypoints`. *)
-module Imported_protocol_test_helpers = Tezos_023_PtSeouLo_test_helpers
+module Imported_protocol_test_helpers = TALLiN_test_helpers

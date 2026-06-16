@@ -155,7 +155,6 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
         force_apply_from_round;
         keep_alive;
         liquidity_baking_vote;
-        adaptive_issuance_vote;
         per_block_vote_file;
         extra_operations;
         dal_node_endpoint;
@@ -164,6 +163,7 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
         pre_emptive_forge_time;
         remote_calls_timeout;
         allow_signing_delay;
+        extra_nodes;
       } baking_mode sources cctxt =
   let open Lwt_result_syntax in
   Octez_baking_common.Signing_delay.enforce_signing_delay_gating
@@ -178,9 +178,6 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
          look into default locations. *)
       Per_block_vote_file.lookup_default_vote_file_path cctxt
     else Lwt.return per_block_vote_file
-  in
-  let*! () =
-    Events.warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote
   in
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
@@ -209,4 +206,5 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
     ?data_dir:baking_mode
     ~keep_alive
     ~state_recorder
+    ~extra_nodes
     sources

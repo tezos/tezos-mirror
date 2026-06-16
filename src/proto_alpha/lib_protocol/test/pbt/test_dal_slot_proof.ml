@@ -104,11 +104,12 @@ struct
         List.filter_map
           (fun (slot, slot_publisher, skip_slot) ->
             let attestation_status =
-              Dal_attestation_repr.Accountability.
+              Dal_attestations_repr.Accountability.
                 {
                   attested_shards = (if skip_slot then 0 else 1);
                   total_shards = 1;
                   is_proto_attested = not skip_slot;
+                  attesters = Environment.Signature.Public_key_hash.Set.empty;
                 }
             in
             if skip_slot then None
@@ -117,15 +118,21 @@ struct
                 (slot, Contract_repr.Implicit slot_publisher, attestation_status))
           slots_headers
       in
+      let slots =
+        List.map
+          (fun (header, publisher, status) -> (header, publisher, Some status))
+          slots_headers
+      in
       let*?@ cell, cache =
         Dal_slot_repr.History.(
           update_skip_list
-            ~number_of_slots:Parameters.dal_parameters.number_of_slots
             cell
             cache
             ~published_level
-            slots_headers
-            ~attestation_lag:Legacy)
+            ~number_of_slots:Parameters.dal_parameters.number_of_slots
+            ~attestation_lag:Legacy
+            ~slots
+            ~fill_unpublished_gaps:false)
       in
       let slots_info =
         List.fold_left
@@ -145,7 +152,7 @@ struct
       prove that it is confirmed, or None if the page's slot is skipped. *)
   let request_confirmed_page (poly, slot, _slot_publisher, slot_status) =
     let open Lwt_result_syntax in
-    if not slot_status.Dal_attestation_repr.Accountability.is_proto_attested
+    if not slot_status.Dal_attestations_repr.Accountability.is_proto_attested
     then
       (* We cannot check that a page of an unconfirmed slot is confirmed. *)
       return_none
@@ -161,7 +168,7 @@ struct
   let request_unconfirmed_page (poly, slot, _slot_publisher, slot_status) =
     let open Lwt_result_syntax in
     let open Dal_slot_repr.Header in
-    if not slot_status.Dal_attestation_repr.Accountability.is_proto_attested
+    if not slot_status.Dal_attestations_repr.Accountability.is_proto_attested
     then
       let level = slot.id.published_level in
       let* _page_info, page_id = mk_page_info ~level slot poly in

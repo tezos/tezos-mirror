@@ -33,12 +33,18 @@ module Request : sig
     unit ->
     Evm_node.request
 
+  val proposeNextBlockTimestamp : timestamp:string -> Evm_node.request
+
   val produceProposal : ?timestamp:string -> unit -> Evm_node.request
 
   val eth_sendRawTransaction : raw_tx:string -> Evm_node.request
 
   val eth_sendRawTransactionSync :
-    raw_tx:string -> timeout:string -> block:block_param -> Evm_node.request
+    raw_tx:string ->
+    ?timeout:string ->
+    block:block_param ->
+    unit ->
+    Evm_node.request
 
   val eth_getTransactionReceipt : tx_hash:string -> Evm_node.request
 
@@ -85,6 +91,10 @@ module Request : sig
   val eth_subscribe : kind:subscription_kind -> Evm_node.request
 
   val eth_unsubscribe : id:string -> Evm_node.request
+
+  val tez_getMetaBlockByNumber : block:string -> Evm_node.request
+
+  val tez_getMetaBlockByHash : hash:string -> Evm_node.request
 end
 
 (** {2 RPC calls wrappers}
@@ -197,6 +207,27 @@ val produce_block :
   Evm_node.t ->
   (int, error) result Lwt.t
 
+(** [propose_next_block_timestamp ~timestamp evm_node] calls the
+    private RPC [proposeNextBlockTimestamp]. If provided the next
+    produced block might have timestamp [timestamp] (in RFC3339)
+    format. *)
+val propose_next_block_timestamp :
+  ?websocket:Websocket.t ->
+  timestamp:string ->
+  Evm_node.t ->
+  (unit, error) result Lwt.t
+
+(** [lock_block_production evm_node] calls the private RPC [lockBlockProduction]
+    to lock the block producer worker. When locked, [produce_block] returns
+    [No_block]. This is a test-only RPC. *)
+val lock_block_production :
+  ?websocket:Websocket.t -> Evm_node.t -> (unit, error) result Lwt.t
+
+(** [unlock_block_production evm_node] calls the private RPC [unlockBlockProduction]
+    to unlock the block producer worker. This is a test-only RPC. *)
+val unlock_block_production :
+  ?websocket:Websocket.t -> Evm_node.t -> (unit, error) result Lwt.t
+
 (** [produce_proposal ?timestamp evm_node] calls the private RPC [produceProposal].
     If provided the block will have timestamp [timestamp] (in RFC3339) format. *)
 val produce_proposal :
@@ -279,15 +310,27 @@ val get_transaction_count :
   Evm_node.t ->
   (int64, error) result Lwt.t
 
-(** [tez_kernelVersion evm_node] calls [tez_kernelVersion]. Returns the
-    kernel commit hash. *)
+(** [tez_kernelVersion ?block evm_node] calls [tez_kernelVersion]. Returns
+    the kernel commit hash at [block] (defaults to [Latest] if omitted). *)
 val tez_kernelVersion :
-  ?websocket:Websocket.t -> Evm_node.t -> (string, error) result Lwt.t
+  ?websocket:Websocket.t ->
+  ?block:block_param ->
+  Evm_node.t ->
+  (string, error) result Lwt.t
 
-(** [tez_kernelRootHash evm_node] calls [tez_kernelRootHash]. Returns the
-    kernel root hash. *)
+(** [tez_kernelRootHash ?block evm_node] calls [tez_kernelRootHash]. Returns
+    the kernel root hash at [block] (defaults to [Latest] if omitted). *)
 val tez_kernelRootHash :
-  ?websocket:Websocket.t -> Evm_node.t -> (string option, error) result Lwt.t
+  ?websocket:Websocket.t ->
+  ?block:block_param ->
+  Evm_node.t ->
+  (string option, error) result Lwt.t
+
+(** [tez_getMichelsonActivationLevel evm_node] calls
+    [tez_getMichelsonActivationLevel]. Returns the EVM block level at which the
+    Michelson runtime was activated, or [None] if it has not been activated. *)
+val tez_getMichelsonActivationLevel :
+  ?websocket:Websocket.t -> Evm_node.t -> (int64 option, error) result Lwt.t
 
 (** [call ~to_ ~data ?block evm_node] call [eth_call] with [to] and
     [data] as argument. [block] defaults to [Latest]. *)
@@ -385,3 +428,72 @@ val coinbase :
 
 (** Returns the EVM node configuration. *)
 val configuration : Evm_node.t -> JSON.t Lwt.t
+
+(** Returns collected Prometheus metrics with /metrics RPC. *)
+val metrics : Evm_node.t -> string Lwt.t
+
+module Tezosx : sig
+  val tez_getTezosEthereumAddress :
+    ?websocket:Websocket.t ->
+    string ->
+    Evm_node.t ->
+    (string, error) result Lwt.t
+
+  val tez_getEthereumTezosAddress :
+    ?websocket:Websocket.t ->
+    string ->
+    Evm_node.t ->
+    (string, error) result Lwt.t
+
+  val http_traceCall_evm :
+    ?websocket:Websocket.t ->
+    to_:string ->
+    data:string ->
+    ?gas:string ->
+    ?block:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  val http_traceCall_michelson :
+    ?websocket:Websocket.t ->
+    operation:string ->
+    ?skip_signature:bool ->
+    ?block:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  (** Call [http_traceTransaction tx_hash] and return its [{txHash, traces}]
+      result (or the JSON-RPC error). *)
+  val http_traceTransaction :
+    ?websocket:Websocket.t ->
+    tx_hash:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  (** Call [http_traceBlockByNumber block] where [block] is either a tag
+      ([latest], [earliest], [finalized]) or a hex-encoded block number. *)
+  val http_traceBlockByNumber :
+    ?websocket:Websocket.t ->
+    block:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  (** Call [http_traceBlockByHash block_hash]. *)
+  val http_traceBlockByHash :
+    ?websocket:Websocket.t ->
+    block_hash:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  val tez_getMetaBlockByNumber :
+    ?websocket:Websocket.t ->
+    block:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  val tez_getMetaBlockByHash :
+    ?websocket:Websocket.t ->
+    hash:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+end

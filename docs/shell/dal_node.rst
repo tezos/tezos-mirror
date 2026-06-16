@@ -83,7 +83,8 @@ A DAL node in controller mode can run in these profiles:
 
       octez-dal-node run --endpoint http://127.0.0.1:8732 --attester-profiles=tz1QCVQinE8iVj1H2fckqx6oiM85CNJSK9Sx --data-dir $DATA_DIR
 
-- The ``observer`` profile contributes to the resilience of network by helping distribute data in the specified slots. To run a DAL node with the ``observer`` profile, pass the ``--observer-profiles`` argument with the indexes of the slots to monitor or an empty string (as in ``--observer-profiles ''``) to use a random index, as in this example:
+- The ``observer`` profile contributes to the resilience of network by reconstructing slots from received shards and republishing missing shards. Unlike operator nodes, observer nodes do not store data long-term and therefore cannot participate in refutation games.
+  To run a DAL node with the ``observer`` profile, pass the ``--observer-profiles`` argument with the indexes of the slots to monitor or an empty string (as in ``--observer-profiles ''``) to use a random index, as in this example:
 
    .. code-block:: shell
 
@@ -147,10 +148,32 @@ The DAL node essentially stores slots and shards. Slots are injected into the no
 The amount of storage space a DAL node needs depends on how long it keeps the data, and different profiles keep the data for different amounts of time:
 
 - Bootstrap nodes store no DAL data and therefore require negligible storage.
-- Attester and observer nodes store data in memory for a few blocks after the attestation delay by default.
+- Attester and observer nodes store data in memory for a few blocks after the maximum attestation lag by default.
 - Operator nodes store data on disk for the slots registered with this profile for 3 months by default because the data may be needed for the Smart Rollup refutation game.
 
 You can set how long the node stores data with the ``--history-mode`` option.
+
+The ``--history-mode`` option accepts three forms:
+
+- ``full`` — never delete shards;
+- ``auto`` — use the profile's default retention period (about 3 months for operators, a small multiple of the attestation lag for attesters and observers);
+- a positive integer ``N`` — keep shards for ``N`` past levels.
+
+When an explicit ``N`` is given, the DAL node checks at startup that ``N`` is large enough for the active profile. The minimum is:
+
+- the attestation lag, for profiles that do not support refutation games (attesters and plain observers);
+- the profile's full retention period (as returned by ``auto``), for profiles that support refutation games (operators, and observers configured with refutation support).
+
+If ``N`` is below this minimum, the node refuses to start with a ``dal.node.not_enough_history`` error indicating both the configured value and the required minimum. The forms ``auto`` and ``full`` always satisfy this check.
+
+L1 history requirement
+~~~~~~~~~~~~~~~~~~~~~~
+
+In addition to checking its own ``--history-mode`` setting, the DAL node also checks at startup that the L1 node it connects to keeps enough block data in the past. The DAL node needs to fetch the protocol parameters and, for refutation-supporting profiles, the skip-list cells for every level it covers; if the L1 node has already pruned those levels, the DAL node cannot operate correctly.
+
+The minimum required L1 history is computed from the DAL node's retention period (in levels) and the protocol's ``blocks_per_cycle``, rounded up to a whole number of cycles. For refutation-supporting profiles, an extra ``attestation_lag + 1`` levels are added. If the L1 node runs in ``archive`` mode, the check trivially passes; otherwise the DAL node compares the result against the number of cycles the L1 node retains (its ``--history-mode`` ``additional_cycles`` plus the protocol's ``blocks_preservation_cycles``).
+
+If the L1 node retains fewer cycles than required, the DAL node refuses to start with a ``dal.node.not_enough_l1_history`` error, which also suggests the ``--history-mode rolling:N`` setting to put on the **L1** side. See :doc:`L1 history modes <../user/history_modes>` for details on configuring the L1 node.
 
 L1 monitoring
 ^^^^^^^^^^^^^
@@ -169,8 +192,25 @@ RPC server
 The DAL node incorporates an RPC server which answers to RPC queries to update or retrieve information about the node’s state.
 For instance, one can post slots, ask the node to compute and store shards, to update profiles, or to connect to or disconnect from peers.
 
-The default listening port for RPCs is 10732, but can be changed using option ``--rpc-addr``.
-The RPC server is started by default, even if this option is not given.
+By default the RPC server binds to the loopback interface (``127.0.0.1:10732``), so only programs running on the same machine can reach it.
+The address and port can be changed with the ``--rpc-addr`` option; the RPC server itself is always started, whether or not the option is given.
+
+To expose the RPC interface to other hosts, pass an explicit non-loopback address such as ``--rpc-addr 0.0.0.0:10732`` (listen on every interface) or ``--rpc-addr <interface-IP>:10732`` (a specific interface).
+When the server binds to a non-loopback address, a warning is emitted at startup and a restrictive ACL is applied: read-only endpoints (``GET`` queries on profiles, slots, ``/version``, plugin endpoints under ``/plugin/**``, …) remain accessible, while mutating endpoints (``PATCH /profiles``, ``POST /slots``, …) return ``401 Unauthorized``.
+If you need remote access to mutating endpoints, either restrict access at the network layer (firewall, reverse proxy with authentication, SSH tunnel, …) or override the ACL via configuration (see below).
+
+The default ACL can be overridden through the ``acl`` field in the configuration file, with the same syntax as the L1 node's ``rpc.acl`` policy: a list of per-bind-address overrides, each providing either a ``whitelist`` or a ``blacklist`` of HTTP method/path matchers. Whichever entry matches the configured ``rpc-addr`` replaces the default policy for that bind. For example, an operator that needs ``POST /slots`` to be reachable from a remote host can add to ``config.json``:
+
+.. code-block:: json
+
+  {
+    "acl": [
+      { "address": "0.0.0.0:10732", "blacklist": [] }
+    ]
+  }
+
+A ``blacklist: []`` allows every endpoint (equivalent to the previous ``allow_all`` behavior). To tighten the default further, supply an explicit ``whitelist`` listing only the methods and paths to permit. When no ``acl`` entry matches the bind address, the default ``dal_secure`` policy described above applies.
+
 Look at  :ref:`openapi description<dal-node-openapi>` for the list of available RPC.
 
 
@@ -214,45 +254,40 @@ The system requirements for the DAL node depend on whether the node is being run
 The following sections provide system requirements for these cases based on experimentation.
 For more information about the experimentation, see `Hardware and bandwidth requirements for the Tezos DAL <https://forum.tezosagora.org/t/hardware-and-bandwidth-requirements-for-the-tezos-dal/6230>`_.
 
-.. note::
-
-    These requirements are for DAL nodes that run independently of any other Octez binary.
-    The requirements are higher if they are running on the same system as other Octez binaries.
-
 DAL attesters
 ~~~~~~~~~~~~~
 
 The amount of data that a DAL node must attest to depends on how much baking power the associated baker has.
 The larger the baking power, the more data the DAL sends to the DAL node to attest and the more system resources the DAL node needs.
 
-This table shows the system requirements for a DAL node (independent of any other Octez binary) that attests 100% of the data assigned to it.
+This table shows the system requirements for a complete baker setup, featuring a Layer 1 node, a baker node and a DAL node that attests 100% of the data assigned to it.
 The specifications in this table are an estimate based on experimentation with Google Cloud Platform compute instances; you must monitor your DAL node to ensure that it attests all or nearly all of the data that it is assigned to attest.
 
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| Baking power          | 0.5% of total         | 1% of total           | 2% of total           | 5% of total           |
+| Baking power          | Up to 1% of total     | 2% of total           | 5% of total           | 10% of total          |
 +=======================+=======================+=======================+=======================+=======================+
-| Machine type          | e2-small (ssd)        | e2-small (ssd)        | e2-small (ssd)        | e2-medium (ssd)       |
+| Number of cores       | 4 cores               | 4 cores               | 8 cores               | 16 cores              |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| CPU clock             | 2.25 GHz              | 2.25 GHz              | 2.25 GHz              | 2.25 GHz              |
+| CPU perf. tier (*)    | low-end               | mid-range             | high-end              | high-end              |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| RAM                   | 2 GiB                 | 2 GiB                 | 2 GiB                 | 4 GiB                 |
-+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| Disk space            | 20 GiB                | 20 GiB                | 20 GiB                | 20 GiB                |
+| RAM                   | 16 GiB                | 16 GiB                | 16 GiB                | 16 GiB                |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
 | Bandwidth (upload)    | 250 KiB/s             | 250 KiB/s             | 250 KiB/s             | 250 KiB/s             |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| Bandwidth (download)  | 250 KiB/s             | 350 KiB/s             | 400 KiB/s             | 600 KiB/s             |
+| Bandwidth (download)  | 1 MiB/s               | 2 MiB/s               | 5 MiB/s               | 10 MiB/s              |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
 
-DAL producer node
-~~~~~~~~~~~~~~~~~
+(*): Low-end covers low-power or entry-level CPUs, mid-range targets modern desktop and entry-level server CPUs with mid-range clock speed, and high-end addresses recent high-performance CPUs with high clock speed.
+
+DAL producer node (operator/observer)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The system resources that a DAL producer node needs depends on how much data it needs to publish to the DAL.
 This example is an estimate based on experimentation with a DAL producer node that publishes data into one slot in each block:
 
 ======================= ===============
-CPU                     n2-standard-2
-RAM                     4 GiB
+CPU                     c2-standard-4
+RAM                     16 GiB
 Disk space              500 GiB
 Bandwidth (upload)      2.5 MiB/s
 Bandwidth (download)    0.5 MiB/s
@@ -279,22 +314,15 @@ Lifetime of slots and shards
 
 The life cycle of slots and shards is described by the following steps:
 
-#. The operator posts the slot data to some DAL node of its choice. The node computes the corresponding commitment and adds the association commitment - slot to the store.
-   This is done via the RPC ``POST /commitments/<slot_data>``, which returns the corresponding commitment.
-#. The operator instructs the DAL node to compute and save the shards of the slot associated with the given commitment.
-   It is important to set the query flag ``with_proof`` to true to be able to publish the shards on the P2P network.
-   This is done via the RPC ``PUT /commitments/<commitment>/shards``.
-#. The operator instructs the DAL node to compute the proof associated with the commitment.
-   This is done via the RPC ``GET /commitments/<commitment>/proof``, which returns the corresponding commitment proof.
+#. The operator posts the slot data to some DAL node of its choice. The node computes the corresponding commitment and commitment proof, as well as the corresponding shards with their proofs.
+   This is done via the RPC ``POST /slots/<slot_data>``, which returns the commitment and its proof.
 #. The operator selects a slot index for its slot, and posts the commitment to L1, via the ``publish_commitment`` operation.
    This can be done via RPCs for injecting an operation into L1, or using the Octez client, via the following command::
 
      octez-client publish dal commitment <commitment> from <pkh> for slot <slot_index> with proof <proof>
 
-#. Once the operation is included in a final block (that is, there are at least two blocks on top of the one including the operation), and the slot is considered published (see :doc:`./dal_overview`), all DAL nodes exchange the slot’s shards they have in their store on the P2P network, depending on their profile (see :ref:`dal_p2p`), and they store previously unknown shards.
-#. Attesters check, for all published slots, the availability of the shards they are assigned by interrogating their DAL node, via the RPC ``GET /profiles/<pkh>/attested_levels/<level>/attestable_slots``, where level is the level at which the slot was published plus ``attestation_lag``, and ``pkh`` is the attester’s public key hash. (See also :doc:`dal_bakers`)
-#. Attesters attach a DAL payload containing the information received at step 6 to their attestation operation, via their baker binary. (See also :doc:`dal_bakers`)
+#. Once the operation is included in a final payload (that is, there is at least one block on top of the one including the operation), the slot is considered published (see :doc:`./dal_overview`), all DAL nodes exchange the slot’s shards they have in their store on the P2P network, depending on their profile (see :ref:`dal_p2p`), and they store previously unknown shards.
+#. Attesters monitor the availability of their assigned shards on their DAL node, via the RPC ``GET /profiles/<pkh>/monitor/attestable_slots``, where ``pkh`` is the attester’s public key hash. (See also :doc:`dal_bakers`)
+#. Attesters attach a DAL payload containing the information received at the previous step to their attestation operation, via their baker binary. (See also :doc:`dal_bakers`)
 #. The protocol aggregates the received attestations, and declares each published slot as available or unavailable, depending on whether some threshold is reached, via the blocks metadata.
-#. Rollups and other users can request stored pages or shards for an attested slot from any DAL node via the RPCs ``GET /slot/pages/<commitment>`` or ``GET /shards/<commitment>`` respectively. Only nodes that store enough shards to reconstruct the slot can provide the requested pages.
-
-Step 2 can be done in parallel with steps 3-4, but before step 5.
+#. Rollups and other users can request stored pages or shards for an attested slot from any DAL node via the RPCs ``GET /slot/levels/<level>/slots/<slot_index>/pages`` or ``GET /levels/<level>/slots/<slot_index>/shards/<shard_index>/content`` respectively. Only nodes that store enough shards to reconstruct the slot can provide the requested pages.

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2023, 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023, 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023-2024 PK Lab <contact@pklab.io>
@@ -7,18 +7,20 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
+use anyhow::anyhow;
+use mir::ast::ChainId;
 use primitive_types::{H160, U256};
+use revm::primitives::alloy_primitives::IntoLogData;
 use revm::primitives::hardfork::SpecId;
-use revm::primitives::{Address, Bytes, Log, B256};
+use revm::primitives::{Address, Bytes, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
-use revm_etherlink::inspectors::call_tracer::{
-    CallTrace, CallTracerConfig, CallTracerInput,
-};
-use revm_etherlink::inspectors::storage::store_call_trace;
+use revm_etherlink::inspectors::call_tracer::CallTracerInput;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
 use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
+use revm_etherlink::journal::commit_evm_journal_from_external;
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
+    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
 };
 use revm_etherlink::precompiles::send_outbox_message::{
     FastWithdrawalInterface, RouterInterface, Withdrawal,
@@ -27,28 +29,47 @@ use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::GasData;
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
-    ExecutionOutcome,
+    ExecutionOutcome, TransactionOrigin,
 };
-use tezos_ethereum::access_list::{AccessList, AccessListItem};
+use tezos_crypto_rs::hash::HashTrait;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::transaction::{
-    TransactionHash, TransactionType, TRANSACTION_HASH_SIZE,
+    TransactionHash, TransactionObject, TransactionType, TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::tx_common::{
     signed_authorization, AuthorizationList, EthereumTransactionCommon,
 };
-use tezos_ethereum::tx_signature::TxSignature;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_execution::context::Context;
+use tezos_execution::mir_ctx::BlockCtx;
+use tezos_execution::ProcessedOperation;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
+use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{Path, RefPath};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_tezlink::block::AppliedOperation;
+use tezos_tezlink::enc_wrappers::BlockNumber;
+use tezos_tezlink::operation_result::{
+    ApplyOperationErrors, ContentResult, OperationBatchWithMetadata,
+    OperationDataAndMetadata, OperationError, OperationResultSum,
+};
 use tezos_tracing::trace_kernel;
+use tezosx_interfaces::{Registry, RuntimeId};
+use tezosx_journal::{CracId, TezosXJournal};
+use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
-use crate::bridge::{execute_etherlink_deposit, Deposit, DepositResult};
-use crate::chains::EvmLimits;
+use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
+use crate::chains::{EvmLimits, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH};
 use crate::error::Error;
-use crate::fees::{tx_execution_gas_limit, FeeUpdates};
+use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
 use crate::transaction::{Transaction, TransactionContent};
+
+sol! {
+    /// Emitted once at the top of every EVM transaction receipt that
+    /// involves cross-runtime calls, whether incoming or outgoing.
+    /// Allows indexers to correlate operations across derived blocks.
+    event CracIdEvent(string cracId);
+}
 
 pub struct TransactionReceiptInfo {
     pub tx_hash: TransactionHash,
@@ -59,26 +80,6 @@ pub struct TransactionReceiptInfo {
     pub effective_gas_price: U256,
     pub type_: TransactionType,
     pub overall_gas_used: U256,
-}
-
-/// Details about the original transaction.
-///
-/// See <https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash>
-/// for more details.
-#[derive(Debug)]
-pub struct TransactionObjectInfo {
-    pub from: H160,
-    /// Gas provided by the sender
-    pub gas: U256,
-    /// Gas price provided by the sender
-    pub gas_price: U256,
-    pub hash: TransactionHash,
-    pub input: Vec<u8>,
-    pub nonce: u64,
-    pub to: Option<H160>,
-    pub index: u32,
-    pub value: U256,
-    pub signature: Option<TxSignature>,
 }
 
 #[inline(always)]
@@ -106,32 +107,52 @@ fn make_receipt_info(
 }
 
 #[inline(always)]
-fn make_object_info(
-    transaction: &Transaction,
+fn make_object(
+    block_number: U256,
+    transaction: Transaction,
     from: H160,
     index: u32,
     fee_updates: &FeeUpdates,
-) -> Result<TransactionObjectInfo, anyhow::Error> {
+) -> Result<TransactionObject, anyhow::Error> {
     let (gas, gas_price) = match &transaction.content {
         TransactionContent::Ethereum(e) | TransactionContent::EthereumDelayed(e) => {
             (e.gas_limit_with_fees().into(), e.max_fee_per_gas)
         }
         TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => {
+            // The gas and gas_price fields of the operation object
+            // represent the gas limit and max fee per gas of the
+            // input transaction; since deposits and FA deposits are
+            // crafted ex nihilo, we don't have a gas limit nor a max
+            // fee per gas in these cases. For lack of a better
+            // alternative, we put the used gas and the actual gas
+            // price instead.
+            (fee_updates.overall_gas_used, fee_updates.overall_gas_price)
+        }
+        TransactionContent::TezosDelayed(_) => {
+            // Gas and gas price are not yet part of the Michelson
+            // runtime cost model.
             (fee_updates.overall_gas_used, fee_updates.overall_gas_price)
         }
     };
 
-    Ok(TransactionObjectInfo {
+    let hash = transaction.tx_hash;
+    let nonce = transaction.nonce();
+    let to = transaction.to()?;
+    let value = transaction.value();
+    let signature = transaction.signature();
+
+    Ok(TransactionObject {
+        block_number,
         from,
         gas,
         gas_price,
-        hash: transaction.tx_hash,
+        hash,
         input: transaction.data(),
-        nonce: transaction.nonce(),
-        to: transaction.to()?,
+        nonce,
+        to,
         index,
-        value: transaction.value(),
-        signature: transaction.signature(),
+        value,
+        signature,
     })
 }
 
@@ -151,25 +172,28 @@ pub enum Validity {
 //       arguably, effective_gas_price should be set on EthereumTransactionCommon
 //       directly - initialised when constructed.
 #[instrument(skip_all)]
-fn is_valid_ethereum_transaction_common<Host: Runtime>(
+pub fn is_valid_ethereum_transaction_common<Host>(
     host: &mut Host,
     transaction: &EthereumTransactionCommon,
     block_constant: &BlockConstants,
     effective_gas_price: U256,
     is_delayed: bool,
     limits: &EvmLimits,
-) -> Result<Validity, Error> {
+) -> Result<Validity, Error>
+where
+    Host: StorageV1,
+{
     // Chain id is correct.
     if transaction.chain_id.is_some()
         && Some(block_constant.chain_id) != transaction.chain_id
     {
-        log!(host, Benchmarking, "Transaction status: ERROR_CHAINID");
+        log!(Benchmarking, "Transaction status: ERROR_CHAINID");
         return Ok(Validity::InvalidChainId);
     }
 
     // ensure that the user was willing to at least pay the base fee
     if transaction.max_fee_per_gas < block_constant.base_fee_per_gas() {
-        log!(host, Benchmarking, "Transaction status: ERROR_MAX_BASE_FEE");
+        log!(Benchmarking, "Transaction status: ERROR_MAX_BASE_FEE");
         return Ok(Validity::InvalidMaxBaseFee);
     }
 
@@ -177,7 +201,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     let caller = match transaction.caller() {
         Ok(caller) => caller,
         Err(_err) => {
-            log!(host, Benchmarking, "Transaction status: ERROR_SIGNATURE.");
+            log!(Benchmarking, "Transaction status: ERROR_SIGNATURE.");
             // Transaction with undefined caller are ignored, i.e. the caller
             // could not be derived from the signature.
             return Ok(Validity::InvalidSignature);
@@ -189,7 +213,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
 
     // The transaction nonce is valid.
     if info.nonce != transaction.nonce {
-        log!(host, Benchmarking, "Transaction status: ERROR_NONCE.");
+        log!(Benchmarking, "Transaction status: ERROR_NONCE.");
         return Ok(Validity::InvalidNonce);
     };
 
@@ -200,7 +224,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     let max_fee = total_gas_limit.saturating_mul(transaction.max_fee_per_gas);
 
     if info.balance < u256_to_alloy(&cost) || info.balance < u256_to_alloy(&max_fee) {
-        log!(host, Benchmarking, "Transaction status: ERROR_PRE_PAY.");
+        log!(Benchmarking, "Transaction status: ERROR_PRE_PAY.");
         return Ok(Validity::InvalidPrePay);
     }
 
@@ -211,7 +235,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         if !code.is_empty()
             && !code.original_byte_slice().starts_with(&[0xef, 0x01, 0x00])
         {
-            log!(host, Benchmarking, "Transaction status: ERROR_CODE.");
+            log!(Benchmarking, "Transaction status: ERROR_CODE.");
             return Ok(Validity::InvalidCode);
         }
     }
@@ -220,38 +244,318 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     let Ok(gas_limit) =
         tx_execution_gas_limit(transaction, &block_constant.block_fees, is_delayed)
     else {
-        log!(host, Benchmarking, "Transaction status: ERROR_GAS_FEE.");
+        log!(Benchmarking, "Transaction status: ERROR_GAS_FEE.");
         return Ok(Validity::InvalidNotEnoughGasForFees);
     };
     let capped_gas_limit = u64::min(gas_limit, limits.maximum_gas_limit);
     Ok(Validity::Valid(caller, capped_gas_limit))
 }
 
-pub struct TransactionResult {
-    caller: H160,
-    execution_outcome: ExecutionOutcome,
-    gas_used: U256,
-    estimated_ticks_used: u64,
+/// Result of executing an Ethereum transaction.
+pub struct EthereumTransactionResult {
+    pub caller: H160,
+    pub execution_outcome: ExecutionOutcome,
+    /// CRAC receipts for Michelson operations triggered during this EVM tx.
+    pub crac_receipts: Vec<AppliedOperation>,
+}
+
+/// Enum distinguishing between Ethereum and Tezos transaction results.
+pub enum RuntimeTransactionResult {
+    Ethereum(EthereumTransactionResult),
+    Tezos {
+        op: AppliedOperation,
+        etherlink_withdrawals: Vec<Withdrawal>,
+        cross_runtime_effects: Vec<CrossRuntimeEffect>,
+        /// Total milligas consumed by the batch (from gas tracker).
+        consumed_milligas: u64,
+    },
+}
+
+/// Extract cross-runtime side effects accumulated in the journal
+/// during a Michelson transaction that may have CRACed into EVM.
+pub fn extract_cross_runtime_effects(
+    journal: &mut TezosXJournal,
+    consumed_milligas: u64,
+) -> Vec<CrossRuntimeEffect> {
+    let mut effects = Vec::new();
+
+    if let Some(tx_info) = journal.evm.take_crac_data() {
+        let crac_id = journal.crac_id().to_string();
+
+        // Build a synthetic CracIdEvent log as the first log in the receipt.
+        let crac_id_log = revm::primitives::Log {
+            address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+            data: CracIdEvent {
+                cracId: crac_id.clone(),
+            }
+            .to_log_data(),
+        };
+
+        let mut logs = vec![crac_id_log];
+        logs.extend(journal.evm.inner.logs.iter().cloned());
+
+        effects.push(CrossRuntimeEffect::Evm(EvmCracEffect {
+            crac_id,
+            logs,
+            source: H160(*tx_info.source.0),
+            sender: H160(*tx_info.sender.0),
+            gas_limit: U256::from_little_endian(&tx_info.gas_limit.to_le_bytes::<32>()),
+            amount: U256::from_little_endian(&tx_info.amount.to_le_bytes::<32>()),
+            gas_used: U256::from(
+                tezosx_interfaces::gas::convert(
+                    RuntimeId::Tezos,
+                    RuntimeId::Ethereum,
+                    consumed_milligas,
+                )
+                .unwrap_or(0),
+            ),
+        }));
+    }
+
+    effects
+}
+
+/// Drain CRAC receipts from the journal, merging all CRACs from the same
+/// EVM transaction into a single manager operation.
+///
+/// Per RFC principle 6 ("CRAC-ID per top-level transaction"), all CRAC
+/// sub-calls within one EVM transaction share one CRAC-ID and therefore
+/// produce a single top-level Michelson operation with all internal
+/// transactions merged and one CRAC event (RFC Example 5).
+///
+/// Both successful and failed receipts must be merged: failed receipts
+/// alone (e.g. several `try { CRAC(); } catch {}` blocks all reverting on
+/// the Michelson side) are otherwise emitted as separate top-level
+/// operations, violating principle 6.
+///
+/// Receipts carry a monotonic sequence number assigned at push time
+/// (shared across the pending and failed lists), so sorting by that
+/// sequence recovers the original execution order regardless of which
+/// list each receipt landed in.  This matters when an EVM transaction
+/// interleaves the two kinds, e.g.
+/// `try { CRAC_1 } catch {}; CRAC_2; try { CRAC_3 } catch {}`:
+/// without the sort, a merged operation would expose internals in
+/// bucket order (failed first) rather than execution order, and
+/// `renumber_nonces` would then assign nonces to internals out of
+/// order as well.
+pub fn drain_pending_crac_receipts(journal: &mut TezosXJournal) -> Vec<AppliedOperation> {
+    // Tri-state captured before draining so the merged top-level
+    // status can be reconciled below.  `has_applied` reflects CRACs
+    // currently still Applied (pending list); `has_failed` reflects
+    // CRACs that hit a Michelson-side failure; receipts in the
+    // backtracked list contribute neither flag — they record what
+    // was attempted but rolled back via an EVM revert.
+    let has_applied = !journal.michelson.pending_crac_receipts.is_empty();
+    let has_failed = !journal.michelson.failed_crac_receipts.is_empty();
+
+    let mut all = std::mem::take(&mut journal.michelson.failed_crac_receipts);
+    all.extend(std::mem::take(
+        &mut journal.michelson.backtracked_crac_receipts,
+    ));
+    all.extend(std::mem::take(&mut journal.michelson.pending_crac_receipts));
+    all.sort_by_key(|(seq, _)| *seq);
+
+    let mut iter = all.into_iter().map(|(_, receipt)| receipt);
+    let Some(mut merged) = iter.next() else {
+        return Vec::new();
+    };
+    for other in iter {
+        merge_crac_internals(&mut merged, other);
+    }
+    // `merge_crac_internals` only touches internals — the top-level
+    // `ContentResult` is inherited from the first-executed receipt.
+    // Reconcile so the merged top-level reflects the EVM tx's overall
+    // CRAC outcome and respects the L1 invariant that internals under
+    // a Failed top-level must be Backtracked/Failed/Skipped:
+    //
+    //   has_applied                       → Applied (force).
+    //   else has_failed                   → Failed  (force, even if
+    //                                       first-by-seq was a
+    //                                       Backtracked-on-revert
+    //                                       receipt).
+    //   else (all entries Backtracked)    → keep the inherited
+    //                                       Backtracked top-level
+    //                                       (no-op).
+    if has_applied {
+        force_top_level_applied(&mut merged);
+    } else if has_failed {
+        force_top_level_failed(&mut merged);
+    }
+    vec![merged]
+}
+
+/// Overwrite the top-level `ContentResult` of a merged CRAC receipt with
+/// `Applied`, preserving the synthetic handler→alias transfer shape.
+/// Called after merging when at least one successful CRAC participated,
+/// to avoid the L1-invalid combination of `Applied` internals under a
+/// `Failed` parent.  Individual internals keep their own statuses.
+///
+/// The success shape is shared with `build_crac_receipt` via
+/// `tezosx_tezos_runtime::crac_top_level_applied_result` so the two
+/// producers cannot drift.
+fn force_top_level_applied(receipt: &mut AppliedOperation) {
+    let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+        receipt.op_and_receipt;
+    // A merged CRAC receipt is always a single-op batch (every CRAC
+    // receipt is built that way by `build_crac_receipt` /
+    // `build_failed_crac_receipt`, and merging only rewrites internals).
+    debug_assert_eq!(batch.operations.len(), 1);
+    if let Some(op) = batch.operations.first_mut() {
+        if let OperationResultSum::Transfer(ref mut result) = op.receipt {
+            if !matches!(result.result, ContentResult::Applied(_)) {
+                result.result = tezosx_tezos_runtime::crac_top_level_applied_result();
+            }
+        }
+    }
+}
+
+/// Overwrite the top-level `ContentResult` of a merged CRAC receipt
+/// with `Failed`.  Mirror of `force_top_level_applied` for the case
+/// where no currently-Applied CRAC contributed to the merge but at
+/// least one Michelson-side failure did and the seq-first receipt
+/// happens to be a Backtracked-on-revert one — without this, the
+/// inherited Backtracked top-level would understate the EVM tx's
+/// actual outcome (a CRAC failure surfaced).
+///
+/// The synthesized error vector is intentionally empty: indexers
+/// already see the original Failed sibling's errors on its body
+/// internals (which are merged in unchanged), so the top-level
+/// merely needs to advertise `status: failed`.
+fn force_top_level_failed(receipt: &mut AppliedOperation) {
+    let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+        receipt.op_and_receipt;
+    debug_assert_eq!(batch.operations.len(), 1);
+    if let Some(op) = batch.operations.first_mut() {
+        if let OperationResultSum::Transfer(ref mut result) = op.receipt {
+            if !matches!(result.result, ContentResult::Failed(_)) {
+                result.result =
+                    ContentResult::Failed(ApplyOperationErrors { errors: vec![] });
+            }
+        }
+    }
+}
+
+/// Assign block-sequential nonces to all internal operations across
+/// all applied operations, matching Tezos L1 semantics where nonces
+/// are shared across all operations in a block and never reset.
+///
+/// Called once at block finalization so that individual operations can
+/// use 0-based local nonces during execution.
+pub fn renumber_nonces(operations: &mut [AppliedOperation]) {
+    use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
+    let mut counter: u16 = 0;
+    for op in operations.iter_mut() {
+        let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+            op.op_and_receipt;
+        for op_with_meta in batch.operations.iter_mut() {
+            let internals = match &mut op_with_meta.receipt {
+                OperationResultSum::Transfer(ref mut result) => {
+                    &mut result.internal_operation_results
+                }
+                OperationResultSum::Origination(ref mut result) => {
+                    &mut result.internal_operation_results
+                }
+                OperationResultSum::Reveal(_) => continue,
+            };
+            for iop in internals.iter_mut() {
+                iop.set_nonce(counter);
+                counter = counter.saturating_add(1);
+            }
+        }
+    }
+}
+
+/// Merge `other`'s internal operations into `target`.
+/// The synthetic CRAC-ID event stays as the first internal operation
+/// in `target`.  Non-synthetic-event operations from `other` (regular
+/// transfers, originations, AND user `EMIT` events) are appended
+/// after `target`'s existing operations.  If `target` has no synthetic
+/// CRAC-ID event but `other` does, the event is prepended.  Duplicate
+/// synthetic CRAC-ID events from `other` are dropped — but user EMITs
+/// always pass through.
+/// Nonces are left as-is; renumber_nonces() fixes them at block finalization.
+fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) {
+    use tezos_execution::enshrined_contracts::is_synthetic_crac_event;
+    use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
+    // Partition `other`'s internals into non-synthetic-event and
+    // synthetic-event entries.  User EMITs (Event variants with a
+    // non-`crac` tag) join the non-synthetic bucket so they are
+    // appended after `target`'s existing operations rather than being
+    // mistakenly treated as duplicates of the synthetic CRAC-ID event.
+    let (other_non_synthetic, other_synthetic_events): (Vec<_>, Vec<_>) = match other
+        .op_and_receipt
+    {
+        OperationDataAndMetadata::OperationWithMetadata(batch) => batch
+            .operations
+            .into_iter()
+            .flat_map(|op| match op.receipt {
+                OperationResultSum::Transfer(result) => result.internal_operation_results,
+                _ => vec![],
+            })
+            .partition(|iop| !is_synthetic_crac_event(iop)),
+    };
+    // Append to `target`'s internal operations, before the CRAC event.
+    // CRAC receipts are built by build_crac_receipt which guarantees exactly
+    // one operation (a Transfer).  Assert this so violations are caught early.
+    let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+        target.op_and_receipt;
+    {
+        debug_assert!(
+            !batch.operations.is_empty(),
+            "CRAC receipt must have at least one operation"
+        );
+        if let Some(op) = batch.operations.first_mut() {
+            debug_assert!(
+                matches!(op.receipt, OperationResultSum::Transfer(_)),
+                "CRAC receipt operation must be a Transfer"
+            );
+            if let OperationResultSum::Transfer(ref mut result) = op.receipt {
+                let has_synthetic_event = result
+                    .internal_operation_results
+                    .iter()
+                    .any(is_synthetic_crac_event);
+                if !has_synthetic_event && !other_synthetic_events.is_empty() {
+                    // Target has no synthetic CRAC-ID event — prepend
+                    // other's first one, then re-append existing
+                    // operations.  Duplicate synthetic events past the
+                    // first one are dropped.
+                    let existing = std::mem::take(&mut result.internal_operation_results);
+                    result
+                        .internal_operation_results
+                        .extend(other_synthetic_events.into_iter().take(1));
+                    result.internal_operation_results.extend(existing);
+                }
+                // Append other's non-synthetic-event entries after
+                // existing operations, preserving execution order.
+                // User EMITs flow through here unchanged.
+                result
+                    .internal_operation_results
+                    .extend(other_non_synthetic);
+            }
+        }
+    }
 }
 
 /// Technically incorrect: it is possible to do a call without sending any data,
 /// however it's done for benchmarking only, and benchmarking doesn't include
 /// such a scenario
-fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8]) {
+fn log_transaction_type(to: Option<H160>, data: &[u8]) {
     if to.is_none() {
-        log!(host, Benchmarking, "Transaction type: CREATE");
+        log!(Benchmarking, "Transaction type: CREATE");
     } else if data.is_empty() {
-        log!(host, Benchmarking, "Transaction type: TRANSFER");
+        log!(Benchmarking, "Transaction type: TRANSFER");
     } else {
-        log!(host, Benchmarking, "Transaction type: CALL");
+        log!(Benchmarking, "Transaction type: CALL");
     }
 }
 
 #[trace_kernel]
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn revm_run_transaction<Host: Runtime>(
+pub fn revm_run_transaction<Host>(
     host: &mut Host,
+    registry: &impl Registry,
+    journal: &mut TezosXJournal,
     block_constants: &BlockConstants,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
     caller: H160,
@@ -261,12 +565,15 @@ pub fn revm_run_transaction<Host: Runtime>(
     gas_limit: u64,
     effective_gas_price: U256,
     maximum_gas_per_transaction: u64,
-    access_list: AccessList,
     authorization_list: Option<AuthorizationList>,
     spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
     is_simulation: bool,
-) -> Result<ExecutionOutcome, anyhow::Error> {
+    origin: revm_etherlink::TransactionOrigin,
+) -> Result<ExecutionOutcome, Error>
+where
+    Host: StorageV1,
+{
     // Disclaimer:
     // The following code is over-complicated because we maintain
     // two sets of primitives inside the kernel's codebase.
@@ -286,15 +593,16 @@ pub fn revm_run_transaction<Host: Runtime>(
     let effective_gas_price = u128::from_le_bytes(if effective_gas_price.bits() < 128 {
         effective_gas_price.low_u128().to_le_bytes()
     } else {
-        return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
+        return Err(Error::Overflow(
             "Given amount does not fit in a u128".to_string(),
-        ))
-        .into());
+        ));
     });
     let gas_data =
         GasData::new(gas_limit, effective_gas_price, maximum_gas_per_transaction);
     revm_etherlink::run_transaction(
         host,
+        registry,
+        journal,
         *spec_id,
         block_constants,
         transaction_hash,
@@ -303,25 +611,6 @@ pub fn revm_run_transaction<Host: Runtime>(
         Bytes::from(call_data),
         gas_data,
         revm::primitives::U256::from_le_slice(&bytes),
-        revm::context::transaction::AccessList::from(
-            access_list
-                .into_iter()
-                .map(
-                    |AccessListItem {
-                         address,
-                         storage_keys,
-                     }| {
-                        revm::context::transaction::AccessListItem {
-                            address: Address::from_slice(&address.0),
-                            storage_keys: storage_keys
-                                .into_iter()
-                                .map(|key| B256::from_slice(&key.0))
-                                .collect(),
-                        }
-                    },
-                )
-                .collect::<Vec<revm::context::transaction::AccessListItem>>(),
-        ),
         authorization_list.map(signed_authorization),
         tracer_input.map(|tracer_input| match tracer_input {
             TracerInput::CallTracer(CallTracerInput {
@@ -351,22 +640,18 @@ pub fn revm_run_transaction<Host: Runtime>(
                     transaction_hash: transaction_hash.map(|hash| B256::from(hash.0)),
                 },
             ),
-            TracerInput::NoOp => revm_etherlink::inspectors::TracerInput::NoOp,
         }),
         is_simulation,
+        origin,
     )
-    .map_err(|err| {
-        Error::InvalidRunTransaction(revm_etherlink::Error::Custom(format!(
-            "REVM error {err:?}"
-        )))
-        .into()
-    })
+    .map_err(Error::InvalidRunTransaction)
 }
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-fn apply_ethereum_transaction_common<Host: Runtime>(
+fn apply_ethereum_transaction_common<Host>(
     host: &mut Host,
+    registry: &impl Registry,
     block_constants: &BlockConstants,
     transaction: &EthereumTransactionCommon,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
@@ -374,7 +659,12 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
+    crac_id: CracId,
+    http_trace_enabled: bool,
+) -> Result<ExecutionResult<RuntimeTransactionResult>, anyhow::Error>
+where
+    Host: StorageV1,
+{
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
         host,
@@ -386,17 +676,56 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     )? {
         Validity::Valid(caller, gas_limit) => (caller, gas_limit),
         _reason => {
-            log!(host, Benchmarking, "Transaction type: INVALID");
+            log!(Benchmarking, "Transaction type: INVALID");
             return Ok(ExecutionResult::Invalid);
         }
     };
 
+    if !is_delayed {
+        // Deduct the DA fee before EVM execution, so that the caller cannot
+        // transfer it out during execution (which would make the post-execution
+        // fee settlement fail and revert the entire block).
+        //
+        // Safety: `is_valid_ethereum_transaction_common` (above) already
+        // verified that `balance >= gas_limit_with_fees * base_fee_per_gas`.
+        // Since `gas_for_fees = ceil(da_fee / minimum_base_fee_per_gas)` and
+        // `base_fee_per_gas >= minimum_base_fee_per_gas`, we have:
+        //   balance >= gas_limit_with_fees * base_fee_per_gas
+        //           >= gas_for_fees * base_fee_per_gas
+        //           >= gas_for_fees * minimum_base_fee_per_gas
+        //           >= da_fee
+        // Nothing modifies the caller's balance between the validation check
+        // and this point, so `sub_balance` cannot fail.
+        let cost = fees::da_fee(
+            block_constants.block_fees.da_fee_per_byte(),
+            &transaction.data,
+            &transaction.access_list,
+            transaction
+                .authorization_list
+                .as_ref()
+                .map_or(0, |al| al.len()),
+        );
+
+        let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
+
+        if let Err(e) = caller_account.sub_balance(host, u256_to_alloy(&cost)) {
+            return Err(anyhow::anyhow!(
+                "Failed to charge {caller} additional fees of {}: {}",
+                cost,
+                e
+            ));
+        }
+    }
+
     let to = transaction.to;
     let call_data = transaction.data.clone();
-    log_transaction_type(host, to, &call_data);
+    log_transaction_type(to, &call_data);
     let value = transaction.value;
-    let execution_outcome = match revm_run_transaction(
+    let mut journal = TezosXJournal::new(crac_id);
+    let run_result = revm_run_transaction(
         host,
+        registry,
+        &mut journal,
         block_constants,
         Some(transaction_hash),
         caller,
@@ -406,90 +735,127 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         gas_limit,
         effective_gas_price,
         limits.maximum_gas_limit,
-        transaction.access_list.clone(),
         transaction.authorization_list.clone(),
         spec_id,
         tracer_input,
         false,
-    ) {
-        Ok(outcome) => outcome,
-        Err(err) => {
-            return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
-                err.to_string(),
-            ))
-            .into());
-        }
-    };
+        TransactionOrigin::UserInput {
+            access_list: revm_etherlink::helpers::legacy::access_list_to_revm(
+                transaction.access_list.clone(),
+            ),
+        },
+    );
 
-    let gas_used = execution_outcome.result.gas_used().into();
+    // Capture HTTP traces before branching on the execution outcome so that
+    // partial traces from a transaction that failed mid-execution remain
+    // observable through the [http_trace*] RPCs. Matches the behavior of the
+    // other two journal sites (Tezos / TezosDelayed).
+    crate::storage::maybe_store_http_traces_for_tx(
+        host,
+        http_trace_enabled,
+        &transaction_hash,
+        &journal,
+    );
 
-    let transaction_result = TransactionResult {
-        caller,
-        execution_outcome,
-        gas_used,
-        estimated_ticks_used: 0,
-    };
+    let execution_outcome = run_result?;
+
+    // Drain any CRAC receipts produced by EVM→Michelson calls during
+    // this transaction so they can be included in the Michelson runtime block.
+    let crac_receipts = drain_pending_crac_receipts(&mut journal);
+
+    let transaction_result =
+        RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
+            caller,
+            execution_outcome,
+            crac_receipts,
+        });
 
     Ok(ExecutionResult::Valid(transaction_result))
 }
 
-fn trace_deposit<Host: Runtime>(
-    host: &mut Host,
-    amount: U256,
-    receiver: Option<H160>,
-    logs: &[Log],
-    tracer_input: Option<TracerInput>,
-) {
-    if let Some(TracerInput::CallTracer(CallTracerInput {
-        transaction_hash,
-        config: CallTracerConfig { with_logs, .. },
-    })) = tracer_input
-    {
-        let mut call_trace = CallTrace::new_minimal_trace(
-            "CALL".into(),
-            revm::primitives::Address::ZERO,
-            u256_to_alloy(&amount),
-            vec![],
-            0,
-        );
+sol! {
+    struct SolXTZDeposit {
+        address receiver;
+        uint256 inbox_level;
+        uint256 inbox_msg_id;
+    }
 
-        call_trace.add_to(receiver.map(|a| h160_to_alloy(&a)));
+    function handle_xtz_deposit(SolXTZDeposit memory deposit) external;
+}
 
-        if with_logs {
-            call_trace.add_logs(Some(logs.to_vec()));
+impl From<&Deposit> for SolXTZDeposit {
+    fn from(deposit: &Deposit) -> Self {
+        SolXTZDeposit {
+            receiver: h160_to_alloy(&deposit.receiver.to_h160().unwrap_or_default()),
+            inbox_level: u256_to_alloy(&U256::from(deposit.inbox_level)),
+            inbox_msg_id: u256_to_alloy(&U256::from(deposit.inbox_msg_id)),
         }
-
-        let _ = store_call_trace(host, &call_trace, &transaction_hash);
     }
 }
 
-fn apply_deposit<Host: Runtime>(
+#[allow(clippy::too_many_arguments)]
+pub fn pure_xtz_deposit<Host>(
     host: &mut Host,
+    registry: &impl Registry,
     deposit: &Deposit,
-    transaction: &Transaction,
+    block_constants: &BlockConstants,
+    transaction_hash: [u8; TRANSACTION_HASH_SIZE],
+    maximum_gas_limit: u64,
+    spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
-) -> Result<ExecutionResult<TransactionResult>, Error> {
-    let DepositResult {
-        outcome: execution_outcome,
-        estimated_ticks_used,
-    } = execute_etherlink_deposit(host, deposit).map_err(|e| {
-        Error::InvalidRunTransaction(revm_etherlink::Error::Custom(e.to_string()))
-    })?;
+) -> Result<ExecutionOutcome, Error>
+where
+    Host: StorageV1,
+{
+    // Fees are set to zero, this is an internal call to the XTZ bridge
+    // solidity contract.
+    // It isn't required for anyone to pay for the execution cost.
+    let block_constants = BlockConstants {
+        block_fees: BlockFees::new(U256::zero(), U256::zero(), U256::zero()),
+        ..*block_constants
+    };
 
-    trace_deposit(
+    let caller = alloy_to_h160(&FEED_DEPOSIT_ADDR);
+    let mut caller_account = StorageAccount::from_address(&FEED_DEPOSIT_ADDR)?;
+    let to = Some(alloy_to_h160(&XTZ_BRIDGE_SOL_ADDR));
+    let gas_limit = XTZ_DEPOSIT_EXECUTION_COST;
+    let value = deposit.amount;
+    // We prefund the feeder address for the xtz deposit.
+    caller_account.add_balance(host, u256_to_alloy(&value))?;
+    let call_data = handle_xtz_depositCall {
+        deposit: SolXTZDeposit::from(deposit),
+    }
+    .abi_encode();
+    let effective_gas_price = block_constants.base_fee_per_gas();
+    let mut journal = TezosXJournal::default();
+    match revm_run_transaction(
         host,
-        transaction.value(),
-        transaction.to()?,
-        execution_outcome.result.logs(),
+        registry,
+        &mut journal,
+        &block_constants,
+        Some(transaction_hash),
+        caller,
+        to,
+        value,
+        call_data,
+        gas_limit,
+        effective_gas_price,
+        maximum_gas_limit,
+        None,
+        spec_id,
         tracer_input,
-    );
-
-    Ok(ExecutionResult::Valid(TransactionResult {
-        caller: H160::zero(),
-        gas_used: execution_outcome.result.gas_used().into(),
-        estimated_ticks_used,
-        execution_outcome,
-    }))
+        false,
+        TransactionOrigin::UserInput {
+            access_list: revm::context::transaction::AccessList::default(),
+        },
+    ) {
+        Ok(execution_outcome) => Ok(execution_outcome),
+        Err(err) => {
+            // Something went wrong, we remove the added balance for the xtz deposit.
+            caller_account.sub_balance(host, u256_to_alloy(&value))?;
+            Err(err)
+        }
+    }
 }
 
 sol! {
@@ -544,16 +910,21 @@ impl From<&FaDeposit> for SolFaDepositWithoutProxy {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[trace_kernel]
-pub fn pure_fa_deposit<Host: Runtime>(
+pub fn pure_fa_deposit<Host>(
     host: &mut Host,
+    registry: &impl Registry,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     maximum_gas_limit: u64,
     spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
-) -> Result<ExecutionOutcome, Error> {
+) -> Result<ExecutionOutcome, Error>
+where
+    Host: StorageV1,
+{
     // Fees are set to zero, this is an internal call from the system address to the FA bridge solidity contract.
     // We do not require the system address to pay for the execution cost.
     let block_constants = BlockConstants {
@@ -578,8 +949,11 @@ pub fn pure_fa_deposit<Host: Runtime>(
         .abi_encode(),
     };
     let effective_gas_price = block_constants.base_fee_per_gas();
-    match revm_run_transaction(
+    let mut journal = TezosXJournal::default();
+    revm_run_transaction(
         host,
+        registry,
+        &mut journal,
         &block_constants,
         Some(transaction_hash),
         caller,
@@ -589,30 +963,33 @@ pub fn pure_fa_deposit<Host: Runtime>(
         gas_limit,
         effective_gas_price,
         maximum_gas_limit,
-        Vec::new(),
         None,
         spec_id,
         tracer_input,
         false,
-    ) {
-        Ok(outcome) => Ok(outcome),
-        Err(err) => Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
-            err.to_string(),
-        ))),
-    }
+        TransactionOrigin::UserInput {
+            access_list: revm::context::transaction::AccessList::default(),
+        },
+    )
 }
 
-fn apply_fa_deposit<Host: Runtime>(
+#[allow(clippy::too_many_arguments)]
+fn apply_fa_deposit<Host>(
     host: &mut Host,
+    registry: &impl Registry,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<TransactionResult>, Error> {
+) -> Result<ExecutionResult<RuntimeTransactionResult>, Error>
+where
+    Host: StorageV1,
+{
     let execution_outcome = pure_fa_deposit(
         host,
+        registry,
         fa_deposit,
         block_constants,
         transaction_hash,
@@ -621,16 +998,14 @@ fn apply_fa_deposit<Host: Runtime>(
         tracer_input,
     )?;
 
-    let gas_used = execution_outcome.result.gas_used().into();
-
-    let transaction_result = TransactionResult {
-        // A specific address is allocated for queue call
-        // System address can only be used as caller for simulations
-        caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
-        execution_outcome,
-        gas_used,
-        estimated_ticks_used: 0,
-    };
+    // A specific address is allocated for queue call
+    // System address can only be used as caller for simulations
+    let transaction_result =
+        RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
+            caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
+            execution_outcome,
+            crac_receipts: vec![],
+        });
 
     Ok(ExecutionResult::Valid(transaction_result))
 }
@@ -638,11 +1013,52 @@ fn apply_fa_deposit<Host: Runtime>(
 pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
     RefPath::assert_from(b"/evm/world_state/__outbox_queue");
 
-pub struct ExecutionInfo {
+/// Execution info for an Ethereum transaction.
+pub struct EthereumExecutionInfo {
     pub receipt_info: TransactionReceiptInfo,
-    pub object_info: TransactionObjectInfo,
-    pub estimated_ticks_used: u64,
-    pub execution_gas_used: U256,
+    pub tx_object: TransactionObject,
+    /// CRAC receipts for Michelson operations triggered during this EVM tx.
+    pub pending_crac_receipts: Vec<AppliedOperation>,
+}
+
+/// Side effect from a cross-runtime call that needs to be registered
+/// in the target runtime's derived block.
+pub enum CrossRuntimeEffect {
+    /// EVM logs accumulated from CRAC executions that need to appear
+    /// as a fake transaction in the EVM block.
+    Evm(EvmCracEffect),
+}
+
+/// Data needed to construct a fake EVM transaction from incoming CRACs.
+#[allow(dead_code)]
+pub struct EvmCracEffect {
+    /// CRAC-ID shared by all CRACs in this transaction.
+    pub crac_id: String,
+    /// Logs accumulated from all `serve()` calls.
+    pub logs: Vec<revm::primitives::Log>,
+    /// EVM address (alias) of the top-level sender (from X-Tezos-Source).
+    pub source: H160,
+    /// EVM address (alias) of the immediate caller (from X-Tezos-Sender).
+    pub sender: H160,
+    /// Gas limit forwarded to the call.
+    pub gas_limit: U256,
+    /// Value attached to the call (in wei).
+    pub amount: U256,
+    /// Cumulative gas used across all CRAC executions.
+    pub gas_used: U256,
+}
+
+/// Enum distinguishing between Ethereum and Tezos execution info.
+#[allow(clippy::large_enum_variant)]
+pub enum RuntimeExecutionInfo {
+    Ethereum(EthereumExecutionInfo),
+    Tezos {
+        op: AppliedOperation,
+        cross_runtime_effects: Vec<CrossRuntimeEffect>,
+        /// Total milligas consumed by the batch, computed from the gas
+        /// tracker (correct for all outcomes including Failed).
+        consumed_milligas: u64,
+    },
 }
 
 pub enum ExecutionResult<T> {
@@ -659,97 +1075,142 @@ impl<T> From<Option<T>> for ExecutionResult<T> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-#[instrument(skip_all)]
-pub fn handle_transaction_result<Host: Runtime>(
+pub fn push_withdrawals_to_outbox<Host>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_constants: &BlockConstants,
-    transaction: &Transaction,
-    index: u32,
-    transaction_result: TransactionResult,
-    pay_fees: bool,
-    sequencer_pool_address: Option<H160>,
-) -> Result<ExecutionInfo, anyhow::Error> {
-    let TransactionResult {
-        caller,
-        mut execution_outcome,
-        gas_used,
-        estimated_ticks_used: ticks_used,
-    } = transaction_result;
-
-    let to = transaction.to()?;
-
-    let fee_updates = transaction
-        .content
-        .fee_updates(&block_constants.block_fees, gas_used);
-
-    log!(
-        host,
-        Debug,
-        "Transaction executed, outcome: {:?}",
-        execution_outcome
-    );
-    log!(
-        host,
-        Benchmarking,
-        "gas_used: {:?}",
-        execution_outcome.result.gas_used()
-    );
-    log!(host, Benchmarking, "reason: {:?}", execution_outcome.result);
-    for message in execution_outcome.withdrawals.drain(..) {
+    withdrawals: Vec<Withdrawal>,
+) -> Result<(), anyhow::Error>
+where
+    Host: StorageV1,
+{
+    for message in withdrawals {
         match message {
             Withdrawal::Standard(message) => {
                 let outbox_message: OutboxMessage<RouterInterface> = message;
                 let len = outbox_queue.queue_message(host, outbox_message)?;
-                log!(host, Debug, "Length of the outbox queue: {}", len);
+                log!(Debug, "Length of the outbox queue: {}", len);
             }
             Withdrawal::Fast(message) => {
                 let outbox_message: OutboxMessage<FastWithdrawalInterface> = message;
                 let len = outbox_queue.queue_message(host, outbox_message)?;
-                log!(host, Debug, "Length of the outbox queue: {}", len);
+                log!(Debug, "Length of the outbox queue: {}", len);
             }
         }
     }
-
-    if pay_fees {
-        fee_updates.apply(host, caller, sequencer_pool_address)?;
-    }
-
-    let object_info = make_object_info(transaction, caller, index, &fee_updates)?;
-
-    let receipt_info = make_receipt_info(
-        transaction.tx_hash,
-        index,
-        execution_outcome,
-        caller,
-        to,
-        fee_updates.overall_gas_price,
-        transaction.type_(),
-        fee_updates.overall_gas_used,
-    );
-
-    Ok(ExecutionInfo {
-        receipt_info,
-        object_info,
-        estimated_ticks_used: ticks_used,
-        execution_gas_used: gas_used,
-    })
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn apply_transaction<Host: Runtime>(
+pub fn handle_transaction_result<Host>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
-    transaction: &Transaction,
+    transaction: Transaction,
+    index: u32,
+    transaction_result: RuntimeTransactionResult,
+    pay_fees: bool,
+    sequencer_pool_address: Option<H160>,
+) -> Result<RuntimeExecutionInfo, anyhow::Error>
+where
+    Host: StorageV1,
+{
+    match transaction_result {
+        RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
+            caller,
+            mut execution_outcome,
+            crac_receipts,
+        }) => {
+            let to = transaction.to()?;
+
+            let tx_hash = transaction.tx_hash;
+            let tx_type = transaction.type_();
+            let gas_used = execution_outcome.result.gas_used();
+
+            let fee_updates = transaction
+                .content
+                .fee_updates(&block_constants.block_fees, gas_used.into());
+
+            log!(
+                Debug,
+                "Transaction executed, outcome: {:?}",
+                execution_outcome
+            );
+            log!(Benchmarking, "gas_used: {:?}", gas_used);
+            log!(Benchmarking, "reason: {:?}", execution_outcome.result);
+
+            let withdrawals = std::mem::take(&mut execution_outcome.withdrawals);
+            push_withdrawals_to_outbox(host, outbox_queue, withdrawals)?;
+
+            if pay_fees {
+                fee_updates.apply(host, caller, sequencer_pool_address)?;
+            }
+
+            let tx_object = make_object(
+                block_constants.number,
+                transaction,
+                caller,
+                index,
+                &fee_updates,
+            )?;
+
+            let receipt_info = make_receipt_info(
+                tx_hash,
+                index,
+                execution_outcome,
+                caller,
+                to,
+                fee_updates.overall_gas_price,
+                tx_type,
+                fee_updates.overall_gas_used,
+            );
+
+            Ok(RuntimeExecutionInfo::Ethereum(EthereumExecutionInfo {
+                receipt_info,
+                tx_object,
+                pending_crac_receipts: crac_receipts,
+            }))
+        }
+        RuntimeTransactionResult::Tezos {
+            op,
+            etherlink_withdrawals,
+            cross_runtime_effects,
+            consumed_milligas,
+        } => {
+            push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
+            Ok(RuntimeExecutionInfo::Tezos {
+                op,
+                cross_runtime_effects,
+                consumed_milligas,
+            })
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+#[instrument(skip_all)]
+pub fn apply_transaction<Host>(
+    host: &mut Host,
+    registry: &impl Registry,
+    outbox_queue: &OutboxQueue<'_, impl Path>,
+    block_constants: &BlockConstants,
+    transaction: Transaction,
+    crac_id: CracId,
     index: u32,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
+    http_trace_enabled: bool,
+    // SafeStorage roots to snapshot around a [TezosDelayed] operation.
+    // Mirrors [TezlinkBlockConstants::safe_roots]; threaded in from the
+    // caller because [BlockConstants] is EVM-flavored and doesn't carry
+    // Tezos-side storage boundaries.
+    tezos_safe_roots: &[tezos_smart_rollup_host::path::OwnedPath],
+) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
+where
+    Host: StorageV1,
+{
     let tracer_input = get_tracer_configuration(
         revm::primitives::B256::from_slice(&transaction.tx_hash),
         tracer_input,
@@ -757,6 +1218,7 @@ pub fn apply_transaction<Host: Runtime>(
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
+            registry,
             block_constants,
             tx,
             transaction.tx_hash,
@@ -764,9 +1226,12 @@ pub fn apply_transaction<Host: Runtime>(
             tracer_input,
             spec_id,
             limits,
+            crac_id,
+            http_trace_enabled,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
+            registry,
             block_constants,
             tx,
             transaction.tx_hash,
@@ -774,15 +1239,27 @@ pub fn apply_transaction<Host: Runtime>(
             tracer_input,
             spec_id,
             limits,
+            crac_id,
+            http_trace_enabled,
         )?,
         TransactionContent::Deposit(deposit) => {
-            log!(host, Benchmarking, "Transaction type: DEPOSIT");
-            apply_deposit(host, deposit, transaction, tracer_input)?
+            log!(Benchmarking, "Transaction type: DEPOSIT");
+            apply_tezosx_xtz_deposit(
+                host,
+                registry,
+                deposit,
+                block_constants,
+                transaction.tx_hash,
+                tracer_input,
+                spec_id,
+                limits,
+            )?
         }
         TransactionContent::FaDeposit(fa_deposit) => {
-            log!(host, Benchmarking, "Transaction type: FA_DEPOSIT");
+            log!(Benchmarking, "Transaction type: FA_DEPOSIT");
             apply_fa_deposit(
                 host,
+                registry,
                 fa_deposit,
                 block_constants,
                 transaction.tx_hash,
@@ -790,6 +1267,123 @@ pub fn apply_transaction<Host: Runtime>(
                 spec_id,
                 limits,
             )?
+        }
+        TransactionContent::TezosDelayed(op) => {
+            // TODO: If we need to use storage root of tezlink pass it as parameter.
+            let context =
+                TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
+            let skip_signature_check = false;
+            let i128_timestamp: i128 = block_constants
+                .timestamp
+                .try_into()
+                .map_err(|e| anyhow!("Failed to convert timestamp: {e}"))?;
+            let i64_timestamp: i64 = i128_timestamp
+                .try_into()
+                .map_err(|e| anyhow!("Failed to convert timestamp to i64: {e}"))?;
+            let mut chain_id_bytes = vec![0u8; 32];
+            block_constants
+                .chain_id
+                .to_little_endian(&mut chain_id_bytes);
+            let op_hash = op.hash()?;
+            // Delayed operations already paid L1 fees through the delayed inbox,
+            // so DA fee check is not applicable.
+            let mut tezosx_journal = TezosXJournal::new(crac_id);
+            let validation_result = tezos_execution::validate_and_apply_operation(
+                host,
+                registry,
+                &mut tezosx_journal,
+                &context,
+                op_hash.clone(),
+                // TODO: !20198 avoid this clone.
+                op.clone(),
+                &BlockCtx {
+                    level: &BlockNumber {
+                        block_number: block_constants
+                            .number
+                            .try_into()
+                            .map_err(|e| anyhow!("{e}"))?,
+                    },
+                    now: &Timestamp::from(i64_timestamp),
+                    // SAFETY: chain_id_bytes is defined as 32 bytes long.
+                    chain_id: &ChainId::try_from_bytes(&chain_id_bytes[..4])?,
+                },
+                skip_signature_check,
+                None,
+                None, // No fee refund for delayed inbox operations
+                tezos_safe_roots,
+            );
+
+            // Persist HTTP traces collected in [tezosx_journal] regardless of
+            // the validation outcome so that operations that failed
+            // mid-execution still expose their captured CRAC exchanges.
+            // Matches the Tezos / Ethereum apply sites.
+            crate::storage::maybe_store_http_traces_for_tx(
+                host,
+                http_trace_enabled,
+                &transaction.tx_hash,
+                &tezosx_journal,
+            );
+
+            match validation_result {
+                Ok(processed_operations) => {
+                    log!(
+                        Debug,
+                        "Delayed Tezos operation status: SUCCESS - {:?}",
+                        processed_operations
+                    );
+                    let consumed_milligas = ProcessedOperation::total_consumed_milligas(
+                        &processed_operations,
+                    );
+                    let operations =
+                        ProcessedOperation::into_receipts(processed_operations);
+                    let operation_and_receipt = AppliedOperation {
+                        hash: op_hash,
+                        branch: op.branch.clone(),
+                        op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                            OperationBatchWithMetadata {
+                                operations,
+                                signature: op.signature.clone(),
+                            },
+                        ),
+                    };
+                    // Extract cross-runtime side effects accumulated
+                    // during the Michelson execution (e.g. CRAC into EVM)
+                    // BEFORE the commit: `commit_evm_journal_from_external`
+                    // runs `JournalInner::finalize()` which clears
+                    // `inner.logs` as part of revm's standard cleanup, so
+                    // reading them after gives an empty buffer.
+                    let cross_runtime_effects = extract_cross_runtime_effects(
+                        &mut tezosx_journal,
+                        consumed_milligas,
+                    );
+                    let etherlink_withdrawals = commit_evm_journal_from_external(
+                        host,
+                        registry,
+                        block_constants,
+                        &mut tezosx_journal,
+                    )?;
+                    Ok::<_, anyhow::Error>(ExecutionResult::Valid(
+                        RuntimeTransactionResult::Tezos {
+                            op: operation_and_receipt,
+                            etherlink_withdrawals,
+                            cross_runtime_effects,
+                            consumed_milligas,
+                        },
+                    ))
+                }
+                Err(OperationError::Validation(err)) => {
+                    log!(Info, "Delayed Tezos operation status: ERROR - {:?}", err);
+                    Ok::<_, anyhow::Error>(ExecutionResult::Invalid)
+                }
+                Err(OperationError::RuntimeError(err)) => {
+                    log!(Info, "Delayed Tezos operation runtime error: {:?}", err);
+                    return Err(err.into());
+                }
+                Err(OperationError::BlockAbort(msg)) => {
+                    log!(Error, "CRAC block abort: {msg}");
+                    return Err(anyhow::anyhow!("CRAC block abort: {msg}"));
+                }
+            }?
         }
     };
 
@@ -895,6 +1489,7 @@ mod tests {
             block_constants.block_fees.minimum_base_fee_per_gas(),
             vec![].as_slice(),
             vec![].as_slice(),
+            0,
         )
         .expect("should have been able to calculate fees")
     }
@@ -1137,6 +1732,397 @@ mod tests {
                 Validity::Valid(_, _)
             ),
             "Transaction should have been accepted through delayed inbox"
+        );
+    }
+
+    /// Build a dummy CRAC receipt with the given internal operations.
+    fn dummy_crac_receipt(
+        internals: Vec<tezos_tezlink::operation_result::InternalOperationSum>,
+    ) -> tezos_tezlink::block::AppliedOperation {
+        use tezos_crypto_rs::hash::{BlockHash, OperationHash, UnknownSignature};
+        use tezos_data_encoding::types::Narith;
+        use tezos_tezlink::operation::{
+            ManagerOperation, ManagerOperationContent, Parameters, TransferContent,
+        };
+        use tezos_tezlink::operation_result::{
+            ContentResult, OperationBatchWithMetadata, OperationDataAndMetadata,
+            OperationResult, OperationResultSum, OperationWithMetadata, TransferSuccess,
+            TransferTarget,
+        };
+        let signature = UnknownSignature::try_from([0u8; 64].as_slice()).unwrap();
+        let source = tezos_smart_rollup::types::PublicKeyHash::from_b58check(
+            "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU",
+        )
+        .unwrap();
+        let destination = tezos_protocol::contract::Contract::Originated(
+            tezos_crypto_rs::hash::ContractKt1Hash::from_base58_check(
+                "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+            )
+            .unwrap(),
+        );
+        tezos_tezlink::block::AppliedOperation {
+            hash: OperationHash::default(),
+            branch: BlockHash::default(),
+            op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                OperationBatchWithMetadata {
+                    operations: vec![OperationWithMetadata {
+                        content: ManagerOperationContent::Transaction(ManagerOperation {
+                            source,
+                            fee: Narith(0u64.into()),
+                            counter: Narith(0u64.into()),
+                            gas_limit: Narith(0u64.into()),
+                            storage_limit: Narith(0u64.into()),
+                            operation: TransferContent {
+                                amount: Narith(0u64.into()),
+                                destination,
+                                parameters: Parameters {
+                                    entrypoint: mir::ast::Entrypoint::default(),
+                                    value: vec![],
+                                },
+                            },
+                        }),
+                        receipt: OperationResultSum::Transfer(OperationResult {
+                            balance_updates: vec![],
+                            result: ContentResult::Applied(TransferTarget::from(
+                                TransferSuccess::default(),
+                            )),
+                            internal_operation_results: internals,
+                        }),
+                    }],
+                    signature,
+                },
+            ),
+        }
+    }
+
+    fn make_transfer(
+        nonce: u16,
+        amount: u64,
+    ) -> tezos_tezlink::operation_result::InternalOperationSum {
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+        use tezos_data_encoding::types::Narith;
+        use tezos_tezlink::operation::{Parameters, TransferContent};
+        use tezos_tezlink::operation_result::{
+            ContentResult, InternalContentWithMetadata, InternalOperationSum,
+            TransferSuccess, TransferTarget,
+        };
+        InternalOperationSum::Transfer(InternalContentWithMetadata {
+            sender: tezos_protocol::contract::Contract::Originated(
+                ContractKt1Hash::from_base58_check(
+                    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                )
+                .unwrap(),
+            ),
+            nonce,
+            content: TransferContent {
+                amount: Narith(amount.into()),
+                destination: tezos_protocol::contract::Contract::Originated(
+                    ContractKt1Hash::from_base58_check(
+                        "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                    )
+                    .unwrap(),
+                ),
+                parameters: Parameters {
+                    entrypoint: mir::ast::Entrypoint::default(),
+                    value: vec![],
+                },
+            },
+            result: ContentResult::Applied(TransferTarget::from(
+                TransferSuccess::default(),
+            )),
+        })
+    }
+
+    fn make_crac_event(
+        nonce: u16,
+    ) -> tezos_tezlink::operation_result::InternalOperationSum {
+        use tezos_data_encoding::types::Narith;
+        use tezos_execution::NULL_PKH;
+        use tezos_tezlink::operation_result::{
+            ContentResult, EventContent, EventSuccess, InternalContentWithMetadata,
+            InternalOperationSum, MichelineExpr,
+        };
+        InternalOperationSum::Event(InternalContentWithMetadata {
+            sender: tezos_protocol::contract::Contract::Implicit(
+                tezos_smart_rollup::types::PublicKeyHash::from_b58check(NULL_PKH)
+                    .unwrap(),
+            ),
+            nonce,
+            content: EventContent {
+                tag: Some(mir::ast::Entrypoint::from_string_unchecked(
+                    tezos_execution::enshrined_contracts::SYNTHETIC_CRAC_EVENT_TAG.into(),
+                )),
+                payload: Some(MichelineExpr(vec![
+                    0x01, 0x00, 0x00, 0x00, 0x03, 0x31, 0x2d, 0x30,
+                ])),
+                ty: MichelineExpr(vec![0x03, 0x68]),
+            },
+            result: ContentResult::Applied(EventSuccess {
+                consumed_milligas: Narith(0u64.into()),
+            }),
+        })
+    }
+
+    fn extract_nonces(receipt: &tezos_tezlink::block::AppliedOperation) -> Vec<u16> {
+        use tezos_tezlink::operation_result::{
+            InternalOperationSum, OperationDataAndMetadata, OperationResultSum,
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            receipt.op_and_receipt;
+        let Some(op) = batch.operations.first() else {
+            return vec![];
+        };
+        let OperationResultSum::Transfer(ref result) = op.receipt else {
+            return vec![];
+        };
+        result
+            .internal_operation_results
+            .iter()
+            .map(|iop| match iop {
+                InternalOperationSum::Transfer(m) => m.nonce,
+                InternalOperationSum::Origination(m) => m.nonce,
+                InternalOperationSum::Event(m) => m.nonce,
+            })
+            .collect()
+    }
+
+    fn extract_amounts(receipt: &tezos_tezlink::block::AppliedOperation) -> Vec<u64> {
+        use tezos_tezlink::operation_result::{
+            InternalOperationSum, OperationDataAndMetadata, OperationResultSum,
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            receipt.op_and_receipt;
+        let Some(op) = batch.operations.first() else {
+            return vec![];
+        };
+        let OperationResultSum::Transfer(ref result) = op.receipt else {
+            return vec![];
+        };
+        result
+            .internal_operation_results
+            .iter()
+            .filter_map(|iop| match iop {
+                InternalOperationSum::Transfer(m) => {
+                    Some(m.content.amount.0.clone().try_into().unwrap())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Mutate a dummy CRAC receipt to carry a `Failed` top-level, matching
+    /// what `build_failed_crac_receipt` produces in production.
+    fn make_top_level_failed(receipt: &mut tezos_tezlink::block::AppliedOperation) {
+        use tezos_tezlink::operation_result::{
+            ApplyOperationError, ApplyOperationErrors, ContentResult,
+            OperationDataAndMetadata, OperationResultSum, TransferError,
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+            receipt.op_and_receipt;
+        for op in batch.operations.iter_mut() {
+            if let OperationResultSum::Transfer(ref mut result) = op.receipt {
+                result.result = ContentResult::Failed(ApplyOperationErrors::from(
+                    ApplyOperationError::Transfer(
+                        TransferError::NonSmartContractExecutionCall,
+                    ),
+                ));
+            }
+        }
+    }
+
+    fn top_level_is_applied(receipt: &tezos_tezlink::block::AppliedOperation) -> bool {
+        use tezos_tezlink::operation_result::{
+            ContentResult, OperationDataAndMetadata, OperationResultSum,
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            receipt.op_and_receipt;
+        batch.operations.first().is_some_and(|op| {
+            matches!(op.receipt, OperationResultSum::Transfer(ref r) if matches!(r.result, ContentResult::Applied(_)))
+        })
+    }
+
+    /// Multiple failed CRACs from the same EVM transaction must merge into
+    /// a single top-level Michelson operation, per RFC principle 6
+    /// ("CRAC-ID per top-level transaction"). Currently
+    /// `drain_pending_crac_receipts` only merges successful receipts and
+    /// passes failed receipts through as-is, producing N separate ops.
+    #[test]
+    fn test_drain_merges_multiple_failed_receipts() {
+        use tezosx_journal::{CracId, TezosXJournal};
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        journal
+            .michelson
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![
+                make_crac_event(0),
+                make_transfer(1, 100),
+            ]));
+        journal
+            .michelson
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![make_transfer(2, 200)]));
+        journal
+            .michelson
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![make_transfer(3, 300)]));
+
+        let result = super::drain_pending_crac_receipts(&mut journal);
+
+        assert_eq!(
+            result.len(),
+            1,
+            "RFC principle 6: failed receipts from same EVM tx must be merged \
+             into a single top-level Michelson operation"
+        );
+        assert_eq!(
+            extract_amounts(&result[0]),
+            vec![100, 200, 300],
+            "all transfers preserved in execution order"
+        );
+        assert_eq!(
+            extract_nonces(&result[0]),
+            vec![0, 1, 2, 3],
+            "single CRAC event at the front, then transfers"
+        );
+    }
+
+    /// When a merge contains at least one successful CRAC, the top-level
+    /// `ContentResult` must be `Applied`.  Leaving it as `Failed`
+    /// (inherited from the first-executed receipt) would produce the
+    /// L1-invalid combination of `Applied` internals under a `Failed`
+    /// parent.
+    #[test]
+    fn test_drain_mixed_forces_applied_top_level() {
+        use tezosx_journal::{CracId, TezosXJournal};
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        // First-executed CRAC fails (top=Failed in the source receipt),
+        // second one succeeds.
+        let mut failed = dummy_crac_receipt(vec![make_transfer(0, 100)]);
+        make_top_level_failed(&mut failed);
+        journal.michelson.push_failed_crac_receipt(failed);
+        journal
+            .michelson
+            .push_pending_crac_receipt(dummy_crac_receipt(vec![make_transfer(1, 200)]));
+
+        let result = super::drain_pending_crac_receipts(&mut journal);
+        assert_eq!(result.len(), 1);
+        assert!(
+            top_level_is_applied(&result[0]),
+            "mixed failed+pending merge must expose an Applied top-level to \
+             avoid Applied-internals-under-Failed-parent"
+        );
+    }
+
+    /// All-failed merges keep their `Failed` top-level (RFC Example 4) —
+    /// the forcing only triggers when at least one CRAC succeeded.
+    #[test]
+    fn test_drain_all_failed_keeps_failed_top_level() {
+        use tezosx_journal::{CracId, TezosXJournal};
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut r1 = dummy_crac_receipt(vec![make_transfer(0, 100)]);
+        make_top_level_failed(&mut r1);
+        let mut r2 = dummy_crac_receipt(vec![make_transfer(1, 200)]);
+        make_top_level_failed(&mut r2);
+        journal.michelson.push_failed_crac_receipt(r1);
+        journal.michelson.push_failed_crac_receipt(r2);
+
+        let result = super::drain_pending_crac_receipts(&mut journal);
+        assert_eq!(result.len(), 1);
+        assert!(
+            !top_level_is_applied(&result[0]),
+            "all-failed merge must keep Failed top-level"
+        );
+    }
+
+    /// When failed and successful CRAC receipts are interleaved within
+    /// one EVM transaction, the merged internal operations must reflect
+    /// execution order — not all-failed-before-all-pending.
+    ///
+    /// Simulates: `try { CRAC_1 } catch {}; CRAC_2; try { CRAC_3 } catch {}`
+    /// where CRAC_1 and CRAC_3 fail, CRAC_2 succeeds.
+    #[test]
+    fn test_drain_preserves_interleaved_execution_order() {
+        use tezosx_journal::{CracId, TezosXJournal};
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        // Execution order: failed(100), pending(200), failed(300)
+        journal
+            .michelson
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![
+                make_crac_event(0),
+                make_transfer(1, 100),
+            ]));
+        journal
+            .michelson
+            .push_pending_crac_receipt(dummy_crac_receipt(vec![make_transfer(2, 200)]));
+        journal
+            .michelson
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![make_transfer(3, 300)]));
+
+        let result = super::drain_pending_crac_receipts(&mut journal);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            extract_amounts(&result[0]),
+            vec![100, 200, 300],
+            "internal transfers must appear in execution order, not \
+             all-failed-before-all-pending"
+        );
+    }
+
+    /// Merging two CRAC receipts preserves block-global nonces.
+    ///
+    /// Receipt 1: [Event("crac", nonce=0), Transfer(M_1, nonce=1, amount=100)]
+    /// Receipt 2: [Event("crac", nonce=2), Transfer(M_2, nonce=3, amount=200)]
+    /// Expected:  [Event("crac", nonce=0), Transfer(M_1, nonce=1), Transfer(M_2, nonce=3)]
+    ///
+    /// The duplicate event (nonce=2) is dropped.  Nonces are block-global
+    /// (assigned at creation time, matching L1 semantics) so no renumbering.
+    #[test]
+    fn test_merge_crac_internals_preserves_nonces() {
+        let receipt_1 =
+            dummy_crac_receipt(vec![make_crac_event(0), make_transfer(1, 100)]);
+        let receipt_2 =
+            dummy_crac_receipt(vec![make_crac_event(2), make_transfer(3, 200)]);
+
+        let mut receipts = vec![receipt_1, receipt_2];
+        let rest = receipts.split_off(1);
+        let target = &mut receipts[0];
+        for other in rest {
+            super::merge_crac_internals(target, other);
+        }
+
+        // Nonces are preserved from creation time (block-global counter).
+        // Event nonce=2 from receipt_2 is dropped (duplicate), so: 0, 1, 3.
+        assert_eq!(
+            extract_nonces(target),
+            vec![0, 1, 3],
+            "nonces must be preserved from creation time"
+        );
+
+        // Transfer ordering: M_1 (100), then M_2 (200)
+        assert_eq!(
+            extract_amounts(target),
+            vec![100, 200],
+            "transfers must be in receipt order"
+        );
+
+        // First op is the single CRAC event (duplicate filtered)
+        use tezos_tezlink::operation_result::{
+            InternalOperationSum, OperationDataAndMetadata, OperationResultSum,
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            target.op_and_receipt;
+        let OperationResultSum::Transfer(ref result) = batch.operations[0].receipt else {
+            panic!("expected Transfer receipt");
+        };
+        assert_eq!(
+            result.internal_operation_results.len(),
+            3,
+            "1 event + 2 transfers"
+        );
+        assert!(
+            matches!(
+                result.internal_operation_results[0],
+                InternalOperationSum::Event(_)
+            ),
+            "first internal op must be the CRAC event"
         );
     }
 }

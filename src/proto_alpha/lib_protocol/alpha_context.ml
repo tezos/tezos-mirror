@@ -57,6 +57,14 @@ module Sc_rollup = struct
   module Tick = Sc_rollup_tick_repr
   include Sc_rollup_repr
 
+  module Internal_for_tests = struct
+    include Internal_for_tests
+
+    let is_signal_enable = Sc_rollup_storage.is_signal_enable
+
+    let signals = Sc_rollup_storage.signals
+  end
+
   module Whitelist = struct
     include Sc_rollup_whitelist_storage
     include Sc_rollup_whitelist_repr
@@ -97,12 +105,13 @@ module Sc_rollup = struct
         ~protocol_migration_message:
           Inbox_message.protocol_migration_serialized_message
 
-    let add_all_messages ~first_block =
+    let add_all_messages ~first_block ~dal_attested_slots_messages =
       add_all_messages
         ~protocol_migration_message:
           (if first_block then
              Some Inbox_message.protocol_migration_internal_message
            else None)
+        ~dal_attested_slots_messages
 
     module Internal_for_tests = struct
       include Sc_rollup_inbox_repr.Internal_for_tests
@@ -141,11 +150,13 @@ module Dal = struct
     include Dal_slot_index_repr
   end
 
-  module Attestation = struct
-    include Dal_attestation_repr.Accountability
-    include Dal_attestation_repr
-    include Raw_context.Dal
+  module Attestations = struct
+    include Dal_attestations_repr.Accountability
+    include Dal_attestations_repr
+    include Dal_attestations_storage
   end
+
+  module Slot_availability = Dal_attestations_repr.Slot_availability
 
   type slot_id = Dal_slot_repr.Header.id = {
     published_level : Raw_level_repr.t;
@@ -159,7 +170,6 @@ module Dal = struct
   module Slot = struct
     include Dal_slot_repr
     include Dal_slot_storage
-    include Raw_context.Dal
   end
 
   module Operations = struct
@@ -219,16 +229,14 @@ module Operation = struct
 
   include Operation_repr
 
-  let check_signature (type kind) ctxt (key : Signature.Public_key.t) chain_id
+  let check_signature (type kind) _ctxt (key : Signature.Public_key.t) chain_id
       (op : kind operation) =
     let encoding =
-      if Constants.aggregate_attestation ctxt then
-        (* Operations signed by BLS keys use a dedicated serialization encoding,
-           which differs only for attestations and preattestations. *)
-        match key with
-        | Bls _ -> bls_mode_unsigned_encoding
-        | _ -> unsigned_encoding
-      else unsigned_encoding
+      (* Operations signed by BLS keys use a dedicated serialization encoding,
+         which differs only for attestations and preattestations. *)
+      match key with
+      | Bls _ -> bls_mode_unsigned_encoding
+      | _ -> unsigned_encoding
     in
     check_signature encoding key chain_id op
 end
@@ -374,29 +382,18 @@ module Script = struct
     storage : lazy_expr;
   }
 
-  type t = Contract_repr.originated_kind =
+  type implementation = Contract_kind_repr.implementation_kind =
+    | Script_code of lazy_expr
+    | Native_kind of native_kind
+
+  type t = Contract_kind_repr.originated_kind =
     | Script of michelson_with_storage
     | Native of native_with_storage
 
-  let michelson_with_storage_encoding = Script_repr.encoding
+  let michelson_with_storage_encoding =
+    Contract_kind_repr.michelson_with_storage_encoding
 
-  let encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          ~title:"michelson"
-          (Tag 0)
-          michelson_with_storage_encoding
-          (function Script m -> Some m | Native _ -> None)
-          (fun m -> Script m);
-        case
-          ~title:"native"
-          (Tag 1)
-          Script_native_repr.with_storage_encoding
-          (function Native n -> Some n | Script _ -> None)
-          (fun n -> Native n);
-      ]
+  let encoding = Contract_kind_repr.encoding
 
   type consume_deserialization_gas = Always | When_needed
 
@@ -469,6 +466,9 @@ module Contract = struct
 
   let get_delegate_status = Contract_delegate_storage.get_delegate_status
 
+  let get_clst_contract_hash ctxt =
+    Storage.Contract.Native_contracts.CLST.get ctxt
+
   module For_RPC = struct
     include Contract_storage.For_RPC
     include Delegate_slashed_deposits_storage.For_RPC
@@ -483,9 +483,6 @@ module Contract = struct
   module Internal_for_tests = struct
     include Contract_repr
     include Contract_storage
-
-    let get_clst_contract_hash ctxt =
-      Storage.Contract.Native_contracts.CLST.get ctxt
   end
 end
 
@@ -510,6 +507,23 @@ module Address_registry = struct
   let get_diffs = Raw_context.Address_registry.get_diffs
 
   include Address_registry_storage
+end
+
+module Clst = struct
+  let add_redemption_request =
+    Clst_redemption_requests_storage.add_redemption_request
+
+  let total_amount_of_tez ctxt = Clst_storage.get_deposits_balance ctxt
+
+  let finalize = Clst_redemption_requests_storage.finalize
+
+  module Delegates = Clst_delegates_storage
+
+  module For_RPC = struct
+    include Clst_redemption_requests_storage.For_RPC
+    include Clst_delegates_storage.For_RPC
+    include Clst_stake_allocation.For_RPC
+  end
 end
 
 module Big_map = struct
@@ -647,7 +661,7 @@ module Delegate = struct
 
   let prepare_stake_distribution = Stake_storage.prepare_stake_distribution
 
-  let check_not_tz4 = Contract_delegate_storage.check_not_tz4
+  let check_not_tz5 = Delegate_storage.Contract.check_not_tz5
 
   let delegated_contracts = Contract_delegate_storage.delegated_contracts
 
@@ -687,6 +701,16 @@ module Delegate = struct
 end
 
 module Stake_distribution = struct
+  type delegate_stake_info = Raw_context.delegate_stake_info = {
+    consensus_pk : Consensus_key.pk;
+    stake_weight : Int64.t;
+  }
+
+  type stake_info = Raw_context.stake_info = {
+    total_stake_weight : Int64.t;
+    delegates : delegate_stake_info list;
+  }
+
   let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
   let attestation_slot_owner ctxt ~attested_level slot =
@@ -706,8 +730,6 @@ module Stake_distribution = struct
   let stake_info = Delegate_sampler.stake_info
 
   let load_sampler_for_cycle = Delegate_sampler.load_sampler_for_cycle
-
-  let load_stake_info_for_cycle = Delegate_sampler.load_stake_info_for_cycle
 
   let get_total_frozen_stake ctxt cycle =
     let open Lwt_result_syntax in
@@ -893,4 +915,6 @@ end
 
 module Internal_for_tests = struct
   let to_raw x = x
+
+  let patch_constants = Raw_context.patch_constants
 end

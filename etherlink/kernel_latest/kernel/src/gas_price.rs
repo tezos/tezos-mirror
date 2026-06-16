@@ -4,12 +4,10 @@
 
 //! Adjustments of the gas price (a.k.a `base_fee_per_gas`), in response to load.
 
-use crate::block_in_progress::EthBlockInProgress;
-
 use primitive_types::U256;
 use softfloat::F64;
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 const CAPACITY: u64 = 27_000_000;
 const TARGET: u64 = CAPACITY / 2;
@@ -21,28 +19,30 @@ const ALPHA: F64 = softfloat::f64!(0.000_000_000_99);
 
 /// Register a completed block into the tick backlog
 pub fn register_block(
-    host: &mut impl Runtime,
-    bip: &EthBlockInProgress,
+    host: &mut impl StorageV1,
+    bip_cumulative_execution_gas: U256,
+    bip_timestamp: Timestamp,
+    bip_queue_length: usize,
 ) -> anyhow::Result<()> {
-    if bip.queue_length() > 0 {
+    if bip_queue_length > 0 {
         anyhow::bail!("update_gas_price on non-empty block");
     }
 
-    let cumulative_execution_gas = if bip.cumulative_execution_gas >= U256::from(u64::MAX)
+    let cumulative_execution_gas = if bip_cumulative_execution_gas >= U256::from(u64::MAX)
     {
         u64::MAX
     } else {
-        bip.cumulative_execution_gas.low_u64()
+        bip_cumulative_execution_gas.low_u64()
     };
 
-    update_backlog(host, cumulative_execution_gas, bip.timestamp)?;
+    update_backlog(host, cumulative_execution_gas, bip_timestamp)?;
 
     Ok(())
 }
 
 /// Retrieve *base fee per gas*, according to the current timestamp.
 pub fn base_fee_per_gas(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     timestamp: Timestamp,
     minimum_gas_price: U256,
 ) -> U256 {
@@ -58,7 +58,7 @@ pub fn base_fee_per_gas(
 }
 
 fn backlog_with_time_elapsed(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     extra_gas: u64,
     current_timestamp: u64,
     last_timestamp: u64,
@@ -74,7 +74,7 @@ fn backlog_with_time_elapsed(
 }
 
 fn update_backlog(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     cumulative_execution_gas: u64,
     timestamp: Timestamp,
 ) -> anyhow::Result<()> {
@@ -160,11 +160,19 @@ fn f64_to_u64(f: F64) -> u64 {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::block_in_progress::BlockInProgress;
+    use crate::chains::{
+        TezlinkBlockConstants, TezosXBlockConstants,
+        TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+    };
     use primitive_types::H160;
     use proptest::prelude::*;
     use std::collections::VecDeque;
     use tezos_ethereum::block::BlockConstants;
-    use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_execution::context::Context;
+    use tezos_smart_rollup_host::storage::StorageV1;
+    use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
     proptest! {
         #[test]
@@ -197,28 +205,45 @@ mod test {
         let mut host = MockKernelHost::default();
         let timestamp = 0_i64;
         let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
-        let dummy_block_constants = BlockConstants::first_block(
-            timestamp.into(),
-            U256::zero(),
-            block_fees,
-            crate::block::GAS_LIMIT,
-            H160::zero(),
-        );
+        let dummy_block_constants = TezosXBlockConstants {
+            evm_runtime_block_constants: BlockConstants::first_block(
+                timestamp.into(),
+                U256::zero(),
+                block_fees,
+                crate::block::GAS_LIMIT,
+                H160::zero(),
+            ),
+            michelson_runtime_block_constants: TezlinkBlockConstants {
+                level: 0.into(),
+                context: TezosRuntimeContext::from_root(
+                    &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+                )
+                .unwrap(),
+                da_fee_per_byte_mutez: 0,
+                michelson_to_evm_gas_multiplier: 0,
+                safe_roots: vec![],
+            },
+        };
 
-        let mut bip = EthBlockInProgress::new_with_ticks(
+        let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
+            Default::default(),
             Default::default(),
             VecDeque::new(),
             // estimated ticks in run (ignored)
-            0,
             timestamp.into(),
             U256::zero(),
         );
         bip.cumulative_execution_gas = U256::from(TOLERANCE);
 
-        register_block(&mut host, &bip).unwrap();
-        bip.clone()
-            .finalize_and_store(&mut host, &dummy_block_constants)
+        register_block(
+            &mut host,
+            bip.cumulative_execution_gas,
+            bip.timestamp,
+            bip.queue_length(),
+        )
+        .unwrap();
+        bip.finalize_and_store(&mut host, &dummy_block_constants, false)
             .unwrap();
 
         // At tolerance, gas price should be min.
@@ -229,9 +254,24 @@ mod test {
         assert_eq!(gas_price, gas_price_now);
 
         // register more blocks - now double tolerance
+        let mut bip = BlockInProgress::new_with_ticks(
+            U256::zero(),
+            Default::default(),
+            Default::default(),
+            VecDeque::new(),
+            timestamp.into(),
+            timestamp.into(),
+        );
+        bip.cumulative_execution_gas = U256::from(TOLERANCE);
         bip.number = 1.into();
-        register_block(&mut host, &bip).unwrap();
-        bip.finalize_and_store(&mut host, &dummy_block_constants)
+        register_block(
+            &mut host,
+            bip.cumulative_execution_gas,
+            bip.timestamp,
+            bip.queue_length(),
+        )
+        .unwrap();
+        bip.finalize_and_store(&mut host, &dummy_block_constants, false)
             .unwrap();
         let gas_price_now = base_fee_per_gas(&host, timestamp.into(), min);
 
@@ -247,7 +287,10 @@ mod test {
         );
     }
 
-    fn load_gas_price(host: &mut impl Runtime) -> (U256, U256) {
+    fn load_gas_price<Host>(host: &mut Host) -> (U256, U256)
+    where
+        Host: StorageV1,
+    {
         let bf = crate::retrieve_block_fees(host).unwrap();
 
         (bf.minimum_base_fee_per_gas(), bf.base_fee_per_gas())

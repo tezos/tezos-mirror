@@ -6,6 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Tezos_services
+module Micheline = Tezos_micheline.Micheline
 
 type error +=
   | Unsupported_chain_parameter of string
@@ -43,6 +44,8 @@ let () =
     (function Failed_operation_forging -> Some () | _ -> None)
     (fun () -> Failed_operation_forging)
 
+module Mempool = Tezos_protocol_plugin_024_PtTALLiN.Mempool
+
 let check_chain =
   let open Result_syntax in
   function
@@ -77,15 +80,22 @@ let version () =
   (* TODO: #7857 need proper implementation *)
   Lwt_result_syntax.return Tezlink_mock.version
 
-let make_contract_info contract_balance counter_z contract_script =
+let make_contract_info contract_balance counter_opt contract_script =
   let open Lwt_result_syntax in
-  let open Imported_protocol_plugin.Contract_services in
-  let*? counter = Protocol_types.Counter.of_z counter_z in
+  let open Tezlink_imports.Imported_protocol_plugin.Contract_services in
+  let*? counter =
+    let open Result_syntax in
+    match counter_opt with
+    | None -> return_none
+    | Some counter_z ->
+        let* counter = Protocol_types.Counter.of_z counter_z in
+        return_some counter
+  in
   return
     {
       balance = contract_balance;
       delegate = None;
-      counter = Some counter;
+      counter;
       script = contract_script;
       revealed = None;
     }
@@ -99,52 +109,32 @@ let tezlink_to_tezos_chain_id ~l2_chain_id _chain =
 let chain_directory_path = Tezos_shell_services.Chain_services.path
 
 let block_directory_path =
-  Tezos_rpc.Path.subst2
-  @@ Tezos_rpc.Path.prefix
-       chain_directory_path
-       Tezos_shell_services.Block_services.path
+  Tezos_rpc.Path.prefix
+    chain_directory_path
+    Tezos_shell_services.Block_services.path
 
-module type HEADER = sig
-  module Block_services : BLOCK_SERVICES
-
-  val tezlink_block_to_shell_header :
-    L2_types.Tezos_block.t -> Block_header.shell_header tzresult
-
-  val tezlink_block_to_block_header :
-    l2_chain_id:L2_types.chain_id ->
-    L2_types.Tezos_block.t * 'b ->
-    Block_services.block_header tzresult
-
-  val tezlink_block_to_block_info :
-    l2_chain_id:L2_types.chain_id ->
-    (module Tezlink_backend_sig.S) ->
-    Tezos_types.level
-    * Tezos_shell_services.Block_services.version
-    * [`Main]
-    * L2_types.Tezos_block.t ->
-    (Tezos_shell_services.Block_services.version * Block_services.block_info)
-    tzresult
-    Lwt.t
-
-  val protocols : Tezlink_protocols.protocols
-end
-
-module Make_block_header (Block_services : BLOCK_SERVICES) :
-  HEADER with module Block_services = Block_services = struct
-  module Block_services = Block_services
+module Make_block_header
+    (Proto : Tezlink_protocol)
+    (Next_proto : Tezlink_protocol) =
+struct
+  module Block_services = Make_block_service (Proto) (Next_proto)
 
   let protocols =
     Tezlink_protocols.Shell_impl.
-      {
-        current_protocol = Block_services.Proto.hash;
-        next_protocol = Block_services.Next_proto.hash;
-      }
+      {current_protocol = Proto.hash; next_protocol = Next_proto.hash}
 
   let tezlink_block_to_shell_header (block : L2_types.Tezos_block.t) :
       Block_header.shell_header tzresult =
     let open Result_syntax in
     let open Tezlink_mock in
     let* predecessor = ethereum_to_tezos_block_hash block.parent_hash in
+    let round = Tezlink_imports.Imported_protocol.Round_repr.zero in
+    let fitness =
+      Tezlink_constants.fitness
+        ~level:block.level
+        ~predecessor_round:round
+        ~round
+    in
     return
       Block_header.
         {
@@ -196,7 +186,7 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
           operation_list_quota = [];
         }
 
-  let tezlink_block_to_block_info ~l2_chain_id _backend
+  let tezlink_block_to_block_info ~l2_chain_id
       (level_info, version, chain, block) =
     let open Lwt_result_syntax in
     let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
@@ -226,56 +216,15 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
       }
     in
     return (version, block_info)
+
+  let tezlink_block_metadata (level_info, version) =
+    let open Result_syntax in
+    let+ metadata = make_metadata ~level_info in
+    (version, metadata)
 end
 
-module Current_block_header = struct
-  include Make_block_header (Current_block_services)
-
-  let tezlink_block_to_block_info ~l2_chain_id backend
-      (level_info, version, chain, block) =
-    let open Lwt_result_syntax in
-    let* version, block_info =
-      tezlink_block_to_block_info
-        ~l2_chain_id
-        backend
-        (level_info, version, chain, block)
-    in
-    (* To allow tzkt to index the bootstrap accounts, we add dummy transfers
-       from a faucet address to all the accounts present in durable storage at
-       block 0 (ie accounts added by an installer kernel). *)
-    if level_info.Tezos_types.level = 2l then
-      let* block_info =
-        match block_info.operations with
-        | [
-         consensus_opperations;
-         voting_operations;
-         anonymous_operations;
-         manager_operations;
-        ] ->
-            let* bootstrap_transfers =
-              Current_block_services.activate_bootstraps_with_transfers
-                ~chain_id:block_info.chain_id
-                backend
-            in
-            return
-              {
-                block_info with
-                operations =
-                  [
-                    consensus_opperations;
-                    voting_operations;
-                    anonymous_operations;
-                    bootstrap_transfers @ manager_operations;
-                  ];
-              }
-        | _ -> assert false
-      in
-      return (version, block_info)
-    else return (version, block_info)
-end
-
-module Zero_block_header = Make_block_header (Zero_block_services)
-module Genesis_block_header = Make_block_header (Genesis_block_services)
+module Current_block_header =
+  Make_block_header (Tezlink_imported_protocol) (Tezlink_imported_protocol)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
@@ -296,82 +245,142 @@ let opt_register ~service ~impl dir =
 let opt_register_with_conversion ~service ~impl ~convert_output dir =
   opt_register ~service ~impl:(wrap (Option.map_e convert_output) impl) dir
 
-let register_dynamic ~root_dir ~path dir_of_path =
-  Tezos_rpc.Directory.register_dynamic_directory root_dir path dir_of_path
+(* On not-yet-allocated implicit accounts, L1 returns the current
+   global counter instead of [None]. We don't have a global counter so
+   we return 0 in this case instead. See also
+   https://gitlab.com/tezos/tezos/-/issues/7960. *)
+let get_counter (module Backend : Tezlink_backend_sig.S) chain block contract =
+  let open Lwt_result_syntax in
+  let* counter_opt = Backend.counter chain block contract in
+  match (counter_opt, contract) with
+  | None, Implicit _ -> return_some Z.zero
+  | counter_opt, _ -> return counter_opt
 
-(** Builds the static part of the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
+(** Builds the static part of the directory registering services under `/chains/<main>/blocks/<head>/...`.
+    This part is based on the current protocol supported by Tezlink, which means that if we request the counter
+    of a tz1 on an old block the encoding used will be the one of the current live protocol. *)
 let build_block_static_directory ~l2_chain_id
-    (module Backend : Tezlink_backend_sig.S) =
+    (module Backend : Tezlink_backend_sig.S) :
+    tezlink_rpc_context Tezlink_imports.Imported_env.RPC_directory.t =
   let open Lwt_result_syntax in
   Tezos_rpc.Directory.empty
   |> register_with_conversion
        ~service:Tezos_services.current_level
-       ~impl:(fun {block; chain} query () ->
+       ~impl:(fun (((), chain), block) query () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.current_level chain block ~offset:query.offset)
        ~convert_output:Protocol_types.Level.convert
   |> register
        ~service:Tezos_services.contract_info
-       ~impl:(fun ({block; chain}, contract) _query () ->
+       ~impl:(fun ((((), chain), block), contract) _query () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let* balance = Backend.balance chain block contract in
-         let* counter = Backend.counter chain block contract in
+         let* counter = get_counter (module Backend) chain block contract in
          let* script = Backend.get_script chain block contract in
          make_contract_info balance counter script)
   |> opt_register
-       ~service:Tezos_services.list_entrypoints
-       ~impl:(fun ({block; chain}, contract) {normalize_types} () ->
+       ~service:Tezos_services.get_script
+       ~impl:(fun ((((), chain), block), contract) _ _ ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
-         let* code = Backend.get_code chain block contract in
-         match code with
-         | None -> return_none
-         | Some code -> Tezlink_mock.list_entrypoints code normalize_types)
+         Backend.get_script chain block contract)
+  |> opt_register
+       ~service:Tezos_services.list_entrypoints
+       ~impl:(fun ((((), chain), block), contract) normalize_types () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.get_entrypoints
+           chain
+           block
+           contract
+           ~normalize_types:normalize_types.normalize_types)
   |> register
        ~service:Tezos_services.balance
-       ~impl:(fun ({chain; block}, contract) _ _ ->
+       ~impl:(fun ((((), chain), block), contract) _ _ ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.balance chain block contract)
   |> register
+       ~service:Tezos_services.list
+       ~impl:(fun (((), chain), block) _ _ ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.list_contracts chain block)
+  |> register
        ~service:Tezos_services.get_storage_normalized
-         (* TODO: #7995
-            Take unparsing_mode argument into account *)
-       ~impl:(fun ({chain; block}, contract) () _unparsing_mode ->
+       ~impl:(fun ((((), chain), block), contract) () unparsing_mode ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let* script = Backend.get_script chain block contract in
+         match script with
+         | None -> return_none
+         | Some script -> (
+             match Data_encoding.force_decode script.storage with
+             | None -> return_none
+             | Some storage ->
+                 let elab_conf =
+                   Tezlink_imports.Imported_protocol.Script_ir_translator_config
+                   .make
+                     ~legacy:true
+                     ()
+                 in
+                 let* ctxt = Tezlink_mock.init_dummy_context () in
+                 let open
+                   Tezlink_imports.Imported_protocol_test_helpers
+                   .Lwt_result_wrap_syntax in
+                 let*@ Ex_code (Code {storage_type; _}), ctxt =
+                   Tezlink_imports.Imported_protocol.Script_ir_translator
+                   .parse_code
+                     ~elab_conf
+                     ctxt
+                     ~code:script.code
+                 in
+                 let storage =
+                   Tezlink_imports.Imported_protocol_plugin.RPC.Scripts
+                   .Normalize_data
+                   .normalize_data
+                     ~unparsing_mode
+                     storage_type
+                     ctxt
+                     (Micheline.root storage)
+                 in
+                 return_some (Micheline.strip_locations storage)))
+  |> opt_register
+       ~service:Tezos_services.get_storage
+       ~impl:(fun ((((), chain), block), contract) _ _ ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.get_storage chain block contract)
+  |> opt_register
+       ~service:Tezos_services.Big_map.get
+       ~impl:(fun (((((), chain), block), id), key_hash) _ _ ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.big_map_get chain block id key_hash)
   |> register
        ~service:Tezos_services.manager_key
-       ~impl:(fun ({chain; block}, contract) _ _ ->
+       ~impl:(fun ((((), chain), block), contract) _ _ ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.manager_key chain block contract)
-  |> register_with_conversion
+  |> opt_register_with_conversion
        ~service:Tezos_services.counter
-       ~impl:(fun ({block; chain}, contract) () () ->
+       ~impl:(fun ((((), chain), block), contract) () () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
-         Backend.counter chain block contract)
+         get_counter (module Backend) chain block contract)
        ~convert_output:Protocol_types.Counter.of_z
   |> register
        ~service:Tezos_services.constants
-       ~impl:(fun {block; chain} () () ->
+       ~impl:(fun (((), chain), block) () () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.constants chain block)
-  |> opt_register_with_conversion
-       ~service:Tezos_services.hash
-       ~impl:(fun {block; chain} () () ->
-         let*? chain = check_chain chain in
-         let*? block = check_block block in
-         Backend.block_hash chain block)
-       ~convert_output:ethereum_to_tezos_block_hash
   |> register
        ~service:Tezos_services.expected_issuance
-       ~impl:(fun {block; chain} () () ->
+       ~impl:(fun (((), chain), block) () () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let* level = Backend.current_level chain block ~offset:0l in
@@ -379,12 +388,12 @@ let build_block_static_directory ~l2_chain_id
          @@ Tezos_services.Adaptive_issuance_services.dummy_rewards level.cycle)
   |> register
        ~service:Tezos_services.Forge.operations
-       ~impl:(fun {block; chain} () operation ->
+       ~impl:(fun (((), chain), block) () operation ->
          let*? _chain = check_chain chain in
          let*? _block = check_block block in
          let*? bytes =
            Data_encoding.Binary.to_bytes
-             Alpha_context.Operation.unsigned_encoding
+             Tezlink_imports.Imported_context.Operation.unsigned_encoding
              operation
            |> Result.map_error_e @@ fun _ ->
               Result_syntax.tzfail Failed_operation_forging
@@ -395,7 +404,7 @@ let build_block_static_directory ~l2_chain_id
      (* We need a proper implementation *)
        ~service:Tezos_services.simulate_operation
        ~impl:(fun
-           {block; chain}
+           (((), chain), block)
            _param
            ( _blocks_before_activation,
              operation,
@@ -404,31 +413,55 @@ let build_block_static_directory ~l2_chain_id
          ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
-         let hash = Alpha_context.Operation.hash_packed operation in
+         let hash =
+           Tezlink_imports.Imported_context.Operation.hash_packed operation
+         in
          let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
          let* result =
            Backend.simulate_operation
              ~chain_id
-             ~skip_signature:true
+             ~simulator_mode:Simulation
              operation
              hash
              block
          in
          return (operation.protocol_data, result))
   |> register
+       ~service:Tezos_services.run_operation
+       ~impl:(fun (((), chain), block) _param (operation, _chain_id) ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+         let* result =
+           Backend.simulate_operation
+             ~chain_id
+             ~simulator_mode:Simulation
+             operation
+             (Tezlink_imports.Imported_context.Operation.hash_packed operation)
+             block
+         in
+         return (operation.protocol_data, result))
+  |> register
+       ~service:Tezos_services.pack_data
+       ~impl:(fun _ctxt () (data, ty, gas) ->
+         Tezlink_mock.pack_data ~data ~ty ~gas)
+  |> register
        ~service:Tezos_services.preapply_operations
-       ~impl:(fun {block; chain} param ops ->
+       ~impl:(fun (((), chain), block) param ops ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
          let* receipts =
            List.map_es
-             (fun (operation : Alpha_context.packed_operation) ->
-               let hash = Alpha_context.Operation.hash_packed operation in
+             (fun operation ->
+               let hash =
+                 Tezlink_imports.Imported_context.Operation.hash_packed
+                   operation
+               in
                let* result =
                  Backend.simulate_operation
                    ~chain_id
-                   ~skip_signature:false
+                   ~simulator_mode:Preapplication
                    operation
                    hash
                    block
@@ -439,75 +472,52 @@ let build_block_static_directory ~l2_chain_id
          return (param#version, receipts))
   |> register
        ~service:Tezos_services.raw_json_cycle
-       ~impl:(fun ({block; chain}, _cycle) () () ->
+       ~impl:(fun ((((), chain), block), _cycle) () () ->
          let*? _chain = check_chain chain in
          let*? _block = check_block block in
          Tezlink_mock.storage_cycle ())
-  |> register
-       ~service:Tezos_services.operation_hashes
-       ~impl:(fun {chain; block} () () ->
-         let*? chain = check_chain chain in
-         let*? block = check_block block in
-         let consensus_operation_hashes = [] in
-         let voting_operation_hashes = [] in
-         let anonymous_operation_hashes = [] in
-         let* manager_operation_hashes =
-           let* block = Backend.block chain block in
-           let*? operations =
-             Tezos_services.Current_block_services.deserialize_operations_header
-               block.operations
-           in
-           return
-           @@ List.map (fun (hash, _header, _op_and_receipt) -> hash) operations
-         in
-         return
-           [
-             consensus_operation_hashes;
-             voting_operation_hashes;
-             anonymous_operation_hashes;
-             manager_operation_hashes;
-           ])
-  |> register
-       ~service:Tezos_services.operations
-       ~impl:(fun {chain; block} o () ->
-         let*? chain = check_chain chain in
-         let*? block = check_block block in
-         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
-         let* block = Backend.block chain block in
-         let consensus_operations = [] in
-         let voting_operations = [] in
-         let anonymous_operations = [] in
-         let*? manager_operations =
-           Tezos_services.Current_block_services.deserialize_operations
-             ~chain_id
-             block.operations
-         in
-         return
-           ( o#version,
-             [
-               consensus_operations;
-               voting_operations;
-               anonymous_operations;
-               manager_operations;
-             ] ))
   |> opt_register
-       ~service:Tezos_services.operation
-       ~impl:(fun (({chain; block}, operation_pass), operation_index) o () ->
+       ~service:Tezos_services.Big_map.raw_info
+       ~impl:(fun ((((), chain), block), id) () () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
-         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
-         if operation_pass <> Imported_protocol.Operation_repr.manager_pass then
-           (* All tezlink operations are manager operations *)
-           return_none
-         else
-           let* block = Backend.block chain block in
-           let*? operations =
-             Tezos_services.Current_block_services.deserialize_operations
-               ~chain_id
-               block.operations
-           in
-           let operation_opt = List.nth_opt operations operation_index in
-           return (Option.map (fun op -> (o#version, op)) operation_opt))
+         Backend.big_map_raw_info chain block id)
+
+let retrieve_block (module Backend : Tezlink_backend_sig.S) chain block =
+  let open Lwt_result_syntax in
+  let*? chain = check_chain chain in
+  let*? block = check_block block in
+  Backend.block chain block
+
+let tezlink_protocol_of_protocol = function
+  | L2_types.Tezos_block.Protocol.S023 ->
+      (module Tezlink_SeouLo_protocol : Tezlink_protocol)
+  | L2_types.Tezos_block.Protocol.T024 ->
+      (module Tezlink_TALLiN_protocol : Tezlink_protocol)
+
+let protocol_for_block_or_level ~allowing_mock block_result :
+    (module Tezlink_protocol) * (module Tezlink_protocol) =
+  let imported =
+    ( (module Tezlink_imported_protocol : Tezlink_protocol),
+      (module Tezlink_imported_protocol : Tezlink_protocol) )
+  in
+  match block_result with
+  | Ok (block : L2_types.Tezos_block.t) -> (
+      match block.level with
+      | 0l when allowing_mock ->
+          ( (module Tezlink_zero_protocol : Tezlink_protocol),
+            (module Tezlink_genesis_protocol : Tezlink_protocol) )
+      | 1l when allowing_mock ->
+          ( (module Tezlink_genesis_protocol : Tezlink_protocol),
+            tezlink_protocol_of_protocol block.next_protocol )
+      | _ ->
+          ( tezlink_protocol_of_protocol block.protocol,
+            tezlink_protocol_of_protocol block.next_protocol ))
+  | _ ->
+      (* TezosX PoC also uses the same backend as Tezlink for now. So when
+        requesting the block, it fails as blocks are not stored at the same path.
+        Until TezosX Poc has its own backend, we should return imported to prevent the failure.*)
+      imported
 
 (** We currently support a single target protocol version but we need to handle early blocks (blocks at
     levels 0 and 1) specifically because TzKT expects the `protocol` and `next_protocol` fields of the
@@ -518,15 +528,19 @@ let build_block_static_directory ~l2_chain_id
 
     To ensure consistency, we register all the services returning block infos and block headers the same way. *)
 let register_dynamic_block_services ~l2_chain_id
-    (module Backend : Tezlink_backend_sig.S) base_dir =
+    (module Backend : Tezlink_backend_sig.S) (chain : chain) (block : block) =
   let open Lwt_result_syntax in
+  let*! tezlink_block = retrieve_block (module Backend) chain block in
+  let (module Proto : Tezlink_protocol), (module Next_proto : Tezlink_protocol)
+      =
+    protocol_for_block_or_level ~allowing_mock:(block <> `Head 0) tezlink_block
+  in
+  let module Block_header = Make_block_header (Proto) (Next_proto) in
+  let module S = Block_header.Block_services.S in
   let static_dir = build_block_static_directory ~l2_chain_id (module Backend) in
-  let make_dir (module Block_header : HEADER) =
-    let module S = Block_header.Block_services.S in
+  let dir =
     static_dir
-    |> register
-         ~service:(import_service S.info)
-         ~impl:(fun {block; chain} q () ->
+    |> register ~service:S.info ~impl:(fun (((), chain), block) q () ->
            let*? chain = check_chain chain in
            let*? block = check_block block in
            let* tezlink_block = Backend.block chain block in
@@ -534,13 +548,12 @@ let register_dynamic_block_services ~l2_chain_id
            let* block_info =
              Block_header.tezlink_block_to_block_info
                ~l2_chain_id
-               (module Backend)
                (level, q#version, chain, tezlink_block)
            in
            return block_info)
     |> register_with_conversion
          ~service:(import_service S.header)
-         ~impl:(fun {chain; block} () () ->
+         ~impl:(fun (((), chain), block) () () ->
            let*? chain = check_chain chain in
            let*? block = check_block block in
            let* tezlink_block = Backend.block chain block in
@@ -549,41 +562,127 @@ let register_dynamic_block_services ~l2_chain_id
            (Block_header.tezlink_block_to_block_header ~l2_chain_id)
     |> register_with_conversion
          ~service:(import_service S.Header.shell_header)
-         ~impl:(fun {chain; block} () () ->
+         ~impl:(fun (((), chain), block) () () ->
            let*? chain = check_chain chain in
            let*? block = check_block block in
            let* tezlink_block = Backend.block chain block in
            Lwt_result_syntax.return tezlink_block)
          ~convert_output:Block_header.tezlink_block_to_shell_header
     |> register
-         ~service:Tezos_services.protocols
-         ~impl:(fun {block; chain} _query () ->
+         ~service:S.protocols
+         ~impl:(fun (((), chain), block) _query () ->
            let*? `Main = check_chain chain in
            let*? _block = check_block block in
            return Block_header.protocols)
-    |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
-           make_env chain block)
+    |> register_with_conversion
+         ~service:(import_service S.metadata)
+         ~impl:(fun (((), chain), block) q () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let* level = Backend.current_level chain block ~offset:0l in
+           Lwt_result_syntax.return (level, q#version))
+         ~convert_output:Block_header.tezlink_block_metadata
+    |> opt_register_with_conversion
+         ~service:S.hash
+         ~impl:(fun (((), chain), block) () () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           Backend.block_hash chain block)
+         ~convert_output:ethereum_to_tezos_block_hash
+    |> register
+         ~service:S.Operations.operations
+         ~impl:(fun (((), chain), block) o () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+           let* block = Backend.block chain block in
+           let consensus_operations = [] in
+           let voting_operations = [] in
+           let anonymous_operations = [] in
+           let*? manager_operations =
+             Block_header.Block_services.deserialize_operations
+               ~chain_id
+               block.operations
+           in
+           return
+             ( o#version,
+               [
+                 consensus_operations;
+                 voting_operations;
+                 anonymous_operations;
+                 manager_operations;
+               ] ))
+    |> opt_register
+         ~service:S.Operations.operation
+         ~impl:(fun
+             (((((), chain), block), operation_pass), operation_index) o () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+           if
+             operation_pass
+             <> Tezlink_imports.Imported_protocol.Operation_repr.manager_pass
+           then
+             (* All tezlink operations are manager operations *)
+             return_none
+           else
+             let* block = Backend.block chain block in
+             let*? operations =
+               Block_header.Block_services.deserialize_operations
+                 ~chain_id
+                 block.operations
+             in
+             let operation_opt = List.nth_opt operations operation_index in
+             return (Option.map (fun op -> (o#version, op)) operation_opt))
+    |> register
+         ~service:S.Operation_hashes.operation_hashes
+         ~impl:(fun (((), chain), block) () () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let consensus_operation_hashes = [] in
+           let voting_operation_hashes = [] in
+           let anonymous_operation_hashes = [] in
+           let* manager_operation_hashes =
+             let* block = Backend.block chain block in
+             let*? operations =
+               Block_header.Block_services.deserialize_operations_header
+                 block.operations
+             in
+             return
+             @@ List.map
+                  (fun (hash, _header, _op_and_receipt) -> hash)
+                  operations
+           in
+           return
+             [
+               consensus_operation_hashes;
+               voting_operation_hashes;
+               anonymous_operation_hashes;
+               manager_operation_hashes;
+             ])
+    |> register
+         ~service:S.Operation_hashes.operation_hashes_in_pass
+         ~impl:(fun ((((), chain), block), list_offset) () () ->
+           if
+             list_offset
+             <> Tezlink_imports.Imported_protocol.Operation_repr.manager_pass
+           (* All tezlink operations are manager operations *)
+           then return_nil
+           else
+             let*? chain = check_chain chain in
+             let*? block = check_block block in
+             let* block = Backend.block chain block in
+             let*? operations =
+               Block_header.Block_services.deserialize_operations_header
+                 block.operations
+             in
+             return (List.map (fun (hash, _, _) -> hash) operations))
   in
-  let dynamic_dir =
-    register_dynamic
-      ~root_dir:Tezos_rpc.Directory.empty
-      ~path:block_directory_path
-      (fun (((), _chain), block) ->
-        match block with
-        (* Trying to access the first blocks info using `Head offset will lead
-           to incoherent results. If it becomes a pb we will need to ignore
-           potential errors from Backend.current_level. *)
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
-        (* RPCs at directory level don't appear properly in the describe RPC *)
-        | `Genesis | `Level 0l ->
-            Lwt.return @@ make_dir (module Zero_block_header)
-        | `Level 1l -> Lwt.return @@ make_dir (module Genesis_block_header)
-        | _ -> Lwt.return @@ make_dir (module Current_block_header))
-  in
-  Tezos_rpc.Directory.merge base_dir dynamic_dir
+  Lwt.return dir
 
-let register_chain_services ~l2_chain_id
-    (module Backend : Tezlink_backend_sig.S) base_dir =
+let register_chain_services ~l2_chain_id ~get_da_fee_per_byte
+    ~get_michelson_base_fee_per_gas (module Backend : Tezlink_backend_sig.S)
+    base_dir =
   let dir =
     Tezos_rpc.Directory.empty
     |> register_with_conversion
@@ -599,6 +698,120 @@ let register_chain_services ~l2_chain_id
              ( true,
                Tezos_shell_services.Chain_validator_worker_state.Synchronised
                  {is_chain_stuck = false} ))
+    |> register
+         ~service:Tezos_services.block_list
+         ~impl:(fun chain list_arg () ->
+           let open Lwt_result_syntax in
+           let*? chain = check_chain chain in
+           let length = Option.value list_arg#length ~default:1 in
+
+           let block_fitness (block : L2_types.Tezos_block.t) =
+             let round = Tezlink_imports.Imported_protocol.Round_repr.zero in
+             Tezlink_constants.fitness
+               ~level:block.level
+               ~predecessor_round:round
+               ~round
+           in
+
+           let block_of_hash_opt hash =
+             let open Lwt_syntax in
+             let* res =
+               Backend.block
+                 chain
+                 (`Hash (tezos_to_ethereum_block_hash hash, 0l))
+             in
+             match res with
+             | Ok block -> return (Ok (Some block))
+             | Error _ -> return (Ok None)
+           in
+
+           let* requested_blocks =
+             match list_arg#heads with
+             | [] ->
+                 let* head = Backend.block chain (`Head 0l) in
+                 return [head]
+             | heads ->
+                 let* blocks = List.filter_map_es block_of_hash_opt heads in
+                 let blocks =
+                   match list_arg#min_date with
+                   | None -> blocks
+                   | Some min_date ->
+                       List.filter
+                         (fun (block : L2_types.Tezos_block.t) ->
+                           Time.Protocol.(min_date <= block.timestamp))
+                         blocks
+                 in
+                 let sorted_blocks =
+                   List.sort
+                     (fun b1 b2 ->
+                       ~-(Fitness.compare (block_fitness b1) (block_fitness b2)))
+                     blocks
+                 in
+                 return sorted_blocks
+           in
+
+           let rec predecessors ignored remaining
+               (block : L2_types.Tezos_block.t) acc =
+             if remaining <= 0 then return (List.rev acc)
+             else
+               let*? current_hash = ethereum_to_tezos_block_hash block.hash in
+               if block.parent_hash = L2_types.Tezos_block.genesis_parent_hash
+               then return (List.rev acc)
+               else if Block_hash.Set.mem current_hash ignored then
+                 return (List.rev acc)
+               else
+                 let* parent =
+                   Backend.block chain (`Hash (block.parent_hash, 0l))
+                 in
+                 let*? parent_hash = ethereum_to_tezos_block_hash parent.hash in
+                 predecessors ignored (remaining - 1) parent (parent_hash :: acc)
+           in
+
+           let* _, chains =
+             List.fold_left_es
+               (fun (ignored, acc) (head_block : L2_types.Tezos_block.t) ->
+                 let*? head_hash =
+                   ethereum_to_tezos_block_hash head_block.hash
+                 in
+                 let* chain =
+                   predecessors ignored (length - 1) head_block [head_hash]
+                 in
+                 let ignored =
+                   List.fold_left
+                     (fun acc hash -> Block_hash.Set.add hash acc)
+                     ignored
+                     chain
+                 in
+                 return (ignored, chain :: acc))
+               (Block_hash.Set.empty, [])
+               requested_blocks
+           in
+
+           return (List.rev chains))
+    |> register
+         ~service:Tezos_services.mempool_get_filter
+         ~impl:(fun chain query () ->
+           let open Lwt_result_syntax in
+           let*? _chain = check_chain chain in
+           let* (Tezos_types.Tez.Nanotez nanotez_per_byte) =
+             get_da_fee_per_byte ()
+           in
+           let* (Tezos_types.Tez.Nanotez nanotez_per_gas) =
+             get_michelson_base_fee_per_gas ()
+           in
+           let config =
+             Mempool.default_config
+             |> Mempool.with_minimal_nanotez_per_byte nanotez_per_byte
+             |> Mempool.with_minimal_nanotez_per_gas_unit nanotez_per_gas
+           in
+           let include_default_fields =
+             if query#include_default then `Always else `Never
+           in
+           return
+             (Data_encoding.Json.construct
+                ~include_default_fields
+                Mempool.config_encoding
+                config))
     |> Tezos_rpc.Directory.map (fun ((), chain) -> Lwt.return chain)
   in
   Tezos_rpc.Directory.merge
@@ -630,9 +843,9 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
                        shell;
                        protocol_data =
                          Data_encoding.Binary.to_bytes_exn
-                           Imported_protocol.Block_header_repr
+                           Tezlink_imported_protocol.Block_header_repr
                            .protocol_data_encoding
-                           Imported_protocol.mock_protocol_data;
+                           Tezlink_imported_protocol.mock_protocol_data;
                      }
                       : Block_header.t) )
             | Error _, _ | _, Error _ -> return_none)
@@ -641,11 +854,22 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
       Tezos_rpc.Answer.return_stream {next; shutdown})
 
 (** Builds the root directory. *)
-let build_dir ~l2_chain_id ~add_operation backend =
+let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte
+    ~get_michelson_base_fee_per_gas backend =
   let (module Backend : Tezlink_backend_sig.S) = backend in
-  Tezos_rpc.Directory.empty
-  |> register_dynamic_block_services ~l2_chain_id backend
-  |> register_chain_services ~l2_chain_id backend
+  let base_dir =
+    Tezos_rpc.Directory.register_dynamic_directory
+      Tezos_rpc.Directory.empty
+      block_directory_path
+      (fun (((), chain), block) ->
+        register_dynamic_block_services ~l2_chain_id backend chain block)
+  in
+  base_dir
+  |> register_chain_services
+       ~l2_chain_id
+       ~get_da_fee_per_byte
+       ~get_michelson_base_fee_per_gas
+       backend
   |> register_with_conversion
        ~service:Tezos_services.bootstrapped
        ~impl:(fun () () () -> Backend.bootstrapped ())
@@ -672,8 +896,16 @@ let build_dir ~l2_chain_id ~add_operation backend =
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
 (* module entrypoint *)
-let register_tezlink_services ~l2_chain_id ~add_operation backend =
-  let directory = build_dir ~l2_chain_id ~add_operation backend in
+let register_tezlink_services ~l2_chain_id ~add_operation ~get_da_fee_per_byte
+    ~get_michelson_base_fee_per_gas backend =
+  let directory =
+    build_dir
+      ~l2_chain_id
+      ~add_operation
+      ~get_da_fee_per_byte
+      ~get_michelson_base_fee_per_gas
+      backend
+  in
   let directory =
     Tezos_rpc.Directory.register_describe_directory_service
       directory

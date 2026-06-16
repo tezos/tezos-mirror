@@ -209,6 +209,22 @@ module Contract : sig
       with type elt = Contract_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
+  (* SWRR Credit Storage
+
+   Per-delegate credit for the SWRR baker selection algorithm.
+   Stored as [Z.t] to avoid overflow and keep exact integer arithmetic.
+
+     Persistence:
+     - Credits persist across cycles (cross-cycle fairness)
+     - Reset to zero on delegate deactivation
+     - No expiration: indefinite persistence for active delegates
+  *)
+  module SWRR_credit :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Z.t
+       and type t := Raw_context.t
+
   (** Tez that were part of frozen deposits (either [own_frozen] or
       [staked_frozen] in {!Staking_balance}) but have been requested to be
       unstaked by a staker.
@@ -598,6 +614,13 @@ module Stake : sig
        and type value = Full_staking_balance_repr.t
        and type t := Raw_context.t
 
+  (* TODO: Remove after next protocol *)
+  module Staking_balance_up_to_T :
+    Indexed_data_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Full_staking_balance_repr.t
+       and type t := Raw_context.t
+
   (** This should be fairly small compared to staking balance *)
   module Active_delegates_with_minimal_stake :
     Data_set_storage
@@ -611,6 +634,21 @@ module Stake : sig
        and type value = (Signature.Public_key_hash.t * Stake_repr.t) list
        and type t := Raw_context.t
 
+  (* Selected Bakers Storage
+
+   Per-cycle precomputed baker selections stored as a [List] of
+   [Raw_context.consensus_pk].
+
+   Rationale: [get_baker] needs indexed access; [FallbackArray.get] provides
+   O(1) lookup, while lists would require linear traversal.
+
+  *)
+  module Selected_bakers :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Raw_context.consensus_pk FallbackArray.t
+       and type t := Raw_context.t
+
   (** Sum of the active stakes of all the delegates with
       {!Constants_parametric_repr.minimal_stake} *)
   module Total_active_stake :
@@ -618,6 +656,48 @@ module Stake : sig
       with type key = Cycle_repr.t
        and type value = Stake_repr.t
        and type t := Raw_context.t
+end
+
+module Clst : sig
+  module Deposits_balance :
+    Single_data_storage with type t := Raw_context.t and type value = Tez_repr.t
+
+  (** Tez that were part of CLST frozen deposits but have been requested to be
+      redeemed by a staker.
+      They won't be part of CLST provided stake for future distributions.
+
+      For cycles [current_cycle - consensus_rights_delay - max_slashing_period + 1] to
+      [current_cycle] they are still slashable.
+      For cycle [current_cycle - consensus_rights_delay - max_slashing_period] they are
+      not slashable anymore and hence any other older cycles must be squashed
+      into this one at cycle end.
+  *)
+  module Redeemed_frozen_deposits :
+    Single_data_storage
+      with type value = Unstaked_frozen_deposits_repr.t
+       and type t := Raw_context.t
+
+  (** The contract's redemption requests from CLST that haven't been finalized
+      yet. Redemption requests and unstake requests share the same underlying
+      implementation. *)
+  module Redemption_requests :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Unstake_request.requests
+       and type t := Raw_context.t
+
+  (** Delegates registered to the CLST contract, with their parameters *)
+  module Registered_delegates :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Clst_delegates_parameters_repr.t
+       and type t := Raw_context.t
+
+  module Pending_delegate_parameters :
+    Indexed_data_storage
+      with type t := Raw_context.t * Cycle_repr.t
+       and type key = Contract_repr.t
+       and type value = Clst_delegates_parameters_repr.update
 end
 
 type consensus_pk_in_R = {
@@ -640,6 +720,13 @@ module Delegate_sampler_state :
   Indexed_data_storage
     with type key = Cycle_repr.t
      and type value = Raw_context.consensus_pk Sampler.t
+     and type t := Raw_context.t
+
+(** Delegate stake info for a given cycle. *)
+module Delegate_stake_info :
+  Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Raw_context.stake_info
      and type t := Raw_context.t
 
 (** Compounding reward bonus for Adaptive Issuance *)
@@ -882,13 +969,6 @@ module Protocol_activation_level :
 (** Tenderbake *)
 
 module Tenderbake : sig
-  (* TODO: #8065: delete in V
-     Use {!Protocol_activation_level} instead. *)
-  module First_level_of_protocol :
-    Single_data_storage
-      with type t := Raw_context.t
-       and type value = Raw_level_repr.t
-
   (** [Attestation_branch] stores a single value composed of the
       grandparent hash and the predecessor's payload (computed with
       the grandparent hash) used to verify the validity of
@@ -949,6 +1029,11 @@ module Sc_rollup : sig
       with type key = Sc_rollup_repr.t
        and type value = Sc_rollup_commitment_repr.genesis_info
        and type t := Raw_context.t
+
+  module Signals :
+    Single_data_storage
+      with type value = (string * Raw_level_repr.t) list
+       and type t = Raw_context.t
 
   module Past_commitment_periods :
     Single_data_storage
@@ -1109,6 +1194,15 @@ module Sc_rollup : sig
 end
 
 module Dal : sig
+  (** Sliding window of attestation accountability, indexed by published
+      levels. Contains attestation information (shard counts and attester sets)
+      for published levels in the range [current_level - attestation_lag + 1,
+      current_level - 1]. *)
+  module AttestationHistory :
+    Single_data_storage
+      with type t := Raw_context.t
+       and type value = Dal_attestations_repr.Accountability.packed_history
+
   module Slot : sig
     (** This is a temporary storage for slot headers proposed onto the L1. The
         size of the list is at most [number_of_slots] as declared
@@ -1126,12 +1220,10 @@ module Dal : sig
          and type value = Dal_slot_repr.History.t
 
     (** This single entry stores the cells of the DAL skip list constructed
-        during the block under validation. The list is expected to have exactly
-        [number_of_slots] elements, except at the migration from T to U, where
-        it is a few times longer. Its cells ordering is not specified (and not
-        relevant). A cell's binary encoding is bounded (the only part that is
-        evolving in size over time is the number of backpointers, which is
-        bounded by 64). *)
+        during the block under validation. Its cells ordering is not specified
+        (and not relevant). A cell's binary encoding is bounded (the only part
+        that is evolving in size over time is the number of backpointers, which
+        is bounded by 64). *)
     module LevelHistories :
       Single_data_storage
         with type t := Raw_context.t

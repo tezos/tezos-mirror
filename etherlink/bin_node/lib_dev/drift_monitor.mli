@@ -11,6 +11,7 @@
 
     It sets {!last_observed_drift} accordingly. *)
 val run :
+  chain_family:_ L2_types.chain_family ->
   evm_node_endpoint:Uri.t ->
   timeout:float ->
   (unit -> Ethereum_types.quantity Lwt.t) ->

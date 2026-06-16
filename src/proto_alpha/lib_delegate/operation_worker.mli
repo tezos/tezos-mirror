@@ -52,17 +52,22 @@ val candidate_encoding : candidate Data_encoding.t
 type event =
   | Prequorum_reached of candidate * Kind.preattestation operation list
   | Quorum_reached of candidate * Kind.attestation operation list
+  | Shutdown
 
 (** {1 Constructors}*)
 
-(** [run ?monitor_node_operations ~round_durations cctxt] spawns an operation
-    worker.
+(** [run ?monitor_node_operations ~multi_node ~round_durations cctxt]
+    spawns an operation worker.
 
     @param monitor_node_operations monitor operations on the node (defaults:
    [true]).  Set [monitor_node_operations] to [false] to only consider
-   externally provided (non-node) operations.  *)
+   externally provided (non-node) operations.
+    @param multi_node if [true], the worker will gracefully shutdown on
+   fatal errors, allowing the supervisor to restart. If [false], the worker
+   will exit the entire process on fatal errors. *)
 val run :
   ?monitor_node_operations:bool ->
+  multi_node:bool ->
   round_durations:Protocol.Alpha_context.Round.round_durations ->
   #Protocol_client_context.full ->
   t Lwt.t
@@ -115,3 +120,14 @@ val cancel_monitoring : t -> unit
     removes current monitored payload.
 *)
 val shutdown_worker : t -> (unit, exn list) result Lwt.t
+
+(** {1 Internal for tests}
+
+    This module exposes internal types and functions for unit testing.
+    Do not use in production code.
+*)
+module Internal_for_tests : sig
+  (** {2 State creation} *)
+
+  val make_initial_state : ?monitor_node_operations:bool -> unit -> t
+end

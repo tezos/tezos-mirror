@@ -1,0 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_025_PsUshuai_test_migration)
+ (public_name octez-protocol-025-PsUshuai-libs.test-migration)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt-migration-registry
+  octez-alcotezt
+  octez-libs.base
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.test-helpers
+  octez-libs.base-test-helpers
+  tezos-protocol-025-PsUshuai.parameters
+  octez-protocol-025-PsUshuai-libs.plugin)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Octez_alcotezt
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_025_PsUshuai_test_helpers
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_025_PsUshuai_parameters
+  -open Tezos_protocol_plugin_025_PsUshuai))

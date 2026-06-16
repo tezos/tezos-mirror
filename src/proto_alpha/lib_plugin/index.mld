@@ -6,6 +6,7 @@ It contains the following libraries:
 
 - {{!module-Tezos_agnostic_baker_alpha}Tezos_agnostic_baker_alpha}: Protocol specific library for the Agnostic Baker
 - {{!module-Tezos_alpha_test_helpers}Tezos_alpha_test_helpers}: Protocol testing framework
+- {{!module-Tezos_alpha_test_migration}Tezos_alpha_test_migration}: Protocol migration testing checks
 - {{!module-Tezos_baking_alpha}Tezos_baking_alpha}: Base library for `tezos-baker/accuser`
 - {{!module-Tezos_baking_alpha_commands}Tezos_baking_alpha_commands}: Protocol-specific commands for baking
 - {{!module-Tezos_client_alpha}Tezos_client_alpha}: Protocol specific library for `octez-client`

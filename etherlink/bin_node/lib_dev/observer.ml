@@ -21,15 +21,10 @@ open Ethereum_types
     into a forced blueprint. The sequencer has performed a reorganization and
     starts submitting blocks from the new branch.
 *)
-let on_new_blueprint (type f)
-    (tx_container : f Services_backend_sig.tx_container) evm_node_endpoint
-    next_blueprint_number
+let on_new_blueprint evm_node_endpoint next_blueprint_number
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
-     blueprint_with_events) =
+     blueprint_with_events) ~expected_block_hash =
   let open Lwt_result_syntax in
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
-  in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
   if Z.(equal level number) then
@@ -40,6 +35,7 @@ let on_new_blueprint (type f)
     let*! res =
       Evm_context.apply_blueprint
         ~events
+        ?expected_block_hash
         blueprint.timestamp
         blueprint.payload
         delayed_transactions
@@ -66,12 +62,12 @@ let on_new_blueprint (type f)
                blueprint.")
     | Ok confirmed_txs ->
         let* () =
-          Tx_container.confirm_transactions
+          Tx_queue.confirm_transactions
             ~clear_pending_queue_after:false
             ~confirmed_txs
         in
         let*! head = Evm_context.head_info () in
-        let* storage_version = Evm_state.storage_version head.evm_state in
+        let* storage_version = Durable_storage.storage_version head.evm_state in
         let sub_block_latency_disabled =
           Storage_version.sub_block_latency_entrypoints_disabled
             ~storage_version
@@ -116,7 +112,8 @@ let on_finalized_levels ~rollup_node_tracking ~l1_level ~start_l2_level
 
 let on_next_block_info timestamp number =
   let open Lwt_result_syntax in
-  let*! () = Events.next_block_timestamp timestamp in
+  Broadcast.notify_next_block_info timestamp number ;
+  let*! () = Events.next_block_info timestamp number in
   let* () = Evm_context.next_block_info timestamp number in
   return_unit
 
@@ -126,20 +123,18 @@ let on_inclusion (txn : Broadcast.transaction) hash =
   let*! () = Events.inclusion hash in
   let* opt_receipt = Evm_context.execute_single_transaction txn hash in
   Option.iter
-    (fun (r : Transaction_receipt.t) ->
-      Broadcast.notify_transaction_result
-        {hash = r.transactionHash; result = Ok r})
+    (fun (receipt : L2_types.single_tx_receipt) ->
+      match receipt with
+      | Ethereum r ->
+          Broadcast.notify_transaction_result
+            {hash = r.transactionHash; result = Ok r}
+      | Tezos -> ())
     opt_receipt ;
   return_unit
 
-let install_finalizer_observer ~rollup_node_tracking
-    ~(tx_container : _ Services_backend_sig.tx_container)
-    finalizer_public_server finalizer_private_server finalizer_rpc_process
-    telemetry_cleanup =
+let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
+    finalizer_private_server finalizer_rpc_process telemetry_cleanup =
   let open Lwt_syntax in
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
-  in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = telemetry_cleanup () in
   let* () = Events.shutdown_node ~exit_status in
@@ -148,14 +143,25 @@ let install_finalizer_observer ~rollup_node_tracking
   let* () = Option.iter_s (fun f -> f ()) finalizer_rpc_process in
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
-  let* () = Tx_container.shutdown () in
+  let* () = Tx_queue.shutdown () in
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
 let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
-    ~init_from_snapshot () =
+    ~init_from_snapshot ~sandbox () =
   let open Lwt_result_syntax in
   let open Configuration in
+  let* config =
+    if config.experimental_features.preconfirmation_stream_enabled then
+      let*! () = Events.forced_native_execution_instant_confirmation () in
+      return
+        {
+          config with
+          kernel_execution =
+            {config.kernel_execution with native_execution_policy = Always};
+        }
+    else return config
+  in
   let* telemetry_cleanup =
     Octez_telemetry.Opentelemetry_setup.setup
       ~data_dir:config.data_dir
@@ -164,7 +170,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~version:Tezos_version_value.Bin_version.octez_evm_node_version_string
       config.opentelemetry.config
   in
-  let*? {evm_node_endpoint; rollup_node_tracking} =
+  let*? {evm_node_endpoint; rollup_node_tracking; _} =
     Configuration.observer_config_exn config
   in
   let* smart_rollup_address =
@@ -203,16 +209,25 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~l2_chains:config.experimental_features.l2_chains
   in
 
-  let* tx_container =
-    let start, tx_container = Tx_queue.tx_container ~chain_family in
-    let* () =
-      start
-        ~config:config.tx_queue
-        ~keep_alive:config.keep_alive
-        ~timeout:config.rpc_timeout
-        ()
-    in
-    return tx_container
+  let* () =
+    Tx_queue.start
+      ~config:config.tx_queue
+      ~keep_alive:config.keep_alive
+      ~timeout:config.rpc_timeout
+      ~start_injector_worker:true
+      ()
+  in
+
+  let sequencer_key_source =
+    if sandbox then
+      Some
+        (Evm_context.RPC_fetch
+           {
+             evm_node_endpoint;
+             timeout = config.rpc_timeout;
+             keep_alive = config.keep_alive;
+           })
+    else None
   in
 
   let* _loaded =
@@ -223,10 +238,11 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
       ~store_perm:Read_write
+      ?sequencer_key_source
       ?snapshot_source
-      ~tx_container
       ()
   in
+
   (* One domain for the Lwt scheduler, one domain for Evm_context, one domain
      for spawning processes, one for the Irmin GC and the rest of the RPCs. *)
   let pool = Lwt_domain.setup_pool (max 1 (Misc.domain_count_cap () - 4)) in
@@ -235,23 +251,16 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
   in
   let* () = Evm_ro_context.preload_known_kernels ro_ctxt in
 
-  let (module Rpc_backend) =
-    Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
-  in
-
   (* Check that the multichain configuration is consistent with the
      kernel config. *)
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
   let* l2_chain_id, _chain_family =
-    Rpc_backend.single_chain_id_and_family ~config ~enable_multichain
+    Evm_ro_context.single_chain_id_and_family ro_ctxt ~config ~enable_multichain
   in
 
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
-  in
   Metrics.init
     ~mode:"observer"
-    ~tx_pool_size_info:Tx_container.size_info
+    ~tx_pool_size_info:Tx_queue.size_info
     ~smart_rollup_address
     () ;
 
@@ -260,34 +269,34 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~max_number_of_chunks:config.sequencer.max_number_of_chunks
       ~chain_family
       Minimal
-      (module Rpc_backend)
+      ro_ctxt
   in
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let tick () =
-    Tx_container.tx_queue_tick ~evm_node_endpoint:(Rpc evm_node_endpoint)
+    Tx_queue.tx_queue_tick ~evm_node_endpoint:(Rpc evm_node_endpoint)
   in
   let* finalizer_public_server =
     Rpc_server.start_public_server
-      ~mode:(Observer tx_container)
+      ~mode:Observer
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
       ~rpc_server_family
       ~tick
       config
-      ((module Rpc_backend), smart_rollup_address)
+      ro_ctxt
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
-      ~mode:(Observer tx_container)
+      ~mode:Observer
       ~rpc_server_family
       ~tick
       config
-      ((module Rpc_backend), smart_rollup_address)
+      ro_ctxt
   in
 
   let* () =
-    if rollup_node_tracking then
+    if rollup_node_tracking && not sandbox then
       let* () =
         Evm_events_follower.start
           {
@@ -341,7 +350,6 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       finalizer_private_server
       finalizer_rpc_process
       telemetry_cleanup
-      ~tx_container
   in
 
   let*! next_blueprint_number = Evm_context.next_blueprint_number () in
@@ -350,31 +358,31 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
     let task, _resolver = Lwt.task () in
     let*! () = task in
     return_unit
-  else
-    let* () =
-      Blueprints_follower.start
-        ~multichain:enable_multichain
-        ~time_between_blocks
-        ~evm_node_endpoint
-        ~rpc_timeout:config.rpc_timeout
-        ~next_blueprint_number
-        ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
-        ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
-        ~on_next_block_info
-        ~on_inclusion
-        ~on_dropped:(fun hash reason ->
-          Broadcast.notify_transaction_result {hash; result = Error reason} ;
-          let* () = Tx_container.dropped_transaction ~dropped_tx:hash ~reason in
-          return_unit)
-        ()
-    and* () =
-      Drift_monitor.run
-        ~evm_node_endpoint
-        ~timeout:config.rpc_timeout
-        Evm_context.next_blueprint_number
-    and* () =
-      Tx_container.tx_queue_beacon
-        ~evm_node_endpoint:(Rpc evm_node_endpoint)
-        ~tick_interval:(float_of_int config.tx_queue.max_lifespan_s)
-    in
-    return_unit
+  else (
+    Misc.background_task ~name:"drift_monitor" (fun () ->
+        Drift_monitor.run
+          ~evm_node_endpoint
+          ~timeout:config.rpc_timeout
+          ~chain_family
+          Evm_context.next_blueprint_number) ;
+    Misc.background_task ~name:"tx_queue_beacon" (fun () ->
+        Tx_queue.tx_queue_beacon
+          ~evm_node_endpoint:(Rpc evm_node_endpoint)
+          ~tick_interval:(float_of_int config.tx_queue.max_lifespan_s)) ;
+    Blueprints_follower.start
+      ~multichain:enable_multichain
+      ~time_between_blocks
+      ~evm_node_endpoint
+      ~rpc_timeout:config.rpc_timeout
+      ~next_blueprint_number
+      ~instant_confirmations:
+        config.experimental_features.preconfirmation_stream_enabled
+      ~on_new_blueprint:(on_new_blueprint evm_node_endpoint)
+      ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
+      ~on_next_block_info
+      ~on_inclusion
+      ~on_dropped:(fun hash reason ->
+        Broadcast.notify_transaction_result {hash; result = Error reason} ;
+        let* () = Tx_queue.dropped_transaction ~dropped_tx:hash ~reason in
+        return_unit)
+      ())

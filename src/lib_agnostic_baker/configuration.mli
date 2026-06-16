@@ -25,7 +25,6 @@ val baker_args :
     * int option
     * bool
     * Per_block_votes.per_block_vote option
-    * Per_block_votes.per_block_vote option
     * string option
     * Uri.t option
     * Uri.t option
@@ -33,7 +32,8 @@ val baker_args :
     * bool
     * Q.t option
     * Q.t option
-    * bool,
+    * bool
+    * Uri.t list option,
     Tezos_client_base.Client_context.full )
   Tezos_clic.options
 
@@ -60,7 +60,6 @@ type t = {
   force_apply_from_round : int option;
   keep_alive : bool;
   liquidity_baking_vote : Per_block_votes.per_block_vote option;
-  adaptive_issuance_vote : Per_block_votes.per_block_vote option;
   per_block_vote_file : string option;
   extra_operations : Uri.t option;
   dal_node_endpoint : Uri.t option;
@@ -69,9 +68,12 @@ type t = {
   pre_emptive_forge_time : Q.t option;
   remote_calls_timeout : Q.t option;
   allow_signing_delay : bool;
+  extra_nodes : Tezos_client_base.Client_context.full list;
 }
 
 val create_config :
+  Tezos_client_base.Client_context.full ->
+  Tezos_rpc_http_client_unix.RPC_client_unix.config ->
   string option
   * bool
   * string option
@@ -81,7 +83,6 @@ val create_config :
   * int option
   * bool
   * Per_block_votes.per_block_vote option
-  * Per_block_votes.per_block_vote option
   * string option
   * Uri.t option
   * Uri.t option
@@ -89,7 +90,8 @@ val create_config :
   * bool
   * Q.t option
   * Q.t option
-  * bool ->
+  * bool
+  * Uri.t list option ->
   t
 
 type per_block_votes_config = {

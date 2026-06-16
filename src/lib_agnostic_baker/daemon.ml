@@ -24,6 +24,7 @@ module type AGNOSTIC_DAEMON = sig
   val run :
     keep_alive:bool ->
     command:command ->
+    extra_nodes:Tezos_client_base.Client_context.full list ->
     Tezos_client_base.Client_context.full ->
     unit tzresult Lwt.t
 end
@@ -112,36 +113,62 @@ module Make_daemon (Agent : AGENT) :
   type command = Agent.command
 
   type state = {
-    node_endpoint : string;
     current_baker : baker;
     old_baker : baker_to_kill option;
     keep_alive : bool;
     command : command;
     cctxt : Tezos_client_base.Client_context.full;
-    head_stream : string Lwt_stream.t;
+    extra_nodes : Tezos_client_base.Client_context.full list;
+    head_stream :
+      (* we switch [head_stream] from [`Live] to [`Reconnecting] on
+         disconnections, and from [`Reconnecting] to [`Live] on reconnections *)
+      [ `Live of
+        (Tezos_client_base.Client_context.full
+        * (Block_hash.t * Block_header.t))
+        Lwt_stream.t
+      | `Reconnecting of
+        (Tezos_client_base.Client_context.full
+        * (Block_hash.t * Block_header.t))
+        Lwt_stream.t
+        tzresult
+        Lwt.t ];
+    last_seen_level : int32 option;
   }
 
   type t = state
 
   (* ---- Baker Process Management ---- *)
 
-  let rec retry_on_disconnection ~emit node_addr f arg =
+  let rec retry_on_disconnection node_addr f arg =
     let open Lwt_result_syntax in
     let*! result = f arg in
     match result with
     | Ok res -> return res
-    | Error (Lost_node_connection :: _ | Cannot_connect_to_node _ :: _) ->
+    | Error
+        ( Tezos_rpc_http.RPC_client_errors.Request_failed _ :: _
+        | Lost_node_connection :: _
+        | Cannot_connect_to_node _ :: _ ) ->
         let* _level =
           Utils.retry
-            ~emit
+            ~emit:Events.(emit retry_on_disconnection)
             ~max_delay:10.
             ~delay:1.
             ~factor:1.5
-            ~is_error:(function Cannot_connect_to_node _ -> true | _ -> false)
+            ~msg:(fun errs ->
+              Format.asprintf
+                "agnostic daemon failed to reach the node at %s.@.%a"
+                node_addr
+                pp_print_trace
+                errs)
+            ~is_error:(function
+              | Tezos_rpc_http.RPC_client_errors.Request_failed _
+              | Cannot_connect_to_node _ ->
+                  true
+              | _ -> false)
             (fun node_addr -> Rpc_services.get_level ~node_addr)
             node_addr
         in
-        retry_on_disconnection ~emit node_addr f arg
+        retry_on_disconnection node_addr f arg
     | Error trace -> fail trace
 
   (** [run_thread ~protocol_hash ~cancel_promise ~init_sapling_params cctxt
@@ -182,8 +209,8 @@ module Make_daemon (Agent : AGENT) :
     let agent_thread = Agent.run_command plugin cctxt command in
     Lwt.pick [agent_thread; cancel_promise]
 
-  (** [spawn_baker cctxt command protocol_hash] spawns a new baker process for
-      the given [protocol_hash]. *)
+  (** [spawn_baker cctxt command protocol_hash] spawns a new baker
+      process for the given [protocol_hash]. *)
   let spawn_baker cctxt command protocol_hash =
     let open Lwt_result_syntax in
     let*! () = Events.(emit starting_agent) (Agent.name, protocol_hash) in
@@ -220,14 +247,15 @@ module Make_daemon (Agent : AGENT) :
     let* new_baker = spawn_baker state.cctxt state.command next_protocol_hash in
     return {state with old_baker; current_baker = new_baker}
 
-  (** [maybe_kill_old_baker state node_addr] checks whether the [old_baker] process
+  (** [maybe_kill_old_baker state] checks whether the [old_baker] process
     from the [state] of the agnostic baker has surpassed its lifetime and it stops
     it if that is the case. *)
-  let maybe_kill_old_baker state node_addr =
+  let maybe_kill_old_baker state =
     let open Lwt_result_syntax in
     match state.old_baker with
     | None -> return state
     | Some {baker; level_to_kill} ->
+        let node_addr = Uri.to_string state.cctxt#base in
         let* head_level =
           (Rpc_services.get_level
              ~node_addr [@profiler.record_s {verbosity = Notice} "get_level"])
@@ -244,32 +272,62 @@ module Make_daemon (Agent : AGENT) :
 
   (* ---- Baker and Chain Monitoring ---- *)
 
-  (** [monitor_heads ~node_addr] creates a stream which returns the data
-    of the heads of the current network; this information is received
-    from the RPC calls at the endpoint given by [~node_addr]. *)
-  let monitor_heads ~node_addr =
+  let monitor_heads cctxt =
     let open Lwt_result_syntax in
-    let uri = Format.sprintf "%s/monitor/heads/main" node_addr in
-    let* _, body = Rpc_services.request_uri ~node_addr ~uri in
-    let cohttp_stream = Cohttp_lwt.Body.to_stream body in
-    let buffer = Buffer.create 2048 in
-    let stream, push = Lwt_stream.create () in
-    let on_chunk v = push (Some v) and on_close () = push None in
-    let rec loop () =
-      let*! v = Lwt_stream.get cohttp_stream in
-      match v with
-      | None ->
-          on_close () ;
-          Lwt.return_unit
-      | Some chunk ->
-          Buffer.add_string buffer chunk ;
-          let data = Buffer.contents buffer in
-          Buffer.reset buffer ;
-          on_chunk data ;
-          loop ()
-    in
-    ignore (loop () : unit Lwt.t) ;
+    let* stream, _stopper = Monitor_services.heads cctxt cctxt#chain in
     return stream
+
+  (** [monitor_heads_with_cctxt cctxt] creates a head stream tagged with the
+      source cctxt for RPC routing. *)
+  let monitor_heads_with_cctxt cctxt =
+    let open Lwt_result_syntax in
+    let* stream = monitor_heads cctxt in
+    return (Lwt_stream.map (fun head -> (cctxt, head)) stream)
+
+  (** [merge_head_streams nodes] creates a merged stream
+      from all node connections. Each stream element is tagged with its source
+      cctxt for RPC routing. Automatically reconnects on stream closure. *)
+  let merge_head_streams nodes =
+    let open Lwt_syntax in
+    let merged_stream, push_to_merged_stream = Lwt_stream.create () in
+    List.iter
+      (fun cctxt ->
+        let node_uri = Uri.to_string cctxt#base in
+        Lwt.async (fun () ->
+            let rec monitor_stream stream =
+              let* value = Lwt_stream.get stream in
+              match value with
+              | Some head ->
+                  push_to_merged_stream (Some (cctxt, head)) ;
+                  monitor_stream stream
+              | None ->
+                  (* Stream closed - retry connection *)
+                  let* () = Events.(emit node_connection_lost) node_uri in
+                  recreate_stream ()
+            and recreate_stream () =
+              let* () = Lwt_unix.sleep 5.0 in
+              let* result = monitor_heads cctxt in
+              match result with
+              | Ok new_stream ->
+                  let* () = Events.(emit node_connection_restored) node_uri in
+                  monitor_stream new_stream
+              | Error trace ->
+                  let* () =
+                    Events.(emit node_connection_retry_failed) (node_uri, trace)
+                  in
+                  recreate_stream ()
+            in
+            (* Start initial stream *)
+            let* result = monitor_heads cctxt in
+            match result with
+            | Ok stream -> monitor_stream stream
+            | Error trace ->
+                let* () =
+                  Events.(emit node_connection_retry_failed) (node_uri, trace)
+                in
+                recreate_stream ()))
+      nodes ;
+    return merged_stream
 
   (** [monitor_voting_periods ~state] continuously monitors chain data to detect
     protocol changes. It will:
@@ -278,7 +336,7 @@ module Make_daemon (Agent : AGENT) :
     The voting period information is used for logging purposes. *)
   let monitor_voting_periods ~state =
     let open Lwt_result_syntax in
-    let node_addr = state.node_endpoint in
+    let node_addr = Uri.to_string state.cctxt#base in
     let* block_hash =
       (Rpc_services.get_block_hash
          ~node_addr [@profiler.record_s {verbosity = Notice} "get_block_hash"])
@@ -294,9 +352,7 @@ module Make_daemon (Agent : AGENT) :
     in
     let* state =
       (maybe_kill_old_baker
-         state
-         node_addr
-       [@profiler.record_s {verbosity = Notice} "maybe_kill_old_baker"])
+         state [@profiler.record_s {verbosity = Notice} "maybe_kill_old_baker"])
     in
     let* next_protocol_hash =
       (Rpc_services.get_next_protocol_hash
@@ -351,7 +407,7 @@ module Make_daemon (Agent : AGENT) :
                     (proto_status, protocol_hash)
                 in
                 let*! () = Events.(emit waiting_for_active_protocol) () in
-                monitor_heads ~node_addr
+                monitor_heads cctxt
           in
           let*! v = Lwt_stream.get head_stream in
           match v with
@@ -374,18 +430,31 @@ module Make_daemon (Agent : AGENT) :
      to determine when to switch to a new protocol baker process. *)
 
   let[@warning "-32"] may_start_profiler baking_dir =
-    match Tezos_profiler_unix.Profiler_instance.selected_backends () with
+    let profiling_config =
+      Tezos_profiler_unix.Profiler_instance.read_profiling_config_from_base_dir
+        baking_dir
+    in
+    match
+      Tezos_profiler_unix.Profiler_instance.selected_backends ~profiling_config
+    with
     | Some backends ->
         List.iter
           (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
             let profiler_maker = instance_maker ~directory:baking_dir in
-            Agnostic_baker_profiler.init profiler_maker)
+            Agnostic_baker_profiler.init ~profiling_config profiler_maker)
           backends
     | None -> ()
 
   type event =
-    | New_head
+    | New_head of {
+        source_cctxt : Tezos_client_base.Client_context.full;
+        head : Block_hash.t * Block_header.t;
+      }
     | Head_stream_ended
+    | Head_stream_reconnected of
+        (Tezos_client_base.Client_context.full
+        * (Block_hash.t * Block_header.t))
+        Lwt_stream.t
     | Old_baker_stopped
     | Current_baker_stopped
 
@@ -408,25 +477,76 @@ module Make_daemon (Agent : AGENT) :
           Lwt_utils.never_ending ()
     in
     let head_stream =
-      Lwt.map
-        (function None -> Ok Head_stream_ended | Some _head -> Ok New_head)
-        (Lwt_stream.get state.head_stream)
+      match state.head_stream with
+      | `Live stream ->
+          Lwt.map
+            (function
+              | None -> Ok Head_stream_ended
+              | Some (source_cctxt, head) -> Ok (New_head {source_cctxt; head}))
+            (Lwt_stream.get stream)
+      | `Reconnecting promise ->
+          Lwt_result.map (fun stream -> Head_stream_reconnected stream) promise
     in
     let* pick = Lwt.choose [current_baker; old_baker; head_stream] in
     match pick with
-    | New_head ->
-        let* state = monitor_voting_periods ~state in
-        return (Some state)
+    | New_head {source_cctxt; head = block_hash, block_header} ->
+        let*! () =
+          Events.(emit monitoring_head_from_node)
+            ( Int32.to_int block_header.shell.level,
+              Uri.to_string source_cctxt#base,
+              block_hash )
+        in
+        let current_level = block_header.shell.level in
+        let should_process_block =
+          match state.last_seen_level with
+          | None -> true
+          | Some last_level -> Int32.compare current_level last_level > 0
+        in
+        if should_process_block then
+          (* Update state.cctxt to the source of this head *)
+          let state =
+            {
+              state with
+              cctxt = source_cctxt;
+              last_seen_level = Some current_level;
+            }
+          in
+          let* state = monitor_voting_periods ~state in
+          return (Some state)
+        else
+          let*! () =
+            Events.(emit skipping_lower_or_equal_level)
+              ( Int32.to_int current_level,
+                Uri.to_string source_cctxt#base,
+                block_hash )
+          in
+          return (Some state)
     | Head_stream_ended ->
-        let* head_stream = monitor_heads ~node_addr:state.node_endpoint in
-        return (Some {state with head_stream})
+        let*! () =
+          Events.(emit head_stream_ended) (Uri.to_string state.cctxt#base)
+        in
+        let reconnect_promise =
+          retry_on_disconnection
+            (Uri.to_string state.cctxt#base)
+            monitor_heads_with_cctxt
+            state.cctxt
+        in
+        return (Some {state with head_stream = `Reconnecting reconnect_promise})
+    | Head_stream_reconnected stream ->
+        let*! () =
+          Events.(emit head_stream_reconnected) (Uri.to_string state.cctxt#base)
+        in
+        return (Some {state with head_stream = `Live stream})
     | Old_baker_stopped -> (
         match state.old_baker with
         | None -> assert false
         | Some old_baker ->
+            let*! () =
+              Events.(emit old_baker_stopped old_baker.baker.protocol_hash)
+            in
             let* head_level =
               (Rpc_services.get_level
-                 ~node_addr:state.node_endpoint
+                 ~node_addr:(Uri.to_string state.cctxt#base)
                [@profiler.record_s {verbosity = Notice} "get_level"])
             in
             if head_level >= old_baker.level_to_kill then
@@ -439,18 +559,12 @@ module Make_daemon (Agent : AGENT) :
 
   let rec main_loop state =
     let open Lwt_result_syntax in
-    let* result =
-      retry_on_disconnection
-        ~emit:(fun _ -> Lwt.return_unit)
-        state.node_endpoint
-        main_iteration
-        state
-    in
+    let* result = main_iteration state in
     match result with
     | None -> return_unit
     | Some next_state -> main_loop next_state
 
-  let run ~keep_alive ~command cctxt =
+  let run ~keep_alive ~command ~extra_nodes cctxt =
     let open Lwt_result_syntax in
     () [@profiler.overwrite may_start_profiler cctxt#get_base_dir] ;
     let node_addr = Uri.to_string cctxt#base in
@@ -463,30 +577,29 @@ module Make_daemon (Agent : AGENT) :
     let* current_baker =
       if keep_alive then
         retry_on_disconnection
-          ~emit:(Events.emit Events.cannot_connect)
           node_addr
           (fun () -> may_start_initial_baker cctxt command ~node_addr)
           ()
       else may_start_initial_baker cctxt command ~node_addr
     in
     let* head_stream =
-      (* Useful if the baker is started before the node or restarted while the
-         node is down. *)
-      retry_on_disconnection
-        ~emit:(fun _ -> Lwt.return_unit)
-        node_addr
-        (fun node_addr -> monitor_heads ~node_addr)
-        node_addr
+      if extra_nodes = [] then
+        (* Useful if the baker is started before the node. *)
+        retry_on_disconnection node_addr monitor_heads_with_cctxt cctxt
+      else
+        let*! stream = merge_head_streams (cctxt :: extra_nodes) in
+        return stream
     in
     let state =
       {
-        node_endpoint = node_addr;
         current_baker;
         old_baker = None;
         keep_alive;
         command;
         cctxt;
-        head_stream;
+        extra_nodes;
+        head_stream = `Live head_stream;
+        last_seen_level = None;
       }
     in
     main_loop state

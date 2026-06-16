@@ -20,8 +20,9 @@ use tezos_smart_rollup_host::path::concat;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::path::RefPath;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 use thiserror::Error;
 
 // TODO: replace with `dac_committee`, `_-` now allowed in paths by PVM,
@@ -30,11 +31,14 @@ pub(crate) const DAC_COMMITTEE_MEMBER_PATH_PREFIX: RefPath =
     RefPath::assert_from(b"/kernel/dac.committee");
 
 /// Reveal and store a DAC message assuming the DAC message is verified
-pub fn reveal_and_store_dac_message<Host: Runtime>(
+pub fn reveal_and_store_dac_message<Host>(
     parsed_dac_message: Certificate,
     host: &mut Host,
     idx: u32,
-) -> Result<(), ProcessExtMsgError> {
+) -> Result<(), ProcessExtMsgError>
+where
+    Host: StorageV1 + HostReveal,
+{
     let dac_payload_path = dac_payload_path(idx).map_err(ProcessExtMsgError::Path)?;
     // preallocate with maximum expected size of DAC content
     parsed_dac_message.reveal_to_store(host, &dac_payload_path)?;
@@ -42,11 +46,14 @@ pub fn reveal_and_store_dac_message<Host: Runtime>(
 }
 
 /// Process a list of operations.
-pub fn process_batch_message<Host: Runtime>(
+pub fn process_batch_message<Host>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
     batch: ParsedBatch,
-) -> Vec<Vec<Withdrawal>> {
+) -> Vec<Vec<Withdrawal>>
+where
+    Host: StorageV1,
+{
     let mut all_withdrawals: Vec<Vec<Withdrawal>> = Vec::new();
 
     for transaction in batch.operations.into_iter() {
@@ -56,7 +63,7 @@ pub fn process_batch_message<Host: Runtime>(
             }
             Err(_err) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "Could not execute transaction: {}\n", _err);
+                debug_msg!("Could not execute transaction: {}\n", _err);
             }
         };
     }
@@ -64,8 +71,8 @@ pub fn process_batch_message<Host: Runtime>(
     all_withdrawals
 }
 
-pub(crate) fn get_dac_committee(
-    host: &impl Runtime,
+pub(crate) fn get_dac_committee<Host: StorageV1>(
+    host: &Host,
 ) -> Result<Vec<PublicKeyBls>, ProcessExtMsgError> {
     let num_keys = host
         .store_count_subkeys(&DAC_COMMITTEE_MEMBER_PATH_PREFIX)
@@ -89,16 +96,12 @@ pub(crate) fn get_dac_committee(
 }
 
 /// Parse external message, logging error if it occurs.
-pub(crate) fn parse_external<'a>(
-    _host: &impl Runtime,
-    message: &'a [u8],
-) -> Option<ParsedExternalInboxMessage<'a>> {
+pub(crate) fn parse_external(message: &[u8]) -> Option<ParsedExternalInboxMessage<'_>> {
     match ParsedExternalInboxMessage::parse(message) {
         Ok((remaining, external)) => {
             if !remaining.is_empty() {
                 #[cfg(feature = "debug")]
                 debug_msg!(
-                    _host,
                     "External message had unused remaining bytes: {:?}\n",
                     remaining
                 );
@@ -107,7 +110,7 @@ pub(crate) fn parse_external<'a>(
         }
         Err(_err) => {
             #[cfg(feature = "debug")]
-            debug_msg!(_host, "Error parsing external message payload {}\n", _err);
+            debug_msg!("Error parsing external message payload {}\n", _err);
             None
         }
     }

@@ -216,7 +216,9 @@ let reconnect_after_migration ~migrate_from ~migrate_to =
         "reconnect";
         Protocol.tag migrate_from;
         Protocol.tag migrate_to;
-        "flaky";
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/8171
+           Reconnection during a protocol migration kills the baker. *)
+        Tag.ci_disabled;
       ]
     ~uses:[Constant.octez_agnostic_baker]
   @@ fun () ->
@@ -363,11 +365,12 @@ let test_keep_alive =
   let process = Agnostic_baker.spawn_run baker in
   let* () = Process.check_error ~msg:(rex "Cannot connect to node") process in
   (* Start the baker with no node running and [--keep-alive], it'll wait. *)
-  let wait_for_cannot_connect =
-    Agnostic_baker.wait_for baker "cannot_connect.v0" (fun _json -> Some ())
+  let wait_for_retry_on_disconnection () =
+    Agnostic_baker.wait_for baker "retry_on_disconnection.v0" (fun _json ->
+        Some ())
   in
   let* () = Agnostic_baker.run ~extra_arguments:["--keep-alive"] baker
-  and* () = wait_for_cannot_connect in
+  and* () = wait_for_retry_on_disconnection () in
   (* Start the node. *)
   let f_wait_for_chain_id () =
     (* This is an event emitted by the baker lib. *)
@@ -392,7 +395,7 @@ let test_keep_alive =
   and* () = wait_baker_proposal
   and* () = wait_period_status in
   (* Kill the node now that they are connected, the baker will stay alive. *)
-  let* () = Node.terminate node and* () = wait_for_cannot_connect in
+  let* () = Node.terminate node and* () = wait_for_retry_on_disconnection () in
   (* Redo the procedure, restart the node and wait for the block events. *)
   let wait_for_chain_id = f_wait_for_chain_id () in
   let* () = Node.run node []
@@ -441,14 +444,781 @@ let test_cli =
   let p = Agnostic_baker.spawn_raw ~arguments baker in
   let* () = check_process_error "Please connect a running DAL node using" p in
 
+  let arguments_with_bad_extra_node =
+    arguments @ ["--without-dal"; "--extra-node"; "file:///etc/passwd"]
+  in
+  let p =
+    Agnostic_baker.spawn_raw ~arguments:arguments_with_bad_extra_node baker
+  in
+  let* () =
+    check_process_error "only http and https endpoints are supported" p
+  in
+
   let arguments = arguments @ ["--without-dal"] in
   let* () = Agnostic_baker.wait_for_ready baker
   and* () = Agnostic_baker.raw ~arguments baker in
   unit
 
+let test_operation_worker_crash_shuts_down_baker_single_node =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker shuts down when node crashes"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "single_node"; "crash"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      ()
+  in
+  let* _ = Node.wait_for_level node 1 in
+
+  let baker =
+    Agnostic_baker.create ~keep_alive:true ~remote_mode:true node client
+  in
+  let baker_process = Agnostic_baker.spawn_run baker in
+
+  Log.info "Baking initial blocks to verify baker is operational" ;
+  let* _ = Node.wait_for_level node 5 in
+
+  let* () = Node.terminate node in
+  Log.info "✓ Node terminated" ;
+
+  (* The baker should retry the monitor_operations RPC 10 times with exponential
+     backoff (1s, 2s, 4s, 8s, 10s, 10s, 10s, 10s, 10s, 10s) = 75 seconds total.
+     After 75 seconds of retries, it should shut down with exit code 111.
+     We use Lwt.pick to race between the expected error and a timeout. *)
+  Log.info
+    "Waiting for baker to shut down after ~75s of retries (10 attempts with \
+     exponential backoff)" ;
+  let* () =
+    Lwt.pick
+      [
+        Process.check_error
+          ~exit_code:111
+          ~msg:(rex ".*Node unreachable via the monitor_operations.*")
+          baker_process;
+        (let* () = Lwt_unix.sleep 90.0 in
+         Test.fail
+           "Baker did not shut down within 90 seconds. Expected shutdown after \
+            ~75s of retries.");
+      ]
+  in
+  Log.info
+    "✓ Baker shut down with exit code 111 and expected error: 'Node \
+     unreachable via the monitor_operations RPC. Unable to monitor quorum. \
+     Shutting down baker...'" ;
+  unit
+
+let test_operation_worker_crash_shuts_down_baker_multi_node =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker does not shut down when operation_worker crashes"
+    ~tags:
+      [team; "sandbox"; "agnostic"; "baker"; "multi_node"; "crash"; Tag.flaky]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Setting up two nodes connected via P2P (in archive mode)" ;
+  (* Setup: 2 nodes sharing the same chain via P2P, both in archive mode *)
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:
+        [Synchronisation_threshold 0; Connections 1; History_mode Archive]
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:
+        [Synchronisation_threshold 0; Connections 1; History_mode Archive]
+      `Client
+      ()
+  in
+
+  (* Set up P2P trust relationships (required for Private_mode) *)
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+
+  (* Connect the nodes *)
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+
+  (* Wait for both nodes to sync to level 1 *)
+  let* _ = Node.wait_for_level node1 1 in
+  let* _ = Node.wait_for_level node2 1 in
+  Log.info "✓ Two nodes set up, connected via P2P, and synced" ;
+
+  Log.info "Creating baker connected to both nodes using --extra-node" ;
+  let baker =
+    Agnostic_baker.create
+      ~remote_mode:true
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      node1
+      client1
+  in
+
+  (* Start baker and wait for ready *)
+  Log.info "Starting baker with --extra-node" ;
+  let baker_process = Agnostic_baker.spawn_run baker in
+
+  (* Bake a few blocks to ensure everything is working *)
+  Log.info "Baking initial blocks to verify baker is operational" ;
+  let* _ = Node.wait_for_level node1 5 in
+  let* _ = Node.wait_for_level node2 5 in
+
+  (* Crash node1 (the primary node) *)
+  Log.info "Crashing node1 (primary node)" ;
+  let* () = Node.terminate node1 in
+  Log.info "✓ Node1 terminated" ;
+
+  (* The baker should retry the monitor_operations RPC 10 times with exponential
+     backoff (1s, 2s, 4s, 8s, 10s, 10s, 10s, 10s, 10s, 10s) = 75 seconds total.
+     After 75 seconds of retries, it should shut down with exit code 111.
+     We use Lwt.pick to race between the expected error and a timeout. *)
+  Log.info
+    "Waiting for baker to shut down after ~75s of retries (10 attempts with \
+     exponential backoff)" ;
+  let* () =
+    Lwt.pick
+      [
+        (let* () = Process.check_error baker_process in
+         Test.fail "Baker wasn't expected to crash.");
+        Lwt_unix.sleep 90.0;
+      ]
+  in
+  Log.info "✓ Baker did not shutdown shut down" ;
+
+  let* () =
+    Node.run
+      node1
+      [Synchronisation_threshold 0; Connections 1; History_mode Archive]
+  in
+  let* () = Node.wait_for_ready node1 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.connect_address client2 ~peer:node1 in
+
+  (* Wait until the node1 is bootstrapped. *)
+  let* () = Client.bootstrapped client1 in
+  let* () = Lwt_unix.sleep 30. in
+
+  (* Kill node2, if we continue to bake more blocks, it's a proof that node1 has
+     been reconnected. We cannot wait on baker events because we spawned the
+     process. *)
+  let* level_before_kill = Node.get_level node2 in
+  let* () = Node.terminate node2 in
+  Log.info "Wait for baker to produce blocks via node1" ;
+  let* _ = Node.wait_for_level node1 (level_before_kill + 5) in
+
+  unit
+
+let test_multi_node_connection_recovery =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Agnostic baker multi-node connection recovery"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"]
+    ~supports:Protocol.(From_protocol (number T024))
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Setting up two nodes connected via P2P" ;
+  (* Setup: 2 nodes sharing the same chain via P2P *)
+  let* node1 = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let node1_uri =
+    Node.as_rpc_endpoint node1 |> Endpoint.to_uri |> Uri.to_string
+  in
+  let* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let node2_uri =
+    Node.as_rpc_endpoint node2 |> Endpoint.to_uri |> Uri.to_string
+  in
+
+  let* client1 = Client.init ~endpoint:(Node node1) () in
+  let* client2 = Client.init ~endpoint:(Node node2) () in
+
+  (* Set up P2P trust relationships (required for Private_mode) *)
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+
+  (* Connect the nodes *)
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+
+  (* Activate protocol on node1 (will propagate to node2) *)
+  let* () = Client.activate_protocol ~protocol client1 in
+
+  (* Wait for both nodes to sync to level 1 *)
+  let* _ = Node.wait_for_level node1 1 in
+  let* _ = Node.wait_for_level node2 1 in
+  Log.info "✓ Two nodes set up, connected via P2P, and synced" ;
+
+  Log.info "Creating baker connected to both nodes using --extra-node" ;
+  (* Use activator (no voting power) to avoid conflict with manual baking *)
+  let baker =
+    Agnostic_baker.create
+      ~delegates:[Constant.activator.public_key_hash]
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      ~keep_alive:true
+      ~remote_mode:true
+      node1
+      client1
+  in
+
+  (* Start baker and wait for ready *)
+  Log.info
+    "Starting baker with --extra-node %s"
+    (Endpoint.as_string (Node.as_rpc_endpoint node2)) ;
+  let* () = Agnostic_baker.run ~event_level:`Debug baker in
+  let* () = Agnostic_baker.wait_for_ready baker in
+  Log.info "✓ Baker is ready and monitoring both nodes" ;
+
+  (* Helper: wait for daemon events *)
+  let wait_for_node_connection_lost uri =
+    Agnostic_baker.wait_for
+      baker
+      "agnostic_daemon_node_connection_lost.v0"
+      (fun json ->
+        let uri' = JSON.as_string json in
+        if uri = uri' then Some () else None)
+  in
+
+  let wait_for_node_connection_restored () =
+    Agnostic_baker.wait_for
+      baker
+      "agnostic_daemon_node_connection_restored.v0"
+      (fun json ->
+        let uri = JSON.as_string json in
+        Log.info "Detected node_connection_restored event for: %s" uri ;
+        Some uri)
+  in
+
+  let wait_for_monitoring_head_from_node level uri =
+    Agnostic_baker.wait_for
+      baker
+      "agnostic_daemon_monitoring_head_from_node.v0"
+      (fun json ->
+        let level' = JSON.(json |-> "level" |> as_int) in
+        let uri' = JSON.(json |-> "uri" |> as_string) in
+        if level = level' && uri = uri' then Some () else None)
+  in
+
+  (* Bake a few initial blocks to ensure the baker is operational *)
+  Log.info "Baking initial blocks to verify daemon is monitoring" ;
+  let wait_monitor1 = wait_for_monitoring_head_from_node 2 node1_uri in
+  let wait_monitor2 = wait_for_monitoring_head_from_node 2 node2_uri in
+
+  let* () = Client.bake_for_and_wait ~keys:[] client1
+  and* () = wait_monitor1
+  and* () = wait_monitor2 in
+
+  Log.info "✓ Daemon saw head at level 2 from %s" node1_uri ;
+  Log.info "✓ Daemon saw head at level 2 from %s" node2_uri ;
+
+  (* Test 1: Terminate node2 - should trigger node_connection_lost event *)
+  Log.info "Terminating node2 to test connection loss detection" ;
+  (* Set up the event watcher BEFORE terminating the node *)
+  let wait_connection_lost = wait_for_node_connection_lost node2_uri in
+  let* () = Node.terminate node2 and* () = wait_connection_lost in
+
+  Log.info "✓ node_connection_lost event received for: %s" node2_uri ;
+
+  (* Verify baker continues working with node1 only *)
+  Log.info "Baking a block to verify baker still works with node1" ;
+  let* current_level = Node.get_level node1 in
+  let wait_monitor =
+    wait_for_monitoring_head_from_node (current_level + 1) node1_uri
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client1 and* _ = wait_monitor in
+  Log.info
+    "✓ Baker continues operating with node1 (monitoring from %s)"
+    node1_uri ;
+
+  (* Test 2: Restart node2 - should trigger node_connection_restored event *)
+  Log.info "Restarting node2 to test connection restoration" ;
+  (* Set up the event watcher BEFORE restarting the node *)
+  let wait_connection_restored = wait_for_node_connection_restored () in
+  let* () = Node.run node2 []
+  and* _ = wait_connection_restored
+  and* () = Node.wait_for_ready node2 in
+
+  (* Re-establish P2P trust (needed after restart in Private_mode) *)
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+  Log.info "Node2 restarted and P2P connected" ;
+
+  (* Wait for node2 to sync *)
+  let* node1_level = Node.get_level node1 in
+  let* _ = Node.wait_for_level node2 node1_level in
+  Log.info "Node2 synced to level %d" node1_level ;
+
+  (* Verify both nodes are working again by baking more blocks *)
+  Log.info "Baking blocks to verify both nodes are operational" ;
+  let expected_level = node1_level + 1 in
+  let wait_monitor1 =
+    wait_for_monitoring_head_from_node expected_level node1_uri
+  in
+  let wait_monitor2 =
+    wait_for_monitoring_head_from_node expected_level node2_uri
+  in
+
+  let* () = wait_monitor1
+  and* () = wait_monitor2
+  and* () = Client.bake_for_and_wait ~keys:[] client1 in
+  Log.info "✓ Daemon saw head at level %d from %s" expected_level node1_uri ;
+  Log.info "✓ Daemon saw head at level %d from %s" expected_level node2_uri ;
+
+  (* Test completed successfully *)
+  Log.info "✓ Multi-node connection recovery test completed successfully" ;
+  unit
+
+let test_multi_node_dal_worker_connection_recovery =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker multi-node DAL worker connection recovery"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"; "dal"]
+    ~supports:Protocol.(From_protocol 025)
+    ~uses:(fun _protocol ->
+      [Constant.octez_agnostic_baker; Constant.octez_dal_node])
+  @@ fun protocol ->
+  Log.info "Setting up three nodes connected via P2P" ;
+  (* Setup: 3 nodes sharing the same chain via P2P *)
+  (* node1 and node2 are for the baker, node3 is dedicated for the DAL node *)
+  (* Use Archive mode to ensure DAL node has enough history *)
+  let* node1 =
+    Node.init [Synchronisation_threshold 0; Private_mode; History_mode Archive]
+  in
+  let* node2 =
+    Node.init [Synchronisation_threshold 0; Private_mode; History_mode Archive]
+  in
+  let* node3 =
+    Node.init [Synchronisation_threshold 0; Private_mode; History_mode Archive]
+  in
+
+  let* client1 = Client.init ~endpoint:(Node node1) () in
+  let* client2 = Client.init ~endpoint:(Node node2) () in
+  let* client3 = Client.init ~endpoint:(Node node3) () in
+
+  (* Set up P2P trust relationships (required for Private_mode) *)
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.trust_address client1 ~peer:node3 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.trust_address client2 ~peer:node3 in
+  let* () = Client.Admin.trust_address client3 ~peer:node1 in
+  let* () = Client.Admin.trust_address client3 ~peer:node2 in
+
+  (* Connect the nodes *)
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+  let* () = Client.Admin.connect_address client1 ~peer:node3 in
+
+  (* Activate protocol with DAL enabled *)
+  let dal_parameters =
+    [
+      (["dal_parametric"; "feature_enable"], `Bool true);
+      (["dal_parametric"; "number_of_slots"], `Int 8);
+      (["dal_parametric"; "attestation_lag"], `Int 4);
+      ( ["dal_parametric"; "attestation_lags"],
+        `A [`Float 2.; `Float 3.; `Float 4.] );
+      (["dal_parametric"; "attestation_threshold"], `Int 50);
+    ]
+  in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.Right (protocol, None))
+      dal_parameters
+  in
+  let* () =
+    Client.activate_protocol ~protocol ~parameter_file client1 ~timestamp:Now
+  in
+
+  (* Wait for all nodes to sync to level 1 *)
+  let* _ = Node.wait_for_level node1 1 in
+  let* _ = Node.wait_for_level node2 1 in
+  let* _ = Node.wait_for_level node3 1 in
+  Log.info "✓ Three nodes set up, connected via P2P, and synced" ;
+
+  (* Start DAL node with attester profiles for delegates, connected to node3 *)
+  Log.info "Starting DAL node connected to node3" ;
+  let dal_node = Dal_node.create ~node:node3 () in
+  let* () =
+    Dal_node.init_config
+      ~attester_profiles:
+        [
+          Account.Bootstrap.keys.(0).public_key_hash;
+          Account.Bootstrap.keys.(1).public_key_hash;
+        ]
+      dal_node
+  in
+  let* () = Dal_node.run ~wait_ready:true dal_node in
+  Log.info "✓ DAL node running" ;
+
+  Log.info "Creating baker connected to both nodes using --extra-node" ;
+  (* Use two bootstrap accounts as delegates to have actual DAL committee membership *)
+  let baker =
+    Agnostic_baker.create
+      ~delegates:[Account.Bootstrap.keys.(0).public_key_hash]
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      ~dal_node_rpc_endpoint:(Dal_node.as_rpc_endpoint dal_node)
+      ~keep_alive:true
+      ~remote_mode:true
+      node1
+      client1
+  in
+
+  (* Start baker and wait for ready *)
+  Log.info
+    "Starting baker with --extra-node %s and DAL node endpoint %s"
+    (Endpoint.as_string (Node.as_rpc_endpoint node2))
+    (Endpoint.as_string (Dal_node.as_rpc_endpoint dal_node)) ;
+  let* () = Agnostic_baker.run ~event_level:`Info baker in
+  let* () = Agnostic_baker.wait_for_ready baker in
+  Log.info "✓ Baker is ready and monitoring both nodes" ;
+
+  (* Wait for DAL workers to start for both automatons *)
+  Log.info "Waiting for DAL workers to start for both automatons" ;
+  let node1_endpoint = Endpoint.as_string (Node.as_rpc_endpoint node1) in
+  let node2_endpoint = Endpoint.as_string (Node.as_rpc_endpoint node2) in
+  let wait_for_dal_worker_started expected_automaton =
+    Agnostic_baker.wait_for baker "dal_worker_started.v0" (fun json ->
+        let automaton_name = JSON.(json |-> "automaton_name" |> as_string) in
+        if automaton_name = expected_automaton then Some () else None)
+  in
+  let* () = wait_for_dal_worker_started node1_endpoint
+  and* () = wait_for_dal_worker_started node2_endpoint in
+  Log.info
+    "✓ DAL workers started for both automatons: %s and %s"
+    node1_endpoint
+    node2_endpoint ;
+
+  (* Phase 1: Both nodes active - wait for 2 no_attestable_dal_slots_for_levels events *)
+  Log.info
+    "Phase 1: Both nodes active - waiting for DAL worker query events from \
+     both automatons" ;
+  let wait_for_dal_event_from expected_automaton =
+    Agnostic_baker.wait_for
+      baker
+      "no_attestable_dal_slots_for_levels.v0"
+      (fun json ->
+        let automaton_name = JSON.(json |-> "automaton_name" |> as_string) in
+        if automaton_name = expected_automaton then Some () else None)
+  in
+  (* Wait for one event from each automaton *)
+  let* () = wait_for_dal_event_from node1_endpoint
+  and* () = wait_for_dal_event_from node2_endpoint in
+  Log.info
+    "✓ Received no_attestable_dal_slots_for_levels events from both \
+     automatons: %s and %s"
+    node1_endpoint
+    node2_endpoint ;
+
+  (* Phase 2: Terminate node1 - should only see 1 event from node2's automaton *)
+  Log.info
+    "Phase 2: Terminating node1 - expecting only 1 DAL worker query event from \
+     node2's automaton" ;
+  let* () = Node.terminate node1 in
+  (* Wait for just one DAL event from the remaining automaton *)
+  let* () = wait_for_dal_event_from node2_endpoint
+  and* () =
+    Lwt.pick
+      [
+        (let* () = wait_for_dal_event_from node1_endpoint in
+         Test.fail "We shouldn't see events from 1st automaton as it's down");
+        Lwt_unix.sleep 10.;
+      ]
+  in
+  Log.info
+    "✓ Received 1 no_attestable_dal_slots_for_levels event from automaton: %s"
+    node2_endpoint ;
+
+  (* Phase 3: Restart node1 - should see 2 events again *)
+  Log.info
+    "Phase 3: Restarting node1 - expecting 2 DAL attestation events from both \
+     automatons" ;
+  let* () = Node.run node1 [] and* () = Node.wait_for_ready node1 in
+
+  (* Re-establish P2P trust (needed after restart in Private_mode) *)
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.trust_address client1 ~peer:node3 in
+  let* () = Client.Admin.connect_address client2 ~peer:node1 in
+  Log.info "Node1 restarted and P2P connected" ;
+
+  (* Wait for node1 to sync *)
+  let* node2_level = Node.get_level node2 in
+  let* _ = Node.wait_for_level node1 node2_level in
+  Log.info "Node1 synced to level %d" node2_level ;
+
+  (* Multi node baker takes 20 seconds before retrying the connection *)
+  let wait_for_dal_worker_started =
+    wait_for_dal_worker_started node1_endpoint
+  in
+
+  (* Wait for DAL worker to restart for node1 automaton *)
+  Log.info "Waiting for DAL worker to restart for node1 automaton" ;
+  let* () = wait_for_dal_worker_started in
+  Log.info "✓ DAL worker restarted for automaton: %s" node1_endpoint ;
+
+  (* Verify both automatons emit DAL events again *)
+  let* () = wait_for_dal_event_from node1_endpoint
+  and* () = wait_for_dal_event_from node2_endpoint in
+  Log.info
+    "✓ Received no_attestable_dal_slots_for_levels events from both \
+     automatons: %s and %s (both operational again)"
+    node1_endpoint
+    node2_endpoint ;
+
+  (* Test completed successfully *)
+  Log.info
+    "✓ Multi-node DAL worker connection recovery test completed: verified \
+     per-automaton DAL worker architecture" ;
+  unit
+
+let test_multi_node_nonce_connection_recovery =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker multi-node nonce worker connection recovery"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"; "nonce"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Setting up two nodes connected via P2P" ;
+  (* Setup: 2 nodes sharing the same chain via P2P *)
+  let* node1 = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let node1_uri =
+    Node.as_rpc_endpoint node1 |> Endpoint.to_uri |> Uri.to_string
+  in
+  let* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let node2_uri =
+    Node.as_rpc_endpoint node2 |> Endpoint.to_uri |> Uri.to_string
+  in
+
+  let* client1 = Client.init ~endpoint:(Node node1) () in
+  let* client2 = Client.init ~endpoint:(Node node2) () in
+
+  (* Set up P2P trust relationships (required for Private_mode) *)
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+
+  (* Connect the nodes *)
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+
+  (* Activate protocol on node1 (will propagate to node2) *)
+  let* () = Client.activate_protocol ~protocol client1 in
+
+  (* Wait for both nodes to sync to level 1 *)
+  let* _ = Node.wait_for_level node1 1 in
+  let* _ = Node.wait_for_level node2 1 in
+  Log.info "✓ Two nodes set up, connected via P2P, and synced" ;
+
+  Log.info "Creating baker connected to both nodes using --extra-node" ;
+  (* Use activator (no voting power) to avoid conflict with manual baking *)
+  let baker =
+    Agnostic_baker.create
+      ~delegates:[Constant.activator.public_key_hash]
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      ~keep_alive:true
+      ~remote_mode:true
+      node1
+      client1
+  in
+
+  (* Start baker and wait for ready *)
+  Log.info
+    "Starting baker with --extra-node %s"
+    (Endpoint.as_string (Node.as_rpc_endpoint node2)) ;
+  let* () = Agnostic_baker.run ~event_level:`Debug baker in
+  let* () = Agnostic_baker.wait_for_ready baker in
+  Log.info "✓ Baker is ready and monitoring both nodes" ;
+
+  let wait_for_revelation_worker_proposal level uri =
+    Agnostic_baker.wait_for
+      baker
+      "revelation_worker_new_proposal.v0"
+      (fun json ->
+        let level' = JSON.(json |-> "level" |> as_int) in
+        let uri' = JSON.(json |-> "uri" |> as_string) in
+        if level = level' && uri = uri' then Some (level, uri) else None)
+  in
+
+  (* Bake a few initial blocks to ensure the baker is operational *)
+  Log.info "Baking initial blocks to verify nonce worker is monitoring" ;
+  let wait_proposal1 = wait_for_revelation_worker_proposal 2 node1_uri in
+  let wait_proposal2 = wait_for_revelation_worker_proposal 2 node2_uri in
+
+  let* () = Client.bake_for_and_wait ~keys:[] client1
+  and* level1, uri1 = wait_proposal1
+  and* level2, uri2 = wait_proposal2 in
+
+  Log.info "✓ Nonce worker saw proposal at level %d from %s" level1 uri1 ;
+  Log.info "✓ Nonce worker saw proposal at level %d from %s" level2 uri2 ;
+
+  (* Test 1: Terminate node2 *)
+  let* () = Node.terminate node2 in
+
+  (* Verify baker continues working with node1 only *)
+  Log.info "Baking a block to verify baker still works with node1" ;
+  let* current_level = Node.get_level node1 in
+  let wait_proposal =
+    wait_for_revelation_worker_proposal (current_level + 1) node1_uri
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client1 and* _ = wait_proposal in
+  Log.info "✓ Baker continues operating with node1 (proposal from %s)" node1_uri ;
+
+  (* Test 2: Restart node2 *)
+  Log.info "Restarting node2 to test connection restoration" ;
+  let* () = Node.run node2 [] and* () = Node.wait_for_ready node2 in
+
+  (* Re-establish P2P trust (needed after restart in Private_mode) *)
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+  Log.info "Node2 restarted and P2P connected" ;
+
+  (* Wait for node2 to sync *)
+  let* node1_level = Node.get_level node1 in
+  let* _ = Node.wait_for_level node2 node1_level in
+  Log.info "Node2 synced to level %d" node1_level ;
+
+  (* Verify both nodes are working again by baking more blocks *)
+  Log.info "Baking blocks to verify both nodes are operational" ;
+  let expected_level = node1_level + 1 in
+  let wait_proposal1 =
+    wait_for_revelation_worker_proposal expected_level node1_uri
+  in
+  let wait_proposal2 =
+    wait_for_revelation_worker_proposal expected_level node2_uri
+  in
+
+  let* () = Lwt_unix.sleep 5. in
+
+  let* level1, uri1 = wait_proposal1
+  and* level2, uri2 = wait_proposal2
+  and* () = Client.bake_for_and_wait ~keys:[] client1 in
+  Log.info "✓ Nonce worker saw proposal at level %d from %s" level1 uri1 ;
+  Log.info "✓ Nonce worker saw proposal at level %d from %s" level2 uri2 ;
+
+  (* Test completed successfully *)
+  Log.info
+    "✓ Multi-node nonce worker connection recovery test completed successfully" ;
+  unit
+
+let test_multi_node_nonce_revelation_injection =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker multi-node nonce revelation injection"
+    ~tags:
+      [
+        team; "sandbox"; "agnostic"; "baker"; "multi_node"; "nonce"; "revelation";
+      ]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Setting up two nodes connected via P2P" ;
+  (* Setup: 2 nodes sharing the same chain via P2P *)
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      `Client
+      ()
+  in
+
+  (* Set up P2P trust relationships (required for Private_mode) *)
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+
+  (* Connect the nodes *)
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+
+  (* Wait for both nodes to sync to level 1 *)
+  let* _ = Node.wait_for_level node1 1 in
+  let* _ = Node.wait_for_level node2 1 in
+  Log.info "✓ Two nodes set up, connected via P2P, and synced" ;
+
+  Log.info "Creating baker connected to both nodes using --extra-node" ;
+  (* Use bootstrap1 so the baker actually bakes blocks with nonces *)
+  let node1_uri =
+    Node.as_rpc_endpoint node1 |> Endpoint.to_uri |> Uri.to_string
+  in
+  let node2_uri =
+    Node.as_rpc_endpoint node2 |> Endpoint.to_uri |> Uri.to_string
+  in
+  let baker =
+    Agnostic_baker.create
+      ~delegates:[] (* It'll use all the bakers. *)
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      ~keep_alive:true
+      ~remote_mode:true
+      node1
+      client1
+  in
+
+  (* Helper to check nodes in revealing_nonce event *)
+  let wait_for_revealing_nonce ?expected_node () =
+    Agnostic_baker.wait_for ~timeout:50. baker "revealing_nonce.v0"
+    @@ fun json ->
+    let level = JSON.(json |-> "level" |> as_int) in
+    let ophash = JSON.(json |-> "ophash" |> as_string) in
+    let node = JSON.(json |-> "node" |> as_string) in
+    Log.info
+      "Detected revealing_nonce: level %d, ophash %s from %s"
+      level
+      ophash
+      node ;
+    match expected_node with
+    | Some expected_node when expected_node <> node -> None
+    | _ -> Some ()
+  in
+
+  (* Start baker and wait for ready *)
+  Log.info
+    "Starting baker with --extra-node %s"
+    (Endpoint.as_string (Node.as_rpc_endpoint node2)) ;
+  let* () = Agnostic_baker.run baker in
+  let* () = Agnostic_baker.wait_for_ready baker in
+  Log.info "✓ Baker is ready and monitoring both nodes" ;
+
+  (* Phase 1: Both nodes active - expect injection from any node *)
+  let* () = wait_for_revealing_nonce () in
+
+  (* Phase 2: Terminate node1, expect injection to node2 *)
+  let* () = Node.terminate node1 in
+  let* () = wait_for_revealing_nonce ~expected_node:node2_uri () in
+
+  (* Phase 3: Restart node1, expect injection *)
+  let node1_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:(Node.as_rpc_endpoint node1)
+      baker
+  in
+
+  let* () = Node.run node1 [Synchronisation_threshold 0; Connections 1] in
+  let* () = Node.wait_for_ready node1 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.connect_address client2 ~peer:node1 in
+  let* () = node1_start_waiter in
+  let* () = wait_for_revealing_nonce () in
+
+  (* Phase 2: Terminate node2, expect injection to node1 *)
+  let* () = Node.terminate node2 in
+  let* () = wait_for_revealing_nonce ~expected_node:node1_uri () in
+
+  Log.info "✓ Multi-node nonce revelation injection test completed successfully" ;
+  unit
+
 let register ~protocols =
   test_keep_alive protocols ;
-  test_cli protocols
+  test_cli protocols ;
+  test_operation_worker_crash_shuts_down_baker_multi_node protocols ;
+  test_operation_worker_crash_shuts_down_baker_single_node protocols ;
+  test_multi_node_connection_recovery protocols ;
+  test_multi_node_dal_worker_connection_recovery protocols ;
+  test_multi_node_nonce_connection_recovery protocols ;
+  test_multi_node_nonce_revelation_injection protocols
 
 let register_migration ~migrate_from ~migrate_to =
   migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;

@@ -109,22 +109,6 @@ module Commands = struct
          `octez-accuser` instead, which automatically handles protocol \
          switches."
       ()
-
-  let deprecated_adaptive_issuance_vote =
-    declare_0
-      ~section
-      ~name:"deprecated_adaptive_issuance_vote"
-      ~level:Warning
-      ~msg:
-        "DEPRECATED ARGUMENT: The 'adaptive-issuance-vote' argument \
-         (placeholder 'vote') is deprecated. It is already ignored by the \
-         baker, and will be removed in the next major version of Octez."
-      ()
-
-  let warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote =
-    if Option.is_some adaptive_issuance_vote then
-      emit deprecated_adaptive_issuance_vote ()
-    else Lwt.return_unit
 end
 
 module State_transitions = struct
@@ -753,6 +737,41 @@ module Scheduling = struct
         "The DAL node has no registered attester profile. It is recommended to \
          start the DAL node with '--attester-profiles <manager_key>'."
       ()
+
+  let supervisor_starting_automaton =
+    declare_1
+      ~section
+      ~name:"supervisor_starting_automaton"
+      ~level:Notice
+      ~msg:"Supervisor: starting automaton for node {uri}"
+      ("uri", Data_encoding.string)
+
+  let supervisor_automaton_crashed =
+    declare_1
+      ~section
+      ~name:"supervisor_automaton_crashed"
+      ~level:Warning
+      ~msg:
+        "Supervisor: automaton for node {uri} crashed, restarting the \
+         connection."
+      ("uri", Data_encoding.string)
+
+  let supervisor_automaton_retry =
+    declare_1
+      ~section
+      ~name:"supervisor_automaton_retry"
+      ~level:Warning
+      ~msg:"Supervisor: retrying connection to node {uri}."
+      ~pp1:Format.pp_print_string
+      ("uri", Data_encoding.string)
+
+  let supervisor_all_down =
+    declare_0
+      ~section
+      ~name:"supervisor_all_automatons_down"
+      ~level:Error
+      ~msg:"Supervisor: all automatons are simultaneously down, shutting down"
+      ()
 end
 
 module Lib = struct
@@ -836,12 +855,23 @@ module Actions = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let failed_to_forge_block =
+  let failed_to_prepare_block =
     declare_2
       ~section
-      ~name:"failed_to_forge_block"
+      ~name:"failed_to_prepare_block"
       ~level:Error
-      ~msg:"failed to forge block for {delegate} -- {trace}"
+      ~msg:"failed to prepare block for {delegate} -- {trace}"
+      ~pp1:Delegate.pp
+      ("delegate", Delegate.encoding_for_logging__cannot_decode)
+      ~pp2:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
+
+  let failed_to_sign_block =
+    declare_2
+      ~section
+      ~name:"failed_to_sign_block"
+      ~level:Error
+      ~msg:"failed to sign block for {delegate} -- {trace}"
       ~pp1:Delegate.pp
       ("delegate", Delegate.encoding_for_logging__cannot_decode)
       ~pp2:Error_monad.pp_print_trace
@@ -853,6 +883,27 @@ module Actions = struct
       ~name:"potential_double_baking"
       ~level:Warning
       ~msg:"potential double baking detected at level {level}, round {round}"
+      ~pp1:pp_int32
+      ~pp2:Round.pp
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+
+  let skipping_outdated_consensus_vote =
+    declare_1
+      ~section
+      ~name:"skipping_outdated_consensus_vote"
+      ~level:Info
+      ~msg:"skipping outdated consensus vote for {operation_information}"
+      ~pp1:pp_unsigned_consensus_vote
+      ( "operation_information",
+        unsigned_consensus_vote_encoding_for_logging__cannot_decode )
+
+  let skipping_outdated_block_forge_request =
+    declare_2
+      ~section
+      ~name:"skipping_outdated_block_forge_request"
+      ~level:Info
+      ~msg:"skipping outdated block forge request for (l{level}, r{round})"
       ~pp1:pp_int32
       ~pp2:Round.pp
       ("level", Data_encoding.int32)
@@ -1035,6 +1086,19 @@ module Actions = struct
       ( "operation_information",
         unsigned_consensus_vote_encoding_for_logging__cannot_decode )
 
+  let signing_block =
+    declare_3
+      ~section
+      ~name:"signing_block"
+      ~level:Info
+      ~msg:"signing block at level {level}, round {round} for {delegate}"
+      ~pp1:pp_int32
+      ~pp2:Round.pp
+      ~pp3:Delegate.pp
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+      ("delegate", Delegate.encoding_for_logging__cannot_decode)
+
   let invalid_json_file =
     declare_1
       ~section
@@ -1206,20 +1270,22 @@ module Nonces = struct
       ("level", Raw_level.encoding)
 
   let revealing_nonce =
-    declare_3
+    declare_4
       ~alternative_color:Internal_event.Cyan
       ~section
       ~name:"revealing_nonce"
       ~level:Notice
       ~msg:
         "revealing nonce of level {level} (chain {chain} with operation \
-         {ophash})"
+         {ophash} injected to {node})"
       ~pp1:pp_int32
       ("level", Data_encoding.int32)
       ~pp2:Format.pp_print_string
       ("chain", Data_encoding.string)
       ~pp3:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
+      ~pp4:Format.pp_print_string
+      ("node", Data_encoding.string)
 
   let cannot_fetch_chain_head_level =
     declare_0
@@ -1300,6 +1366,18 @@ module Nonces = struct
       ~level:Info
       ~msg:"revelation worker started"
       ()
+
+  let revelation_worker_new_proposal =
+    declare_3
+      ~section
+      ~name:"revelation_worker_new_proposal"
+      ~level:Debug
+      ~msg:"revelation worker received proposal at level {level} from {uri}"
+      ~pp1:pp_int32
+      ("level", Data_encoding.int32)
+      ("uri", Data_encoding.string)
+      ~pp3:Block_hash.pp
+      ("block", Block_hash.encoding)
 
   let success_migrate_nonces =
     declare_0
@@ -1442,7 +1520,7 @@ module Forge_worker = struct
       ~name:"error_while_processing_forge_request"
       ~level:Warning
       ~msg:"error while processing forge request: {errors}"
-      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+      ("errors", Error_monad.trace_encoding)
       ~pp1:pp_print_top_error_of_trace
 
   let error_while_authorizing_consensus_votes =
@@ -1453,4 +1531,28 @@ module Forge_worker = struct
       ~msg:"error while authorizing consensus votes: {errors}"
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
       ~pp1:pp_print_top_error_of_trace
+
+  let forge_worker_unavailable =
+    declare_0
+      ~section
+      ~name:"forge_worker_unavailable"
+      ~level:Error
+      ~msg:"forge worker unavailable (queue closed or crashed)"
+      ()
+end
+
+module Client_daemon = struct
+  include Internal_event.Simple
+
+  let section = section @ ["client_daemon"]
+
+  let extra_node_warning =
+    declare_0
+      ~section
+      ~name:"extra_node_warning"
+      ~level:Warning
+      ~msg:
+        "the extra-node feature is under development.\n\
+         You must not use it in your baking setup."
+      ()
 end

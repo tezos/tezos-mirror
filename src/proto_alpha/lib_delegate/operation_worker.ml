@@ -26,8 +26,7 @@
 open Protocol_client_context
 open Protocol
 open Alpha_context
-
-module Profiler = (val Profiler.wrap Baking_profiler.operation_worker_profiler)
+module Profiler = Baking_profiler.Operation_worker_profiler
 
 module Events = struct
   include Internal_event.Simple
@@ -241,6 +240,7 @@ let candidate_encoding =
 type event =
   | Prequorum_reached of candidate * Kind.preattestation operation list
   | Quorum_reached of candidate * Kind.attestation operation list
+  | Shutdown
 
 let compare_consensus_contents (op1 : consensus_content)
     (op2 : consensus_content) =
@@ -749,7 +749,7 @@ let flush_operation_pool state (head_level, head_round) =
   let operation_pool = {Operation_pool.empty with consensus = attestations} in
   state.operation_pool <- operation_pool
 
-let run ?(monitor_node_operations = true) ~round_durations
+let run ?(monitor_node_operations = true) ~multi_node ~round_durations
     (cctxt : #Protocol_client_context.full) =
   let open Lwt_syntax in
   let state =
@@ -782,11 +782,19 @@ let run ?(monitor_node_operations = true) ~round_durations
     match result with
     | Error _ ->
         (* The baker failed to reach the node via the monitor_operations
-           RPC after multiple retries. Because it can no longer monitor the
-           consensus, it is unable to attest or bake. Rather than remain in this
-           degraded state or retry indefinitely, we shut it down explicitly. *)
+           RPC after multiple retries. In multi-node setups, the supervisor
+           will handle this failure by restarting this automaton while other
+           nodes continue operating. In single-node setups, we exit the entire
+           baker process immediately. *)
         let* () = Events.(emit node_unreachable_crash ()) in
-        Lwt_exit.exit_and_raise (*ECONNREFUSED*) 111
+        if multi_node then (
+          (* Multi-node: close stream to signal automaton, cancel worker *)
+          state.qc_event_stream.push (Some Shutdown) ;
+          let* _ = shutdown_worker state in
+          return_unit)
+        else
+          (* Single-node: exit entire baker process *)
+          Lwt_exit.exit_and_raise (*ECONNREFUSED*) 111
     | Ok (((_, round) as head), operation_stream, op_stream_stopper) ->
         () [@profiler.stop] ;
         ()
@@ -902,3 +910,8 @@ let retrieve_pending_operations cctxt state =
 let get_current_operations state = state.operation_pool
 
 let get_quorum_event_stream state = state.qc_event_stream.stream
+
+module Internal_for_tests = struct
+  (* State creation *)
+  let make_initial_state = make_initial_state
+end

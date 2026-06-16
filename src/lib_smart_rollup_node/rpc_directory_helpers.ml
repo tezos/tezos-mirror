@@ -26,6 +26,8 @@
 (* Conveniences to construct RPC directory
    against a subcontext of the Node_context *)
 
+open Tezos_rpc
+
 module type PARAM = sig
   type prefix
 
@@ -35,7 +37,38 @@ module type PARAM = sig
 
   val context_of_prefix : context -> prefix -> subcontext tzresult Lwt.t
 
-  val prefix : (unit, prefix) Tezos_rpc.Path.t
+  val prefix : (unit, prefix) Path.t
+end
+
+module type SUBDIRECTORY = sig
+  type prefix
+
+  type context
+
+  type subcontext
+
+  val register0 :
+    ([< Resto.meth], 'prefix, 'prefix, 'query, 'input, 'output) Service.t ->
+    (subcontext -> 'query -> 'input -> 'output tzresult Lwt.t) ->
+    unit
+
+  val register1 :
+    ( [< Resto.meth],
+      'prefix,
+      'prefix * 'param1,
+      'query,
+      'input,
+      'output )
+    Service.t ->
+    (subcontext -> 'param1 -> 'query -> 'input -> 'output tzresult Lwt.t) ->
+    unit
+
+  val gen_register0 :
+    ([< Resto.meth], 'prefix, 'prefix, 'query, 'input, 'output) Service.t ->
+    (subcontext -> 'query -> 'input -> 'output Answer.t Lwt.t) ->
+    unit
+
+  val build_sub_directory : context -> prefix Directory.t
 end
 
 module Make_sub_directory (S : PARAM) = struct

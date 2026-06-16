@@ -35,4 +35,7 @@ pub enum LexerError {
     /// Invalid hexadecimal sequence in a byte literal.
     #[error("invalid hex sequence: {0}")]
     InvalidHex(#[from] hex::FromHexError),
+    /// A token matched the annotation regex, but couldn't be converted to an [Annotation].
+    #[error("invalid annotation: {0}")]
+    InvalidAnnotation(String),
 }

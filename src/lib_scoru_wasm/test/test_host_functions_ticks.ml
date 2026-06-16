@@ -48,7 +48,15 @@ let register_new_write_debug ~version added_ticks =
   let current_write_debug =
     Tezos_webassembly_interpreter.Host_funcs.lookup
       ~global_name:name
-      (Host_funcs.registry ~version ~write_debug:Noop)
+      (* [Wasm_utils.Config.config] is [Wasm_pvm_config.empty], which
+         leaves [nds_host_functions_enabled] [false] at runtime. We
+         match that here so the install/revert pattern mutates the
+         same cached singleton the kernel evaluation will later
+         dispatch through. *)
+      (Host_funcs.registry
+         ~version
+         ~nds_host_functions_enabled:false
+         ~write_debug:Noop)
   in
   let alternative_write_debug =
     match current_write_debug with
@@ -58,13 +66,17 @@ let register_new_write_debug ~version added_ticks =
           return (durable, res, Z.add ticks (Z.of_int added_ticks))
         in
         Tezos_webassembly_interpreter.Host_funcs.Host_func write_debug
-    | Reveal_func _ -> Stdlib.failwith "write_debug is not a reveal function"
+    | Nds_host_func _ | Reveal_func _ ->
+        Stdlib.failwith "write_debug is not a durable host function"
   in
   let register impl () =
     Tezos_webassembly_interpreter.Host_funcs.register
       ~global_name:name
       impl
-      (Host_funcs.registry ~version ~write_debug:Noop)
+      (Host_funcs.registry
+         ~version
+         ~nds_host_functions_enabled:false
+         ~write_debug:Noop)
   in
   (register alternative_write_debug, register current_write_debug)
 
@@ -93,7 +105,7 @@ let test_tickified_host_function ~version () =
  )
 |}
     in
-    let* tree = initial_tree ~version ~from_binary:false module_ in
+    let* tree = initial_state ~version ~from_binary:false module_ in
     (* Feeding it with one input *)
     let* tree = set_empty_inbox_step 0l tree in
     (* running until waiting for input *)

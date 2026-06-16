@@ -56,11 +56,14 @@
     e.g. octez-client.
 *)
 
-(** [parse_and_validate_for_queue read raw_op] parses [raw_op] into an
-    operation, and checks that the operation is valid on its own. [read] is
-    used to check information about the source in the current context (counter,
-    balance, public key). This first validation pass should be done at
-    insertion in the [tx_queue].
+(** [parse_and_validate_for_queue state ~data_model raw_op]
+    parses [raw_op] into an operation, and checks that the operation
+    is valid on its own. [state] is the EVM state used to check
+    information about the source in the current context (counter,
+    balance, public key); [data_model] is used to know which data
+    model (path-based or RLP-based) to use when checking information.
+    This first validation pass should be done at insertion in the
+    [tx_queue].
 
     At this point operations are valid if they could be inserted into a future
     blueprint, i.e. it is either valid or could be valid in the future. For
@@ -72,8 +75,10 @@
     Another pass of validation will be done at insertion into a blueprint (see
     in this module {!validate_for_blueprint}).
 
-    The optionnal [check_signature] is used to bypass signature verifications
-    during simulation.
+    The [simulator_mode] is used to bypass signature verifications and
+    minimal-fee check during simulation, allowing the client to
+    simulate gas and storage consumption before estimating the
+    appropriate fee and signing the operation.
 
     The value returned, of type {!Tezos_types.Operation.t}, contains more
     information than just the parsed operation, used by the node notably at
@@ -82,8 +87,10 @@
     (one, unless it's a batch) etc. Therefore, any {!Tezos_types.Operation.t}
     value should be created and validated at the same time. *)
 val parse_and_validate_for_queue :
-  ?check_signature:bool ->
-  read:(string -> bytes option tzresult Lwt.t) ->
+  simulator_mode:Tezlink_backend_sig.simulator_mode ->
+  nanotez_per_michelson_gas:Tezos_types.Tez.nanotez ->
+  state:Evm_state.t ->
+  data_model:Tezlink_durable_storage.implicit_account_data_model ->
   string ->
   (Tezos_types.Operation.t, string) result tzresult Lwt.t
 
@@ -92,10 +99,11 @@ val parse_and_validate_for_queue :
 val gas_limit_could_fit :
   Validation_types.validation_state -> Tezos_types.Operation.t -> bool
 
-(** [init_blueprint_validation read ()] creates a empty validation state, from
-    the context the [read] returns info about. *)
+(** [init_blueprint_validation state ~data_model ()] creates an empty
+    validation state, from the EVM [state]. *)
 val init_blueprint_validation :
-  (string -> bytes option tzresult Lwt.t) ->
+  Evm_state.t ->
+  data_model:Tezlink_durable_storage.implicit_account_data_model ->
   unit ->
   Validation_types.validation_state
 

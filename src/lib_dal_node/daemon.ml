@@ -39,54 +39,24 @@ module Gossipsub_profiler = struct
     Gossipsub.Profiler.(create_reset_block_section gossipsub_profiler)
 end
 
-let[@warning "-32"] may_start_profiler data_dir =
-  match Tezos_profiler_unix.Profiler_instance.selected_backends () with
+let[@warning "-32"] may_start_profiler data_dir profiling_config =
+  match
+    Tezos_profiler_unix.Profiler_instance.selected_backends ~profiling_config
+  with
   | Some backends ->
       List.iter
         (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
           let profiler_maker = instance_maker ~directory:data_dir in
-          Dal_profiler.init profiler_maker ;
-          Gossipsub.Profiler.init profiler_maker)
+          Dal_profiler.init ~profiling_config profiler_maker ;
+          Gossipsub.Profiler.init ~profiling_config profiler_maker)
         backends
   | None -> ()
 
-let init_cryptobox config proto_parameters profile =
-  let open Lwt_result_syntax in
-  let prover_srs = Profile_manager.is_prover_profile profile in
-  let* () =
-    if prover_srs then
-      let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-      Cryptobox.init_prover_dal
-        ~find_srs_files
-        ~fetch_trusted_setup:config.Configuration_file.fetch_trusted_setup
-        ()
-    else return_unit
-  in
-  match Cryptobox.make proto_parameters.Types.cryptobox_parameters with
-  | Ok cryptobox ->
-      if prover_srs then
-        match Cryptobox.precompute_shards_proofs cryptobox with
-        | Ok precomputation -> return (cryptobox, Some precomputation)
-        | Error (`Invalid_degree_strictly_less_than_expected {given; expected})
-          ->
-            fail
-              [
-                Errors.Cryptobox_initialisation_failed
-                  (Printf.sprintf
-                     "Cryptobox.precompute_shards_proofs: SRS size (= %d) \
-                      smaller than expected (= %d)"
-                     given
-                     expected);
-              ]
-      else return (cryptobox, None)
-  | Error (`Fail msg) -> fail [Errors.Cryptobox_initialisation_failed msg]
-
 (* Monitor and process finalized heads. *)
-let on_new_finalized_head ctxt cctxt crawler =
+let on_new_finalized_head ctxt cctxt crawler amplificator =
   let open Lwt_result_syntax in
   let stream = Crawler.finalized_heads_stream crawler in
   let rec loop () =
-    let cryptobox = Node_context.get_cryptobox ctxt in
     let*! next_final_head = Lwt_stream.get stream in
     let launch_time = Unix.gettimeofday () in
     match next_final_head with
@@ -103,10 +73,10 @@ let on_new_finalized_head ctxt cctxt crawler =
              ctxt
              cctxt
              crawler
-             cryptobox
              finalized_block_hash
              finalized_shell_header
              ~launch_time
+             ?amplificator
            [@profiler.record_s
              {verbosity = Notice; profiler_module = Profiler}
                "new_finalized_head"])
@@ -149,9 +119,9 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     let config = Node_context.get_config node_ctxt in
     config.disable_amplification
   in
-  let shards_out_handler shards =
+  let shards_out_handler shard_store =
     (* Counting potentially emitted message is a good way to count the number of shards validated. *)
-    let save_and_notify = Store.Shards.write_all shards in
+    let save_and_notify = Store.Shards.write_all shard_store in
     fun Types.Message.{share; _}
         Types.Message_id.{commitment; shard_index; level; slot_index; _}
       ->
@@ -267,7 +237,7 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
             return_unit
         | _ -> return_unit)
       [@profiler.aggregate_s
-        {verbosity = Notice; profiler_module = Profiler} "shards_handler"])
+        {verbosity = Notice; profiler_module = Profiler} "output_shards_handler"])
   in
   let shards_in_handler still_to_receive_indices =
    fun Types.Message_id.{level; slot_index; shard_index; _} from_peer ->
@@ -317,7 +287,8 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
       return_unit
     in
     match[@profiler.aggregate_s
-           {verbosity = Notice; profiler_module = Profiler} "shards_handler"]
+           {verbosity = Notice; profiler_module = Profiler}
+             "input_shards_handler"]
       Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
     with
     | Controller profile
@@ -356,6 +327,21 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     Dal_metrics.Slot_id_bounded_map.create
       (proto_parameters.number_of_slots * proto_parameters.attestation_lag)
   in
+  let canceler = Lwt_canceler.create () in
+  let _ : Lwt_exit.clean_up_callback_id =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+        let open Lwt_syntax in
+        let* c = Lwt_canceler.cancel canceler in
+        match c with
+        | Ok () | Error [] -> Lwt.return_unit
+        | Error excs ->
+            let texcs =
+              List.map (fun exc -> TzTrace.make (Error_monad.Exn exc)) excs
+            in
+            let errs = TzTrace.conp_list [] texcs in
+            Format.eprintf "Error: %a@." Error_monad.pp_print_trace errs ;
+            return_unit)
+  in
   Lwt.catch
     (fun () ->
       Gossipsub.Transport_layer_hooks.activate
@@ -363,14 +349,28 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
         transport_layer
         ~app_out_callback:(shards_out_handler node_store)
         ~app_in_callback:(shards_in_handler still_to_receive_indices)
+        ~canceler
         ~verbose)
     (fun exn ->
-      let msg =
-        "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
-        ^ Printexc.to_string exn
-      in
-      Format.eprintf "Error: %s@." msg ;
-      Lwt_exit.exit_and_raise 1)
+      match exn with
+      | Lwt.Canceled ->
+          (* This is expected when the daemon loop terminates and [Lwt.pick]
+             cancels us. Re-raise so the actual error can surface. *)
+          Lwt.fail exn
+      | Effect.Unhandled Eio.Private.Effects.Get_context ->
+          (* When [gs] is canceled (e.g. daemon loop failed and [Lwt.pick]
+             canceled us), code inside [Lwt_eio.run_eio] can surface as
+             unhandled Eio [Cancel.Get_context] instead of [Lwt.Canceled]. Treat
+             that as cancellation so the real error (e.g. daemon failure) can
+             surface. *)
+          Lwt.fail Lwt.Canceled
+      | _ ->
+          let msg =
+            "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
+            ^ Printexc.to_string exn
+          in
+          Format.eprintf "Error: %s@." msg ;
+          Lwt_exit.exit_and_raise 1)
 
 let resolve names =
   let open Lwt_result_syntax in
@@ -424,7 +424,7 @@ let update_and_register_profiles ctxt =
   let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let gs_worker = Node_context.get_gs_worker ctxt in
   let*? proto_parameters =
-    Node_context.get_proto_parameters ctxt ~level:`Last_proto
+    Node_context.get_proto_parameters ctxt ~level:`Head
   in
   let profile_ctxt =
     Profile_manager.register_profile
@@ -441,10 +441,14 @@ let backfill_slot_statuses cctxt store (module Plugin : Dal_plugin.T)
     proto_parameters ~from_level =
   let open Lwt_result_syntax in
   let number_of_slots = proto_parameters.Types.number_of_slots in
+  let* _block_hash, l1_savepoint_level =
+    Chain_services.Levels.savepoint cctxt ()
+  in
+  let first_valid_level = Int32.max 2l l1_savepoint_level in
   List.iter_es
     (fun i ->
       let block_level = Int32.(sub from_level (of_int i)) in
-      if block_level > 1l then
+      if block_level >= first_valid_level then
         let* slot_headers =
           Plugin.get_published_slot_headers ~block_level cctxt
         in
@@ -459,8 +463,8 @@ let backfill_slot_statuses cctxt store (module Plugin : Dal_plugin.T)
       else return_unit)
     (Stdlib.List.init proto_parameters.attestation_lag Fun.id)
 
-let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
-    ~configuration_override () =
+let run ?(disable_shard_validation = false) ?(ignore_l1_history_check = false)
+    ~ignore_pkhs ~data_dir ~config_file ~configuration_override () =
   let open Lwt_result_syntax in
   let*! () =
     let log_cfg =
@@ -487,15 +491,24 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
           ignore_l1_config_peers;
           _;
         } as config) =
-    let*! result = Configuration_file.load ~config_file in
-    match result with
-    | Ok configuration -> return (configuration_override configuration)
-    | Error _ ->
-        let*! () = Event.emit_config_file_not_found ~path:config_file in
-        (* Store the default configuration if no configuration were found. *)
-        let configuration = configuration_override Configuration_file.default in
-        let* () = Configuration_file.save ~config_file configuration in
-        return configuration
+    let on_file_not_found () =
+      let*! () = Event.emit_config_file_not_found ~path:config_file in
+      (* Store the default configuration if no configuration were found. *)
+      let configuration = configuration_override Configuration_file.default in
+      let* () =
+        Configuration_file.save
+          ~allow_overwrite:false
+          ~config_file
+          configuration
+      in
+      return configuration
+    in
+    let* loaded =
+      Configuration_file.exit_on_configuration_error
+        ~emit:Event.emit_configuration_loading_failed
+      @@ Configuration_file.load ~on_file_not_found ~config_file ()
+    in
+    return (configuration_override loaded)
   in
   let*! () = Event.emit_configuration_loaded () in
   let cctxt = Rpc_context.make endpoint in
@@ -547,8 +560,6 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       ~level:head_level
   in
 
-  (* Set proto number of slots hook. *)
-  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
   let* profile_ctxt =
     let+ profile_ctxt = build_profile_context config in
     Profile_manager.resolve_profile
@@ -607,6 +618,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       {driver_ids = [Opentelemetry]}
         (Opentelemetry_profiler.initialize
            ~unique_identifier:(P2p_peer.Id.to_b58check identity.peer_id)
+           ?env:config.telemetry_env
            config.service_name)] ;
     let self =
       (* What matters is the identity, the reachable point is more like a placeholder here. *)
@@ -649,8 +661,24 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
         Gossipsub.Transport_layer.shutdown transport_layer)
   in
+  (* Ban addresses specified in the configuration. *)
+  let*! () =
+    List.iter_s
+      (Gossipsub.Transport_layer.ban_addr transport_layer)
+      config.banned_addrs
+  in
   (* Initialize store *)
   let* store = Store.init config profile_ctxt proto_parameters in
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
+        let open Lwt_syntax in
+        let* r = Store.close store in
+        match r with
+        | Ok () -> Lwt.return_unit
+        | Error errs ->
+            let*! () = Event.emit_closing_store_failed errs in
+            Lwt.return_unit)
+  in
   let* current_chain_id = L1_helpers.fetch_l1_chain_id cctxt in
   let chain_id_store = Store.chain_id store in
   let* stored_chain_id = Store.Chain_id.load chain_id_store in
@@ -681,23 +709,36 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
     | None -> Store.First_seen_level.save first_seen_level_store head_level
     | Some _ -> return_unit
   in
+  let* ignore_l1_history_check =
+    if
+      ignore_l1_history_check
+      && Chain_id.equal current_chain_id Constants.mainnet_chain_id
+    then
+      let*! () = Event.emit_ignore_l1_history_check_refused_on_mainnet () in
+      return_false
+    else return ignore_l1_history_check
+  in
   let* () =
     History_check.check_l1_history_mode
+      ~ignore_l1_check:ignore_l1_history_check
       profile_ctxt
       cctxt
       proto_parameters
       ~head_level
       ~first_seen_level
   in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
-     Instead of recomputing these parameters, they could be stored
-     (for a given cryptobox). *)
-  let* cryptobox, shards_proofs_precomputation =
-    init_cryptobox config proto_parameters profile_ctxt
+  let* proto_cryptoboxes =
+    Proto_cryptoboxes.init
+      ~cctxt
+      ~header
+      ~config
+      ~first_seen_level:(Option.value first_seen_level ~default:head_level)
+      profile_ctxt
+      proto_plugins
   in
-  (* Set crypto box share size hook. *)
-  Value_size_hooks.set_share_size
-    (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
+  let*? cryptobox, _ =
+    Proto_cryptoboxes.get_for_level proto_cryptoboxes ~level:head_level
+  in
   let*! () =
     if disable_shard_validation then Event.emit_shard_validation_is_disabled ()
     else Lwt.return_unit
@@ -713,14 +754,14 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       config
       ~identity
       profile_ctxt
-      cryptobox
-      shards_proofs_precomputation
+      proto_cryptoboxes
       proto_plugins
       store
       gs_worker
       transport_layer
       cctxt
       ~last_finalized_level:head_level
+      ~l1_current_level:head_level
       ~network_name
       ~disable_shard_validation
       ~ignore_pkhs
@@ -827,6 +868,27 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
        ~from_level
      [@profiler.record_s {verbosity = Notice} "backfill_slot_statuses"])
   in
+  (* Fetch the committees for the first levels. Note that that committees are
+     fetched on a "regular basis" by {!Block_handler.may_update_topics} with a
+     delta of [additional_levels + lag] wrt to HEAD~1. We fetch here for a few
+     more levels, because the head might have advanced more until
+     [may_update_topics] is first called. *)
+  let () =
+    let additional_levels =
+      let minimal_block_delay =
+        Int64.to_int proto_parameters.Types.minimal_block_delay
+      in
+      Constants.time_to_join_new_topics_in_levels ~minimal_block_delay
+    in
+    List.iter
+      (fun i ->
+        let level = Int32.(add head_level (of_int i)) in
+        let _ = Node_context.fetch_committees ctxt ~level in
+        ())
+      (Stdlib.List.init
+         (additional_levels + proto_parameters.attestation_lag + 2)
+         Fun.id)
+  in
   (* Activate the p2p instance. *)
   let shards_store = Store.shards store in
   let gs =
@@ -849,9 +911,26 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   let* () = update_and_register_profiles ctxt in
   (* Start never-ending monitoring daemons *)
   let*! () = Event.emit_node_is_ready () in
-  () [@profiler.overwrite may_start_profiler data_dir] ;
-  let* _ =
-    Lwt.pick
-      [Lwt.bind gs return; daemonize [on_new_finalized_head ctxt cctxt crawler]]
+  let[@warning "-26"] profiling_config =
+    Option.value
+      ~default:Tezos_profiler.Profiler.default_profiling_config
+      config.profiling
+  in
+  () [@profiler.overwrite may_start_profiler data_dir profiling_config] ;
+  let* () =
+    let daemon =
+      daemonize [on_new_finalized_head ctxt cctxt crawler amplificator]
+    in
+    let daemon_with_log =
+      let open Lwt_syntax in
+      let* result = daemon in
+      let* () =
+        match result with
+        | Ok () -> Event.emit_daemon_loop_unexpected_termination ()
+        | Error errs -> Event.emit_daemon_error ~error:errs
+      in
+      Lwt.return result
+    in
+    Lwt.pick [gs; daemon_with_log]
   in
   return_unit

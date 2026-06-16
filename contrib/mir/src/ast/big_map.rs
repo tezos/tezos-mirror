@@ -5,11 +5,12 @@
 //! `big_map` typed representation and utilities for working with `big_map`s.
 
 use num_bigint::{BigInt, Sign};
-use num_traits::One;
+use num_traits::{One, Zero};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     fmt::Display,
     mem,
+    rc::Rc,
 };
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
@@ -61,6 +62,34 @@ impl BigMapId {
         BigMapId {
             value: Zarith(result),
         }
+    }
+
+    /// Increment the mutable id
+    pub fn incr(&mut self) {
+        let Zarith(ref int_value) = self.value;
+        let result = if self.is_temporary() {
+            int_value - BigInt::one()
+        } else {
+            int_value + BigInt::one()
+        };
+        self.value = Zarith(result);
+    }
+
+    /// Decrement the id
+    ///
+    /// If there's no predecessor return false, otherwise true
+    pub fn dec(&mut self) -> bool {
+        let Zarith(ref int_value) = self.value;
+        let result = if self.is_temporary() {
+            int_value + BigInt::one()
+        } else {
+            int_value - BigInt::one()
+        };
+        let has_pred = !result.eq(&BigInt::zero());
+        if has_pred {
+            self.value = Zarith(result);
+        }
+        has_pred
     }
 
     /// Tells if a big_map id is temporary
@@ -220,8 +249,21 @@ pub enum LazyStorageError {
     #[error("Error nom_reading stored value: {0}")]
     NomReadError(String),
     /// Error when using bin_write to interact with the storage
+    ///
+    /// Wrapped in `Rc` because [`tezos_data_encoding::enc::BinError`]
+    /// does not implement [`Clone`] (its `IOError` variant carries a
+    /// non-Clone `std::io::Error`), and this enum derives `Clone`.
     #[error("Error bin_writing value to store: {0}")]
-    BinWriteError(String),
+    BinWriteError(std::rc::Rc<tezos_data_encoding::enc::BinError>),
+    /// The requested big_map id was not found in the lazy storage.
+    #[error("big map with ID {0} not found in the lazy storage")]
+    BigMapNotFound(BigMapId),
+}
+
+impl From<tezos_data_encoding::enc::BinError> for LazyStorageError {
+    fn from(err: tezos_data_encoding::enc::BinError) -> Self {
+        LazyStorageError::BinWriteError(std::rc::Rc::new(err))
+    }
 }
 
 /// All the operations for working with the lazy storage.
@@ -410,13 +452,13 @@ impl<'a> InMemoryLazyStorage<'a> {
     fn access_big_map(&self, id: &BigMapId) -> Result<&MapInfo<'a>, LazyStorageError> {
         self.big_maps
             .get(id)
-            .ok_or_else(|| panic!("Non-existent big map by id {id}"))
+            .ok_or_else(|| LazyStorageError::BigMapNotFound(id.clone()))
     }
 
     fn access_big_map_mut(&mut self, id: &BigMapId) -> Result<&mut MapInfo<'a>, LazyStorageError> {
         self.big_maps
             .get_mut(id)
-            .ok_or_else(|| panic!("Non-existent big map by id {id}"))
+            .ok_or_else(|| LazyStorageError::BigMapNotFound(id.clone()))
     }
 }
 
@@ -637,26 +679,28 @@ impl<'a> TypedValue<'a> {
             Bls12381G1(_) => {}
             #[cfg(feature = "bls")]
             Bls12381G2(_) => {}
-            Pair(p) => {
-                p.0.collect_big_maps(put_res);
-                p.1.collect_big_maps(put_res);
+            Pair(l, r) => {
+                Rc::make_mut(l).collect_big_maps(put_res);
+                Rc::make_mut(r).collect_big_maps(put_res);
             }
-            Or(p) => match p.as_mut() {
-                Left(l) => l.collect_big_maps(put_res),
-                Right(r) => r.collect_big_maps(put_res),
+            Or(p) => match p {
+                Left(l) => Rc::make_mut(l).collect_big_maps(put_res),
+                Right(r) => Rc::make_mut(r).collect_big_maps(put_res),
             },
             Option(p) => {
-                if let Some(x) = p {
-                    x.collect_big_maps(put_res)
+                if let Some(x) = p.as_mut() {
+                    Rc::make_mut(x).collect_big_maps(put_res)
                 }
             }
-            List(l) => l.iter_mut().for_each(|v| v.collect_big_maps(put_res)),
+            List(l) => l
+                .iter_mut()
+                .for_each(|v| Rc::make_mut(v).collect_big_maps(put_res)),
             Set(_) => {
                 // Elements are comparable and so have no big maps
             }
             Map(m) => m.iter_mut().for_each(|(_k, v)| {
                 // Key is comparable as so has no big map, skipping it
-                v.collect_big_maps(put_res)
+                Rc::make_mut(v).collect_big_maps(put_res)
             }),
             BigMap(m) => put_res(m),
             Ticket(_) => {

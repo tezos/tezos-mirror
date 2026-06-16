@@ -199,9 +199,20 @@ module Pipeline = struct
       {
         image = None;
         interruptible = Some true;
+        (* Check https://docs.gitlab.com/ci/yaml/#retry for more details *)
         retry =
           Some
-            {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]};
+            {
+              max = 2;
+              when_ =
+                [
+                  Stuck_or_timeout_failure;
+                  Runner_system_failure;
+                  Api_failure;
+                  Unknown_failure;
+                  Scheduler_failure;
+                ];
+            };
       }
 
   let default = function
@@ -658,6 +669,18 @@ module Image = struct
 
   let mk_external ~image_path : t = External (Image image_path)
 
+  (** Register internal image for [image_path] built by [image_builder_amd64].
+
+      Optionally, a builder for an arm64 version of the image can be
+      registered by supplying [image_builder_arm64]. If
+      [image_builder_arm64] is supplied, then it must have a distinct
+      name from [image_builder_amd64].
+
+      Note: the name of the image builder(s) must uniquely identify the
+      job definition. If two image builders with the same name but
+      differing job definitions (as per polymorphic comparison of the
+      underlying {!Gitlab_ci.Types.job}) are registered, then this
+      function throws a run-time error. *)
   let mk_internal ?image_builder_arm64 ~image_builder_amd64 ~image_path () : t =
     let image =
       Internal
@@ -706,8 +729,31 @@ module Changeset = struct
 
   let make = String_set.of_list
 
+  (* Remove paths that are implied by other paths.
+     For instance, [a/b/c] is implied by [a/**/*]. *)
+  let remove_implied changeset =
+    let implies a b =
+      if String.ends_with ~suffix:"/**/*" a then
+        let a_without_suffix =
+          (* Remove "**/*" (do NOT remove the first "/"). *)
+          String.sub a 0 (String.length a - 4)
+        in
+        String.starts_with ~prefix:a_without_suffix b
+      else false
+    in
+    let add acc path =
+      if String_set.exists (fun previous -> implies previous path) acc then acc
+      else String_set.add path acc
+    in
+    (* Add all paths one by one, starting from the smallest ones so that
+       the next ones can see if they are implied by smaller prefixes before them. *)
+    changeset |> String_set.to_list
+    |> List.sort (fun a b -> Int.compare (String.length a) (String.length b))
+    |> List.fold_left add String_set.empty
+
   let encode changeset =
-    changeset |> String_set.elements |> List.sort String.compare
+    changeset |> remove_implied |> String_set.elements
+    |> List.sort String.compare
 
   let union = String_set.union
 
@@ -771,9 +817,9 @@ let enc_git_strategy = function
   | Clone -> "clone"
   | No_strategy -> "none"
 
-let number_of_declared_jobs = ref 0
+let declared_jobs = ref String_map.empty
 
-let get_number_of_declared_jobs () = !number_of_declared_jobs
+let get_declared_jobs () = !declared_jobs
 
 let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     ?artifacts ?(before_script = []) ?cache ?id_tokens ?interruptible
@@ -781,10 +827,10 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     ?variables ?(rules : Gitlab_ci.Types.job_rule list option)
     ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
     ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
-    ?interruptible_runner ?git_strategy ?coverage ?retry ?parallel ?description
+    ?interruptible_runner ?git_strategy ?retry ?parallel ?description
     ?(dev_infra = false) ~__POS__ ?image ?template ?(datadog = true) ~stage
     ~name script : tezos_job =
-  incr number_of_declared_jobs ;
+  declared_jobs := String_map.add name __POS__ !declared_jobs ;
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag : Runner.Tag.t =
     let provider : Runner.Provider.t = if dev_infra then GCP_dev else GCP in
@@ -999,7 +1045,7 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
       timeout = Some timeout;
       tags;
       when_ = None;
-      coverage;
+      coverage = None;
       retry;
       parallel;
     }
@@ -1308,8 +1354,6 @@ let with_interruptible value tezos_job =
   map_non_trigger_job tezos_job @@ fun job ->
   {job with interruptible = Some value}
 
-let script_propagate_exit_code script = [script ^ " || exit $?"]
-
 (* Define [stages:]
 
    The "manual" stage exists to fix a UI problem that occurs when mixing
@@ -1326,8 +1370,6 @@ module Stages = struct
 
   let test = Stage.register "test"
 
-  let test_coverage = Stage.register "test_coverage"
-
   let packaging = Stage.register "packaging"
 
   let publish = Stage.register "publish"
@@ -1342,7 +1384,11 @@ end
    Use this module to register images that are as built outside the
    [tezos/tezos] CI. *)
 module Images_external = struct
-  let nix = Image.mk_external ~image_path:"nixos/nix:2.22.1"
+  (* https://hub.docker.com/layers/nixos/nix/2.34.6/images/sha256-ffb94901e4ef854fe5a8e1a3170a1b8480ed505eaaa37091809664390acd8d20 *)
+  let nix =
+    Image.mk_external
+      ~image_path:
+        "nixos/nix:2.34.6@sha256:e2fe74e96e965653c7b8f16ac64d1e56581c63c84d7fa07fb0692fd055cd06b0"
 
   (* Match GitLab executors version and directly use the Docker socket
      The Docker daemon is already configured, experimental features are enabled
@@ -1361,17 +1407,22 @@ module Images_external = struct
   (* Image used in initial pipeline job that sends to Datadog useful
      info for CI visibility.
 
+     https://hub.docker.com/layers/datadog/ci/v5.13.1/images/sha256-cdf912e7d4c2002dcbb40f048449053695f980157b7249d3d7891e5444cd807b
+
      The [datadog-ci] version should be consistent across all CI
      images that use it. At the moment it is installed in the
-     external image below and the internal image [e2etest]. *)
-  let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v4.1.0"
+     external image below and the internal image [monitoring]. *)
 
-  let ci_release =
+  let datadog_ci =
     Image.mk_external
       ~image_path:
-        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
+        "datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2"
 
-  let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
+  (* https://hub.docker.com/layers/hadolint/hadolint/v2.14.0-alpine/images/sha256-be27962427a85de242820cb710a374478cce9bfb534a2c07e4fa54741d98908f *)
+  let hadolint =
+    Image.mk_external
+      ~image_path:
+        "hadolint/hadolint:2.14.0-alpine@sha256:7aba693c1442eb31c0b015c129697cb3b6cb7da589d85c7562f9deb435a6657c"
 
   (* We specify the semgrep image by hash to avoid flakiness. Indeed, if we took the
      latest release, then an update in the parser or analyser could result in new
@@ -1379,10 +1430,20 @@ module Images_external = struct
      burden for fixing the code on the wrong dev (the devs who happen to open an
      MR coinciding with the semgrep update rather than the dev who wrote the
      infringing code in the first place).
+
+     https://hub.docker.com/layers/returntocorp/semgrep-agent/sha-c6cd7cf/images/sha256-431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24
+
      Update the hash in scripts/semgrep/README.md too when updating it here
-     Last update: 2022-01-03 *)
+     Last update: 2022-01-03
+
+     NB: this image seems unmaintained (latest version
+     [returntocorp/semgrep-agent:sha-688b98c] is from October
+     2023). We should consider switching to [semgrep/semgrep]
+     https://semgrep.dev/docs/update. *)
   let semgrep_agent =
-    Image.mk_external ~image_path:"returntocorp/semgrep-agent:sha-c6cd7cf"
+    Image.mk_external
+      ~image_path:
+        "returntocorp/semgrep-agent:sha-c6cd7cf@sha256:431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24"
 
   (* Image provided by GitLab. More details in the doc:
      - https://docs.gitlab.com/ee/ci/runners/hosted_runners/macos.html#supported-macos-images
@@ -1391,7 +1452,10 @@ module Images_external = struct
 
   (* Image used in [schedule_security_scans] pipeline. Trivy scans
      Docker images and codebase for CVEs and SBOMs. *)
-  let trivy = Image.mk_external ~image_path:"aquasec/trivy:latest"
+  let trivy =
+    Image.mk_external
+      ~image_path:
+        "aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
 end
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
@@ -1446,39 +1510,45 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
 
 (** {2 Caches} *)
 module Cache = struct
-  let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
-      ?(cache_size = "5GB") ?(copy_mode = false) ?policy job =
-    let key =
-      Option.value
-        ~default:
-          ("dune_cache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-        key
-    in
+  let enable_dune_cache job =
+    let path = "$CI_PROJECT_DIR/_dune_cache" in
     job
     |> append_variables
          [
            ("DUNE_CACHE", "enabled");
-           ("DUNE_CACHE_STORAGE_MODE", if copy_mode then "copy" else "hardlink");
+           ("DUNE_CACHE_STORAGE_MODE", "hardlink");
            ("DUNE_CACHE_ROOT", path);
          ]
-    |> append_cache (cache ?policy ~key [path])
-    |> append_after_script
-         ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
+    |> append_cache
+         (cache
+            ~policy:Gitlab_ci.Types.Pull_push
+            ~key:
+              ("dune_cache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+            [path])
+    |> append_after_script ["eval $(opam env)"; "dune cache trim --size=5GB"]
 
-  let enable_sccache ?key ?error_log ?idle_timeout ?log
-      ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
-    let key =
-      Option.value
-        ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-        key
+  let enable_sccache ?error_log ?log ?(policy = Gitlab_ci.Types.Pull) job =
+    let rw_mode =
+      match policy with Pull -> "READ_ONLY" | Pull_push | Push -> "READ_WRITE"
     in
     job
     |> append_variables
-         ([("SCCACHE_DIR", path); ("SCCACHE_CACHE_SIZE", cache_size)]
+         ([
+            (* force incremental build in cargo
+
+              see https://github.com/mozilla/sccache?tab=readme-ov-file#known-caveats *)
+            ("CARGO_INCREMENTAL", "0");
+            (* we use GCP backend in r/w mode *)
+            ("SCCACHE_GCS_BUCKET", "$GCP_SCCACHE_BUCKET");
+            ("SCCACHE_GCS_RW_MODE", rw_mode);
+            ("SCCACHE_GCS_KEY_PREFIX", "sccache");
+            (* if network error, fail over local rust compiler instead of stopping *)
+            ("SCCACHE_IGNORE_SERVER_IO_ERROR", "1");
+            (* daemon does not stop if no client request *)
+            ("SCCACHE_IDLE_TIMEOUT", "0");
+          ]
          @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
-         @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
          @ opt_var "SCCACHE_LOG" Fun.id log)
-    |> append_cache (cache ~key [path])
     (* Starts sccache and sets [RUSTC_WRAPPER] *)
     |> append_before_script [". ./scripts/ci/sccache-start.sh"]
     |> append_after_script ["./scripts/ci/sccache-stop.sh"]
@@ -1498,7 +1568,20 @@ module Cache = struct
     |> append_cache
          (cache
             ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-            [cargo_home // "registry/cache"])
+            [
+              (* The cache folder contains the .crate (tar.gz) files. *)
+              cargo_home // "registry/cache";
+              (* The index folder contains the database of all
+                 available crates on crates.io. *)
+              cargo_home // "registry/index";
+              (* The src folder contains the unzipped source code
+                 ready for compilation. *)
+              cargo_home // "registry/src";
+              (* cargo_home // "git/db";
+                 These are "bare" git repositories. They contain all
+                 the compressed git history and objects. We might
+                 agree to add them later *)
+            ])
     (* Allow Cargo to access the network *)
     |> enable_networked_cargo
 end
@@ -1525,74 +1608,86 @@ module Images = struct
     let make_img distro version =
       Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
 
-    (* !20799 merge commit: https://gitlab.com/tezos/tezos/-/pipelines/2324059035 *)
-    let common_version = "v24-release-2642faac"
+    (* DEB packaging *)
 
-    let debian_version = common_version
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2491675993
+       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+       https://gitlab.com/tezos/tezos/-/commit/05e36a5c/pipelines *)
+    let debian_version = "master-05e36a5c"
 
     let debian_bookworm = make_img "debian:bookworm" debian_version
 
     let debian_trixie = make_img "debian:trixie" debian_version
 
-    let debian_unstable = make_img "debian:unstable" debian_version
+    let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
 
-    let ubuntu_noble = make_img "ubuntu:noble" debian_version
+    let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
 
-    let ubuntu_jammy = make_img "ubuntu:jammy" debian_version
+    let ubuntu_26_04 = make_img "ubuntu:26.04" debian_version
 
-    let ubuntu_plucky = make_img "ubuntu:plucky" debian_version
+    (* RPM packaging *)
 
-    let rpm_version = common_version
+    (* Version created by
+       https://gitlab.com/tezos/tezos/-/pipelines/2412618967
 
-    let rockylinux_9_3 = make_img "rockylinux:9.3" rpm_version
+       NB: these images are currently not build in our regular
+       pipelines. If we build them again, we will need to build fresh
+       ones.
 
-    let rockylinux_9_6 = make_img "rockylinux:9.6" rpm_version
+       Pipelines of the commit.
+       https://gitlab.com/tezos/tezos/-/commit/d79172a8/pipelines *)
+    let rpm_version = "master-d79172a8"
 
-    let rockylinux_10_0 = make_img "rockylinux:10.0" rpm_version
+    let rockylinux_9 = make_img "rockylinux:9" rpm_version
+
+    let rockylinux_10 = make_img "rockylinux:10" rpm_version
 
     let fedora_39 = make_img "fedora:39" rpm_version
 
-    let fedora_41 = make_img "fedora:41" rpm_version
-
     let fedora_42 = make_img "fedora:42" rpm_version
 
-    let homebrew_version = common_version
+    (* [debian-jsonnet-trixie] *)
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
+       after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
+    let debian_jsonnet_trixie =
+      make_img "debian-jsonnet:trixie" "master-d70f7d37"
 
-    let homebrew = make_img "debian-homebrew:trixie" homebrew_version
+    (* [debian-homebrew-trixie] *)
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+    let debian_homebrew_trixie =
+      make_img "debian-homebrew:trixie" "master-be43e621"
 
-    let rust_toolchain_version = common_version
+    (* [debian-rust-trixie] *)
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
+       which contains libclang for building rocksdb in CI.
 
-    let rust_toolchain_trixie =
-      make_img "debian-rust:trixie" rust_toolchain_version
+       When the common_version is updated to a more recent commit this value can
+       be reverted to [common_version] and this comment removed. *)
+
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+    let debian_rust_trixie = make_img "debian-rust:trixie" "master-8afd610a"
+
+    (* [ci-release] *)
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+       May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
+       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
+    (* FIXME: currently not used. + make name consistent *)
+    let _ci_release_version = "master-be43e621"
+
+    let ci_release =
+      Image.mk_external
+        ~image_path:
+          "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
 
     let pp = Image.pp
   end
 
   (* Internal images are built in the stage {!Stages.images}. *)
   let stage = Stages.images
-
-  let client_libs_dependencies =
-    let image_builder_amd64 =
-      job_docker_authenticated
-        ~__POS__
-        ~stage
-        ~name:"oc.docker:client-libs-dependencies"
-        ~description:"Build internal client-libs-dependencies images"
-          (* This image is not built for external use. *)
-        ~ci_docker_hub:false
-          (* Handle docker initialization, if necessary, in [./scripts/ci/docker_client_libs_dependencies_build.sh]. *)
-        ~skip_docker_initialization:true
-        ["./scripts/ci/docker_client_libs_dependencies_build.sh"]
-        ~artifacts:
-          (artifacts
-             ~reports:
-               (reports ~dotenv:"client_libs_dependencies_image_tag.env" ())
-             [])
-    in
-    let image_path =
-      "${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}"
-    in
-    Image.mk_internal ~image_builder_amd64 ~image_path ()
 
   (** The rust toolchain image *)
   let rust_toolchain =
@@ -1611,10 +1706,7 @@ module Images = struct
           ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~variables:
-          [
-            ( "IMAGE",
-              Base_images.(Format.asprintf "%a" pp rust_toolchain_trixie) );
-          ]
+          [("IMAGE", Base_images.(Format.asprintf "%a" pp debian_rust_trixie))]
         ~artifacts:
           (artifacts
              ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
@@ -1629,11 +1721,6 @@ module Images = struct
       ~image_builder_arm64:(image_builder Arm64 ~storage:Ramfs ())
       ~image_path
       ()
-
-  (** The rust toolchain image (static tag [master]) *)
-  let rust_toolchain_master =
-    let image_path = "${rust_toolchain_image_name_protected}:master" in
-    Image.mk_external ~image_path
 
   (** The image containing all dependencies required for Rust SDK bindings *)
   let rust_sdk_bindings =
@@ -1664,27 +1751,6 @@ module Images = struct
       ~image_builder_arm64:(image_builder Arm64 ~storage:Ramfs ())
       ~image_path
       ()
-
-  (** The jsonnet image *)
-  let jsonnet =
-    let image_builder arch =
-      job_docker_authenticated
-        ~__POS__
-        ~arch
-        ~stage
-        ~name:("oc.docker:jsonnet:" ^ Runner.Arch.show_uniform arch)
-        ~ci_docker_hub:false
-        ~artifacts:
-          (artifacts ~reports:(reports ~dotenv:"jsonnet_image_tag.env" ()) [])
-        ["./scripts/ci/docker_jsonnet_build.sh"]
-    in
-    let image_path = "${jsonnet_image_name}:${jsonnet_image_tag}" in
-    Image.mk_internal ~image_builder_amd64:(image_builder Amd64) ~image_path ()
-
-  (** The jsonnet image (static tag [master]) *)
-  let jsonnet_master =
-    let image_path = "${jsonnet_image_name_protected}:master" in
-    Image.mk_external ~image_path
 
   module CI = struct
     (* The job that builds the CI images.
@@ -1731,7 +1797,8 @@ module Images = struct
     (* To use static images from the protected registry. *)
     let mk_ci_image_master name =
       Image.mk_external
-        ~image_path:("${ci_image_name_protected}/" ^ name ^ ":amd64--master")
+        ~image_path:
+          ("${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/" ^ name ^ ":amd64--master")
 
     (* Reuse the same image_builder job [job_docker_ci] for all
        the below images, since they're all produced in that same job.
@@ -1791,110 +1858,7 @@ let job_datadog_pipeline_trace : tezos_job =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
-module Coverage = struct
-  let enable_instrumentation : tezos_job -> tezos_job =
-    append_variables [("COVERAGE_OPTIONS", "--instrument-with bisect_ppx")]
-
-  let enable_location : tezos_job -> tezos_job =
-    append_variables [("BISECT_FILE", "$CI_PROJECT_DIR/_coverage_output/")]
-
-  let enable_report job : tezos_job =
-    job
-    |> add_artifacts
-         ~expose_as:"Coverage report"
-         ~reports:
-           (reports
-              ~coverage_report:
-                {
-                  coverage_format = Cobertura;
-                  path = "_coverage_report/cobertura.xml";
-                }
-              ())
-         ~expire_in:(Duration (Days 15))
-         ~when_:Always
-         ["_coverage_report/"; "$BISECT_FILE"]
-    |> append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
-
-  let unified_coverage_job : tezos_job option ref = ref None
-
-  (* Collect coverage trace-producing jobs. *)
-  let jobs_with_coverage_output = ref []
-
-  let enable_output_artifact ?(expire_in = Gitlab_ci.Types.Duration (Days 1))
-      tezos_job : tezos_job =
-    (* If another job with the same name was already registered:
-       - don't register it again;
-       - allow to apply this function even after [close].
-       This is a hack to allow both [Before_merging] and [Merge_train]
-       in [code_verification.ml] to register the jobs and then call [close]. *)
-    if
-      Fun.flip List.for_all !jobs_with_coverage_output @@ fun previous_job ->
-      name_of_tezos_job previous_job <> name_of_tezos_job tezos_job
-    then (
-      if !unified_coverage_job <> None then
-        failwith
-          "it is too late to apply enable_output_artifact to job %s because \
-           Coverage.close was already called"
-          (name_of_tezos_job tezos_job) ;
-      jobs_with_coverage_output := tezos_job :: !jobs_with_coverage_output) ;
-    tezos_job |> enable_location
-    |> append_script ["./scripts/ci/merge_coverage.sh"]
-    |> add_artifacts
-         ~expire_in
-         ~name:"coverage-files-$CI_JOB_ID"
-         ~when_:On_success
-         (* Store merged .coverage files or [.corrupt.json] files. *)
-         ["$BISECT_FILE/$CI_JOB_NAME_SLUG.*"]
-
-  let close changeset =
-    match !unified_coverage_job with
-    | Some job -> job
-    | None ->
-        (* Write the name of each job that produces coverage as input for other scripts.
-           Only includes the stem of the name: parallel jobs only appear once.
-           E.g. as [tezt], not [tezt X/Y]. *)
-        write_file
-          "script-inputs/ci-coverage-producing-jobs"
-          ~contents:
-            (String.concat
-               "\n"
-               (List.map name_of_tezos_job !jobs_with_coverage_output)
-            ^ "\n") ;
-        (* This job fetches coverage files by precedent test stage. It creates
-           the html, summary and cobertura reports. It also provide a coverage %
-           for the merge request. *)
-        let dependencies = List.rev !jobs_with_coverage_output in
-        let job =
-          job
-            ~__POS__
-            ~image:Images.CI.e2etest
-            ~name:"oc.unified_coverage"
-            ~stage:Stages.test_coverage
-            ~coverage:"/Coverage: ([^%]+%)/"
-            ~rules:
-              [
-                job_rule ~if_:Rules.is_final_pipeline ~when_:Never ();
-                job_rule
-                  ~changes:(Changeset.encode changeset)
-                  ~when_:On_success
-                  ();
-              ]
-            ~variables:
-              [
-                (* This inhibits the Makefile's opam version check, which
-                 this job's opam-less image ([e2etest]) cannot pass. *)
-                ("TEZOS_WITHOUT_OPAM", "true");
-              ]
-            ~dependencies:(Staged dependencies)
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6173
-             We propagate the exit code to temporarily allow corrupted coverage files. *)
-            ["./scripts/ci/report_coverage.sh || exit $?"]
-            ~allow_failure:Yes
-          |> enable_location |> enable_report
-        in
-        unified_coverage_job := Some job ;
-        job
-end
+let container_scanning_flag = false
 
 let enable_kernels =
   append_variables

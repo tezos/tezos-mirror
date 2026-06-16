@@ -90,6 +90,7 @@ type daemon =
   | Etherlink_sc_rollup_node of string
   | Etherlink_evm_node of string
   | Etherlink_producer_node of string
+  | Stresstester of int
 
 (** [name_of_daemon] returns the standard name associated with a given [daemon].
     Used for consistent naming of VMs, logs and artifacts. *)

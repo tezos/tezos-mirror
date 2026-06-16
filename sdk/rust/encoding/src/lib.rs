@@ -92,3 +92,6 @@ pub mod binary_writer;
 pub mod enc;
 pub mod encoding;
 pub mod nom;
+
+#[cfg(test)]
+mod roundtrip_tests;

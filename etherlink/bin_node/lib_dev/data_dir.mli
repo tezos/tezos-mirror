@@ -15,14 +15,17 @@ type store_info = {
   first_number : Ethereum_types.quantity;
 }
 
-(** [export_store ~data_dir ~output_db_file] exports the store database with
-    data from the [data_dir] into the [output_db_file] and returns the rollup
-    address and the current level. *)
+(** [export_store ~data_dir ~output_db_file] exports a compacted copy of the
+    store database from [data_dir] into [output_db_file] using SQLite
+    {{:https://www.sqlite.org/lang_vacuum.html}VACUUM INTO}. This is intended
+    for non-archive history modes where the database is small enough for the
+    vacuum to complete in a reasonable time. *)
 val export_store :
-  data_dir:string -> output_db_file:string -> store_info tzresult Lwt.t
+  data_dir:string -> output_db_file:string -> unit tzresult Lwt.t
 
-(** [store_info ~data_dir_file] returns information about the store
-    database in [data_dir] such as the address and the current level. *)
+(** [store_info ~data_dir] returns metadata about the store database in
+    [data_dir]: the rollup address, the current and first block numbers, and
+    the history mode. *)
 val store_info : data_dir:string -> store_info tzresult Lwt.t
 
 (** [lock ~data_dir] takes an exclusive lock on [data_dir] for the

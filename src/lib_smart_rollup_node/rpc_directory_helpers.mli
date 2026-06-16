@@ -40,13 +40,17 @@ module type PARAM = sig
   val prefix : (unit, prefix) Tezos_rpc.Path.t
 end
 
-(** This module is a helper to register your endpoints and
-    build a resulting subdirectory eventually. *)
-module Make_sub_directory (S : PARAM) : sig
+module type SUBDIRECTORY = sig
+  type prefix
+
+  type context
+
+  type subcontext
+
   (** Register an endpoint with no parameters in the path. *)
   val register0 :
     ([< Resto.meth], 'prefix, 'prefix, 'query, 'input, 'output) Service.t ->
-    (S.subcontext -> 'query -> 'input -> 'output tzresult Lwt.t) ->
+    (subcontext -> 'query -> 'input -> 'output tzresult Lwt.t) ->
     unit
 
   (** Register an endpoint with a single parameter in the path. *)
@@ -58,25 +62,37 @@ module Make_sub_directory (S : PARAM) : sig
       'input,
       'output )
     Service.t ->
-    (S.subcontext -> 'param1 -> 'query -> 'input -> 'output tzresult Lwt.t) ->
+    (subcontext -> 'param1 -> 'query -> 'input -> 'output tzresult Lwt.t) ->
     unit
 
   (** Register an endpoint that specifies how to process incoming queries and inputs;
       this function is intended for handling asynchronous contexts. *)
   val gen_register0 :
     ([< Resto.meth], 'prefix, 'prefix, 'query, 'input, 'output) Service.t ->
-    (S.subcontext -> 'query -> 'input -> 'output Tezos_rpc.Answer.t Lwt.t) ->
+    (subcontext -> 'query -> 'input -> 'output Tezos_rpc.Answer.t Lwt.t) ->
     unit
 
   (** Build sub-directory with registered endpoints with respect to
       Node_context. *)
-  val build_sub_directory : S.context -> S.prefix Tezos_rpc.Directory.t
+  val build_sub_directory : context -> prefix Tezos_rpc.Directory.t
 end
+
+(** This module is a helper to register your endpoints and
+    build a resulting subdirectory eventually. *)
+module Make_sub_directory (S : PARAM) :
+  SUBDIRECTORY
+    with type prefix := S.prefix
+     and type context := S.context
+     and type subcontext := S.subcontext
 
 (** This module is a helper to register your endpoints and
     build a resulting top level directory eventually. *)
 module Make_directory (S : PARAM) : sig
-  include module type of Make_sub_directory (S)
+  include
+    SUBDIRECTORY
+      with type prefix := S.prefix
+       and type context := S.context
+       and type subcontext := S.subcontext
 
   (** Build a top-level directory from a sub-directory by prefixing it with
       {!val:prefix}. *)

@@ -25,13 +25,16 @@
 
 type error +=
   | Merging_failed of string
-  | Missing_shards of {provided : int; required : int}
   | Illformed_pages
   | Invalid_slot_size of {provided : int; expected : int}
+  | Invalid_commitment of {
+      expected : Cryptobox.commitment;
+      obtained : Cryptobox.commitment;
+    }
   | Invalid_degree of string
   | No_prover_SRS
   | Unable_to_fetch_the_commitment_of_slot_id of Types.Slot_id.t
-  | No_commitment_published_on_l1_for_slot_id of Types.Slot_id.t
+  | No_commitment_found_for_slot_id of Types.Slot_id.t
 
 let () =
   register_error_kind
@@ -43,23 +46,6 @@ let () =
     Data_encoding.(obj1 (req "msg" string))
     (function Merging_failed parameter -> Some parameter | _ -> None)
     (fun parameter -> Merging_failed parameter) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.missing_shards"
-    ~title:"Missing shards"
-    ~description:"Some shards are missing"
-    ~pp:(fun ppf (provided, required) ->
-      Format.fprintf
-        ppf
-        "Some shards are missing, expected at least %d, found %d. Store is \
-         invalid."
-        provided
-        required)
-    Data_encoding.(obj2 (req "provided" int31) (req "required" int31))
-    (function
-      | Missing_shards {provided; required} -> Some (provided, required)
-      | _ -> None)
-    (fun (provided, required) -> Missing_shards {provided; required}) ;
   register_error_kind
     `Permanent
     ~id:"dal.node.illformed_pages"
@@ -85,6 +71,28 @@ let () =
       | Invalid_slot_size {provided; expected} -> Some (provided, expected)
       | _ -> None)
     (fun (provided, expected) -> Invalid_slot_size {provided; expected}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.invalid_commitment"
+    ~title:"Invalid commitment"
+    ~description:"The commitment of the slot does not match the expected one"
+    ~pp:(fun ppf (expected, obtained) ->
+      Format.fprintf
+        ppf
+        "The commitment of the slot (%a) does not match the expected \
+         commitment (%a)"
+        Cryptobox.Commitment.pp
+        obtained
+        Cryptobox.Commitment.pp
+        expected)
+    Data_encoding.(
+      obj2
+        (req "expected" Cryptobox.Commitment.encoding)
+        (req "obtained" Cryptobox.Commitment.encoding))
+    (function
+      | Invalid_commitment {expected; obtained} -> Some (expected, obtained)
+      | _ -> None)
+    (fun (expected, obtained) -> Invalid_commitment {expected; obtained}) ;
   register_error_kind
     `Permanent
     ~id:"dal.node.invalid_degree_string"
@@ -131,22 +139,24 @@ let () =
       Unable_to_fetch_the_commitment_of_slot_id {slot_level; slot_index}) ;
   register_error_kind
     `Permanent
-    ~id:"dal.node.No_commitment_published_on_l1_for_slot_id"
-    ~title:"No commitment published on L1 for slot id"
-    ~description:"No commitment was published on L1 for the given slot id."
+    ~id:"dal.node.No_commitment_found_for_slot_id"
+    ~title:"No commitment found on L1 for slot id"
+    ~description:
+      "No commitment found (neither in memory, nor in the skip-list, nor in \
+       the L1 context) for the given slot id."
     ~pp:(fun ppf (published_level, slot_index) ->
       Format.fprintf
         ppf
-        "There is no commitment published on L1 at level %ld and index %d."
+        "No commitment found (neither in memory, nor in the skip-list, nor in \
+         the L1 context) at level %ld and index %d."
         published_level
         slot_index)
     Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
     (function
-      | No_commitment_published_on_l1_for_slot_id id ->
-          Some (id.slot_level, id.slot_index)
+      | No_commitment_found_for_slot_id id -> Some (id.slot_level, id.slot_index)
       | _ -> None)
     (fun (slot_level, slot_index) ->
-      No_commitment_published_on_l1_for_slot_id {slot_level; slot_index})
+      No_commitment_found_for_slot_id {slot_level; slot_index})
 
 type slot = bytes
 
@@ -181,49 +191,136 @@ let polynomial_from_shards cryptobox shards =
       | `Invalid_shard_length msg ) ->
       Error (Errors.other [Merging_failed msg])
 
-let get_slot_content_from_shards cryptobox store slot_id =
+let read_minimal_shards_for_reconstruction ?from_bytes cryptobox store slot_id =
   let open Lwt_result_syntax in
-  let {Cryptobox.number_of_shards; redundancy_factor; slot_size; _} =
+  let {Cryptobox.number_of_shards; redundancy_factor; _} =
     Cryptobox.parameters cryptobox
   in
-  let minimal_number_of_shards = number_of_shards / redundancy_factor in
-  let rec loop acc shard_id remaining =
-    if remaining <= 0 then return acc
-    else if shard_id >= number_of_shards then
-      let provided = minimal_number_of_shards - remaining in
-      fail
-        (Errors.other
-           [Missing_shards {provided; required = minimal_number_of_shards}])
-    else
-      let*! res = Store.Shards.read (Store.shards store) slot_id shard_id in
-      match res with
-      | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
-      | Error _ -> loop acc (shard_id + 1) remaining
+  let needed = number_of_shards / redundancy_factor in
+  let*! res =
+    let* seq =
+      Store.Shards.read_all
+        ?from_bytes
+        (Store.shards store)
+        slot_id
+        ~number_of_shards
+    in
+    let*! shards =
+      Seq_s.fold_left
+        (fun (acc, count_elts) elt ->
+          match elt with
+          | _, index, Ok share ->
+              (Cryptobox.{index; share} :: acc, count_elts + 1)
+          | _ -> (acc, count_elts))
+        ([], 0)
+        seq
+    in
+    return shards
   in
-  let* shards = loop Seq.empty 0 minimal_number_of_shards in
+  match res with
+  | Ok (rev_shards, count_elts) ->
+      if needed > count_elts then
+        let*! () =
+          Event.emit_not_enough_shards_for_reconstruction
+            ~published_level:slot_id.slot_level
+            ~slot_index:slot_id.slot_index
+            ~provided:count_elts
+            ~required:needed
+        in
+        return_none
+      else List.take_n needed rev_shards |> List.to_seq |> return_some
+  | Error _ -> return_none
+
+let get_slot_content_from_shards cryptobox shards =
+  let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
-  (* Store the slot so that next calls don't require a reconstruction. *)
-  let* () = Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id in
-  let*! () =
-    Event.emit_reconstructed_slot
-      ~size:(Bytes.length slot)
-      ~shards:(Seq.length shards)
-  in
   return slot
 
+let http_request_path_from_kind backup_uri published_level slot_index slot_size
+    store_kind =
+  let kind, filename =
+    match store_kind with
+    | `Shards_archive ->
+        ("shards", Format.sprintf "%ld_%d" published_level slot_index)
+    | `Slots_archive ->
+        ( "slots",
+          Format.sprintf "%ld_%d_%d" published_level slot_index slot_size )
+  in
+  Uri.with_path
+    backup_uri
+    String.(
+      concat
+        "/"
+        [
+          (let initial_path = Uri.path backup_uri in
+           match String.remove_suffix ~suffix:"/" initial_path with
+           | Some path -> path
+           | None -> initial_path);
+          "v0";
+          kind;
+          "by_published_level";
+          filename;
+        ])
+
+let local_filename_from_kind backup_uri published_level slot_index slot_size
+    store_kind =
+  let uri = Uri.path_and_query backup_uri in
+  match store_kind with
+  | `Shards_archive -> Format.sprintf "%s/%ld_%d" uri published_level slot_index
+  | `Slots_archive ->
+      Format.sprintf "%s/%ld_%d_%d" uri published_level slot_index slot_size
+
+(* The function below fetches a slot payload (or its shards) from a local file
+   or over HTTP(S), depending on the URI scheme, with the choice between slots
+   and shards driven by the URI fragment:
+
+    - No fragment or ["#slots"]  -> consider the source as a *slots* archive
+    - ["#shards"]                -> consider the source as a *shards* archive
+    - Any other fragment         -> [Failure "Invalid backup_uri fragment ..."]
+
+    The fragment is only a DAL-side indication to extend the
+    [--slots-backup-uri] option and associated code to handle shards without
+    breaking compatibility. It is stripped from [backup_uri]
+    before computing the local path or issuing the HTTP request.
+
+   URL/path shapes look as follows:
+
+   - Local (file://): the fragment affects the *filename*, not the directory.
+     * #slots  -> <base>/<published_level>_<slot_index>_<slot_size>
+     * #shards -> <base>/<published_level>_<slot_index>
+
+   - Remote (http[s]://): the fragment selects a server-side subtree.
+     * #slots  -> <base>/v0/slots/by_published_level/<published_level>_<slot_index>_<slot_size>
+     * #shards -> <base>/v0/shards/by_published_level/<published_level>_<slot_index>
+*)
 let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
     backup_uri =
   let open Lwt_result_syntax in
+  (* Extract the fragment of the URI. We expect nothing, #slots or #shards. *)
+  let fragment_kind = Uri.fragment backup_uri in
+  let archive_kind =
+    match fragment_kind with
+    | None -> `Slots_archive (* default *)
+    | Some "slots" -> `Slots_archive
+    | Some "shards" -> `Shards_archive
+    | Some s ->
+        Stdlib.failwith
+          (Format.sprintf
+             "Invalid backup_uri fragment %S. Expecting 'slots' or 'shards'."
+             s)
+  in
+  (* Drop the fragment part from the URI *)
+  let backup_uri = Uri.with_fragment backup_uri None in
   match Uri.scheme backup_uri with
   | Some "file" ->
       let slot_filename =
-        Format.sprintf
-          "%s/%ld_%d_%d"
-          (Uri.path_and_query backup_uri)
+        local_filename_from_kind
+          backup_uri
           published_level
           slot_index
           slot_size
+          archive_kind
       in
       if Sys.file_exists slot_filename then
         let*! content =
@@ -232,30 +329,30 @@ let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
               let*! res =
                 Lwt_io.with_file ~mode:Lwt_io.Input slot_filename Lwt_io.read
               in
-              Lwt.return_some (Bytes.of_string res))
+              let res = Bytes.of_string res in
+              Lwt.return_some
+                (if archive_kind = `Shards_archive then `Shards res
+                 else `Slot res))
             (fun _ -> Lwt.return_none)
         in
         return content
       else return_none
   | Some ("http" | "https") -> (
       let url =
-        Uri.with_path
+        http_request_path_from_kind
           backup_uri
-          String.(
-            concat
-              "/"
-              [
-                "v0";
-                "slots";
-                "by_published_level";
-                Format.sprintf "%ld_%d_%d" published_level slot_index slot_size;
-              ])
+          published_level
+          slot_index
+          slot_size
+          archive_kind
       in
       let*! resp, body = Cohttp_lwt_unix.Client.get url in
       match resp.status with
       | `OK ->
           let*! body_str = Cohttp_lwt.Body.to_string body in
-          return_some (Bytes.of_string body_str)
+          let res = Bytes.of_string body_str in
+          return_some
+            (if archive_kind = `Shards_archive then `Shards res else `Slot res)
       | #Cohttp.Code.status_code as status ->
           (* Consume the body of the request in case of failure to avoid leaking stream!
              See https://github.com/mirage/ocaml-cohttp/issues/730 *)
@@ -272,28 +369,39 @@ let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
       tzfail (Exn (Failure (Format.sprintf "URI scheme %S not supported" s)))
   | None -> tzfail (Exn (Failure (Format.sprintf "Bad URI. No URI scheme")))
 
+let verify_commitment cryptobox expected slot =
+  let open Result_syntax in
+  let* polynomial = polynomial_from_slot cryptobox slot in
+  let* obtained = commit cryptobox polynomial in
+  if Cryptobox.Commitment.equal expected obtained then return_unit
+  else fail (`Other [Invalid_commitment {expected; obtained}])
+
+(*
 let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
+   *)
+let try_fetch_slot_from_backup ctxt cryptobox ~slot_size slot_id
     expected_commitment_hash backup_uri =
   let open Lwt_result_syntax in
-  let fetch_and_sanitize_slot_content () =
-    (* /!\ Warning: We are fetching the slot content as stored by another DAL
-       node on disk into its store/slot_store/ directory. Currently the
-       home-made KVS we use appends extra bytes at the beginning of each
-       "file" to chech if values are present. We should takes them into
-       account to:
-       - compute the expected size of the data
-       - fetch the exact slot content, without encoding artifacts when written
-         to disk. *)
-    let* slot_opt =
+  let Types.Slot_id.{slot_index; slot_level = published_level} = slot_id in
+  let fetch_and_sanitize_data () =
+    let* data_opt =
       fetch_slot_from_backup_uri
         ~slot_size
         ~published_level
         ~slot_index
         backup_uri
     in
-    match slot_opt with
+    match data_opt with
     | None -> return_none
-    | Some slot_bytes ->
+    | Some (`Slot slot_bytes) ->
+        (* /!\ Warning: We are fetching the slot content as stored by another DAL
+         node on disk into its store/slot_store/ directory. Currently the
+         home-made KVS we use appends extra bytes at the beginning of each
+         "file" to chech if values are present. We should takes them into
+         account to:
+         - compute the expected size of the data
+         - fetch the exact slot content, without encoding artifacts when written
+           to disk. *)
         let expected_size =
           slot_size + Key_value_store.file_prefix_bitset_size
         in
@@ -314,30 +422,50 @@ let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
                slot_bytes
                Key_value_store.file_prefix_bitset_size
                slot_size
+    | Some (`Shards shard_bytes) -> (
+        (* We got the raw shards KVS file. We could reuse the KVS to decode the
+           bytes into a list of shards. *)
+        let* shards_opt =
+          read_minimal_shards_for_reconstruction
+            ~from_bytes:shard_bytes
+            cryptobox
+            (Node_context.get_store ctxt)
+            slot_id
+        in
+        match shards_opt with
+        | None -> return_none
+        | Some shards ->
+            let*! res_shard_store =
+              Node_context.may_reconstruct
+                ~reconstruct:(fun _slot_index ->
+                  get_slot_content_from_shards cryptobox shards)
+                slot_id
+                ctxt
+            in
+            Result.to_option res_shard_store |> return)
   in
-  let* slot_opt =
-    fetch_and_sanitize_slot_content () |> Errors.other_lwt_result
-  in
+  (* We either directly fetched a slot, or we rebuilt it from fetched shards. *)
+  let* slot_opt = fetch_and_sanitize_data () |> Errors.other_lwt_result in
   match (slot_opt, expected_commitment_hash) with
   | None, _ -> return_none
   | Some slot, None ->
       (* We trust the backup URI, no extra checks to do. *)
       return_some slot
-  | Some slot, Some expected_commitment ->
-      let*? polynomial = polynomial_from_slot cryptobox slot in
-      let*? obtained_commitment = commit cryptobox polynomial in
-      if Cryptobox.Commitment.equal expected_commitment obtained_commitment then
-        return_some slot
-      else
-        let*! () =
-          Event.emit_slot_from_backup_has_unexpected_commitment
-            ~published_level
-            ~slot_index
-            ~backup_uri
-            ~expected_commitment
-            ~obtained_commitment
-        in
-        return_none
+  | Some slot, Some expected_commitment -> (
+      let res = verify_commitment cryptobox expected_commitment slot in
+      match res with
+      | Ok () -> return_some slot
+      | Error (`Other [Invalid_commitment {expected; obtained}]) ->
+          let*! () =
+            Event.emit_slot_from_backup_has_unexpected_commitment
+              ~published_level
+              ~slot_index
+              ~backup_uri
+              ~expected_commitment:expected
+              ~obtained_commitment:obtained
+          in
+          return_none
+      | Error e -> fail e)
 
 (* Attempt to retrieve the commitment associated with [slot_id] from the
    in-memory finalized commitments store.
@@ -360,7 +488,8 @@ let try_get_commitment_of_slot_id_from_memory ctxt slot_id =
    - Decode the cell using the DAL plugin.
    - Return the extracted slot header, if available.
 
-    Returns [None] if the cell is not found in the store. *)
+   Returns [None] if the cell is found but contains an unpublished slot.
+   Raises [Not_found] if no matching cell is found in the store. *)
 let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let* cell_bytes_opt =
@@ -369,7 +498,7 @@ let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
       slot_id
   in
   match cell_bytes_opt with
-  | None -> return_none
+  | None -> raise Not_found
   | Some (cell_bytes, attestation_lag) ->
       let*? (module Plugin : Dal_plugin.T) =
         let level = Int32.(add slot_id.slot_level (of_int attestation_lag)) in
@@ -380,89 +509,96 @@ let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
         cell_bytes
       |> Plugin.Skip_list.slot_header_of_cell |> return
 
-(* Retrieve the slot header for [slot_id] by accessing the skip list cells
-   produced during [attested_level] and stored in in the L1 context).
+(* Retrieve the slot header for [slot_id] from the L1 skip list.
 
-   Steps:
-   - Retrieve the skip list cells for [attested_level] using the plugin from L1.
-   - Locate the one matching the [slot_index] of [slot_id].
-   - Extract and return the slot header via the plugin. *)
-let _try_get_slot_header_from_L1_skip_list ctxt slot_id =
+   For each [lag] in [attestation_lags], fetch the skip list at
+   [slot_level + lag] and look for a cell matching both [slot_index] and [lag]
+   (the lag check is required with dynamic lags to avoid matching a cell from a
+   different published level).
+
+   Returns [None] if a matching cell is found but it contains an unpublished
+   slot. Returns an error if no matching cell is found after all lags are
+   exhausted. *)
+let try_get_slot_header_from_L1_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let Types.Slot_id.{slot_level; slot_index} = slot_id in
-  let*? (module Plugin : Dal_plugin.T), dal_constants =
+  let*? _plugin_slot, dal_constants_slot =
     Node_context.get_plugin_and_parameters_for_level ctxt ~level:slot_level
   in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
-     The attested level is wrong around migration!
-     Example: If [M] is the migration level, for [slot_level = M-2],
-     [attested_lag = 8] in P1, and [attested_lag = 5] in P2, we get
-     [attested_level = M+6], but at this level skip-list cells for
-     [slot_level = M+1] are found in the L1 context.  *)
-  let attested_level =
-    Int32.(add slot_level (of_int dal_constants.Types.attestation_lag))
+  let attestation_lags = dal_constants_slot.Types.attestation_lags in
+  let pred_published_level = Int32.pred slot_level in
+  let pred_publication_level_dal_constants =
+    lazy
+      (Lwt.return
+      @@ Node_context.get_proto_parameters
+           ctxt
+           ~level:(`Level pred_published_level))
   in
-  let* cells_of_level =
-    let pred_published_level = Int32.pred slot_level in
-    Plugin.Skip_list.cells_of_level
-      ~attested_level
-      (Node_context.get_tezos_node_cctxt ctxt)
-      ~dal_constants
-      ~pred_publication_level_dal_constants:
-        (lazy
-          (Lwt.return
-          @@ Node_context.get_proto_parameters
-               ctxt
-               ~level:(`Level pred_published_level)))
+  let rec find_in_lags = function
+    | [] -> tzfail (Exn Not_found)
+    | lag :: rest -> (
+        let attested_level = Int32.(add slot_level (of_int lag)) in
+        match
+          Node_context.get_plugin_and_parameters_for_level
+            ctxt
+            ~level:attested_level
+        with
+        | Error _ -> find_in_lags rest (* plugin not yet known; skip *)
+        | Ok (plugin_attested, dal_constants) -> (
+            let (module Plugin : Dal_plugin.T) = plugin_attested in
+            let* cells =
+              Plugin.Skip_list.cells_of_level
+                ~attested_level
+                (Node_context.get_tezos_node_cctxt ctxt)
+                ~dal_constants
+                ~pred_publication_level_dal_constants
+            in
+            match
+              List.find_opt
+                (fun (_hash, _cell, cell_slot_index, cell_lag) ->
+                  cell_slot_index = slot_index && cell_lag = lag)
+                cells
+            with
+            | None -> find_in_lags rest
+            | Some (_hash, cell, _slot_index, _cell_lag) ->
+                Plugin.Skip_list.slot_header_of_cell cell |> return))
   in
-  match
-    List.find_all
-      (fun (_hash, _cell, cell_slot_index, _cell_attestation_lag) ->
-        cell_slot_index = slot_index)
-      cells_of_level
-  with
-  | [(_cell_hash, cell, _slot_index, _cell_attestation_lag)] ->
-      Plugin.Skip_list.slot_header_of_cell cell |> return
-  | _ ->
-      (* This should not happen (unless the slot index is not valid). In fact,
-         the skip list delta for a level contains exactly [number_of_slots]
-         items: one per slot index. *)
-      let number_of_slots = dal_constants.number_of_slots in
-      if slot_index < 0 || slot_index >= number_of_slots then
-        tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
-      else (* Should not be reachable *)
-        assert false
+  find_in_lags attestation_lags
 
 (* Attempt to retrieve the commitment hash associated with the published slot
    header identified by [slot_id].
 
    Retrieval order:
     1. Attempt to get the header from the local SQLite skip list.
-    2. ~~If not found, fall back to fetching it from the L1 skip list context.~~
+    2. If not found locally (empty skip list, or data pruned), fall back to
+       fetching it from the L1 node's context via
+       [try_get_slot_header_from_L1_skip_list].
 
-    Returns [Some commitment] if found and matches the [slot_id], [None]
-    otherwise. Performs assertions to ensure the returned slot header matches
-    the requested [slot_id]. *)
+    Returns [Some commitment] if a commitment was published for [slot_id],
+    [None] if the slot was confirmed unpublished by either local or L1 data,
+    or an error if the lookup itself failed or there is no skip-list data
+    available to answer the query. *)
 let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
-  let*! published_slot_header_opt =
-    try_get_slot_header_from_indexed_skip_list ctxt slot_id
-  in
-  match published_slot_header_opt with
-  | Ok (Some Dal_plugin.{published_level; slot_index; commitment}) ->
-      (* These invariants are expected to hold by design. *)
-      assert (Int32.equal published_level slot_id.slot_level) ;
-      assert (Int.equal slot_index slot_id.slot_index) ;
-      return_some commitment
-  | Ok None ->
-      (* The function(s) above succeeded, but nothing was found as "published". *)
-      return_none
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
-     If the header was not found, or there was an error, then normally we would
-     try to get it from the L1 context, using
-     [_try_get_slot_header_from_L1_skip_list ctxt slot_id]. See the FIXME there
-     to see why we don't use it. *)
-  | Error error -> tzfail error
+  Lwt.catch
+    (fun () ->
+      let+ slot_header_opt =
+        try_get_slot_header_from_indexed_skip_list ctxt slot_id
+      in
+      Option.map
+        (fun Dal_plugin.{published_level; slot_index; commitment} ->
+          (* These invariants are expected to hold by design. *)
+          assert (Int32.equal published_level slot_id.slot_level) ;
+          assert (Int.equal slot_index slot_id.slot_index) ;
+          commitment)
+        slot_header_opt)
+    (fun exn ->
+      match exn with
+      | Not_found ->
+          try_get_slot_header_from_L1_skip_list ctxt slot_id
+          |> Lwt_result.map
+             @@ Option.map (fun Dal_plugin.{commitment; _} -> commitment)
+      | exn -> Lwt.reraise exn)
 
 (* This function attempts to retrieve the commitment associated to a (published)
    slot whose id is given in [slot_id]. For that, we check in various places:
@@ -470,31 +606,26 @@ let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
 let get_commitment_from_slot_id ctxt slot_id =
   let open Lwt_result_syntax in
   match try_get_commitment_of_slot_id_from_memory ctxt slot_id with
-  | Some res -> return res
+  | Some commitment -> return commitment
   | None -> (
       let*! res = try_get_commitment_of_slot_id_from_skip_list ctxt slot_id in
       match res with
-      | Ok (Some res) -> return res
-      | Ok None ->
-          (* Here, we managed to fetch the skip list cell, but nothing was
-             published at the given slot id. *)
-          tzfail @@ No_commitment_published_on_l1_for_slot_id slot_id
+      | Ok (Some commitment) -> return commitment
+      | Ok None -> tzfail @@ No_commitment_found_for_slot_id slot_id
       | Error error ->
-          (* Here, we encountered an error which could be due to various
-             reasons, like not having sufficient L1 history to fetch the skip
-             list cell. *)
+          (* Both lookups failed with an error (e.g. the L1 node does not have
+             the requested level in its history). *)
           let*! () =
             Event.emit_failed_to_retrieve_commitment_of_slot_id
               ~published_level:slot_id.slot_level
               ~slot_index:slot_id.slot_index
-              ~error
+              ~error:[error]
           in
           Unable_to_fetch_the_commitment_of_slot_id slot_id |> tzfail)
 
 let fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id =
   let open Lwt_result_syntax in
   let config : Configuration_file.t = Node_context.get_config ctxt in
-  let Types.Slot_id.{slot_index; slot_level = published_level} = slot_id in
   match config.slots_backup_uris with
   | [] ->
       (* Fail if no backup URI is configured. *)
@@ -505,20 +636,18 @@ let fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id =
       let* expected_commitment_hash =
         (if config.trust_slots_backup_uris then return_none
          else
-           let+ res = get_commitment_from_slot_id ctxt slot_id in
-           Option.some res)
+           let+ commitment = get_commitment_from_slot_id ctxt slot_id in
+           Some commitment)
         |> Errors.other_lwt_result
       in
       let* slot_opt =
         List.find_map_es
-          (fun uri ->
-            try_fetch_slot_from_backup
-              cryptobox
-              ~slot_size
-              ~published_level
-              ~slot_index
-              expected_commitment_hash
-              uri)
+          (try_fetch_slot_from_backup
+             ctxt
+             cryptobox
+             ~slot_size
+             slot_id
+             expected_commitment_hash)
           backup_uris
       in
       match slot_opt with
@@ -529,31 +658,53 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
   let store = Node_context.get_store ctxt in
-  let cryptobox = Node_context.get_cryptobox ctxt in
-  let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-  let*! res_slot_store =
-    Store.Slots.find_slot (Store.slots store) ~slot_size slot_id
+  let res =
+    Node_context.get_cryptobox_and_precomputations
+      ~level:slot_id.Types.Slot_id.slot_level
+      ctxt
   in
-  match res_slot_store with
-  | Ok slot -> return slot
-  | Error _ -> (
-      let*! res_shard_store =
-        if reconstruct_if_missing then
-          (* The slot could not be obtained from the slot store, attempt a
-             reconstruction. *)
-          let*! res_shard_store =
-            Node_context.may_reconstruct
-              ~reconstruct:(get_slot_content_from_shards cryptobox store)
-              slot_id
-              ctxt
-          in
-          Lwt.return_some res_shard_store
-        else Lwt.return_none
+  match res with
+  | Error _ ->
+      (* No cryptobox associated to this slot_id. *)
+      fail Errors.not_found
+  | Ok (cryptobox, _) -> (
+      let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+      let*! res_slot_store =
+        Store.Slots.find_slot (Store.slots store) slot_id
       in
-      match res_shard_store with
-      | Some (Ok slot) -> return slot
-      | Some (Error _) | None ->
-          fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id)
+      match res_slot_store with
+      | Ok slot -> return slot
+      | Error _ -> (
+          let* res_shard_store =
+            if reconstruct_if_missing then
+              (* The slot could not be obtained from the slot store, attempt a
+             reconstruction. *)
+              let* shards_opt =
+                Errors.other_lwt_result
+                @@ read_minimal_shards_for_reconstruction
+                     cryptobox
+                     store
+                     slot_id
+              in
+              match shards_opt with
+              | None -> return_none
+              | Some shards ->
+                  let*! res_shard_store =
+                    Node_context.may_reconstruct
+                      ~reconstruct:(fun _slot_id ->
+                        get_slot_content_from_shards cryptobox shards)
+                      slot_id
+                      ctxt
+                  in
+                  return_some res_shard_store
+            else return_none
+          in
+          match res_shard_store with
+          | Some (Ok slot) ->
+              let* () = Store.Slots.add_slot (Store.slots store) slot slot_id in
+              return slot
+          | Some (Error _) | None ->
+              fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id))
 
 (* Main functions *)
 
@@ -667,12 +818,12 @@ let shards_to_attesters committee =
 let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
     proto_parameters commitment shards shard_proofs gs_worker =
   let open Lwt_result_syntax in
-  let attestation_level =
+  let committee_level =
     Int32.(
       pred
       @@ add slot_id.slot_level (of_int proto_parameters.Types.attestation_lag))
   in
-  let* committee = level_committee ~level:attestation_level in
+  let* committee = level_committee ~level:committee_level in
   let attester_of_shard = shards_to_attesters committee in
   let ignore_pkhs = Node_context.get_ignore_pkhs ctxt in
   shards
@@ -705,11 +856,12 @@ let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
              in
              let store = Node_context.get_store ctxt in
              let traps_store = Store.traps store in
-             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
-                The [proto_parameters] are those for the last known finalized
-                level, which may differ from those of the slot level. This will
-                be an issue when the value of the [traps_fraction] changes.*)
-             let traps_fraction = proto_parameters.traps_fraction in
+             let traps_fraction =
+               Node_context.get_traps_fraction
+                 ctxt
+                 ~published_level:slot_id.slot_level
+                 ~default:proto_parameters.traps_fraction
+             in
              let () =
                maybe_register_trap
                  traps_store
@@ -744,8 +896,8 @@ let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
 (** This function publishes the shards of a commitment that is waiting
     for attestation on L1 if this node has those shards and their proofs
     in memory. *)
-let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
-    proto_parameters commitment slot_id =
+let publish_slot_data ctxt ~level_committee gs_worker proto_parameters
+    commitment slot_id =
   let open Lwt_result_syntax in
   let node_store = Node_context.get_store ctxt in
   let cache = Store.not_yet_published_cache node_store in
@@ -768,7 +920,7 @@ let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
         Attestable_slots.may_notify_attestable_slot_or_trap ctxt ~slot_id
       in
       let* () =
-        Store.Slots.add_slot ~slot_size (Store.slots node_store) slot slot_id
+        Store.Slots.add_slot (Store.slots node_store) slot slot_id
         |> Errors.to_tzresult
       in
       publish_proved_shards

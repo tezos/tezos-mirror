@@ -566,8 +566,6 @@ module Internal_for_tests : sig
   val precomputation_equal :
     shards_proofs_precomputation -> shards_proofs_precomputation -> bool
 
-  val encoded_share_size : t -> int
-
   (** [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool
@@ -609,6 +607,13 @@ val init_prover_dal :
   fetch_trusted_setup:bool ->
   unit ->
   unit Error_monad.tzresult Lwt.t
+
+(** [init_verifier_dal ()] resets the DAL initialisation parameters to verifier
+    mode with the real (non-fake) embedded SRS. This is the default state at
+    program startup. Calling this is useful to restore a clean state when the
+    initialisation parameters may have been altered (e.g. by test code using
+    {!Internal_for_tests}). *)
+val init_verifier_dal : unit -> unit
 
 val pp_error :
   Format.formatter ->

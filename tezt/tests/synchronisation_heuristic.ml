@@ -510,6 +510,7 @@ let test_many_nodes_bootstrap =
         "bootstrap";
         "threshold";
         Tag.memory_hungry;
+        Tag.slow;
       ]
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->

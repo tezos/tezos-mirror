@@ -13,7 +13,7 @@ all: build test check
 
 .PHONY: tx_kernel
 tx_kernel:
-	@cargo build --target wasm32-unknown-unknown --release -p tx_kernel --features dal
+	@cargo build --target wasm32-unknown-unknown --release -p tx_kernel --features dal,debug
 	@mv target/wasm32-unknown-unknown/release/tx_kernel.wasm target/wasm32-unknown-unknown/release/tx_kernel_dal.wasm
 	@cargo build --target wasm32-unknown-unknown --release -p tx_kernel
 
@@ -39,6 +39,7 @@ test:
 .PHONY: check
 check:
 	@cargo clippy --features testing --all-targets --locked -- --deny warnings
+	@cargo clippy --features testing,dal,debug --all-targets --locked -- --deny warnings
 
 .PHONY: clean
 clean:

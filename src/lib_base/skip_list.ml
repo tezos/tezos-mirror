@@ -196,7 +196,7 @@ end) : S = struct
   let pp ~pp_ptr ~pp_content fmt {content; back_pointers; index} =
     Format.fprintf
       fmt
-      "content: %a@,index: %s@,@[<hv 2>back_pointers:@ %a@]"
+      "content: %a@ index: %s@,@[<hv 2>back_pointers:@ %a@]"
       pp_content
       content
       (Z.to_string index)

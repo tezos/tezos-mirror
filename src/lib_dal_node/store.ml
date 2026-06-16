@@ -144,7 +144,9 @@ module Stores_dirs = struct
 end
 
 module Shards_disk = struct
-  type error += Invalid_min_shards_to_reconstruct_slot of {given : int}
+  type error +=
+    | Invalid_min_shards_to_reconstruct_slot of {given : int}
+    | NoShardLayout of {level : int32}
 
   let () =
     register_error_kind
@@ -163,7 +165,17 @@ module Shards_disk = struct
       (function
         | Invalid_min_shards_to_reconstruct_slot {given} -> Some given
         | _ -> None)
-      (fun given -> Invalid_min_shards_to_reconstruct_slot {given})
+      (fun given -> Invalid_min_shards_to_reconstruct_slot {given}) ;
+    register_error_kind
+      `Permanent
+      ~id:"dal.shards.NoShardLayout"
+      ~title:"No shard layout"
+      ~description:"No shard layout found for the given slot level"
+      ~pp:(fun ppf level ->
+        Format.fprintf ppf "No shard layout found for slot at level %ld" level)
+      Data_encoding.(obj1 (req "level" int32))
+      (function NoShardLayout {level} -> Some level | _ -> None)
+      (fun level -> NoShardLayout {level})
 
   type t = {
     shards_store : (Types.slot_id, int, Cryptobox.share) KVS.t;
@@ -174,25 +186,49 @@ module Shards_disk = struct
            parameters. It must always be > 0. *)
   }
 
-  let file_layout ~root_dir (slot_id : Types.slot_id) =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
+  module ShardsLayouts = Map.Make (struct
+    type t = Int32.t
 
-       Make Key-Value store layout resilient to crypto parameters change.  Also,
-       putting a value not far from the real number of shards allows saving disk
-       storage. *)
-    let number_of_shards = 4096 in
-    let slot_id_string =
-      Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+    let compare = compare
+  end)
+
+  let shards_layouts = ref ShardsLayouts.empty
+
+  let get_file_layout ~(slot_id : Types.slot_id) =
+    let e =
+      ShardsLayouts.find_last
+        (fun first_level -> slot_id.slot_level >= first_level)
+        !shards_layouts
     in
-    let filepath = Filename.concat root_dir slot_id_string in
-    Key_value_store.layout
-      ~encoded_value_size:(Value_size_hooks.share_size ())
-      ~encoding:Cryptobox.share_encoding
-      ~filepath
-      ~eq:Stdlib.( = )
-      ~index_of:Fun.id
-      ~number_of_keys_per_file:number_of_shards
-      ()
+    match e with
+    | Some (_, v) -> Lwt_result_syntax.return v
+    | None ->
+        Lwt_result_syntax.tzfail (NoShardLayout {level = slot_id.slot_level})
+
+  let make_file_layout cryptobox =
+    let share_size = Cryptobox.encoded_share_size cryptobox in
+    let params = Cryptobox.parameters cryptobox in
+    let number_of_shards = params.number_of_shards in
+    fun ~root_dir (slot_id : Types.slot_id) ->
+      let slot_id_string =
+        Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+      in
+      let filepath = Filename.concat root_dir slot_id_string in
+      Key_value_store.layout
+        ~encoded_value_size:share_size
+        ~encoding:Cryptobox.share_encoding
+        ~filepath
+        ~eq:Stdlib.( = )
+        ~index_of:Fun.id
+        ~number_of_keys_per_file:number_of_shards
+        ()
+
+  let add_file_layout level cryptobox_parameters =
+    let open Result_syntax in
+    let* cryptobox = Cryptobox.make cryptobox_parameters in
+    let layout = make_file_layout cryptobox in
+    shards_layouts := ShardsLayouts.add level layout !shards_layouts ;
+    return_unit
 
   let with_metrics store f =
     let open Lwt_result_syntax in
@@ -202,22 +238,31 @@ module Shards_disk = struct
     Dal_metrics.update_kvs_shards_metrics ~opened_files ~ongoing_actions ;
     return r
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
-     Make storage more resilient to DAL parameters change. *)
   let number_of_shards_available {shards_store = store; _} slot_id shard_indexes
       =
     let open Lwt_result_syntax in
-    List.fold_left_es
-      (fun count shard_index ->
-        let+ exists = KVS.value_exists store file_layout slot_id shard_index in
-        if exists then count + 1 else count)
-      0
-      shard_indexes
+    let*! fl = get_file_layout ~slot_id in
+    match fl with
+    | Ok file_layout ->
+        List.fold_left_es
+          (fun count shard_index ->
+            let+ exists =
+              KVS.value_exists store file_layout slot_id shard_index
+            in
+            if exists then count + 1 else count)
+          0
+          shard_indexes
+    | Error [NoShardLayout _] ->
+        (* There is no file layout available to read the data, we assume no
+           shard are available. *)
+        return 0
+    | Error _ as e -> Lwt.return e
 
   (* Persist shards for [slot_id], but never more than
      [min_shards_to_reconstruct_slot]. *)
   let write_all {shards_store; min_shards_to_reconstruct_slot} slot_id shards =
     let open Lwt_result_syntax in
+    let* file_layout = Errors.other_lwt_result @@ get_file_layout ~slot_id in
     (* Invariant of init below: [min_shards_to_reconstruct_slot > 0] *)
     (* Get how many shards are already persisted. *)
     let* already_stored =
@@ -276,40 +321,51 @@ module Shards_disk = struct
       return_unit
 
   let read_all ?from_bytes {shards_store; _} slot_id ~number_of_shards =
+    let open Lwt_result_syntax in
+    let* file_layout = get_file_layout ~slot_id in
     let reader =
       match from_bytes with
       | None -> KVS.read_values shards_store file_layout
       | Some bytes -> KVS.read_values_from_bytes file_layout bytes
     in
-    Seq.ints 0
-    |> Seq.take_while (fun x -> x < number_of_shards)
-    |> Seq.map (fun shard_index -> (slot_id, shard_index))
-    |> reader
+    let v =
+      Seq.ints 0
+      |> Seq.take_while (fun x -> x < number_of_shards)
+      |> Seq.map (fun shard_index -> (slot_id, shard_index))
+      |> reader
+    in
+    return (fun () -> v ())
 
   let read {shards_store = store; _} slot_id shard_id =
     let open Lwt_result_syntax in
+    let* file_layout = Errors.other_lwt_result @@ get_file_layout ~slot_id in
     let*! res =
       with_metrics store @@ fun () ->
       KVS.read_value store file_layout slot_id shard_id
     in
     match res with
     | Ok share -> return {Cryptobox.share; index = shard_id}
-    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
+    | Error [KVS.Missing_stored_kvs_data _] | Error [NoShardLayout _] ->
+        fail Errors.not_found
     | Error err ->
         let data_kind = Types.Store.Shard in
         fail @@ Errors.decoding_failed data_kind err
 
   let count_values {shards_store = store; _} slot_id =
+    let open Lwt_result_syntax in
+    let* file_layout = get_file_layout ~slot_id in
     with_metrics store @@ fun () -> KVS.count_values store file_layout slot_id
 
   let remove {shards_store = store; _} slot_id =
     let open Lwt_result_syntax in
+    let* file_layout = get_file_layout ~slot_id in
     let* () =
       with_metrics store @@ fun () -> KVS.remove_file store file_layout slot_id
     in
     return_unit
 
-  let init node_store_dir shard_store_dir ~min_shards_to_reconstruct_slot =
+  let init node_store_dir shard_store_dir ~min_shards_to_reconstruct_slot
+      ~lru_size =
     let open Lwt_result_syntax in
     if min_shards_to_reconstruct_slot <= 0 then
       tzfail
@@ -317,9 +373,7 @@ module Shards_disk = struct
            {given = min_shards_to_reconstruct_slot})
     else
       let root_dir = Filename.concat node_store_dir shard_store_dir in
-      let* shards_store =
-        KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
-      in
+      let* shards_store = KVS.init ~lru_size ~root_dir in
       return {shards_store; min_shards_to_reconstruct_slot}
 end
 
@@ -427,7 +481,8 @@ module Shards = struct
 
   type t = {disk : Disk.t option; cache : Cache.t}
 
-  let init ~profile_ctxt ~proto_parameters node_store_dir shard_store_dir =
+  let init ~profile_ctxt ~proto_parameters ~lru_size node_store_dir
+      shard_store_dir =
     let open Lwt_result_syntax in
     let* disk =
       if Profile_manager.is_attester_only_profile profile_ctxt then return_none
@@ -443,6 +498,7 @@ module Shards = struct
             node_store_dir
             shard_store_dir
             ~min_shards_to_reconstruct_slot
+            ~lru_size
         in
         return_some store
     in
@@ -480,9 +536,12 @@ module Shards = struct
     | `Disk d -> Disk.read d slot_id shard_id
 
   let read_all ?from_bytes st slot_id ~number_of_shards =
+    let open Lwt_result_syntax in
     match source_target st slot_id with
-    | `Cache c -> Cache.read_all c slot_id
-    | `Disk d -> Disk.read_all ?from_bytes d slot_id ~number_of_shards
+    | `Cache c -> Cache.read_all c slot_id |> return
+    | `Disk d ->
+        let* v = Disk.read_all ?from_bytes d slot_id ~number_of_shards in
+        return (fun () -> v ())
 
   let count_values st slot_id =
     match source_target st slot_id with
@@ -493,15 +552,52 @@ module Shards = struct
     let open Lwt_result_syntax in
     let* () = Cache.remove cache slot_id in
     match disk with Some d -> Disk.remove d slot_id | None -> return_unit
+
+  let close {disk; _} =
+    match disk with
+    | Some d -> KVS.close d.shards_store
+    | None -> Lwt_result_syntax.return_unit
 end
 
 module Slots = struct
-  type t = (Types.slot_id * int, unit, bytes) KVS.t
+  type error += NoSlotLayout of {level : int32}
 
-  let file_layout ~root_dir ((slot_id : Types.slot_id), slot_size) =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal.shards.NoSlotLayout"
+      ~title:"No slot layout"
+      ~description:"No slot layout found for the given slot level"
+      ~pp:(fun ppf level ->
+        Format.fprintf ppf "No slot layout found for slot at level %ld" level)
+      Data_encoding.(obj1 (req "level" int32))
+      (function NoSlotLayout {level} -> Some level | _ -> None)
+      (fun level -> NoSlotLayout {level})
 
-       Make Key-Value store layout resilient to crypto parameters change. *)
+  type t = (Types.slot_id, unit, bytes) KVS.t
+
+  module SlotsLayouts = Map.Make (struct
+    type t = Int32.t
+
+    let compare = compare
+  end)
+
+  let slots_layouts = ref SlotsLayouts.empty
+
+  let get_file_layout ~(slot_id : Types.slot_id) =
+    let e =
+      SlotsLayouts.find_last
+        (fun first_level -> slot_id.slot_level >= first_level)
+        !slots_layouts
+    in
+    match e with
+    | Some (_, v) ->
+        Lwt_result_syntax.return (fun ~root_dir slot_id -> v ~root_dir slot_id)
+    | None ->
+        Lwt_result_syntax.tzfail (NoSlotLayout {level = slot_id.slot_level})
+
+  let make_file_layout {Cryptobox.slot_size; _} =
+   fun ~root_dir (slot_id : Types.slot_id) ->
     let number_of_slots = 1 in
     let slot_id_string =
       Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
@@ -516,14 +612,19 @@ module Slots = struct
       ~number_of_keys_per_file:number_of_slots
       ()
 
-  let init node_store_dir slot_store_dir =
-    let root_dir = Filename.concat node_store_dir slot_store_dir in
-    KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
+  let add_file_layout level cryptobox =
+    let layout = make_file_layout cryptobox in
+    slots_layouts := SlotsLayouts.add level layout !slots_layouts
 
-  let add_slot t ~slot_size slot (slot_id : Types.slot_id) =
+  let init node_store_dir slot_store_dir ~lru_size =
+    let root_dir = Filename.concat node_store_dir slot_store_dir in
+    KVS.init ~lru_size ~root_dir
+
+  let add_slot t slot (slot_id : Types.slot_id) =
     let open Lwt_result_syntax in
+    let* file_layout = Errors.other_lwt_result @@ get_file_layout ~slot_id in
     let* () =
-      KVS.write_value ~override:true t file_layout (slot_id, slot_size) () slot
+      KVS.write_value ~override:true t file_layout slot_id () slot
       |> Errors.other_lwt_result
     in
     let*! () =
@@ -533,18 +634,24 @@ module Slots = struct
     in
     return_unit
 
-  let find_slot t ~slot_size slot_id =
+  let find_slot t slot_id =
     let open Lwt_result_syntax in
-    let*! res = KVS.read_value t file_layout (slot_id, slot_size) () in
+    let* file_layout = Errors.other_lwt_result @@ get_file_layout ~slot_id in
+    let*! res = KVS.read_value t file_layout slot_id () in
     match res with
     | Ok slot -> return slot
-    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
+    | Error [KVS.Missing_stored_kvs_data _] | Error [NoSlotLayout _] ->
+        fail Errors.not_found
     | Error err ->
         let data_kind = Types.Store.Slot in
         fail @@ Errors.decoding_failed data_kind err
 
-  let remove_slot t ~slot_size slot_id =
-    KVS.remove_file t file_layout (slot_id, slot_size)
+  let remove_slot t slot_id =
+    let open Lwt_result_syntax in
+    let* file_layout = get_file_layout ~slot_id in
+    KVS.remove_file t file_layout slot_id
+
+  let close t = KVS.close t
 end
 
 module Slot_id_cache = struct
@@ -579,6 +686,8 @@ module Slot_id_cache = struct
     fun t Types.Slot_id.{slot_level; slot_index} ->
       Levels.find_opt t slot_level
       |> Option.filter_map (Fun.flip get_opt slot_index)
+
+  let fold = Levels.fold
 end
 
 module Traps = struct
@@ -665,26 +774,71 @@ module Statuses_cache = struct
 
   let get_slot_status = Slot_map.find_opt
 
-  let update_slot_header_status t slot_id status =
-    assert (status <> `Waiting_attestation) ;
-    (match get_slot_status t slot_id with
-    | None -> add_status t status slot_id
-    | Some `Unpublished -> assert (status = `Unpublished)
-    | Some `Waiting_attestation -> (
-        match status with
-        | `Attested _lag -> add_status t status slot_id
-        | `Unattested -> add_status t status slot_id
-        | `Unpublished | `Waiting_attestation -> assert false)
-    | Some (`Attested _lag) ->
-        (* If a status was already inserted, then its value was either
-           [Unpublished] or [Waiting_attestation]. *)
-        assert false
-    | Some `Unattested -> assert false) ;
-    match status with
-    | `Attested _lag -> Dal_metrics.slot_attested ~set:true slot_id.slot_index
-    | `Unattested | `Unpublished | `Waiting_attestation ->
+  let update_slot_header_status t slot_id to_status =
+    let open Result_syntax in
+    let* () =
+      match to_status with
+      | `Waiting_attestation ->
+          tzfail
+            (Errors.Unexpected_slot_status_transition
+               {
+                 slot_id;
+                 from_status_opt = None;
+                 to_status = `Waiting_attestation;
+               })
+      | _ -> return_unit
+    in
+    let* () =
+      let from_status_opt = get_slot_status t slot_id in
+      match from_status_opt with
+      | None ->
+          add_status t to_status slot_id ;
+          return_unit
+      | Some from_status -> (
+          let fail_transition () =
+            tzfail
+              (Errors.Unexpected_slot_status_transition
+                 {slot_id; from_status_opt; to_status})
+          in
+          match from_status with
+          | `Unpublished -> (
+              match to_status with
+              | `Unpublished ->
+                  (* No-op: status already Unpublished *)
+                  return_unit
+              | `Attested _ | `Unattested | `Waiting_attestation ->
+                  fail_transition ())
+          | `Waiting_attestation -> (
+              match to_status with
+              | `Attested _lag ->
+                  add_status t to_status slot_id ;
+                  return_unit
+              | `Unattested ->
+                  add_status t to_status slot_id ;
+                  return_unit
+              | `Unpublished -> fail_transition ()
+              | `Waiting_attestation -> return_unit (* No-op, already waiting *)
+              )
+          | `Attested _lag ->
+              (* If a status was already inserted, then its value was either
+                 [Unpublished] or [Waiting_attestation]. *)
+              fail_transition ()
+          | `Unattested -> fail_transition ())
+    in
+    (match to_status with
+    | `Attested lag ->
+        let slot_index = slot_id.slot_index in
+        Dal_metrics.slot_attested ~set:true slot_index ;
+        Dal_metrics.slot_attested_with_lag ~lag ~slot_index
+    | `Unattested ->
+        (* per the invariant stated above, the function can only be called once
+           per slot_id with the `Unattested value *)
+        Dal_metrics.slot_unattested slot_id.slot_index ;
         (* TODO: is the right way to update the metric here?? *)
         Dal_metrics.slot_attested ~set:false slot_id.slot_index
+    | `Unpublished | `Waiting_attestation ->
+        Dal_metrics.slot_attested ~set:false slot_id.slot_index) ;
+    return_unit
 end
 
 module Commitment_indexed_cache =
@@ -785,19 +939,19 @@ end
 
 (** Store context *)
 type t = {
-  statuses_cache : Statuses_cache.t;
+  mutable statuses_cache : Statuses_cache.t;
   shards : Shards.t;
   slots : Slots.t;
-  traps : Traps.t;
+  mutable traps : Traps.t;
   not_yet_published_cache :
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
       (* Cache of not-yet-published slots, shards, and shard proofs. The length
          of the array is the number of shards per slot *)
-  chain_id : Chain_id.t;
-  finalized_commitments : Slot_id_cache.t;
-  last_processed_level : Last_processed_level.t;
-  first_seen_level : First_seen_level.t;
+  chain_id : Chain_id.rw Chain_id.t;
+  mutable finalized_commitments : Slot_id_cache.t;
+  last_processed_level : Last_processed_level.rw Last_processed_level.t;
+  first_seen_level : First_seen_level.rw First_seen_level.t;
   skip_list_cells_store : Dal_store_sqlite3.Skip_list_cells.t;
 }
 
@@ -817,6 +971,54 @@ let shards {shards; _} = shards
 let skip_list_cells t = t.skip_list_cells_store
 
 let statuses_cache {statuses_cache; _} = statuses_cache
+
+let resize_caches t proto_parameters =
+  let number_of_slots = proto_parameters.Types.number_of_slots in
+  let number_of_shards =
+    proto_parameters.cryptobox_parameters.number_of_shards
+  in
+  let attestation_lag = proto_parameters.attestation_lag in
+  let traps_fraction = proto_parameters.traps_fraction in
+  let new_statuses_cache =
+    let size =
+      Constants.statuses_cache_size ~number_of_slots ~attestation_lag
+    in
+    let cache = Statuses_cache.init size in
+    Slot_map.fold
+      (fun slot_id status () -> Statuses_cache.add_status cache status slot_id)
+      t.statuses_cache
+      () ;
+    cache
+  in
+  let new_finalized_commitments =
+    let capacity =
+      Constants.slot_id_cache_size ~number_of_slots ~attestation_lag
+    in
+    let cache = Slot_id_cache.create ~capacity in
+    Slot_id_cache.fold
+      (fun level table () -> Slot_id_cache.Levels.replace cache level table)
+      t.finalized_commitments
+      () ;
+    cache
+  in
+  let new_traps =
+    let capacity =
+      Constants.traps_cache_size
+        ~number_of_slots
+        ~number_of_shards
+        ~attestation_lag
+        ~traps_fraction
+    in
+    let cache = Traps.create ~capacity in
+    Traps.Level_map.fold
+      (fun level slots () -> Traps.Level_map.replace cache level slots)
+      t.traps
+      () ;
+    cache
+  in
+  t.statuses_cache <- new_statuses_cache ;
+  t.finalized_commitments <- new_finalized_commitments ;
+  t.traps <- new_traps
 
 let slots {slots; _} = slots
 
@@ -946,13 +1148,43 @@ let init config profile_ctxt proto_parameters =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
   let* () = check_version_and_may_upgrade base_dir in
-  let statuses_cache = Statuses_cache.init Constants.statuses_cache_size in
-  let* shards =
-    Shards.init ~profile_ctxt ~proto_parameters base_dir Stores_dirs.shard
+  let number_of_slots = proto_parameters.Types.number_of_slots in
+  let number_of_shards =
+    proto_parameters.cryptobox_parameters.number_of_shards
   in
-  let* slots = Slots.init base_dir Stores_dirs.slot in
+  let attestation_lag = proto_parameters.attestation_lag in
+  let traps_fraction = proto_parameters.traps_fraction in
+  let statuses_cache_size =
+    Constants.statuses_cache_size ~number_of_slots ~attestation_lag
+  in
+  let shards_store_lru_size =
+    Constants.shards_store_lru_size ~number_of_slots
+  in
+  let slots_store_lru_size = Constants.slots_store_lru_size in
+  let traps_cache_size =
+    Constants.traps_cache_size
+      ~number_of_slots
+      ~number_of_shards
+      ~attestation_lag
+      ~traps_fraction
+  in
+  let slot_id_cache_size =
+    Constants.slot_id_cache_size ~number_of_slots ~attestation_lag
+  in
+  let statuses_cache = Statuses_cache.init statuses_cache_size in
+  let* shards =
+    Shards.init
+      ~profile_ctxt
+      ~proto_parameters
+      ~lru_size:shards_store_lru_size
+      base_dir
+      Stores_dirs.shard
+  in
+  let* slots =
+    Slots.init base_dir Stores_dirs.slot ~lru_size:slots_store_lru_size
+  in
   let* () = Version.(write_version_file ~base_dir ~version:current_version) in
-  let traps = Traps.create ~capacity:Constants.traps_cache_size in
+  let traps = Traps.create ~capacity:traps_cache_size in
   let* chain_id = Chain_id.init ~root_dir:base_dir in
   let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
   let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
@@ -966,13 +1198,22 @@ let init config profile_ctxt proto_parameters =
       statuses_cache;
       not_yet_published_cache =
         Commitment_indexed_cache.create Constants.not_yet_published_cache_size;
-      finalized_commitments =
-        Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
+      finalized_commitments = Slot_id_cache.create ~capacity:slot_id_cache_size;
       chain_id;
       last_processed_level;
       first_seen_level;
       skip_list_cells_store;
     }
+
+let close t =
+  let open Lwt_result_syntax in
+  let* () = Shards.close t.shards in
+  let* () = Slots.close t.slots in
+  let*! () = Dal_store_sqlite3.Skip_list_cells.close t.skip_list_cells_store in
+  let* () = Chain_id.close t.chain_id in
+  let* () = Last_processed_level.close t.last_processed_level in
+  let* () = First_seen_level.close t.first_seen_level in
+  return_unit
 
 let add_slot_headers ~number_of_slots ~block_level slot_headers t =
   let module SI = Set.Make (Int) in

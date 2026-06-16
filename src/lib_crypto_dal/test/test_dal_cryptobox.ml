@@ -1121,9 +1121,7 @@ module Test = struct
          let expected_encoded_share_size =
            Data_encoding.Binary.length Cryptobox.share_encoding shard.share
          in
-         return
-           (Cryptobox.Internal_for_tests.encoded_share_size t
-           = expected_encoded_share_size))
+         return (Cryptobox.encoded_share_size t = expected_encoded_share_size))
         |> function
         | Ok check -> check
         | _ -> false)

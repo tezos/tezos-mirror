@@ -8,6 +8,7 @@
 type instance_maker =
   verbosity:Profiler.verbosity ->
   directory:string ->
+  profiling_config:Profiler.profiling_config ->
   name:string ->
   Profiler.instance
 
@@ -46,8 +47,20 @@ val register_backend :
   string list -> ('config driver -> instance_maker) -> 'config driver -> unit
 
 type wrapped_instance_maker =
-  directory:string -> name:string -> Profiler.instance option
+  directory:string ->
+  profiling_config:Profiler.profiling_config ->
+  name:string ->
+  Profiler.instance option
 
-(** [selected_backends ()] returns the selected backends using the environment
-    variable [PROFILING_BACKENDS]. *)
-val selected_backends : unit -> wrapped_instance_maker backend_infos list option
+(** [selected_backends ~profiling_config ()] returns the selected backends
+    using [profiling_config] (falling back to the [PROFILING_BACKENDS]
+    environment variable when the config field is unset). *)
+val selected_backends :
+  profiling_config:Profiler.profiling_config ->
+  wrapped_instance_maker backend_infos list option
+
+(** [read_profiling_config_from_base_dir base_dir] reads the profiling
+    config from the [config] file in [base_dir]. Returns
+    {!Profiler.default_profiling_config} if the file is missing or has
+    no [profiling] section. *)
+val read_profiling_config_from_base_dir : string -> Profiler.profiling_config

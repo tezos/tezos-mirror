@@ -55,7 +55,7 @@ echo "* Step 1: Setup the LIGO compiler"
 #   https://gitlab.com/ligolang/ligo/-/releases/0.9.0-liquidity-baking
 #
 rm -fr ligo
-curl --silent https://gitlab.com/ligolang/ligo/-/jobs/1291756399/artifacts/raw/ligo --output ligo
+curl --silent https://gitlab.com/api/v4/projects/ligolang%2Fligo/jobs/1291756399/artifacts/ligo --output ligo
 chmod a+rx ligo
 LIGO=$(pwd)/ligo
 
@@ -64,7 +64,7 @@ echo "* Step 2: Retrieve and compile the LIGO scripts"
 # ----------------------------------------------------
 
 retrieve() {
-  curl --silent https://gitlab.com/dexter2tz/dexter2tz/-/raw/"$COMMIT_HASH"/"$1" --output "$2"
+  curl --silent https://gitlab.com/api/v4/projects/dexter2tz%2Fdexter2tz/repository/files/"$1"/raw?ref="$COMMIT_HASH" --output "$2"
 }
 
 retrieve dexter.liquidity_baking.mligo cpmm.mligo

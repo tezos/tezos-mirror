@@ -70,6 +70,10 @@ module Mutable_state : sig
   val get_reveal_request : t -> string Lwt.t
 
   val insert_failure : t -> unit Lwt.t
+
+  val install_boot_sector : t -> string -> unit Lwt.t
+
+  val get_outbox : t -> Bounded.Non_negative_int32.t -> output list Lwt.t
 end
 
 val compute_step_many :
@@ -100,6 +104,8 @@ val state_hash : state -> hash
 
 val set_input : state -> input -> state Lwt.t
 
+val get_outbox : state -> Bounded.Non_negative_int32.t -> output list Lwt.t
+
 val proof_start_state : proof -> hash
 
 val proof_stop_state : proof -> hash
@@ -117,6 +123,10 @@ val output_info_of_output_proof : output_proof -> output_info
 val state_of_output_proof : output_proof -> hash
 
 val verify_output_proof : output_proof -> output option
+
+val verify_output_proof_res : output_proof -> (output, string) result
+
+val produce_output_proof : state -> output_info -> (output_proof, string) result
 
 val serialise_output_proof : output_proof -> bytes
 

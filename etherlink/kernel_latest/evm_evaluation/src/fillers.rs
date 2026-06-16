@@ -379,11 +379,7 @@ pub fn process(
         }
         TestResult::Failure => {
             if output.log {
-                write_out!(
-                    output_file,
-                    "{}",
-                    String::from_utf8(host.buffer.borrow_mut().to_vec()).unwrap()
-                );
+                write_out!(output_file, "{}", String::from_utf8(host.buffer()).unwrap());
             }
             report_map.entry(report_key).and_modify(|report_value| {
                 *report_value = ReportValue {

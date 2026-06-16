@@ -1,6 +1,10 @@
 #!/bin/sh
 #
-# Sign the releasing docker images using Cosign
+# Sign the releasing docker image(s) using Cosign.
+# Usage:
+# - '$0 <IMAGE:TAG>' this script will sign the provided image reference
+# and its layers or its sub-images in case of multi-arch images
+# - Without arguments, this script will sign all docker images listed in docker_images.
 #
 # Reads the following environment variables:
 #  - 'GCP_SIGNER_SERVICE_ACCOUNT': signer service account key file encoded
@@ -11,10 +15,29 @@
 
 set -eu
 
-current_dir=$(cd "$(dirname "${0}")" && pwd)
+echo "Starting Docker image signing process..."
 
-# shellcheck source=./scripts/ci/docker.sh
-. "${current_dir}/docker.sh"
+# In case Cosign crashes during signature process especially during TLog upload
+# (i.e Rekor Transparency Log timeout)
+MAX_RETRY_ATTEMPTS=5
+SLEEP_TIME=5
+
+# Check if argument is valid
+if [ $# -gt 1 ]; then
+  echo "Usage: $0 [<IMAGE:TAG>]"
+  exit 1
+fi
+if [ $# -eq 1 ]; then
+  # Extract IMAGE and TAG from argument when provided
+  IMAGE="${1%:*}"
+  TAG="${1##*:}"
+  # Check the result
+  if [ "$1" = "${IMAGE}" ] || [ -z "${IMAGE}" ] || [ -z "${TAG}" ]; then
+    echo "Format error: When needed, the first optional argument must respect <IMAGE:TAG> format"
+    echo "Usage: $0 [<IMAGE:TAG>]"
+    exit 1
+  fi
+fi
 
 # Auth signer service account
 echo "${GCP_SIGNER_SERVICE_ACCOUNT}" | base64 -d > signer_sa.json
@@ -27,20 +50,86 @@ export GOOGLE_APPLICATION_CREDENTIALS=signer_sa.json
 apk add --update cosign
 cosign version
 
-# Loop over images
-for docker_image in ${docker_images}; do
+# Usage: sign_image <IMAGE> <TAG> [recursive]
+sign_image() {
+  # Get image digest (better than tag for precision)
+  # Retry on empty digest: a transient registry error (e.g. 504 Gateway Timeout) can cause
+  # imagetools inspect to return nothing, making cosign fail with "invalid reference format".
+  retry_attempt=0
+  IMAGE_DIGEST=''
+  until [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; do
+    _digest=$(docker buildx imagetools inspect "$1:$2" --format "{{json .Manifest}}" | jq -r '.digest') || _digest=''
+    if [ -n "${_digest}" ]; then
+      IMAGE_DIGEST="$1@${_digest}"
+      break
+    fi
+    retry_attempt="$((retry_attempt + 1))"
+    echo "Empty digest for $1:$2, retrying in ${SLEEP_TIME}s..."
+    sleep "${SLEEP_TIME}"
+  done
+  if [ -z "${IMAGE_DIGEST}" ]; then
+    echo "Fatal: Failed to retrieve digest for $1:$2 after ${MAX_RETRY_ATTEMPTS} attempts."
+    exit 1
+  fi
+  echo "Image digest to sign: ${IMAGE_DIGEST}"
 
-  # Get image digest
-  IMAGE_DIGEST="${docker_image}@$(docker buildx imagetools inspect "${docker_image}:${DOCKER_IMAGE_TAG}" --format "{{json .Manifest}}" | jq -r '.digest')"
-  echo "Image digest: ${IMAGE_DIGEST}"
+  # Disable error catching to be able to retry
+  set +e
 
   # Sign image with cosign
-  cosign sign --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" -y
+  # Check if the image is a multi-arch image
+  # --recursive is needed to sign all included images and not only the manifest
+  # list for multi-arch images
+
+  retry_attempt=0
+  if [ "$(docker manifest inspect "${IMAGE_DIGEST}" | jq '.manifests | length > 1')" ]; then
+    until [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; do
+      cosign sign --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" --recursive -y && break
+      retry_attempt="$((retry_attempt + 1))"
+      if [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; then
+        echo "Fatal: Failed to sign recursively ${IMAGE_DIGEST} after ${MAX_RETRY_ATTEMPTS} attempts."
+        exit 1
+      else
+        echo "Recursive signing failed, retrying in ${SLEEP_TIME}s..."
+        sleep "${SLEEP_TIME}"
+      fi
+    done
+  else
+    until [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; do
+      cosign sign --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" -y && break
+      retry_attempt="$((retry_attempt + 1))"
+      if [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; then
+        echo "Fatal: Failed to sign ${IMAGE_DIGEST} after ${MAX_RETRY_ATTEMPTS} attempts."
+        exit 1
+      else
+        echo "Signing failed, retrying in ${SLEEP_TIME}s..."
+        sleep "${SLEEP_TIME}"
+      fi
+    done
+  fi
+  set -e
 
   # Get the location of image signature as reference
   IMAGE_SIGNATURE_LOCATION=$(cosign triangulate "${IMAGE_DIGEST}")
   echo "Image signature location: ${IMAGE_SIGNATURE_LOCATION}"
-done
+}
+
+# Sign the provided image or sign all images provided in $docker_images
+if [ $# -eq 1 ]; then
+  sign_image "${IMAGE}" "${TAG}"
+else
+  # Get context
+  current_dir=$(cd "$(dirname "${0}")" && pwd)
+  # shellcheck source=./scripts/ci/docker.sh
+  . "${current_dir}/docker.sh"
+
+  # Loop over images in $docker_images and use $DOCKER_IMAGE_TAG as tag
+  for docker_image in ${docker_images}; do
+    sign_image "${docker_image}" "${DOCKER_IMAGE_TAG}"
+  done
+fi
 
 # Remove credentials
 rm signer_sa.json
+
+echo "Docker image signing process done."

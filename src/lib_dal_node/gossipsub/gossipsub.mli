@@ -102,6 +102,11 @@ module Transport_layer : sig
     P2p_limits.t ->
     t tzresult Lwt.t
 
+  (** [ban_addr t addr] bans the given IP address. Existing connections
+      from this address are terminated, and future connections from/to
+      it are rejected. The port in the point is ignored. *)
+  val ban_addr : t -> P2p_addr.t -> unit Lwt.t
+
   (** [shutdown t] shutdowns the transport layer and ensures that
       active connections are closed. *)
   val shutdown : t -> unit Lwt.t
@@ -205,7 +210,8 @@ module Transport_layer_hooks : sig
       (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->
     app_in_callback:(Types.Message_id.t -> Types.Peer.t -> unit tzresult Lwt.t) ->
     verbose:bool ->
-    unit Lwt.t
+    canceler:Lwt_canceler.t ->
+    unit tzresult Lwt.t
 end
 
 (** [version ~network_name] returns the current version of the P2P. *)
@@ -216,7 +222,12 @@ module Profiler : sig
 
   val gossipsub_profiler : profiler
 
-  val init : (name:string -> instance option) -> unit
+  val init :
+    profiling_config:Tezos_profiler.Profiler.profiling_config ->
+    (profiling_config:Tezos_profiler.Profiler.profiling_config ->
+    name:string ->
+    instance option) ->
+    unit
 
   val create_reset_block_section : profiler -> Block_hash.t * metadata -> unit
 end

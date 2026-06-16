@@ -24,12 +24,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type migration_status_entry = {
+  is_migration_pending : bool;
+  period_end_level : int32;
+}
+
 type t = {
   config : Configuration_file.t;
   identity : P2p_identity.t;
   network_name : Distributed_db_version.Name.t;
-  cryptobox : Cryptobox.t;
-  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
+  mutable proto_cryptoboxes : Proto_cryptoboxes.t;
   mutable proto_plugins : Proto_plugins.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
   mutable slots_under_reconstruction :
@@ -37,10 +41,12 @@ type t = {
   store : Store.t;
   tezos_node_cctxt : Tezos_rpc.Context.generic;
   committee_cache : Committee_cache.t;
+  attestation_ops_cache : Attestation_ops_cache.t;
   gs_worker : Gossipsub.Worker.t;
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
   mutable last_finalized_level : int32;
+  mutable l1_current_level : int32;
   (* the highest finalized level the DAL node is aware of (except at start-up, where
      it is the highest level the node is aware of) *)
   mutable l1_crawler_status : L1_crawler_status.t;
@@ -49,18 +55,17 @@ type t = {
   ignore_pkhs : Signature.Public_key_hash.Set.t;
   mutable last_migration_level : int32;
   mutable attestable_slots_watcher_table : Attestable_slots_watcher_table.t;
+  mutable migration_status : migration_status_entry option;
 }
 
-let init config ~identity ~network_name profile_ctxt cryptobox
-    shards_proofs_precomputation proto_plugins store gs_worker transport_layer
-    cctxt ~last_finalized_level ?(disable_shard_validation = false) ~ignore_pkhs
-    () =
+let init config ~identity ~network_name profile_ctxt proto_cryptoboxes
+    proto_plugins store gs_worker transport_layer cctxt ~last_finalized_level
+    ~l1_current_level ?(disable_shard_validation = false) ~ignore_pkhs () =
   {
     config;
     identity;
     network_name;
-    cryptobox;
-    shards_proofs_precomputation;
+    proto_cryptoboxes;
     proto_plugins;
     ongoing_amplifications = Types.Slot_id.Set.empty;
     slots_under_reconstruction = Types.Slot_id.Map.empty;
@@ -68,10 +73,14 @@ let init config ~identity ~network_name profile_ctxt cryptobox
     tezos_node_cctxt = cctxt;
     committee_cache =
       Committee_cache.create ~max_size:Constants.committee_cache_size;
+    attestation_ops_cache =
+      Attestation_ops_cache.create
+        ~max_size:Constants.attestation_ops_cache_size;
     gs_worker;
     transport_layer;
     profile_ctxt;
     last_finalized_level;
+    l1_current_level;
     l1_crawler_status = Unknown;
     l1_crawler_status_input = Lwt_watcher.create_input ();
     disable_shard_validation;
@@ -79,6 +88,7 @@ let init config ~identity ~network_name profile_ctxt cryptobox
     last_migration_level = 0l;
     attestable_slots_watcher_table =
       Attestable_slots_watcher_table.create ~initial_size:5;
+    migration_status = None;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
@@ -112,25 +122,62 @@ let may_reconstruct ~reconstruct slot_id t =
     Types.Slot_id.Map.remove slot_id t.slots_under_reconstruction ;
   Lwt.return res
 
-let may_add_plugin ctxt cctxt ~block_level ~proto_level =
+type error += Unexpected_empty_plugin_table
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.unexpected_empty_plugin_table"
+    ~title:"DAL node: no plugins registered"
+    ~description:"DAL node: no plugins registered"
+    ~pp:(fun ppf () -> Format.fprintf ppf "No plugin registered.")
+    Data_encoding.unit
+    (function Unexpected_empty_plugin_table -> Some () | _ -> None)
+    (fun () -> Unexpected_empty_plugin_table)
+
+let may_add_plugin_and_cryptobox ctxt cctxt ~block_level ~proto_level =
   let open Lwt_result_syntax in
   let old_proto_plugins = ctxt.proto_plugins in
-  let* new_proto_plugins =
-    Proto_plugins.may_add
-      cctxt
-      old_proto_plugins
-      ~first_level:block_level
-      ~proto_level
-  in
-  if
-    not
-    @@ Option.equal
-         Int.equal
-         (Proto_plugins.current_proto_level old_proto_plugins)
-         (Proto_plugins.current_proto_level new_proto_plugins)
-  then ctxt.last_migration_level <- block_level ;
-  ctxt.proto_plugins <- new_proto_plugins ;
-  return_unit
+  match Proto_plugins.current_proto_level old_proto_plugins with
+  | Some lvl when lvl = proto_level -> return_false
+  | _ -> (
+      let* new_proto_plugins =
+        Proto_plugins.may_add
+          cctxt
+          old_proto_plugins
+          ~first_level:block_level
+          ~proto_level
+      in
+      ctxt.last_migration_level <- block_level ;
+      ctxt.proto_plugins <- new_proto_plugins ;
+      let proto_param_opt =
+        Proto_plugins.current_proto_parameters new_proto_plugins
+      in
+      match proto_param_opt with
+      | None -> tzfail Unexpected_empty_plugin_table
+      | Some params ->
+          let* new_cryptoboxes =
+            Proto_cryptoboxes.add
+              params
+              ~level:block_level
+              ctxt.proto_cryptoboxes
+          in
+          Store.Slots.add_file_layout
+            (Int32.add block_level 1l)
+            params.cryptobox_parameters ;
+          let* () =
+            match
+              Store.Shards_disk.add_file_layout
+                (Int32.add block_level 1l)
+                params.cryptobox_parameters
+            with
+            | Ok () -> return_unit
+            | Error (`Fail msg) ->
+                tzfail (Proto_cryptoboxes.Cannot_register_shard_layout {msg})
+          in
+          Store.resize_caches ctxt.store params ;
+          ctxt.proto_cryptoboxes <- new_cryptoboxes ;
+          return_true)
 
 let get_plugin_and_parameters_for_level ctxt ~level =
   Proto_plugins.get_plugin_and_parameters_for_level ctxt.proto_plugins ~level
@@ -140,6 +187,9 @@ let get_plugin_for_level ctxt ~level =
   let* plugin, _parameters = get_plugin_and_parameters_for_level ctxt ~level in
   return plugin
 
+let get_proto_level_for_level ctxt ~level =
+  Proto_plugins.get_proto_level_for_level ctxt.proto_plugins ~level
+
 let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
 
 let set_proto_plugins ctxt proto_plugins = ctxt.proto_plugins <- proto_plugins
@@ -147,12 +197,15 @@ let set_proto_plugins ctxt proto_plugins = ctxt.proto_plugins <- proto_plugins
 let get_proto_parameters ~level ctxt =
   let open Result_syntax in
   let level =
-    match level with
-    | `Last_proto -> ctxt.last_finalized_level
-    | `Level level -> level
+    match level with `Head -> ctxt.l1_current_level | `Level level -> level
   in
   let* _plugin, parameters = get_plugin_and_parameters_for_level ctxt ~level in
   return parameters
+
+let get_traps_fraction ctxt ~published_level ~default =
+  match get_proto_parameters ~level:(`Level published_level) ctxt with
+  | Ok params -> params.traps_fraction
+  | Error _ -> default
 
 let storage_period ctxt proto_parameters =
   match ctxt.config.history_mode with
@@ -207,17 +260,22 @@ let set_profile_ctxt ctxt ?(save = true) pctxt =
 
 let get_config ctxt = ctxt.config
 
-let get_cryptobox ctxt = ctxt.cryptobox
+let get_cryptobox_and_precomputations ~level ctxt =
+  Proto_cryptoboxes.get_for_level ctxt.proto_cryptoboxes ~level
 
 let set_last_finalized_level ctxt level = ctxt.last_finalized_level <- level
 
 let get_last_finalized_level ctxt = ctxt.last_finalized_level
 
-let get_shards_proofs_precomputation ctxt = ctxt.shards_proofs_precomputation
+let set_l1_current_head_level ctxt level = ctxt.l1_current_level <- level
+
+let get_l1_current_head_level ctxt = ctxt.l1_current_level
 
 let get_store ctxt = ctxt.store
 
 let get_gs_worker ctxt = ctxt.gs_worker
+
+let get_attestation_ops_cache ctxt = ctxt.attestation_ops_cache
 
 let get_ongoing_amplifications ctxt = ctxt.ongoing_amplifications
 
@@ -289,6 +347,91 @@ let get_attestation_lag ctxt ~level =
   let open Result_syntax in
   let+ params = get_proto_parameters ctxt ~level:(`Level level) in
   Int32.of_int params.attestation_lag
+
+let get_attestation_lags ctxt ~level =
+  let open Result_syntax in
+  let+ params = get_proto_parameters ctxt ~level:(`Level level) in
+  List.map Int32.of_int params.attestation_lags
+
+let get_next_migration_level ctxt =
+  let open Lwt_result_syntax in
+  let last_finalized_level = get_last_finalized_level ctxt in
+  let* {is_migration_pending; period_end_level} =
+    match ctxt.migration_status with
+    | Some entry when last_finalized_level < entry.period_end_level ->
+        return entry
+    | _ ->
+        let*? (module Plugin) =
+          get_plugin_for_level ctxt ~level:last_finalized_level
+        in
+        let* is_migration_pending, period_end_level =
+          Plugin.is_migration_pending (get_tezos_node_cctxt ctxt)
+        in
+        let entry = {is_migration_pending; period_end_level} in
+        ctxt.migration_status <- Some entry ;
+        return entry
+  in
+  if is_migration_pending then return_some period_end_level else return_none
+
+let convert_attestations_to_cache_format (type tb_slot dal_attestations)
+    (module Plugin : Dal_plugin.T
+      with type tb_slot = tb_slot
+       and type dal_attestations = dal_attestations) ~number_of_slots
+    ~number_of_lags attestations =
+  let open Result_syntax in
+  List.map_e
+    (fun (tb_slot, _op, dal_att_opt) ->
+      let* dal_att =
+        match dal_att_opt with
+        | None -> return_none
+        | Some dal_att ->
+            let* decoded =
+              Plugin.decode_baker_attestations
+                dal_att
+                ~number_of_slots
+                ~number_of_lags
+            in
+            return_some decoded
+      in
+      return (Plugin.tb_slot_to_int tb_slot, dal_att))
+    attestations
+
+let store_attestations_in_cache (type tb_slot dal_attestations)
+    (module Plugin : Dal_plugin.T
+      with type tb_slot = tb_slot
+       and type dal_attestations = dal_attestations) node_ctxt parameters
+    attestations ~block_level =
+  let open Lwt_result_syntax in
+  let cache = get_attestation_ops_cache node_ctxt in
+  let*? attestation_ops =
+    convert_attestations_to_cache_format
+      (module Plugin)
+      ~number_of_slots:parameters.Types.number_of_slots
+      ~number_of_lags:(List.length parameters.Types.attestation_lags)
+      attestations
+  in
+  Attestation_ops_cache.add cache ~level:block_level ~attestation_ops ;
+  return attestation_ops
+
+let get_cached_or_fetch_attestation_ops cctxt node_ctxt parameters
+    ~attested_level =
+  let open Lwt_result_syntax in
+  let cache = get_attestation_ops_cache node_ctxt in
+  match Attestation_ops_cache.find cache ~level:attested_level with
+  | Some cached_ops -> return cached_ops
+  | None ->
+      let*? (module Plugin), _proto_parameters =
+        get_plugin_and_parameters_for_level node_ctxt ~level:attested_level
+      in
+      let* attestations =
+        Plugin.get_attestations ~block_level:attested_level cctxt
+      in
+      store_attestations_in_cache
+        (module Plugin)
+        node_ctxt
+        parameters
+        attestations
+        ~block_level:attested_level
 
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =

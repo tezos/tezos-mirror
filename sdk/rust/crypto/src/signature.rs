@@ -107,7 +107,7 @@ impl TryFrom<Vec<u8>> for Signature {
     type Error = FromBytesError;
 
     fn try_from(hash: Vec<u8>) -> Result<Self, Self::Error> {
-        if hash.len() == BlsSignature::hash_size() {
+        if hash.len() == BlsSignature::SIZE {
             Ok(Signature::Bls(BlsSignature::try_from(hash)?))
         } else {
             Ok(Signature::Unknown(UnknownSignature::try_from(hash)?))

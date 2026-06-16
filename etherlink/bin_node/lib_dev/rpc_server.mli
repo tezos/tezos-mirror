@@ -5,16 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type evm_services_methods = {
-  next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
-  find_blueprint :
-    Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
-  find_blueprint_legacy :
-    Ethereum_types.quantity ->
-    Blueprint_types.Legacy.with_events option tzresult Lwt.t;
-  smart_rollup_address : Address.t;
-  time_between_blocks : Evm_node_config.Configuration.time_between_blocks;
-}
+type evm_services_methods = Evm_ro_context.evm_services_methods
 
 type finalizer = unit -> unit Lwt.t
 
@@ -37,7 +28,7 @@ val start_private_server :
   tick:(unit -> unit tzresult Lwt.t) ->
   ?block_production:block_production ->
   Configuration.t ->
-  (module Services_backend_sig.S) * 'a ->
+  Evm_ro_context.t ->
   finalizer tzresult Lwt.t
 
 (** [start_public_server config ctxt] starts the RPC servers as per specified
@@ -55,5 +46,5 @@ val start_public_server :
   tick:(unit -> unit tzresult Lwt.t) ->
   ?evm_services:evm_services_methods ->
   Configuration.t ->
-  (module Services_backend_sig.S) * 'a ->
+  Evm_ro_context.t ->
   finalizer tzresult Lwt.t

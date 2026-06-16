@@ -27,7 +27,6 @@ module Files = struct
       "tezt/**/*.ml*";
       "brassaia/**/*.ml*";
       "irmin/**/*.ml*";
-      "client-libs/**/*.ml*";
       "etherlink/**/*.ml*";
       "data-encoding/**/*.ml*";
       "vendors/**/*.ml*";
@@ -57,7 +56,7 @@ let job_rst_check =
     ~stage:Test
     ~description:"Check ReStructured Text files."
     ~only_if_changed:Files.rst
-    [". $HOME/.venv/bin/activate"; "make --silent -C docs sphinx-check"]
+    ~script:[". $HOME/.venv/bin/activate"; "make --silent -C docs sphinx-check"]
 
 let job_install_python =
   Cacio.parameterize @@ fun os_distribution ->
@@ -65,8 +64,8 @@ let job_install_python =
   let os_distribution_name, image =
     let open Tezos_ci in
     match os_distribution with
-    | `ubuntu_noble -> ("noble", Images.Base_images.ubuntu_noble)
-    | `ubuntu_jammy -> ("jammy", Images.Base_images.ubuntu_jammy)
+    | `ubuntu_22_04 -> ("22_04", Images.Base_images.ubuntu_24_04)
+    | `ubuntu_24_04 -> ("24_04", Images.Base_images.ubuntu_22_04)
     | `debian_bookworm -> ("bookworm", Images.Base_images.debian_bookworm)
   in
   let project, branch =
@@ -86,7 +85,13 @@ let job_install_python =
        actually work."
     ~only_if_changed:Files.python_install_script
     ~force_if_label:["ci--docs"]
-    [sf "./docs/developer/install-python-debian-ubuntu.sh %s %s" project branch]
+    ~script:
+      [
+        sf
+          "./docs/developer/install-python-debian-ubuntu.sh %s %s"
+          project
+          branch;
+      ]
 
 let job_odoc =
   Cacio.parameterize @@ fun mode ->
@@ -99,6 +104,7 @@ let job_odoc =
     ~description:
       ("Build the documentation of our OCaml libraries (make -C docs " ^ target
      ^ ").")
+    ~cpu:Tezos_ci.Runner.CPU.Very_high
     ~only_if_changed:Files.odoc
     ~force_if_label:["ci--docs"]
     ~artifacts:
@@ -109,10 +115,9 @@ let job_odoc =
          ["docs/_build/api/odoc/"; "docs/odoc.log"])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ["eval $(opam env)"; "make -C docs " ^ target]
+    ~script:["eval $(opam env)"; "make -C docs " ^ target]
 
 let job_manuals =
-  Cacio.parameterize @@ fun executables_to_use ->
   CI.job
     "manuals"
     ~__POS__
@@ -121,25 +126,11 @@ let job_manuals =
     ~description:
       "Build the command-line interface manuals (man pages) of Octez \
        executables."
-    ~needs_legacy:
-      (match executables_to_use with
-      | `dynamic ->
-          (* It's ok to assume Before_merging here because we only care about the job name. *)
-          [
-            ( Artifacts,
-              Tezos_ci_jobs.Code_verification.job_build_x86_64_release
-                Before_merging );
-            ( Artifacts,
-              Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
-                Before_merging );
-            ( Artifacts,
-              Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_exp
-                Before_merging );
-            ( Artifacts,
-              Tezos_ci_jobs.Code_verification.job_build_kernels Before_merging
-            );
-          ]
-      | `static -> [(Artifacts, Tezos_ci_jobs.Master_branch.job_static_x86_64)])
+    ~needs:
+      [
+        (Artifacts, Tezos_ci_jobs.Build.job_build_released Amd64);
+        (Artifacts, Tezos_ci_jobs.Build.job_build_extra_dev Amd64);
+      ]
     ~only_if_changed:Files.odoc
     ~force_if_label:["ci--docs"]
     ~artifacts:
@@ -152,11 +143,7 @@ let job_manuals =
            "docs/developer/rollup_metrics.csv";
            "docs/user/node-config.json";
          ])
-    ("eval $(opam env)"
-    ::
-    (match executables_to_use with
-    | `dynamic -> ["make -C docs -j octez-gen"]
-    | `static -> ["scripts/ci/documentation:manuals_static.sh"]))
+    ~script:["eval $(opam env)"; "make -C docs -j octez-gen"]
 
 let job_docgen =
   CI.job
@@ -167,6 +154,7 @@ let job_docgen =
     ~description:
       "Build various generated reference material. This includes the RPC, P2P \
        and error reference."
+    ~cpu:Tezos_ci.Runner.CPU.Very_high
     ~only_if_changed:Files.odoc
     ~force_if_label:["ci--docs"]
     ~artifacts:
@@ -181,11 +169,10 @@ let job_docgen =
          ])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ["eval $(opam env)"; "make -C docs -j docexes-gen"]
+    ~script:["eval $(opam env)"; "make -C docs -j docexes-gen"]
 
 let job_build_all =
   Cacio.parameterize @@ fun mode ->
-  Cacio.parameterize @@ fun executables_to_use ->
   CI.job
     "build_all"
     ~__POS__
@@ -197,7 +184,7 @@ let job_build_all =
     ~needs:
       [
         (Artifacts, job_odoc mode);
-        (Artifacts, job_manuals executables_to_use);
+        (Artifacts, job_manuals);
         (Artifacts, job_docgen);
       ]
     ~artifacts:
@@ -206,15 +193,16 @@ let job_build_all =
          ~expire_in:(Duration (Weeks 1))
          (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
          ["docs/_build/"])
-    [
-      "eval $(opam env)";
-      ". $HOME/.venv/bin/activate";
-      "make -C docs -j sphinx";
-      "make -C docs -j _build/octezdoc.txt";
-    ]
+    ~script:
+      [
+        "eval $(opam env)";
+        ". $HOME/.venv/bin/activate";
+        "make -C docs -j sphinx";
+        "make -C docs -j _build/octezdoc.txt";
+      ]
 
 let job_linkcheck =
-  Cacio.parameterize @@ fun mode executables_to_use ->
+  Cacio.parameterize @@ fun mode ->
   CI.job
     "linkcheck"
     ~__POS__
@@ -225,18 +213,19 @@ let job_linkcheck =
     ~force_if_label:["ci--docs"]
     ~needs:
       [
-        (Artifacts, job_manuals executables_to_use);
+        (Artifacts, job_manuals);
         (Artifacts, job_docgen);
-        (Artifacts, job_build_all mode executables_to_use);
+        (Artifacts, job_build_all mode);
       ]
     ~allow_failure:Yes
-    [
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      ". $HOME/.venv/bin/activate";
-      "make -C docs redirectcheck";
-      "make -C docs linkcheck";
-    ]
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        ". $HOME/.venv/bin/activate";
+        "make -C docs redirectcheck";
+        "make -C docs linkcheck";
+      ]
 
 let job_publish =
   CI.job
@@ -245,43 +234,42 @@ let job_publish =
     ~image:Tezos_ci.Images.CI.test
     ~stage:Publish
     ~description:"Publish the documentation to octez.com/docs."
-    ~needs:[(Artifacts, job_build_all `full `static)]
+    ~needs:[(Artifacts, job_build_all `full)]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "eval $(opam env)";
-      ". $HOME/.venv/bin/activate";
-      {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
-      {|echo "${CI_KH}" > ~/.ssh/known_hosts|};
-      "chmod 400 ~/.ssh/id_ed25519";
-      "./scripts/ci/doc_publish.sh";
-    ]
+    ~script:
+      [
+        "eval $(opam env)";
+        ". $HOME/.venv/bin/activate";
+        {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
+        {|echo "${CI_KH}" > ~/.ssh/known_hosts|};
+        "chmod 400 ~/.ssh/id_ed25519";
+        "./scripts/ci/doc_publish.sh";
+      ]
 
 let register () =
-  CI.register_before_merging_jobs
+  Cacio.register_merge_request_jobs
     [
       (Immediate, job_rst_check);
       (Auto, job_install_python `debian_bookworm `current_branch);
-      (Auto, job_build_all `lite `dynamic);
-      (Manual, job_linkcheck `lite `dynamic);
+      (Auto, job_build_all `lite);
+      (Manual, job_linkcheck `lite);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for the documentation."
-    ~legacy_jobs:[Tezos_ci_jobs.Master_branch.job_static_x86_64]
     [
       (Auto, job_rst_check);
-      (Auto, job_install_python `ubuntu_noble `master);
-      (Auto, job_install_python `ubuntu_jammy `master);
+      (Auto, job_install_python `ubuntu_22_04 `master);
+      (Auto, job_install_python `ubuntu_24_04 `master);
       (Auto, job_install_python `debian_bookworm `master);
-      (Auto, job_build_all `lite `static);
-      (Auto, job_linkcheck `lite `static);
+      (Auto, job_build_all `lite);
+      (Auto, job_linkcheck `lite);
     ] ;
   CI.register_scheduled_pipeline
     "update"
     ~description:
       "Generate and push the documentation to octez.com/docs without being \
        interrupted."
-    ~legacy_jobs:[Tezos_ci_jobs.Master_branch.job_static_x86_64]
     [(Auto, job_publish)] ;
   ()

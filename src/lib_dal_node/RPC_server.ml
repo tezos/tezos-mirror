@@ -27,11 +27,68 @@
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
+(* Build an ACL matcher from a service definition. The HTTP method and path
+   are derived from the service itself, so a path or method change in
+   [Services] is automatically reflected in the ACL. Path arguments [<arg>]
+   become wildcards [*], and a final [add_final_args] segment becomes [**]. *)
+let matcher_of_service service =
+  let meth =
+    Tezos_rpc.Service.meth service |> Tezos_rpc.Service.string_of_meth
+  in
+  let to_acl_segment seg =
+    let n = String.length seg in
+    if n >= 3 && seg.[0] = '<' && seg.[n - 2] = '>' && seg.[n - 1] = '*' then
+      "**"
+    else if n >= 2 && seg.[0] = '<' && seg.[n - 1] = '>' then "*"
+    else seg
+  in
+  let path =
+    Tezos_rpc.Service.path service
+    |> Tezos_rpc.Path.to_segments |> List.map to_acl_segment
+    |> String.concat "/"
+  in
+  RPC_server.Acl.parse (Format.sprintf "%s /%s" meth path)
+
+(* ACL for public (non-loopback) RPC binds: allow read-only DAL endpoints
+   while blocking mutating ones (PATCH /profiles, POST /slots, p2p management).
+   Entries are derived from [Services] so paths/methods stay in sync with the
+   route declarations. To expose a new read-only endpoint here, add the
+   corresponding [Services.*] reference below. *)
+let dal_secure =
+  let mk = matcher_of_service in
+  RPC_server.Acl.Deny_all
+    {
+      except =
+        [
+          mk Services.health;
+          mk Services.synchronized;
+          mk Services.monitor_synchronized;
+          mk Services.get_last_processed_level;
+          mk Services.get_protocol_parameters;
+          mk Services.get_profiles;
+          mk Services.get_assigned_shard_indices;
+          mk Services.get_attestable_slots;
+          mk Services.monitor_attestable_slots;
+          mk Services.get_traps;
+          mk Services.get_slot_content;
+          mk Services.get_slot_pages;
+          mk Services.get_slot_page_proof;
+          mk Services.get_slot_commitment;
+          mk Services.get_slot_status;
+          mk Services.get_slot_shard;
+          mk Services.version;
+          (* Plugin endpoints are mounted dynamically under /plugin and are
+             read-only (skip-list cell lookups); allow any GET below /plugin. *)
+          RPC_server.Acl.parse "GET /plugin/**";
+        ];
+    }
+
 let call_handler1 handler = handler () |> Errors.to_option_tzresult
 
 type error +=
   | Cryptobox_error of string * string
   | Cannot_publish_on_slot_index of Types.slot_index
+  | Publish_crosses_migration of int32
 
 let () =
   register_error_kind
@@ -58,7 +115,23 @@ let () =
     Data_encoding.(obj1 (req "slot_index" uint8))
     (function
       | Cannot_publish_on_slot_index slot_index -> Some slot_index | _ -> None)
-    (fun slot_index -> Cannot_publish_on_slot_index slot_index)
+    (fun slot_index -> Cannot_publish_on_slot_index slot_index) ;
+  register_error_kind
+    `Permanent
+    ~id:"publish_crosses_migration"
+    ~title:"Publish crosses migration"
+    ~description:
+      "Publishing this slot would cross the T to U protocol migration \
+       boundary, potentially causing attestation issues."
+    ~pp:(fun fmt published_level ->
+      Format.fprintf
+        fmt
+        "Cannot publish slot at level %ld: would cross protocol migration \
+         boundary"
+        published_level)
+    Data_encoding.(obj1 (req "published_level" int32))
+    (function Publish_crosses_migration level -> Some level | _ -> None)
+    (fun level -> Publish_crosses_migration level)
 
 module Slots_handlers = struct
   let get_slot_content ctxt slot_level slot_index () () =
@@ -77,13 +150,19 @@ module Slots_handlers = struct
             slot_id
         in
         let*! proof =
-          let cryptobox = Node_context.get_cryptobox ctxt in
+          let*? cryptobox, _ =
+            Errors.other_result
+            @@ Node_context.get_cryptobox_and_precomputations
+                 ~level:slot_level
+                 ctxt
+          in
           let*? polynomial = Cryptobox.polynomial_from_slot cryptobox content in
           let*? proof = Cryptobox.prove_page cryptobox polynomial page_index in
           return proof
         in
         match proof with
         | Ok proof -> return proof
+        | Error (`Other _ as e) -> fail e
         | Error e ->
             let msg =
               match e with
@@ -93,6 +172,7 @@ module Slots_handlers = struct
               | ( `Invalid_degree_strictly_less_than_expected _
                 | `Prover_SRS_not_loaded ) as commit_error ->
                   Cryptobox.string_of_commit_error commit_error
+              | `Other _ -> assert false (* Case already catched above *)
             in
             fail (Errors.other [Cryptobox_error ("get_slot_page_proof", msg)]))
 
@@ -114,17 +194,26 @@ module Slots_handlers = struct
           fail (Errors.other [Cannot_publish_on_slot_index slot_index])
       | None | Some _ -> return_unit
     in
-    (Slot_production.produce_commitment_and_proof
-       ctxt
-       query#padding
-       slot
-     [@profiler.wrap_f
-       {driver_ids = [Opentelemetry]}
-         (Opentelemetry_helpers.trace_slot_after_es
-            ~name:"inject_slot"
-            ?slot_index:query#slot_index
-            ~error_pp
-            ~commitment_of_result:fst)])
+    let published_level =
+      Node_context.get_l1_current_head_level ctxt |> Int32.succ
+    in
+    let* should_skip =
+      Slot_production.check_publish_crosses_migration ctxt ~published_level
+    in
+    if should_skip then
+      fail (Errors.other [Publish_crosses_migration published_level])
+    else
+      Slot_production.produce_commitment_and_proof
+        ctxt
+        query#padding
+        slot
+      [@profiler.wrap_f
+        {driver_ids = [Opentelemetry]}
+          (Opentelemetry_helpers.trace_slot_after_es
+             ~name:"inject_slot"
+             ?slot_index:query#slot_index
+             ~error_pp
+             ~commitment_of_result:fst)]
 
   let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler1 (fun () ->
@@ -161,7 +250,7 @@ module Node = struct
     |> Store.last_processed_level |> Store.Last_processed_level.load
 
   let get_protocol_parameters ctxt level () =
-    let level = match level with None -> `Last_proto | Some l -> `Level l in
+    let level = match level with None -> `Head | Some l -> `Level l in
     Node_context.get_proto_parameters ~level ctxt |> Lwt.return
 end
 
@@ -175,7 +264,7 @@ module Profile_handlers = struct
           |> lwt_map_error (fun e -> `Other e)
         in
         let* proto_parameters =
-          Node_context.get_proto_parameters ctxt ~level:`Last_proto
+          Node_context.get_proto_parameters ctxt ~level:`Head
           |> Lwt.return
           |> lwt_map_error (fun e -> `Other e)
         in
@@ -289,26 +378,12 @@ module Profile_handlers = struct
     in
     Lwt.return_unit
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7969
-
-     We could reuse the internal L1 crawler's newly added status to implement this
-     function. *)
-  let warn_if_lagging ~last_finalized_level ~attestation_level =
-    (* The L1 node's level is at least [last_finalized_level + 2], because the
-       DAL node processes blocks with a delay of two levels, to be sure that
-       processed blocks are final. *)
-    let current_level = Int32.add last_finalized_level 2l in
-    (* The baker's current level is the same as its L1 node and is the level
-       of the latest seen proposal (ie block). The baker asks for slots'
-       status when it has seen a proposal at [attestation_level - 1]. *)
-    let current_baker_level = Int32.sub attestation_level 1l in
-    (* We check that the baker is not in advance wrt the DAL node, which would
-       mean that the DAL node is lagging. We allow a slack of 1 level. *)
-    if Int32.succ current_level < current_baker_level then
-      Event.emit_get_attestable_slots_future_level_warning
-        ~current_level
-        ~current_baker_level
-    else Lwt.return_unit
+  let warn_if_lagging ctxt =
+    match Node_context.get_l1_crawler_status ctxt with
+    | Lagging {levels_to_process} ->
+        Event.emit_get_attestable_slots_future_level_warning ~levels_to_process
+    | Synced | Catching_up _ | L1_bootstrapping | L1_unreachable | Unknown ->
+        Lwt.return_unit
 
   let get_attestable_slots ctxt pkh attested_level () () =
     let get_attestable_slots ~shard_indices store last_known_parameters
@@ -367,7 +442,7 @@ module Profile_handlers = struct
                 else
                   Attestable_slots.is_attestable_slot_with_traps
                     shards_store
-                    last_known_parameters.traps_fraction
+                    published_level_parameters.traps_fraction
                     pkh
                     shard_indices
                     slot_id)
@@ -412,9 +487,8 @@ module Profile_handlers = struct
 
     call_handler1 (fun () ->
         let open Lwt_result_syntax in
-        let last_finalized_level = Node_context.get_last_finalized_level ctxt in
         let attestation_level = Int32.pred attested_level in
-        let*! () = warn_if_lagging ~last_finalized_level ~attestation_level in
+        let*! () = warn_if_lagging ctxt in
         (* For retrieving the assigned shard indexes, we consider the committee
            at [attestation_level], because the (DAL) attestations in the blocks
            at level [attested_level] refer to the predecessor level. *)
@@ -600,7 +674,17 @@ module Synchronized = struct
       Node_context.get_l1_crawler_status_input ctxt
     in
     let stream, stopper = Lwt_watcher.create_stream l1_crawler_status_input in
-    let next () = Lwt_stream.get stream in
+    (* Emit the current status first so that subscribers immediately receive a
+       value, instead of waiting for the next status transition (which may
+       never happen on a steady-state node). *)
+    let first = ref (Some (Node_context.get_l1_crawler_status ctxt)) in
+    let next () =
+      match !first with
+      | Some s ->
+          first := None ;
+          Lwt.return_some s
+      | None -> Lwt_stream.get stream
+    in
     let shutdown () = Lwt_watcher.shutdown stopper in
     Tezos_rpc.Answer.return_stream {next; shutdown}
 end
@@ -799,7 +883,7 @@ let register_plugin node_ctxt =
 
 let start configuration ctxt =
   let open Lwt_syntax in
-  let Configuration_file.{rpc_addr; _} = configuration in
+  let Configuration_file.{rpc_addr; rpc_acl_policy; _} = configuration in
   let dir = register ctxt (register_plugin ctxt) in
   let dir =
     Tezos_rpc.Directory.register_describe_directory_service
@@ -810,16 +894,22 @@ let start configuration ctxt =
   let rpc_addr = fst rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/5918
-
-     We should probably configure a better ACL policy.
-  *)
-  let acl = RPC_server.Acl.allow_all in
+  let is_public = Ipaddr.V6.scope rpc_addr <> Ipaddr.Interface in
+  let* acl_policy = RPC_server.Acl.resolve_domain_names rpc_acl_policy in
+  let acl =
+    match RPC_server.Acl.find_policy acl_policy (host, Some rpc_port) with
+    | Some custom -> custom
+    | None -> if is_public then dal_secure else RPC_server.Acl.allow_all
+  in
   let server =
     RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
   in
   Lwt.catch
     (fun () ->
+      let* () =
+        if is_public then Event.emit_rpc_addr_is_public ~rpc_addr:host
+        else Lwt.return_unit
+      in
       let* () =
         RPC_server.launch
           ~host

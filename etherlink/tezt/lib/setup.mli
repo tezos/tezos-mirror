@@ -17,23 +17,6 @@ type l1_contracts = {
   fa_deposit : string;
 }
 
-type multichain_sequencer_setup = {
-  node : Node.t;
-  client : Client.t;
-  sc_rollup_address : string;
-  sc_rollup_node : Sc_rollup_node.t;
-  observers : Evm_node.t list;
-  sequencer : Evm_node.t;
-  proxies : Evm_node.t list;
-  l1_contracts : l1_contracts;
-  boot_sector : string;
-  kernel : Uses.t;
-  enable_dal : bool;
-  evm_version : Evm_version.t;
-  enable_multichain : bool;
-  l2_chains : Evm_node.l2_setup list;
-}
-
 type sequencer_setup = {
   node : Node.t;
   client : Client.t;
@@ -41,14 +24,12 @@ type sequencer_setup = {
   sc_rollup_node : Sc_rollup_node.t;
   observer : Evm_node.t;
   sequencer : Evm_node.t;
-  proxy : Evm_node.t;
   l1_contracts : l1_contracts;
   boot_sector : string;
-  kernel : Uses.t;
+  kernel : Kernel.t;
   enable_dal : bool;
   evm_version : Evm_version.t;
-  enable_multichain : bool;
-  l2_chains : Evm_node.l2_setup list;
+  l2_chain : Evm_node.l2_setup;
 }
 
 type tx_queue_config = {
@@ -73,6 +54,7 @@ val run_new_rpc_endpoint : Evm_node.t -> Evm_node.t Lwt.t
 val run_new_observer_node :
   ?finalized_view:bool ->
   ?patch_config:(Tezt_wrapper.JSON.t -> Tezt_wrapper.JSON.t) ->
+  ?fail_on_divergence:bool ->
   sc_rollup_node:Sc_rollup_node.t option ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
@@ -101,66 +83,15 @@ val register_test :
   ?max_number_of_chunks:int ->
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
-  ?sequencer:Account.key ->
-  ?additional_sequencer_keys:Account.key list ->
-  ?sequencer_pool_address:string ->
-  kernel:Kernel.t ->
-  ?da_fee:Wei.t ->
-  ?minimum_base_fee_per_gas:Wei.t ->
-  ?preimages_dir:string ->
-  ?maximum_allowed_ticks:int64 ->
-  ?maximum_gas_per_transaction:int64 ->
-  ?max_blueprint_lookahead_in_seconds:int64 ->
-  ?enable_fa_bridge:bool ->
-  ?enable_fast_withdrawal:bool ->
-  ?enable_fast_fa_withdrawal:bool ->
-  ?commitment_period:int ->
-  ?challenge_window:int ->
-  ?uses:(Protocol.t -> Uses.t list) ->
-  ?additional_uses:Uses.t list ->
-  ?rollup_history_mode:Sc_rollup_node.history_mode ->
-  enable_dal:bool ->
-  ?dal_slots:int list option ->
-  enable_multichain:bool ->
-  ?rpc_server:Evm_node.rpc_server ->
-  ?websockets:bool ->
-  ?history_mode:Evm_node.history_mode ->
-  ?tx_queue:tx_queue_config ->
-  ?spawn_rpc:int ->
-  ?periodic_snapshot_path:string ->
-  ?signatory:bool ->
-  ?l2_setups:Evm_node.l2_setup list ->
-  ?sequencer_sunset_sec:int ->
-  ?with_runtimes:Tezosx_runtime.t list ->
-  (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
-  title:string ->
-  tags:string list ->
-  Protocol.t list ->
-  unit
-
-val register_multichain_test :
-  __FILE__:string ->
-  ?max_delayed_inbox_blueprint_length:int ->
-  ?sequencer_rpc_port:int ->
-  ?sequencer_private_rpc_port:int ->
-  ?genesis_timestamp:Client.timestamp ->
-  ?time_between_blocks:Evm_node.time_between_blocks ->
-  ?max_blueprints_lag:int ->
-  ?max_blueprints_ahead:int ->
-  ?max_blueprints_catchup:int ->
-  ?catchup_cooldown:int ->
-  ?delayed_inbox_timeout:int ->
-  ?delayed_inbox_min_levels:int ->
-  ?max_number_of_chunks:int ->
-  ?eth_bootstrap_accounts:string list ->
-  ?tez_bootstrap_accounts:Account.key list ->
   ?tez_bootstrap_contracts:Evm_node.tez_contract list ->
+  ?michelson_runtime_chain_id:string ->
   ?sequencer:Account.key ->
   ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   kernel:Kernel.t ->
   ?da_fee:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?preimages_dir:string ->
   ?maximum_allowed_ticks:int64 ->
   ?maximum_gas_per_transaction:int64 ->
@@ -175,8 +106,7 @@ val register_multichain_test :
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
-  enable_multichain:bool ->
-  l2_setups:Evm_node.l2_setup list option ->
+  ?dal_publishers_whitelist:string list ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
@@ -184,9 +114,12 @@ val register_multichain_test :
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
+  ?l2_setup:Evm_node.l2_setup ->
   ?sequencer_sunset_sec:int ->
   ?with_runtimes:Tezosx_runtime.t list ->
-  (multichain_sequencer_setup -> Protocol.t -> unit Lwt.t) ->
+  ?enable_michelson_gas_refund:bool ->
+  ?instant_confirmations:bool ->
+  (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
   Protocol.t list ->
@@ -216,6 +149,7 @@ val register_test_for_kernels :
   ?sequencer_pool_address:string ->
   ?kernels:Kernel.t list ->
   ?da_fee:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?minimum_base_fee_per_gas:Wei.t ->
   ?preimages_dir:string ->
   ?maximum_allowed_ticks:int64 ->
@@ -228,7 +162,7 @@ val register_test_for_kernels :
   ?additional_uses:Tezt_wrapper.Uses.t list ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
-  enable_multichain:bool ->
+  ?dal_publishers_whitelist:string list ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?enable_fast_withdrawal:bool ->
@@ -238,8 +172,9 @@ val register_test_for_kernels :
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
-  ?l2_setups:Evm_node.l2_setup list ->
+  ?l2_setup:Evm_node.l2_setup ->
   ?sequencer_sunset_sec:int ->
+  ?instant_confirmations:bool ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
@@ -251,7 +186,7 @@ val setup_sequencer :
   ?next_wasm_runtime:bool ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
-  mainnet_compat:bool ->
+  ?kernel_compat:string ->
   ?genesis_timestamp:Client.timestamp ->
   ?time_between_blocks:Evm_node.time_between_blocks ->
   ?max_blueprints_lag:int ->
@@ -268,9 +203,10 @@ val setup_sequencer :
   ?sequencer:Account.key ->
   ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
-  ?kernel:Uses.t ->
+  ?kernel:Kernel.t ->
   ?da_fee:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?preimages_dir:string ->
   ?maximum_allowed_ticks:int64 ->
   ?maximum_gas_per_transaction:int64 ->
@@ -283,16 +219,16 @@ val setup_sequencer :
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list ->
-  enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
-  ?l2_chains:Evm_node.l2_setup list ->
+  ?l2_chain:Evm_node.l2_setup ->
   ?sequencer_sunset_sec:int ->
   ?with_runtimes:Tezosx_runtime.t list ->
+  ?instant_confirmations:bool ->
   Protocol.t ->
   sequencer_setup Lwt.t
 
@@ -335,6 +271,7 @@ val register_all :
   ?kernels:Kernel.t list ->
   ?da_fee:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?preimages_dir:string ->
   ?maximum_allowed_ticks:int64 ->
   ?maximum_gas_per_transaction:int64 ->
@@ -350,13 +287,13 @@ val register_all :
   ?enable_fast_fa_withdrawal:bool ->
   ?history_mode:Evm_node.history_mode ->
   ?use_dal:feature_test_registration ->
-  ?use_multichain:feature_test_registration ->
   ?tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
-  ?l2_setups:Evm_node.l2_setup list ->
+  ?l2_setup:Evm_node.l2_setup ->
   ?sequencer_sunset_sec:int ->
+  ?instant_confirmations:bool ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->

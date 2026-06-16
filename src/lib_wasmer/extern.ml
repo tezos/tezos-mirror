@@ -23,14 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** External objects that can be provided as imports to a WebAssembly
+    module. Currently only functions are supported. *)
+
 open Api
 
+(** An existentially-typed external: a function with its type signature
+    and implementation. *)
 type t = Function : 'a Function_type.t * 'a -> t
 
+(** [to_extern store ext] materializes [ext] into a Wasmer extern pointer
+    and a cleanup function. *)
 let to_extern wasmer ext =
   match ext with
   | Function (typ, f) ->
       let func, clean = Function.create wasmer typ f in
       (Functions.Func.as_extern func, clean)
 
+(** [to_externkind ext] returns the Wasmer extern kind for [ext]. *)
 let to_externkind = function Function _ -> Types.Externkind.func

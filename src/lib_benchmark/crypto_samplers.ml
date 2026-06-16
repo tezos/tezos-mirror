@@ -153,6 +153,17 @@ module V2 = struct
     Make_p_finite_key_pool (Tezos_crypto.Signature.V2)
 end
 
+module V3 = struct
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash := Tezos_crypto.Signature.V3.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V3.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V3.Secret_key.t
+
+  module Make_finite_key_pool =
+    Make_p_finite_key_pool (Tezos_crypto.Signature.V3)
+end
+
 module V_latest = struct
   module type Finite_key_pool_S =
     P_Finite_key_pool_S

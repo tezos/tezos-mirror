@@ -79,8 +79,7 @@ impl TagMap {
             let prev_item = id_to_tag.insert(tag_id, tag);
             debug_assert!(
                 prev_item.is_none(),
-                "Tag id: 0x{:X} is already present in TagMap",
-                tag_id
+                "Tag id: 0x{tag_id:X} is already present in TagMap"
             );
             variant_to_id.insert(variant, tag_id);
         }

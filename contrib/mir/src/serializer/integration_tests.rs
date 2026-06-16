@@ -31,7 +31,7 @@ mod test_typed_encode {
 
         let arena = Arena::new();
         let micheline = v.into_micheline_optimized_legacy(&arena);
-        assert_eq!(&micheline.encode_for_pack(), bytes);
+        assert_eq!(&micheline.encode_for_pack().unwrap(), bytes);
         assert_eq!(Micheline::decode_packed(&arena, bytes), Ok(micheline),);
     }
 

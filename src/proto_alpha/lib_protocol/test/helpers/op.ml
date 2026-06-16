@@ -34,26 +34,22 @@ let pack_operation ctxt signature contents =
   Operation.pack
     ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
 
-let raw_sign (type kind) ctxt ?(watermark = Signature.Generic_operation)
+let raw_sign (type kind) _ctxt ?(watermark = Signature.Generic_operation)
     ?(companion_key : Delegate_services.companion_key option)
     (sk : Signature.secret_key) branch (contents : kind contents_list) =
   let open Lwt_result_syntax in
-  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let encoding =
-    if Constants.aggregate_attestation alpha_ctxt then
-      (* Under the [aggregate_attestation] feature flag, operations signed with
-         BLS keys use a dedicated serialization encoding, which differs only for
-         attestations and preattestations. *)
-      match sk with
-      | Bls _ -> Operation.bls_mode_unsigned_encoding
-      | _ -> Operation.unsigned_encoding
-    else Operation.unsigned_encoding
+    (* Operations signed with BLS keys use a dedicated serialization encoding,
+       which differs only for attestations and preattestations. *)
+    match sk with
+    | Bls _ -> Operation.bls_mode_unsigned_encoding
+    | _ -> Operation.unsigned_encoding
   in
   let bytes =
     Data_encoding.Binary.to_bytes_exn encoding ({branch}, Contents_list contents)
   in
   match (contents, sk, companion_key) with
-  | ( Single (Attestation {dal_content = Some {attestation = dal_content}; _}),
+  | ( Single (Attestation {dal_content = Some {attestations = dal_content}; _}),
       (Bls _ : Signature.secret_key),
       Some companion_key ) -> (
       let* companion_signer =
@@ -70,7 +66,7 @@ let raw_sign (type kind) ctxt ?(watermark = Signature.Generic_operation)
       | Bls consensus_pk, Bls companion_pk, Bls consensus_sig, Bls companion_sig
         -> (
           let dal_dependent_bls_sig_opt =
-            Alpha_context.Dal.Attestation.Dal_dependent_signing.aggregate_sig
+            Alpha_context.Dal.Attestations.Dal_dependent_signing.aggregate_sig
               ~subgroup_check:false
               ~consensus_pk
               ~companion_pk
@@ -1074,7 +1070,8 @@ let double_baking ctxt bh1 bh2 =
   }
 
 let dal_entrapment (type a) ctxt (attestation : a Kind.consensus operation)
-    ~consensus_slot dal_slot_index (shard_with_proof : Dal.Shard_with_proof.t) =
+    ~consensus_slot dal_slot_index ~lag_index
+    (shard_with_proof : Dal.Shard_with_proof.t) =
   let contents =
     Single
       (Dal_entrapment_evidence
@@ -1082,6 +1079,7 @@ let dal_entrapment (type a) ctxt (attestation : a Kind.consensus operation)
            attestation;
            consensus_slot;
            slot_index = dal_slot_index;
+           lag_index_opt = Some lag_index;
            shard_with_proof;
          })
   in
@@ -1566,3 +1564,482 @@ let set_op_signature op new_signature =
 let copy_op_signature ~src ~dst =
   let signature = get_op_signature src in
   set_op_signature dst signature
+
+let clst_deposit ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) (src : Contract.t) (amount : Tez.t) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "deposit")
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    amount
+
+let clst_redeem ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) (src : Contract.t) (amount : int64) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let parameters =
+    Alpha_context.Script.lazy_expr (Expr.from_string (Int64.to_string amount))
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "redeem")
+    ~parameters
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let clst_finalize_redeem ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) ~(sender : Contract.t)
+    ~(redeemer : Signature.Public_key_hash.t) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      Environment.Micheline.(
+        String (dummy_location, Signature.Public_key_hash.to_b58check redeemer)
+        |> strip_locations)
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "finalize_redeem")
+    ~parameters
+    ctxt
+    sender
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let clst_approve ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) ~(sender : Contract.t)
+    (batch : (Contract.t * Contract.t * int64) list) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let open Environment.Micheline in
+  let elements =
+    List.map
+      (fun (owner, spender, amount) ->
+        (* (owner, spender, token_id, increase or decrease amount) *)
+        let amount =
+          let l_or_r = if amount < 0L then Script.D_Right else Script.D_Left in
+          Prim
+            ( dummy_location,
+              l_or_r,
+              [Int (dummy_location, Z.of_int64 (Int64.abs amount))],
+              [] )
+        in
+        Prim
+          ( dummy_location,
+            Script.D_Pair,
+            [
+              String (dummy_location, Contract.to_b58check owner);
+              String (dummy_location, Contract.to_b58check spender);
+              Int (dummy_location, Z.zero);
+              amount;
+            ],
+            [] ))
+      batch
+  in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      Environment.Micheline.(Seq (dummy_location, elements) |> strip_locations)
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "approve")
+    ~parameters
+    ctxt
+    sender
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let clst_update_operator ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) ~(sender : Contract.t)
+    (batch : (Contract.t * Contract.t * [< `Add | `Remove]) list) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let open Environment.Micheline in
+  let elms =
+    List.map
+      (fun (owner, operator, action) ->
+        (* add or remove (owner, operator, token_id) *)
+        let l_or_r =
+          match action with `Add -> Script.D_Left | `Remove -> Script.D_Right
+        in
+        Prim
+          ( dummy_location,
+            l_or_r,
+            [
+              Prim
+                ( dummy_location,
+                  Script.D_Pair,
+                  [
+                    String (dummy_location, Contract.to_b58check owner);
+                    String (dummy_location, Contract.to_b58check operator);
+                    Int (dummy_location, Z.zero);
+                  ],
+                  [] );
+            ],
+            [] ))
+      batch
+  in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      Environment.Micheline.(Seq (dummy_location, elms) |> strip_locations)
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "update_operators")
+    ~parameters
+    ctxt
+    sender
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let clst_transfer ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) ~sender
+    (batch : (Contract.t * (Contract.t * int64) list) list) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let open Environment.Micheline in
+  let elements =
+    List.map
+      (fun (src, txs) ->
+        let txs =
+          List.map
+            (fun (dst, amount) ->
+              Prim
+                ( dummy_location,
+                  Script.D_Pair,
+                  [
+                    String (dummy_location, Contract.to_b58check dst);
+                    Int (dummy_location, Z.zero);
+                    Int (dummy_location, Z.of_int64 amount);
+                  ],
+                  [] ))
+            txs
+        in
+        Prim
+          ( dummy_location,
+            Script.D_Pair,
+            [
+              String (dummy_location, Contract.to_b58check src);
+              Seq (dummy_location, txs);
+            ],
+            [] ))
+      batch
+  in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      Environment.Micheline.(Seq (dummy_location, elements) |> strip_locations)
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "transfer")
+    ~parameters
+    ctxt
+    sender
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let clst_export_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    ?(destination_contract = None) (ctxt : Context.t) ~(sender : Contract.t)
+    (batch : (Contract.t * (Contract.t * int64) list) list) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let open Environment.Micheline in
+  let destination_contract =
+    match destination_contract with
+    | None -> Prim (dummy_location, Script.D_None, [], [])
+    | Some contract ->
+        Prim
+          ( dummy_location,
+            Script.D_Some,
+            [String (dummy_location, contract)],
+            [] )
+  in
+  let elms =
+    List.map
+      (fun (dst, tickets) ->
+        let tickets_to_export =
+          List.map
+            (fun (src, amount) ->
+              Prim
+                ( dummy_location,
+                  Script.D_Pair,
+                  [
+                    String (dummy_location, Contract.to_b58check src);
+                    Int (dummy_location, Z.zero);
+                    Int (dummy_location, Z.of_int64 amount);
+                  ],
+                  [] ))
+            tickets
+        in
+        let tx =
+          Prim
+            ( dummy_location,
+              Script.D_Pair,
+              [
+                String (dummy_location, Contract.to_b58check dst);
+                Seq (dummy_location, tickets_to_export);
+              ],
+              [] )
+        in
+        Prim
+          ( dummy_location,
+            Script.D_Pair,
+            [destination_contract; Seq (dummy_location, [tx])],
+            [] ))
+      batch
+  in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      Environment.Micheline.(Seq (dummy_location, elms) |> strip_locations)
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "export_ticket")
+    ~parameters
+    ctxt
+    sender
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let clst_lambda_export ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) ~(src : Contract.t) ~(lambda_action : Script.expr)
+    (amount : int64) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let open Environment.Micheline in
+  let ticket_to_export =
+    Prim
+      ( dummy_location,
+        Script.D_Pair,
+        [
+          String (dummy_location, Contract.to_b58check src);
+          Int (dummy_location, Z.zero);
+          Int (dummy_location, Z.of_int64 amount);
+        ],
+        [] )
+  in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      (Prim
+         ( dummy_location,
+           Script.D_Pair,
+           [
+             Seq (dummy_location, [ticket_to_export]);
+             Micheline.root lambda_action;
+           ],
+           [] )
+      |> strip_locations)
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "lambda_export")
+    ~parameters
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let clst_import_ticket_from_implicit ?force_reveal ?counter ?fee ?gas_limit
+    ?storage_limit (ctxt : Context.t) ~(src : Contract.t) (amount : int64) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let*@ (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
+    Clst_contract_storage.ticket_token ~clst_hash
+  in
+  let*?@ cont_ty_unstripped, alpha_ctxt =
+    Script_ir_unparser.unparse_ty
+      ~loc:Micheline.dummy_location
+      alpha_ctxt
+      contents_type
+  in
+  let ty =
+    Script.lazy_expr
+      (Micheline.strip_locations (Script.strip_annotations cont_ty_unstripped))
+  in
+  let*@ contents, _alpha_ctxt =
+    Script_ir_unparser.unparse_comparable_data
+      alpha_ctxt
+      Script_ir_unparser.Readable
+      contents_type
+      contents
+  in
+  let amount =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ Ticket_amount.of_n @@ Script_int.abs @@ Script_int.of_int64 amount
+  in
+  transfer_ticket
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ctxt
+    ~source:src
+    ~contents:(Script.lazy_expr contents)
+    ~ty
+    ~ticketer
+    ~amount
+    ~destination:(Contract.Originated clst_hash)
+    ~entrypoint:(Entrypoint.of_string_strict_exn "import_ticket_from_implicit")
+
+let clst_register_delegate ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) (src : Contract.t)
+    ~edge_of_clst_staking_over_baking_millionth
+    ~ratio_of_clst_staking_over_direct_staking_billionth =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+    @@ Micheline.strip_locations
+         (Micheline.Prim
+            ( (),
+              Script.D_Some,
+              [
+                Micheline.Prim
+                  ( (),
+                    Script.D_Pair,
+                    [
+                      Micheline.Int
+                        ((), edge_of_clst_staking_over_baking_millionth);
+                      Micheline.Int
+                        ((), ratio_of_clst_staking_over_direct_staking_billionth);
+                    ],
+                    [] );
+              ],
+              [] ))
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "register_delegate")
+    ~parameters
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let clst_update_delegate_parameters ?force_reveal ?counter ?fee ?gas_limit
+    ?storage_limit (ctxt : Context.t) (src : Contract.t)
+    ~edge_of_clst_staking_over_baking_millionth
+    ~ratio_of_clst_staking_over_direct_staking_billionth =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+    @@ Micheline.strip_locations
+         (Micheline.Prim
+            ( (),
+              Script.D_Pair,
+              [
+                Micheline.Int ((), edge_of_clst_staking_over_baking_millionth);
+                Micheline.Int
+                  ((), ratio_of_clst_staking_over_direct_staking_billionth);
+              ],
+              [] ))
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "update_delegate_parameters")
+    ~parameters
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let clst_unregister_delegate ?force_reveal ?counter ?fee ?gas_limit
+    ?storage_limit (ctxt : Context.t) (src : Contract.t) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "unregister_delegate")
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let set_delegate_parameters ?force_reveal ?counter ?fee ?gas_limit
+    ?storage_limit ctxt delegate ~limit_of_staking_over_baking_millionth
+    ~edge_of_baking_over_staking_billionth =
+  let set_params_parameters =
+    Script.lazy_expr
+      (Expr.from_string
+         (Printf.sprintf
+            "Pair %s (Pair %s Unit)"
+            (Z.to_string limit_of_staking_over_baking_millionth)
+            (Z.to_string edge_of_baking_over_staking_billionth)))
+  in
+  transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:Entrypoint.set_delegate_parameters
+    ~parameters:set_params_parameters
+    ctxt
+    delegate
+    delegate
+    Tez.zero

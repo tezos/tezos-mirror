@@ -141,7 +141,7 @@ module Balance_updates = struct
     Format.sprintf
       "{kind: %s\n\
        contract: %s\n\
-       change: %d\n\
+       change: %#d\n\
        staker: %s\n\
        category: %s\n\
        delayed_operation_hash: %s\n\

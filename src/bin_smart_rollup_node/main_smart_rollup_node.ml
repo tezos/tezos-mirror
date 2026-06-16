@@ -68,11 +68,13 @@ let config_init_command =
           no_degraded_arg
           gc_frequency_arg
           history_mode_arg)
-       (args7
+       (args9
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           bail_on_disagree_switch
+          commit_on_arg
           unsafe_disable_wasm_kernel_checks_switch
+          slow_vm_fallback_switch
           profiling_arg
           etherlink_switch
           l1_monitor_finalized_switch))
@@ -108,7 +110,9 @@ let config_init_command =
            ( allowed_origins,
              allowed_headers,
              bail_on_disagree,
+             commit_on,
              unsafe_disable_wasm_kernel_checks,
+             slow_vm_fallback,
              profiling,
              force_etherlink,
              l1_monitor_finalized ) )
@@ -154,6 +158,8 @@ let config_init_command =
           ~allowed_headers
           ~apply_unsafe_patches:false
           ~bail_on_disagree
+          ~slow_vm_fallback
+          ~commit_on
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -188,7 +194,7 @@ let legacy_run_command =
           enable_performance_metrics_arg
           disable_performance_metrics_arg
           l1_monitor_finalized_switch)
-       (args21
+       (args23
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
@@ -208,7 +214,9 @@ let legacy_run_command =
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
           bail_on_disagree_switch
+          commit_on_arg
           unsafe_disable_wasm_kernel_checks_switch
+          slow_vm_fallback_switch
           profiling_arg))
     (prefixes ["run"] @@ stop)
     (fun ( ( data_dir,
@@ -242,7 +250,9 @@ let legacy_run_command =
              allowed_headers,
              apply_unsafe_patches,
              bail_on_disagree,
+             commit_on,
              unsafe_disable_wasm_kernel_checks,
+             slow_vm_fallback,
              profiling ) )
          cctxt
        ->
@@ -285,6 +295,8 @@ let legacy_run_command =
           ~allowed_headers
           ~apply_unsafe_patches
           ~bail_on_disagree
+          ~slow_vm_fallback
+          ~commit_on
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -320,7 +332,7 @@ let run_command =
           reconnection_delay_arg
           dal_node_endpoint_arg
           pre_images_endpoint_arg)
-       (args17
+       (args19
           injector_retention_period_arg
           injector_attempts_arg
           injection_ttl_arg
@@ -336,7 +348,9 @@ let run_command =
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
           bail_on_disagree_switch
+          commit_on_arg
           unsafe_disable_wasm_kernel_checks_switch
+          slow_vm_fallback_switch
           profiling_arg))
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
@@ -371,7 +385,9 @@ let run_command =
              allowed_headers,
              apply_unsafe_patches,
              bail_on_disagree,
+             commit_on,
              unsafe_disable_wasm_kernel_checks,
+             slow_vm_fallback,
              profiling ) )
          mode
          sc_rollup_address
@@ -417,6 +433,8 @@ let run_command =
           ~allowed_headers
           ~apply_unsafe_patches
           ~bail_on_disagree
+          ~slow_vm_fallback
+          ~commit_on
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -524,7 +542,8 @@ let export_snapshot
       compress_on_the_fly,
       uncompressed,
       compact,
-      rollup_node_endpoint ) filename (cctxt : Client_context.full) =
+      rollup_node_endpoint,
+      level ) filename (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
   let*! compression =
     match (compress_on_the_fly, uncompressed) with
@@ -543,6 +562,7 @@ let export_snapshot
         ~data_dir
         ~dest
         ~filename
+        ~level
     else
       Snapshots.export
         ?rollup_node_endpoint
@@ -552,6 +572,7 @@ let export_snapshot
         ~data_dir
         ~dest
         ~filename
+        ~level
   in
   let*! () = cctxt#message "Snapshot exported to %s@." snapshot_file in
   return_unit
@@ -561,14 +582,15 @@ let export_snapshot_auto_name =
   command
     ~group
     ~desc:"Export a snapshot of the rollup node state."
-    (args7
+    (args8
        data_dir_arg
        Cli.snapshot_dir_arg
        Cli.no_checks_arg
        Cli.compress_on_the_fly_arg
        Cli.uncompressed
        Cli.compact
-       Cli.rollup_node_endpoint_arg)
+       Cli.rollup_node_endpoint_arg
+       Cli.snapshot_level_arg)
     (prefixes ["snapshot"; "export"] @@ stop)
     (fun params cctxt -> export_snapshot params None cctxt)
 
@@ -577,20 +599,22 @@ let export_snapshot_named =
   command
     ~group
     ~desc:"Export a snapshot of the rollup node state to a given file."
-    (args6
+    (args7
        data_dir_arg
        Cli.no_checks_arg
        Cli.compress_on_the_fly_arg
        Cli.uncompressed
        Cli.compact
-       Cli.rollup_node_endpoint_arg)
+       Cli.rollup_node_endpoint_arg
+       Cli.snapshot_level_arg)
     (prefixes ["snapshot"; "export"] @@ Cli.snapshot_file_param @@ stop)
     (fun ( data_dir,
            no_checks,
            compress_on_the_fly,
            uncompressed,
            compact,
-           rollup_node_endpoint )
+           rollup_node_endpoint,
+           level )
          filename
          cctxt
        ->
@@ -601,7 +625,8 @@ let export_snapshot_named =
           compress_on_the_fly,
           uncompressed,
           compact,
-          rollup_node_endpoint )
+          rollup_node_endpoint,
+          level )
         (Some filename)
         cctxt)
 
@@ -610,13 +635,20 @@ let import_snapshot =
   command
     ~group
     ~desc:"Import a snapshot file in a rollup node."
-    (args4
+    (args6
        data_dir_arg
        Cli.no_checks_arg
        Cli.import_force_switch
-       Cli.apply_unsafe_patches_switch)
+       Cli.apply_unsafe_patches_switch
+       Cli.import_level_arg
+       Cli.dal_node_endpoint_arg)
     (prefixes ["snapshot"; "import"] @@ Cli.snapshot_file_or_url_param @@ stop)
-    (fun (data_dir, no_checks, force, apply_unsafe_patches)
+    (fun ( data_dir,
+           no_checks,
+           force,
+           apply_unsafe_patches,
+           level,
+           dal_node_endpoint )
          snapshot_file
          cctxt
        ->
@@ -627,6 +659,8 @@ let import_snapshot =
           cctxt
           ~no_checks
           ~force
+          ?dal_node_endpoint
+          ?level
           ~data_dir
           ~snapshot_file
       in

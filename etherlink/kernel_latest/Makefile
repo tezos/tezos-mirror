@@ -15,9 +15,12 @@ endif
 ifdef EXCLUDE_MEMBER
 	$(eval EXCLUDE := --workspace --exclude ${EXCLUDE_MEMBER})
 else
-# By default evm-evaluation is excluded as it's an isolated component
-# of the EVM workspace.
-	$(eval EXCLUDE := --workspace --exclude evm-evaluation)
+# By default evm-evaluation and revm-evaluation are excluded as they're
+# isolated components of the EVM workspace.
+	$(eval EXCLUDE := --workspace --exclude evm-evaluation --exclude revm-evaluation)
+endif
+ifndef EVM_KERNEL_SKIP_BYTECODE
+	@make -C revm/contracts/predeployed bytecode
 endif
 	@cargo build --target wasm32-unknown-unknown --release ${EXCLUDE} ${FEATURES}
 

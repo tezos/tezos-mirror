@@ -6,20 +6,17 @@
 // SPDX-License-Identifier: MIT
 
 use crate::extensions::WithGas;
-use crate::internal_runtime::{ExtendedRuntime, InternalRuntime};
-use crate::runtime::{IsEvmNode, Runtime};
-use tezos_evm_logging::Verbosity;
-use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
+use crate::runtime::IsEvmNode;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{
-    input::Message,
-    metadata::RollupMetadata,
     path::{concat, OwnedPath, Path, RefPath},
-    runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
+    runtime::{RuntimeError, ValueType},
 };
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/evm/trace");
+pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state");
 
 pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
     concat(&TMP_PATH, path).map_err(|_| RuntimeError::PathNotFound)
@@ -27,50 +24,11 @@ pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
 
 pub struct SafeStorage<Runtime> {
     pub host: Runtime,
-    pub world_state: OwnedPath,
+    /// Invariant: paths must not overlap (no path is a prefix of another)
+    pub world_states: Vec<OwnedPath>,
 }
 
-impl<Host: Runtime> InternalRuntime for SafeStorage<&mut Host> {
-    fn __internal_store_get_hash<T: Path>(
-        &mut self,
-        path: &T,
-    ) -> Result<Vec<u8>, RuntimeError> {
-        self.host.__internal_store_get_hash(path)
-    }
-}
-
-impl<Host: Runtime> ExtendedRuntime for SafeStorage<&mut Host> {
-    #[inline(always)]
-    fn store_get_hash<P: Path>(&mut self, path: &P) -> Result<Vec<u8>, RuntimeError> {
-        let path = safe_path(path)?;
-        self.__internal_store_get_hash(&path)
-    }
-
-    #[inline(always)]
-    fn internal_store_read_all<T: Path>(
-        &self,
-        path: &T,
-    ) -> Result<Vec<u8>, RuntimeError> {
-        self.host.store_read_all(path)
-    }
-}
-
-impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
-    #[inline(always)]
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.host.write_output(from)
-    }
-
-    #[inline(always)]
-    fn write_debug(&self, msg: &str) {
-        self.host.write_debug(msg)
-    }
-
-    #[inline(always)]
-    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        self.host.read_input()
-    }
-
+impl<Host: StorageV1> StorageV1 for SafeStorage<&mut Host> {
     #[inline(always)]
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         let path = safe_path(path)?;
@@ -167,88 +125,41 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
     }
 
     #[inline(always)]
-    fn reveal_preimage(
-        &self,
-        hash: &[u8; PREIMAGE_HASH_SIZE],
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host.reveal_preimage(hash, destination)
-    }
-
-    #[inline(always)]
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
         let path = safe_path(path)?;
         self.host.store_value_size(&path)
     }
 
     #[inline(always)]
-    fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
-        self.host.mark_for_reboot()
-    }
-
-    #[inline(always)]
-    fn reveal_metadata(&self) -> RollupMetadata {
-        self.host.reveal_metadata()
-    }
-
-    #[inline(always)]
-    fn reveal_dal_page(
+    fn store_get_hash(
         &self,
-        published_level: i32,
-        slot_index: u8,
-        page_index: i16,
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host
-            .reveal_dal_page(published_level, slot_index, page_index, destination)
-    }
-
-    #[inline(always)]
-    fn reveal_dal_parameters(&self) -> RollupDalParameters {
-        self.host.reveal_dal_parameters()
-    }
-
-    #[inline(always)]
-    fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
-        self.host.last_run_aborted()
-    }
-
-    #[inline(always)]
-    fn upgrade_failed(&self) -> Result<bool, RuntimeError> {
-        self.host.upgrade_failed()
-    }
-
-    #[inline(always)]
-    fn restart_forced(&self) -> Result<bool, RuntimeError> {
-        self.host.restart_forced()
-    }
-
-    #[inline(always)]
-    fn reboot_left(&self) -> Result<u32, RuntimeError> {
-        self.host.reboot_left()
-    }
-
-    #[inline(always)]
-    fn runtime_version(&self) -> Result<String, RuntimeError> {
-        self.host.runtime_version()
+        path: &impl Path,
+    ) -> Result<[u8; tezos_smart_rollup_core::STORE_HASH_SIZE], RuntimeError> {
+        let path = safe_path(path)?;
+        self.host.store_get_hash(&path)
     }
 }
 
-impl<Host: Runtime> Verbosity for SafeStorage<&mut Host> {
-    fn verbosity(&self) -> tezos_evm_logging::Level {
-        self.host.verbosity()
-    }
-}
-
-impl<Host: Runtime> SafeStorage<&mut Host> {
+impl<Host: StorageV1> SafeStorage<&mut Host> {
     pub fn start(&mut self) -> Result<(), RuntimeError> {
-        let tmp_path = safe_path(&self.world_state)?;
-        self.host.store_copy(&self.world_state, &tmp_path)
+        // Clean up any leftover data in /tmp from a previous run.
+        // This is safe because start() is only called when no
+        // BlockInProgress exists in storage.
+        let _ = self.host.store_delete(&TMP_PATH);
+
+        for world_state in self.world_states.iter() {
+            let tmp_path = safe_path(world_state)?;
+            self.host.store_copy(world_state, &tmp_path)?;
+        }
+        Ok(())
     }
 
     pub fn promote(&mut self) -> Result<(), RuntimeError> {
-        let tmp_path = safe_path(&self.world_state)?;
-        self.host.store_move(&tmp_path, &self.world_state)
+        for world_state in self.world_states.iter() {
+            let tmp_path = safe_path(world_state)?;
+            self.host.store_move(&tmp_path, world_state)?;
+        }
+        Ok(())
     }
 
     // Only used in tracing mode, so that the trace doesn't polute the world
@@ -266,7 +177,7 @@ impl<Host: Runtime> SafeStorage<&mut Host> {
     }
 }
 
-impl<Host: Runtime> WithGas for SafeStorage<&mut Host> {
+impl<Host: WithGas> WithGas for SafeStorage<&mut Host> {
     fn add_execution_gas(&mut self, gas: u64) {
         self.host.add_execution_gas(gas)
     }
@@ -276,8 +187,119 @@ impl<Host: Runtime> WithGas for SafeStorage<&mut Host> {
     }
 }
 
-impl<Host: Runtime> IsEvmNode for SafeStorage<&mut Host> {
+impl<Host: IsEvmNode> IsEvmNode for SafeStorage<&mut Host> {
     fn is_evm_node(&self) -> bool {
         self.host.is_evm_node()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::storage::StorageV1;
+
+    fn trace_call_trace_path() -> OwnedPath {
+        // /tmp/evm/trace/call_trace — where traces land through SafeStorage
+        safe_path(&concat(&TRACE_PATH, &RefPath::assert_from(b"/call_trace")).unwrap())
+            .unwrap()
+    }
+
+    fn trace_length_path() -> OwnedPath {
+        concat(&trace_call_trace_path(), &RefPath::assert_from(b"/length")).unwrap()
+    }
+
+    fn trace_entry_path(index: u32) -> OwnedPath {
+        let suffix: Vec<u8> = format!("/{index}").into();
+        concat(&trace_call_trace_path(), &RefPath::assert_from(&suffix)).unwrap()
+    }
+
+    /// Simulate writing trace entries into /tmp/evm/trace/call_trace/,
+    /// as the kernel's IndexableStorage would during block-level tracing.
+    fn write_fake_traces(host: &mut MockKernelHost, count: u32) {
+        let length_path = trace_length_path();
+        host.store_write_all(&length_path, &(count as u64).to_le_bytes())
+            .unwrap();
+        for i in 0..count {
+            let path = trace_entry_path(i);
+            host.store_write_all(&path, &[0xAA, 0xBB]).unwrap();
+        }
+    }
+
+    #[test]
+    fn start_clears_stale_trace_data() {
+        let mut host = MockKernelHost::default();
+
+        // Set up some initial world state
+        let world_state_data = RefPath::assert_from(b"/evm/world_state/accounts");
+        host.store_write_all(&world_state_data, b"some_account_data")
+            .unwrap();
+
+        let mut safe = SafeStorage {
+            host: &mut host,
+            world_states: vec![OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH)],
+        };
+
+        // First start: copy world state to /tmp
+        safe.start().unwrap();
+
+        // Simulate traces written during block production (through SafeStorage)
+        write_fake_traces(safe.host, 2);
+
+        // Verify the stale traces exist in /tmp
+        assert!(safe.host.store_has(&trace_length_path()).unwrap().is_some());
+        assert!(safe.host.store_has(&trace_entry_path(0)).unwrap().is_some());
+        assert!(safe.host.store_has(&trace_entry_path(1)).unwrap().is_some());
+
+        // Simulate: kernel was interrupted, no BIP saved.
+        // On restart, start() is called again.
+        safe.start().unwrap();
+
+        // The fix: stale trace entries must be gone
+        assert_eq!(
+            safe.host.store_has(&trace_length_path()).unwrap(),
+            None,
+            "Stale trace length should be cleaned up by start()"
+        );
+        assert_eq!(
+            safe.host.store_has(&trace_entry_path(0)).unwrap(),
+            None,
+            "Stale trace entry 0 should be cleaned up by start()"
+        );
+        assert_eq!(
+            safe.host.store_has(&trace_entry_path(1)).unwrap(),
+            None,
+            "Stale trace entry 1 should be cleaned up by start()"
+        );
+
+        // World state should still be correctly copied
+        let tmp_accounts = safe_path(&world_state_data).unwrap();
+        assert_eq!(
+            safe.host.store_read_all(&tmp_accounts).unwrap(),
+            b"some_account_data"
+        );
+    }
+
+    #[test]
+    fn start_preserves_world_state_when_tmp_is_clean() {
+        let mut host = MockKernelHost::default();
+
+        let world_state_data = RefPath::assert_from(b"/evm/world_state/accounts");
+        host.store_write_all(&world_state_data, b"account_data")
+            .unwrap();
+
+        let mut safe = SafeStorage {
+            host: &mut host,
+            world_states: vec![OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH)],
+        };
+
+        // First start on a clean host (no stale /tmp)
+        safe.start().unwrap();
+
+        let tmp_accounts = safe_path(&world_state_data).unwrap();
+        assert_eq!(
+            safe.host.store_read_all(&tmp_accounts).unwrap(),
+            b"account_data"
+        );
     }
 }

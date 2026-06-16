@@ -44,9 +44,11 @@ let test_typecheck_contract protocol scripts =
   Protocol.register_regression_test
     ~__FILE__
     ~title:(sf "Tc scripts")
-    ~tags:[team; "client"; "michelson"; "typechecking"]
+    ~tags:[team; "client"; "michelson"; "typechecking"; Tag.add_new_script]
+    ~uses:(fun _protocol -> [Constant.michelson_test_scripts])
     ~uses_node:false
     (fun _protocol ->
+      let _ = Uses.path Constant.michelson_test_scripts in
       let* client = Client.init_mockup ~protocol () in
       (* Register constants because some scripts require them. *)
       let* () =

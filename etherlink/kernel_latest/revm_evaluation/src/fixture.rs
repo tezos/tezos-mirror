@@ -80,6 +80,7 @@ impl From<Account> for AccountInfo {
             balance: account.balance,
             nonce: account.nonce,
             code_hash,
+            account_id: None,
             code,
         }
     }

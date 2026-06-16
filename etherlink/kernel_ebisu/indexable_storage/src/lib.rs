@@ -180,6 +180,26 @@ impl IndexableStorage {
         let new_index = self.get_length_and_increment(host)?;
         self.store_index(host, new_index, value)
     }
+
+    /// Push multiple values in batch, reading and writing the length only once.
+    /// This reduces storage operations from 3*N to N+2 compared to calling
+    /// `push_value` N times.
+    pub fn push_values<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        values: &[Vec<u8>],
+    ) -> Result<(), IndexableStorageError> {
+        if values.is_empty() {
+            return Ok(());
+        }
+        let length_path = concat(&self.path, &LENGTH)?;
+        let base_index = read_u64_le(host, &length_path).unwrap_or(0);
+        for (i, value) in values.iter().enumerate() {
+            self.store_index(host, base_index + i as u64, value)?;
+        }
+        write_u64_le(host, &length_path, base_index + values.len() as u64)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

@@ -82,24 +82,47 @@ let inject_next_move node_ctxt ~refutation ~opponent =
 
 type pvm_intermediate_state =
   | Hash of State_hash.t
-  | Evaluated of Fuel.Accounted.t Pvm_plugin_sig.eval_state
+  | Evaluated of {
+      head :
+        ( Fuel.Accounted.t,
+          Access_mode.rw Context.pvmstate )
+        Pvm_plugin_sig.eval_state;
+          (** The working head which we are currently updating to go forwards
+              during dissection traversal. *)
+      snapshot : Fuel.Accounted.t Pvm_plugin_sig.cached_eval_state;
+          (** A cached view of the most recent agreement point. For Irmin this
+              is an in-memory immutable copy; for RISC-V it is a commit hash
+              on disk. We use the previous state we agree with as a starting
+              point of the following dissection. *)
+    }
 
 let new_dissection (module Plugin : Protocol_plugin_sig.S) ~opponent
     ~default_number_of_sections ~commitment_period_tick_offset node_ctxt
     state_cache last_level ok our_view =
   let open Lwt_result_syntax in
-  let start_hash, start_tick, start_state =
+  let* start_hash, start_tick, start_state =
     match ok with
-    | Hash hash, tick -> (hash, tick, None)
-    | Evaluated ({state_hash; _} as state), tick ->
-        (state_hash, tick, Some state)
+    | Hash hash, tick -> return (hash, tick, None)
+    | Evaluated state, tick ->
+        let* restored =
+          Interpreter.from_cached_eval_state
+            node_ctxt.Node_context.context
+            state.snapshot
+        in
+        return (state.snapshot.cached_info.state_hash, tick, Some restored)
   in
   let start_chunk = Game.{state_hash = Some start_hash; tick = start_tick} in
   let our_state, our_tick = our_view in
   let our_state_hash =
-    Option.map (fun Pvm_plugin_sig.{state_hash; _} -> state_hash) our_state
+    Option.map (fun s -> s.Pvm_plugin_sig.info.state_hash) our_state
   in
   let our_stop_chunk = Game.{state_hash = our_state_hash; tick = our_tick} in
+  let*! () =
+    Refutation_game_event.computing_dissection
+      ~opponent
+      ~start_tick
+      ~end_tick:our_tick
+  in
   let* dissection =
     Plugin.Refutation_game_helpers.make_dissection
       (module Plugin)
@@ -141,10 +164,22 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
         tzfail
           Rollup_node_errors.Unreliable_tezos_node_returning_inconsistent_game
     | Octez_smart_rollup.Game.{state_hash = their_hash; tick} :: dissection -> (
-        let start_state =
+        let* start_state =
           match ok with
-          | Hash _, _ -> None
-          | Evaluated ok_state, _ -> Some ok_state
+          | Evaluated ok_state, _ -> return_some ok_state.head
+          | Hash _, tick -> (
+              match
+                Pvm_plugin_sig.Tick_state_cache.bind state_cache tick Lwt.return
+              with
+              | None -> return_none
+              | Some cached ->
+                  let* cached in
+                  let* state =
+                    Interpreter.from_cached_eval_state
+                      node_ctxt.Node_context.context
+                      cached
+                  in
+                  return_some state)
         in
         let* our =
           Interpreter.state_of_tick
@@ -161,13 +196,47 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
                end and the two players disagree about the end. *)
             assert false
         | Some _, None | None, Some _ -> return (ok, (our, tick))
-        | Some their_hash, Some ({state_hash = our_hash; _} as our_state) ->
-            if Octez_smart_rollup.State_hash.equal our_hash their_hash then
-              traverse (Evaluated our_state, tick) dissection
-            else return (ok, (our, tick)))
+        | Some their_hash, Some our_state ->
+            if
+              Octez_smart_rollup.State_hash.equal
+                our_state.info.state_hash
+                their_hash
+            then
+              let*! () =
+                Refutation_game_event.dissection_agree
+                  ~tick
+                  ~state_hash:our_state.info.state_hash
+              in
+              let*! snapshot =
+                Interpreter.to_cached_eval_state
+                  (Context.PVMState.cache_preference node_ctxt.context)
+                  node_ctxt.context
+                  our_state
+              in
+              let ok = Evaluated {head = our_state; snapshot} in
+              traverse (ok, tick) dissection
+            else
+              let*! () =
+                Refutation_game_event.dissection_disagree
+                  ~tick
+                  ~their_hash
+                  ~our_hash:our_state.info.state_hash
+              in
+              return (ok, (our, tick)))
   in
   match dissection with
   | {state_hash = Some hash; tick} :: dissection ->
+      let end_tick =
+        List.last_opt dissection
+        |> Option.fold ~some:(fun x -> x.tick) ~none:tick
+      in
+      let*! () =
+        Refutation_game_event.traversing_dissection
+          ~opponent
+          ~dissection_length:(List.length dissection + 1)
+          ~start_tick:tick
+          ~end_tick
+      in
       let* ok, ko = traverse (Hash hash, tick) dissection in
       let* dissection =
         new_dissection
@@ -250,6 +319,7 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt state_cache
 let play_next_move plugin node_ctxt state_cache ~commitment_period_tick_offset
     game opponent =
   let open Lwt_result_syntax in
+  let*! () = Refutation_game_event.playing_next_move ~opponent game in
   let* refutation =
     next_move
       plugin

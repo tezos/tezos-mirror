@@ -286,8 +286,39 @@ module Remote = struct
       let tezt_cloud = Env.tezt_cloud in
       let* workspaces = Terraform.VM.Workspace.list ~tezt_cloud in
       let* project_id = Gcloud.project_id () in
-      let* () = Terraform.VM.destroy workspaces ~project_id in
-      Terraform.VM.Workspace.destroy ~tezt_cloud)
+      (* If terraform destroy fails (e.g. state desync, transient GCP
+         error), we still want to attempt the IP cleanup rather than
+         aborting entirely.  However, we only delete terraform
+         workspaces if the destroy succeeded: a workspace that still
+         contains resources cannot be deleted. *)
+      let* destroy_succeeded =
+        Lwt.catch
+          (fun () ->
+            let* () = Terraform.VM.destroy workspaces ~project_id in
+            Lwt.return_true)
+          (fun exn ->
+            Log.warn
+              "Terraform destroy failed: %s. Proceeding with IP cleanup."
+              (Printexc.to_string exn) ;
+            Lwt.return_false)
+      in
+      (* Clean up static IP addresses that belonged to the destroyed
+         workspaces.  Terraform should have deleted them, but if the
+         destroy was partial or the state was out of sync, some
+         addresses may remain in RESERVED status.  We scope the
+         deletion to the exact workspace names we just destroyed so
+         that concurrent scenarios from the same user are not
+         affected.  No age filter is needed here: the workspaces have
+         just been destroyed, so any matching RESERVED address is
+         genuinely orphaned. *)
+      let* () =
+        Lwt_list.iter_s
+          (fun workspace ->
+            Gcloud.delete_unused_addresses ~project_id ~name_filter:workspace ())
+          workspaces
+      in
+      if destroy_succeeded then Terraform.VM.Workspace.destroy ~tezt_cloud
+      else Lwt.return_unit)
     else (
       Log.report
         "No VM destroyed! Don't forget to destroy them when you are done with \
@@ -505,6 +536,7 @@ module Ssh_host = struct
         ("/tmp/grafana", "/tmp/grafana");
         ("/tmp/alert_manager", "/tmp/alert_manager");
         ("/tmp/otel", "/tmp/otel");
+        ("/tmp/nginx", "/tmp/nginx");
       ]
     in
     let* registry_uri_opt =
@@ -534,6 +566,19 @@ module Ssh_host = struct
         ["-D"; "-p"; guest_port]
       |> Process.check
     in
+    let* () =
+      if Env.monitoring then
+        let interface =
+          if Option.is_some Env.auth_enabled then "127.0.0.1" else "0.0.0.0"
+        in
+        Monitoring.run ~runner ~interface ()
+      else Lwt.return_unit
+    in
+    let process_monitor =
+      if Env.process_monitoring then
+        Some (Process_monitor.init ~listening_port:(next_available_port ()))
+      else None
+    in
     let agent =
       Agent.make
         ~vm_name:None
@@ -541,7 +586,7 @@ module Ssh_host = struct
         ~next_available_port
         ~point:(Runner.address (Some runner), ssh_listening_port)
         ~ssh_id:(Env.ssh_private_key_filename ())
-        ~process_monitor:None
+        ~process_monitor
         ~artifacts_dir:Env.artifacts_dir
         ()
     in
@@ -629,16 +674,24 @@ module Ssh_host = struct
               host
               ssh_port
           in
+          let next_available_port =
+            let port = ref (base_port + (i * range)) in
+            fun () ->
+              incr port ;
+              !port
+          in
+          let process_monitor =
+            if Env.process_monitoring then
+              Some
+                (Process_monitor.init ~listening_port:(next_available_port ()))
+            else None
+          in
           let agent =
             Agent.make
               ~vm_name:None
               ~configuration
-              ~next_available_port:
-                (let cpt = ref (base_port + (i * range)) in
-                 fun () ->
-                   incr cpt ;
-                   !cpt)
-              ~process_monitor:None
+              ~next_available_port
+              ~process_monitor
               ~point:(host, ssh_port)
               ~ssh_id:(Env.ssh_private_key_filename ())
               ~artifacts_dir:Env.artifacts_dir
@@ -702,6 +755,12 @@ module Localhost = struct
     let* network =
       if Env.docker_host_network then Lwt.return "host"
       else
+        (* Remove existing network if it exists (ignore errors) *)
+        let* () =
+          Docker.network ~command:"rm" ~network_name:docker_network
+          |> Process.wait
+          |> Lwt.map (fun _ -> ())
+        in
         let* () =
           Docker.network ~command:"create" ~network_name:docker_network
           |> Process.check
@@ -747,7 +806,9 @@ module Localhost = struct
       |> List.of_seq |> Lwt.all
     in
     let address configuration =
-      if Env.docker_host_network then Lwt.return "127.0.0.1"
+      (* On macOS, container IPs are not routable from the host.
+         We must use 127.0.0.1 with published ports instead. *)
+      if Env.docker_host_network || Env.macosx then Lwt.return "127.0.0.1"
       else
         let* output =
           Process.run_and_read_stdout

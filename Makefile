@@ -147,38 +147,6 @@ $(ALL_EXECUTABLES): check-slim-mode check-custom-flags
 	dune build $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
-# If slim mode is active, kaitai updates should fail, as some protocol encoding
-# will be missing.
-# This check is disabled if file scripts/slim-mode.sh is not available,
-# which may be the case in Docker images or tarballs for instance.
-.PHONY: kaitai-fail-slim-mode
-kaitai-fail-slim-mode:
-	@if [ -f scripts/slim-mode.sh ]; then scripts/slim-mode.sh fail; fi || (echo "Cannot check kaitai struct files, slim mode is active."; exit 1)
-
-.PHONY: kaitai-struct-files-update
-kaitai-struct-files-update: kaitai-fail-slim-mode
-	@dune exe client-libs/bin_codec_kaitai/codec.exe dump kaitai specs in client-libs/kaitai-struct-files/files
-
-.PHONY: kaitai-struct-files
-kaitai-struct-files: kaitai-fail-slim-mode
-	@$(MAKE) kaitai-struct-files-update
-	@$(MAKE) -C client-libs/kaitai-struct-files/
-
-.PHONY: check-kaitai-struct-files
-check-kaitai-struct-files: kaitai-fail-slim-mode
-	@git diff --exit-code HEAD -- client-libs/kaitai-struct-files/files || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
-	@dune build client-libs/bin_codec_kaitai/codec.exe
-	@rm client-libs/kaitai-struct-files/files/*.ksy
-	@_build/default/client-libs/bin_codec_kaitai/codec.exe dump kaitai specs in client-libs/kaitai-struct-files/files 2>/dev/null
-	@git add client-libs/kaitai-struct-files/files/*.ksy
-	@git diff --exit-code HEAD -- client-libs/kaitai-struct-files/files/ || (echo "Kaitai struct files mismatch. Update the files with `make kaitai-struct-files-update`."; exit 1)
-
-.PHONY: validate-kaitai-struct-files
-validate-kaitai-struct-files: kaitai-fail-slim-mode
-	@$(MAKE) check-kaitai-struct-files
-	@./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files 2>/dev/null || \
-	 (echo "To see the full log run: \"./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files client-libs/kaitai-struct-files/input\""; exit 1)
-
 # If slim mode is active, print a message before building anything.
 # This check is disabled if file scripts/slim-mode.sh is not available,
 # which may be the case in Docker images or tarballs for instance.
@@ -251,8 +219,12 @@ ifeq (${OCTEZ_EXECUTABLES},)
 endif
 # [dune.sh] is a wrapper around [dune] that does not change the core build logic
 # but enables cache monitoring when DUNE_CACHE_INFO=true.
-# Useful to compute dune cache hit ratio in the CI.
-	@./scripts/ci/dune.sh build --profile=$(PROFILE) $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) \
+# In CI (detected via GITLAB_CI), use dune.sh for cache metrics reporting.
+# For local development, use dune directly.
+# More information about GITLAB_CI detection available at
+# https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+	@DUNE=$${GITLAB_CI:+./scripts/ci/dune.sh}; \
+	$${DUNE:-dune} build --profile=$(PROFILE) $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) \
 		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
 		$(BUILD_EXTRA) \
 		@copy-parameters
@@ -309,7 +281,7 @@ PROTO_DIRS := $(shell find src/ -maxdepth 1 -type d -path "src/proto_*" 2>/dev/n
 NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
 ETHERLINK_DIRS := etherlink/bin_node/test
 
-OTHER_DIRS := $(shell find contrib/ ci/ client-libs/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
+OTHER_DIRS := $(shell find contrib/ ci/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
 
 .PHONY: test-proto-unit
 test-proto-unit:
@@ -522,11 +494,6 @@ etherlink-outbox-monitor:
 	@dune build ./etherlink/bin_outbox_monitor
 	@cp -f ./_build/default/etherlink/bin_outbox_monitor/main.exe $@
 
-.PHONY: fa-bridge-watchtower
-fa-bridge-watchtower:
-	@dune build ./etherlink/fa-bridge-watchtower
-	@cp -f ./_build/default/etherlink/fa-bridge-watchtower/main.exe $@
-
 .PHONY: build-unreleased
 build-unreleased: all
 	@echo 'Note: "make build-unreleased" is deprecated. Just use "make".'
@@ -621,7 +588,8 @@ clean-kernels:
 
 .PHONY: wasm_runtime_gen_files
 wasm_runtime_gen_files::
-	@cd etherlink/lib_wasm_runtime; cargo build 2> /dev/null
+	@echo 'Building etherlink/lib_wasm_runtime'
+	@cd etherlink/lib_wasm_runtime; cargo build
 
 octez-evm-node: wasm_runtime_gen_files
 

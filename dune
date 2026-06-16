@@ -56,8 +56,20 @@
    (system
     "[ '%{profile}' = 'static' ] && echo '(-ccopt -static -cclib -lusb-1.0 -cclib -ludev -cclib -lcrypto -cclib -lssl -cclib -lpgport -cclib -lpgcommon)' || echo '()'"))))
 
-; This file is uncluded in the link_flags stanza for the EVM node, to
-; accomodate with how Alpine Linux handles threads stacks.
+; This file is included in the link_flags stanza of libraries and binaries
+; that link against C++ code (e.g. Rust dependencies using the C++ stdlib).
+; On macOS the C++ stdlib is libc++, on Linux (and others) it is libstdc++.
+
+(rule
+ (target c++-stdlib-link-flags.sexp)
+ (action
+  (with-stdout-to
+   %{target}
+   (system
+    "[ '%{system}' = 'macosx' ] && echo '(-lc++)' || echo '(-lstdc++)'"))))
+
+; This file is included in the link_flags stanza for the EVM node, to
+; accommodate how Alpine Linux handles threads stacks.
 
 (rule
  (target link-flags-evm-node.sexp)

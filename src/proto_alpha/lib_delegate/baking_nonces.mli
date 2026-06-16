@@ -66,15 +66,22 @@ val register_nonce :
   round:Round.t ->
   unit tzresult Lwt.t
 
-(** [start_revelation_worker cctxt config chain_id constants block_stream]
-    represents the continuous process of receiving new proposal from [block_stream]
-    and applying them to the internal state created from [cctxt], [config],
-    [chain_id] and [constants]; each new proposal can produce a nonce, to be stored
-    in a nonce file location, facilitating the nonce revelation process. *)
+(** [start_revelation_worker cctxt config chain_id constants] starts the
+    continuous process of monitoring block proposals to determine when nonces
+    should be revealed. The internal state is created from [cctxt],
+    [~extra_nodes], [config], [chain_id] and [constants].
+
+    The function returns a canceller to stop the worker and a callback function
+    to push new block proposals for processing. The callback takes a [cctxt] to
+    identify which node the proposal came from, and the [proposal] itself.
+
+    Nonce revelations will be injected to all nodes ([cctxt] and [~extra_nodes])
+    in parallel. *)
 val start_revelation_worker :
   Protocol_client_context.full ->
   Baking_configuration.nonce_config ->
   Chain_id.t ->
   Constants.t ->
-  Baking_state_types.proposal Lwt_stream.t ->
-  Lwt_canceler.t Lwt.t
+  (Lwt_canceler.t
+  * (Protocol_client_context.full -> Baking_state_types.proposal -> unit))
+  Lwt.t

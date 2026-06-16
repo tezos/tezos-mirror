@@ -34,9 +34,13 @@
     - Can disable the shard validation using [?disable_shard_validation].
 
     - Does not propagate message with topics related to the pkhs in [ignore_pkhs].
+
+    - When [?ignore_l1_history_check] is set, the startup check that the L1
+      node retains enough cycles is downgraded from an error to a warning.
 *)
 val run :
   ?disable_shard_validation:bool ->
+  ?ignore_l1_history_check:bool ->
   ignore_pkhs:Signature.public_key_hash list ->
   data_dir:string ->
   config_file:string ->

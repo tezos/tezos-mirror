@@ -30,6 +30,7 @@ module type BAKER_COMMANDS_HELPERS = sig
     ?state_recorder:bool ->
     chain:Shell_services.chain ->
     keep_alive:bool ->
+    extra_nodes:Tezos_client_base.Client_context.full list ->
     Signature.V_latest.public_key_hash list ->
     unit tzresult Lwt.t
 

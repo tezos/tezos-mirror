@@ -11,20 +11,21 @@ use revm::{
     primitives::Bytes,
 };
 
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
+
 use crate::{
-    database::DatabasePrecompileStateChanges,
-    helpers::legacy::{
-        alloy_to_h160, alloy_to_u256, h160_to_alloy, u256_to_alloy, FaDepositWithProxy,
-    },
+    database::EtherlinkVMDB,
+    helpers::legacy::{alloy_to_h160, alloy_to_u256, h160_to_alloy, u256_to_alloy},
     journal::Journal,
     precompiles::{
         constants::{
             FA_BRIDGE_SOL_ADDR, TABLE_PRECOMPILE_ADDRESS, TICKET_TABLE_BASE_COST,
         },
-        error::CustomPrecompileError,
-        guard::{guard, out_of_gas, revert},
+        guard::{charge, guard},
     },
 };
+use evm_types::{CustomPrecompileError, FaDepositWithProxy, IntoWithRemainder};
 
 sol! {
     contract Table {
@@ -60,26 +61,23 @@ sol! {
     }
 }
 
-pub(crate) fn table_precompile<CTX, DB>(
+pub(crate) fn table_precompile<'j, CTX, Host, R>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    DB: DatabasePrecompileStateChanges,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
-    guard(TABLE_PRECOMPILE_ADDRESS, &[FA_BRIDGE_SOL_ADDR], inputs)?;
-
     let mut gas = Gas::new(inputs.gas_limit);
-    if !gas.record_cost(TICKET_TABLE_BASE_COST) {
-        return Ok(out_of_gas(inputs.gas_limit));
-    }
+    guard(TABLE_PRECOMPILE_ADDRESS, &[FA_BRIDGE_SOL_ADDR], inputs, gas)?;
 
-    let interface = match Table::TableCalls::abi_decode(calldata) {
-        Ok(data) => data,
-        Err(e) => return Ok(revert(e, gas)),
-    };
+    charge(&mut gas, TICKET_TABLE_BASE_COST)?;
+
+    let interface = Table::TableCalls::abi_decode(calldata)
+        .map_err(|e| CustomPrecompileError::Revert(e.to_string(), gas))?;
 
     let output = match interface {
         Table::TableCalls::ticket_balance_add(Table::ticket_balance_addCall {
@@ -89,7 +87,8 @@ where
         }) => {
             context
                 .journal_mut()
-                .ticket_balance_add(ticket_hash, owner, amount)?;
+                .ticket_balance_add(ticket_hash, owner, amount)
+                .map_err(|e| e.into_with_remainder(gas))?;
             None
         }
         Table::TableCalls::ticket_balance_remove(Table::ticket_balance_removeCall {
@@ -99,7 +98,8 @@ where
         }) => {
             context
                 .journal_mut()
-                .ticket_balance_remove(ticket_hash, owner, amount)?;
+                .ticket_balance_remove(ticket_hash, owner, amount)
+                .map_err(|e| e.into_with_remainder(gas))?;
             None
         }
         Table::TableCalls::queue_deposit(Table::queue_depositCall {
@@ -115,6 +115,7 @@ where
                         |_| {
                             CustomPrecompileError::Revert(
                                 "invalid inbox level".to_string(),
+                                gas,
                             )
                         },
                     )?,
@@ -123,6 +124,7 @@ where
                         .map_err(|_| {
                             CustomPrecompileError::Revert(
                                 "invalid message id".to_string(),
+                                gas,
                             )
                         })?,
                     ticket_hash: H256::from_slice(
@@ -134,7 +136,10 @@ where
             None
         }
         Table::TableCalls::find_deposit(Table::find_depositCall { deposit_id }) => {
-            let deposit = context.journal().find_deposit_in_queue(&deposit_id)?;
+            let deposit = context
+                .journal()
+                .find_deposit_in_queue(&deposit_id)
+                .map_err(|e| e.into_with_remainder(gas))?;
             let sol_deposit = Table::SolFaDepositWithProxy {
                 amount: u256_to_alloy(&deposit.amount),
                 receiver: h160_to_alloy(&deposit.receiver),
@@ -150,7 +155,8 @@ where
         Table::TableCalls::remove_deposit(Table::remove_depositCall { deposit_id }) => {
             context
                 .journal_mut()
-                .remove_deposit_from_queue(deposit_id)?;
+                .remove_deposit_from_queue(deposit_id)
+                .map_err(|e| e.into_with_remainder(gas))?;
             None
         }
     };

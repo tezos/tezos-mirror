@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-execution-farfadet-dev"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+thiserror.workspace = true
+anyhow.workspace = true
+typed-arena.workspace = true
+
+tezos_crypto_rs.workspace = true
+hex.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+
+
+tezos-evm-runtime.workspace = true
+tezos-storage.workspace = true
+
+tezos-smart-rollup-host.workspace = true
+tezos_data_encoding.workspace = true
+nom.workspace = true
+
+primitive-types.workspace = true
+tezos-smart-rollup.workspace = true
+tezos_tezlink.workspace = true
+tezos-evm-logging.workspace = true
+mir.workspace = true
+tezos-protocol.workspace = true
+
+[dev-dependencies]
+pretty_assertions = "1.4.0"

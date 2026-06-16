@@ -24,3 +24,57 @@ val known_runtimes : runtime list
     Creating a file at this path in the durable storage of the kernel will
     enable the feature. *)
 val feature_flag : runtime -> string
+
+(** [target_sunrise_level_path runtime] is the path of the target sunrise
+    level (the EVM block level at which the [runtime] will start producing
+    blocks). *)
+val target_sunrise_level_path : runtime -> string
+
+(** [encode_target_sunrise_level n] encodes [n] as a 32-byte little-endian
+    U256 value suitable for writing at [target_sunrise_level_path]. *)
+val encode_target_sunrise_level : int -> string
+
+module Ethereum_runtime : sig
+  type address = Ethereum_types.address
+
+  val generate_alias : string -> Ethereum_types.address
+end
+
+module Tezos_runtime : sig
+  type address = Signature.V2.public_key_hash
+
+  type account_info = {
+    balance : Tezos_types.Tez.t;
+    nonce : int64;
+    public_key : Signature.V2.public_key option;
+  }
+
+  val decode_account_info : bytes -> account_info tzresult
+
+  val encode_account_info : account_info -> bytes
+
+  val generate_alias : string -> Tezos_types.Contract.t
+end
+
+module Foreign_address : sig
+  type t =
+    [`Tezos of Tezos_runtime.address | `Ethereum of Ethereum_types.address]
+
+  val encode : t -> bytes
+end
+
+module Durable_storage_path : sig
+  module Accounts : sig
+    module Tezos : sig
+      val info : Tezos_runtime.address -> Durable_storage_path.path
+
+      val ethereum_alias : Tezos_runtime.address -> Durable_storage_path.path
+    end
+  end
+end
+
+type address =
+  | Ethereum_address of Ethereum_runtime.address
+  | Tezos_address of Tezos_runtime.address
+
+val address_of_string : string -> address tzresult

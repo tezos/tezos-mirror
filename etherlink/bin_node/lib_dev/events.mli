@@ -67,6 +67,15 @@ val ignored_periodic_snapshot : unit -> unit Lwt.t
     be ignoring the all the incoming preconfirmation data. *)
 val ignored_preconfirmations : unit -> unit Lwt.t
 
+(** [assemble_block_diverged level] advertises that the assembled block has
+    diverged from the expected one and that the node will re-execute
+    the full blueprint to recover consistency. *)
+val assemble_block_diverged : Z.t -> unit Lwt.t
+
+(** [seq_block_hash_missing level] advertises that the assembled block cannot
+    be validated because the sequencer block hash is missing. *)
+val seq_block_hash_missing : Z.t -> unit Lwt.t
+
 (** [catching_up_evm_event ~from ~to_] advertises that the sequencer
     is catching up on event produced by the evm kernel in the rollup
     node from L1 level [from] to [to_]. *)
@@ -95,7 +104,14 @@ val private_server_is_ready :
   backend:Configuration.rpc_server ->
   unit Lwt.t
 
+(** [drift_monitor_is_ready drift] advertises that the drift monitor
+    is ready and provides the initial drift (difference of block
+    number between the current node and its upstream node). *)
+val drift_monitor_is_ready : Z.t -> unit Lwt.t
+
 val rpc_server_error : exn -> unit
+
+val background_task_error : name:string -> exn -> unit Lwt.t
 
 (** [shutdown_rpc_server ~private_ ()] advertises that the RPC server
     was shut down, [private_] tells whether it is the private server
@@ -121,6 +137,8 @@ val event_kernel_log :
   level:kernel_log_level -> kind:kernel_log_kind -> msg:string -> unit Lwt.t
 
 val retrying_connect : endpoint:Uri.t -> delay:float -> unit Lwt.t
+
+val connection_acquired : endpoint:Uri.t -> unit Lwt.t
 
 (** [preload_kernel version] advertizes the EVM node has preloaded in the
     module cache the kernel [version]. *)
@@ -209,10 +227,24 @@ val replicate_transaction_dropped : Ethereum_types.hash -> string -> unit Lwt.t
     [hash] was dropped because it is now invalid in the sandbox. *)
 val replicate_operation_dropped : Operation_hash.t -> string -> unit Lwt.t
 
-val next_block_timestamp : Time.Protocol.t -> unit Lwt.t
+val next_block_info : Time.Protocol.t -> Ethereum_types.quantity -> unit Lwt.t
 
 val inclusion : Ethereum_types.hash -> unit Lwt.t
+
+val sent_next_block_info :
+  Time.Protocol.t -> Ethereum_types.quantity -> unit Lwt.t
+
+val sent_inclusion : Ethereum_types.hash -> unit Lwt.t
+
+(** [single_tx_execution_done hash] advertises that a single transaction
+    execution is complete for the transaction with hash [hash]. *)
+val single_tx_execution_done : Ethereum_types.hash -> unit Lwt.t
 
 (** [patched_sequencer_key pk] advertises that the sequencer key in
     state was patched with [pk] . *)
 val patched_sequencer_key : Signature.Public_key.t -> unit Lwt.t
+
+(** [forced_native_execution_instant_confirmation ()] advertises that the
+    native execution policy is being overridden for instant confirmation
+    compatibility. *)
+val forced_native_execution_instant_confirmation : unit -> unit Lwt.t

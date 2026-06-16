@@ -102,3 +102,5 @@ let fold_map f array init fallback =
       aux accu (idx + 1)
   in
   (aux init 0, output)
+
+let encoding = Data_encoding.array

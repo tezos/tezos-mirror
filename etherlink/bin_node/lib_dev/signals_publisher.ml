@@ -139,6 +139,11 @@ module Worker = struct
     let ready_injections =
       List.filter_map (is_signal_injection_ready ~finalized_level) statuses
     in
+    let*! () =
+      Signals_publisher_events.report_ready_operations
+        ~operations:(List.length statuses)
+        ~ready_operations:(List.length ready_injections)
+    in
     unless (List.is_empty ready_injections) (fun () ->
         let* () =
           List.iter_es
@@ -164,10 +169,7 @@ module Worker = struct
         let signals = List.map snd ready_injections in
         let*! head_info = Evm_context.head_info () in
         let* expected_sequencer =
-          Durable_storage.sequencer (fun path ->
-              let open Lwt_result_syntax in
-              let*! res = Evm_state.inspect head_info.evm_state path in
-              return res)
+          Durable_storage.read Sequencer_key head_info.evm_state
         in
         let*? signer = Signer.get_signer state.signer expected_sequencer in
         let* payload =

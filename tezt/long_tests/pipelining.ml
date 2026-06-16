@@ -195,7 +195,7 @@ let init_node_client_with_protocol number_of_additional_bootstrap protocol =
         ( x,
           Some
             {
-              Protocol.balance = Some 500_000_000;
+              Protocol.balance = Some 500_000_000L;
               consensus_key = None;
               delegate = None;
             },

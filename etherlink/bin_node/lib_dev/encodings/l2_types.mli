@@ -21,7 +21,11 @@ module Chain_id : sig
 
   val decode_le : bytes -> chain_id
 
+  val encode_le : chain_id -> string
+
   val decode_be : bytes -> chain_id
+
+  val encode_be : chain_id -> string
 
   val compare : chain_id -> chain_id -> int
 
@@ -81,30 +85,65 @@ module Chain_family : sig
   *)
   val of_string_exn : string -> ex_chain_family
 
+  val of_bytes : bytes -> ex_chain_family tzresult
+
   val to_string : _ chain_family -> string
 
   val pp : Format.formatter -> _ chain_family -> unit
 end
 
 module Tezos_block : sig
+  module Protocol : sig
+    type t = S023 | T024
+  end
+
   type t = {
     hash : Ethereum_types.block_hash;
     level : int32;
     timestamp : Time.Protocol.t;
     parent_hash : Ethereum_types.block_hash;
+    protocol : Protocol.t;
+    next_protocol : Protocol.t;
     operations : bytes;
+    state_root : bytes;
+        (** Fixed 32 bytes.
+            [keccak256(h(/tez/tez_accounts) || blueprint_hash)]. A
+            block with an all-zero [state_root] pre-dates the feature
+            (V0/V1 upgrades fill zeros). *)
   }
 
   val decode_block_hash : bytes -> Ethereum_types.block_hash
 
   val genesis_parent_hash : Ethereum_types.block_hash
 
-  val block_from_binary : bytes -> t
+  val block_from_kernel : bytes -> t
 
-  val encode_block : t -> (string, string) result
+  val encode_block_for_store : t -> (string, string) result
 
-  val decode_block : string -> (t, string) result
+  val decode_block_for_store : string -> (t, string) result
+
+  module Internal_for_test : sig
+    module V0 : sig
+      type t = {
+        hash : Ethereum_types.block_hash;
+        level : int32;
+        timestamp : Time.Protocol.t;
+        parent_hash : Ethereum_types.block_hash;
+        operations : bytes;
+      }
+
+      val encode_block_for_store : t -> (string, string) result
+    end
+
+    module Legacy : sig
+      type nonrec t = V0.t
+
+      val encode_block_for_store : t -> (string, string) result
+    end
+  end
 end
+
+type single_tx_receipt = Ethereum of Transaction_receipt.t | Tezos
 
 type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.t
 

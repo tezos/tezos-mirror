@@ -21,8 +21,8 @@ module DAL = struct
     producers : int option;
     producers_delay : int option;
     producer_machine_type : string option;
-    observer_slot_indices : int list;
-    observers_multi_slot_indices : int list list;
+    observers_slot_indices : int list list;
+    observer_machine_type : string list;
     archivers_slot_indices : int list list;
     observer_pkhs : string list;
     protocol : Protocol.t option;
@@ -53,7 +53,10 @@ module DAL = struct
     slot_size : int option;
     number_of_slots : int option;
     attestation_lag : int option;
+    attestation_lags : int list option;
     traps_fraction : Q.t option;
+    publish_slots_regularly : bool;
+    stresstest : Stresstest.t option;
   }
 
   let encoding =
@@ -80,8 +83,8 @@ module DAL = struct
              producers;
              producers_delay;
              producer_machine_type;
-             observer_slot_indices;
-             observers_multi_slot_indices;
+             observers_slot_indices;
+             observer_machine_type;
              archivers_slot_indices;
              observer_pkhs;
              protocol;
@@ -112,7 +115,10 @@ module DAL = struct
              slot_size;
              number_of_slots;
              attestation_lag;
+             attestation_lags;
              traps_fraction;
+             publish_slots_regularly;
+             stresstest;
            }
          ->
         ( ( ( ( blocks_history,
@@ -129,8 +135,8 @@ module DAL = struct
                   producers,
                   producers_delay,
                   producer_machine_type,
-                  observer_slot_indices,
-                  observers_multi_slot_indices,
+                  observers_slot_indices,
+                  observer_machine_type,
                   archivers_slot_indices,
                   observer_pkhs ),
                 (protocol, data_dir, etherlink, etherlink_sequencer) ) ),
@@ -155,7 +161,13 @@ module DAL = struct
                   ppx_profiling_backends,
                   enable_network_health_monitoring ),
                 tezlink ) ) ),
-          (slot_size, number_of_slots, attestation_lag, traps_fraction) ))
+          ( slot_size,
+            number_of_slots,
+            attestation_lag,
+            attestation_lags,
+            traps_fraction,
+            publish_slots_regularly,
+            stresstest ) ))
       (fun ( ( ( ( blocks_history,
                    producer_key,
                    fundraiser,
@@ -170,8 +182,8 @@ module DAL = struct
                      producers,
                      producers_delay,
                      producer_machine_type,
-                     observer_slot_indices,
-                     observers_multi_slot_indices,
+                     observers_slot_indices,
+                     observer_machine_type,
                      archivers_slot_indices,
                      observer_pkhs ),
                    (protocol, data_dir, etherlink, etherlink_sequencer) ) ),
@@ -196,7 +208,13 @@ module DAL = struct
                      ppx_profiling_backends,
                      enable_network_health_monitoring ),
                    tezlink ) ) ),
-             (slot_size, number_of_slots, attestation_lag, traps_fraction) )
+             ( slot_size,
+               number_of_slots,
+               attestation_lag,
+               attestation_lags,
+               traps_fraction,
+               publish_slots_regularly,
+               stresstest ) )
          ->
         {
           blocks_history;
@@ -213,8 +231,8 @@ module DAL = struct
           producers;
           producers_delay;
           producer_machine_type;
-          observer_slot_indices;
-          observers_multi_slot_indices;
+          observers_slot_indices;
+          observer_machine_type;
           archivers_slot_indices;
           observer_pkhs;
           protocol;
@@ -245,7 +263,10 @@ module DAL = struct
           slot_size;
           number_of_slots;
           attestation_lag;
+          attestation_lags;
           traps_fraction;
+          publish_slots_regularly;
+          stresstest;
         })
       (merge_objs
          (merge_objs
@@ -267,8 +288,8 @@ module DAL = struct
                      (opt "producers" int31)
                      (opt "producers_delay" int31)
                      (opt "producer_machine_type" string)
-                     (dft "observer_slot_indices" (list int31) [])
-                     (dft "observers_multi_slot_indices" (list (list int31)) [])
+                     (dft "observers_slot_indices" (list (list int31)) [])
+                     (dft "observer_machine_type" (list string) [])
                      (dft "archivers_slot_indices" (list (list int31)) [])
                      (dft "observer_pkhs" (list string) []))
                   (obj4
@@ -301,11 +322,14 @@ module DAL = struct
                      (dft "ppx_profiling_backends" (list string) [])
                      (opt "enable_network_health_monitoring" bool))
                   (obj1 (opt "tezlink" bool)))))
-         (obj4
+         (obj7
             (opt "slot_size" int31)
             (opt "number_of_slots" int31)
             (opt "attestation_lag" int31)
-            (opt "traps_fraction" q_encoding)))
+            (opt "attestation_lags" (list int31))
+            (opt "traps_fraction" q_encoding)
+            (dft "publish_slots_regularly" bool false)
+            (opt "stresstest" Stresstest.encoding)))
 end
 
 module LAYER1 = struct
@@ -327,7 +351,7 @@ module LAYER1 = struct
     without_dal : bool;
     dal_node_producers : int list option;
     maintenance_delay : int;
-    migration_offset : int option;
+    migration : Protocol_migration.t option;
     ppx_profiling_verbosity : string option;
     ppx_profiling_backends : string list;
     signing_delay : (float * float) option;
@@ -347,7 +371,7 @@ module LAYER1 = struct
              without_dal;
              dal_node_producers;
              maintenance_delay;
-             migration_offset;
+             migration;
              ppx_profiling_verbosity;
              ppx_profiling_backends;
              signing_delay;
@@ -363,7 +387,7 @@ module LAYER1 = struct
             without_dal,
             dal_node_producers,
             maintenance_delay,
-            migration_offset,
+            migration,
             ppx_profiling_verbosity,
             ppx_profiling_backends ),
           (signing_delay, fixed_random_seed, octez_release, auto_faketime) ))
@@ -374,7 +398,7 @@ module LAYER1 = struct
                without_dal,
                dal_node_producers,
                maintenance_delay,
-               migration_offset,
+               migration,
                ppx_profiling_verbosity,
                ppx_profiling_backends ),
              (signing_delay, fixed_random_seed, octez_release, auto_faketime) )
@@ -387,7 +411,7 @@ module LAYER1 = struct
           without_dal;
           dal_node_producers;
           maintenance_delay;
-          migration_offset;
+          migration;
           ppx_profiling_verbosity;
           ppx_profiling_backends;
           signing_delay;
@@ -404,7 +428,7 @@ module LAYER1 = struct
             (dft "without_dal" bool Default.without_dal)
             (opt "dal_node_producers" (list int31))
             (dft "maintenance_delay" int31 Default.maintenance_delay)
-            (opt "migration_offset" int31)
+            (opt "migration" Protocol_migration.encoding)
             (opt "ppx_profiling_verbosity" string)
             (dft
                "ppx_profiling_backends"

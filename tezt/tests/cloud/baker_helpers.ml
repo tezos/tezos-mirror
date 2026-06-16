@@ -21,14 +21,7 @@ type baker = {
   dal_node : Dal_node.t option;
   baker : Agnostic_baker.t;
   accounts : baker_account list;
-  stake : int;
-}
-
-type per_baker_dal_summary = {
-  attestable_slots : int;
-  attested_slots : int;
-  in_committee : bool;
-  attestation_with_dal : bool option;
+  stake : int64;
 }
 
 let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
@@ -58,7 +51,7 @@ let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
         match stake with
         | None -> return (List.nth configuration_stake i)
         | Some stake -> return stake)
-    | Scatter _ | Map _ -> Lwt.return 0
+    | Scatter _ | Map _ -> Lwt.return 0L
   in
   let name = name_of_daemon (Baker_l1_node i) in
   let data_dir = data_dir |> Option.map (fun data_dir -> data_dir // name) in
@@ -145,6 +138,7 @@ let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
           Lwt_list.iter_s
             (fun account ->
               Client.import_public_key
+                ~force:true
                 client
                 ~public_key:account.Account.public_key
                 ~alias:account.alias)
@@ -297,7 +291,7 @@ let init_bakers ~bakers ~stake ~data_dir ~simulate_network ~external_rpc
             in
             (* A bit random, to fix later. *)
             init_baker
-              ~stake:1
+              ~stake:1L
               ~configuration_stake:stake
               ~data_dir
               ~simulate_network

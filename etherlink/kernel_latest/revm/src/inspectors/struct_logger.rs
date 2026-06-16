@@ -4,8 +4,9 @@
 
 use crate::{
     database::EtherlinkVMDB,
+    error::EvmKernelError,
     helpers::rlp::{append_option_canonical, append_u16_le, append_u64_le},
-    Error,
+    inspectors::EtherlinkInspector,
 };
 
 use revm::{
@@ -24,7 +25,8 @@ use revm::{
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::rlp_helpers::{check_list, decode_field, decode_option, next};
 use tezos_evm_logging::{log, tracing::instrument, Level::Debug};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
 
 use super::{
     storage::{
@@ -138,11 +140,12 @@ impl StructLog {
         }
     }
 
-    pub fn store(&self, host: &mut impl Runtime, transaction_hash: &Option<B256>) {
+    pub fn store<Host>(&self, host: &mut Host, transaction_hash: &Option<B256>)
+    where
+        Host: StorageV1,
+    {
         store_struct_log(host, self, transaction_hash)
-            .inspect_err(|err| {
-                log!(host, Debug, "Storing call trace failed with: {err:?}")
-            })
+            .inspect_err(|err| log!(Debug, "Storing call trace failed with: {err:?}"))
             .ok();
     }
 }
@@ -189,13 +192,16 @@ impl StructLogger {
     }
 
     #[instrument(skip_all)]
-    pub fn store_outcome<Host: Runtime>(
+    pub fn store_outcome<Host>(
         host: &mut Host,
         is_success: bool,
         output: Option<&Bytes>,
         gas_used: u64,
         transaction_hash: Option<B256>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmKernelError>
+    where
+        Host: StorageV1,
+    {
         store_trace_failed(host, is_success, &transaction_hash)?;
         store_trace_gas(host, gas_used, &transaction_hash)?;
         if let Some(return_value) = output {
@@ -205,10 +211,25 @@ impl StructLogger {
     }
 }
 
-impl<'a, Host, CTX, INTR> Inspector<CTX, INTR> for StructLogger
+impl<'a, Host, R> EtherlinkInspector<'a, Host, R> for StructLogger
 where
-    Host: Runtime + 'a,
-    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host>>,
+    Host: StorageV1 + 'a,
+    R: Registry + 'a,
+{
+    fn is_struct_logger(&self) -> bool {
+        true
+    }
+
+    fn get_transaction_hash(&self) -> Option<B256> {
+        self.transaction_hash
+    }
+}
+
+impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for StructLogger
+where
+    Host: StorageV1 + 'a,
+    R: Registry + 'a,
+    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     INTR: InterpreterTypes<
         Stack: StackTr + StructStack,
         ReturnData = ReturnDataImpl,
@@ -309,7 +330,8 @@ where
         context: &mut CTX,
         inputs: &mut CreateInputs,
     ) -> Option<CreateOutcome> {
-        if let Ok(Some(AccountInfo { nonce, .. })) = context.db_mut().basic(inputs.caller)
+        if let Ok(Some(AccountInfo { nonce, .. })) =
+            context.db_mut().basic(inputs.caller())
         {
             self.execution_address = inputs.created_address(nonce);
         }

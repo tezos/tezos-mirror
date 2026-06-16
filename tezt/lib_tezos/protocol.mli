@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = T024 | S023 | Alpha
+type t = U025 | T024 | S023 | Alpha
 
 val encoding : t Data_encoding.t
 
@@ -115,7 +115,7 @@ type bootstrap_contract = {
 }
 
 type bootstrap_parameters = {
-  balance : int option;
+  balance : int64 option;
   consensus_key : Account.key option;
   delegate : Account.key option;
 }
@@ -124,7 +124,7 @@ type bootstrap_parameters = {
 val default_bootstrap_parameters : bootstrap_parameters
 
 (** The value is the same as the one in src/proto_alpha/lib_parameters/default_parameters.ml. *)
-val default_bootstrap_balance : int
+val default_bootstrap_balance : int64
 
 (** Write a protocol parameter file.
 
@@ -159,6 +159,22 @@ val write_parameter_file :
   base:(string, t * constants option) Either.t ->
   parameter_overrides ->
   string Lwt.t
+
+(** Changes the parameter values that are related to the consensus rights delay.
+
+    The protocol enforces the following restrictions to the parameters, as
+    specified in [constants_repr.ml]:
+    - cache_stake_distribution_cycles = consensus_rights_delay + slashing_delay + 2
+    - cache_sampler_state_cycles = cache_stake_distribution_cycles
+    - cache_stake_info_cycles = cache_stake_distribution_cycles
+
+    This function ensures that the resulting parameters are acceptable by the protocol. *)
+val parameters_with_custom_consensus_rights_delay :
+  protocol:t ->
+  consensus_rights_delay:int ->
+  ?slashing_delay:int ->
+  parameter_overrides ->
+  parameter_overrides
 
 (** Get the predecessor of a protocol.
 

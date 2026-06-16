@@ -42,29 +42,6 @@ val execute :
 (** [init ~kernel] initializes the local [evm_state] with [kernel]. *)
 val init : kernel:Pvm_types.kernel -> t tzresult Lwt.t
 
-(** [modify ~key ~value evm_state] sets [value] at [key] in the local EVM
-    state. *)
-val modify : ?edit_readonly:bool -> key:string -> value:string -> t -> t Lwt.t
-
-(** [delete ~kind evm_state key] delete the value/directory at [key] *)
-val delete : kind:Tezos_scoru_wasm.Durable.kind -> t -> string -> t Lwt.t
-
-(** [exists evm_state key] returns [true] if a value or a tree/subtree
-    exists under [key] in [evm_state], [false] otherwise. *)
-val exists : t -> string -> bool Lwt.t
-
-(** [inspect evm_state key] returns the value stored under [key] in
-    [evm_state], if any. *)
-val inspect : t -> string -> bytes option Lwt.t
-
-(** [subkeys evm_state key] returns the list of keys stored under [key] in
-    [evm_state]. *)
-val subkeys : t -> string -> string trace Lwt.t
-
-(** [read evm_state key] returns the bytes stored under [key] in
-    [evm_state]. *)
-val read : t -> string -> bytes option tzresult Lwt.t
-
 (** [execute_and_inspect ~pool ~data_dir ?wasm_entrypoint ~config ~input
     evm_state] executes the [wasm_entrypoint] function (default to
     [kernel_run]) with [input] within the inbox of [evm_state], and
@@ -82,10 +59,12 @@ val execute_and_inspect :
   t ->
   bytes option list tzresult Lwt.t
 
-(** [current_block_height ~root evm_state] returns the height of the latest
-    block produced by the kernel at [root]. *)
+(** [current_block_height ~chain_family evm_state] returns the height of the
+    latest block produced by the kernel for [chain_family]. *)
 val current_block_height :
-  root:Durable_storage_path.path -> t -> Ethereum_types.quantity Lwt.t
+  chain_family:_ L2_types.chain_family ->
+  t ->
+  Ethereum_types.quantity tzresult Lwt.t
 
 (** Same as {!current_block_height} for the block hash. *)
 val current_block_hash :
@@ -93,10 +72,18 @@ val current_block_hash :
   t ->
   Ethereum_types.block_hash tzresult Lwt.t
 
+(** [retrieve_block_at_root ~chain_family evm_state] reads the current
+    block from durable storage, decoding it using [chain_family]. *)
+val retrieve_block_at_root :
+  chain_family:_ L2_types.chain_family ->
+  t ->
+  Ethereum_types.legacy_transaction_object L2_types.block option tzresult Lwt.t
+
 type apply_result =
   | Apply_success of {
       evm_state : t;
       block : Ethereum_types.legacy_transaction_object L2_types.block;
+      tezos_block : L2_types.Tezos_block.t option;
     }
   | Apply_failure
 
@@ -121,13 +108,69 @@ val apply_unsigned_chunks :
   Sequencer_blueprint.unsigned_chunked_blueprint ->
   apply_result tzresult Lwt.t
 
+type block_in_progress = {
+  timestamp : Time.Protocol.t;
+  number : Ethereum_types.quantity;
+  transactions_count : int32;
+}
+
+(** [execute_single_transaction ~data_dir ~pool ~native_execution ~config
+    evm_state block_in_progress hash txn] calls the kernel entrypoint allowing
+    to execute [txn] on top of [evm_state], where [txn] is the
+    [block_in_progress.transactions_count]th transaction of the next block. *)
+val execute_single_transaction :
+  storage_version:int ->
+  data_dir:string ->
+  pool:Lwt_domain.pool ->
+  native_execution:bool ->
+  config:Pvm_types.config ->
+  t ->
+  block_in_progress ->
+  Ethereum_types.hash ->
+  Broadcast.transaction ->
+  (L2_types.single_tx_receipt * t) tzresult Lwt.t
+
+(** [execute_entrypoint ~data_dir ~pool ~native_execution ~config evm_state
+    ~input_path ~input ~output_path ~entrypoint] writes [input] to
+    [input_path] in durable storage, calls the kernel [entrypoint], and
+    reads the result bytes from [output_path]. *)
+val execute_entrypoint :
+  data_dir:string ->
+  pool:Lwt_domain.pool ->
+  native_execution_policy:Configuration.native_execution_policy ->
+  config:Pvm_types.config ->
+  t ->
+  input_path:string ->
+  input:bytes ->
+  output_path:string ->
+  entrypoint:string ->
+  bytes tzresult Lwt.t
+
+(** [assemble_block ~pool ~data_dir ~chain_family ~config ~timestamp ~number
+    ~native_execution t]
+    builds an L2 block at height [number] and [timestamp] from the transactions
+    previously accumulated in durable storage by the kernel instant-confirmation
+    execution. No blueprint application is (re)performed; the function only
+    assembles the block from already recorded effects and returns the result
+    of this operation. *)
+val assemble_block :
+  pool:Lwt_domain.pool ->
+  data_dir:string ->
+  chain_family:'a L2_types.chain_family ->
+  config:Pvm_types.config ->
+  timestamp:Time.Protocol.t ->
+  number:Ethereum_types.quantity ->
+  native_execution:bool ->
+  t ->
+  apply_result tzresult Lwt.t
+
 (** [flag_local_exec evm_state] adds a flag telling the kernel it is executed
     by an EVM node, not a rollup node. *)
-val flag_local_exec : t -> t Lwt.t
+val flag_local_exec : t -> t tzresult Lwt.t
 
 (** [clear_delayed_inbox evm_state] removes the delayed inbox from the current
     EVM state. *)
-val clear_delayed_inbox : t -> t Lwt.t
+val clear_delayed_inbox : t -> t tzresult Lwt.t
 
 val wasm_pvm_version : t -> Tezos_scoru_wasm.Wasm_pvm_state.version Lwt.t
 
@@ -154,20 +197,18 @@ val get_delayed_inbox_item :
     and all durable storage information stored for [block], if this function is
     called they need to be store elsewhere, mainly it consists in transactions. *)
 val clear_block_storage :
-  _ L2_types.chain_family -> 'transaction_object L2_types.block -> t -> t Lwt.t
+  _ L2_types.chain_family ->
+  'transaction_object L2_types.block ->
+  t ->
+  t tzresult Lwt.t
 
 (** [clear_events state] will remove events generated by the kernel from the
     durable storage of [state]. *)
-val clear_events : t -> t Lwt.t
-
-(** [storage_version tree] returns the current storage version set by the
-    kernel. This storage version is used by the EVM node to determine whether a
-    given feature is implemented by the kernel or not. *)
-val storage_version : t -> int tzresult Lwt.t
+val clear_events : t -> t tzresult Lwt.t
 
 (** [delayed_inbox_hashes tree] returns a list of hashes—each hash identifying
     an item of the delayed inbox.
 
     This function will raise an exception if the delayed inbox is nowhere to be
     found. *)
-val delayed_inbox_hashes : t -> Ethereum_types.hash list Lwt.t
+val delayed_inbox_hashes : t -> Ethereum_types.hash list tzresult Lwt.t

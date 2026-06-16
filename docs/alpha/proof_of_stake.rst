@@ -31,7 +31,8 @@ Delegation and Staking
 A *delegate* is any :ref:`user account <def_user_account_alpha>` registered as
 such. This is done by *self-delegating*, that is, emitting a delegation
 operation (see below) in which the specified delegate is the same as the
-operation emitter (its signer).
+operation emitter (its signer). Note that ``tz5`` accounts cannot be registered
+as delegate.
 
 Any :ref:`account <def_account_alpha>` (user account or smart contract) can specify a delegate
 through a delegation operation.  Any non-delegate account can change or revoke its delegate
@@ -74,7 +75,7 @@ Consensus key
 The key used by a delegate to sign blocks and consensus operations is called the
 *consensus key*. By default, this is the delegate's private key, called its
 *manager key*. However, a delegate may specify another, dedicated key for this
-role.
+role. Note that ``tz5`` keys cannot be used as consensus key.
 
 Setting a new consensus key is accomplished via the
 ``Update_consensus_key`` operation. There is delay of

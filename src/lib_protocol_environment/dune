@@ -21,6 +21,7 @@
   octez-libs.tezos-context.memory
   octez-libs.tezos-context-brassaia.memory
   octez-libs.scoru-wasm
+  octez-libs.smart-rollup-wasm-in-memory
   octez-riscv-pvm
   octez-libs.event-logging
   octez-libs.octez-profiler)

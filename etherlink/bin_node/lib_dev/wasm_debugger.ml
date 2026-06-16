@@ -10,7 +10,13 @@ open Pvm_types
 let config = Octez_smart_rollup_wasm_debugger_lib.Config.config
 
 module Bare_context = struct
-  module Tree = Irmin_context.Tree
+  module Tree = struct
+    include Irmin_context.Tree
+
+    let empty _ = empty ()
+
+    let of_value _ = of_value ()
+  end
 
   type t = Irmin_context.rw
 
@@ -40,7 +46,15 @@ end
    To avoid introducing a dependency to Wasmer, we redefine a `Wasm_utils`
    module which uses the (slow) PVM both for fast and slow execution. *)
 module Ctx = Tezos_tree_encoding.Encodings_util.Make (Bare_context)
-module Slow_pvm = Tezos_scoru_wasm.Wasm_pvm.Make (Ctx.Tree)
+
+module Slow_vm = Tezos_scoru_wasm.Wasm_vm.Make_vm (struct
+  let config = Tezos_scoru_wasm.Wasm_pvm_config.empty
+end)
+
+module Slow_pvm =
+  Tezos_scoru_wasm.Wasm_pvm.Make_machine
+    (Slow_vm)
+    (Tezos_scoru_wasm.Tree_state.Make (Ctx.Tree))
 module Wasm_utils = Wasm_utils_functor.Make (Ctx) (Slow_pvm) (Slow_pvm)
 
 module Wasm =
@@ -59,10 +73,10 @@ let get_function_symbols = Wasm.Commands.get_function_symbols
 
 let set_durable_value = Wasm.set_durable_value
 
-let start ~tree version = function
-  | On_disk kernel -> Wasm.start ~tree version kernel
+let start ~state version = function
+  | On_disk kernel -> Wasm.start ~state version kernel
   | In_memory kernel ->
-      Wasm.handle_module ~tree version true "installer.wasm" kernel
+      Wasm.handle_module ~state version true "installer.wasm" kernel
 
 let find_key_in_durable = Wasm.Commands.find_key_in_durable
 
@@ -72,10 +86,8 @@ let eval = Wasm.Commands.eval
 
 let profile = Wasm.Commands.profile
 
-let encode =
-  Ctx.Tree_encoding_runner.encode Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+let encode = Wasm_utils.State.Encoding_runner.encode
 
-let decode =
-  Ctx.Tree_encoding_runner.decode Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+let decode = Wasm_utils.State.Encoding_runner.decode
 
 let get_wasm_version = Wasm_utils.Wasm.get_wasm_version

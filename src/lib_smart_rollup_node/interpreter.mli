@@ -23,35 +23,106 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Result of evaluating a head's messages through the PVM. *)
+type process_head_result = {
+  num_messages : int;  (** Number of messages consumed during evaluation. *)
+  num_ticks : int64;
+      (** Number of ticks taken by the PVM for the evaluation. *)
+  initial_tick : Z.t;  (** Tick counter of the PVM before evaluation started. *)
+  state_hash : State_hash.t;  (** Root hash of the PVM state after evaluation. *)
+}
+
 (** [process_head plugin node_ctxt ctxt ~predecessor head (inbox, messages)]
     interprets the [messages] associated with a [head] (where [predecessor] is
     the predecessor of [head] in the L1 chain). This requires the [inbox] to be
-    updated beforehand. It returns [(ctxt, num_messages, num_ticks, tick)] where
-    [ctxt] is the updated layer 2 context (with the new PVM state),
-    [num_messages] is the number of [messages], [num_ticks] is the number of
-    ticks taken by the PVM for the evaluation and [tick] is the tick reached by
-    the PVM after the evaluation. *)
+    updated beforehand.
+    NOTE: [ctxt] is modified in place by [process_head]. It is the
+    responsibility of the caller to make a copy and revert if needed in case of
+    error.
+*)
 val process_head :
   (module Protocol_plugin_sig.PARTIAL) ->
   _ Node_context.t ->
-  'a Context.t ->
+  < index : _ ; state : Access_mode.rw > Context.t ->
   predecessor:Layer1.head ->
   Layer1.head ->
   Octez_smart_rollup.Inbox.t * string list ->
-  ('a Context.t * int * int64 * Z.t) tzresult Lwt.t
+  process_head_result tzresult Lwt.t
 
-type original_genesis_state = Original of Context.pvmstate
+(** {2 Genesis state}
 
-(** [genesis_state plugin ?genesis_block node_ctxt] returns a pair [s1, s2]
-    where [s1] is the PVM state at the genesis block and [s2] is the genesis
-    state without any patches applied. [s2] is meant to be used to compute the
-    genesis commitment. If there are no unsafe patches for the rollup [s2] is
-    the same as [s1]. *)
+    The genesis state can be retrieved in different variants depending on
+    whether unsafe patches should be applied. The permission parameter
+    tracks the access mode of the underlying PVM state. *)
+
+(** Tag for a genesis state with patches applied. *)
+type 'a patched = Patched constraint 'a = [< `Read | `Write > `Read]
+
+(** Tag for a genesis state without patches (the original boot sector). *)
+type 'a unpatched = Unpatched constraint 'a = [< `Read | `Write > `Read]
+
+(** Tag for requesting both the patched and unpatched genesis states. *)
+type ('a, 'b) both =
+  | Both
+  constraint 'a = [< `Read | `Write > `Read]
+  constraint 'b = [< `Read | `Write > `Read]
+
+(** A genesis PVM state, parameterized by the requested variant. *)
+type _ genesis_state =
+  | Patched : 'perm Context.pvmstate -> 'perm patched genesis_state
+      (** The PVM state after applying unsafe patches. *)
+  | Unpatched : 'perm Context.pvmstate -> 'perm unpatched genesis_state
+      (** The original PVM state from the boot sector. *)
+  | Both : {
+      patched : 'perm_patched Context.pvmstate;
+      original : 'perm_orig Context.pvmstate;
+    }
+      -> ('perm_orig, 'perm_patched) both genesis_state
+      (** Both variants at once, each with independently tracked permissions. *)
+
+(** Selects which genesis state variant to compute and with what access
+    permissions. *)
+type _ genesis_state_mode =
+  | Patched : 'a Access_mode.t -> 'a patched genesis_state_mode
+      (** Request only the patched state. *)
+  | Unpatched : 'a Access_mode.t -> 'a unpatched genesis_state_mode
+      (** Request only the unpatched state. *)
+  | Both :
+      'a Access_mode.t * 'b Access_mode.t
+      -> ('a, 'b) both genesis_state_mode
+      (** Request both states with potentially different access permissions. *)
+
+(** [genesis_state mode plugin ?genesis_block ?empty node_ctxt] the PVM state
+    at the genesis block with and/or without patches applied depending on
+    [mode]. *)
 val genesis_state :
+  'm genesis_state_mode ->
   (module Protocol_plugin_sig.PARTIAL) ->
   ?genesis_block:Block_hash.t ->
+  ?empty:Access_mode.rw Context.pvmstate ->
   _ Node_context.t ->
-  (Context.pvmstate * original_genesis_state) tzresult Lwt.t
+  'm genesis_state tzresult Lwt.t
+
+(** {2 Cached snapshots for refutation game dissections} *)
+
+(** [to_cached_eval_state preference ctx_index eval_st] creates a cached
+    snapshot from a mutable evaluation state. For [In_memory], it makes an
+    immutable copy. For [On_disk], it commits the state to disk and stores
+    only the hash. *)
+val to_cached_eval_state :
+  Context_sigs.cache_preference ->
+  [`Read | `Write] Context.index ->
+  ('fuel, Access_mode.rw Context.pvmstate) Pvm_plugin_sig.eval_state ->
+  'fuel Pvm_plugin_sig.cached_eval_state Lwt.t
+
+(** [from_cached_eval_state ctx_index cached] restores a mutable evaluation
+    state from a cached snapshot. For [In_memory], it creates a mutable copy.
+    For [On_disk], it checkouts the state from disk. *)
+val from_cached_eval_state :
+  _ Context.index ->
+  'fuel Pvm_plugin_sig.cached_eval_state ->
+  ('fuel, Access_mode.rw Context.pvmstate) Pvm_plugin_sig.eval_state tzresult
+  Lwt.t
 
 (** [state_of_tick plugin node_ctxt cache ?start_state ~tick level] returns [Some
     state] for a given [tick] if this [tick] happened before [level] and where
@@ -60,12 +131,20 @@ val genesis_state :
     [start_state]. *)
 val state_of_tick :
   (module Protocol_plugin_sig.PARTIAL) ->
-  _ Node_context.t ->
+  _ Node_context.rw_context ->
   Pvm_plugin_sig.state_cache ->
-  ?start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state ->
+  ?start_state:
+    ( Fuel.Accounted.t,
+      Access_mode.rw Context.pvmstate )
+    Pvm_plugin_sig.eval_state ->
   tick:Z.t ->
   int32 ->
-  Fuel.Accounted.t Pvm_plugin_sig.eval_state option tzresult Lwt.t
+  (Fuel.Accounted.t, Access_mode.rw Context.pvmstate) Pvm_plugin_sig.eval_state
+  option
+  tzresult
+  Lwt.t
+
+(** {2 State retrieval} *)
 
 (** [state_of_head plugin node_ctxt ctxt head] returns the state corresponding
     to the block [head], or the state at rollup genesis if the block is before
@@ -73,6 +152,6 @@ val state_of_tick :
 val state_of_head :
   (module Protocol_plugin_sig.PARTIAL) ->
   < context : 'a ; store : _ > Node_context.t ->
-  'a Context.t ->
+  < index : 'a ; state : 'b > Context.t ->
   Layer1.head ->
-  Context.pvmstate tzresult Lwt.t
+  'b Context.pvmstate tzresult Lwt.t

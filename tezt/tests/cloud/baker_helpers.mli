@@ -20,25 +20,13 @@ type baker = {
   dal_node : Dal_node.t option;
   baker : Agnostic_baker.t;
   accounts : baker_account list;
-  stake : int;
-}
-
-(** A summary of a single baker’s DAL performance at one block,
-    used in monitoring *)
-type per_baker_dal_summary = {
-  attestable_slots : int;
-  attested_slots : int;
-  in_committee : bool;
-  (* [attestation_with_dal] is [None] if one is out of the DAL committee or did
-     not send any attestation.
-     Otherwise, it is [Some the_sent_attestation_is_"with_dal"]. *)
-  attestation_with_dal : bool option;
+  stake : int64;
 }
 
 (** Initialize a whole fleet of bakers. *)
 val init_bakers :
   bakers:string list ->
-  stake:int list Lwt.t ->
+  stake:int64 list Lwt.t ->
   data_dir:string option ->
   simulate_network:Network_simulation.t ->
   external_rpc:bool ->

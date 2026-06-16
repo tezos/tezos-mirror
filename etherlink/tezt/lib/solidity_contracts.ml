@@ -4,7 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2026 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -293,6 +293,12 @@ let counter =
     ~label:"counter"
     ~contract:"TestCounter"
 
+let dummy_proxy =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/dummy_proxy.sol")
+    ~label:"dummyproxy"
+    ~contract:"DummyProxy"
+
 (** The info for the "coinbase.sol" contract. *)
 let coinbase =
   compile_contract
@@ -437,6 +443,18 @@ let eip7702 =
     ~label:"eip7702contract"
     ~contract:"EIP7702Contract"
 
+let eip7702_fallback =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/eip7702_fallback.sol")
+    ~label:"eip7702fallbackcontract"
+    ~contract:"EIP7702FallbackContract"
+
+let gateway_catch_revert =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/gateway_catch_revert.sol")
+    ~label:"gateway_catch_revert"
+    ~contract:"GatewayCatchRevert"
+
 let nested_delegatecalls_A =
   compile_contract
     ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
@@ -461,10 +479,64 @@ let nested_delegatecalls_D =
     ~label:"nested_delegatecalls_D"
     ~contract:"D"
 
-module Precompile = struct
-  let withdrawal = "0xff00000000000000000000000000000000000001"
+let transfer_crac =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/transfer_crac.sol")
+    ~label:"crac_caller"
+    ~contract:"CracCaller"
 
-  let fa_withdrawal = "0xff00000000000000000000000000000000000002"
+let drain_balance =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/drain_balance.sol")
+    ~label:"drain_balance"
+    ~contract:"DrainBalance"
+
+let multi_run_caller =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/multi_run_caller.sol")
+    ~label:"multi_run_caller"
+    ~contract:"MultiRunCaller"
+
+let cross_runtime_run_tez =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/cross_runtime_run_tez.sol")
+    ~label:"cross_runtime_run_tez"
+    ~contract:"CrossRuntimeRunTez"
+
+let crac_http_call =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_http_call.sol")
+    ~label:"crac_http_call"
+    ~contract:"CracHttpCall"
+
+let crac_http_call_evm =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_http_call_evm.sol")
+    ~label:"crac_http_call_evm"
+    ~contract:"CracHttpCallEvm"
+
+let crac_collect_result =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_collect_result.sol")
+    ~label:"crac_collect_result"
+    ~contract:"CracCollectResult"
+
+let store_and_return =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/store_and_return.sol")
+    ~label:"store_and_return"
+    ~contract:"StoreAndReturn"
+
+let gas_burner =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/gas_burner.sol")
+    ~label:"gas_burner"
+    ~contract:"GasBurner"
+
+module Precompile = struct
+  let xtz_bridge = "0xff00000000000000000000000000000000000001"
+
+  let fa_bridge = "0xff00000000000000000000000000000000000002"
 
   let sequencer_key_change = "0xff00000000000000000000000000000000000006"
 end

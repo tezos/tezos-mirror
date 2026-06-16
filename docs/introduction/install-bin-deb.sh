@@ -59,9 +59,10 @@ set -x
 
 if [ "$RELEASETYPE" = "Master" ]; then
   apt-get update
-  apt-get install -y sudo gpg curl
-  # [add repository]
+  apt-get install -y sudo
 
+  # [add repository]
+  sudo apt-get install -y gpg curl
   curl -s "https://packages.nomadic-labs.com/$distribution/octez.asc" |
     sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
   echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] https://packages.nomadic-labs.com/$distribution $release main" |

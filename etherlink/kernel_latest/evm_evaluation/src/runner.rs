@@ -4,21 +4,21 @@
 //
 // SPDX-License-Identifier: MIT
 
-use revm::context::result::EVMError;
-use revm::primitives::{hardfork::SpecId, keccak256, Address, Bytes, B256};
+use revm::primitives::{hardfork::SpecId, keccak256, Bytes};
 use revm::state::AccountInfo;
 use revm_etherlink::helpers::legacy::{h256_to_alloy, u256_to_alloy};
 use revm_etherlink::storage::code::CodeStorage;
 use revm_etherlink::storage::world_state_handler::StorageAccount;
-use revm_etherlink::{run_transaction, Error, ExecutionOutcome, GasData};
+use revm_etherlink::{
+    run_transaction, EvmRunError, ExecutionOutcome, GasData, TransactionOrigin,
+};
 use tezos_ethereum::access_list::AccessList;
-use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
+use tezosx_journal::TezosXJournal;
 use thiserror::Error;
 
 use hex_literal::hex;
 use primitive_types::{H160, H256, U256};
-use std::cell::RefCell;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::fs::File;
@@ -88,14 +88,7 @@ fn read_testsuite(path: &Path) -> Result<TestSuite, TestError> {
 }
 
 fn prepare_host() -> EvalHost {
-    let execution_buffer = Vec::new();
-    let buffer = RefCell::new(execution_buffer);
-    EvalHost::default_with_buffer(buffer)
-}
-
-fn prepare_host_with_buffer(execution_buffer: Vec<u8>) -> EvalHost {
-    let buffer = RefCell::new(execution_buffer);
-    EvalHost::default_with_buffer(buffer)
+    EvalHost::default_with_buffer_reset()
 }
 
 fn prepare_filler_source(
@@ -148,6 +141,7 @@ fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
                     nonce: info.nonce,
                     balance: u256_to_alloy(&info.balance),
                     code_hash,
+                    account_id: None,
                     code: None,
                 },
             )
@@ -221,7 +215,7 @@ fn execute_transaction(
     test: &Test,
     data: bytes::Bytes,
     access_list: AccessList,
-) -> Result<ExecutionOutcome, EVMError<Error>> {
+) -> Result<ExecutionOutcome, EvmRunError> {
     let gas_limit = *unit.transaction.gas_limit.get(test.indexes.gas).unwrap();
     let gas_limit = u64::try_from(gas_limit).unwrap_or(u64::MAX);
     env.tx.gas_limit = gas_limit;
@@ -237,6 +231,7 @@ fn execute_transaction(
         timestamp: env.block.timestamp,
         gas_limit: env.block.gas_limit.as_u64(),
         block_fees,
+        tezos_experimental_features: false,
         chain_id: U256::from(1337),
         prevrandao: env.block.prevrandao,
     };
@@ -245,25 +240,7 @@ fn execute_transaction(
     let call_data = env.tx.data.to_vec();
     let gas_limit = env.tx.gas_limit;
     let transaction_value = env.tx.value;
-    let access_list = revm::context::transaction::AccessList::from(
-        access_list
-            .into_iter()
-            .map(
-                |AccessListItem {
-                     address,
-                     storage_keys,
-                 }| {
-                    revm::context::transaction::AccessListItem {
-                        address: Address::from_slice(&address.0),
-                        storage_keys: storage_keys
-                            .into_iter()
-                            .map(|key| B256::from_slice(&key.0))
-                            .collect(),
-                    }
-                },
-            )
-            .collect::<Vec<revm::context::transaction::AccessListItem>>(),
-    );
+    let access_list = revm_etherlink::helpers::legacy::access_list_to_revm(access_list);
 
     write_host!(
         host,
@@ -279,8 +256,12 @@ fn execute_transaction(
     );
     let mut bytes = vec![0u8; 32];
     transaction_value.to_little_endian(&mut bytes);
+    let registry = kernel::registry_impl::RegistryImpl::default();
+    let mut journal = TezosXJournal::default();
     run_transaction(
         host,
+        &registry,
+        &mut journal,
         spec_id,
         &block_constants,
         None,
@@ -289,11 +270,11 @@ fn execute_transaction(
         Bytes::from(call_data),
         GasData::new(gas_limit, u256_to_u128(env.tx.gas_price), gas_limit),
         revm::primitives::U256::from_le_slice(&bytes),
-        access_list,
         // TODO: add authorization list when Prague tests are enabled.
         None,
         None,
         false,
+        TransactionOrigin::UserInput { access_list },
     )
 }
 
@@ -312,7 +293,7 @@ fn check_results(
     host: &EvalHost,
     name: &str,
     test: &Test,
-    exec_result: &Result<ExecutionOutcome, EVMError<Error>>,
+    exec_result: &Result<ExecutionOutcome, EvmRunError>,
 ) {
     match exec_result {
         Ok(execution_outcome) => {
@@ -404,7 +385,7 @@ pub fn run_test(
                     }
                     continue;
                 }
-                host = prepare_host_with_buffer(host.buffer.take());
+                host = prepare_host();
                 initialize_accounts(&mut host, &unit);
                 let data_label = info.labels.get(&data);
                 if let Some(data_label) = data_label {
@@ -475,7 +456,6 @@ pub fn run_test(
                 };
 
                 check_results(&host, &name, test_execution, &exec_result);
-                host.buffer.borrow_mut().clear();
             }
         }
     }

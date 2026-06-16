@@ -10,6 +10,12 @@ type init_status = Loaded | Created
 
 type snapshot_source = Url_legacy of string
 
+type signer_source = Sequencer | Sandbox
+
+type sequencer_key_source =
+  | Local of signer_source * Signer.map
+  | RPC_fetch of {evm_node_endpoint : Uri.t; timeout : float; keep_alive : bool}
+
 type head = {
   current_block_hash : Ethereum_types.block_hash;
   finalized_number : Ethereum_types.quantity;
@@ -17,6 +23,8 @@ type head = {
   evm_state : Evm_state.t;
   pending_upgrade : Evm_events.Upgrade.t option;
   pending_sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
+  storage_version : int;
+  tezosx_runtimes : Tezosx.runtime list;
 }
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
@@ -45,9 +53,8 @@ val start :
   ?kernel_path:Pvm_types.kernel ->
   ?smart_rollup_address:string ->
   store_perm:Sqlite.perm ->
-  ?signer:Signer.map ->
+  ?sequencer_key_source:sequencer_key_source ->
   ?snapshot_source:snapshot_source ->
-  tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 
@@ -60,7 +67,6 @@ val init_from_rollup_node :
   configuration:Configuration.t ->
   omit_delayed_tx_events:bool ->
   rollup_node_data_dir:string ->
-  tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   unit tzresult Lwt.t
 
@@ -82,14 +88,17 @@ val apply_evm_events :
 val apply_evm_events' :
   ?finalized_level:int32 -> Evm_events.t list -> unit tzresult Lwt.t
 
-(** [apply_blueprint ?events timestamp payload delayed_transactions]
+(** [apply_blueprint ?events ?expected_block_hash timestamp payload
+    delayed_transactions]
     applies [payload] in the freshest EVM state stored under [ctxt] at
-    timestamp [timestamp], forwards the
-    {!Blueprint_types.with_events}, and returns the transaction hashes
-    of the created block. It commits the result if the blueprint
-    produces the expected block. *)
+    timestamp [timestamp], forwards the {!Blueprint_types.with_events},
+    and returns the transaction hashes of the created block.
+    It commits the result if the blueprint produces the expected block.
+    In the case of an assembled block, the resulting block hash is matched
+    against [expected_block_hash], which represents the sequencer resulting hash. *)
 val apply_blueprint :
   ?events:Evm_events.t list ->
+  ?expected_block_hash:Ethereum_types.block_hash ->
   Time.Protocol.t ->
   Blueprint_types.payload ->
   Evm_events.Delayed_transaction.t list ->
@@ -151,16 +160,8 @@ val patch_kernel :
     [block_number] can be provided to modify another block. *)
 val provision_balance :
   ?block_number:Ethereum_types.quantity ->
-  Ethereum_types.address ->
+  Tezosx.address ->
   Ethereum_types.quantity ->
-  unit tzresult Lwt.t
-
-(** [patch_sequencer_key public_key] modifies the in memory state of the
-    EVM node to replace the sequencer key with [public_key]. It does not
-    modify the current head.  *)
-val patch_sequencer_key :
-  ?block_number:Ethereum_types.quantity ->
-  Signature.public_key ->
   unit tzresult Lwt.t
 
 (** [patch_state ~key ~value ()] writes [value] at [key]. *)
@@ -188,15 +189,16 @@ val potential_observer_reorg :
 val next_block_info :
   Time.Protocol.t -> Ethereum_types.quantity -> (unit, tztrace) result Lwt.t
 
-(** [execute_single_transaction evm_state transaction time number tx_index] executes
+(** [execute_single_transaction transaction hash] executes
     a single Ethereum transaction within the current future block state.
-    Returns the execution outcome as [Transaction_receipt.t].
-    Can be None if single execution was locked by a divergence or stream startup.
-    Hash is exclusively used by OTel tracing, we take it as input to avoid recomputing. *)
+    Returns the execution outcome as [Evm_state.single_tx_receipt].
+    Returns [None] if instant confirmation is disabled.
+    Returns an error if called while awaiting block info, as this indicates
+    a bug in the caller. *)
 val execute_single_transaction :
   Broadcast.transaction ->
   Ethereum_types.hash ->
-  (Transaction_receipt.t option, tztrace) result Lwt.t
+  (L2_types.single_tx_receipt option, tztrace) result Lwt.t
 
 (** Watcher that gets notified each time a new block is produced. *)
 val head_watcher :

@@ -10,7 +10,9 @@ let name = "docker"
 let color = Log.Color.FG.yellow
 
 let macos_platform_arg =
-  if Env.macosx then ["--platform"; "linux/amd64"] else []
+  (* Force amd64 platform on macOS only when deploying to GCP (not localhost).
+     With --localhost on Apple Silicon, we want native arm64 to avoid Rosetta. *)
+  if Env.macosx && not Cli.localhost then ["--platform"; "linux/amd64"] else []
 
 let build ?image_name ?alias ?(tag = "latest") ?dockerfile ~args () =
   let build_args =

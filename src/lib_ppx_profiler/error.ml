@@ -72,7 +72,8 @@ let error loc err =
                    fields:@,\
                    - verbosity@,\
                    - cpu_profiling@,\
-                   - profiler_module@,\
+                   - profiler_module (module or expression evaluating to a \
+                   module)@,\
                    - metadata@,\
                    - drivers_ids@]@,"
               else ())
@@ -153,7 +154,8 @@ let error loc err =
              it. Possible options are:@,\
              - the verbosity@,\
              - cpu_profiling@,\
-             - the profiler_module@,\
+             - the profiler_module (module or expression evaluating to a \
+             module)@,\
              - the metadata@,\
              - the opt-in drivers_ids@,\
              Found: { @[<v 2>%a@] }@."
@@ -168,7 +170,8 @@ let error loc err =
             "@[<v 2>Expecting a field specifying either:@,\
              - the verbosity@,\
              - cpu_profiling@,\
-             - the profiler_module@,\
+             - the profiler_module (module or expression evaluating to a \
+             module)@,\
              - the metadata@,\
              - the opt-in drivers_ids@,\
              Found: @[<v 0>%a@]@."

@@ -429,3 +429,25 @@ val section_maker :
   ('a -> string) ->
   profiler ->
   'a section_maker
+
+(** {1 Profiling configuration} *)
+
+(** Configuration for profiling output. *)
+type profiling_config = {
+  days_kept : int;
+  verbosity : string option;
+      (** Per-profiler verbosity rules, same format as the [PROFILING]
+          environment variable. When [Some], overrides the PROFILING
+          environment variable. *)
+  backends : string list option;
+      (** List of profiling backends to enable (e.g. [["txt"; "json"]]).
+          When [Some], overrides the [PROFILING_BACKENDS] environment
+          variable. *)
+  output_dir : string option;
+      (** Override the profiling output directory. When [Some], overrides
+          the [PROFILING_OUTPUT_DIR] environment variable. *)
+}
+
+val default_profiling_config : profiling_config
+
+val profiling_config_encoding : profiling_config Data_encoding.t

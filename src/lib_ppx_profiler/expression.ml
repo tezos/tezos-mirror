@@ -124,6 +124,36 @@ let replace_expr_with loc key = [%expr [%e Key.to_expression loc key]]
 let add_wrapping_custom_function expr loc key =
   [%expr [%e Key.to_expression loc key] @@ fun () -> [%e expr]]
 
+(** [apply_profiler_method loc method_call build_body] handles profiler method
+    calls for both static modules and first-class modules.
+
+    For static modules ([Direct method_expr]), it simply calls [build_body]
+    with the method expression.
+
+    For first-class modules ([Unpack {module_expr; method_name}]), it generates:
+    {[
+      let (module Profiler__) = module_expr in
+      <body with Profiler__.method_name>
+    ]} *)
+let apply_profiler_method loc method_call build_body =
+  match method_call with
+  | Rewriter.Direct method_expr -> build_body method_expr
+  | Rewriter.Unpack {module_expr; method_name} ->
+      let module_pat =
+        Ppxlib.Ast_helper.Pat.unpack ~loc {txt = Some "Profiler__"; loc}
+      in
+      let method_expr =
+        Ppxlib.Ast_helper.Exp.ident
+          ~loc
+          {txt = Ldot (Lident "Profiler__", method_name); loc}
+      in
+      let body = build_body method_expr in
+      Ppxlib.Ast_helper.Exp.let_
+        ~loc
+        Nonrecursive
+        [Ppxlib.Ast_helper.Vb.mk ~loc module_pat module_expr]
+        body
+
 let rewrite rewriters t =
   let loc = Ppxlib_helper.get_loc t in
   List.fold_left
@@ -131,34 +161,42 @@ let rewrite rewriters t =
       match rewriter.Rewriter.action with
       | Rewriter.Aggregate_f | Rewriter.Aggregate_s | Rewriter.Record_f
       | Rewriter.Record_s | Rewriter.Span_f | Rewriter.Span_s ->
-          add_wrapping_function
-            expr
-            (Rewriter.to_fully_qualified_lident_expr rewriter loc)
+          apply_profiler_method
             loc
-            rewriter.key
+            (Rewriter.to_profiler_method_call rewriter loc)
+            (fun method_expr ->
+              add_wrapping_function expr method_expr loc rewriter.key)
       (* Functions that have a ~verbosity parameter *)
       | Rewriter.Aggregate | Rewriter.Record | Rewriter.Span | Rewriter.Stamp ->
-          add_unit_function_cpu
-            ~verbosity:true
-            expr
-            (Rewriter.to_fully_qualified_lident_expr rewriter loc)
+          apply_profiler_method
             loc
-            rewriter.key
+            (Rewriter.to_profiler_method_call rewriter loc)
+            (fun method_expr ->
+              add_unit_function_cpu
+                ~verbosity:true
+                expr
+                method_expr
+                loc
+                rewriter.key)
       | Rewriter.Mark ->
-          add_unit_function_no_cpu
-            expr
-            (Rewriter.to_fully_qualified_lident_expr rewriter loc)
+          apply_profiler_method
             loc
-            rewriter.key
+            (Rewriter.to_profiler_method_call rewriter loc)
+            (fun method_expr ->
+              add_unit_function_no_cpu expr method_expr loc rewriter.key)
       (* Functions that don't have a ~verbosity nor ~metadata parameter *)
       | Rewriter.Stop ->
-          add_unit_function_no_cpu
-            ~verbosity:false
-            ~metadata:false
-            expr
-            (Rewriter.to_fully_qualified_lident_expr rewriter loc)
+          apply_profiler_method
             loc
-            rewriter.key
+            (Rewriter.to_profiler_method_call rewriter loc)
+            (fun method_expr ->
+              add_unit_function_no_cpu
+                ~verbosity:false
+                ~metadata:false
+                expr
+                method_expr
+                loc
+                rewriter.key)
           (* Custom functions *)
       | Rewriter.Overwrite -> replace_expr_with loc rewriter.key
       | Rewriter.Wrap_f | Rewriter.Wrap_s ->

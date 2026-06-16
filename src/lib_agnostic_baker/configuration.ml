@@ -178,17 +178,6 @@ let liquidity_baking_toggle_vote_arg =
     ~placeholder:"vote"
     per_block_vote_parameter
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/8055
-   Remove this argument in Octez v25. *)
-let adaptive_issuance_vote_arg =
-  Tezos_clic.arg
-    ~doc:
-      "DEPRECATED: This argument is ignored by the baker and will be removed \
-       in the next major version of Octez."
-    ~long:"adaptive-issuance-vote"
-    ~placeholder:"vote"
-    per_block_vote_parameter
-
 let per_block_vote_file_arg =
   Tezos_clic.arg
     ~doc:"read per block votes as json file"
@@ -330,6 +319,15 @@ let allow_signing_delay_arg =
          Octez_baking_common.Signing_delay.env_var)
     ()
 
+let extra_nodes_arg =
+  Tezos_clic.multiple_arg
+    ~doc:
+      "EXPERIMENTAL: Allow the use of multiple nodes to improve fault \
+       resilience."
+    ~long:"extra-node"
+    ~placeholder:"Endpoint of an octez-node, e.g. 'http://localhost:8733'"
+    (Client_config.endpoint_parameter ())
+
 let baker_args =
   Tezos_clic.args18
     pidfile_arg
@@ -341,7 +339,6 @@ let baker_args =
     force_apply_from_round_arg
     keep_alive_arg
     liquidity_baking_toggle_vote_arg
-    adaptive_issuance_vote_arg
     per_block_vote_file_arg
     operations_arg
     dal_node_endpoint_arg
@@ -350,6 +347,7 @@ let baker_args =
     pre_emptive_forge_time_arg
     remote_calls_timeout_arg
     allow_signing_delay_arg
+    extra_nodes_arg
 
 let directory_parameter =
   let open Lwt_result_syntax in
@@ -392,7 +390,6 @@ type t = {
   force_apply_from_round : int option;
   keep_alive : bool;
   liquidity_baking_vote : Per_block_votes.per_block_vote option;
-  adaptive_issuance_vote : Per_block_votes.per_block_vote option;
   per_block_vote_file : string option;
   extra_operations : Uri.t option;
   dal_node_endpoint : Uri.t option;
@@ -401,10 +398,11 @@ type t = {
   pre_emptive_forge_time : Q.t option;
   remote_calls_timeout : Q.t option;
   allow_signing_delay : bool;
+  extra_nodes : Tezos_client_base.Client_context.full list;
 }
 
 (** Create the configuration from the given arguments. *)
-let create_config
+let create_config cctxt rpc_config
     ( pidfile,
       node_version_check_bypass,
       node_version_allowed,
@@ -414,7 +412,6 @@ let create_config
       force_apply_from_round,
       keep_alive,
       liquidity_baking_vote,
-      adaptive_issuance_vote,
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint,
@@ -422,7 +419,14 @@ let create_config
       state_recorder,
       pre_emptive_forge_time,
       remote_calls_timeout,
-      allow_signing_delay ) =
+      allow_signing_delay,
+      extra_nodes ) =
+  let extra_nodes =
+    Option.fold
+      ~none:[]
+      ~some:(List.map (Client_context_unix.with_endpoint cctxt rpc_config))
+      extra_nodes
+  in
   {
     pidfile;
     node_version_check_bypass;
@@ -433,7 +437,6 @@ let create_config
     force_apply_from_round;
     keep_alive;
     liquidity_baking_vote;
-    adaptive_issuance_vote;
     per_block_vote_file;
     extra_operations;
     dal_node_endpoint;
@@ -442,6 +445,7 @@ let create_config
     pre_emptive_forge_time;
     remote_calls_timeout;
     allow_signing_delay;
+    extra_nodes;
   }
 
 type per_block_votes_config = {

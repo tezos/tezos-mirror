@@ -100,6 +100,12 @@ val register_default_signer :
   Client_context.io_wallet ->
   unit
 
+val parse_rpc_config :
+  Client_config.Cfg_file.t option ->
+  Client_config.cli_args option ->
+  Media_type.Command_line.t ->
+  RPC_client_unix.config
+
 (** [init_logging (module M) ?parsed_args ?parsed_config_file ~base_dir ()]
     starts the logging process based on optional parsed arguments [?parse_args],
     optional configuration file [?parsed_config_file], with output in the

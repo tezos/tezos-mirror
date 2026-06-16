@@ -7,63 +7,169 @@
 use crate::contract::Contract;
 use crate::entrypoint::Entrypoint;
 use tezos_crypto_rs::{
-    hash::{BlockHash, BlsSignature},
+    hash::{
+        SmartRollupCommitmentHash, SmartRollupHash, SmartRollupStateHash, {BlockHash, BlsSignature},
+    },
     public_key::PublicKey,
     public_key_hash::PublicKeyHash,
 };
-use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith, types::WithDefaultValue};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+/// Tezos operation without signature/watermark, as used for forging.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct UnsignedOperation {
+    /// The branch (blockhash) this operation is applied against.
     pub branch: BlockHash,
+    /// The ordered list of operation contents.
     pub content_list: OperationContentList,
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+/// List wrapper for operation contents, as encoded by the protocol.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct OperationContentList {
+    /// The sequence of contents included in the operation.
     pub contents: Vec<OperationContent>,
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+/// Tezos operation contents.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 #[encoding(tags = "u8")]
 pub enum OperationContent {
+    /// Reveal a manager's public key.
     #[encoding(tag = 107)]
     Reveal(ManagerOperationContent<RevealContent>),
+    /// Transfer tokens and/or call a contract.
     #[encoding(tag = 108)]
     Transaction(ManagerOperationContent<TransactionContent>),
+    /// Originate a new smart contract.
     #[encoding(tag = 109)]
     Origination(ManagerOperationContent<OriginationContent>),
+    /// Set or clear a delegate.
     #[encoding(tag = 110)]
     Delegation(ManagerOperationContent<DelegationContent>),
+    // SMART_ROLLUP_OPERATION_TAG_OFFSET = 200;
+    /// Cement a smart rollup commitment.
+    #[encoding(tag = 202)] // SMART_ROLLUP_OPERATION_TAG_OFFSET + 2
+    SmartRollupCement(ManagerOperationContent<SmartRollupCementContent>),
+    /// Publish a smart rollup commitment.
+    #[encoding(tag = 203)] // SMART_ROLLUP_OPERATION_TAG_OFFSET + 3
+    SmartRollupPublish(ManagerOperationContent<SmartRollupPublishContent>),
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+/// Common fields for Tezos manager operations.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct ManagerOperationContent<Op> {
+    /// Manager source account.
     pub source: PublicKeyHash,
+    /// Fee paid for inclusion (mutez).
     pub fee: Narith,
+    /// Manager counter (nonce).
     pub counter: Narith,
+    /// Gas limit for the operation (milligas).
     pub gas_limit: Narith,
+    /// Storage limit for the operation (bytes).
     pub storage_limit: Narith,
+    /// Operation-specific payload.
     pub operation: Op,
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+/// Reveal operation payload.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct RevealContent {
+    /// Manager public key to reveal.
     pub pk: PublicKey,
+    /// Optional BLS proof (for tz4 keys).
     #[encoding(dynamic)]
     pub proof: Option<BlsSignature>,
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct TransactionContent {
-    pub amount: Narith,
-    pub destination: Contract,
-    pub parameters: WithDefaultValue<Parameters>,
+mod internal {
+    use super::*;
+
+    /// Encoded representation of the `TransactionContent` type used for binary
+    /// serialization and deserialization via the `NomReader` and `BinWriter` traits.
+    ///
+    /// The `parameters` field is an `Option` to optimize encoding: `None` represents
+    /// the default `Parameters` value. During decoding, `None` is restored as the
+    /// default value.
+    #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+    pub struct EncodedTransactionContent<Amount, Destination, Param> {
+        amount: Amount,
+        destination: Destination,
+        parameters: Option<Param>,
+    }
+
+    impl<'a> From<&'a TransactionContent>
+        for EncodedTransactionContent<&'a Narith, &'a Contract, &'a Parameters>
+    {
+        fn from(c: &'a TransactionContent) -> Self {
+            let TransactionContent {
+                amount,
+                destination,
+                parameters,
+            } = c;
+            let parameters = if parameters == &Parameters::default() {
+                None
+            } else {
+                Some(parameters)
+            };
+            Self {
+                amount,
+                destination,
+                parameters,
+            }
+        }
+    }
+
+    impl From<EncodedTransactionContent<Narith, Contract, Parameters>> for TransactionContent {
+        fn from(c: EncodedTransactionContent<Narith, Contract, Parameters>) -> Self {
+            let EncodedTransactionContent {
+                amount,
+                destination,
+                parameters,
+            } = c;
+            let parameters = parameters.unwrap_or_default();
+            Self {
+                amount,
+                destination,
+                parameters,
+            }
+        }
+    }
+
+    impl NomReader<'_> for TransactionContent {
+        fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+            nom::combinator::map(
+                EncodedTransactionContent::nom_read,
+                TransactionContent::from,
+            )(input)
+        }
+    }
+
+    impl BinWriter for TransactionContent {
+        fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
+            EncodedTransactionContent::from(self).bin_write(out)
+        }
+    }
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+/// Transaction operation payload.
+#[derive(PartialEq, Debug, Clone, Eq)]
+pub struct TransactionContent {
+    /// Amount transferred (mutez).
+    pub amount: Narith,
+    /// Destination contract or implicit account.
+    pub destination: Contract,
+    /// Parameters for a contract call.
+    pub parameters: Parameters,
+}
+
+/// Parameters attached to a transaction.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct Parameters {
+    /// Entrypoint called on the destination contract.
     pub entrypoint: Entrypoint,
+    /// Micheline-encoded parameter payload.
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
 }
@@ -79,24 +185,62 @@ impl Default for Parameters {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+/// Origination operation payload.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct OriginationContent {
+    /// Initial balance for the originated contract (mutez).
     pub balance: Narith,
+    /// Optional delegate for the contract.
     pub delegate: Option<PublicKeyHash>,
+    /// Contract script code and initial storage.
     pub script: Script,
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+/// Micheline script for contract origination.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct Script {
+    /// Micheline-encoded contract code.
     #[encoding(dynamic, bytes)]
     pub code: Vec<u8>,
+    /// Micheline-encoded initial storage.
     #[encoding(dynamic, bytes)]
     pub storage: Vec<u8>,
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+/// Delegation operation payload.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct DelegationContent {
+    /// Delegate to set, or `None` to clear.
     pub delegate: Option<PublicKeyHash>,
+}
+
+/// Smart rollup cement operation payload.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
+pub struct SmartRollupCementContent {
+    /// Smart rollup address.
+    pub address: SmartRollupHash,
+}
+
+/// Smart rollup commitment data.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
+pub struct SmartRollupCommitment {
+    /// Compressed state hash.
+    pub compressed_state: SmartRollupStateHash,
+    /// Inbox level the commitment refers to (level).
+    pub inbox_level: i32,
+    /// Previous commitment hash.
+    pub predecessor: SmartRollupCommitmentHash,
+    /// Number of ticks executed (ticks).
+    pub number_of_ticks: i64,
+}
+
+/// Smart rollup publish operation payload.
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
+pub struct SmartRollupPublishContent {
+    /// Smart rollup address.
+    pub address: SmartRollupHash,
+    /// Commitment being published.
+    pub commitment: SmartRollupCommitment,
 }
 
 #[cfg(test)]
@@ -222,8 +366,7 @@ mod tests {
                     entrypoint: Entrypoint::try_from("B").unwrap(),
                     // octez-client convert data '"Hello"' from Michelson to binary
                     value: hex::decode("010000000548656c6c6f").unwrap(),
-                }
-                .into(),
+                },
             },
             gas_limit: 1380_u64.into(),
             storage_limit: 0_u64.into(),
@@ -261,7 +404,7 @@ mod tests {
                 amount: 10.into(),
                 destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                parameters: Parameters::default().into(),
+                parameters: Parameters::default(),
             },
             gas_limit: 0.into(),
             storage_limit: 1405.into(),
@@ -305,7 +448,7 @@ mod tests {
                 amount: 10.into(),
                 destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                parameters: Parameters::default().into(),
+                parameters: Parameters::default(),
             },
             gas_limit: 0.into(),
             storage_limit: 1405.into(),
@@ -353,8 +496,7 @@ mod tests {
                     entrypoint: Entrypoint::try_from("remove_delegate").unwrap(),
                     // octez-client convert data "Unit" from Michelson to binary
                     value: hex::decode("030b").unwrap(),
-                }
-                .into(),
+                },
             },
             gas_limit: 0.into(),
             storage_limit: 0.into(),
@@ -638,7 +780,7 @@ mod tests {
                 amount: 20000.into(),
                 destination: Contract::from_b58check("tz1Rc6wtS349fFTyuUhDXTXoBUZ9j7XiN61o")
                     .unwrap(),
-                parameters: Parameters::default().into(),
+                parameters: Parameters::default(),
             },
         });
 
@@ -757,8 +899,7 @@ mod tests {
                     entrypoint: Entrypoint::try_from("balance_of").unwrap(),
                     // octez-client convert data '"tz3j873xGK219DrCKYL4usxM8EQgHUmDdbJB"' from Michelson to binary
                     value: hex::decode("0100000024747a336a38373378474b3231394472434b594c347573784d3845516748556d4464624a42").unwrap(),
-                }
-                .into(),
+                },
             },
         });
 
@@ -998,6 +1139,101 @@ mod tests {
 
         let (bytes, decoded_unsigned) = UnsignedOperation::nom_read(&encoded_unsigned).unwrap();
         assert_eq!(unsigned, decoded_unsigned);
+        assert!(bytes.is_empty());
+    }
+
+    /// Test `smart_rollup_cement` encoding
+    ///
+    /// Generated with:
+    /// ```sh
+    /// octez-codec encode "023-PtSeouLo.operation.contents" from '{
+    ///   "kind": "smart_rollup_cement",
+    ///   "source": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+    ///   "fee": "1234",
+    ///   "counter": "789",
+    ///   "gas_limit": "2000",
+    ///   "storage_limit": "10",
+    ///   "rollup": "sr1V6huFSUBUujzubUCg9nNXqpzfG9t4XD1h"
+    /// }'
+    /// ```
+    #[test]
+    fn smart_rollup_cement_encoding() {
+        let operation = OperationContent::SmartRollupCement(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
+            fee: 1_234.into(),
+            counter: 789.into(),
+            gas_limit: 2_000.into(),
+            storage_limit: 10.into(),
+            operation: SmartRollupCementContent {
+                address: SmartRollupHash::from_base58_check("sr1V6huFSUBUujzubUCg9nNXqpzfG9t4XD1h")
+                    .unwrap(),
+            },
+        });
+
+        let encoded_operation = operation.to_bytes().unwrap();
+
+        let bytes = hex::decode("ca00e7670f32038107a59a2b9cfefae36ea21f5aa63cd2099506d00f0afceda8e679c698b26b5f6772411955354a81a05c").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
+    }
+
+    /// Test `smart_rollup_publish` encoding
+    ///
+    /// Generated with:
+    ///
+    /// ```sh
+    /// octez-codec encode "023-PtSeouLo.operation.contents" from '{
+    ///   "kind": "smart_rollup_publish",
+    ///   "source": "tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF",
+    ///   "fee": "4000",
+    ///   "counter": "61",
+    ///   "gas_limit": "4200",
+    ///   "storage_limit": "0",
+    ///   "rollup": "sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg",
+    ///   "commitment": {
+    ///     "compressed_state": "srs11ZWE34ur1d8j81Eqt68v2P5gFkP3hHms6kQ9Qo26j7ktDeu85y",
+    ///     "inbox_level": 42,
+    ///     "predecessor": "src12UJzB8mg7yU6nWPzicH7ofJbFjyJEbHvwtZdfRXi8DQHNp1LY8",
+    ///     "number_of_ticks": "1234567890"
+    ///   }
+    /// }'
+    /// ```
+    #[test]
+    fn smart_rollup_publish_encoding() {
+        let operation = OperationContent::SmartRollupPublish(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF").unwrap(),
+            fee: 4_000.into(),
+            counter: 61.into(),
+            gas_limit: 4_200.into(),
+            storage_limit: 00.into(),
+            operation: SmartRollupPublishContent {
+                address: SmartRollupHash::from_base58_check("sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg")
+                    .unwrap(),
+                commitment: SmartRollupCommitment {
+                    compressed_state: SmartRollupStateHash::from_base58_check(
+                        "srs11ZWE34ur1d8j81Eqt68v2P5gFkP3hHms6kQ9Qo26j7ktDeu85y",
+                    )
+                    .unwrap(),
+                    inbox_level: 42,
+                    predecessor: SmartRollupCommitmentHash::from_base58_check(
+                        "src12UJzB8mg7yU6nWPzicH7ofJbFjyJEbHvwtZdfRXi8DQHNp1LY8",
+                    )
+                    .unwrap(),
+                    number_of_ticks: 1_234_567_890,
+                },
+            },
+        });
+
+        let encoded_operation = operation.to_bytes().unwrap();
+
+        let bytes = hex::decode("cb03ae7b7d713977a27ec643969f0c2e665ba9ad9aa1a01f3de8200027b7e1d8fb4292cca7b57c065ac9f210fcf2250111111111111111111111111111111111111111111111111111111111111111110000002a000000000000000000000000000000000000000000000000000000000000000000000000499602d2").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
         assert!(bytes.is_empty());
     }
 }

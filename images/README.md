@@ -9,7 +9,6 @@ The images, their content and indented usage, are:
 |----------------------------|-----------------------------------------|--------------------------------|
 | `rust-toolchain`           | cargo                                   | CI: kernel build, test and SDK |
 | `jsonnet`                  | jsonnet                                 | CI: Grafazos jobs              |
-| `client-libs-dependencies` | kaitai-struct-compiler, xxd, java, node | CI: Kaitai e2e tests           |
 | `ci`                       | ocaml, cargo, npm, python ...           | CI: the majority of jobs       |
 
 For more details on the contents and usage of each image, see below,
@@ -68,15 +67,11 @@ image for local use, run `create_image.sh "rust-toolchain"`.
 
 # `jsonnet` image
 
-The `jsonnet` image is used in the CI to build and test Grafazos.
-It contains the `jsonnet` tools to compile and format jsonnet files.
-To build this image for local use, run `create_image.sh "grafazos"`
-
-# `client-libs-dependencies` image
-
-The `client-libs-depencies` image is used in the CI to run end-to-end
-tests of client-libs. To build this image for local use, run
-`create_client_libs_dependencies_image.sh`.
+The `jsonnet` image is used in the CI to build and test Grafazos.  It
+contains the `jsonnet` tools to compile and format jsonnet files.  ~To
+build this image for local use, run `create_image.sh "grafazos"`~
+(This has changed and building this image locally is currently not
+straightforward. Simplifying local build is planned as future work.)
 
 # `ci` images
 
@@ -94,7 +89,7 @@ Files that are shared between image built contexts are stored in
 require them. `docker build` does not resolve symlinks, but we work
 around this by tarring the image's build context directory, having tar
 resolve symlinks and piping the result to `docker build`. See
-`create_client_libs_dependencies_image.sh` for an example.
+`create_ci_images.sh` for an example.
 
 # Building the Octez Docker Distribution
 

@@ -83,41 +83,33 @@ end
 type mode = Minimal | Full
 
 module Types = struct
-  type etherlink_infos = {
+  type tezosx_infos = {
     minimum_base_fee_per_gas : Z.t;
     base_fee_per_gas : Z.t;
     da_fee_per_bytes : Z.t;
     maximum_gas_per_transaction : Z.t;
+    michelson_to_evm_gas_multiplier : int64;
   }
 
-  let etherlink_infos_default =
-    {
-      minimum_base_fee_per_gas = Z.zero;
-      base_fee_per_gas = Z.zero;
-      da_fee_per_bytes = Z.zero;
-      maximum_gas_per_transaction = Z.zero;
-    }
-
-  type 'a inner_session = {
-    state : 'a;
-    state_backend : (module Services_backend_sig.S with type Reader.state = 'a);
+  type session = {
+    state : Evm_state.t;
+    ctxt : Evm_ro_context.t;
     storage_version : int;
-    etherlink_infos : etherlink_infos;
+    tezosx_infos : tezosx_infos;
   }
 
-  type session = Session : 'a inner_session -> session
-
-  let etherlink_infos_of_state (type state) state_backend state =
+  let da_fee_per_bytes_of_state state =
     let open Lwt_result_syntax in
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      state_backend
+    let* (Qty da_fee_per_bytes) =
+      Etherlink_durable_storage.da_fee_per_byte state
     in
+    return da_fee_per_bytes
+
+  let tezosx_infos_of_state state =
+    let open Lwt_result_syntax in
     let* (Qty base_fee_per_gas) =
       Lwt.catch
-        (fun () ->
-          Etherlink_durable_storage.base_fee_per_gas
-            (Backend_rpc.Reader.read state))
+        (fun () -> Etherlink_durable_storage.base_fee_per_gas state)
         (function
           | Durable_storage.Invalid_block_structure _ ->
               (* Placeholder value for observer starting from genesis.
@@ -126,15 +118,14 @@ module Types = struct
           | exn -> Lwt.reraise exn)
     in
     let* minimum_base_fee_per_gas =
-      Etherlink_durable_storage.minimum_base_fee_per_gas
-        (Backend_rpc.Reader.read state)
+      Etherlink_durable_storage.minimum_base_fee_per_gas state
     in
-    let* (Qty da_fee_per_bytes) =
-      Etherlink_durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
-    in
+    let* da_fee_per_bytes = da_fee_per_bytes_of_state state in
     let* (Qty maximum_gas_per_transaction) =
-      Etherlink_durable_storage.maximum_gas_per_transaction
-        (Backend_rpc.Reader.read state)
+      Etherlink_durable_storage.maximum_gas_per_transaction state
+    in
+    let* michelson_to_evm_gas_multiplier =
+      Etherlink_durable_storage.michelson_to_evm_gas_multiplier state
     in
     return
       {
@@ -142,31 +133,41 @@ module Types = struct
         minimum_base_fee_per_gas;
         da_fee_per_bytes;
         maximum_gas_per_transaction;
+        michelson_to_evm_gas_multiplier;
       }
 
-  let session_of_state (type state) chain_family state_backend state =
+  let session_of_state chain_family ctxt state =
     let open Lwt_result_syntax in
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      state_backend
-    in
-    let* storage_version =
-      Durable_storage.storage_version (Backend_rpc.Reader.read state)
-    in
+    let* storage_version = Durable_storage.storage_version state in
     match chain_family with
     | L2_types.Ex_chain_family EVM ->
-        let* etherlink_infos = etherlink_infos_of_state state_backend state in
-        return
-          (Session {state; state_backend; storage_version; etherlink_infos})
+        let* tezosx_infos = tezosx_infos_of_state state in
+        return {state; ctxt; storage_version; tezosx_infos}
     | L2_types.Ex_chain_family Michelson ->
+        let*! da_fee_result = da_fee_per_bytes_of_state state in
+        let* da_fee_per_bytes =
+          match da_fee_result with
+          | Ok v -> return v
+          | Error _ ->
+              let*! () = Prevalidator_events.failed_da_fee_read () in
+              return Z.zero
+        in
         return
-          (Session
-             {
-               state;
-               state_backend;
-               storage_version;
-               etherlink_infos = etherlink_infos_default;
-             })
+          {
+            state;
+            ctxt;
+            storage_version;
+            (* Michelson chains do not use EVM gas semantics, only
+               da_fee_per_bytes is meaningful here. *)
+            tezosx_infos =
+              {
+                minimum_base_fee_per_gas = Z.zero;
+                base_fee_per_gas = Z.zero;
+                da_fee_per_bytes;
+                maximum_gas_per_transaction = Z.zero;
+                michelson_to_evm_gas_multiplier = 10L;
+              };
+          }
 
   type parameters = {
     mode : mode;
@@ -212,6 +213,7 @@ module Request = struct
     | Refresh_state : (unit, tztrace) t
     | Prevalidate_raw_transaction_tezlink : {
         raw_transaction : string;
+        simulator_mode : Tezlink_backend_sig.simulator_mode;
       }
         -> ( (Tezos_types.Operation.t prevalidation_result, string) result,
              tztrace )
@@ -255,14 +257,17 @@ module Request = struct
         case
           ~title:"Prevalidate_raw_transaction_tezlink"
           Json_only
-          (obj2
+          (obj3
              (req "request" (constant "prevalidate_raw_transaction_tezlink"))
-             (req "raw_transaction" (string' Hex)))
+             (req "raw_transaction" (string' Hex))
+             (req "simulator_mode" Tezlink_backend_sig.simulator_mode_encoding))
           (function
-            | View (Prevalidate_raw_transaction_tezlink {raw_transaction}) ->
-                Some ((), raw_transaction)
+            | View
+                (Prevalidate_raw_transaction_tezlink
+                   {raw_transaction; simulator_mode}) ->
+                Some ((), raw_transaction, simulator_mode)
             | _ -> None)
-          (fun ((), _) ->
+          (fun ((), _, _) ->
             (* Only used for logging *)
             assert false);
       ]
@@ -302,6 +307,9 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
   (* Computing the execution gas limit validates that the gas limit is
      sufficient to cover the inclusion fees. *)
   let access_list = Transaction_object.access_list transaction in
+  let authorization_list_len =
+    List.length (Transaction_object.authorization_list transaction)
+  in
   let (Qty gas_limit) = Transaction_object.gas transaction in
   let data =
     Transaction_object.input transaction |> Ethereum_types.encode_hex
@@ -310,9 +318,10 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
     (* since Dionysus, the execution gas limit is always computed from the
        minimum base fee per gas *)
     Fees.execution_gas_limit
-      ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
+      ~da_fee_per_byte:(Qty session.tezosx_infos.da_fee_per_bytes)
       ~access_list
-      ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
+      ~authorization_list_len
+      ~minimum_base_fee_per_gas:session.tezosx_infos.minimum_base_fee_per_gas
       ~gas_limit
       data
   in
@@ -322,8 +331,7 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
   then
     if
       Compare.Z.(
-        execution_gas_limit
-        <= session.etherlink_infos.maximum_gas_per_transaction)
+        execution_gas_limit <= session.tezosx_infos.maximum_gas_per_transaction)
     then return (Ok ())
     else
       return
@@ -332,71 +340,31 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
               "Gas limit for execution is too high. Maximum limit is %a, \
                transaction has %a"
               Z.pp_print
-              session.etherlink_infos.maximum_gas_per_transaction
+              session.tezosx_infos.maximum_gas_per_transaction
               Z.pp_print
               execution_gas_limit))
   else return (Ok ())
 
-let validate_authorizations (type state) ~session ~chain_id ~caller txn =
+let validate_authorizations txn =
   let open Lwt_result_syntax in
   let authorization_list = Transaction_object.authorization_list txn in
   if not (Transaction_object.is_eip7702 txn) then return (Ok ())
   else if List.is_empty authorization_list then
     return (Error "Authorization list cannot be empty per EIP-7702.")
   else
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      session.state_backend
-    in
-    let read_nonce address =
-      Etherlink_durable_storage.nonce
-        (Backend_rpc.Reader.read session.state)
-        address
-      |> lwt_map_error (fun _ -> "Couldn't retrieve address' nonce")
-    in
-    let check_auth (item : Transaction_object.authorization_item) =
-      let (Qty tx_chain_id) = item.chain_id in
-      if not (Z.equal chain_id tx_chain_id) then
-        fail "Authorization chain id mismatch"
-      else
-        let*? signer_address = Transaction_object.authorization_signer item in
-        let* current_nonce = read_nonce signer_address in
-        let current_nonce =
-          match current_nonce with
-          | Some (Qty current_nonce) -> current_nonce
-          | None -> Z.zero
-        in
-        let nonce_check =
-          (* The authorization list is processed before the execution portion of
-             the transaction begins, but after the sender’s nonce is incremented.
-             If the sender of the transaction is also the one that signed the
-             authorization, the nonce of the signed authorization must be equal
-             to its current nonce + 1. *)
-          if Address.equal caller signer_address then Z.succ current_nonce
-          else current_nonce
-        in
-        let (Qty nonce) = item.nonce in
-        if Z.equal nonce_check nonce then return_unit
-        else fail "Authorization nonce mismatch"
-    in
-    let*! opt_err =
-      Lwt_list.map_p check_auth authorization_list
-      |> Lwt.map (List.find Result.is_error)
-    in
-    match opt_err with Some error -> return error | None -> return (Ok ())
+    (* Per EIP-7702, invalid authorizations (wrong chain id, nonce mismatch,
+       etc.) are silently skipped during execution — they do not invalidate
+       the transaction. The kernel (revm) already implements this correctly.
+       The prevalidator should not reject transactions based on individual
+       authorization validity, as this is stricter than the spec requires
+       and breaks legitimate use cases (e.g., concurrent submissions with
+       the same authorization). *)
+    return (Ok ())
 
-let validate_sender_not_a_contract (type state) session caller :
+let validate_sender_not_a_contract session caller :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let (module Backend_rpc : Services_backend_sig.S
-        with type Reader.state = state) =
-    session.state_backend
-  in
-  let* (Hex code) =
-    Etherlink_durable_storage.code
-      (Backend_rpc.Reader.read session.state)
-      caller
-  in
+  let* (Hex code) = Etherlink_durable_storage.code session.state caller in
   if
     (* EOA: *)
     code = ""
@@ -530,10 +498,14 @@ let validate_minimum_gas_requirement ~session
   let data =
     Transaction_object.input transaction |> Ethereum_types.encode_hex
   in
+  let authorization_list_len =
+    List.length (Transaction_object.authorization_list transaction)
+  in
   let da_inclusion_fees =
     Fees.da_fees_gas_limit_overhead
-      ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
-      ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
+      ~da_fee_per_byte:(Qty session.tezosx_infos.da_fee_per_bytes)
+      ~minimum_base_fee_per_gas:session.tezosx_infos.minimum_base_fee_per_gas
+      ~authorization_list_len
       data
   in
   let (Qty gas_limit) = Transaction_object.gas transaction in
@@ -558,13 +530,13 @@ let validate_minimum_gas_requirement ~session
 let minimal_validation ~next_nonce ~max_number_of_chunks ctxt
     (transaction : Transaction_object.t) ~caller =
   let open Lwt_result_syntax in
-  let (Session session) = ctxt.session in
+  let session = ctxt.session in
   let (Chain_id chain_id) = ctxt.chain_id in
   let** () = validate_minimum_gas_requirement ~session ~transaction in
   let** () = validate_chain_id chain_id transaction in
   let** () = validate_nonce ~next_nonce transaction in
   let** () = validate_sender_not_a_contract session caller in
-  let** () = validate_authorizations ~session ~chain_id ~caller transaction in
+  let** () = validate_authorizations transaction in
   let** () = validate_tx_data_size ~max_number_of_chunks transaction in
   let** () = validate_gas_limit session transaction in
   return (Ok ())
@@ -578,21 +550,12 @@ let validate_balance_and_max_fee_per_gas ~base_fee_per_gas ~transaction
   in
   return (Ok total_cost)
 
-let validate_balance_and_gas_with_backend (type state) ~caller session
-    transaction =
+let validate_balance_and_gas_with_backend ~caller session transaction =
   let open Lwt_result_syntax in
-  let (module Backend_rpc : Services_backend_sig.S
-        with type Reader.state = state) =
-    session.state_backend
-  in
-  let* from_balance =
-    Etherlink_durable_storage.balance
-      (Backend_rpc.Reader.read session.state)
-      caller
-  in
+  let* from_balance = Etherlink_durable_storage.balance session.state caller in
   let** _total_cost =
     validate_balance_and_max_fee_per_gas
-      ~base_fee_per_gas:(Qty session.etherlink_infos.base_fee_per_gas)
+      ~base_fee_per_gas:(Qty session.tezosx_infos.base_fee_per_gas)
       ~transaction
       ~from_balance
   in
@@ -608,24 +571,16 @@ let full_validation ~next_nonce ~max_number_of_chunks ~caller ctxt transaction =
       ctxt
       transaction
   in
-  let (Session session) = ctxt.session in
+  let session = ctxt.session in
   let** () =
     validate_balance_and_gas_with_backend ~caller session transaction
   in
   return (Ok ())
 
-let valid_transaction_object (type state) ctxt session mode txn =
+let valid_transaction_object ctxt session mode txn =
   let open Lwt_result_syntax in
-  let (module Backend_rpc : Services_backend_sig.S
-        with type Reader.state = state) =
-    session.state_backend
-  in
   let caller = Transaction_object.sender txn in
-  let* next_nonce =
-    Etherlink_durable_storage.nonce
-      (Backend_rpc.Reader.read session.state)
-      caller
-  in
+  let* next_nonce = Etherlink_durable_storage.nonce session.state caller in
   let next_nonce =
     match next_nonce with None -> Qty Z.zero | Some next_nonce -> next_nonce
   in
@@ -666,14 +621,10 @@ module Handlers = struct
       ({chain_id; mode; max_number_of_chunks; chain_family; session}
         : Types.state)
 
-  let is_tx_valid (type state) ctxt session raw_transaction :
+  let is_tx_valid ctxt session raw_transaction :
       (Transaction_object.t prevalidation_result, string) result tzresult Lwt.t
       =
     let open Lwt_result_syntax in
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      session.state_backend
-    in
     let*? transaction_object = Transaction_object.decode raw_transaction in
     let* () =
       when_
@@ -688,33 +639,39 @@ module Handlers = struct
     in
     return (Ok {next_nonce; transaction_object})
 
-  let refresh_state (type state) ctxt session =
+  let refresh_state ctxt session =
     let open Lwt_result_syntax in
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      session.state_backend
-    in
-    let* state = Backend_rpc.Reader.get_state () in
+    let* state = Evm_ro_context.get_state session.ctxt () in
     let* session =
-      Types.session_of_state ctxt.chain_family session.state_backend state
+      Types.session_of_state ctxt.chain_family session.ctxt state
     in
     ctxt.session <- session ;
     return_unit
 
-  let is_tezlink_tx_valid (type state) _ctxt session raw_transaction :
+  let is_tezlink_tx_valid ~data_model ~simulator_mode ctxt session
+      raw_transaction :
       (Tezos_types.Operation.t prevalidation_result, string) result tzresult
       Lwt.t =
     let open Lwt_result_syntax in
-    (* We build a `read` function from the session. It's the only part of the
-       backend we should rely on: the other helpers in the backend rely on the
-       internal state, not the state in the session. *)
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      session.state_backend
+    let open Tezos_types.Tez in
+    let michelson_to_evm_gas_multiplier =
+      ctxt.session.tezosx_infos.michelson_to_evm_gas_multiplier
     in
-    let read = Backend_rpc.Reader.read session.state in
+    let nanotez_per_evm_gas =
+      Tezos_types.Tez.(
+        nanotez_of_wei (Wei session.tezosx_infos.base_fee_per_gas))
+    in
+    let nanotez_per_michelson_gas =
+      let (Nanotez per_evm_gas) = nanotez_per_evm_gas in
+      Nanotez Q.(per_evm_gas * of_int64 michelson_to_evm_gas_multiplier)
+    in
     let** op =
-      Tezlink_prevalidation.parse_and_validate_for_queue ~read raw_transaction
+      Tezlink_prevalidation.parse_and_validate_for_queue
+        ~simulator_mode
+        ~nanotez_per_michelson_gas
+        ~state:session.state
+        ~data_model
+        raw_transaction
     in
     return (Ok {next_nonce = Qty op.first_counter; transaction_object = op})
 
@@ -722,13 +679,24 @@ module Handlers = struct
       self -> (r, err) Request.t -> (r, err) result Lwt.t =
    fun self request ->
     let ctxt = Worker.state self in
-    let (Session session) = ctxt.session in
+    let session = ctxt.session in
     match request with
     | Prevalidate_raw_transaction {raw_transaction} ->
-        is_tx_valid ctxt session raw_transaction
-    | Refresh_state -> refresh_state ctxt session
-    | Prevalidate_raw_transaction_tezlink {raw_transaction} ->
-        is_tezlink_tx_valid ctxt session raw_transaction
+        protect @@ fun () -> is_tx_valid ctxt session raw_transaction
+    | Refresh_state -> protect @@ fun () -> refresh_state ctxt session
+    | Prevalidate_raw_transaction_tezlink {raw_transaction; simulator_mode} ->
+        let data_model =
+          match ctxt.chain_family with
+          | Ex_chain_family Michelson -> Tezlink_durable_storage.Path
+          | Ex_chain_family EVM -> Tezlink_durable_storage.Rlp
+        in
+        protect @@ fun () ->
+        is_tezlink_tx_valid
+          ctxt
+          session
+          raw_transaction
+          ~data_model
+          ~simulator_mode
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -754,8 +722,7 @@ type worker_status =
   | Pending_valid_state : {
       mode : mode;
       max_number_of_chunks : int option;
-      state_backend :
-        (module Services_backend_sig.S with type Reader.state = 'a);
+      ctxt : Evm_ro_context.t;
       chain_family : 'f L2_types.chain_family;
     }
       -> worker_status
@@ -769,21 +736,17 @@ let table = Worker.create_table Queue
 
 type error += No_worker
 
-let start (type state f) ?max_number_of_chunks
-    ~(chain_family : f L2_types.chain_family) mode state_backend =
+let start (type f) ?max_number_of_chunks
+    ~(chain_family : f L2_types.chain_family) mode ctxt =
   let open Lwt_result_syntax in
   let starting_promise, starting_waker = Lwt.task () in
   worker := Starting starting_promise ;
   let*! start_result =
     protect @@ fun () ->
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      state_backend
-    in
-    let* state = Backend_rpc.Reader.get_state () in
-    let* chain_id = Durable_storage.chain_id (Backend_rpc.Reader.read state) in
+    let* state = Evm_ro_context.get_state ctxt () in
+    let* chain_id = Durable_storage.read Chain_id state in
     let* session =
-      Types.session_of_state (Ex_chain_family chain_family) state_backend state
+      Types.session_of_state (Ex_chain_family chain_family) ctxt state
     in
     let* w =
       Worker.launch
@@ -808,8 +771,7 @@ let start (type state f) ?max_number_of_chunks
   | Error _ ->
       let*! () = Prevalidator_events.cannot_start () in
       worker :=
-        Pending_valid_state
-          {max_number_of_chunks; mode; state_backend; chain_family} ;
+        Pending_valid_state {max_number_of_chunks; mode; ctxt; chain_family} ;
       Lwt.wakeup starting_waker () ;
       return_unit
 
@@ -828,10 +790,9 @@ let rec get_worker ?(allow_retry = true) () =
   | Starting p ->
       let*! () = p in
       get_worker ~allow_retry ()
-  | Pending_valid_state
-      {max_number_of_chunks; mode; state_backend; chain_family}
+  | Pending_valid_state {max_number_of_chunks; mode; ctxt; chain_family}
     when allow_retry ->
-      let* () = start ~chain_family ?max_number_of_chunks mode state_backend in
+      let* () = start ~chain_family ?max_number_of_chunks mode ctxt in
       get_worker ~allow_retry:false ()
   | Pending_valid_state _ | Not_started -> tzfail No_worker
 
@@ -874,9 +835,29 @@ let prevalidate_raw_transaction raw_transaction =
 
 let refresh_state () = worker_add_request ~request:Request.Refresh_state
 
-let prevalidate_raw_transaction_tezlink raw_transaction =
+let get_da_fee_per_byte () =
+  let open Lwt_result_syntax in
+  let* w = get_worker () in
+  let state = Worker.state w in
+  let da_fee_wei =
+    Tezos_types.Tez.Wei state.session.tezosx_infos.da_fee_per_bytes
+  in
+  return (Tezos_types.Tez.nanotez_of_wei da_fee_wei)
+
+let get_michelson_base_fee_per_gas () =
+  let open Lwt_result_syntax in
+  let open Tezos_types.Tez in
+  let* w = get_worker () in
+  let state = Worker.state w in
+  let base_fee = Wei state.session.tezosx_infos.base_fee_per_gas in
+  let multiplier = state.session.tezosx_infos.michelson_to_evm_gas_multiplier in
+  let (Nanotez nanotez_per_evm_gas) = nanotez_of_wei base_fee in
+  return (Nanotez Q.(nanotez_per_evm_gas * of_int64 multiplier))
+
+let prevalidate_raw_transaction_tezlink ~simulator_mode raw_transaction =
   worker_wait_for_request
-    (Request.Prevalidate_raw_transaction_tezlink {raw_transaction})
+    (Request.Prevalidate_raw_transaction_tezlink
+       {raw_transaction; simulator_mode})
 
 let validate_balance_gas_nonce_with_validation_state validation_state
     (transaction : Transaction_object.t) :

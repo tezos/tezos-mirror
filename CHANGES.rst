@@ -22,68 +22,28 @@ or which will affect users in the future (deprecated features),
 not refactorings or tests. Changes to the documentation do not need to
 be documented here either.
 
+Breaking changes and deprecated features should be prefixed with the
+appropriate tag **Breaking change** or **Deprecation**, and also added
+to the breaking changes page in
+``docs/introduction/breaking_changes.rst``, section "Upcoming Octez
+Release".
+
+
 General
 -------
 
-- Hardened ``lib_bees`` worker lifecycle for OCaml 5.x Eio domains: switched
-  the worker registry to Saturn lock-free tables, serialized worker creation
-  with mutex protection, added retries under resource pressure, ensured worker
-  launch/initialization runs on the Event_loop main switch, and exposed clean
-  shutdown for tests. Improves reliability under domain contention and low
-  resources. (MR :gl:`!19990`)
+- Fixed a file descriptor leak in the RPC client: the connection of each
+  followed HTTP redirect was never released. This affected every Octez
+  executable issuing RPC calls through an endpoint answering redirects
+  (e.g. behind a reverse proxy).
+
+- RPC servers now enable TCP keepalive on accepted connections, so that
+  connections whose peer has disappeared without closing (e.g. behind a
+  NAT or load balancer that drops idle flows) are eventually closed and
+  their resources released, instead of being retained until restart.
 
 Node
 ----
-
-- **Breaking change** Only the short hash of blocks are output in the following
-  events from the block validator ``validation_or_application_failed``,
-  ``application_failed``, ``application_failure_after_validation``,
-  ``validation_failure``, ``validation_canceled``, ``commit_block_failure``,
-  ``validated_block``, ``validation_and_application_success`` and
-  ``updated_to_checkpoint`` events. From the prevalidator
-  ``request_completed_info`` event. And from the store ``<block_hash> (level:
-  <level>)`` into ``<short_block_hash> (level: <level>)`` events. (MR
-  :gl:`!19720`)
-
-- **Breaking change** events ``validator.block.validating_block`` level has been
-  changed from ``Debug`` to ``Info`` (output in the daily-logs) and now show the long
-  block hash, the level, predecessor, fitness and timestamp of the block. (MR
-  :gl:`!19720`)
-
-- **Breaking change** ``validator.chain.block_info`` level is now ``Debug``
-  (previously ``Info``) and is no longer output in daily-logs. (MR :gl:`!19720`)
-
-- Brassaia context backend is no longer experimental. (MR :gl:`!20079`)
-
-- Fixed the external validator process being unnecessarily restarted when a
-  bootstrap pipeline is canceled (e.g. due to peer disconnection). Also improved
-  canceled error matching to handle all forms of ``Lwt.Canceled`` errors,
-  including serialized forms from IPC round-trips. (MR :gl:`!20903`)
-
-- Fixed node shutdown ordering so the node shuts down before RPC servers,
-  avoiding EPIPE errors and slow shutdown when many external RPC processes are
-  running. (MR :gl:`!20476`)
-
-- A new store version (v3.3) is introduced. At node startup, an existing
-  ``data_dir`` containing a store with a supported version (v3.1 and v3.2) is
-  automatically upgraded to v3.3. (MR :gl:`!19967`)
-
-- **Breaking change** Brassaia becomes the default context backend. During the
-  v3.3 store upgrade, any store containing an Irmin context will automatically
-  migrate to Brassaia unless the user explicitly opts out using
-  ``TEZOS_CONTEXT_BACKEND=irmin``. (MR :gl:`!20079`)
-
-- Updated the default secure RPC ACL policy: tightened ``contracts`` and
-  ``delegates`` endpoint patterns to require an explicit identifier, and removed
-  ``merkle_tree``, ``merkle_tree_v2``, ``network/version``, and
-  ``network/versions`` endpoints from the default allowlist.
-
-- P2P hardening improvements: setting message-queue size and count limit
-  (:gl:`!21349`, :gl:`!21363`); per-connection throttling (:gl:`!21436`); faster
-  on connection loss peer shutdown (:gl:`!21335`); updated welcome-worker
-  admission rules (:gl:`!21415`).
-
-- RPC: Updated the default secure RPC ACL policy. (MR :gl:`!21131`)
 
 Client
 ------
@@ -94,29 +54,8 @@ Signer
 Baker
 -----
 
-- **Deprecation** The ``adaptive-issuance-vote`` argument (placeholder
-  ``vote``) is now deprecated, and will be removed in the next major
-  version of Octez. It was meant to decide the activation of the
-  Adaptive Issuance feature, and has had no effects since the Paris
-  protocol has been voted in. (MR :gl:`!19215`)
-
-- **Deprecation** The ``octez-baker-<protocol>`` binaries are
-   deprecated, and will be removed in the next major version of
-   Octez. Please use ``octez-baker`` instead, which automatically
-   handles protocol switches. (MR :gl:`!19641`)
-
-- Fix issue when connecting to Octez nodes behind a proxy that can rearrange
-  chunks. (MR :gl:`!20057`)
-
-
 Accuser
 -------
-
-- **Deprecation** The ``octez-accuser-<protocol>`` binaries are
-   deprecated, and will be removed in the next major version of
-   Octez. Please use ``octez-accuser`` instead, which automatically
-   handles protocol switches. (MR :gl:`!19641`)
-
 
 Proxy Server
 ------------
@@ -133,53 +72,31 @@ Docker Images
 Packaging
 ---------
 
-- **Breaking change**: Debian/Ubuntu packages now install services as disabled
-  by default. Users must explicitly enable services with
-  ``systemctl enable octez-node`` (and similar for other services) before
-  starting them. This prevents accidental service starts during package
-  installation or upgrades. (MR :gl:`!19996`)
-
-- **Breaking change**: Services (octez-node, octez-baker, octez-dal-node) are
-  now gracefully stopped during package upgrade and NOT automatically restarted.
-  Users must manually restart services after upgrade with
-  ``systemctl start octez-node`` (and similar). (MR :gl:`!19996`)
-
 Smart Rollup node
 -----------------
 
-- Update opentelemetry library to 0.12 which should fix the issue where a log
-  protobuf encoding crashes the node when telemetry is activated. (MR
-  :gl:`!19516`)
+- Registered the missing handler for the ``/global/last_cemented_commitment``
+  RPC, which previously returned 404 even though the service was declared. (MR
+  :gl:`!21757`)
 
-- Ensure metrics are initialized before starting metrics server. (MR
-  :gl:`!19707`)
+- Skip context reconstruction during ``snapshot import`` when the head's commit
+  is already present in the imported context, so non-compact snapshots no longer
+  pay for unnecessary PVM replay. Fixes a regression. (MR :gl:`!21810`)
 
-- Allow to only monitor finalized L1 blocks with CLI switch
-  ``--l1-monitor-finalized``. This allows a more efficient processing when the
-  consumer is only interested in finalized blocks. (MR :gl:`!19568`)
+- Add a ``--dal-node`` option to ``snapshot import`` so reconstruction of
+  compact snapshots can fetch DAL pages from a DAL node. (MR :gl:`!21810`)
 
-- New RPC **GET** ``/global/monitor_finalized_blocks`` to stream only finalized
-  blocks (similarly to ``/global/monitor_blocks``). (MR :gl:`!19568`)
+- Make ``snapshot import`` more robust when verifying that the snapshot's
+  commitment is published on L1: search around the snapshot's head level
+  rather than only at the L1 head, and report a clear error suggesting an
+  archive L1 node when the snapshot is older than the savepoint. (MR
+  :gl:`!21841`)
 
-- Fix streaming RPC ``/global/monitor_blocks``
-  (resp. ``/global/monitor_finalized_blocks``) which could return an empty body
-  if they were called before the first (resp. finalized) block is produced. (MR
-  :gl:`!19569`)
-
-- Reduce number of RPCs to L1 node by fetching chain id on startup. (MR
-  :gl:`!19788`)
-
-- The rollup node now properly supports DAL on Shadownet. (MRs :gl:`!19765`,
-  :gl:`!19809`)
-
-- Fix issue when connecting to Octez nodes behind a proxy that can rearrange
-  chunks. (MR :gl:`!20057`)
-
-- Fix issue where setting for ``l1_monitor_finalized`` would be ignored from the
-  configuration file. (MR :gl:`!20239`)
-
-- Fix issue where finalized blocks would not be notified when using
-  ``--l1-monitor-finalized``. (MR :gl:`!20256`)
+- The rollup node no longer exits when the L1 RPC is unreachable at startup;
+  the initial connection is retried with the configured
+  ``--reconnection-delay`` exponential backoff, matching the existing behaviour
+  for runtime disconnections. A ``reconnected`` notice is emitted once the
+  connection is re-established. (MR :gl:`!21854`)
 
 Smart Rollup WASM Debugger
 --------------------------
@@ -189,34 +106,17 @@ Data Availability Layer (DAL)
 
 DAL node
 ~~~~~~~~
+- **Breaking change**: The DAL node RPC server now binds to ``127.0.0.1:10732``
+  by default instead of ``0.0.0.0:10732``. Operators who need to expose the RPC
+  interface publicly must explicitly pass ``--rpc-addr 0.0.0.0:10732``. When
+  bound to a non-loopback address, a warning is emitted and a restrictive ACL is
+  applied (only safe/read-only endpoints are accessible). The ACL can be
+  overridden per-bind-address via the new ``acl`` field in ``config.json``,
+  using the same policy syntax as the L1 node's ``rpc.acl``.
 
-- **Breaking change** The ``/levels/<slot_level>/slots/<slot_index>/status``
-  RPC now answers with ``unpublished`` status for unpublished slots instead
-  of a 404 empty response. (MR :gl:`!19613`)
-
-- Added RPC ``GET /profiles/{pkh}/monitor/attestable_slots`` to open a monitoring
-  stream that emits a JSON ``slot_id`` each time a slot becomes attestable for the
-  given public key hash (``pkh``). A slot id is emitted when all shards assigned to
-  that ``pkh`` at the corresponding attestation level are available in the DAL
-  node's store. If traps are detected within the slot, then it should not be attested,
-  so the id is not sent via the stream. (MR :gl:`!19459`)
-
-- The DAL node now starts propagating shards one level after the inclusion of the
-  corresponding published slot header operation (i.e., when the operation is finalized),
-  instead of two levels after, when the block is finalized. (MR :gl:`!19366`)
-
-- **Breaking change** Slots status are not stored in dedicated files on disk
-  anymore, but found in a cache and the skip list. A consequence of this is that
-  the ``/levels/<slot_level>/slots/<slot_index>/status`` will only work with nodes that store the
-  skip list, and therefore not with observer nodes. Also, the RPC will now answer
-  a 500 error if querying a level at which the DAL was not supported instead
-  of a 404 error. (MR :gl:`!19471`)
-
-- **Breaking change** Enforced stricter validation for the JSON configuration
-  file. Previously, the parser would silently ignore any content that appeared
-  after the first valid JSON object. Now, any extraneous data will cause the
-  function to return an error. (MR :gl:`!18745`)
-
+- Added a ``--skip-shards`` flag to the ``snapshot export`` and ``snapshot
+  import`` commands. When set, shards are neither exported nor imported,
+  producing smaller snapshots for nodes that only need slot data.
 
 Miscellaneous
 -------------

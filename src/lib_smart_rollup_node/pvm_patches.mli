@@ -10,6 +10,7 @@ type unsafe_patch =
   | Increase_max_nb_ticks of int64
       (** Increase the maximum number of ticks.  *)
   | Patch_durable_storage of {key : string; value : string}
+  | Patch_PVM_version of {version : string}
 
 (** Where the patch comes from  *)
 type kind =

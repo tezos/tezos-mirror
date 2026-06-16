@@ -102,12 +102,10 @@ fn make_target(target: f64) -> BigUint {
 
 #[cfg(test)]
 mod tests {
-    use hex::FromHex;
+
     use num_bigint::BigUint;
 
-    use crate::crypto_box::PublicKey;
-
-    use super::{check_proof_of_work, ProofOfWork};
+    use super::check_proof_of_work;
 
     // `BigUint::from_bytes_le` is the same as `Z.of_bits`
     #[test]

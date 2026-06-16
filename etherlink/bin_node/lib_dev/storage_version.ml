@@ -27,3 +27,14 @@ let legacy_storage_compatible ~storage_version = storage_version < 41
 
 let sub_block_latency_entrypoints_disabled ~storage_version =
   storage_version < 42
+
+let tezosx_tezos_blocks ~storage_version = storage_version >= 49
+
+let sequencer_key_storage_migrated_to_world_state ~storage_version =
+  storage_version >= 50
+
+let ipc_paths_moved_to_base ~storage_version = storage_version >= 51
+
+let tezosx_single_tx ~storage_version = storage_version >= 52
+
+let governance_config_moved_to_base ~storage_version = storage_version >= 53

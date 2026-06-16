@@ -21,8 +21,8 @@ module DAL : sig
     producers : int option;
     producers_delay : int option;
     producer_machine_type : string option;
-    observer_slot_indices : int list;
-    observers_multi_slot_indices : int list list;
+    observers_slot_indices : int list list;
+    observer_machine_type : string list;
     archivers_slot_indices : int list list;
     observer_pkhs : string list;
     protocol : Protocol.t option;
@@ -53,9 +53,14 @@ module DAL : sig
     slot_size : int option;
     number_of_slots : int option;
     attestation_lag : int option;
+    attestation_lags : int list option;
     traps_fraction : Q.t option;
+    publish_slots_regularly : bool;
+    stresstest : Stresstest.t option;
   }
 
+  (** If [seed] is omitted from the JSON config, a random seed is chosen
+      at decode time. *)
   val encoding : t Data_encoding.t
 end
 
@@ -97,8 +102,10 @@ module LAYER1 : sig
       Use 0 for disabling delay and have all the bakers to merge their
       store at the beginning of cycles.
 
-    - [migration_offset]: offset that dictates after how many levels a protocol
-      upgrade will be performed via a UAU.
+      - [migration]: is the parameters for protocol migration. The level offset
+      (can be expressed in cycle) that dictates after how many levels a protocol
+      upgrade will be performed via a UAU. And the number of level or cycle that
+      should be baked after the migration until the experiment stops
 
     - [stresstest]: See the description of [stresstest_conf]
 
@@ -113,7 +120,7 @@ module LAYER1 : sig
     without_dal : bool;
     dal_node_producers : int list option;
     maintenance_delay : int;
-    migration_offset : int option;
+    migration : Protocol_migration.t option;
     ppx_profiling_verbosity : string option;
     ppx_profiling_backends : string list;
     signing_delay : (float * float) option;

@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint_storage::MAXIMUM_NUMBER_OF_CHUNKS;
+use crate::chains::ExperimentalFeatures;
 use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::tick_model::constants::{
     TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE, TICKS_FOR_DELAYED_MESSAGES,
@@ -31,7 +32,6 @@ use tezos_ethereum::{
     tx_common::EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_encoding::{
     inbox::{
@@ -137,6 +137,13 @@ pub enum Input<Mode> {
     RemoveSequencer,
     Info(LevelWithInfo),
     ForceKernelUpgrade,
+    /// DAL attested slots from the protocol - contains published_level, slot parameters, and list of attested slot indices.
+    DalAttestedSlots {
+        published_level: i32,
+        slot_size: u64,
+        page_size: u64,
+        slot_indices: Vec<u8>,
+    },
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -188,6 +195,13 @@ pub trait Parsable {
     fn on_deposit(context: &mut Self::Context);
 
     fn on_fa_deposit(context: &mut Self::Context);
+
+    /// Get the whitelist of authorized DAL publishers from the context.
+    /// Returns an empty slice if no whitelist is configured or in proxy mode.
+    /// NOTE: Empty whitelist means reject all publishers (therefore all slots).
+    fn dal_publishers_whitelist(
+        context: &Self::Context,
+    ) -> &[tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash];
 }
 
 impl ProxyInput {
@@ -287,6 +301,13 @@ impl Parsable for ProxyInput {
     fn on_deposit(_: &mut Self::Context) {}
 
     fn on_fa_deposit(_: &mut Self::Context) {}
+
+    fn dal_publishers_whitelist(
+        _context: &Self::Context,
+    ) -> &[tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash] {
+        // Proxy mode doesn't have a whitelist - return empty slice (rejects all publishers)
+        &[]
+    }
 }
 
 pub struct BufferTransactionChunks {
@@ -306,6 +327,14 @@ pub struct SequencerParsingContext {
     // Number of the next expected blueprint, handling blueprints
     // before this is useless.
     pub next_blueprint_number: U256,
+    pub experimental_features: ExperimentalFeatures,
+    // When true, legacy DAL slot import signals are disabled.
+    // The kernel will rely on DalAttestedSlots internal messages instead.
+    pub legacy_dal_signals_disabled: bool,
+    // Whitelist of authorized DAL publishers (public key hashes).
+    // Only slots published by these keys will be accepted from DalAttestedSlots messages.
+    pub dal_publishers_whitelist:
+        Vec<tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash>,
 }
 
 fn check_unsigned_blueprint_chunk(
@@ -407,6 +436,16 @@ impl SequencerInput {
             .allocated_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
 
+        // If legacy DAL signals are disabled, ignore this message.
+        // The kernel would then rely entirely on DalAttestedSlots internal
+        // messages from the protocol.
+        if context.legacy_dal_signals_disabled {
+            log!(Error,
+                "Legacy DAL slot import signal ignored (disable_legacy_dal_signals is enabled)"
+            );
+            return InputResult::Unparsable;
+        }
+
         let Some(dal) = &context.dal_configuration else {
             return InputResult::Unparsable;
         };
@@ -458,13 +497,49 @@ mod delayed_chunked_transaction {
     // L1 operation, but in several inbox messages.
 
     use crate::parsing::BufferTransactionChunks;
+    use rlp::DecoderError;
     use sha3::{Digest, Keccak256};
+    use tezos_data_encoding::nom::NomReader;
     use tezos_ethereum::{
         transaction::TransactionHash, tx_common::EthereumTransactionCommon,
     };
+    use tezos_tezlink::operation::Operation;
+    use tezosx_interfaces::RuntimeId;
 
     pub const NEW_CHUNK_TAG: u8 = 0x0;
     pub const CHUNK_TAG: u8 = 0x1;
+
+    #[allow(clippy::large_enum_variant)]
+    pub enum Transaction {
+        Ethereum(EthereumTransactionCommon),
+        Tezos(Operation),
+    }
+
+    impl Transaction {
+        pub fn from_bytes(bytes: &[u8]) -> Result<Self, DecoderError> {
+            if bytes.is_empty() {
+                return Err(DecoderError::Custom("Empty transaction bytes"));
+            }
+
+            let (tag, remaining) = bytes
+                .split_first()
+                .ok_or(DecoderError::Custom("No tag for transaction"))?;
+            match RuntimeId::try_from(*tag).map_err(DecoderError::Custom)? {
+                RuntimeId::Ethereum => {
+                    let tx: EthereumTransactionCommon =
+                        EthereumTransactionCommon::from_bytes(remaining)?;
+                    Ok(Transaction::Ethereum(tx))
+                }
+                RuntimeId::Tezos => {
+                    let tx: Operation =
+                        Operation::nom_read_exact(remaining).map_err(|_| {
+                            DecoderError::Custom("Failed to parse Tezos operation")
+                        })?;
+                    Ok(Transaction::Tezos(tx))
+                }
+            }
+        }
+    }
 
     pub fn parse_new_chunk(
         bytes: &[u8],
@@ -479,6 +554,38 @@ mod delayed_chunked_transaction {
                 chunks: vec![],
             })
         }
+    }
+
+    pub fn parse_multi_runtime_chunk(
+        bytes: &[u8],
+        buffer_transaction_chunks_opt: &mut Option<BufferTransactionChunks>,
+    ) -> Option<(Transaction, TransactionHash)> {
+        let is_complete = match buffer_transaction_chunks_opt.as_mut() {
+            None => {
+                // Again, it's the responsibility of the contract to respect
+                // the message protocol.
+                return None;
+            }
+            Some(buffer_transaction_chunks) => {
+                buffer_transaction_chunks.chunks.extend(bytes);
+                buffer_transaction_chunks.accumulated += 1;
+                buffer_transaction_chunks.total == buffer_transaction_chunks.accumulated
+            }
+        };
+
+        if !is_complete {
+            return None;
+        }
+
+        // Transaction is complete.
+        //
+        // Drop the mutable borrow before clearing the buffer.
+        let buffer_transaction_chunks = buffer_transaction_chunks_opt.take()?;
+        let chunks = buffer_transaction_chunks.chunks;
+
+        let transaction = Transaction::from_bytes(&chunks).ok()?;
+        let tx_hash: TransactionHash = Keccak256::digest(&chunks).into();
+        Some((transaction, tx_hash))
     }
 
     pub fn parse_chunk(
@@ -556,28 +663,63 @@ impl Parsable for SequencerInput {
 
         let (tag, remaining) = parsable!(bytes.split_first());
 
-        let (tx, tx_hash) = parsable!(match *tag {
-            delayed_chunked_transaction::NEW_CHUNK_TAG => {
-                delayed_chunked_transaction::parse_new_chunk(
-                    remaining,
-                    &mut context.buffer_transaction_chunks,
-                );
-                None
-            }
-            delayed_chunked_transaction::CHUNK_TAG =>
-                delayed_chunked_transaction::parse_chunk(
-                    remaining,
-                    &mut context.buffer_transaction_chunks,
-                ),
-            _ => None,
-        });
+        if context
+            .experimental_features
+            .is_tezos_runtime_enabled(context.next_blueprint_number)
+        {
+            let (tx, tx_hash) = parsable!(match *tag {
+                delayed_chunked_transaction::NEW_CHUNK_TAG => {
+                    delayed_chunked_transaction::parse_new_chunk(
+                        remaining,
+                        &mut context.buffer_transaction_chunks,
+                    );
+                    None
+                }
+                delayed_chunked_transaction::CHUNK_TAG =>
+                    delayed_chunked_transaction::parse_multi_runtime_chunk(
+                        remaining,
+                        &mut context.buffer_transaction_chunks,
+                    ),
+                _ => None,
+            });
 
-        InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
-            Transaction {
-                tx_hash,
-                content: TransactionContent::EthereumDelayed(tx),
-            },
-        ))))
+            InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
+                Transaction {
+                    tx_hash,
+                    content: match tx {
+                        delayed_chunked_transaction::Transaction::Ethereum(tx) => {
+                            TransactionContent::EthereumDelayed(tx)
+                        }
+                        delayed_chunked_transaction::Transaction::Tezos(op) => {
+                            TransactionContent::TezosDelayed(op)
+                        }
+                    },
+                },
+            ))))
+        } else {
+            let (tx, tx_hash) = parsable!(match *tag {
+                delayed_chunked_transaction::NEW_CHUNK_TAG => {
+                    delayed_chunked_transaction::parse_new_chunk(
+                        remaining,
+                        &mut context.buffer_transaction_chunks,
+                    );
+                    None
+                }
+                delayed_chunked_transaction::CHUNK_TAG =>
+                    delayed_chunked_transaction::parse_chunk(
+                        remaining,
+                        &mut context.buffer_transaction_chunks,
+                    ),
+                _ => None,
+            });
+
+            InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
+                Transaction {
+                    tx_hash,
+                    content: TransactionContent::EthereumDelayed(tx),
+                },
+            ))))
+        }
     }
 
     fn on_deposit(context: &mut Self::Context) {
@@ -590,6 +732,12 @@ impl Parsable for SequencerInput {
         context.allocated_ticks = context
             .allocated_ticks
             .saturating_sub(TICKS_PER_FA_DEPOSIT_PARSING);
+    }
+
+    fn dal_publishers_whitelist(
+        context: &Self::Context,
+    ) -> &[tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash] {
+        &context.dal_publishers_whitelist
     }
 }
 
@@ -644,8 +792,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         }
     }
 
-    fn parse_fa_deposit<Host: Runtime>(
-        host: &mut Host,
+    fn parse_fa_deposit(
         ticket: FA2_1Ticket,
         routing_info: MichelsonBytes,
         inbox_level: u32,
@@ -657,12 +804,11 @@ impl<Mode: Parsable> InputResult<Mode> {
         Mode::on_fa_deposit(context);
         match FaDeposit::try_parse(ticket, routing_info, inbox_level, inbox_msg_id) {
             Ok((fa_deposit, chain_id)) => {
-                log!(host, Debug, "Parsed from input: {}", fa_deposit.display());
+                log!(Debug, "Parsed from input: {}", fa_deposit.display());
                 InputResult::Input(Input::FaDeposit((fa_deposit, chain_id)))
             }
             Err(err) => {
                 log!(
-                    host,
                     Debug,
                     "FA deposit ignored because of parsing errors: {}",
                     err
@@ -672,8 +818,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         }
     }
 
-    fn parse_deposit<Host: Runtime>(
-        host: &mut Host,
+    fn parse_deposit(
         ticket: FA2_1Ticket,
         receiver: MichelsonBytes,
         inbox_level: u32,
@@ -685,24 +830,18 @@ impl<Mode: Parsable> InputResult<Mode> {
         Mode::on_deposit(context);
         match Deposit::try_parse(ticket, receiver, inbox_level, inbox_msg_id) {
             Ok((deposit, chain_id)) => {
-                log!(host, Info, "Parsed from input: {}", deposit.display());
+                log!(Info, "Parsed from input: {}", deposit.display());
                 Self::Input(Input::Deposit((deposit, chain_id)))
             }
             Err(err) => {
-                log!(
-                    host,
-                    Info,
-                    "Deposit ignored because of parsing errors: {}",
-                    err
-                );
+                log!(Info, "Deposit ignored because of parsing errors: {}", err);
                 Self::Unparsable
             }
         }
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn parse_internal_transfer<Host: Runtime>(
-        host: &mut Host,
+    fn parse_internal_transfer(
         transfer: Transfer<RollupType>,
         smart_rollup_address: &[u8],
         tezos_contracts: &TezosContracts,
@@ -713,7 +852,6 @@ impl<Mode: Parsable> InputResult<Mode> {
     ) -> Self {
         if transfer.destination.hash().as_ref() != smart_rollup_address {
             log!(
-                host,
                 Info,
                 "Deposit ignored because of different smart rollup address"
             );
@@ -729,7 +867,6 @@ impl<Mode: Parsable> InputResult<Mode> {
                         Contract::Originated(kt1) => {
                             if Some(kt1) == tezos_contracts.ticketer.as_ref() {
                                 Self::parse_deposit(
-                                    host,
                                     ticket,
                                     receiver,
                                     inbox_level,
@@ -738,7 +875,6 @@ impl<Mode: Parsable> InputResult<Mode> {
                                 )
                             } else if enable_fa_deposits {
                                 Self::parse_fa_deposit(
-                                    host,
                                     ticket,
                                     receiver,
                                     inbox_level,
@@ -747,7 +883,6 @@ impl<Mode: Parsable> InputResult<Mode> {
                                 )
                             } else {
                                 log!(
-                                    host,
                                     Info,
                                     "FA deposit ignored because the feature is disabled"
                                 );
@@ -755,11 +890,7 @@ impl<Mode: Parsable> InputResult<Mode> {
                             }
                         }
                         _ => {
-                            log!(
-                                host,
-                                Info,
-                                "Deposit ignored because of invalid ticketer"
-                            );
+                            log!(Info, "Deposit ignored because of invalid ticketer");
                             InputResult::Unparsable
                         }
                     }
@@ -788,8 +919,7 @@ impl<Mode: Parsable> InputResult<Mode> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn parse_internal<Host: Runtime>(
-        host: &mut Host,
+    fn parse_internal(
         message: InternalInboxMessage<RollupType>,
         smart_rollup_address: &[u8],
         tezos_contracts: &TezosContracts,
@@ -803,7 +933,6 @@ impl<Mode: Parsable> InputResult<Mode> {
                 InputResult::Input(Input::Info(LevelWithInfo { level, info }))
             }
             InternalInboxMessage::Transfer(transfer) => Self::parse_internal_transfer(
-                host,
                 transfer,
                 smart_rollup_address,
                 tezos_contracts,
@@ -813,12 +942,74 @@ impl<Mode: Parsable> InputResult<Mode> {
                 enable_fa_deposits,
             ),
             InternalInboxMessage::EndOfLevel => InputResult::NoInput,
+            InternalInboxMessage::DalAttestedSlots(dal_attested) => {
+                // Extract slot indices only from whitelisted publishers.
+                // Each PublisherSlots contains a Zarith bitset where bit i is
+                // set if slot index i is attested.
+                let whitelist = Mode::dal_publishers_whitelist(context);
+
+                // Count total published slots before filtering
+                let total_published_slots: usize = dal_attested
+                    .slots_by_publisher
+                    .iter()
+                    .map(|publisher_slots| {
+                        (0..dal_attested.number_of_slots)
+                            .filter(|&i| publisher_slots.slots_bitset.0.bit(i as u64))
+                            .count()
+                    })
+                    .sum();
+
+                let mut rejected_publishers = Vec::new();
+                let slot_indices: Vec<u8> = dal_attested
+                    .slots_by_publisher
+                    .iter()
+                    .filter(|publisher_slots| {
+                        let is_whitelisted =
+                            whitelist.contains(&publisher_slots.publisher);
+                        if !is_whitelisted {
+                            rejected_publishers
+                                .push(publisher_slots.publisher.to_b58check());
+                        }
+                        is_whitelisted
+                    })
+                    .flat_map(|publisher_slots| {
+                        (0..dal_attested.number_of_slots)
+                            .filter(|&i| publisher_slots.slots_bitset.0.bit(i as u64))
+                            .map(|i| i as u8)
+                    })
+                    .collect();
+
+                // Log summary
+                if rejected_publishers.is_empty() {
+                    log!(Debug,
+                        "For published level {}, accepted {}/{} DAL slots from {} publishers",
+                        dal_attested.published_level,
+                        slot_indices.len(),
+                        total_published_slots,
+                        dal_attested.slots_by_publisher.len()
+                    );
+                } else {
+                    log!(Debug,
+                        "For published level {}, accepted {}/{} DAL slots; not whitelisted: {}",
+                        dal_attested.published_level,
+                        slot_indices.len(),
+                        total_published_slots,
+                        rejected_publishers.join(", ")
+                    );
+                }
+
+                InputResult::Input(Input::DalAttestedSlots {
+                    published_level: dal_attested.published_level,
+                    slot_size: dal_attested.slot_size as u64,
+                    page_size: dal_attested.page_size as u64,
+                    slot_indices,
+                })
+            }
             _ => InputResult::Unparsable,
         }
     }
 
-    pub fn parse<Host: Runtime>(
-        host: &mut Host,
+    pub fn parse(
         input: Message,
         smart_rollup_address: [u8; 20],
         tezos_contracts: &TezosContracts,
@@ -837,7 +1028,6 @@ impl<Mode: Parsable> InputResult<Mode> {
                     Self::parse_external(message, &smart_rollup_address, context)
                 }
                 InboxMessage::Internal(message) => Self::parse_internal(
-                    host,
                     message,
                     &smart_rollup_address,
                     tezos_contracts,
@@ -856,19 +1046,15 @@ impl<Mode: Parsable> InputResult<Mode> {
 pub mod tests {
     use super::*;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
-    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::input::Message;
 
     const ZERO_SMART_ROLLUP_ADDRESS: [u8; 20] = [0; 20];
 
     #[test]
     fn parse_unparsable_transaction() {
-        let mut host = MockKernelHost::default();
-
         let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
         assert_eq!(
             InputResult::<ProxyInput>::parse(
-                &mut host,
                 message,
                 ZERO_SMART_ROLLUP_ADDRESS,
                 &TezosContracts {

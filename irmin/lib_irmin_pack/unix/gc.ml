@@ -47,6 +47,7 @@ module Make (Args : Gc_args.S) = struct
     commit : read Commit_store.t;
     mutable partial_stats : Gc_stats.Main.t;
     mutable resulting_stats : Stats.Latest_gc.stats option;
+    mutable finalization_started : bool;
     latest_gc_target_offset : int63;
   }
 
@@ -154,6 +155,7 @@ module Make (Args : Gc_args.S) = struct
         commit;
         partial_stats;
         resulting_stats = None;
+        finalization_started = false;
         latest_gc_target_offset;
       }
 
@@ -266,6 +268,22 @@ module Make (Args : Gc_args.S) = struct
   let finalise ~wait t =
     match t.resulting_stats with
     | Some partial_stats -> Lwt.return_ok (`Finalised partial_stats)
+    | None when t.finalization_started -> (
+        if
+          (* Another caller has already entered [go]. Either it is still
+           running (promise [Sleep]), or it has resolved the promise with
+           the final outcome. Consult the promise state rather than lying
+           with [`Running] when an error or success is already available. *)
+          wait
+        then
+          let* result = t.promise in
+          Lwt.return (Result.map (fun stats -> `Finalised stats) result)
+        else
+          match Lwt.state t.promise with
+          | Lwt.Return (Ok stats) -> Lwt.return_ok (`Finalised stats)
+          | Lwt.Return (Error _ as err) -> Lwt.return err
+          | Lwt.Sleep -> Lwt.return_ok `Running
+          | Lwt.Fail _ -> assert false)
     | None -> (
         let partial_stats = t.partial_stats in
         let partial_stats =
@@ -319,13 +337,21 @@ module Make (Args : Gc_args.S) = struct
           Lwt.return result
         in
         let module Task = (val t.task) in
-        if wait then
+        (* Flip [finalization_started] only at the point we commit to
+           running [go] — otherwise a [wait:false] call that observes
+           [`Running] would set the flag without anyone calling [go],
+           causing a subsequent [wait:true] to block on [t.promise]
+           forever. *)
+        if wait then (
+          t.finalization_started <- true;
           let* status = Task.Async.await Task.v in
-          go status
+          go status)
         else
           match Task.Async.status Task.v with
           | `Running -> Lwt.return_ok `Running
-          | #Task.Async.outcome as status -> go status)
+          | #Task.Async.outcome as status ->
+              t.finalization_started <- true;
+              go status)
 
   let finalise_without_swap t =
     let module Task = (val t.task) in

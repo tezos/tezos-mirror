@@ -2,3 +2,8 @@ Development Changelog
 '''''''''''''''''''''
 
 - Introduce FA bridge watchtower. (MR :gl:`!17984`)
+- The FA bridge watchtower becomes the bridge watchtower.
+  It becomes generic over the type of bridge it monitors.
+  From now on the watchtower will monitor events related
+  to both the XTZ and FA bridge and will claim deposits
+  for both bridges. (MR :gl:`!20558`)

@@ -83,8 +83,11 @@ module Installer_kernel_config = struct
     | Reveal {hash; to_} -> sf {|- reveal: %s
   to: %s
 |} hash to_
-    | Set {value; to_} -> sf {|- set:
-    value: %s
+    | Set {value; to_} ->
+        (* Quote the value so that empty strings are preserved as "" in YAML
+         rather than being interpreted as null. *)
+        sf {|- set:
+    value: "%s"
     to: %s
 |} value to_
 
@@ -330,7 +333,8 @@ let make_string_parameter name = function
 let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
     ?commitment_period ?challenge_window ?timeout ?whitelist_enable
     ?rpc_external ?(riscv_pvm_enable = false) ?minimal_block_delay
-    ?dal_incentives ?dal_rewards_weight protocol =
+    ?dal_incentives ?dal_rewards_weight ?dal_attested_slots_validity_lag
+    protocol =
   let parameters =
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
@@ -351,6 +355,12 @@ let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
     @ make_int_parameter
         ["issuance_weights"; "dal_rewards_weight"]
         dal_rewards_weight
+    @ make_int_parameter
+        [
+          "smart_rollup_reveal_activation_level";
+          "dal_attested_slots_validity_lag";
+        ]
+        dal_attested_slots_validity_lag
     @
     if riscv_pvm_enable then [(["smart_rollup_riscv_pvm_enable"], `Bool true)]
     else []
@@ -429,6 +439,7 @@ let setup_rollup ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
       tezos_node
       ?data_dir
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ?default_operator:operator
       ?operators
       ?name:rollup_node_name
@@ -700,8 +711,8 @@ let get_staked_on_commitment ~sc_rollup ~staker client =
   | Some hash -> return hash
   | None -> failwith (Format.sprintf "hash is missing %s" __LOC__)
 
-let forge_and_publish_commitment ?compressed_state ?number_of_ticks ~inbox_level
-    ~predecessor ~sc_rollup ~src client =
+let forge_and_publish_commitment ?keys ?compressed_state ?number_of_ticks
+    ~inbox_level ~predecessor ~sc_rollup ~src client =
   let open Runnable in
   let open Syntax in
   let commitment, runnable =
@@ -715,11 +726,11 @@ let forge_and_publish_commitment ?compressed_state ?number_of_ticks ~inbox_level
       client
   in
   let*! () = runnable in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ?keys client in
   let* hash = get_staked_on_commitment ~sc_rollup ~staker:src client in
   return (commitment, hash)
 
-let bake_period_then_publish_commitment ?compressed_state ?number_of_ticks
+let bake_period_then_publish_commitment ?keys ?compressed_state ?number_of_ticks
     ~sc_rollup ~src client =
   let* {commitment_period_in_blocks = commitment_period; _} =
     get_sc_rollup_constants client
@@ -733,9 +744,11 @@ let bake_period_then_publish_commitment ?compressed_state ?number_of_ticks
     last_inbox_level + commitment_period - current_level + 1
   in
   let* () =
-    repeat missing_blocks_to_commit (fun () -> Client.bake_for_and_wait client)
+    repeat missing_blocks_to_commit (fun () ->
+        Client.bake_for_and_wait ?keys client)
   in
   forge_and_publish_commitment
+    ?keys
     ?compressed_state
     ?number_of_ticks
     ~inbox_level
@@ -803,16 +816,16 @@ let check_op_included ~__LOC__ =
 (** Helper function that allows to inject the given operation in a node, bake a
     block, and check that the operation is successfully applied in the baked
     block. *)
-let bake_operation_via_rpc ~__LOC__ client op =
+let bake_operation_via_rpc ~__LOC__ ?keys client op =
   let* (`OpHash oph) = Operation.Manager.inject [op] client in
-  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait ?keys client in
   check_op_included ~__LOC__ ~oph client
 
-let start_refute client ~source ~opponent ~sc_rollup ~player_commitment_hash
-    ~opponent_commitment_hash =
+let start_refute ?keys client ~source ~opponent ~sc_rollup
+    ~player_commitment_hash ~opponent_commitment_hash =
   let module M = Operation.Manager in
   let refutation = M.Start {player_commitment_hash; opponent_commitment_hash} in
-  bake_operation_via_rpc ~__LOC__ client
+  bake_operation_via_rpc ~__LOC__ ?keys client
   @@ M.make ~source
   @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
 
@@ -1009,7 +1022,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind ?with_dal
   let* dal_node =
     match with_dal with
     | None -> Lwt.return_none
-    | Some init_dal_node -> init_dal_node node client
+    | Some init_dal_node -> init_dal_node protocol node client
   in
 
   let run_honest_node sc_rollup_node =
@@ -1101,6 +1114,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind ?with_dal
           node
           ?dal_node
           ~base_dir:(Client.base_dir client)
+          ~kind
           ~default_operator
           ~name:rollup_node_name
           ~loser_mode

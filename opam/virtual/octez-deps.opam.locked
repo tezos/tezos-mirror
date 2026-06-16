@@ -16,8 +16,8 @@ depends: [
   "afl-persistent" {= "1.4"}
   "alcotest" {= "1.9.1"}
   "alcotest-lwt" {= "1.9.1"}
-  "ambient-context" {= "0.1.0"}
-  "ambient-context-lwt" {= "0.1.0"}
+  "ambient-context" {= "0.1.1"}
+  "ambient-context-lwt" {= "0.1.1"}
   "angstrom" {= "0.16.1"}
   "asetmap" {= "0.8.1"}
   "asn1-combinators" {= "0.3.2"}
@@ -339,5 +339,9 @@ pin-depends: [
   [
     "dream-httpaf.1.0.0~alpha4-octez"
     "git+https://github.com/lthms/dream.git#c29c883a8a314bdb5dc90db865797e32cd4f5eee"
+  ]
+  [
+    "memtrace.0.2.3"
+    "git+https://github.com/mattiasdrp/memtrace.git#16f4b8dfd3956768526c78ce3795276bed176360"
   ]
 ]

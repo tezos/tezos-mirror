@@ -83,6 +83,8 @@ phases required to agree on the next block.
   observed. These operations also hold information on :doc:`DAL attestations <../shell/dal_bakers>`
   when the attesting baker participates in the DAL.
 
+.. _consensus_operations_aggregate_alpha:
+
 Starting in protocol S, blocks are also able to include these operations in an aggregated form, using operations ``Attestations_aggregate`` and ``Preattestations_aggregate``.
 If the attesting baker uses a tz4 consensus key, thanks to the BLS signature scheme,
 its attestation can be aggregated with all the other tz4 pre/attestations,
@@ -149,10 +151,10 @@ conflicting :ref:`consensus operations<consensus_operations_alpha>`:
   preattested, or respectively attested, two different block candidates, at the same level and at
   the same round. The bulk of the evidence, the two arguments
   provided, consists of the two offending preattestations, respectively attestations.
-  
+
   Beside the two offending operations, there is a ``slot`` field containing the delegate's slot used in the offending operations.
   More precisely, each offending operation may be either a standalone operation for this slot, or an :ref:`aggregate operation<consensus_operations_alpha>` containing this slot in its committee.
-  
+
   In protocols older than S, there were two operations, ``Double_preattestation_evidence`` and ``Double_attestation_evidence``, instead of ``Double_consensus_operation_evidence``, which did not exist.
 
 - The ``Double_baking_evidence`` allows for accusing a delegate of
@@ -207,7 +209,9 @@ manager operations are the only fee-paying and
 - The ``Update_consensus_key`` operation allows users to register a
   :ref:`consensus key<consensus_key_alpha>`, which is a dedicated key
   for signing blocks and consensus-related operations.
-  When the new consensus key is a tz4 (BLS key), the optional ``proof`` field must contain a proof of possession, which is the signature of the public key itself.
+  When the new consensus key is a tz4 (BLS key), the optional ``proof`` field
+  must contain a proof of possession, which is the signature of the public key
+  itself. Note that consensus keys cannot be ML-DSA-44 public keys.
 - The ``Update_companion_key`` operation allows users to register a
   :ref:`companion key<companion_key>`, which is a dedicated key (introduced in protocol S)
   for signing the DAL specific part of consensus operations,

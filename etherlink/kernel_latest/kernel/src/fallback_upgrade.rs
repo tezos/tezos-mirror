@@ -3,25 +3,27 @@
 // SPDX-License-Identifier: MIT
 
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError, KERNEL_BOOT_PATH};
 
 use crate::upgrade::KERNEL_ROOT_HASH;
 
 const BACKUP_KERNEL_BOOT_PATH: RefPath =
-    RefPath::assert_from(b"/__backup_kernel/boot.wasm");
+    RefPath::assert_from(b"/base/__backup_kernel/boot.wasm");
 
 const BACKUP_KERNEL_ROOT_HASH: RefPath =
-    RefPath::assert_from(b"/__backup_kernel/root_hash");
+    RefPath::assert_from(b"/base/__backup_kernel/root_hash");
 
-pub fn backup_current_kernel(host: &mut impl Runtime) -> Result<(), RuntimeError> {
+pub fn backup_current_kernel<Host>(host: &mut Host) -> Result<(), RuntimeError>
+where
+    Host: StorageV1,
+{
     // Fallback preparation detected
     // Storing the current kernel boot path under a temporary path in
     // order to fallback on it if something goes wrong in the upcoming
     // upgraded kernel.
     log!(
-        host,
         Info,
         "Preparing potential fallback by backing up the current kernel."
     );
@@ -46,9 +48,11 @@ pub fn backup_current_kernel(host: &mut impl Runtime) -> Result<(), RuntimeError
     }
 }
 
-pub fn fallback_backup_kernel(host: &mut impl Runtime) -> Result<(), RuntimeError> {
+pub fn fallback_backup_kernel<Host>(host: &mut Host) -> Result<(), RuntimeError>
+where
+    Host: StorageV1,
+{
     log!(
-        host,
         Error,
         "Something went wrong, fallback mechanism is triggered."
     );

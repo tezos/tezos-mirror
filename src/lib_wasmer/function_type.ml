@@ -23,9 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** WebAssembly function type signatures.
+
+    Uses GADTs and phantom types to represent function signatures
+    (parameters and results) in a type-safe way. Signatures are
+    composed using {!Cons_param} and checked against Wasmer function
+    types at instantiation and call time. *)
+
 open Api
 open Vectors
 
+(** GADT for function parameters. ['f] is the OCaml function type being
+    built, ['r] is the final return type. *)
 type (_, _) params =
   | End_param : ('r, 'r) params
   | Trigger_param : ('a, 'r) params -> (unit -> 'a, 'r) params
@@ -59,6 +68,7 @@ let param_types params =
   go params 0 ;
   inputs
 
+(** GADT for function results. ['r] is the OCaml type of the return value. *)
 type _ results =
   | No_result : unit results
   | One_result : 'a Value_type.t -> 'a results
@@ -92,8 +102,10 @@ let result_types results =
   go results 0 ;
   outputs
 
+(** A complete function type: parameters and results. *)
 type 'f t = Function : ('f, 'r Lwt.t) params * 'r results -> 'f t
 
+(** [to_owned typ] creates an owned Wasmer function type pointer from [typ]. *)
 let to_owned (Function (params, results)) =
   let inputs = param_types params in
   let outputs = result_types results in
@@ -180,6 +192,9 @@ let () =
              (Printexc.to_string reason))
     | _ -> None)
 
+(** [check_types typ func_type] verifies that the OCaml function type
+    [typ] matches the Wasmer [func_type]. Raises
+    {!Function_type_mismatch} on mismatch. *)
 let check_types (Function (params, results)) func_type =
   try
     let param_types = Functions.Functype.params func_type in

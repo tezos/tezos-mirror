@@ -20,6 +20,8 @@ val transfer :
   unit ->
   Ethereum_types.hex tzresult Lwt.t
 
+(** Same as {!transfer}, but raises [Failure] instead of returning an
+    [Error] when the transaction cannot be crafted. *)
 val transfer_exn :
   ?nonce:Z.t ->
   ?to_:Efunc_core.Eth.address ->
@@ -30,3 +32,18 @@ val transfer_exn :
   from:Account.t ->
   unit ->
   Ethereum_types.hex Lwt.t
+
+(** Same as {!transfer_exn}, but also returns the decoded
+  {!Transaction_object.t} corresponding to the signed transaction.
+  Returns [Error _] if decoding the raw transaction fails, and may
+  raise [Failure] if the transaction cannot be crafted. *)
+val transfer_with_obj_exn :
+  ?nonce:Z.t ->
+  ?to_:Efunc_core.Eth.address ->
+  ?data:Efunc_core.Private.b ->
+  value:Z.t ->
+  gas_limit:Z.t ->
+  infos:Network_info.t ->
+  from:Account.t ->
+  unit ->
+  (Ethereum_types.hex * Transaction_object.t) tzresult Lwt.t

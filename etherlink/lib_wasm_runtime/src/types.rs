@@ -65,7 +65,7 @@ unsafe impl FromValue for OCamlBytes {
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Clone, Ord)]
-pub struct ContextHash([u8; 32]);
+pub struct ContextHash(pub [u8; 32]);
 
 impl ContextHash {
     pub fn as_bytes(&self) -> &[u8; 32] {

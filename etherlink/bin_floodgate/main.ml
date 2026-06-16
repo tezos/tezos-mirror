@@ -10,6 +10,17 @@ module Parameter = struct
   let endpoint =
     Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
 
+  let header =
+    Tezos_clic.parameter (fun _ header ->
+        Lwt.return
+        @@
+        match String.split_on_char '=' header with
+        | [h; v] -> Ok (String.trim h, String.trim v)
+        | _ ->
+            error_with
+              "%s does not satisfy the expected header=value syntax"
+              header)
+
   let signer =
     Tezos_clic.parameter (fun _ value ->
         let open Lwt_result_syntax in
@@ -36,6 +47,8 @@ module Parameter = struct
           ~none:[error_of_fmt "Expected an integer, got %s" n]
           (int_of_string_opt n)
         |> Lwt.return)
+
+  let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
 
   let float =
     Tezos_clic.parameter (fun _ n ->
@@ -135,6 +148,16 @@ module Arg = struct
       ~doc:
         "Maximum number of transactions injected at each tick; if this option \
          is not given there is no limit"
+      Parameter.int
+
+  let max_lifespan_s =
+    let default = "2" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"max-lifespan"
+      ~placeholder:"N"
+      ~doc:
+        "Maximum lifespan of transactions before considered dropped, in second"
       Parameter.int
 
   let spawn_interval =
@@ -266,7 +289,69 @@ module Arg = struct
                      (int_of_string_opt s)
                  in
                  return (Number n)))
+
+  let benchmark_instant_confirmations =
+    Tezos_clic.arg
+      ~placeholder:"CSV"
+      ~long:"benchmark-instant-confirmations"
+      ~doc:"Benchmark instant confirmations"
+      Parameter.string
+
+  let otlp_endpoint =
+    Tezos_clic.arg
+      ~doc:
+        "A base endpoint URL for any signal type, with an optionally-specified \
+         port number."
+      ~placeholder:"endpoint"
+      ~env:"OTEL_EXPORTER_OTLP_ENDPOINT"
+      ~long:"otlp-endpoint"
+      Parameter.endpoint
+
+  let otlp_traces_endpoint =
+    Tezos_clic.arg
+      ~doc:
+        "Endpoint URL for trace data only, with an optionally-specified port \
+         number.\n\
+         Typically ends with v1/traces when using OTLP/HTTP."
+      ~placeholder:"endpoint"
+      ~env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
+      ~long:"otlp-traces-endpoint"
+      Parameter.endpoint
+
+  let otlp_logs_endpoint =
+    Tezos_clic.arg
+      ~doc:
+        "Endpoint URL for log data only, with an optionally-specified port \
+         number.\n\
+         Typically ends with v1/logs when using OTLP/HTTP."
+      ~placeholder:"endpoint"
+      ~env:"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"
+      ~long:"otlp-logs-endpoint"
+      Parameter.endpoint
+
+  let otlp_headers =
+    Tezos_clic.multiple_arg
+      ~doc:"Header to apply to all outgoing data (traces, metrics, and logs)."
+      ~placeholder:"header=value"
+      ~env:"OTEL_EXPORTER_OTLP_HEADERS"
+      ~long:"otlp-header"
+      Parameter.header
+
+  let otlp_environment =
+    Tezos_clic.arg
+      ~doc:"DD_ENV"
+      ~placeholder:"env"
+      ~long:"otlp-env"
+      Parameter.string
 end
+
+let otlp_args =
+  Tezos_clic.args5
+    Arg.otlp_endpoint
+    Arg.otlp_traces_endpoint
+    Arg.otlp_logs_endpoint
+    Arg.otlp_headers
+    Arg.otlp_environment
 
 let log_config ~verbose () =
   let open Tezos_base_unix.Internal_event_unix in
@@ -279,45 +364,125 @@ let require ~error_msg arg =
   let open Lwt_result_syntax in
   match arg with Some arg -> return arg | None -> failwith "%s" error_msg
 
+let with_traces_url endpoint (c : Octez_telemetry.Opentelemetry_config.t) =
+  match endpoint with
+  | Some endpoint ->
+      {
+        c with
+        enable = true;
+        config =
+          Opentelemetry_client_cohttp_lwt.Config.make
+            ~url_traces:(Uri.to_string endpoint)
+            ~url_logs:c.config.url_logs
+            ~headers:c.config.headers
+            ();
+      }
+  | None -> c
+
+let with_logs_url endpoint (c : Octez_telemetry.Opentelemetry_config.t) =
+  match endpoint with
+  | Some endpoint ->
+      {
+        c with
+        enable = true;
+        config =
+          Opentelemetry_client_cohttp_lwt.Config.make
+            ~url_logs:(Uri.to_string endpoint)
+            ~url_traces:c.config.url_traces
+            ~headers:c.config.headers
+            ();
+      }
+  | None -> c
+
+let with_url endpoint c =
+  match endpoint with
+  | Some endpoint ->
+      c
+      |> with_logs_url (Some (Uri.with_path endpoint "/v1/logs"))
+      |> with_traces_url (Some (Uri.with_path endpoint "/v1/traces"))
+  | None -> c
+
+let with_headers headers (c : Octez_telemetry.Opentelemetry_config.t) =
+  match headers with
+  | Some headers ->
+      {
+        c with
+        enable = true;
+        config =
+          Opentelemetry_client_cohttp_lwt.Config.make
+            ~url_logs:c.config.url_logs
+            ~url_traces:c.config.url_traces
+            ~headers
+            ();
+      }
+  | None -> c
+
+let with_env env (c : Octez_telemetry.Opentelemetry_config.t) =
+  match env with Some env -> {c with environment = Some env} | None -> c
+
+let with_otlp ~data_dir (otlp_url, otlp_traces, otlp_logs, otlp_headers, env) =
+  let config =
+    Octez_telemetry.Opentelemetry_config.default |> with_url otlp_url
+    |> with_logs_url otlp_logs
+    |> with_traces_url otlp_traces
+    |> with_headers otlp_headers |> with_env env
+  in
+  Octez_telemetry.Opentelemetry_setup.setup
+    ~data_dir
+    ~service_namespace:"floodgate"
+    ~service_name:"floodgate"
+    ~version:
+      (Format.sprintf
+         "floodgate-%s"
+         Tezos_version_value.Current_git_info.abbreviated_commit_hash)
+    config
+
 let run_command =
   let open Tezos_clic in
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args16
-        verbose
-        relay_endpoint
-        rpc_endpoint
-        ws_endpoint
-        controller
-        max_active_eoa
-        max_transaction_batch_length
-        spawn_interval
-        tick_interval
-        base_fee_factor
-        initial_balance
-        scenario
-        txs_salvo_eoa
-        elapsed_time_between_report
-        dummy_data_size
-        retry_attempt)
+      merge_options
+        (args18
+           verbose
+           relay_endpoint
+           rpc_endpoint
+           ws_endpoint
+           controller
+           max_active_eoa
+           max_transaction_batch_length
+           max_lifespan_s
+           spawn_interval
+           tick_interval
+           base_fee_factor
+           initial_balance
+           scenario
+           txs_salvo_eoa
+           elapsed_time_between_report
+           dummy_data_size
+           retry_attempt
+           benchmark_instant_confirmations)
+        otlp_args)
     (prefixes ["run"] @@ stop)
-    (fun ( verbose,
-           relay_endpoint,
-           rpc_endpoint,
-           ws_endpoint,
-           controller,
-           max_active_eoa,
-           max_transaction_batch_length,
-           spawn_interval,
-           tick_interval,
-           base_fee_factor,
-           initial_balance,
-           scenario,
-           txs_per_salvo,
-           elapsed_time_between_report,
-           dummy_data_size,
-           retry_attempt )
+    (fun ( ( verbose,
+             relay_endpoint,
+             rpc_endpoint,
+             ws_endpoint,
+             controller,
+             max_active_eoa,
+             max_transaction_batch_length,
+             max_lifespan_s,
+             spawn_interval,
+             tick_interval,
+             base_fee_factor,
+             initial_balance,
+             scenario,
+             txs_per_salvo,
+             elapsed_time_between_report,
+             dummy_data_size,
+             retry_attempt,
+             benchmark_instant_confirmations ),
+           otlp_args )
          ()
        ->
       let open Lwt_result_syntax in
@@ -332,6 +497,12 @@ let run_command =
              scenario."
         else return_unit
       in
+      Lwt_utils_unix.with_tempdir "floodgate_dir" @@ fun data_dir ->
+      let* finalizer = with_otlp ~data_dir otlp_args in
+      let _callback =
+        Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+            Lwt_utils_unix.safe_cancel_on_exit finalizer)
+      in
       Floodgate.run
         ~relay_endpoint
         ~rpc_endpoint
@@ -339,6 +510,7 @@ let run_command =
         ~controller
         ~max_active_eoa
         ~max_transaction_batch_length
+        ~max_lifespan_s
         ~spawn_interval
         ~tick_interval
         ~base_fee_factor
@@ -347,7 +519,8 @@ let run_command =
         ~elapsed_time_between_report
         ~scenario
         ~dummy_data_size
-        ~retry_attempt)
+        ~retry_attempt
+        ~benchmark_instant_confirmations)
 
 let commands = [run_command]
 

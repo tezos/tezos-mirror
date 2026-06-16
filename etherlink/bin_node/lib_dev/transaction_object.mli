@@ -19,13 +19,16 @@ val encoding : t Data_encoding.t
     {{:https://eips.ethereum.org/EIPS/eip-2930}EIP-2930}.
     Each entry specifies an [address] and a list of [storage_keys]
     that the transaction plans to access. *)
-type access = {address : address; storage_keys : hex list}
+type access = Ethereum_types.access = {
+  address : address;
+  storage_keys : hex list;
+}
 
 (** A single authorization item as introduced by
     {{:https://eips.ethereum.org/EIPS/eip-7702}EIP-7702}.
     Each item authorizes an address to act on behalf of a signer and includes
     the signature components [y_parity], [r], and [s]. *)
-type authorization_item = {
+type authorization_item = Ethereum_types.authorization_item = {
   chain_id : quantity;
   address : address;
   nonce : quantity;

@@ -108,19 +108,25 @@ let is_attestable_slot_or_trap ctxt ~pkh ~(slot_id : Types.slot_id) =
   let published_level = slot_id.slot_level in
   let*? lag = get_attestation_lag ctxt ~level:published_level in
   let attested_level = Int32.(add published_level lag) in
-  let attestation_level = Int32.pred attested_level in
+  let committee_level = Int32.pred attested_level in
+  (* TODO: https://gitlab.com/tezos/tezos/-/work_items/8064
+     Omit this check after the T->U migration is no longer relevant. *)
   let*? should_drop = published_just_before_migration ctxt ~published_level in
   if should_drop then return_none
   else
-    let*? last_known_parameters =
-      get_proto_parameters ctxt ~level:(`Level attested_level)
+    let*? params = get_proto_parameters ctxt ~level:(`Level attested_level) in
+    let last_known_parameters =
+      let traps_fraction =
+        get_traps_fraction ctxt ~published_level ~default:params.traps_fraction
+      in
+      {params with traps_fraction}
     in
     let shards_store = Store.shards (get_store ctxt) in
     (* For retrieving the assigned shard indexes, we consider the committee
-       at [attestation_level], because the (DAL) attestations in the blocks
+       at [committee_level], because the (DAL) attestations in the blocks
        at level [attested_level] refer to the predecessor level. *)
     let* shard_indices =
-      fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
+      fetch_assigned_shard_indices ctxt ~pkh ~level:committee_level
     in
     let number_of_assigned_shards = List.length shard_indices in
     check_is_attestable_slot_or_trap
@@ -165,7 +171,7 @@ let is_not_in_committee committee ~pkh =
   in
   List.is_empty assigned_shard_indices
 
-let may_notify_not_in_committee ctxt committee ~attestation_level =
+let may_notify_not_in_committee ctxt committee ~committee_level =
   let module T = Attestable_slots_watcher_table in
   let attestable_slots_watcher_table =
     Node_context.get_attestable_slots_watcher_table ctxt
@@ -177,7 +183,7 @@ let may_notify_not_in_committee ctxt committee ~attestation_level =
         T.notify_no_shards_assigned
           attestable_slots_watcher_table
           pkh
-          ~attestation_level)
+          ~committee_level)
     subscribers
 
 (** [get_backfill_payload ctxt ~pkh] computes a compact “backfill” payload for
@@ -195,7 +201,7 @@ let may_notify_not_in_committee ctxt committee ~attestation_level =
       slots can be published and attested in the near future;
       - `stop = L`, as this is the newest level where we did not have time to obtain
       the information about the published slots.
-    
+
     We include [L + 1] in backfill to cover possible races between updating the
     last-finalized level and stream subscription. This keeps the
     client's cache consistent even if the first slot was published before the stream
@@ -220,88 +226,107 @@ let get_backfill_payload ctxt ~pkh =
   in
   List.fold_left_es
     (fun acc published_level ->
-      let attestation_level =
-        Int32.(pred (add published_level attestation_lag))
+      let*? should_drop =
+        published_just_before_migration ctxt ~published_level
       in
-      let* committee =
-        Node_context.fetch_committees ctxt ~level:attestation_level
-      in
-      if is_not_in_committee committee ~pkh then
-        (* If not in committee, record and skip per-slot checks. *)
-        return
-          E.
-            {
-              acc with
-              no_shards_attestation_levels =
-                attestation_level :: acc.no_shards_attestation_levels;
-            }
+      if should_drop then return acc
       else
-        let*? proto_params =
-          get_proto_parameters ctxt ~level:(`Level published_level)
+        let*? attestation_lag =
+          get_attestation_lag ctxt ~level:published_level
         in
-        let slot_indices =
-          Stdlib.List.init proto_params.number_of_slots Fun.id
+        let committee_level =
+          Int32.(pred (add published_level attestation_lag))
         in
-        let store = get_store ctxt in
-        let candidate_slot_indices =
-          let statuses_cache = Store.statuses_cache store in
-          List.filter_map
-            (fun index ->
-              let status_opt =
-                Store.Statuses_cache.get_slot_status
-                  statuses_cache
-                  {slot_level = published_level; slot_index = index}
-              in
-              match status_opt with
-              | Some `Unpublished -> None
-              | _ -> Some index)
-            slot_indices
+        let* committee =
+          Node_context.fetch_committees ctxt ~level:committee_level
         in
-        if candidate_slot_indices = [] then return acc
-        else
-          (* Check each slot for attestability. *)
-          let*? lag = get_attestation_lag ctxt ~level:published_level in
-          let*? last_known_parameters =
-            let attested_level = Int32.(add published_level lag) in
-            get_proto_parameters ctxt ~level:(`Level attested_level)
-          in
-          let shards_store = Store.shards store in
-          let* shard_indices =
-            fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
-          in
-          let number_of_assigned_shards = List.length shard_indices in
-          let* new_slot_ids, new_trap_slot_ids =
-            List.fold_left_es
-              (fun (slot_ids_acc, trap_slot_ids_acc) slot_index ->
-                let slot_id =
-                  Types.Slot_id.{slot_level = published_level; slot_index}
-                in
-                let* is_attestable_slot_or_trap =
-                  check_is_attestable_slot_or_trap
-                    ~pkh
-                    ~slot_id
-                    ~last_known_parameters
-                    ~shard_indices
-                    ~shards_store
-                    ~number_of_assigned_shards
-                in
-                match is_attestable_slot_or_trap with
-                | Some `Attestable_slot ->
-                    return (slot_id :: slot_ids_acc, trap_slot_ids_acc)
-                | Some `Trap ->
-                    return (slot_ids_acc, slot_id :: trap_slot_ids_acc)
-                | None -> return (slot_ids_acc, trap_slot_ids_acc))
-              ([], [])
-              candidate_slot_indices
-          in
+        if is_not_in_committee committee ~pkh then
+          (* If not in committee, record and skip per-slot checks. *)
           return
             E.
               {
-                slot_ids = List.append new_slot_ids acc.slot_ids;
-                trap_slot_ids = List.append new_trap_slot_ids acc.trap_slot_ids;
-                no_shards_attestation_levels = acc.no_shards_attestation_levels;
-              })
-    {slot_ids = []; trap_slot_ids = []; no_shards_attestation_levels = []}
+                acc with
+                no_shards_committee_levels =
+                  committee_level :: acc.no_shards_committee_levels;
+              }
+        else
+          let*? proto_params =
+            get_proto_parameters ctxt ~level:(`Level published_level)
+          in
+          let slot_indices =
+            Stdlib.List.init proto_params.number_of_slots Fun.id
+          in
+          let store = get_store ctxt in
+          let candidate_slot_indices =
+            let statuses_cache = Store.statuses_cache store in
+            List.filter_map
+              (fun index ->
+                let status_opt =
+                  Store.Statuses_cache.get_slot_status
+                    statuses_cache
+                    {slot_level = published_level; slot_index = index}
+                in
+                match status_opt with
+                | Some `Unpublished -> None
+                | _ -> Some index)
+              slot_indices
+          in
+          if candidate_slot_indices = [] then return acc
+          else
+            (* Check each slot for attestability. *)
+            let*? params =
+              let attested_level =
+                Int32.(add published_level attestation_lag)
+              in
+              get_proto_parameters ctxt ~level:(`Level attested_level)
+            in
+            let last_known_parameters =
+              let traps_fraction =
+                get_traps_fraction
+                  ctxt
+                  ~published_level
+                  ~default:params.traps_fraction
+              in
+              {params with traps_fraction}
+            in
+            let shards_store = Store.shards store in
+            let* shard_indices =
+              fetch_assigned_shard_indices ctxt ~pkh ~level:committee_level
+            in
+            let number_of_assigned_shards = List.length shard_indices in
+            let* new_slot_ids, new_trap_slot_ids =
+              List.fold_left_es
+                (fun (slot_ids_acc, trap_slot_ids_acc) slot_index ->
+                  let slot_id =
+                    Types.Slot_id.{slot_level = published_level; slot_index}
+                  in
+                  let* is_attestable_slot_or_trap =
+                    check_is_attestable_slot_or_trap
+                      ~pkh
+                      ~slot_id
+                      ~last_known_parameters
+                      ~shard_indices
+                      ~shards_store
+                      ~number_of_assigned_shards
+                  in
+                  match is_attestable_slot_or_trap with
+                  | Some `Attestable_slot ->
+                      return (slot_id :: slot_ids_acc, trap_slot_ids_acc)
+                  | Some `Trap ->
+                      return (slot_ids_acc, slot_id :: trap_slot_ids_acc)
+                  | None -> return (slot_ids_acc, trap_slot_ids_acc))
+                ([], [])
+                candidate_slot_indices
+            in
+            return
+              E.
+                {
+                  slot_ids = List.append new_slot_ids acc.slot_ids;
+                  trap_slot_ids =
+                    List.append new_trap_slot_ids acc.trap_slot_ids;
+                  no_shards_committee_levels = acc.no_shards_committee_levels;
+                })
+    {slot_ids = []; trap_slot_ids = []; no_shards_committee_levels = []}
     published_levels
 
 (** [create_new_stream_with_backfill stream backfill_payload_opt] builds a new

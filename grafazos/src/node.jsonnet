@@ -45,7 +45,7 @@ local table = base.table;
     info.new('Node release version', q, h, w, x, y) + info.withName(),
 
   releaseCommitInfo(h, w, x, y):
-    local q = query.prometheus.new('Prometheus', '(label_replace(' + namespace + '_version' + base.node_instance_query + ',"commit_hash_short" ,"$1","commit_hash","^(.{8}).*$"))')
+    local q = query.prometheus.new(base.datasource, '(label_replace(' + namespace + '_version' + base.node_instance_query + ',"commit_hash_short" ,"$1","commit_hash","^(.{8}).*$"))')
               + query.prometheus.withLegendFormat('{{ commit_hash_short }}');
     info.new('Node release commit', q, h, w, x, y) + info.withName(),
 
@@ -72,7 +72,7 @@ local table = base.table;
     + info.withMapping([['0', 'Unsync', 'red'], ['1', 'Sync', 'green'], ['2', 'Stuck', 'red']]),
 
   uptime(h, w, x, y):
-    local q = query.prometheus.new('Prometheus', 'time()-(process_start_time_seconds' + base.node_instance_query + ')')
+    local q = query.prometheus.new(base.datasource, 'time()-(process_start_time_seconds' + base.node_instance_query + ')')
               + query.prometheus.withLegendFormat('node uptime');
     info.new('Node uptime', q, h, w, x, y)
     + stat.panelOptions.withDescription('Reflects the uptime of the monitoring of the job, not the uptime of the process.')
@@ -130,13 +130,13 @@ local table = base.table;
     + graph.withFixedColor('light-yellow'),
 
   headOperations(h, w, x, y):
-    local consensusQuery = query.prometheus.new('Prometheus', base.namespace + '_validator_block_operations_per_pass{pass_id="0",' + base.node_instance + '="$node_instance"}')
+    local consensusQuery = query.prometheus.new(base.datasource, base.namespace + '_validator_block_operations_per_pass{pass_id="0",' + base.node_instance + '="$node_instance"}')
                            + query.prometheus.withLegendFormat('Consensus');
-    local voteQuery = query.prometheus.new('Prometheus', base.namespace + '_validator_block_operations_per_pass{pass_id="1",' + base.node_instance + '="$node_instance"}')
+    local voteQuery = query.prometheus.new(base.datasource, base.namespace + '_validator_block_operations_per_pass{pass_id="1",' + base.node_instance + '="$node_instance"}')
                       + query.prometheus.withLegendFormat('Vote');
-    local anonymousQuery = query.prometheus.new('Prometheus', base.namespace + '_validator_block_operations_per_pass{pass_id="2",' + base.node_instance + '="$node_instance"}')
+    local anonymousQuery = query.prometheus.new(base.datasource, base.namespace + '_validator_block_operations_per_pass{pass_id="2",' + base.node_instance + '="$node_instance"}')
                            + query.prometheus.withLegendFormat('Anonymous');
-    local managerQuery = query.prometheus.new('Prometheus', base.namespace + '_validator_block_operations_per_pass{pass_id="3",' + base.node_instance + '="$node_instance"}')
+    local managerQuery = query.prometheus.new(base.datasource, base.namespace + '_validator_block_operations_per_pass{pass_id="3",' + base.node_instance + '="$node_instance"}')
                          + query.prometheus.withLegendFormat('Manager');
     graph.new('Head operations', [consensusQuery, voteQuery, anonymousQuery, managerQuery], h, w, x, y)
     + graph.withLegendRight(calcs=['mean', 'lastNotNull', 'max', 'min']),
@@ -149,7 +149,7 @@ local table = base.table;
   blocksValidationTime(h, w, x, y):
     local completion = base.namespace + '_validator_block_last_finished_request_completion_timestamp' + base.node_instance_query;
     local treatment = base.namespace + '_validator_block_last_finished_request_treatment_timestamp' + base.node_instance_query;
-    local q = query.prometheus.new('Prometheus', completion + '-' + treatment)
+    local q = query.prometheus.new(base.datasource, completion + '-' + treatment)
               + query.prometheus.withLegendFormat('Validation time');
     graph.new('Block validation time', [q], h, w, x, y)
     + graph.withLegendBottom(calcs=['mean', 'max', 'min'])
@@ -159,7 +159,7 @@ local table = base.table;
   blocksValidationMean(h, w, x, y):
     local completion = base.namespace + '_validator_block_last_finished_request_completion_timestamp' + base.node_instance_query;
     local treatment = base.namespace + '_validator_block_last_finished_request_treatment_timestamp' + base.node_instance_query;
-    local q = query.prometheus.new('Prometheus', completion + '-' + treatment)
+    local q = query.prometheus.new(base.datasource, completion + '-' + treatment)
               + query.prometheus.withLegendFormat('block validation mean');
     info.new('Block validation mean', q, h, w, x, y, instant=false)
     + stat.options.withColorMode('value')
@@ -214,13 +214,13 @@ local table = base.table;
     local major = 'Major collections';
     local forced = 'Forced major collections';
     local compact = 'Heap compactions';
-    local minorQuery = query.prometheus.new('Prometheus', 'ocaml_gc_minor_collections' + base.node_instance_query)
+    local minorQuery = query.prometheus.new(base.datasource, 'ocaml_gc_minor_collections' + base.node_instance_query)
                        + query.prometheus.withLegendFormat(minor);
-    local majorQuery = query.prometheus.new('Prometheus', 'ocaml_gc_major_collections' + base.node_instance_query)
+    local majorQuery = query.prometheus.new(base.datasource, 'ocaml_gc_major_collections' + base.node_instance_query)
                        + query.prometheus.withLegendFormat(major);
-    local forcedQuery = query.prometheus.new('Prometheus', 'ocaml_gc_forced_major_collections' + base.node_instance_query)
+    local forcedQuery = query.prometheus.new(base.datasource, 'ocaml_gc_forced_major_collections' + base.node_instance_query)
                         + query.prometheus.withLegendFormat(forced);
-    local compactQuery = query.prometheus.new('Prometheus', 'ocaml_gc_compactions' + base.node_instance_query)
+    local compactQuery = query.prometheus.new(base.datasource, 'ocaml_gc_compactions' + base.node_instance_query)
                          + query.prometheus.withLegendFormat(compact);
     graph.new('GC maintenance operations', [minorQuery, majorQuery, forcedQuery, compactQuery], h, w, x, y)
     + graph.withLogScale()
@@ -228,7 +228,7 @@ local table = base.table;
 
   gcMajorHeap(h, w, x, y):
     local major = 'Major heap';
-    local majorQuery = query.prometheus.new('Prometheus', 'ocaml_gc_heap_words' + base.node_instance_query + '* 8')
+    local majorQuery = query.prometheus.new(base.datasource, 'ocaml_gc_heap_words' + base.node_instance_query + '* 8')
                        + query.prometheus.withLegendFormat(major);
     graph.new('GC major word sizes', [majorQuery], h, w, x, y)
     + graph.withQueryColor([[major, 'light-green']])

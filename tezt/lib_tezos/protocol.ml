@@ -25,12 +25,13 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = T024 | S023 | Alpha
+type t = U025 | T024 | S023 | Alpha
 
-let all = [T024; S023; Alpha]
+let all = [U025; T024; Alpha]
 
 let encoding =
-  Data_encoding.string_enum [("alpha", Alpha); ("t024", T024); ("s023", S023)]
+  Data_encoding.string_enum
+    [("alpha", Alpha); ("u025", U025); ("t024", T024); ("s023", S023)]
 
 type constants =
   | Constants_sandbox
@@ -44,12 +45,17 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | T024 -> "T024" | S023 -> "S023"
+let name = function
+  | Alpha -> "Alpha"
+  | U025 -> "U025"
+  | T024 -> "T024"
+  | S023 -> "S023"
 
-let number = function S023 -> 023 | T024 -> 024 | Alpha -> 025
+let number = function S023 -> 023 | T024 -> 024 | U025 -> 025 | Alpha -> 026
 
 let directory = function
   | Alpha -> "proto_alpha"
+  | U025 -> "proto_025_PsUshuai"
   | T024 -> "proto_024_PtTALLiN"
   | S023 -> "proto_023_PtSeouLo"
 
@@ -60,6 +66,7 @@ let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | S023 -> "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
   | T024 -> "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
+  | U025 -> "PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let short_hash protocol_hash =
@@ -106,12 +113,12 @@ type bootstrap_smart_rollup = {
 }
 
 type bootstrap_parameters = {
-  balance : int option;
+  balance : int64 option;
   consensus_key : Account.key option;
   delegate : Account.key option;
 }
 
-let default_bootstrap_balance = 4_000_000_000_000
+let default_bootstrap_balance = 4_000_000_000_000L
 
 let default_bootstrap_parameters =
   {balance = None; consensus_key = None; delegate = None}
@@ -163,7 +170,7 @@ let write_parameter_file :
                   ([
                      `String account.public_key;
                      `String
-                       (string_of_int
+                       (Int64.to_string
                           (Option.value
                              ~default:default_bootstrap_balance
                              bootstrap_param.balance));
@@ -275,7 +282,7 @@ let write_parameter_file :
                  (if is_revealed then account.public_key
                   else account.public_key_hash);
                `String
-                 (string_of_int
+                 (Int64.to_string
                     (Option.value
                        ~default:default_bootstrap_balance
                        bootstrap_param.balance));
@@ -299,9 +306,25 @@ let write_parameter_file :
   JSON.encode_to_file_u output_file parameters ;
   Lwt.return output_file
 
+let parameters_with_custom_consensus_rights_delay ~protocol
+    ~consensus_rights_delay ?(slashing_delay = 1) parameters =
+  let cache_size = consensus_rights_delay + slashing_delay + 2 in
+  let parameters =
+    (["consensus_rights_delay"], `Int consensus_rights_delay)
+    :: (["cache_sampler_state_cycles"], `Int cache_size)
+    :: (["cache_stake_distribution_cycles"], `Int cache_size)
+    :: parameters
+  in
+  if number protocol >= 025 then
+    (["cache_stake_info_cycles"], `Int cache_size)
+    :: (["cache_swrr_selected_distribution_cycles"], `Int cache_size)
+    :: parameters
+  else parameters
+
 let previous_protocol = function
-  | Alpha -> Some T024
-  | T024 -> Some S023
+  | Alpha -> Some U025
+  | U025 -> Some T024
+  | T024 -> None
   | S023 -> None
 
 let has_predecessor p = previous_protocol p <> None

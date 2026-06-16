@@ -108,6 +108,10 @@ val layout :
   unit ->
   ('key, 'value) layout
 
+(** [filepath layout] returns the path of the physical file described by
+    [layout]. *)
+val filepath : ('key, 'value) layout -> string
+
 module Read : sig
   (** An abstract representation of a file-based key-value store. *)
   type ('file, 'key, 'value) t
@@ -192,7 +196,10 @@ module Read : sig
     ('file, 'key, 'value) t tzresult Lwt.t
 
   (** [close kvs] waits until all pending reads and writes are completed
-      and closes the key-value store. *)
+      and closes the key-value store.
+
+      After closing, any subsequent operation on the store will fail with a
+      {!Closed} error. *)
   val close : ('file, 'key, 'value) t -> unit tzresult Lwt.t
 end
 

@@ -84,12 +84,216 @@ let get_manager_operation_gas_and_fee (contents : packed_contents_list) =
 
 type fee_parameter = {
   minimal_fees : Tez.t;
-  minimal_nanotez_per_byte : Q.t;
-  minimal_nanotez_per_gas_unit : Q.t;
+  minimal_nanotez_per_byte : Q.t option;
+  minimal_nanotez_per_gas_unit : Q.t option;
   force_low_fee : bool;
   fee_cap : Tez.t;
   burn_cap : Tez.t;
 }
+
+module Mempool = struct
+  type nanotez = Q.t
+
+  let nanotez_enc : nanotez Data_encoding.t =
+    let open Data_encoding in
+    def
+      "nanotez"
+      ~title:"A thousandth of a mutez"
+      ~description:"One thousand nanotez make a mutez (1 tez = 1e9 nanotez)"
+      (conv
+         (fun q -> (q.Q.num, q.Q.den))
+         (fun (num, den) -> {Q.num; den})
+         (tup2 z z))
+
+  let manager_op_replacement_factor_enc : Q.t Data_encoding.t =
+    let open Data_encoding in
+    def
+      "manager operation replacement factor"
+      ~title:"A manager operation's replacement factor"
+      ~description:
+        "The fee and fee/gas ratio of an operation to replace another"
+      (conv
+         (fun q -> (q.Q.num, q.Q.den))
+         (fun (num, den) -> {Q.num; den})
+         (tup2 z z))
+
+  type config = {
+    minimal_fees : Tez.t;
+    minimal_nanotez_per_gas_unit : nanotez;
+    minimal_nanotez_per_byte : nanotez;
+    clock_drift : Period.t option;
+    replace_by_fee_factor : Q.t;
+        (** Factor by which the fee and fee/gas ratio of an old operation in
+          the mempool are both multiplied to determine the values that a new
+          operation must exceed in order to replace the old operation. See
+          the [better_fees_and_ratio] function further below. *)
+  }
+
+  let default_minimal_fees =
+    match Tez.of_mutez 100L with None -> assert false | Some t -> t
+
+  let default_minimal_nanotez_per_gas_unit = Q.of_int 100
+
+  let default_minimal_nanotez_per_byte = Q.of_int 1000
+
+  let get_minimal_nanotez_per_byte config = config.minimal_nanotez_per_byte
+
+  let get_minimal_nanotez_per_gas_unit config =
+    config.minimal_nanotez_per_gas_unit
+
+  (* If the drift is not specified, it will be the duration of round zero.
+   It allows only to spam with one future round.
+
+   /!\ Warning /!\ : current plugin implementation implies that this drift
+   cumulates with the accepted  drift regarding the current head's timestamp.
+*)
+  let default_config =
+    {
+      minimal_fees = default_minimal_fees;
+      minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
+      minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
+      clock_drift = None;
+      replace_by_fee_factor =
+        Q.make (Z.of_int 105) (Z.of_int 100)
+        (* Default value of [replace_by_fee_factor] is set to 5% *);
+    }
+
+  let config_encoding : config Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {
+             minimal_fees;
+             minimal_nanotez_per_gas_unit;
+             minimal_nanotez_per_byte;
+             clock_drift;
+             replace_by_fee_factor;
+           }
+         ->
+        ( minimal_fees,
+          minimal_nanotez_per_gas_unit,
+          minimal_nanotez_per_byte,
+          clock_drift,
+          replace_by_fee_factor ))
+      (fun ( minimal_fees,
+             minimal_nanotez_per_gas_unit,
+             minimal_nanotez_per_byte,
+             clock_drift,
+             replace_by_fee_factor )
+         ->
+        {
+          minimal_fees;
+          minimal_nanotez_per_gas_unit;
+          minimal_nanotez_per_byte;
+          clock_drift;
+          replace_by_fee_factor;
+        })
+      (obj5
+         (dft "minimal_fees" Tez.encoding default_config.minimal_fees)
+         (dft
+            "minimal_nanotez_per_gas_unit"
+            nanotez_enc
+            default_config.minimal_nanotez_per_gas_unit)
+         (dft
+            "minimal_nanotez_per_byte"
+            nanotez_enc
+            default_config.minimal_nanotez_per_byte)
+         (opt "clock_drift" Period.encoding)
+         (dft
+            "replace_by_fee_factor"
+            manager_op_replacement_factor_enc
+            default_config.replace_by_fee_factor))
+end
+
+let fetch_mempool_config (rpc_ctxt : Tezos_rpc.Context.simple) ~chain =
+  let open Lwt_syntax in
+  let* result = Alpha_block_services.Mempool.get_filter rpc_ctxt ~chain () in
+  match result with
+  | Ok json -> (
+      try
+        return_some
+          (Json_encoding.destruct
+             ~ignore_extra_fields:true
+             (Data_encoding.Json.convert Mempool.config_encoding)
+             json)
+      with Json_encoding.Cannot_destruct _ -> return_none)
+  | Error _ -> return_none
+
+(** [resolve_fee_parameter_from_mempool cctxt ~chain fee_parameter] resolves
+    [minimal_nanotez_per_byte] and [minimal_nanotez_per_gas_unit] based on
+    the following priority:
+    1. User-provided value via the corresponding CLI flag ([Some _])
+    2. Value from the node's mempool filter RPC ([GET .../mempool/filter])
+    3. Hardcoded default (1000 nanotez/byte, 100 nanotez/gas_unit)
+
+    After this call, both fields are always [Some _].
+
+    A warning is emitted when the RPC fails and the default is used. This
+    is why [cctxt] is [#Protocol_client_context.full] rather than
+    [#Tezos_rpc.Context.simple]. *)
+let resolve_fee_parameter_from_mempool (cctxt : #Protocol_client_context.full)
+    ~chain fee_parameter =
+  let open Lwt_result_syntax in
+  match
+    ( fee_parameter.minimal_nanotez_per_byte,
+      fee_parameter.minimal_nanotez_per_gas_unit )
+  with
+  | Some _, Some _ -> return fee_parameter
+  | _ ->
+      let*! fetched =
+        fetch_mempool_config (cctxt :> Tezos_rpc.Context.simple) ~chain
+      in
+      let nanotez_per_byte =
+        match fee_parameter.minimal_nanotez_per_byte with
+        | Some v -> v
+        | None ->
+            Option.fold
+              ~none:Mempool.default_minimal_nanotez_per_byte
+              ~some:Mempool.get_minimal_nanotez_per_byte
+              fetched
+      in
+      let nanotez_per_gas =
+        match fee_parameter.minimal_nanotez_per_gas_unit with
+        | Some v -> v
+        | None ->
+            Option.fold
+              ~none:Mempool.default_minimal_nanotez_per_gas_unit
+              ~some:Mempool.get_minimal_nanotez_per_gas_unit
+              fetched
+      in
+      let*! () =
+        match fetched with
+        | Some _ -> Lwt.return_unit
+        | None ->
+            let defaulted =
+              (if Option.is_none fee_parameter.minimal_nanotez_per_byte then
+                 [
+                   Format.asprintf
+                     "%a nanotez/byte"
+                     Q.pp_print
+                     Mempool.default_minimal_nanotez_per_byte;
+                 ]
+               else [])
+              @
+              if Option.is_none fee_parameter.minimal_nanotez_per_gas_unit then
+                [
+                  Format.asprintf
+                    "%a nanotez/gas_unit"
+                    Q.pp_print
+                    Mempool.default_minimal_nanotez_per_gas_unit;
+                ]
+              else []
+            in
+            cctxt#warning
+              "Failed to fetch mempool filter configuration from the node's \
+               RPC. Using defaults: %s."
+              (String.concat ", " defaulted)
+      in
+      return
+        {
+          fee_parameter with
+          minimal_nanotez_per_byte = Some nanotez_per_byte;
+          minimal_nanotez_per_gas_unit = Some nanotez_per_gas;
+        }
 
 (* Rounding up (see Z.cdiv) *)
 let z_mutez_of_q_nanotez (ntz : Q.t) =
@@ -133,12 +337,22 @@ let check_fees : type t.
               (Q.of_int 1000)
           in
           let minimal_fees_for_gas_in_nanotez =
+            (* [Some] after [resolve_fee_parameter_from_mempool]; uses
+               default if called before resolution. *)
             Q.mul
-              config.minimal_nanotez_per_gas_unit
+              (Option.value
+                 ~default:Mempool.default_minimal_nanotez_per_gas_unit
+                 config.minimal_nanotez_per_gas_unit)
               (Q.of_bigint (Gas.Arith.integral_to_z gas))
           in
           let minimal_fees_for_size_in_nanotez =
-            Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
+            (* [Some] after [resolve_fee_parameter_from_mempool]; uses
+               default if called before resolution. *)
+            Q.mul
+              (Option.value
+                 ~default:Mempool.default_minimal_nanotez_per_byte
+                 config.minimal_nanotez_per_byte)
+              (Q.of_int size)
           in
           let estimated_fees_in_nanotez =
             Q.add
@@ -805,12 +1019,22 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
              (Q.of_int 1000)
          in
          let minimal_fees_for_gas_in_nanotez =
+           (* [Some] after [resolve_fee_parameter_from_mempool]; uses
+              default if called before resolution. *)
            Q.mul
-             fee_parameter.minimal_nanotez_per_gas_unit
+             (Option.value
+                ~default:Mempool.default_minimal_nanotez_per_gas_unit
+                fee_parameter.minimal_nanotez_per_gas_unit)
              (Q.of_bigint @@ Gas.Arith.integral_to_z c.gas_limit)
          in
          let minimal_fees_for_size_in_nanotez =
-           Q.mul fee_parameter.minimal_nanotez_per_byte (Q.of_int size)
+           (* [Some] after [resolve_fee_parameter_from_mempool]; uses
+              default if called before resolution. *)
+           Q.mul
+             (Option.value
+                ~default:Mempool.default_minimal_nanotez_per_byte
+                fee_parameter.minimal_nanotez_per_byte)
+             (Q.of_int size)
          in
          let fees_in_nanotez =
            Q.add minimal_fees_in_nanotez
@@ -1470,6 +1694,9 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     tzresult
     Lwt.t =
   let open Lwt_result_syntax in
+  let* fee_parameter =
+    resolve_fee_parameter_from_mempool cctxt ~chain fee_parameter
+  in
   let* counter =
     match counter with
     | None ->

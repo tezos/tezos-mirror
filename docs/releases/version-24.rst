@@ -1,5 +1,5 @@
-Version 24.0~beta1
-==================
+Version 24.4
+============
 
 Changes
 -------
@@ -14,6 +14,35 @@ Version 24 introduces the following changes or new features:
 
 An overview of breaking changes and deprecations introduced in Octez
 v24 can be found :ref:`here <v24_breaking_changes>`.
+
+Octez v24.1
+~~~~~~~~~~~
+
+Octez v24.1 addresses two issues in v24.0:
+
+- A downstream ``opam`` dependency issue that can prevent bakers and operators from building v24.0 from sources in certain setups. v24.1 makes the opam cache the default archive provider when building Octez from sources. This ensures operators can build Octez without disruptions to their deployment infrastructure.
+
+- A regression in the snapshot import mechanism in v24.0, which made the process slower than usual. v24.1 restores the usual performance of the snapshot import mechanism.
+
+Octez v24.2
+~~~~~~~~~~~
+
+Octez v24.2 fixes two minor bugs in Octez node. Notably, it addresses an issue where the node can, in some scenarios, stop processing new blocks after a peer disconnects, hence being unable to follow the chain unless restarted.
+
+If you deploy Octez v24.1 (or earlier) infrastructure, and notice your octez-node to be falling behind, we recommend upgrading to v24.2 at your earliest convenience.
+
+Octez v24.3
+~~~~~~~~~~~
+
+Octez v24.3 fixes a protocol vulnerability and strengthens defensive protections on the peer-to-peer (P2P) layer. User funds remain safe.
+
+
+Octez v24.4
+~~~~~~~~~~~
+
+Octez v24.4 fixes two bugs in Octez node. Notably, it addresses an issue where the node can become fully unresponsive — unable to process blocks, serve RPCs, or produce logs — for an extended period after a peer connects and immediately disconnects, requiring a manual restart to recover. It also fixes a gas-limit computation error in run-code RPC introduced in v24.3.
+
+If you deploy Octez v24.3 (or earlier) infrastructure and notice your octez-node becoming unresponsive or falling behind the chain, we recommend upgrading to v24.4 at your earliest convenience.
 
 .. _protocol_support_v24:
 
@@ -32,6 +61,10 @@ Version 23 introduced protocol-independent baker and accuser executables, which 
 
 These executables replace protocol-dependent executables. As a result, the latter are deprecated starting from Octez v24 and will be removed in v25.
 
+.. note:
+
+	The baker sub-command ``octez-baker run dal`` (allowing to start the DAL node via the baker) is experimental in version 24. **It should not be used in production.** Instead, the DAL node should be run the usual way, by invoking the ``octez-dal-node`` binary directly.
+
 .. _octez_releases_page_v24:
 
 New Octez releases page
@@ -40,7 +73,7 @@ New Octez releases page
 A new Octez Releases website is now available at https://octez.tezos.com/releases/. It replaces the `Gitlab Releases page <https://gitlab.com/tezos/tezos/-/releases>`__, which is now deprecated.
 This new Releases page centralizes  release information for the different Octez :ref:`components <component_releases>` developed on the tezos/tezos Gitlab repository: Octez, Grafazos, Teztale.
 
-Moreover, it provides predictable links to assets (for instance, https://octez.tezos.com/releases/octez-v24.0-rc1/binaries/x86_64/octez-v24.0-rc1.tar.gz), a `machine-readable releases summary <https://octez.tezos.com/releases/versions.json>`__ file, and an `RSS feed <https://octez.tezos.com/releases/feed.xml>`__.
+Moreover, it provides predictable links to assets (for instance, https://octez.tezos.com/releases/octez-v24.0/binaries/x86_64/octez-v24.0.tar.gz), a `machine-readable releases summary <https://octez.tezos.com/releases/versions.json>`__ file, and an `RSS feed <https://octez.tezos.com/releases/feed.xml>`__.
 
 Minimal hardware specifications
 -------------------------------
@@ -65,26 +98,41 @@ Update Instructions
 This section contains update instructions specialized for the current release, handling only a few installation types that are most common or that require special handling for this version.
 For full instructions on updating your Octez suite for any types of installation, refer to :doc:`../introduction/howtoget`.
 
+If you are installing Ubuntu and Debian packages from scratch, follow :ref:`their install instructions <installing_deb>`
+
 RPM Octez packages
 ~~~~~~~~~~~~~~~~~~
 
-.. code-block:: shell
+**RPM packages are no longer provided starting with Octez version 24.**
 
-  dnf -y update octez-node  octez-client octez-baker octez-dal-node octez-smart-rollup-node
-
-If you are installing Ubuntu and Debian packages from scratch, follow :ref:`their install instructions <installing_rpm>`
+Please choose another installation method.
 
 From sources
 ~~~~~~~~~~~~
 
+.. note::
+
+	For building v24 from sources, please make sure that you have installed opam 2.3 or later.
+
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v24.0-beta1
+  git checkout octez-v24.4
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v24.0-beta1`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v24.4`` Docker images of Octez.
+
+Changelog
+---------
+
+- `Version 24.4 <../CHANGES.html#version-24-4>`_
+- `Version 24.3 <../CHANGES.html#version-24-3>`_
+- `Version 24.2 <../CHANGES.html#version-24-2>`_
+- `Version 24.1 <../CHANGES.html#version-24-1>`_
+- `Version 24.0 <../CHANGES.html#version-24-0>`_
+- `Version 24.0~rc2 <../CHANGES.html#version-24-0-rc2>`_
+- `Version 24.0~rc1 <../CHANGES.html#version-24-0-rc1>`_

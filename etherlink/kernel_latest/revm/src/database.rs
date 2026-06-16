@@ -1,26 +1,27 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    custom,
-    helpers::legacy::FaDepositWithProxy,
-    journal::PrecompileStateChanges,
-    precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
-    storage::{
-        block::{get_block_hash, BLOCKS_STORED},
-        code::CodeStorage,
-        sequencer_key_change::store_sequencer_key_change,
-        world_state_handler::{
-            StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_PATH, KT1_B58_SIZE,
-            SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
-        },
+use crate::error::EvmDbError;
+use crate::storage::{
+    block::{get_block_hash, BLOCKS_STORED},
+    code::CodeStorage,
+    sequencer_key_change::store_sequencer_key_change,
+    world_state_handler::{
+        StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_PATH, KT1_B58_SIZE,
+        NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_PATH,
     },
-    Error,
 };
+use evm_types::{
+    DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges,
+    FaDepositWithProxy, PrecompileStateChanges, PrecompileStateError,
+};
+use michelson_types::Withdrawal;
 use revm::{
-    primitives::{Address, HashMap, StorageKey, StorageValue, B256, U256},
+    primitives::{
+        Address, AddressMap, HashMap, StorageKey, StorageValue, B256, KECCAK_EMPTY, U256,
+    },
     state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
     Database, DatabaseCommit,
 };
@@ -30,14 +31,15 @@ use tezos_crypto_rs::{
 };
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level};
-use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
+use tezosx_interfaces::{Origin, Registry};
 
-pub struct EtherlinkVMDB<'a, Host: Runtime> {
+pub struct EtherlinkVMDB<'a, Host: StorageV1, R: Registry> {
+    pub registry: &'a R,
     /// Runtime host
     pub host: &'a mut Host,
     /// Constants for the current block
-    block: &'a BlockConstants,
+    pub(crate) block: &'a BlockConstants,
     /// Commit guard, the `DatabaseCommit` trait and in particular
     /// its `commit` function does NOT return errors.
     /// We need this guard to change if there's an unrecoverable
@@ -58,12 +60,20 @@ enum AccountState {
     SelfDestructed,
 }
 
-impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
+impl<'a, Host, R: Registry> EtherlinkVMDB<'a, Host, R>
+where
+    Host: StorageV1,
+{
     #[instrument(skip_all)]
-    pub fn new(host: &'a mut Host, block: &'a BlockConstants) -> Result<Self, Error> {
+    pub fn new(
+        host: &'a mut Host,
+        registry: &'a R,
+        block: &'a BlockConstants,
+    ) -> Result<Self, EvmDbError> {
         let system = StorageAccount::from_address(&Address::ZERO)?;
         Ok(EtherlinkVMDB {
             host,
+            registry,
             block,
             commit_status: true,
             withdrawals: vec![],
@@ -73,38 +83,20 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
     }
 }
 
-pub trait DatabasePrecompileStateChanges {
-    fn log_node_message(&mut self, level: Level, message: &str);
-    fn global_counter(&self) -> Result<U256, CustomPrecompileError>;
-    fn ticket_balance(
-        &self,
-        ticket_hash: &U256,
-        owner: &Address,
-    ) -> Result<U256, CustomPrecompileError>;
-    fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError>;
-    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, CustomPrecompileError>;
-    fn deposit_in_queue(
-        &self,
-        deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, CustomPrecompileError>;
-    fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError>;
-}
-
-pub(crate) trait DatabaseCommitPrecompileStateChanges {
-    fn commit(&mut self, etherlink_data: PrecompileStateChanges);
-}
-
 macro_rules! abort_on_error {
     ($obj:expr, $expr:expr, $msg:expr) => {
         if let Err(err) = $expr {
             $obj.abort();
-            log!($obj.host, Level::Error, "{} error: {err:?}", $msg);
+            log!(Level::Error, "{} error: {err:?}", $msg);
             return;
         }
     };
 }
 
-impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
+impl<Host, R: Registry> EtherlinkVMDB<'_, Host, R>
+where
+    Host: StorageV1,
+{
     #[instrument(skip_all)]
     pub fn commit_status(&self) -> bool {
         self.commit_status
@@ -132,6 +124,41 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
                             ),
                             "DatabaseCommit `CodeStorage::add`"
                         );
+                    }
+                    // Mark Native if the account signed (nonce bump)
+                    // or was just deployed (empty to non-empty code).
+                    // Only writes when the path is empty, so existing
+                    // classifications survive.
+                    let original_info = self.original_account_infos.get(&address);
+                    let nonce_increased = match original_info {
+                        Some(prev) => info.nonce > prev.nonce,
+                        None => info.nonce > 0,
+                    };
+                    let original_code_hash = original_info
+                        .map(|prev| prev.code_hash)
+                        .unwrap_or(KECCAK_EMPTY);
+                    let code_was_set = original_code_hash == KECCAK_EMPTY
+                        && info.code_hash != KECCAK_EMPTY;
+                    if nonce_increased || code_was_set {
+                        match storage_account.get_origin(self.host) {
+                            Ok(None) => {
+                                abort_on_error!(
+                                    self,
+                                    storage_account
+                                        .set_origin(self.host, &Origin::Native),
+                                    "DatabaseCommit `set_origin(Native)`"
+                                );
+                            }
+                            Ok(Some(_)) => {}
+                            Err(err) => {
+                                self.abort();
+                                log!(
+                                    Level::Error,
+                                    "DatabaseCommit `get_origin` error: {err:?}"
+                                );
+                                return;
+                            }
+                        }
                     }
                     // Avoid rewriting the account info if it hasn't changed
                     if self.original_account_infos.get(&address) != Some(&info) {
@@ -182,68 +209,62 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
 
 // Precompile read functions care about the difference between a path not found and a runtime error
 // as path not found is the only one that will produce a revert result
-impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
+impl<Host, R: Registry> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host, R>
+where
+    Host: StorageV1,
+{
     fn log_node_message(&mut self, level: Level, message: &str) {
-        log!(self.host, level, "{message:?}");
+        log!(level, "{message:?}");
     }
 
-    fn global_counter(&self) -> Result<U256, CustomPrecompileError> {
-        Ok(self.system.read_global_counter(self.host)?)
+    fn global_counter(&self) -> Result<U256, PrecompileStateError> {
+        self.system.read_global_counter(self.host)
     }
 
     fn ticket_balance(
         &self,
         ticket_hash: &U256,
         owner: &Address,
-    ) -> Result<U256, CustomPrecompileError> {
-        Ok(self
-            .system
-            .read_ticket_balance(self.host, ticket_hash, owner)?)
+    ) -> Result<U256, PrecompileStateError> {
+        self.system
+            .read_ticket_balance(self.host, ticket_hash, owner)
     }
 
     fn deposit_in_queue(
         &self,
         deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
-        Ok(self.system.read_deposit_from_queue(self.host, deposit_id)?)
+    ) -> Result<FaDepositWithProxy, PrecompileStateError> {
+        self.system.read_deposit_from_queue(self.host, deposit_id)
     }
 
-    fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError> {
+    fn ticketer(&self) -> Result<ContractKt1Hash, PrecompileStateError> {
         let ticketer =
             self.host
-                .store_read(&WITHDRAWALS_TICKETER_PATH, 0, KT1_B58_SIZE)?;
-        let kt1_b58 = String::from_utf8(ticketer.to_vec()).map_err(custom)?;
-        Ok(ContractKt1Hash::from_b58check(&kt1_b58).map_err(custom)?)
+                .store_read(&NATIVE_TOKEN_TICKETER_PATH, 0, KT1_B58_SIZE)?;
+        let kt1_b58 = std::str::from_utf8(&ticketer)?;
+        Ok(ContractKt1Hash::from_b58check(kt1_b58)?)
     }
 
-    fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError> {
-        let bytes = self.host.internal_store_read_all(&SEQUENCER_KEY_PATH)?;
-        PublicKey::from_b58check(std::str::from_utf8(&bytes).map_err(|e| {
-            CustomPrecompileError::Revert(format!(
-                "Invalid sequencer key UTF-8 encoding: {e}"
-            ))
-        })?)
-        .map_err(|e| {
-            CustomPrecompileError::Revert(format!(
-                "Invalid sequencer key Base58Check encoding: {e}"
-            ))
-        })
+    fn sequencer(&self) -> Result<PublicKey, PrecompileStateError> {
+        let bytes = self.host.store_read_all(&SEQUENCER_KEY_PATH)?;
+        let s = std::str::from_utf8(&bytes)?;
+        Ok(PublicKey::from_b58check(s)?)
     }
 
-    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, CustomPrecompileError> {
-        match self
-            .host
-            .internal_store_read_all(&GOVERNANCE_SEQUENCER_UPGRADE_PATH)
-        {
+    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, PrecompileStateError> {
+        match self.host.store_read_all(&GOVERNANCE_SEQUENCER_UPGRADE_PATH) {
             Ok(_) => Ok(true),
             Err(RuntimeError::PathNotFound) => Ok(false),
-            Err(e) => Err(CustomPrecompileError::from(e)),
+            Err(e) => Err(e.into()),
         }
     }
 }
 
-impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
-    type Error = Error;
+impl<Host, R: Registry> Database for EtherlinkVMDB<'_, Host, R>
+where
+    Host: StorageV1,
+{
+    type Error = EvmDbError;
 
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
         let storage_account = StorageAccount::from_address(&address)?;
@@ -284,9 +305,13 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
         }
     }
 }
-impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, Host> {
+impl<Host, R: Registry> DatabaseCommitPrecompileStateChanges
+    for EtherlinkVMDB<'_, Host, R>
+where
+    Host: StorageV1,
+{
     fn commit(&mut self, etherlink_data: PrecompileStateChanges) {
-        self.withdrawals = etherlink_data.withdrawals.into_iter().collect();
+        self.withdrawals = etherlink_data.withdrawals;
         if let Some(new_sequencer_key_change) = etherlink_data.sequencer_key_change {
             abort_on_error!(
                 self,
@@ -327,8 +352,11 @@ impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, H
     }
 }
 
-impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
-    fn commit(&mut self, changes: HashMap<Address, Account>) {
+impl<Host, R: Registry> DatabaseCommit for EtherlinkVMDB<'_, Host, R>
+where
+    Host: StorageV1,
+{
+    fn commit(&mut self, changes: AddressMap<Account>) {
         for (address, account) in changes {
             // The account isn't marked as touched, the changes are not commited
             // to the database.

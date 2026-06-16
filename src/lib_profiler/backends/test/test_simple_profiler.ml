@@ -251,10 +251,25 @@ let get_profiler file_name =
       (* The default driver is a text driver writing to a file
          without suffixing it *)
       Tezos_profiler_backends.Simple_profiler.auto_write_as_txt_to_file
-      (file_name, Info)
+      (file_name, Info, 7)
   in
   plug profiler test_profiler_instance ;
   profiler
+
+let find_dated_file base_path =
+  let dir = Filename.dirname base_path in
+  let base_name = Filename.basename base_path in
+  let files = Sys.readdir dir in
+  let prefix = base_name ^ "-" in
+  match
+    Array.to_list files
+    |> List.filter (fun f ->
+           String.length f > String.length prefix
+           && String.sub f 0 (String.length prefix) = prefix)
+    |> List.sort (fun a b -> -String.compare a b)
+  with
+  | f :: _ -> Filename.concat dir f
+  | [] -> base_path
 
 let run_test_with_profiler test_name test_fn =
   let file_name = Temp.file ("output_test_simple_profiling_" ^ test_name) in
@@ -263,7 +278,8 @@ let run_test_with_profiler test_name test_fn =
   test_fn profiler ;
   Log.info "\nProfiling result for %s" test_name ;
   Log.info "==================================" ;
-  check_file_content file_name
+  let actual_file = find_dated_file file_name in
+  check_file_content actual_file
 
 let () =
   Tezt_core.Regression.register

@@ -32,7 +32,7 @@ If a block contains a valid ``DAL_publish_commitment`` operation, any subsequent
 Economics
 ---------
 
-Currently, the fees are estimated based on the execution cost of this operation alone. There are no additional charges related to the bandwidth required for bakers to download data from the DAL for this commitment. However, this might be subject to changes in the future.
+Currently, the fees are estimated based on the execution cost of this operation alone. There are no additional charges related to the network bandwidth required by bakers to download data from the DAL for this commitment. However, this might be subject to changes in the future.
 
 DAL attestation payloads
 ========================
@@ -57,6 +57,7 @@ In the block’s metadata, there is a specific field for the DAL, called ``"dal_
 
 Therefore, for data committed (published) at level ``n``, the slot's availability is determined by the metadata of the block at level ``n + ATTESTATION_LAG``. Consequently, a smart rollup can only utilize this data from level ``n + ATTESTATION_LAG + 1`` onward.
 
+.. _DAL_incentives_scheme:
 .. _DAL_incentives_scheme_tallinn:
 
 DAL incentives scheme
@@ -148,6 +149,7 @@ Penalties
 
 A baker that is correctly accused, through an accusation operation included in a block, loses their DAL rewards for the cycle containing the block.
 
+.. _dal_rollups_integration:
 .. _dal_rollups_integration_tallinn:
 
 Smart Rollups integration
@@ -163,6 +165,7 @@ If the kernel requests a page that does not satisfy the mentioned conditions, th
 
 Moreover, the rollup kernel has access to the protocol constants so that the same kernel code can be used on different test networks.
 
+.. _dal_constants:
 .. _dal_constants_tallinn:
 
 DAL-related protocol constants

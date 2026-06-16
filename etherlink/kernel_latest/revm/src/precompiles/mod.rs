@@ -4,11 +4,12 @@
 
 pub mod change_sequencer_key;
 pub mod constants;
-pub mod error;
 pub mod initializer;
 pub mod provider;
+pub mod runtime_gateway;
 pub mod send_outbox_message;
 
 mod global_counter;
 mod guard;
 mod table;
+mod verify_tezos_signature;

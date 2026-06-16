@@ -686,9 +686,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   let profile ?migrate_to ?hooks ~collapse ~with_time ~no_reboot level inboxes
       config function_symbols tree =
     let open Lwt_result_syntax in
-    let*! pvm_state =
-      Wasm_utils.Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
-    in
+    let*! pvm_state = Wasm_utils.State.Encoding_runner.decode tree in
     let*! status = check_input_request tree in
     let is_profilable =
       match pvm_state.tick_state with

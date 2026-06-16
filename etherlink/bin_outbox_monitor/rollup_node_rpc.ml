@@ -32,7 +32,11 @@ let get_outbox_messages ctxt ~outbox_level =
       List.fold_left
         (fun acc -> function
           | _, None -> acc
-          | _, Some (Outbox_message.Whitelist_update _) -> acc
+          | ( _,
+              Some
+                ( Outbox_message.Whitelist_update _
+                | Outbox_message.Canonical_rollup_signal _ ) ) ->
+              acc
           | message_index, Some (Transaction_batch transactions) ->
               {outbox_level; message_index; transactions} :: acc)
         acc

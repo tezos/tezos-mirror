@@ -55,11 +55,40 @@ let read_from_rollup_node ~keep_alive path level rollup_node_endpoint =
     {key = path}
     ()
 
-let fetch_event
+(* Fetch the storage_version of the kernel served by the rollup node at the
+   given level. Tries the new /base/ path first, falls back to the legacy
+   /evm/ path. Returns 0 if neither is set. *)
+let fetch_storage_version ~keep_alive ~timeout level rollup_node_endpoint =
+  let open Lwt_result_syntax in
+  let decode bytes = Helpers.decode_z_le bytes |> Z.to_int in
+  let* bytes_opt =
+    read_from_rollup_node
+      ~keep_alive
+      ~timeout
+      Durable_storage_path.storage_version_base
+      level
+      rollup_node_endpoint
+  in
+  match bytes_opt with
+  | Some bytes -> return (decode bytes)
+  | None ->
+      let* bytes_opt =
+        read_from_rollup_node
+          ~keep_alive
+          ~timeout
+          Durable_storage_path.storage_version_legacy
+          level
+          rollup_node_endpoint
+      in
+      return (Option.fold ~none:0 ~some:decode bytes_opt)
+
+let fetch_event ~storage_version
     ({rollup_node_endpoint; keep_alive; rpc_timeout; _} : Types.state)
     rollup_block_lvl event_index =
   let open Lwt_result_syntax in
-  let path = Durable_storage_path.Evm_events.nth_event event_index in
+  let path =
+    Durable_storage_path.Evm_events.nth_event ~storage_version event_index
+  in
   let* bytes_opt =
     read_from_rollup_node
       ~keep_alive
@@ -85,11 +114,18 @@ let fetch_events_one_by_one
     ({rollup_node_endpoint; keep_alive; rpc_timeout; filter_event; _} as state :
       Types.state) rollup_block_lvl =
   let open Lwt_result_syntax in
+  let* storage_version =
+    fetch_storage_version
+      ~keep_alive
+      ~timeout:rpc_timeout
+      rollup_block_lvl
+      rollup_node_endpoint
+  in
   let* nb_of_events_bytes =
     read_from_rollup_node
       ~keep_alive
       ~timeout:rpc_timeout
-      Durable_storage_path.Evm_events.length
+      (Durable_storage_path.Evm_events.length ~storage_version)
       rollup_block_lvl
       rollup_node_endpoint
   in
@@ -107,7 +143,7 @@ let fetch_events_one_by_one
                "Internal error: the rollup node advertised a negative length \
                 for the events stream")
           nb_of_events
-          (fetch_event state rollup_block_lvl)
+          (fetch_event ~storage_version state rollup_block_lvl)
       in
       List.filter_map
         (function
@@ -118,7 +154,14 @@ let fetch_events_at_once
     ({rollup_node_endpoint; keep_alive; rpc_timeout; filter_event; _} :
       Types.state) rollup_block_lvl =
   let open Lwt_result_syntax in
-  let path = Durable_storage_path.Evm_events.events in
+  let* storage_version =
+    fetch_storage_version
+      ~keep_alive
+      ~timeout:rpc_timeout
+      rollup_block_lvl
+      rollup_node_endpoint
+  in
+  let path = Durable_storage_path.Evm_events.events ~storage_version in
   let* bindings =
     let open Rollup_services in
     call_service

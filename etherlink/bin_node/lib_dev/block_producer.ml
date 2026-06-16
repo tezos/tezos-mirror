@@ -8,7 +8,6 @@
 type parameters = {
   signer : Signer.map;
   maximum_number_of_chunks : int;
-  tx_container : Services_backend_sig.ex_tx_container;
   sequencer_sunset_sec : int64;
   preconfirmation_stream_enabled : bool;
 }
@@ -61,18 +60,33 @@ let minimum_ethereum_transaction_size =
 module Types = struct
   type nonrec parameters = parameters
 
+  type preconfirmation_state =
+    | Potential_next_block_timestamp of Time.Protocol.t
+    | Selecting_delayed_txs of {
+        timestamp : Time.Protocol.t;
+        rev_delayed_txs : Ethereum_types.hash list;
+        current_size : int;
+      }
+    | Validating_txs of {
+        timestamp : Time.Protocol.t;
+        rev_delayed_txs : Ethereum_types.hash list;
+        rev_validated_txs :
+          (Broadcast.common_transaction * Ethereum_types.hash) list;
+        validation_state : Validation_types.validation_state;
+      }
+
+  type preconfirmation =
+    | Disabled
+    | Awaiting_first_timestamp
+    | Enabled of preconfirmation_state
+
   type state = {
     signer : Signer.map;
     maximum_number_of_chunks : int;
-    tx_container : Services_backend_sig.ex_tx_container;
     sequencer_sunset_sec : int64;
     mutable sunset : bool;
-    preconfirmation_stream_enabled : bool;
-    mutable selected_delayed_txns : Evm_events.Delayed_transaction.t list;
-    mutable validated_txns :
-      (string * Tx_queue_types.transaction_object_t) list;
-    mutable validation_state : Validation_types.validation_state;
-    mutable next_block_timestamp : Time.System.t option;
+    mutable locked : bool;
+    mutable preconfirmation_state : preconfirmation;
   }
 end
 
@@ -88,18 +102,32 @@ module Name = struct
   let equal () () = true
 end
 
+type force = True | False | With_timestamp of Time.Protocol.t
+
 module Request = struct
   type ('a, 'b) t =
-    | Produce_block :
-        (bool * Time.Protocol.t * bool)
+    | Produce_genesis :
+        (Time.Protocol.t * Ethereum_types.block_hash)
+        -> (unit, tztrace) t
+    | Produce_block : {
+        with_delayed_transactions : bool;
+        force : force;
+      }
         -> ([`Block_produced of int | `No_block], tztrace) t
+    | Propose_next_block_timestamp : Time.Protocol.t -> (unit, tztrace) t
     | Preconfirm_transactions :
         (string * Tx_queue_types.transaction_object_t) list
-        -> (Ethereum_types.hash list, tztrace) t
+        -> (Tx_queue_types.preconfirmed_transactions_result, tztrace) t
+    | Lock_block_production : (unit, tztrace) t
+    | Unlock_block_production : (unit, tztrace) t
 
   let name : type a b. (a, b) t -> string = function
+    | Produce_genesis _ -> "Produce_genesis"
     | Produce_block _ -> "Produce_block"
+    | Propose_next_block_timestamp _ -> "Propose_next_block_timestamp"
     | Preconfirm_transactions _ -> "Preconfirm_transactions"
+    | Lock_block_production -> "Lock_block_production"
+    | Unlock_block_production -> "Unlock_block_production"
 
   type view = View : _ t -> view
 
@@ -130,19 +158,54 @@ module Request = struct
       [
         case
           Json_only
+          ~title:"Produce_genesis"
+          (obj3
+             (req "request" (constant "produce_genesis"))
+             (req "timestamp" Time.Protocol.encoding)
+             (req "hash" Ethereum_types.block_hash_encoding))
+          (function
+            | View (Produce_genesis (timestamp, hash)) ->
+                Some ((), timestamp, hash)
+            | _ -> None)
+          (fun ((), timestamp, hash) ->
+            View (Produce_genesis (timestamp, hash)));
+        case
+          Json_only
           ~title:"Produce_block"
           (obj4
              (req "request" (constant "produce_block"))
              (req "with_delayed_transactions" bool)
-             (req "timestamp" Time.Protocol.encoding)
+             (opt "timestamp" Time.Protocol.encoding)
              (req "force" bool))
           (function
-            | View (Produce_block (with_delayed_transactions, timestamp, force))
-              ->
+            | View (Produce_block {with_delayed_transactions; force}) ->
+                let timestamp, force =
+                  match force with
+                  | True -> (None, true)
+                  | False -> (None, false)
+                  | With_timestamp timestamp -> (Some timestamp, true)
+                in
                 Some ((), with_delayed_transactions, timestamp, force)
             | _ -> None)
           (fun ((), with_delayed_transactions, timestamp, force) ->
-            View (Produce_block (with_delayed_transactions, timestamp, force)));
+            let force =
+              match (timestamp, force) with
+              | Some t, true -> With_timestamp t
+              | None, true -> True
+              | _ -> False
+            in
+            View (Produce_block {with_delayed_transactions; force}));
+        case
+          Json_only
+          ~title:"Propose_next_block_timestamp"
+          (obj2
+             (req "request" (constant "propose_next_block_timestamp"))
+             (req "timestamp" Time.Protocol.encoding))
+          (function
+            | View (Propose_next_block_timestamp timestamp) ->
+                Some ((), timestamp)
+            | _ -> None)
+          (fun ((), timestamp) -> View (Propose_next_block_timestamp timestamp));
         case
           Json_only
           ~title:"Preconfirm_transactions"
@@ -157,6 +220,18 @@ module Request = struct
             | _ -> None)
           (fun ((), transactions) ->
             View (Preconfirm_transactions transactions));
+        case
+          Json_only
+          ~title:"Lock_block_production"
+          (obj1 (req "request" (constant "lock_block_production")))
+          (function View Lock_block_production -> Some () | _ -> None)
+          (fun () -> View Lock_block_production);
+        case
+          Json_only
+          ~title:"Unlock_block_production"
+          (obj1 (req "request" (constant "unlock_block_production")))
+          (function View Unlock_block_production -> Some () | _ -> None)
+          (fun () -> View Unlock_block_production);
       ]
 
   let pp _ppf (View _) = ()
@@ -175,7 +250,7 @@ let take_delayed_transactions evm_state maximum_number_of_chunks =
   let maximum_delayed_transactions =
     maximum_cumulative_size / maximum_delayed_transaction_size
   in
-  let*! delayed_transactions = Evm_state.delayed_inbox_hashes evm_state in
+  let* delayed_transactions = Evm_state.delayed_inbox_hashes evm_state in
   let delayed_transactions =
     List.take_n maximum_delayed_transactions delayed_transactions
   in
@@ -192,10 +267,17 @@ let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
     (Blueprint_events.blueprint_production
        head_info.Evm_context.next_blueprint_number)
   @@ fun () ->
+  let storage_version = head_info.storage_version in
+  let tezosx_runtimes = head_info.tezosx_runtimes in
+  let blueprint_version : Sequencer_blueprint.blueprint_version =
+    if storage_version >= 48 && not (List.is_empty tezosx_runtimes) then V1
+    else Legacy
+  in
   let chunks =
     Sequencer_blueprint.make_blueprint_chunks
       ~number:head_info.next_blueprint_number
       {
+        version = blueprint_version;
         parent_hash = head_info.current_block_hash;
         delayed_transactions = delayed_hashes;
         transactions;
@@ -225,6 +307,19 @@ let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
       (tx_hashes @ delayed_hashes)
   in
   return confirmed_txs
+
+let produce_empty_block ~signer ~timestamp head_info =
+  let open Lwt_result_syntax in
+  let* hashes =
+    produce_block_with_transactions
+      ~signer
+      ~timestamp
+      ~transactions_and_objects:[]
+      ~delayed_hashes:[]
+      head_info
+  in
+  (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
+  return (`Block_produced (Seq.length hashes))
 
 let validate_etherlink_tx ~maximum_cumulative_size
     (validation_state : Validation_types.validation_state) raw_tx
@@ -263,87 +358,105 @@ let validate_tezlink_op ~maximum_cumulative_size
         let*! () = Block_producer_events.operation_rejected hash msg in
         return (`Drop msg)
 
-let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
-    (head_info : Evm_context.head) ~maximum_cumulative_size =
+let init_validation_state (head_info : Evm_context.head) =
   let open Lwt_result_syntax in
-  (* Skip validation if chain_family is Michelson. *)
-  match tx_container with
-  | Michelson_tx_container (module Tx_container) ->
-      if maximum_cumulative_size <= Tezos_types.Operation.minimum_operation_size
-      then return_nil
-      else
-        let read = Evm_state.read head_info.evm_state in
-        let initial_validation_state =
-          Tezlink_prevalidation.init_blueprint_validation read ()
-        in
-        let* l =
-          Tx_container.pop_transactions
-            ~maximum_cumulative_size
-            ~validate_tx:(validate_tezlink_op ~maximum_cumulative_size)
-            ~initial_validation_state
-        in
-        let l =
-          List.map
-            (fun (raw, tx) ->
-              (raw, Tx_queue_types.Tezlink_operation.hash_of_tx_object tx))
-            l
-        in
-        return l
-  | Evm_tx_container (module Tx_container) ->
-      (* Low key optimization to avoid even checking the txpool if there is not
-         enough space for the smallest transaction. *)
-      if maximum_cumulative_size <= minimum_ethereum_transaction_size then
-        return_nil
-      else
-        let read = Evm_state.read head_info.evm_state in
-        let* minimum_base_fee_per_gas =
-          Etherlink_durable_storage.minimum_base_fee_per_gas read
-        in
-        let* base_fee_per_gas =
-          Etherlink_durable_storage.base_fee_per_gas read
-        in
-        let* maximum_gas_limit =
-          Etherlink_durable_storage.maximum_gas_per_transaction read
-        in
-        let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
-        let evm_config =
-          Validation_types.
-            {
-              minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
-              base_fee_per_gas;
-              maximum_gas_limit;
-              da_fee_per_byte;
-              next_nonce =
-                (fun addr -> Etherlink_durable_storage.nonce read addr);
-              balance =
-                (fun addr -> Etherlink_durable_storage.balance read addr);
-            }
-        in
-        let initial_validation_state =
-          Validation_types.empty_validation_state
-            ~michelson_config:Validation_types.dummy_michelson_config
-            ~evm_config
-        in
-        let* l =
-          Tx_container.pop_transactions
-            ~maximum_cumulative_size
-            ~validate_tx:(validate_etherlink_tx ~maximum_cumulative_size)
-            ~initial_validation_state
-        in
-        let l =
-          List.map (fun (raw, tx) -> (raw, Transaction_object.hash tx)) l
-        in
-        return l
+  let state = head_info.evm_state in
+  let data_model =
+    if List.mem ~equal:( = ) Tezosx.Tezos head_info.tezosx_runtimes then
+      Tezlink_durable_storage.Rlp
+    else Tezlink_durable_storage.Path
+  in
+  let michelson_config =
+    let get_counter = Tezlink_durable_storage.counter state ~data_model in
+    let get_balance = Tezlink_durable_storage.balance_z state ~data_model in
+    Validation_types.{get_balance; get_counter}
+  in
+  let* minimum_base_fee_per_gas =
+    Etherlink_durable_storage.minimum_base_fee_per_gas_opt state
+  in
+  let* base_fee_per_gas =
+    Etherlink_durable_storage.base_fee_per_gas_opt state
+  in
+  let* maximum_gas_limit =
+    Etherlink_durable_storage.maximum_gas_per_transaction state
+  in
+  let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte state in
+  (* TODO #8236 / L2-862
+   Using optional values for [minimum_base_fee_per_gas] and [base_fee_per_gas]
+   is a temporary work around. In the context of Tezlink, no EVM block
+   exists yet so reading these values from the block header raises
+   [Invalid_block_structure]. Once the kernel writes an initial EVM block for
+   all chain families, this fallback can be removed. *)
+  let evm_config =
+    Validation_types.
+      {
+        minimum_base_fee_per_gas =
+          Qty
+            (Option.value
+               ~default:Fees.default_minimum_base_fee_per_gas
+               minimum_base_fee_per_gas);
+        base_fee_per_gas =
+          Option.value
+            ~default:(Qty Fees.default_minimum_base_fee_per_gas)
+            base_fee_per_gas;
+        maximum_gas_limit;
+        da_fee_per_byte;
+        next_nonce = (fun addr -> Etherlink_durable_storage.nonce state addr);
+        balance = (fun addr -> Etherlink_durable_storage.balance state addr);
+      }
+  in
+  return (Validation_types.empty_validation_state ~michelson_config ~evm_config)
 
-(** Produces a block if we find at least one valid transaction in the transaction
-    pool or if [force] is true. *)
-let produce_block_if_needed (type f) ~signer ~force ~timestamp ~delayed_hashes
-    ~transactions_and_objects
-    ~(tx_container : f Services_backend_sig.tx_container)
-    ~clear_pending_queue_after head_info =
+let pop_valid_tx (head_info : Evm_context.head) ~maximum_cumulative_size =
+  let open Lwt_result_syntax in
+  (* Low key optimization to avoid even checking the txpool if there is not
+     enough space for the smallest transaction. *)
+  if
+    maximum_cumulative_size
+    <= Int.min
+         minimum_ethereum_transaction_size
+         Tezos_types.Operation.minimum_operation_size
+  then return_nil
+  else
+    let* initial_validation_state = init_validation_state head_info in
+    let* l =
+      Tx_queue.pop_transactions
+        ~maximum_cumulative_size
+        ~validate_tx:(fun validation_state raw_tx tx_object ->
+          match tx_object with
+          | Tx_queue_types.Evm tx_object ->
+              validate_etherlink_tx
+                ~maximum_cumulative_size
+                validation_state
+                raw_tx
+                tx_object
+          | Tx_queue_types.Michelson operation ->
+              validate_tezlink_op
+                ~maximum_cumulative_size
+                validation_state
+                raw_tx
+                operation)
+        ~initial_validation_state
+    in
+    let l =
+      List.map
+        (fun (raw, tx) ->
+          match tx with
+          | Tx_queue_types.Evm tx ->
+              (Broadcast.Evm raw, Transaction_object.hash tx)
+          | Tx_queue_types.Michelson tx ->
+              (Broadcast.Michelson raw, Tezos_types.Operation.hash_operation tx))
+        l
+    in
+    return l
+
+(** Produces a block if we find at least one valid transaction in the
+    transaction pool. *)
+let produce_block_if_needed ~signer ~timestamp ~delayed_hashes
+    ~transactions_and_objects ~clear_pending_queue_after head_info =
   let open Lwt_result_syntax in
   let n = List.length transactions_and_objects + List.length delayed_hashes in
-  if force || n > 0 then
+  if n > 0 then
     let* confirmed_txs =
       produce_block_with_transactions
         ~signer
@@ -352,13 +465,8 @@ let produce_block_if_needed (type f) ~signer ~force ~timestamp ~delayed_hashes
         ~delayed_hashes
         head_info
     in
-    let (module Tx_container) =
-      Services_backend_sig.tx_container_module tx_container
-    in
     let* () =
-      Tx_container.confirm_transactions
-        ~clear_pending_queue_after
-        ~confirmed_txs
+      Tx_queue.confirm_transactions ~clear_pending_queue_after ~confirmed_txs
     in
     return (`Block_produced n)
   else return `No_block
@@ -380,59 +488,6 @@ let head_info_and_delayed_transactions ~with_delayed_transactions evm_state
   in
   return (delayed_hashes, remaining_cumulative_size)
 
-let init_michelson_validation_state () =
-  let open Lwt_result_syntax in
-  return
-    (Validation_types.empty_validation_state
-       ~michelson_config:Validation_types.dummy_michelson_config
-       ~evm_config:Validation_types.dummy_evm_config)
-
-let init_evm_validation_state () =
-  let open Lwt_result_syntax in
-  let*! head_info = Evm_context.head_info () in
-  let read = Evm_state.read head_info.evm_state in
-  let* minimum_base_fee_per_gas =
-    Etherlink_durable_storage.minimum_base_fee_per_gas read
-  in
-  let* base_fee_per_gas = Etherlink_durable_storage.base_fee_per_gas read in
-  let* maximum_gas_limit =
-    Etherlink_durable_storage.maximum_gas_per_transaction read
-  in
-  let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
-  let evm_config =
-    Validation_types.
-      {
-        minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
-        base_fee_per_gas;
-        maximum_gas_limit;
-        da_fee_per_byte;
-        next_nonce = (fun addr -> Etherlink_durable_storage.nonce read addr);
-        balance = (fun addr -> Etherlink_durable_storage.balance read addr);
-      }
-  in
-  return
-    (Validation_types.empty_validation_state
-       ~michelson_config:Validation_types.dummy_michelson_config
-       ~evm_config)
-
-let init_validation_state ~(tx_container : Services_backend_sig.ex_tx_container)
-    =
-  match tx_container with
-  | Ex_tx_container tx_container -> (
-      match tx_container with
-      | Evm_tx_container _ -> init_evm_validation_state ()
-      | Michelson_tx_container _ -> init_michelson_validation_state ())
-
-let clear_preconfirmation_data ~(state : Types.state) =
-  let open Lwt_result_syntax in
-  state.validated_txns <- [] ;
-  state.selected_delayed_txns <- [] ;
-  let* validation_state =
-    init_validation_state ~tx_container:state.tx_container
-  in
-  state.validation_state <- validation_state ;
-  return_unit
-
 (* [now] is the timestamp of the previously created block.
    We compute [next] as the maximum between:
    - [now + 500 ms], ensuring a minimal delay between blocks, and
@@ -446,214 +501,401 @@ let compute_next_block_timestamp ~now =
   let now_plus =
     Ptime.add_span now t_500 |> WithExceptions.Option.get ~loc:__LOC__
   in
-  Time.System.(max now_plus now')
+  Time.System.(max now_plus now') |> Time.System.to_protocol
 
-(* Required while the preconfirmation system and previous block production co-exist *)
-let choose_block_timestamp preconfirmation_stream_enabled next_block_timestamp
-    external_timestamp =
-  match (preconfirmation_stream_enabled, next_block_timestamp) with
-  | false, _ -> external_timestamp
-  | true, Some next -> Time.System.to_protocol next
-  | true, None -> Misc.now ()
+let preconfirmation_stream_enabled state =
+  match state.Types.preconfirmation_state with Disabled -> false | _ -> true
 
-let produce_block (state : Types.state) ~force ~(timestamp : Time.Protocol.t)
-    ~with_delayed_transactions =
+let set_preconfirmation_state (state : Types.state) preconfirmation_state =
+  match state.preconfirmation_state with
+  | Types.Disabled -> ()
+  | Awaiting_first_timestamp | Enabled _ ->
+      state.preconfirmation_state <- Enabled preconfirmation_state
+
+let notify_next_block_info ~timestamp ~next_blueprint_number =
+  let open Lwt_syntax in
+  Broadcast.notify_next_block_info timestamp next_blueprint_number ;
+  let* () = Events.sent_next_block_info timestamp next_blueprint_number in
+  Evm_context.next_block_info timestamp next_blueprint_number
+
+let notify_delayed_tx ~raw_tx ~tx_hash =
+  Broadcast.notify_inclusion (Delayed raw_tx) tx_hash ;
+  Events.sent_inclusion tx_hash
+
+let notify_common_tx ~wrapped_raw_tx ~tx_hash =
+  let open Lwt_syntax in
+  Broadcast.notify_inclusion (Common wrapped_raw_tx) tx_hash ;
+  let* () = Events.sent_inclusion tx_hash in
+  return_unit
+
+let add_selected_delayed_txs (head_info : Evm_context.head)
+    (preconfirmation_state : Types.preconfirmation_state) delayed_hash =
   let open Lwt_result_syntax in
-  match state.tx_container with
-  | Ex_tx_container tx_container ->
-      let (module Tx_container) =
-        Services_backend_sig.tx_container_module tx_container
-      in
-      (*
-        now and timestamp serve distinct but complementary purposes:
-        - now: taken at the start of the request, used to predict the next timestamp
-          and keep it aligned with real time.
-        - timestamp: derived from the previously computed `next_block_timestamp`,
-          ensuring consistency between preconfirmation and block creation.
-      *)
-      let now = Ptime_clock.now () in
-      let timestamp =
-        choose_block_timestamp
-          state.preconfirmation_stream_enabled
-          state.next_block_timestamp
-          timestamp
-      in
-      let*! head_info = Evm_context.head_info () in
+  match preconfirmation_state with
+  | Potential_next_block_timestamp timestamp ->
       let* () =
-        when_ (not state.sunset) @@ fun () ->
-        match head_info.pending_sequencer_upgrade with
-        | Some Evm_events.Sequencer_upgrade.{timestamp = upgrade_timestamp; _}
-          when Time.Protocol.(
-                 add timestamp state.sequencer_sunset_sec >= upgrade_timestamp
-                 && timestamp < upgrade_timestamp) ->
-            (* We stop producing blocks ahead of the upgrade *)
-            let*! () = Block_producer_events.sunset () in
-            state.sunset <- true ;
-            Tx_container.lock_transactions ()
-        | _ -> return_unit
+        notify_next_block_info
+          ~timestamp
+          ~next_blueprint_number:head_info.next_blueprint_number
       in
-      let* is_locked = Tx_container.is_locked () in
-      if is_locked then
-        let*! () = Block_producer_events.production_locked () in
-        return `No_block
-      else
-        let is_going_to_upgrade_kernel =
-          match head_info.pending_upgrade with
-          | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
-              timestamp >= upgrade_timestamp
-          | None -> false
-        in
-        let signer = state.signer in
-        if is_going_to_upgrade_kernel then (
-          let* hashes =
-            produce_block_with_transactions
-              ~signer
-              ~timestamp
-              ~transactions_and_objects:[]
-              ~delayed_hashes:[]
-              head_info
-          in
-          state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
-          (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
-          return (`Block_produced (Seq.length hashes)))
-        else
-          let* delayed_hashes, transactions_and_objects =
-            if state.preconfirmation_stream_enabled then
-              let delayed_hashes =
-                List.map
-                  (fun {Evm_events.Delayed_transaction.hash; _} -> hash)
-                  state.selected_delayed_txns
-              in
-              return
-                ( delayed_hashes,
-                  List.map
-                    (fun (raw, obj) ->
-                      match obj with
-                      | Tx_queue_types.Evm obj ->
-                          (raw, Transaction_object.hash obj)
-                      | Tx_queue_types.Michelson obj ->
-                          ( raw,
-                            Tx_queue_types.Tezlink_operation.hash_of_tx_object
-                              obj ))
-                    state.validated_txns )
-            else
-              let* delayed_hashes, remaining_cumulative_size =
-                head_info_and_delayed_transactions
-                  ~with_delayed_transactions
-                  head_info.evm_state
-                  state.maximum_number_of_chunks
-              in
-              let* transactions_and_objects =
-                pop_valid_tx
-                  ~tx_container
-                  head_info
-                  ~maximum_cumulative_size:remaining_cumulative_size
-              in
-              return (delayed_hashes, transactions_and_objects)
-          in
-          let* result =
-            produce_block_if_needed
-              ~signer
-              ~timestamp
-              ~force
-              ~transactions_and_objects
-              ~delayed_hashes
-              ~tx_container
-              ~clear_pending_queue_after:
-                (not state.preconfirmation_stream_enabled)
-              head_info
-          in
-          state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
-          let* () = clear_preconfirmation_data ~state in
-          return result
+      let* raw_tx =
+        Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash
+      in
+      let*! () = notify_delayed_tx ~raw_tx ~tx_hash:delayed_hash in
+      return
+        (Types.Selecting_delayed_txs
+           {timestamp; rev_delayed_txs = [delayed_hash]; current_size = 4096})
+  | Selecting_delayed_txs
+      {timestamp; rev_delayed_txs = rev_current; current_size} ->
+      let* raw_tx =
+        Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash
+      in
+      let*! () = notify_delayed_tx ~raw_tx ~tx_hash:delayed_hash in
+      let rev_delayed_txs = delayed_hash :: rev_current in
+      return
+        (Types.Selecting_delayed_txs
+           {timestamp; rev_delayed_txs; current_size = current_size + 4096})
+  | Validating_txs _ ->
+      invalid_arg "add_selected_delayed_txs called in invalid state"
 
-let preconfirm_delayed_transactions ~(state : Types.state)
-    ~(head_info : Evm_context.head) =
+let add_validated_tx (head_info : Evm_context.head) ~wrapped_raw_tx ~tx_hash
+    validation_state preconfirmation_state =
+  let open Lwt_result_syntax in
+  match preconfirmation_state with
+  | Types.Potential_next_block_timestamp timestamp ->
+      let* () =
+        notify_next_block_info
+          ~timestamp
+          ~next_blueprint_number:head_info.next_blueprint_number
+      in
+      let*! () = notify_common_tx ~wrapped_raw_tx ~tx_hash in
+      return
+        (Types.Validating_txs
+           {
+             timestamp;
+             rev_delayed_txs = [];
+             validation_state;
+             rev_validated_txs = [(wrapped_raw_tx, tx_hash)];
+           })
+  | Selecting_delayed_txs {timestamp; rev_delayed_txs; current_size = _} ->
+      let*! () = notify_common_tx ~wrapped_raw_tx ~tx_hash in
+      return
+        (Types.Validating_txs
+           {
+             timestamp;
+             rev_delayed_txs;
+             validation_state;
+             rev_validated_txs = [(wrapped_raw_tx, tx_hash)];
+           })
+  | Validating_txs
+      {timestamp; rev_delayed_txs; rev_validated_txs; validation_state = _} ->
+      let*! () = notify_common_tx ~wrapped_raw_tx ~tx_hash in
+      return
+        (Types.Validating_txs
+           {
+             timestamp;
+             rev_delayed_txs;
+             rev_validated_txs = (wrapped_raw_tx, tx_hash) :: rev_validated_txs;
+             validation_state;
+           })
+
+let produce_genesis ~(state : Types.state) ~timestamp ~parent_hash =
+  let open Lwt_result_syntax in
+  let delayed_transactions = [] in
+  (* The genesis blueprint contains no transaction so the version
+     field (which versions the format of the "transactions" field) is
+     irrelevant. *)
+  let chunks =
+    Sequencer_blueprint.make_blueprint_chunks
+      ~number:Ethereum_types.(Qty Z.zero)
+      {
+        version = Legacy;
+        parent_hash;
+        delayed_transactions;
+        transactions = [];
+        timestamp;
+      }
+  in
+  let* genesis_chunks, genesis_payload, _ =
+    Evm_context.apply_chunks
+      ~signer:state.signer
+      timestamp
+      chunks
+      delayed_transactions
+  in
+  set_preconfirmation_state
+    state
+    (Types.Potential_next_block_timestamp
+       (compute_next_block_timestamp
+          ~now:(Time.System.of_protocol_exn timestamp))) ;
+  Blueprints_publisher.publish
+    Z.zero
+    (Blueprints_publisher_types.Request.Blueprint
+       {chunks = genesis_chunks; inbox_payload = genesis_payload})
+
+let choose_block_timestamp preconfirmation_state (force : force) =
+  match (force, preconfirmation_state) with
+  | With_timestamp t, _ -> t
+  | _, Types.(Disabled | Awaiting_first_timestamp) -> Misc.now ()
+  | _, Types.Enabled preconfirmation_state -> (
+      match preconfirmation_state with
+      | Types.Potential_next_block_timestamp timestamp
+      | Selecting_delayed_txs {timestamp; _}
+      | Validating_txs {timestamp; _} ->
+          timestamp)
+
+let produce_block (state : Types.state) ~force ~with_delayed_transactions =
+  let open Lwt_result_syntax in
+  (* now and timestamp serve distinct but complementary purposes:
+     - now: taken at the start of the request, used to predict the next timestamp
+       and keep it aligned with real time.
+     - timestamp: derived from the previously computed `next_block_timestamp`,
+       ensuring consistency between preconfirmation and block creation.
+  *)
+  let now = Ptime_clock.now () in
+  let timestamp = choose_block_timestamp state.preconfirmation_state force in
+  let*! head_info = Evm_context.head_info () in
+  let* () =
+    when_ (not state.sunset) @@ fun () ->
+    match head_info.pending_sequencer_upgrade with
+    | Some Evm_events.Sequencer_upgrade.{timestamp = upgrade_timestamp; _}
+      when Time.Protocol.(
+             add timestamp state.sequencer_sunset_sec >= upgrade_timestamp
+             && timestamp < upgrade_timestamp) ->
+        (* We stop producing blocks ahead of the upgrade *)
+        let*! () = Block_producer_events.sunset () in
+        state.sunset <- true ;
+        state.locked <- true ;
+        return_unit
+    | _ -> return_unit
+  in
+  let is_locked = state.locked in
+  let has_preconfirmed_txs =
+    match state.preconfirmation_state with
+    | Enabled (Selecting_delayed_txs _ | Validating_txs _) -> true
+    | _ -> false
+  in
+  if is_locked && not has_preconfirmed_txs then (
+    let*! () = Block_producer_events.production_locked () in
+    set_preconfirmation_state
+      state
+      (Potential_next_block_timestamp (compute_next_block_timestamp ~now)) ;
+    return `No_block)
+  else
+    let is_going_to_upgrade_kernel =
+      match head_info.pending_upgrade with
+      | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
+          timestamp >= upgrade_timestamp
+      | None -> false
+    in
+    let signer = state.signer in
+    if is_going_to_upgrade_kernel then (
+      let* result = produce_empty_block ~signer ~timestamp head_info in
+      set_preconfirmation_state
+        state
+        (Potential_next_block_timestamp (compute_next_block_timestamp ~now)) ;
+      return result)
+    else
+      let* delayed_hashes, transactions_and_objects =
+        match state.preconfirmation_state with
+        | Disabled ->
+            let* delayed_hashes, remaining_cumulative_size =
+              head_info_and_delayed_transactions
+                ~with_delayed_transactions
+                head_info.evm_state
+                state.maximum_number_of_chunks
+            in
+            let* transactions_and_hashes =
+              pop_valid_tx
+                head_info
+                ~maximum_cumulative_size:remaining_cumulative_size
+            in
+            return (delayed_hashes, transactions_and_hashes)
+        | Enabled (Potential_next_block_timestamp _) | Awaiting_first_timestamp
+          ->
+            let* delayed_hashes, _rem_size =
+              head_info_and_delayed_transactions
+                ~with_delayed_transactions
+                head_info.evm_state
+                state.maximum_number_of_chunks
+            in
+            return (delayed_hashes, [])
+        | Enabled
+            (Selecting_delayed_txs
+               {rev_delayed_txs; timestamp = _; current_size = _}) ->
+            return (List.rev rev_delayed_txs, [])
+        | Enabled
+            (Validating_txs
+               {
+                 rev_delayed_txs;
+                 rev_validated_txs;
+                 timestamp = _;
+                 validation_state = _;
+               }) ->
+            return (List.rev rev_delayed_txs, List.rev rev_validated_txs)
+      in
+      let* result =
+        produce_block_if_needed
+          ~signer
+          ~timestamp
+          ~transactions_and_objects
+          ~delayed_hashes
+          ~clear_pending_queue_after:
+            (not (preconfirmation_stream_enabled state))
+          head_info
+      in
+      let* result =
+        match (result, force) with
+        | `No_block, (True | With_timestamp _) ->
+            produce_empty_block ~signer ~timestamp head_info
+        | result, _ -> return result
+      in
+      set_preconfirmation_state
+        state
+        (Potential_next_block_timestamp (compute_next_block_timestamp ~now)) ;
+      return result
+
+let preconfirm_delayed_transactions
+    (preconfirmation_state : Types.preconfirmation_state)
+    ~maximum_number_of_chunks (head_info : Evm_context.head) =
   let open Lwt_result_syntax in
   let* delayed_hashes, remaining_cumulative_size =
     head_info_and_delayed_transactions
       ~with_delayed_transactions:true
       head_info.evm_state
-      state.maximum_number_of_chunks
+      maximum_number_of_chunks
   in
-  let* txns =
-    List.map_es
-      (fun delayed_hash ->
-        let* tx =
-          Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash
-        in
-        Broadcast.notify_inclusion (Delayed tx) delayed_hash ;
-        return tx)
+  let* preconfirmation_state =
+    List.fold_left_es
+      (add_selected_delayed_txs head_info)
+      preconfirmation_state
       delayed_hashes
   in
-  state.selected_delayed_txns <- txns ;
-  return remaining_cumulative_size
+  return (remaining_cumulative_size, preconfirmation_state)
 
-let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
+let preconfirm_transaction ~maximum_cumulative_size validation_state ~raw_tx
+    transaction_object =
   let open Lwt_result_syntax in
+  let* res, tx_hash, wrapped_raw_tx =
+    match transaction_object with
+    | Tx_queue_types.Evm tx_object ->
+        let* res =
+          validate_etherlink_tx
+            ~maximum_cumulative_size
+            validation_state
+            raw_tx
+            tx_object
+        in
+        return (res, Transaction_object.hash tx_object, Broadcast.Evm raw_tx)
+    | Tx_queue_types.Michelson operation ->
+        let* res =
+          validate_tezlink_op
+            ~maximum_cumulative_size
+            validation_state
+            raw_tx
+            operation
+        in
+        return
+          ( res,
+            Tezos_types.Operation.hash_operation operation,
+            Broadcast.Michelson raw_tx )
+  in
+  match res with
+  | `Drop msg ->
+      Broadcast.notify_dropped ~hash:tx_hash ~reason:msg ;
+      return (tx_hash, `Dropped)
+  | `Keep validation_state ->
+      let*! () = Events.inclusion tx_hash in
+      return (tx_hash, `Continue (wrapped_raw_tx, validation_state))
+  | `Stop -> return (tx_hash, `Stop)
+
+let preconfirm_transactions
+    (preconfirmation_state : Types.preconfirmation_state)
+    ~maximum_number_of_chunks ~transactions =
+  let open Lwt_result_syntax in
+  let open Tx_queue_types in
   let maximum_cumulative_size =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
-      state.maximum_number_of_chunks
+      maximum_number_of_chunks
   in
   let*! head_info = Evm_context.head_info () in
-  let* current_size =
-    (* Accumulator empty and at least one transaction = start next future block *)
-    if state.validated_txns = [] && transactions <> [] then (
-      let proto_timestamp = Time.System.to_protocol timestamp in
-      Broadcast.notify_next_block_info
-        proto_timestamp
-        head_info.next_blueprint_number ;
-      let*! () = Events.next_block_timestamp proto_timestamp in
-      let* remaining_cumulative_size =
-        preconfirm_delayed_transactions ~state ~head_info
-      in
-      return (Int.sub maximum_cumulative_size remaining_cumulative_size))
-    else return state.validation_state.current_size
+  Octez_telemetry.Trace.add_attrs (fun () ->
+      [Telemetry.Attributes.Block.number head_info.next_blueprint_number]) ;
+  let* validation_state, preconfirmation_state =
+    match preconfirmation_state with
+    | Potential_next_block_timestamp _ ->
+        let* remaining_cumulative_size, preconfirmation_state =
+          preconfirm_delayed_transactions
+            preconfirmation_state
+            (head_info : Evm_context.head)
+            ~maximum_number_of_chunks
+        in
+        let* validation_state = init_validation_state head_info in
+        return
+          ( {
+              validation_state with
+              current_size =
+                Int.sub maximum_cumulative_size remaining_cumulative_size;
+            },
+            preconfirmation_state )
+    | Selecting_delayed_txs {current_size; _} ->
+        let* validation_state = init_validation_state head_info in
+        return ({validation_state with current_size}, preconfirmation_state)
+    | Validating_txs {validation_state; _} ->
+        return (validation_state, preconfirmation_state)
   in
-  let input_validation_state = {state.validation_state with current_size} in
-  let validate (validation_state, (rev_txns, rev_accepted_hashes))
-      ((raw, tx_object) as entry) =
-    let* res, wrapped_raw, hash =
-      match tx_object with
-      | Tx_queue_types.Evm tx_object ->
-          let+ res =
-            validate_etherlink_tx
-              ~maximum_cumulative_size
-              validation_state
-              raw
-              tx_object
-          in
-          (res, Broadcast.Evm raw, Transaction_object.hash tx_object)
-      | Tx_queue_types.Michelson operation ->
-          let+ res =
-            validate_tezlink_op
-              ~maximum_cumulative_size
-              validation_state
-              raw
-              operation
-          in
-          ( res,
-            Broadcast.Michelson raw,
-            Tezos_types.Operation.hash_operation operation )
+  let aux (validation_state, preconfirmation_state, rev_hashes)
+      (raw_tx, transaction_object) =
+    let* hash, res =
+      preconfirm_transaction
+        ~maximum_cumulative_size
+        validation_state
+        ~raw_tx
+        transaction_object
     in
     match res with
-    | `Drop msg ->
-        Broadcast.notify_dropped ~hash ~reason:msg ;
-        return (validation_state, (rev_txns, rev_accepted_hashes))
-    | `Keep latest_validation_state ->
-        Broadcast.notify_inclusion (Common wrapped_raw) hash ;
-        let*! () = Events.inclusion hash in
+    | `Dropped ->
         return
-          ( latest_validation_state,
-            (entry :: rev_txns, hash :: rev_accepted_hashes) )
-    | `Stop -> return (validation_state, (rev_txns, rev_accepted_hashes))
+          ( validation_state,
+            preconfirmation_state,
+            {rev_hashes with refused = hash :: rev_hashes.refused} )
+    | `Continue (wrapped_raw_tx, validation_state) ->
+        let* preconfirmation_state =
+          add_validated_tx
+            head_info
+            ~wrapped_raw_tx
+            ~tx_hash:hash
+            validation_state
+            preconfirmation_state
+        in
+        return
+          ( validation_state,
+            preconfirmation_state,
+            {rev_hashes with accepted = hash :: rev_hashes.accepted} )
+    | `Stop ->
+        return
+          ( validation_state,
+            preconfirmation_state,
+            {rev_hashes with dropped = hash :: rev_hashes.dropped} )
   in
-  let* validation_state, (rev_validated_txns, rev_accepted_hashes) =
-    List.fold_left_es validate (input_validation_state, ([], [])) transactions
+  let* ( _validation_state,
+         preconfirmation_state,
+         {accepted = rev_accepted; refused = rev_refused; dropped = rev_dropped}
+       ) =
+    List.fold_left_es
+      aux
+      ( validation_state,
+        preconfirmation_state,
+        {accepted = []; refused = []; dropped = []} )
+      transactions
   in
-  state.validated_txns <- state.validated_txns @ List.rev rev_validated_txns ;
-  state.validation_state <- validation_state ;
-  return (List.rev rev_accepted_hashes)
+  return
+    ( preconfirmation_state,
+      {
+        accepted = List.rev rev_accepted;
+        refused = List.rev rev_refused;
+        dropped = List.rev rev_dropped;
+      } )
 
 module Handlers = struct
   type self = worker
@@ -664,17 +906,44 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
-    | Request.Produce_block (with_delayed_transactions, timestamp, force) ->
+    | Request.Produce_genesis (timestamp, parent_hash) ->
+        produce_genesis ~state ~timestamp ~parent_hash
+    | Request.Produce_block {with_delayed_transactions; force} ->
         protect @@ fun () ->
-        produce_block state ~force ~timestamp ~with_delayed_transactions
+        produce_block state ~force ~with_delayed_transactions
+    | Request.Propose_next_block_timestamp timestamp ->
+        protect @@ fun () ->
+        set_preconfirmation_state
+          state
+          (Potential_next_block_timestamp timestamp) ;
+        Lwt_result_syntax.return_unit
     | Request.Preconfirm_transactions transactions -> (
+        let open Lwt_result_syntax in
         protect @@ fun () ->
-        (* If we are before the first created block and block producer
-          is not aware of its future timestamp, preconfirmation are disabled *)
-        match state.next_block_timestamp with
-        | Some timestamp ->
-            preconfirm_transactions ~state ~transactions ~timestamp
-        | None -> Lwt_result_syntax.return [])
+        (* Refuse preconfirmations when locked, before the first
+           created block, or when preconfirmations are explicitly disabled *)
+        if state.locked then tzfail Tx_queue_types.IC_disabled
+        else
+          match state.preconfirmation_state with
+          | Disabled -> tzfail Tx_queue_types.IC_disabled
+          | Awaiting_first_timestamp -> tzfail Tx_queue_types.IC_disabled
+          | Enabled preconfirmation_state ->
+              let* preconfirmation_state, selected_txns_hashes =
+                preconfirm_transactions
+                  ~maximum_number_of_chunks:state.maximum_number_of_chunks
+                  ~transactions
+                  preconfirmation_state
+              in
+              set_preconfirmation_state state preconfirmation_state ;
+              return selected_txns_hashes)
+    | Request.Lock_block_production ->
+        protect @@ fun () ->
+        state.locked <- true ;
+        Lwt_result_syntax.return_unit
+    | Request.Unlock_block_production ->
+        protect @@ fun () ->
+        state.locked <- false ;
+        Lwt_result_syntax.return_unit
 
   type launch_error = error trace
 
@@ -682,26 +951,21 @@ module Handlers = struct
       ({
          signer;
          maximum_number_of_chunks;
-         tx_container;
          sequencer_sunset_sec;
          preconfirmation_stream_enabled;
        } :
         Types.parameters) =
-    let open Lwt_result_syntax in
-    let* validation_state = init_validation_state ~tx_container in
-    return
+    Lwt_result_syntax.return
       Types.
         {
           sunset = false;
+          locked = false;
           signer;
           maximum_number_of_chunks;
-          tx_container;
           sequencer_sunset_sec;
-          preconfirmation_stream_enabled;
-          validation_state;
-          selected_delayed_txns = [];
-          validated_txns = [];
-          next_block_timestamp = None;
+          preconfirmation_state =
+            (if preconfirmation_stream_enabled then Awaiting_first_timestamp
+             else Disabled);
         }
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
@@ -722,6 +986,33 @@ let worker_promise, worker_waker = Lwt.task ()
 type error += No_block_producer
 
 type error += Block_producer_terminated
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"No_block_producer"
+    ~title:"No_block_producer"
+    ~description:
+      "Failed to add a request to the Block producer, it was not started."
+    Data_encoding.unit
+    (function No_block_producer -> Some () | _ -> None)
+    (fun () -> No_block_producer) ;
+  register_error_kind
+    `Permanent
+    ~id:"Block_producer_is_closed"
+    ~title:"Block_producer_is_closed"
+    ~description:"Failed to add a request to the Block producer, it's closed."
+    Data_encoding.unit
+    (function No_block_producer -> Some () | _ -> None)
+    (fun () -> No_block_producer) ;
+  register_error_kind
+    `Permanent
+    ~id:"Instant_confirmation_is_disabled"
+    ~title:"Instant_confirmation_is_disabled"
+    ~description:"Instant confirmation is disabled, request can't be traited."
+    Data_encoding.unit
+    (function Tx_queue_types.IC_disabled -> Some () | _ -> None)
+    (fun () -> Tx_queue_types.IC_disabled)
 
 let worker =
   lazy
@@ -755,12 +1046,20 @@ let shutdown () =
       let* () = Block_producer_events.shutdown () in
       Worker.shutdown w
 
-let produce_block ~with_delayed_transactions ~force ~timestamp =
+let produce_genesis ~timestamp ~parent_hash =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     worker
-    (Request.Produce_block (with_delayed_transactions, timestamp, force))
+    (Request.Produce_genesis (timestamp, parent_hash))
+  |> handle_request_error
+
+let produce_block ~with_delayed_transactions ~force =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait
+    worker
+    (Request.Produce_block {with_delayed_transactions; force})
   |> handle_request_error
 
 let preconfirm_transactions ~transactions =
@@ -771,9 +1070,33 @@ let preconfirm_transactions ~transactions =
     (Request.Preconfirm_transactions transactions)
   |> handle_request_error
 
+let lock_block_production () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  let*! (_pushed : bool) =
+    Worker.Queue.push_request worker Request.Lock_block_production
+  in
+  return_unit
+
+let unlock_block_production () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  let*! (_pushed : bool) =
+    Worker.Queue.push_request worker Request.Unlock_block_production
+  in
+  return_unit
+
 module Internal_for_tests = struct
   let produce_block ~with_delayed_transactions =
     produce_block ~with_delayed_transactions
+
+  let propose_next_block_timestamp ~next_block_timestamp =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait
+      worker
+      (Request.Propose_next_block_timestamp next_block_timestamp)
+    |> handle_request_error
 end
 
 let produce_block = produce_block ~with_delayed_transactions:true

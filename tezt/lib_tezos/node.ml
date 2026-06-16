@@ -464,22 +464,6 @@ module Config_file = struct
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
-  let seoulnet_network_config : JSON.u =
-    `O
-      [
-        ( "genesis",
-          mk_genesis
-            ~timestamp:"2025-07-11T08:00:00Z"
-            ~block:"BLQGRyv3v92oE9iM4BGWwWpy6NxcDFPb7NLsNeuRVr3TYidU7MC"
-            ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
-        ( "genesis_parameters",
-          mk_genesis_parameters
-            ~genesis_pubkey:
-              "edpktosVHk2f3Yrz9Jb6rMrk6uVy4sTxVhP2iyF39AdgzvsTWgbaLy" );
-        ("chain_name", `String "TEZOS_SEOULNET_2025-07-11T08:00:00Z");
-        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
-      ]
-
   let tallinnnet_network_config : JSON.u =
     `O
       [
@@ -493,6 +477,22 @@ module Config_file = struct
             ~genesis_pubkey:
               "edpktosVHk2f3Yrz9Jb6rMrk6uVy4sTxVhP2iyF39AdgzvsTWgbaLy" );
         ("chain_name", `String "TEZOS_TALLINNNET_2025-11-18T21:00:00Z");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
+  let ushuaianet_network_config : JSON.u =
+    `O
+      [
+        ( "genesis",
+          mk_genesis
+            ~timestamp:"2026-04-21T14:00:00Z"
+            ~block:"BLTL5xNANUbfrdHsVzdbpYfccoqE3mPuNZjumQiaFAJJpL5taZr"
+            ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
+        ( "genesis_parameters",
+          mk_genesis_parameters
+            ~genesis_pubkey:
+              "edpktosVHk2f3Yrz9Jb6rMrk6uVy4sTxVhP2iyF39AdgzvsTWgbaLy" );
+        ("chain_name", `String "TEZOS_USHUAIANET_2026-04-21T14:00:00Z");
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
@@ -614,15 +614,15 @@ module Config_file = struct
       ?user_activated_upgrades
       ("set_ghostnet_sandbox_network", ghostnet_sandbox_network_config)
 
-  let set_seoulnet_network ?user_activated_upgrades () =
-    set_network
-      ?user_activated_upgrades
-      ("set_seoulnet_network", seoulnet_network_config)
-
   let set_tallinnnet_network ?user_activated_upgrades () =
     set_network
       ?user_activated_upgrades
       ("set_tallinnnet_network", tallinnnet_network_config)
+
+  let set_ushuaianet_network ?user_activated_upgrades () =
+    set_network
+      ?user_activated_upgrades
+      ("set_ushuaianet_network", ushuaianet_network_config)
 
   let set_shadownet_network ?user_activated_upgrades () =
     set_network
@@ -1242,33 +1242,36 @@ let as_rpc_endpoint ?(local = false) (t : t) =
 module RPC = struct
   module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct
     let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        node rpc =
+        ?log_response_body_max node rpc =
       RPC_core.call
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         (as_rpc_endpoint node)
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        ?extra_headers node rpc =
+        ?log_response_body_max ?extra_headers node rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         ?extra_headers
         (as_rpc_endpoint node)
         rpc
 
     let call_json ?rpc_hooks ?log_request ?log_response_status
-        ?log_response_body node rpc =
+        ?log_response_body ?log_response_body_max node rpc =
       RPC_core.call_json
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         (as_rpc_endpoint node)
         rpc
   end
@@ -1276,3 +1279,7 @@ module RPC = struct
   include RPC_callers
   include RPC
 end
+
+let current_cycle node =
+  let* level = RPC.call node @@ RPC.get_chain_block_helper_current_level () in
+  return level.cycle

@@ -8,7 +8,7 @@ use crate::blueprint_storage::{
     clear_all_blueprints, read_current_blueprint_header, store_forced_blueprint,
     store_inbox_blueprint,
 };
-use crate::chains::{ChainConfig, ChainConfigTrait, EvmChainConfig};
+use crate::chains::{ChainConfig, ChainConfigTrait, EvmChainConfig, TezosXTransaction};
 use crate::configuration::{
     Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
 };
@@ -17,23 +17,29 @@ use crate::event::Event;
 use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
 use crate::inbox::{ProxyInboxContent, StageOneStatus};
 use crate::storage::read_last_info_per_level_timestamp;
-use crate::transaction::Transactions::EthTxs;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 
-pub fn fetch_proxy_blueprints<Host: Runtime>(
+pub fn fetch_proxy_blueprints<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
     chain_configuration: &EvmChainConfig,
-) -> Result<StageOneStatus, anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error>
+where
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+{
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
         smart_rollup_address,
@@ -55,10 +61,13 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
     }
 }
 
-fn fetch_delayed_transactions<Host: Runtime>(
+fn fetch_delayed_transactions<Host>(
     host: &mut Host,
     delayed_inbox: &mut DelayedInbox,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + IsEvmNode,
+{
     let timestamp = read_last_info_per_level_timestamp(host)?;
     // Number and minimal timestamp for the first forced blueprint
     let (base, minimal_timestamp) = match read_current_blueprint_header(host) {
@@ -72,7 +81,6 @@ fn fetch_delayed_transactions<Host: Runtime>(
 
     while let Some(timed_out) = delayed_inbox.next_delayed_inbox_blueprint(host)? {
         log!(
-            host,
             Info,
             "Creating blueprint from timed out delayed transactions of length {}",
             timed_out.len()
@@ -92,18 +100,13 @@ fn fetch_delayed_transactions<Host: Runtime>(
 
         // Clean existing blueprints
         if offset == 0 {
-            log!(
-                host,
-                Info,
-                "Deleting all blueprints following flush at {}",
-                level
-            );
+            log!(Info, "Deleting all blueprints following flush at {}", level);
             clear_all_blueprints(host)?;
         }
 
         // Create a new blueprint with the timed out transactions
         let blueprint = Blueprint {
-            transactions: EthTxs(timed_out),
+            transactions: timed_out.into_iter().map(TezosXTransaction::from).collect(),
             timestamp,
         };
         // Store the blueprint.
@@ -115,7 +118,7 @@ fn fetch_delayed_transactions<Host: Runtime>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn fetch_sequencer_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
+fn fetch_sequencer_blueprints<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
@@ -126,7 +129,10 @@ fn fetch_sequencer_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
     maximum_allowed_ticks: u64,
     enable_fa_bridge: bool,
     chain_configuration: &ChainConfig,
-) -> Result<StageOneStatus, anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error>
+where
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+{
     match read_sequencer_inbox(
         host,
         smart_rollup_address,
@@ -140,7 +146,7 @@ fn fetch_sequencer_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
         chain_configuration,
     )? {
         StageOneStatus::Done => {
-            log!(host, Debug, "Stage one done, rebooting");
+            log!(Debug, "Stage one done, rebooting");
             // Check if there are timed-out transactions in the delayed inbox
             let timed_out = delayed_inbox.first_has_timed_out(host)?;
             if timed_out {
@@ -158,12 +164,15 @@ fn fetch_sequencer_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn fetch_blueprints<Host: Runtime>(
+pub fn fetch_blueprints<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     chain_config: &crate::chains::ChainConfig,
     config: &mut Configuration,
-) -> Result<StageOneStatus, anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error>
+where
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+{
     match (chain_config, &mut config.mode) {
         (
             ChainConfig::Evm(chain_config),
@@ -230,7 +239,8 @@ mod tests {
     use crate::{
         blueprint_storage::EVMBlockHeader,
         chains::{
-            test_chain_config, test_evm_chain_config, ChainHeaderTrait, TransactionsTrait,
+            test_chain_config, test_evm_chain_config, ChainHeaderTrait,
+            ETHERLINK_SAFE_STORAGE_ROOT_PATH,
         },
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
@@ -252,11 +262,9 @@ mod tests {
         },
         types::PublicKeyHash,
     };
-    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
+    use tezos_smart_rollup_host::reveal::HostReveal;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_mock::TransferMetadata;
-    // SdkRuntime is not used directly but necessary to add the Runtime trait in
-    // context for typechecking. Feel free to remove it and look at rustc
-    // errors.
 
     use crate::{
         block_storage::internal_for_tests::store_current_number,
@@ -414,7 +422,7 @@ mod tests {
         }
     }
 
-    fn delayed_inbox_is_empty<Host: Runtime>(
+    fn delayed_inbox_is_empty<Host: StorageV1>(
         conf: &Configuration,
         host: &mut Host,
     ) -> bool {
@@ -445,7 +453,7 @@ mod tests {
             .0
         {
             Some(Blueprint { transactions, .. }) => {
-                assert!(transactions.number_of_txs() == 1)
+                assert!(transactions.len() == 1)
             }
             _ => panic!("There should be a blueprint"),
         }
@@ -474,7 +482,7 @@ mod tests {
             .0
         {
             Some(Blueprint { transactions, .. }) => {
-                assert!(transactions.number_of_txs() == 1)
+                assert!(transactions.len() == 1)
             }
             _ => panic!("There should be a blueprint"),
         }
@@ -641,13 +649,13 @@ mod tests {
             None => panic!("There should be an InboxContent"),
             Some(ProxyInboxContent { transactions, .. }) => assert_eq!(
                 transactions,
-                EthTxs(vec![]),
+                vec![],
                 "The proxy shouldn't have read any transaction"
             ),
         };
 
         // The dummy chunk in the inbox is registered at block 10
-        store_current_number(&mut host, &chain_config.storage_root_path(), U256::from(9))
+        store_current_number(&mut host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH, U256::from(9))
             .unwrap();
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -774,7 +782,7 @@ mod tests {
         {
             None => panic!("There should be a blueprint"),
             Some(Blueprint { transactions, .. }) =>
-                assert_eq!(transactions.number_of_txs(), 0,
+                assert_eq!(transactions.len(), 0,
                            "The transaction from the delayed bridge entrypoint should have been rejected in proxy mode"),
         }
     }
@@ -805,7 +813,7 @@ mod tests {
         {
             None => panic!("There should be a blueprint"),
             Some(Blueprint { transactions, .. }) => assert_eq!(
-                transactions.number_of_txs(),
+                transactions.len(),
                 1,
                 "The deposit should have been picked in the blueprint"
             ),
@@ -840,7 +848,7 @@ mod tests {
         {
             None => panic!("There should be a blueprint"),
             Some(Blueprint { transactions, .. }) => assert_eq!(
-                transactions.number_of_txs(),
+                transactions.len(),
                 0,
                 "The deposit shouldn't have been picked in the blueprint as it is invalid"
             ),
@@ -1022,5 +1030,182 @@ mod tests {
         {
             panic!("The DAL signal shouldn't have been applied by the kernel, and the blueprint shouldn't have been read")
         }
+    }
+
+    #[test]
+    fn test_proxy_no_transactions_produces_empty_blueprint() {
+        // The mock host always contains SOL/info-per-level/EOL messages, so
+        // the proxy reads an inbox with zero user transactions and produces
+        // a blueprint with an empty transaction list.
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_proxy_configuration();
+        let status = fetch_blueprints(
+            &mut host,
+            DEFAULT_SR_ADDRESS,
+            &test_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
+
+        assert!(
+            matches!(status, StageOneStatus::Reboot),
+            "Even with no user transactions the proxy reads the inbox and requests a reboot"
+        );
+
+        match read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+        {
+            Some(Blueprint { transactions, .. }) => {
+                assert_eq!(
+                    transactions.len(),
+                    0,
+                    "The blueprint should have zero transactions"
+                );
+            }
+            None => panic!("There should be an (empty) blueprint"),
+        }
+    }
+
+    #[test]
+    fn test_proxy_multiple_simple_transactions_in_one_blueprint() {
+        // All transactions received during a single L1 level must be
+        // collected into a single proxy blueprint.
+        let mut host = MockKernelHost::default();
+        // Add the same transaction three times (they are independent
+        // external messages).
+        for _ in 0..3 {
+            host.host
+                .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
+        }
+        let mut conf = dummy_proxy_configuration();
+        let status = fetch_blueprints(
+            &mut host,
+            DEFAULT_SR_ADDRESS,
+            &test_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
+
+        assert!(
+            matches!(status, StageOneStatus::Reboot),
+            "Non-empty proxy inbox should request a reboot"
+        );
+
+        match read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+        {
+            Some(Blueprint { transactions, .. }) => {
+                assert_eq!(
+                    transactions.len(),
+                    3,
+                    "All three transactions should appear in the same blueprint"
+                );
+            }
+            None => panic!("There should be a blueprint"),
+        }
+    }
+
+    #[test]
+    fn test_proxy_mixed_simple_tx_and_deposit() {
+        // A blueprint produced in proxy mode should contain both plain
+        // transactions and deposits received during the same L1 level.
+        let mut host = MockKernelHost::default();
+
+        // One simple transaction
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
+
+        // One deposit
+        let mut conf = dummy_proxy_configuration();
+        let metadata = TransferMetadata::new(
+            conf.tezos_contracts.ticketer.clone().unwrap(),
+            PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
+        );
+        host.host.add_transfer(
+            dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
+            &metadata,
+        );
+
+        let status = fetch_blueprints(
+            &mut host,
+            DEFAULT_SR_ADDRESS,
+            &test_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
+
+        assert!(
+            matches!(status, StageOneStatus::Reboot),
+            "Mixed tx+deposit inbox should request a reboot"
+        );
+
+        match read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+        {
+            Some(Blueprint { transactions, .. }) => {
+                assert_eq!(
+                    transactions.len(),
+                    2,
+                    "Blueprint should contain both the simple transaction and the deposit"
+                );
+            }
+            None => panic!("There should be a blueprint"),
+        }
+    }
+
+    #[test]
+    fn test_proxy_blueprint_carries_timestamp() {
+        // The proxy blueprint must carry the info-per-level timestamp
+        // extracted from the inbox. We verify that after
+        // fetch_blueprints the resulting blueprint has a non-zero
+        // timestamp that matches the value read back from storage.
+        let mut host = MockKernelHost::default();
+
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
+
+        let mut conf = dummy_proxy_configuration();
+        fetch_blueprints(
+            &mut host,
+            DEFAULT_SR_ADDRESS,
+            &test_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
+
+        // Read back the timestamp that fetch_blueprints stored from
+        // the info-per-level message.
+        let stored_ts = read_last_info_per_level_timestamp(&host)
+            .expect("timestamp should be readable after fetch");
+
+        match read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+        {
+            Some(Blueprint { timestamp, .. }) => {
+                assert_eq!(
+                    timestamp, stored_ts,
+                    "The blueprint timestamp should match the info-per-level timestamp"
+                );
+            }
+            None => panic!("There should be a blueprint"),
+        }
+    }
+
+    #[test]
+    fn test_proxy_fetch_configuration_without_sequencer_key() {
+        // fetch_configuration should return Proxy when the durable
+        // storage contains no sequencer public key.
+        use crate::configuration::fetch_configuration;
+
+        let mut host = MockKernelHost::default();
+        let conf = fetch_configuration(&mut host);
+        assert!(
+            matches!(conf.mode, ConfigurationMode::Proxy),
+            "fetch_configuration should return Proxy when no sequencer key is stored"
+        );
     }
 }

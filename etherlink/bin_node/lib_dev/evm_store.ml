@@ -172,6 +172,51 @@ type metadata = {
   history_mode : Configuration.history_mode;
 }
 
+module Compact_transactions_receipt = struct
+  open Ethereum_types
+
+  let strip_log_context (log : transaction_log) =
+    {
+      log with
+      blockNumber = None;
+      transactionHash = None;
+      transactionIndex = None;
+      blockHash = None;
+    }
+
+  let fill_log_context ~hash ~block_hash ~block_number ~index
+      (log : transaction_log) =
+    {
+      log with
+      transactionHash = Some hash;
+      blockHash = Some block_hash;
+      blockNumber = Some block_number;
+      transactionIndex = Some index;
+    }
+
+  (* Compact encoding for receipt fields: strips per-log context fields
+   (blockNumber, transactionHash, transactionIndex, blockHash) that are
+   derivable from the outer transaction row. They are stored as [None] and
+   reconstructed at read time.
+
+   The decoder is identical to [receipt_fields_encoding], so both legacy rows
+   (fields stored as [Some ...]) and compact rows (fields stored as [None])
+   decode transparently. *)
+  let encoding : Transaction_info.receipt_fields Data_encoding.t =
+    Data_encoding.conv
+      (fun rf ->
+        Transaction_info.{rf with logs = List.map strip_log_context rf.logs})
+      Fun.id
+      Transaction_info.receipt_fields_encoding
+
+  (* Legacy encoding for receipt fields: keeps per-log context fields and
+     uses the legacy hex bloom encoding. Used when
+     [experimental_features.compact_receipt_encoding = false] so that rows
+     remain readable by older node releases that predate the compact format. *)
+  let legacy_encoding : Transaction_info.receipt_fields Data_encoding.t =
+    Transaction_info.legacy_receipt_fields_encoding
+end
+
 module Q = struct
   open Sqlite.Request
   open Caqti_type.Std
@@ -191,6 +236,8 @@ module Q = struct
       ~decode:(fun x -> Ok (Qty Z.(of_bits x)))
       string
 
+  (* WARNING: uses [octets] — SELECT queries must use
+     [CAST(payload AS BLOB)] to support old TEXT rows. *)
   let payload =
     custom
       ~encode:(fun payload ->
@@ -203,7 +250,7 @@ module Q = struct
         @@ Data_encoding.Binary.of_string_opt
              Blueprint_types.payload_encoding
              bytes)
-      string
+      octets
 
   let context_hash =
     custom
@@ -260,6 +307,8 @@ module Q = struct
         Ok (Block_hash (Hex hash)))
       string
 
+  (* WARNING: uses [octets] — SELECT queries must use
+     [CAST(block AS BLOB)] to support old TEXT rows. *)
   let block =
     custom
       ~encode:(fun payload ->
@@ -287,13 +336,15 @@ module Q = struct
                Data_encoding.Binary.of_string
                  Legacy_encodings.block_encoding
                  bytes)))
-      string
+      octets
 
+  (* WARNING: uses [octets] — SELECT queries must use
+     [CAST(tez_block AS BLOB)] to support old TEXT rows. *)
   let tezos_block =
     custom
-      ~encode:L2_types.Tezos_block.encode_block
-      ~decode:L2_types.Tezos_block.decode_block
-      string
+      ~encode:L2_types.Tezos_block.encode_block_for_store
+      ~decode:L2_types.Tezos_block.decode_block_for_store
+      octets
 
   let timestamp =
     custom
@@ -318,6 +369,8 @@ module Q = struct
         Ok Evm_events.Sequencer_upgrade.{sequencer; pool_address; timestamp})
       (t3 public_key address timestamp)
 
+  (* WARNING: uses [octets] — SELECT queries must use
+     [CAST(payload AS BLOB)] to support old TEXT rows. *)
   let delayed_transaction =
     custom
       ~encode:(fun payload ->
@@ -330,7 +383,7 @@ module Q = struct
         @@ Data_encoding.Binary.of_string_opt
              Evm_events.Delayed_transaction.encoding
              bytes)
-      string
+      octets
 
   let smart_rollup_address =
     custom
@@ -387,62 +440,6 @@ module Q = struct
     @@ proj timestamp (fun k -> k.sequencer_upgrade.timestamp)
     @@ proj_end
 
-  let table_exists =
-    (string ->! bool)
-    @@ {|
-    SELECT EXISTS (
-      SELECT name FROM sqlite_master
-      WHERE type='table'
-        AND name=?
-    )|}
-
-  module Schemas = struct
-    let get_all =
-      (unit ->* string)
-      @@ {|SELECT sql FROM sqlite_schema WHERE name
-           NOT LIKE 'sqlite_%' AND name != 'migrations'|}
-  end
-
-  module Migrations = struct
-    let create_table =
-      (unit ->. unit)
-      @@ {|
-      CREATE TABLE migrations (
-        id SERIAL PRIMARY KEY,
-        name TEXT
-      )|}
-
-    let current_migration =
-      (unit ->? int) @@ {|SELECT id FROM migrations ORDER BY id DESC LIMIT 1|}
-
-    let register_migration =
-      (t2 int string ->. unit)
-      @@ {|
-      INSERT INTO migrations (id, name) VALUES (?, ?)
-      |}
-
-    (*
-      To introduce a new migration
-
-        - Create a .sql file led by the next migration number [N = version + 1]
-          (with leading 0s) followed by the name of the migration (e.g.
-          [005_create_blueprints_table.sql])
-        - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
-        - Increment [version]
-        - Regenerate the schemas, using [[
-              dune exec -- etherlink/tezt/tests/main.exe --file evm_sequencer.ml \
-                evm store schemas regression --reset-regressions
-          ]]
-
-      You can review the result at
-      [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
-    *)
-    let version = 22
-
-    let all : Evm_node_migrations.migration list =
-      Evm_node_migrations.migrations version
-  end
-
   module Blueprints = struct
     let table = "blueprints" (* For opentelemetry *)
 
@@ -450,13 +447,15 @@ module Q = struct
       (t3 level timestamp payload ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|INSERT INTO blueprints (id, timestamp, payload) VALUES (?, ?, ?)|eos}
 
+    (* See {Note cast} *)
     let select =
       (level ->? t2 payload timestamp) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT payload, timestamp FROM blueprints WHERE id = ?|eos}
+      @@ {eos|SELECT CAST(payload AS BLOB), timestamp FROM blueprints WHERE id = ?|eos}
 
+    (* See {Note cast} *)
     let select_range =
       (t2 level level ->* t2 level payload) ~name:__FUNCTION__ ~table
-      @@ {|SELECT id, payload FROM blueprints
+      @@ {|SELECT id, CAST(payload AS BLOB) FROM blueprints
            WHERE ? <= id AND id <= ?
            ORDER BY id ASC|}
 
@@ -613,13 +612,15 @@ module Q = struct
         ~table
       @@ {|INSERT INTO delayed_transactions (injected_before, hash, payload) VALUES (?, ?, ?)|}
 
+    (* See {Note cast} *)
     let select_at_level =
       (level ->* delayed_transaction) ~name:__FUNCTION__ ~table
-      @@ {|SELECT payload FROM delayed_transactions WHERE ? = injected_before|}
+      @@ {|SELECT CAST(payload AS BLOB) FROM delayed_transactions WHERE ? = injected_before|}
 
+    (* See {Note cast} *)
     let select_at_hash =
       (root_hash ->? delayed_transaction) ~name:__FUNCTION__ ~table
-      @@ {|SELECT payload FROM delayed_transactions WHERE ? = hash|}
+      @@ {|SELECT CAST(payload AS BLOB) FROM delayed_transactions WHERE ? = hash|}
 
     let clear_after =
       (level ->. unit) ~name:__FUNCTION__ ~table
@@ -744,20 +745,37 @@ DO UPDATE SET value = excluded.value
   module Transactions = struct
     let table = "transactions" (* For opentelemetry *)
 
-    let receipt_fields =
+    (* WARNING: the SQLite extension in [sqlite_receipt_bloom/] depends on the
+       database storing receipts with [Transaction_info.receipt_fields_encoding]
+       to work. If it is ever changed, the SQLite extension will also need to be
+       adapted. *)
+    (* WARNING: uses [octets] — SELECT queries must use
+       [CAST(receipt_fields AS BLOB)] to support old TEXT rows. *)
+    (* The decoder is shared by both column types — it transparently accepts
+       compact and legacy rows — so SELECT queries can use either; only the
+       encoder used at INSERT time differs. *)
+    let make_receipt_fields write_encoding =
       custom
         ~encode:(fun payload ->
-          Ok
-            (Data_encoding.Binary.to_string_exn
-               Transaction_info.receipt_fields_encoding
-               payload))
+          Ok (Data_encoding.Binary.to_string_exn write_encoding payload))
         ~decode:(fun bytes ->
           Option.to_result ~none:"Not a valid receipt fields payload"
           @@ Data_encoding.Binary.of_string_opt
                Transaction_info.receipt_fields_encoding
                bytes)
-        string
+        octets
 
+    let receipt_fields =
+      make_receipt_fields Compact_transactions_receipt.encoding
+
+    (* Same column type as [receipt_fields] but encodes using the legacy
+       (non-compact) format, so the resulting rows remain decodable by node
+       releases that predate the compact encoding. *)
+    let receipt_fields_legacy =
+      make_receipt_fields Compact_transactions_receipt.legacy_encoding
+
+    (* WARNING: uses [octets] — SELECT queries must use
+       [CAST(object_fields AS BLOB)] to support old TEXT rows. *)
     let object_fields =
       custom
         ~encode:(fun payload ->
@@ -770,9 +788,12 @@ DO UPDATE SET value = excluded.value
           @@ Data_encoding.Binary.of_string_opt
                Transaction_info.object_fields_encoding
                bytes)
-        string
+        octets
 
-    let insert =
+    (* Built once per receipt-fields column type so Caqti's
+       prepared-statement cache keeps each request's identity stable across
+       calls. Dispatch happens at the call site. *)
+    let insert_with receipt_fields =
       (t8
          block_hash
          level
@@ -789,6 +810,10 @@ DO UPDATE SET value = excluded.value
           [Telemetry.Attributes.Transaction.hash hash])
       @@ {eos|INSERT INTO transactions (block_hash, block_number, index_, hash, from_, to_, receipt_fields, object_fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?)|eos}
 
+    let insert_compact = insert_with receipt_fields
+
+    let insert_legacy = insert_with receipt_fields_legacy
+
     let select_receipt =
       (root_hash
       ->? t7
@@ -801,7 +826,8 @@ DO UPDATE SET value = excluded.value
             receipt_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, receipt_fields FROM transactions WHERE hash = ?|eos}
+      (* See {Note cast} *)
+      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions WHERE hash = ?|eos}
 
     let select_receipts_from_block_number =
       (level
@@ -814,10 +840,11 @@ DO UPDATE SET value = excluded.value
             receipt_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ? ORDER BY index_ DESC|eos}
+      (* See {Note cast} *)
+      @@ {eos|SELECT block_hash, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions WHERE block_number = ? ORDER BY index_ DESC|eos}
 
     let select_receipts_from_block_range =
-      (t2 level level
+      (t3 level level (option octets)
       ->* t6
             block_hash
             quantity
@@ -827,8 +854,11 @@ DO UPDATE SET value = excluded.value
             receipt_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions
-              WHERE ? <= block_number AND block_number < ?
+      (* See {Note cast} *)
+      @@ {eos|SELECT block_hash, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions
+              WHERE $1 <= block_number AND block_number < $2
+              AND ($3 IS NULL OR
+                   receipt_contains_bloom_filter(receipt_fields, $3))
               ORDER BY block_number DESC, index_ DESC|eos}
 
     let select_object =
@@ -843,13 +873,15 @@ DO UPDATE SET value = excluded.value
             object_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, object_fields FROM transactions WHERE hash = ?|eos}
+      (* See {Note cast} *)
+      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, CAST(object_fields AS BLOB) FROM transactions WHERE hash = ?|eos}
 
     let select_objects_from_block_number =
       (level ->* t5 quantity root_hash address (option address) object_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT index_, hash, from_, to_, object_fields FROM transactions WHERE block_number = ?|eos}
+      (* See {Note cast} *)
+      @@ {eos|SELECT index_, hash, from_, to_, CAST(object_fields AS BLOB) FROM transactions WHERE block_number = ?|eos}
 
     let clear_after =
       (level ->. unit) ~name:__FUNCTION__ ~table
@@ -876,32 +908,55 @@ DO UPDATE SET value = excluded.value
     let table = "blocks" (* For opentelemetry *)
 
     let insert =
-      (t3 level block_hash block ->. unit) ~name:__FUNCTION__ ~table
-      @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
+      (t5 level block_hash block (option tezos_block) (option block_hash)
+      ->. unit)
+        ~name:__FUNCTION__
+        ~table
+      @@ {eos|INSERT INTO blocks (level, hash, block, tez_block, tez_hash) VALUES (?, ?, ?, ?, ?)|eos}
 
     let tez_insert =
       (t3 level block_hash tezos_block ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
 
+    (* See {Note cast} *)
     let select_with_level =
       (level ->? block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+      @@ {eos|SELECT CAST(block AS BLOB) FROM blocks WHERE level = ?|eos}
 
+    (* See {Note cast} *)
     let tez_select_with_level =
       (level ->? tezos_block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+      @@ {eos|SELECT CAST(block AS BLOB) FROM blocks WHERE level = ?|eos}
 
+    (* See {Note cast} *)
+    let tezosx_select_tez_block_with_level =
+      (level ->? tezos_block) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT CAST(tez_block AS BLOB) FROM blocks WHERE level = ? AND tez_block IS NOT NULL|eos}
+
+    (* See {Note cast} *)
     let select_with_hash =
       (block_hash ->? block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT block FROM blocks WHERE hash = ?|eos}
+      @@ {eos|SELECT CAST(block AS BLOB) FROM blocks WHERE hash = ?|eos}
 
     let select_hash_of_number =
       (level ->? block_hash) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT hash FROM blocks WHERE level = ?|eos}
 
+    let select_tez_hash_of_number =
+      (level ->? block_hash) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT tez_hash FROM blocks WHERE level = ? AND tez_hash IS NOT NULL|eos}
+
     let select_number_of_hash =
       (block_hash ->? level) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
+
+    let select_number_of_tez_hash =
+      (block_hash ->? level) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT level FROM blocks WHERE tez_hash = ?|eos}
+
+    let select_hashes_of_number =
+      (level ->? t2 block_hash (option block_hash)) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT hash, tez_hash FROM blocks WHERE level = ?|eos}
 
     let clear_after =
       (level ->. unit) ~name:__FUNCTION__ ~table
@@ -968,94 +1023,73 @@ DO UPDATE SET value = excluded.value
   end
 end
 
-module Schemas = struct
-  let get_all store =
-    with_connection store @@ fun conn ->
-    Db.collect_list conn Q.Schemas.get_all ()
-end
+(*
+  To introduce a new migration
 
-module Migrations = struct
-  let create_table store =
-    with_connection store @@ fun conn ->
-    Db.exec conn Q.Migrations.create_table ()
+    - Create a .sql file led by the next migration number [N = version + 1]
+      (with leading 0s) followed by the name of the migration (e.g.
+      [005_create_blueprints_table.sql]), or
+    - Create a .ml file of with name [mN_migration_name.ml] (e.g.
+      [m005_create_blueprints_table.ml])
+    - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
+    - Increment [Evm_migration.version] or [Tezlink_migration.version] below
+      depending on the context
+    - Regenerate the schemas, using [[
+          dune exec -- etherlink/tezt/tests/main.exe --file evm_sequencer.ml \
+            evm store schemas regression --reset-regressions
+      ]]
 
-  let table_exists store =
-    with_connection store @@ fun conn ->
-    Db.find conn Q.table_exists "migrations"
+  You can review the result at
+  [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
+*)
+module Evm_migration = Sqlite.Migration.Make (struct
+  let table_name = "migrations"
 
-  let missing_migrations store =
-    let open Lwt_result_syntax in
-    let all_migrations = List.mapi (fun i m -> (i, m)) Q.Migrations.all in
-    let* current =
-      with_connection store @@ fun conn ->
-      Db.find_opt conn Q.Migrations.current_migration ()
-    in
-    match current with
-    | Some current ->
-        let applied = current + 1 in
-        let known = List.length all_migrations in
-        if applied <= known then return (List.drop_n applied all_migrations)
-        else
-          let*! () =
-            Evm_store_events.migrations_from_the_future ~applied ~known
-          in
-          failwith
-            "Cannot use a store modified by a more up-to-date version of the \
-             EVM node"
-    | None -> return all_migrations
+  let version = 24
 
-  let apply_migration store id (module M : Evm_node_migrations.S) =
-    let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let* () = List.iter_es (fun up -> Db.exec conn up ()) M.up in
-    Db.exec conn Q.Migrations.register_migration (id, M.name)
-end
+  let all_migrations = Evm_node_migrations.all
+end)
+
+module Tezlink_migration = Sqlite.Migration.Make (struct
+  let table_name = "tezlink_migrations"
+
+  let version = 0
+
+  let all_migrations = Tezlink_node_migrations.all
+end)
 
 let sqlite_file_name = "store.sqlite"
 
-let init ?max_conn_reuse_count ~data_dir ~perm () =
+let init (type f) ?max_conn_reuse_count
+    ~(chain_family : f L2_types.chain_family) ~data_dir ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // sqlite_file_name in
-  let*! exists = Lwt_unix.file_exists path in
+  let read_only = match perm with Read_only _ -> true | Read_write -> false in
   let migration conn =
     Sqlite.assert_in_transaction conn ;
+    with_connection conn @@ fun db_conn ->
     let* () =
-      if not exists then
-        let* () = Migrations.create_table conn in
-        let*! () = Evm_store_events.init_store () in
-        return_unit
-      else
-        let* table_exists = Migrations.table_exists conn in
-        let* () =
-          when_ (not table_exists) (fun () ->
-              failwith "A store already exists, but its content is incorrect.")
-        in
-        return_unit
-    in
-    let* migrations = Migrations.missing_migrations conn in
-    let*? () =
-      match (perm, migrations) with
-      | Read_only _, _ :: _ ->
-          error_with
-            "The store has %d missing migrations but was opened in read-only \
-             mode."
-            (List.length migrations)
-      | _, _ -> Ok ()
+      Evm_migration.apply
+        db_conn
+        ~read_only
+        ~on_init:Evm_store_events.init_store
+        ~on_future:Evm_store_events.migrations_from_the_future
+        ~on_applied:Evm_store_events.applied_migration
+        ()
     in
     let* () =
-      List.iter_es
-        (fun (i, ((module M : Evm_node_migrations.S) as mig)) ->
-          let start_t = Time.System.now () in
-          let* () = Migrations.apply_migration conn i mig in
-          let end_t = Time.System.now () in
-          let migration_time = Ptime.diff end_t start_t in
-          let*! () = Evm_store_events.applied_migration M.name migration_time in
-          return_unit)
-        migrations
+      match chain_family with
+      | L2_types.Michelson ->
+          Tezlink_migration.apply
+            db_conn
+            ~read_only
+            ~on_future:Evm_store_events.migrations_from_the_future
+            ~on_applied:Evm_store_events.applied_migration
+            ()
+      | _ -> return_unit
     in
     let* legacy_block_storage_mode =
-      with_connection conn @@ fun conn ->
-      Db.find conn Q.Block_storage_mode.legacy ()
+      Db.find db_conn Q.Block_storage_mode.legacy ()
     in
     let* () =
       when_ legacy_block_storage_mode @@ fun () ->
@@ -1065,7 +1099,12 @@ let init ?max_conn_reuse_count ~data_dir ~perm () =
     in
     return_unit
   in
-  Sqlite.init ?max_conn_reuse_count ~path ~perm migration
+  Sqlite.init
+    ?max_conn_reuse_count
+    ~register:Sqlite_receipt_bloom.register
+    ~path
+    ~perm
+    migration
 
 module Context_hashes = struct
   let store store number hash =
@@ -1447,7 +1486,7 @@ module Metadata = struct
 end
 
 module Transactions = struct
-  let store store
+  let store ~compact_receipt_encoding store
       ({
          block_hash;
          block_number;
@@ -1462,7 +1501,8 @@ module Transactions = struct
     with_connection store @@ fun conn ->
     Db.exec
       conn
-      Q.Transactions.insert
+      (if compact_receipt_encoding then Q.Transactions.insert_compact
+       else Q.Transactions.insert_legacy)
       ( block_hash,
         block_number,
         index,
@@ -1506,7 +1546,14 @@ module Transactions = struct
             cumulativeGasUsed = cumulative_gas_used;
             effectiveGasPrice = effective_gas_price;
             gasUsed = gas_used;
-            logs;
+            logs =
+              List.map
+                (Compact_transactions_receipt.fill_log_context
+                   ~hash
+                   ~block_hash
+                   ~block_number
+                   ~index)
+                logs;
             logsBloom = logs_bloom;
             type_;
             status;
@@ -1548,7 +1595,14 @@ module Transactions = struct
             cumulativeGasUsed = cumulative_gas_used;
             effectiveGasPrice = effective_gas_price;
             gasUsed = gas_used;
-            logs;
+            logs =
+              List.map
+                (Compact_transactions_receipt.fill_log_context
+                   ~hash
+                   ~block_hash
+                   ~block_number:level
+                   ~index)
+                logs;
             logsBloom = logs_bloom;
             type_;
             status;
@@ -1558,7 +1612,7 @@ module Transactions = struct
       level
       []
 
-  let receipts_of_block_range store (Ethereum_types.Qty level) len =
+  let receipts_of_block_range ?mask store (Ethereum_types.Qty level) len =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
     let+ res =
@@ -1594,14 +1648,23 @@ module Transactions = struct
               cumulativeGasUsed = cumulative_gas_used;
               effectiveGasPrice = effective_gas_price;
               gasUsed = gas_used;
-              logs;
+              logs =
+                List.map
+                  (Compact_transactions_receipt.fill_log_context
+                     ~hash
+                     ~block_hash
+                     ~block_number:(Qty level)
+                     ~index)
+                  logs;
               logsBloom = logs_bloom;
               type_;
               status;
               contractAddress = contract_address;
             }
           :: acc)
-        (Qty level, Qty Z.(level + of_int len))
+        ( Qty level,
+          Qty Z.(level + of_int len),
+          Option.map Bytes.unsafe_to_string mask )
         []
     in
     res
@@ -1692,10 +1755,16 @@ module Irmin_chunks = struct
 end
 
 module Blocks = struct
-  let store store
+  let store ?tez_block store
       (block : Ethereum_types.legacy_transaction_object Ethereum_types.block) =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
+    let tez_hash =
+      Option.map (fun (block : L2_types.Tezos_block.t) -> block.hash) tez_block
+    in
+    Db.exec
+      conn
+      Q.Blocks.insert
+      (block.number, block.hash, block, tez_block, tez_hash)
 
   let tez_store store (block : L2_types.Tezos_block.t) =
     with_connection store @@ fun conn ->
@@ -1703,6 +1772,14 @@ module Blocks = struct
       conn
       Q.Blocks.tez_insert
       (Qty (Z.of_int32 block.level), block.hash, block)
+
+  let tezosx_find_tez_block_with_level store level =
+    let open Lwt_result_syntax in
+    let* block_opt =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Blocks.tezosx_select_tez_block_with_level level
+    in
+    return block_opt
 
   let block_with_objects store block =
     let open Lwt_result_syntax in
@@ -1792,9 +1869,33 @@ module Blocks = struct
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Blocks.select_hash_of_number level
 
+  let find_tez_hash_of_number store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_tez_hash_of_number level
+
   let find_number_of_hash store hash =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Blocks.select_number_of_hash hash
+
+  let find_number_of_tez_hash store hash =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_number_of_tez_hash hash
+
+  let find_hashes_of_number store level =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let* hashes = Db.find_opt conn Q.Blocks.select_hashes_of_number level in
+    return
+    @@ Option.map
+         (fun (evm, michelson) ->
+           let michelson =
+             Option.map
+               (fun h ->
+                 Block_hash.of_string_exn (Ethereum_types.block_hash_to_bytes h))
+               michelson
+           in
+           Meta_block.{evm; michelson})
+         hashes
 
   let clear_after store level =
     with_connection store @@ fun conn -> Db.exec conn Q.Blocks.clear_after level
@@ -1875,6 +1976,15 @@ let reset_before store ~l2_level ~history_mode =
         let* () = Sequencer_upgrades.clear_before store l2_level in
         let* () = Delayed_transactions.clear_before store l2_level in
         return_unit
+    | Configuration.Seed _ ->
+        (* Blueprints are kept forever: they are the only data served to
+           consumers in this mode. Blocks and transactions are pruned.
+           Delayed_transactions, Kernel_upgrades and Sequencer_upgrades are
+           kept because [find_with_events] reads them to reconstruct
+           blueprint events served at the /evm/v2/blueprint endpoint. *)
+        let* () = Blocks.clear_before store l2_level in
+        let* () = Transactions.clear_before store l2_level in
+        return_unit
     | _ -> return_unit
   in
 
@@ -1886,3 +1996,8 @@ let reset_before store ~l2_level ~history_mode =
      number of splits plus an additional one. *)
   let* () = Irmin_chunks.clear_before_included store l2_level in
   return_unit
+
+(* {Note cast}
+
+   Backward compatibility cast to avoid a costly migration, as some
+   columns have been stored as TEXT instead of BLOB. *)

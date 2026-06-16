@@ -19,7 +19,7 @@ if [ -z "$CI_PROJECT_DIR" ]; then
 fi
 
 # This does not fail because the tag format has already been checked
-# to launch the `publish_sdk_bindings_releases` pipeline.
+# to launch the `sdk_bindings.release` pipeline.
 TAG_VERSION=$(echo "$CI_COMMIT_TAG" | sed -nE 's/^tezos-sdk-v([0-9]+\.[0-9]+\.[0-9]+)$/\1/p')
 
 CARGO_TOML=$CI_PROJECT_DIR/rust/Cargo.toml

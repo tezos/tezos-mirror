@@ -205,8 +205,7 @@ type consensus_filter = {
     out the attestations that are different from the [current_level],
     the [current_round] or the optional [current_block_payload_hash],
     as well as preattestations. *)
-let filter_with_relevant_consensus_ops ~aggregate_attestation_feature_flag
-    ~(attestation_filter : consensus_filter)
+let filter_with_relevant_consensus_ops ~(attestation_filter : consensus_filter)
     ~(preattestation_filter : consensus_filter option) operation_set =
   Operation_set.filter
     (fun {shell = {branch}; protocol_data} ->
@@ -230,8 +229,7 @@ let filter_with_relevant_consensus_ops ~aggregate_attestation_feature_flag
           Compare.Int32.(Raw_level.to_int32 level = level')
           && Round.(round = round')
           && Block_payload_hash.(block_payload_hash = block_payload_hash')
-          && ((not aggregate_attestation_feature_flag)
-             || Block_hash.(branch = branch'))
+          && Block_hash.(branch = branch')
       (* 2. Filter attestations. *)
       | ( Operation_data
             {
@@ -249,8 +247,7 @@ let filter_with_relevant_consensus_ops ~aggregate_attestation_feature_flag
           && Round.(round = attestation_filter.round)
           && Block_payload_hash.(
                block_payload_hash = attestation_filter.payload_hash
-               && ((not aggregate_attestation_feature_flag)
-                  || Block_hash.(branch = attestation_filter.branch)))
+               && Block_hash.(branch = attestation_filter.branch))
       (* 3. Preserve all non-consensus operations. *)
       | _ -> true)
     operation_set

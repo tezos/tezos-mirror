@@ -118,6 +118,29 @@ pub mod tracer {
 
         Ok(())
     }
+
+    /// Returns the current number of call traces stored for the given
+    /// transaction hash.
+    pub fn call_trace_length<Host: Runtime>(
+        host: &Host,
+        hash: &Option<H256>,
+    ) -> Result<u64, Error> {
+        let path = trace_tx_path(hash, &CALL_TRACE)?;
+        let call_trace_storage = IndexableStorage::new_owned_path(path);
+        Ok(call_trace_storage.length(host)?)
+    }
+
+    /// Truncate the call trace storage back to `length`, discarding
+    /// any entries that were appended after that point.
+    pub fn set_call_trace_length<Host: Runtime>(
+        host: &mut Host,
+        hash: &Option<H256>,
+        length: u64,
+    ) -> Result<(), Error> {
+        let path = trace_tx_path(hash, &CALL_TRACE)?;
+        let call_trace_storage = IndexableStorage::new_owned_path(path);
+        Ok(call_trace_storage.set_length(host, length)?)
+    }
 }
 
 /// API to interact with blocks storage

@@ -8,18 +8,14 @@
 
 open Ethereum_types
 
-type access = {address : address; storage_keys : hex list}
+type access = Ethereum_types.access = {
+  address : address;
+  storage_keys : hex list;
+}
 
-let access_encoding =
-  let open Data_encoding in
-  conv
-    (fun {address; storage_keys} -> (address, storage_keys))
-    (fun (address, storage_keys) -> {address; storage_keys})
-    (obj2
-       (req "address" address_encoding)
-       (req "storageKeys" (list hex_encoding)))
+let access_encoding = Ethereum_types.access_encoding
 
-type authorization_item = {
+type authorization_item = Ethereum_types.authorization_item = {
   chain_id : quantity;
   address : address;
   nonce : quantity;
@@ -28,20 +24,7 @@ type authorization_item = {
   s : quantity;
 }
 
-let authorization_item_encoding =
-  let open Data_encoding in
-  conv
-    (fun {chain_id; address; nonce; y_parity; r; s} ->
-      (chain_id, address, nonce, y_parity, r, s))
-    (fun (chain_id, address, nonce, y_parity, r, s) ->
-      {chain_id; address; nonce; y_parity; r; s})
-    (obj6
-       (req "chainId" quantity_encoding)
-       (req "address" address_encoding)
-       (req "nonce" quantity_encoding)
-       (req "yParity" quantity_encoding)
-       (req "r" quantity_encoding)
-       (req "s" quantity_encoding))
+let authorization_item_encoding = Ethereum_types.authorization_item_encoding
 
 module EIP_2930 = struct
   type t = {
@@ -1038,22 +1021,18 @@ let reconstruct_from_transactions_list transactions
     (obj : legacy_transaction_object) =
   let open Result_syntax in
   match List.assoc ~equal:( = ) obj.hash transactions with
-  | None ->
-      (* This should not happen *)
-      error_with
-        "Cannot reconstruct %a: cannot find the raw transaction in the \
-         blueprint"
-        Ethereum_types.pp_hash
-        obj.hash
-  | Some None ->
+  | Some None | None ->
       (* It is a delayed transaction, there is nothing we can do except
          returning the potentially incorrect transaction object *)
       return (from_store_transaction_object obj)
-  | Some (Some raw_txn) ->
+  | Some (Some (Broadcast.Evm raw_txn)) ->
       (* We have the original transaction, let's try to reconstruct the
          transaction object *)
       let* res = reconstruct_from_raw_transaction obj raw_txn in
       return res
+  | Some (Some (Broadcast.Michelson _)) ->
+      (* Reconstructing a Tezos operation does not make sense. *)
+      error_with "Tezos operations cannot be reconstructed"
 
 let reconstruct payload (obj : legacy_transaction_object) =
   let open Result_syntax in

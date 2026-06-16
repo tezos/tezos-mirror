@@ -78,10 +78,6 @@ type stresstest_contract_parameters = {
   invocation_gas_limit : int;
 }
 
-type ai_vote = On | Off | Pass
-
-let ai_vote_to_string = function On -> "on" | Off -> "off" | Pass -> "pass"
-
 let name t = t.name
 
 let base_dir t = t.base_dir
@@ -846,8 +842,7 @@ let spawn_bake_for ?env ?endpoint ?protocol
     ?(keys = [Constant.bootstrap1.alias]) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?count
-    ?force ?context_path ?dal_node_endpoint ?ai_vote ?(state_recorder = false)
-    client =
+    ?force ?context_path ?dal_node_endpoint ?(state_recorder = false) client =
   spawn_command
     ?env
     ?endpoint
@@ -870,13 +865,12 @@ let spawn_bake_for ?env ?endpoint ?protocol
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ optional_arg "context" Fun.id context_path
     @ dal_node_arg dal_node_endpoint client
-    @ optional_arg "adaptive-issuance-vote" ai_vote_to_string ai_vote
     @ optional_switch "record_state" state_recorder)
 
 let bake_for ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?dal_node_endpoint
-    ?ai_vote ?state_recorder ?expect_failure client =
+    ?state_recorder ?expect_failure client =
   spawn_bake_for
     ?env
     ?endpoint
@@ -892,7 +886,6 @@ let bake_for ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?context_path
     ?protocol
     ?dal_node_endpoint
-    ?ai_vote
     ?state_recorder
     client
   |> Process.check ?expect_failure
@@ -900,7 +893,7 @@ let bake_for ?env ?endpoint ?protocol ?keys ?minimal_fees
 let bake_for_and_wait_level ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
-    ?node ?dal_node_endpoint ?ai_vote ?state_recorder client =
+    ?node ?dal_node_endpoint ?state_recorder client =
   let node =
     match node with
     | Some n -> n
@@ -932,7 +925,6 @@ let bake_for_and_wait_level ?env ?endpoint ?protocol ?keys ?minimal_fees
       ?force
       ?context_path
       ?dal_node_endpoint
-      ?ai_vote
       ?state_recorder
       client
   in
@@ -942,7 +934,7 @@ let bake_for_and_wait_level ?env ?endpoint ?protocol ?keys ?minimal_fees
 let bake_for_and_wait ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
-    ?node ?dal_node_endpoint ?ai_vote client =
+    ?node ?dal_node_endpoint client =
   let* (_level : int) =
     bake_for_and_wait_level
       ?env
@@ -961,7 +953,6 @@ let bake_for_and_wait ?env ?endpoint ?protocol ?keys ?minimal_fees
       ?level_before
       ?node
       ?dal_node_endpoint
-      ?ai_vote
       client
   in
   unit
@@ -1260,7 +1251,7 @@ let add_address ?force client ~alias ~src =
 let spawn_transfer ?env ?hooks ?(log_requests = false) ?log_output ?endpoint
     ?(wait = "none") ?burn_cap ?fee ?fee_cap ?gas_limit ?safety_guard
     ?storage_limit ?counter ?entrypoint ?arg ?(simulation = false)
-    ?(force = false) ~amount ~giver ~receiver client =
+    ?(force = false) ?minimal_nanotez_per_byte ~amount ~giver ~receiver client =
   spawn_command
     ?env
     ?log_output
@@ -1283,11 +1274,16 @@ let spawn_transfer ?env ?hooks ?(log_requests = false) ?log_output ?endpoint
     @ optional_arg "entrypoint" Fun.id entrypoint
     @ optional_arg "arg" Fun.id arg
     @ (if simulation then ["--simulation"] else [])
-    @ if force then ["--force"] else [])
+    @ (if force then ["--force"] else [])
+    @ optional_arg
+        "minimal-nanotez-per-byte"
+        string_of_int
+        minimal_nanotez_per_byte)
 
 let transfer ?env ?hooks ?log_requests ?log_output ?endpoint ?wait ?burn_cap
     ?fee ?fee_cap ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint
-    ?arg ?simulation ?force ?expect_failure ~amount ~giver ~receiver client =
+    ?arg ?simulation ?force ?expect_failure ?minimal_nanotez_per_byte ~amount
+    ~giver ~receiver client =
   spawn_transfer
     ?env
     ?log_requests
@@ -1306,6 +1302,7 @@ let transfer ?env ?hooks ?log_requests ?log_output ?endpoint ?wait ?burn_cap
     ?arg
     ?simulation
     ?force
+    ?minimal_nanotez_per_byte
     ~amount
     ~giver
     ~receiver
@@ -3249,7 +3246,7 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
     return (Some parameter_file)
 
 let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
-    ?event_level ?event_sections_levels
+    ?event_level ?event_sections_levels ?media_type
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
     ?(keys = Constant.all_secret_keys) ?rpc_external ?dal_node ?remote_signer
     tag () =
@@ -3266,7 +3263,7 @@ let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
       let endpoint = Node node in
       let mode =
         match mode with
-        | `Client -> Client (Some endpoint, None)
+        | `Client -> Client (Some endpoint, media_type)
         | `Proxy -> Proxy endpoint
       in
       let client =
@@ -3297,7 +3294,7 @@ let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
       return (node1, client)
 
 let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
-    ?event_level ?event_sections_levels ?nodes_args
+    ?event_level ?event_sections_levels ?media_type ?nodes_args
     ?additional_bootstrap_account_count
     ?additional_revealed_bootstrap_account_count ?default_accounts_balance
     ?parameter_file ?timestamp ?keys ?rpc_external ?dal_node ?remote_signer tag
@@ -3312,6 +3309,7 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
       ?base_dir
       ?event_level
       ?event_sections_levels
+      ?media_type
       ?nodes_args
       ?keys
       ?rpc_external
@@ -4915,3 +4913,19 @@ let threshold_bls_signatures ~pk ~msg client id_signatures =
 let signing_delay_env_var = "TEZOS_SIGN_DELAY_I_KNOW_WHAT_I_AM_DOING"
 
 let fixed_seed_env_var = "TEZOS_CLIENT_FIXED_RANDOM_SEED"
+
+let spawn_stez_deposit ?(wait = "none") ?burn_cap amount ~src client =
+  spawn_command client
+  @@ ["--wait"; wait; "stez"; "deposit"; Tez.to_string amount; "for"; src]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let stez_deposit ?wait ?burn_cap amount ~src client =
+  spawn_stez_deposit ?wait ?burn_cap amount ~src client |> Process.check
+
+let spawn_stez_redeem ?(wait = "none") ?burn_cap amount ~src client =
+  spawn_command client
+  @@ ["--wait"; wait; "stez"; "redeem"; Tez.to_string amount; "for"; src]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let stez_redeem ?wait ?burn_cap amount ~src client =
+  spawn_stez_redeem ?wait ?burn_cap amount ~src client |> Process.check

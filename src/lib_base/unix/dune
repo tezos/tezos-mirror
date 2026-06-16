@@ -20,7 +20,8 @@
   terminal
   eio
   eio_posix
-  lwt_eio)
+  lwt_eio
+  re)
  (inline_tests
   (flags -verbose)
   (modes native)

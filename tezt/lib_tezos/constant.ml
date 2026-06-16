@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
-(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
+(* Copyright (c) 2024, 2026 Trilitech <contact@trili.tech>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,6 +34,9 @@ let octez_admin_client = Uses.octez_admin_client
 
 let octez_node = Uses.octez_node
 
+let michelson_test_scripts =
+  Uses.make ~tag:"michelson_test_scripts" ~path:"michelson_test_scripts" ()
+
 let octez_codec = Uses.make ~tag:"codec" ~path:"./octez-codec" ()
 
 let octez_snoop = Uses.make ~tag:"snoop" ~path:"./octez-snoop" ()
@@ -57,8 +60,6 @@ let etherlink_governance_observer =
     ~tag:"etherlink_governance_observer"
     ~path:"./etherlink-governance-observer"
     ()
-
-let octez_dsn_node = Uses.make ~tag:"dsn_node" ~path:"./octez-dsn-node" ()
 
 let octez_signer = Uses.make ~tag:"signer" ~path:"./octez-signer" ()
 
@@ -101,6 +102,9 @@ let _octez_baker_seoul =
 let _octez_baker_tallinn =
   Uses.make ~tag:"baker_psd5wvtj" ~path:"./octez-baker-PtTALLiN" ()
 
+let _octez_baker_ushuaia =
+  Uses.make ~tag:"baker_psgxqmsv" ~path:"./octez-baker-PsUshuai" ()
+
 let _octez_baker_alpha =
   Uses.make ~tag:"baker_alpha" ~path:"./octez-baker-alpha" ()
 
@@ -116,6 +120,9 @@ let _octez_accuser_seoul =
 let _octez_accuser_tallinn =
   Uses.make ~tag:"accuser_tallinn" ~path:"./octez-accuser-PtTALLiN" ()
 
+let _octez_accuser_ushuaia =
+  Uses.make ~tag:"accuser_ushuaia" ~path:"./octez-accuser-PsUshuai" ()
+
 let _octez_accuser_alpha =
   Uses.make ~tag:"accuser_alpha" ~path:"./octez-accuser-alpha" ()
 
@@ -125,6 +132,13 @@ let yes_wallet =
   Uses.make
     ~tag:"yes_wallet"
     ~path:"./_build/default/devtools/yes_wallet/yes_wallet.exe"
+    ()
+
+let watchtower =
+  Uses.make
+    ~how_to_build:"make fa-bridge-watchtower"
+    ~tag:"watchtower"
+    ~path:"./fa-bridge-watchtower"
     ()
 
 module WASM = struct
@@ -158,6 +172,49 @@ module WASM = struct
       ~path:"tezt/tests/kernels/echo_dal_reveal_parameters.wasm"
       ()
 
+  (* Toy kernel "echo_dal_reveal_pages".
+
+     - On each kernel_run, asks to reveal exactly one DAL page:
+     published level = 15, slot = 1, page_index = 2.
+
+     - The revealed bytes are written to the key "/dal/page" next to the pages
+     that were already written, if any.
+
+     - No per-page loop, no L1-level watcher, and no strict size/error checks. *)
+  let echo_dal_reveal_pages =
+    Uses.make
+      ~tag:"echo_dal_reveal_pages"
+      ~path:"tezt/tests/kernels/echo_dal_reveal_pages.wasm"
+      ()
+
+  (* Same as {!echo_dal_reveal_pages} above, but the publish level is equal to
+     3000. It is used to test the corner case where a rollup is asked to import
+     a slot whose level is very far in the future. *)
+  let echo_dal_reveal_pages_high_target_pub_level =
+    Uses.make
+      ~tag:"echo_dal_reveal_pages"
+      ~path:
+        "tezt/tests/kernels/echo_dal_reveal_pages_high_target_pub_level.wasm"
+      ()
+
+  (* Toy kernel "echo_dal_reveal_pages_with_external_message".
+
+     Same as {!echo_dal_reveal_pages} above, but the page is revealed and
+    appended to the key "/dal/page" only when an external message starts
+    with "I". *)
+  let echo_dal_reveal_pages_with_external_message =
+    Uses.make
+      ~tag:"echo_dal_reveal_pages"
+      ~path:
+        "tezt/tests/kernels/echo_dal_reveal_pages_with_external_message.wasm"
+      ()
+
+  let unreachable_kernel =
+    Uses.make
+      ~tag:"unreachable_kernel"
+      ~path:"tezt/tests/kernels/unreachable_kernel.wasm"
+      ()
+
   let evm_kernel =
     Uses.make
       ~how_to_build:"make -f etherlink.mk build"
@@ -178,7 +235,16 @@ module WASM = struct
       ~path:"etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wasm"
       ()
 
-  let mainnet_commit = "7a62d6a155cc17f5d3b9f8d34b2eb0d68c6f95cc"
+  let mainnet_commit = "7af992cf274a0902c172b5e9829397107e817178"
+
+  let tezlink_shadownet_kernel =
+    Uses.make
+      ~tag:"tezlink_shadownet_kernel"
+      ~path:
+        "etherlink/kernel_latest/kernel/tests/resources/tezlink_shadownet_kernel.wasm"
+      ()
+
+  let tezlink_shadownet_commit = "f6eb212728d8b2e7fd4b8092890be25ddf6f74cb"
 
   let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm" ()
 

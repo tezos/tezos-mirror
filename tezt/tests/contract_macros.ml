@@ -310,8 +310,10 @@ let test_macro_expansion protocols =
             ~__FILE__
             ~title:(sf "Macro expansion: %s" (Michelson_script.name_s script))
             ~tags:[team; "michelson"; "macros"]
+            ~uses:(fun _protocol -> [Constant.michelson_test_scripts])
             ~uses_node:false
             (fun protocol ->
+              let _ = Uses.path Constant.michelson_test_scripts in
               let client = Client.create_with_mode Mockup in
               let script_path = Michelson_script.path script in
               let* (expansion : string) =

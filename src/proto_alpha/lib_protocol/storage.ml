@@ -127,13 +127,6 @@ module Protocol_activation_level =
     (Raw_level_repr)
 
 module Tenderbake = struct
-  module First_level_of_protocol =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["first_level_of_protocol"]
-      end)
-      (Raw_level_repr)
-
   module Branch = struct
     type t = Block_hash.t * Block_payload_hash.t
 
@@ -396,6 +389,18 @@ module Contract = struct
          end))
          (Make_index (Contract_repr.Index))
 
+  module SWRR_credit =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["swrr_credit"]
+      end)
+      (struct
+        type t = Z.t
+
+        let encoding = Data_encoding.z
+      end)
+
   module Counter =
     Indexed_context.Make_map
       (Registered)
@@ -626,7 +631,7 @@ module Contract = struct
     module CLST =
       Make_single_data_storage (Registered) (Raw_context)
         (struct
-          let name = ["clst"]
+          let name = ["stez"]
         end)
         (struct
           type t = Contract_hash.t
@@ -1139,6 +1144,7 @@ module Public_key_hash = struct
   module Path_Secp256k1 = Path_encoding.Make_hex (Secp256k1.Public_key_hash)
   module Path_P256 = Path_encoding.Make_hex (P256.Public_key_hash)
   module Path_Bls = Path_encoding.Make_hex (Bls.Public_key_hash)
+  module Path_Mldsa44 = Path_encoding.Make_hex (Mldsa44.Public_key_hash)
 
   let to_path (key : public_key_hash) l =
     match key with
@@ -1146,6 +1152,7 @@ module Public_key_hash = struct
     | Secp256k1 h -> "secp256k1" :: Path_Secp256k1.to_path h l
     | P256 h -> "p256" :: Path_P256.to_path h l
     | Bls h -> "bls" :: Path_Bls.to_path h l
+    | Mldsa44 h -> "mldsa44" :: Path_Mldsa44.to_path h l
 
   let of_path : _ -> public_key_hash option = function
     | "ed25519" :: rest -> (
@@ -1164,14 +1171,19 @@ module Public_key_hash = struct
         match Path_Bls.of_path rest with
         | Some pkh -> Some (Bls pkh)
         | None -> None)
+    | "mldsa44" :: rest -> (
+        match Path_Mldsa44.of_path rest with
+        | Some pkh -> Some (Mldsa44 pkh)
+        | None -> None)
     | _ -> None
 
   let path_length =
     let l1 = Path_Ed25519.path_length
     and l2 = Path_Secp256k1.path_length
     and l3 = Path_P256.path_length
-    and l4 = Path_Bls.path_length in
-    assert (Compare.Int.(l1 = l2 && l2 = l3 && l3 = l4)) ;
+    and l4 = Path_Bls.path_length
+    and l5 = Path_Mldsa44.path_length in
+    assert (Compare.Int.(l1 = l2 && l2 = l3 && l3 = l4 && l4 = l5)) ;
     l1 + 1
 end
 
@@ -1311,6 +1323,18 @@ module Cycle = struct
                  (req "active_stake" Stake_repr.encoding)))
       end)
 
+  module Selected_bakers =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["selected_bakers"]
+      end)
+      (struct
+        type t = Raw_context.consensus_pk FallbackArray.t
+
+        let encoding = FallbackArray.encoding Raw_context.consensus_pk_encoding
+      end)
+
   module Total_active_stake =
     Indexed_context.Make_map
       (Registered)
@@ -1364,6 +1388,18 @@ module Cycle = struct
         type t = Raw_context.consensus_pk Sampler.t
 
         let encoding = Sampler.encoding Raw_context.consensus_pk_encoding
+      end)
+
+  module Delegate_stake_info =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["delegate_stake_info"]
+      end)
+      (struct
+        type t = Raw_context.stake_info
+
+        let encoding = Raw_context.stake_info_encoding
       end)
 
   module Issuance_bonus =
@@ -1476,6 +1512,19 @@ module Cycle = struct
          end))
          (Make_index (Contract_repr.Index))
       (Staking_parameters_repr)
+
+  module Pending_CLST_delegate_parameters =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["pending_stez_delegate_parameters"]
+         end))
+         (Make_index (Contract_repr.Index))
+      (struct
+        type t = Clst_delegates_parameters_repr.update
+
+        let encoding = Clst_delegates_parameters_repr.update_encoding
+      end)
 end
 
 module Already_denounced = Cycle.Already_denounced
@@ -1494,6 +1543,20 @@ module Stake = struct
          (Public_key_hash_index)
       (Full_staking_balance_repr)
 
+  (* TODO: Remove after next protocol *)
+  module Staking_balance_up_to_T =
+    Make_indexed_data_storage
+      (Make_subcontext (Ghost) (Raw_context)
+         (struct
+           let name = ["staking_balance"]
+         end))
+         (Public_key_hash_index)
+      (struct
+        type t = Full_staking_balance_repr.t
+
+        let encoding = Full_staking_balance_repr.encoding_up_to_t
+      end)
+
   module Active_delegates_with_minimal_stake =
     Make_data_set_storage
       (Make_subcontext (Registered) (Raw_context)
@@ -1504,6 +1567,53 @@ module Stake = struct
 
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
   module Total_active_stake = Cycle.Total_active_stake
+  module Selected_bakers = Cycle.Selected_bakers
+end
+
+module Clst = struct
+  module Raw_context =
+    Make_subcontext (Registered) (Raw_context)
+      (struct
+        let name = ["clst"]
+      end)
+
+  module Deposits_balance =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["deposits"]
+      end)
+      (Tez_repr)
+
+  module Redeemed_frozen_deposits =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["redeemed_frozen_deposits"]
+      end)
+      (Unstaked_frozen_deposits_repr)
+
+  module Redemption_requests =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["redemption_requests"]
+         end))
+         (Make_index (Contract_repr.Index))
+      (struct
+        type t = Unstake_request.requests
+
+        let encoding = Unstake_request.requests_encoding
+      end)
+
+  module Registered_delegates =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["registered_delegates"]
+         end))
+         (Make_index (Contract_repr.Index))
+      (Clst_delegates_parameters_repr)
+
+  module Pending_delegate_parameters = Cycle.Pending_CLST_delegate_parameters
 end
 
 type consensus_pk_in_R = Cycle.consensus_pk_in_R = {
@@ -1514,6 +1624,7 @@ type consensus_pk_in_R = Cycle.consensus_pk_in_R = {
 
 module Delegate_sampler_state_up_to_R = Cycle.Delegate_sampler_state_up_to_R
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
+module Delegate_stake_info = Cycle.Delegate_stake_info
 module Issuance_bonus = Cycle.Issuance_bonus
 module Issuance_coeff = Cycle.Issuance_coeff
 
@@ -2033,6 +2144,18 @@ module Sc_rollup = struct
           Data_encoding.(list Sc_rollup_repr.Past_commitment_period.encoding)
       end)
 
+  module Signals =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["signals"]
+      end)
+      (struct
+        type t = (string * Raw_level_repr.t) list
+
+        let encoding =
+          Data_encoding.(list (tup2 (string Plain) Raw_level_repr.encoding))
+      end)
+
   module Inbox = struct
     include
       Make_single_data_storage (Registered) (Raw_context)
@@ -2337,6 +2460,18 @@ module Dal = struct
     Make_subcontext (Registered) (Raw_context)
       (struct
         let name = ["dal"]
+      end)
+
+  module AttestationHistory =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["attestation_history"]
+      end)
+      (struct
+        type t = Dal_attestations_repr.Accountability.packed_history
+
+        let encoding =
+          Dal_attestations_repr.Accountability.packed_history_encoding
       end)
 
   module Slot = struct

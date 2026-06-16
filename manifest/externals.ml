@@ -36,7 +36,7 @@ let alcotest = external_lib "alcotest" V.(at_least "1.5.0")
 
 let alcotest_lwt = external_lib "alcotest-lwt" V.(at_least "1.5.0")
 
-let ambient_context_lwt = external_lib "ambient-context-lwt" V.(exactly "0.1.0")
+let ambient_context_lwt = external_lib "ambient-context-lwt" V.(exactly "0.1.1")
 
 let asetmap = external_lib "asetmap" V.(at_least "0.8.1")
 
@@ -297,6 +297,11 @@ let semaphore_compat = external_lib "semaphore-compat" (V.at_least "1.0.1")
 let seqes = external_lib "seqes" V.(at_least "0.2")
 
 let sexplib = external_lib "sexplib" V.True
+
+(* WARNING: SQLite extension in etherlink/bin_node/lib_dev/sqlite_receipt_bloom
+   re-export some types of the ocaml sqlite3 interface which is not guaranteed
+   to be stable. Verify compatibility before updating sqlite3 dependency. *)
+let sqlite3 = external_lib "sqlite3" V.(exactly "5.3.1")
 
 let stdint = external_lib "stdint" V.True
 

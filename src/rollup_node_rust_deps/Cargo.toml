@@ -1,0 +1,37 @@
+[package]
+name = "octez-rollup-node-rust-deps"
+version = "0.0.0"
+edition = "2021"
+resolver = "3"
+
+[lib]
+crate-type = ["staticlib", "cdylib"]
+
+# Rust dependencies for the smart rollup node.
+# Superset of rust_deps for the link_deps that the rollup node needs
+# (Rustzcash, Wasmer, Riscv_pvm, Nds_on_disk).
+# Executables that do NOT need on-disk NDS (e.g. the L1 node) continue
+# to use rust_deps, which does not pull in RocksDB.
+
+[dependencies.wasmer-c-api]
+path = "../rust_deps/wasmer-3.3.0/lib/c-api"
+default-features = false
+features = ["singlepass", "cranelift", "wat", "middlewares"]
+
+[dependencies.librustzcash]
+path = "../rustzcash_deps"
+
+[dependencies.rust_igd_next]
+path = "../rust_deps/rust_igd_next"
+
+[dependencies.rust_tezos_context]
+path = "../rust_deps/rust_tezos_context"
+
+[dependencies.octez-riscv-api]
+path = "../riscv/api"
+
+[dependencies.octez-riscv-durable-storage-in-memory]
+path = "../riscv/durable-in-memory"
+
+[dependencies.octez-riscv-durable-storage-on-disk]
+path = "../riscv/durable-on-disk"

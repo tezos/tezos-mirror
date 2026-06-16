@@ -11,6 +11,40 @@
 
 open Cryptobox
 
+(** Store directory names within the DAL node's data directory. *)
+module Stores_dirs : sig
+  val shard : string
+
+  val slot : string
+
+  val skip_list_cells : string
+end
+
+module Shards_disk : sig
+  (** Low-level access to shards stored on disk. *)
+
+  (** [get_file_layout slot_id] returns a function to be used as the
+      [file_layout] of the Key_value_store for the given [slot_id] in the root
+      directory. This function might fail if there is no layout registered for the
+      given [slot_id].
+
+      Beware that cryptographic parameters must be initialized via
+      {!Node_context.init_cryptobox} before using this function. *)
+  val get_file_layout :
+    slot_id:Types.slot_id ->
+    (root_dir:string ->
+    Types.slot_id ->
+    (int, Cryptobox.share) Key_value_store.layout)
+    tzresult
+    Lwt.t
+
+  (** [add_file_layout] adds a new file layout that will be used starting at the
+      given level. This should be called when a new protocol is activated,
+      introducing a new layout related to DAL protocol parameters changes. *)
+  val add_file_layout :
+    int32 -> Cryptobox.parameters -> (unit, [> `Fail of string]) result
+end
+
 module Shards : sig
   (** A shard of some slot id consist of a shard index (a number
       between 0 and the number_of_shards protocol parameter) and a
@@ -44,7 +78,7 @@ module Shards : sig
     t ->
     Types.slot_id ->
     number_of_shards:int ->
-    (Types.slot_id * int * share tzresult) Seq_s.t
+    (Types.slot_id * int * share tzresult) Seq_s.t tzresult Lwt.t
 
   (** [count_values store slot_id] returns the number of shards
       which are stored for the given slot id. *)
@@ -60,24 +94,34 @@ module Slots : sig
 
   type t
 
-  (** [add_slot store ~slot_size slot_content slot_id] adds a mapping from the
-      given slot id to the given slot content. *)
-  val add_slot :
-    t ->
-    slot_size:int ->
-    bytes ->
-    Types.slot_id ->
-    (unit, [> Errors.other]) result Lwt.t
+  (** [get_file_layout slot_id] returns a function to be used as the
+      [file_layout] of the Key_value_store for the given [slot_id] in the root
+      directory. This function might fail if there is no layout registered for the
+      given [slot_id]. *)
+  val get_file_layout :
+    slot_id:Types.slot_id ->
+    (root_dir:string -> Types.slot_id -> (unit, bytes) Key_value_store.layout)
+    tzresult
+    Lwt.t
 
-  (** [find_slot store ~slot_size slot_id] returns the slot associated to some
-      slot id or [Error `Not_found] if no slot is associated. *)
+  (** [add_slot store slot_content slot_id] adds a mapping from the given slot
+      id to the given slot content. *)
+  val add_slot :
+    t -> bytes -> Types.slot_id -> (unit, [> Errors.other]) result Lwt.t
+
+  (** [find_slot store slot_id] returns the slot associated to some slot id or
+      [Error `Not_found] if no slot is associated. *)
   val find_slot :
     t ->
-    slot_size:int ->
     Types.slot_id ->
     (bytes, [> Errors.other | Errors.not_found]) result Lwt.t
 
-  val remove_slot : t -> slot_size:int -> Types.slot_id -> unit tzresult Lwt.t
+  val remove_slot : t -> Types.slot_id -> unit tzresult Lwt.t
+
+  (** [add_file_layout] adds a new file layout that will be used starting at the
+      given level. This aims to be called when a new protocol is activated,
+      introducing a new layout related to DAL protocol parameters changes. *)
+  val add_file_layout : int32 -> Cryptobox.parameters -> unit
 end
 
 module Slot_id_cache : sig
@@ -96,7 +140,7 @@ module Statuses_cache : sig
   (** [update_slot_header_status store slot_id status] updates the status of the
       [slot_id] to [status]. *)
   val update_slot_header_status :
-    t -> Types.slot_id -> Types.header_status -> unit
+    t -> Types.slot_id -> Types.header_status -> unit tzresult
 
   (** [get_slot_status cache ~slot_id] returns the status associated
       to the given [slot_id], if any. *)
@@ -158,7 +202,7 @@ val not_yet_published_cache :
 
 (** [first_seen_level t] returns the first seen level store associated
     with the store [t]. *)
-val first_seen_level : t -> First_seen_level.t
+val first_seen_level : t -> First_seen_level.rw First_seen_level.t
 
 (** [finalized_commitments t] returns the cache of commitments indexed
     by level and then by slot id associated with the store [t]. The
@@ -167,11 +211,11 @@ val first_seen_level : t -> First_seen_level.t
 val finalized_commitments : t -> Slot_id_cache.t
 
 (** [chain_id t] returns the chain_id store associated with the store [t]. *)
-val chain_id : t -> Chain_id.t
+val chain_id : t -> Chain_id.rw Chain_id.t
 
 (** [last_processed_level t] returns the last processed level store
     associated with the store [t]. *)
-val last_processed_level : t -> Last_processed_level.t
+val last_processed_level : t -> Last_processed_level.rw Last_processed_level.t
 
 (** [shards t] returns the shards store associated with the store
     [t]. *)
@@ -184,6 +228,19 @@ val skip_list_cells : t -> Dal_store_sqlite3.Skip_list_cells.t
 (** [statuses_cache t] returns the statuses cache associated with the store
     [t]. *)
 val statuses_cache : t -> Statuses_cache.t
+
+(** [resize_caches t proto_parameters] resizes in-memory caches whose capacity
+    depends on DAL protocol parameters. Existing entries are preserved when
+    the capacity increases.
+
+    This function replaces the cache objects in [t] (it does not resize them
+    in place). Callers that captured a reference to a cache field before the
+    resize (e.g. via {!traps} or {!statuses_cache}) will keep using the old,
+    stale cache. This is safe as long as [resize_caches] is called before any
+    concurrent cache readers/writers in the same block-processing cycle — which
+    is the case today since it runs at the beginning of
+    {!Node_context.may_add_plugin_and_cryptobox}. *)
+val resize_caches : t -> Types.proto_parameters -> unit
 
 (** [slots t] returns the slots store associated with the store
     [t]. *)
@@ -210,6 +267,11 @@ val init :
   Profile_manager.t ->
   Types.proto_parameters ->
   t tzresult Lwt.t
+
+(** [close t] closes all storage backends (KVS shards and slots stores,
+    SQLite skip-list cells, and single-value stores). Pending writes are
+    flushed before handles are released. *)
+val close : t -> unit tzresult Lwt.t
 
 (** [add_slot_headers ~number_of_slots ~block_level slot_headers store]
     processes the [slot_headers] published at [block_level]. Concretely, for
@@ -256,7 +318,8 @@ module Skip_list_cells : sig
     published_level:int32 ->
     (Dal_proto_types.Skip_list_cell.t
     * Dal_proto_types.Skip_list_hash.t
-    * Types.slot_index)
+    * Types.slot_index
+    * int)
     list
     tzresult
     Lwt.t

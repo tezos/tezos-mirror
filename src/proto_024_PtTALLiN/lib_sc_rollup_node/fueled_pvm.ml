@@ -53,8 +53,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
         failing_ticks : int64 list;
       }
 
-  exception Error_wrapper of tztrace
-
   let metadata (node_ctxt : _ Node_context.t) =
     let address =
       Sc_rollup_proto_types.Address.of_octez node_ctxt.config.sc_rollup_address
@@ -133,7 +131,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           | Error error ->
               (* The [Error_wrapper] must be caught upstream and converted into
                  a tzresult. *)
-              Lwt.fail (Error_wrapper error)
+              Lwt.fail (Rollup_node_errors.Error_wrapper error)
           | Ok data -> Lwt.return data)
       | Reveal_metadata ->
           Lwt.return
@@ -176,7 +174,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               (* The [Error_wrapper] must be caught upstream and converted into
                  a tzresult. *)
               (* This happens when, for example, the kernel requests a page from a future level. *)
-              Lwt.fail (Error_wrapper error)
+              Lwt.fail (Rollup_node_errors.Error_wrapper error)
           | Ok None ->
               (* The page was not confirmed by L1.
                  We return empty string in this case, as done in the slow executon. *)
@@ -212,6 +210,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               PVM_mut_state.eval_many
                 ~check_invalid_kernel:
                   (not node_ctxt.config.unsafe_disable_wasm_kernel_checks)
+                ~fallback_to_slow_vm:node_ctxt.config.slow_vm_fallback
                 ~reveal_builtins
                 ~write_debug:(Printer node_ctxt.kernel_debug_logger)
                 ~max_steps
@@ -228,7 +227,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             in
             return (executed_ticks, failing_ticks, remaining_fuel))
           (function
-            | Error_wrapper error -> Lwt.return (Error error)
+            | Rollup_node_errors.Error_wrapper error -> Lwt.return (Error error)
             | exn -> Lwt.reraise exn)
       in
       let normal_eval_wrapper state fuel one_step_eval =
@@ -493,13 +492,11 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     (feed_messages [@tailcall]) (state, fuel) message_counter_offset messages
 
   let eval_block_inbox ~fuel (node_ctxt : _ Node_context.t) (inbox, messages)
-      (state : Context.pvmstate) : fuel eval_result tzresult Lwt.t =
+      (state : _ Context.pvmstate) : fuel eval_result tzresult Lwt.t =
     let open Lwt_result_syntax in
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let module PVM_mut_state = PVM.Mutable_state in
-    let mut_state =
-      PVM.Ctxt_wrapper.from_imm @@ PVM.Ctxt_wrapper.of_node_pvmstate state
-    in
+    let mut_state = PVM.Ctxt_wrapper.of_node_pvmstate state in
     (* Obtain inbox and its messages for this block. *)
     let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
     let*! initial_tick = PVM_mut_state.get_tick mut_state in
@@ -518,12 +515,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     let*! final_tick = PVM_mut_state.get_tick mut_state in
     let*! state_hash = PVM_mut_state.state_hash mut_state in
     let num_ticks = Sc_rollup.Tick.distance initial_tick final_tick in
-    let state =
-      PVM.Ctxt_wrapper.to_node_pvmstate @@ PVM.Ctxt_wrapper.to_imm mut_state
-    in
-    let eval_state =
+    let state_info =
       {
-        state;
         state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
         tick = Sc_rollup.Tick.to_z final_tick;
         inbox_level;
@@ -532,24 +525,25 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
         remaining_messages;
       }
     in
-    return {state = eval_state; num_ticks; num_messages}
+    return {state_info; num_ticks; num_messages}
 
   let eval_messages ?reveal_map (node_ctxt : _ Node_context.t)
       {
         state;
-        tick = initial_tick;
-        inbox_level;
-        message_counter_offset;
-        remaining_fuel = fuel;
-        remaining_messages = messages;
-        _;
+        info =
+          {
+            tick = initial_tick;
+            inbox_level;
+            message_counter_offset;
+            remaining_fuel = fuel;
+            remaining_messages = messages;
+            _;
+          };
       } =
     let open Lwt_result_syntax in
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let module PVM_mut_state = PVM.Mutable_state in
-    let state =
-      PVM.Ctxt_wrapper.from_imm @@ PVM.Ctxt_wrapper.of_node_pvmstate state
-    in
+    let state = PVM.Ctxt_wrapper.of_node_pvmstate state in
     let* remaining_fuel, num_messages, remaining_messages =
       match messages with
       | [] ->
@@ -592,12 +586,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     let final_tick = Sc_rollup.Tick.to_z final_tick in
     let*! state_hash = PVM_mut_state.state_hash state in
     let num_ticks = Z.sub final_tick initial_tick in
-    let state =
-      PVM.Ctxt_wrapper.to_node_pvmstate @@ PVM.Ctxt_wrapper.to_imm state
-    in
-    let eval_state =
+    let state_info =
       {
-        state;
         state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
         tick = final_tick;
         inbox_level;
@@ -606,7 +596,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
         remaining_messages;
       }
     in
-    return {state = eval_state; num_ticks; num_messages}
+    return {state_info; num_ticks; num_messages}
 end
 
 module Free = Make_fueled (Fuel.Free)

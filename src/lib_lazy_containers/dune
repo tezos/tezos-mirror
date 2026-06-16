@@ -7,4 +7,5 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   zarith
-  octez-libs.tree-encoding))
+  octez-libs.tree-encoding
+  octez-libs.riscv-nds-common))

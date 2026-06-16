@@ -32,6 +32,15 @@ pub mod host {
     pub use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
     #[doc(inline)]
     pub use tezos_smart_rollup_host::Error as HostError;
+
+    #[doc(inline)]
+    pub use tezos_smart_rollup_host::reveal::HostReveal;
+
+    #[doc(inline)]
+    pub use tezos_smart_rollup_host::storage::StorageV1;
+
+    #[doc(inline)]
+    pub use tezos_smart_rollup_host::wasm::WasmHost;
 }
 
 /// Lowest level definitions of host functions & associated constants.
@@ -53,7 +62,7 @@ pub mod prelude {
     //!
     //! #[entrypoint::main]
     //! fn kernel_run(host: &mut impl Runtime) {
-    //!   debug_msg!(host, "Hello, world!");
+    //!   debug_msg!("Hello, world!");
     //! }
     //!
     //! # use tezos_smart_rollup::testing::prelude::MockHost;
@@ -63,7 +72,6 @@ pub mod prelude {
     pub use crate::entrypoint;
     #[cfg(feature = "debug_alloc")]
     pub use tezos_smart_rollup_debug::debug_msg;
-    #[cfg(not(feature = "debug_alloc"))]
     pub use tezos_smart_rollup_debug::debug_str;
     pub use tezos_smart_rollup_host::runtime::Runtime;
 }

@@ -32,6 +32,14 @@ type genesis_info = Metadata.genesis_info = {
   commitment_hash : Commitment.Hash.t;
 }
 
+type context_status = Valid | Dirty
+
+type context_state = {
+  ctxt : Context.rw;
+  status : context_status;
+  block : Layer1.header;
+}
+
 type 'a store = 'a Store.t constraint 'a = [< `Read | `Write > `Read]
 
 module Node_store = struct
@@ -102,7 +110,7 @@ type 'a t = {
   unsafe_patches : Pvm_patches.t;
   lockfile : Lwt_unix.file_descr;
   store : 'store store;
-  context : 'context Context.t;
+  context : 'context Context.index;
   lcc : lcc Reference.rw;
   lpc : Commitment.t option Reference.rw;
   private_info : private_info option Reference.rw;
@@ -114,6 +122,8 @@ type 'a t = {
   sync : sync_info;
 }
   constraint 'a = < store : 'store ; context : 'context >
+  constraint 'store = [< `Read | `Write > `Read]
+  constraint 'context = [< `Read | `Write > `Read]
 
 type rw = < store : [`Read | `Write] ; context : [`Read | `Write] > t
 
@@ -159,23 +169,39 @@ let processing_lockfile_path ~data_dir =
 
 let gc_lockfile_path ~data_dir = Filename.concat data_dir "gc_lock"
 
-let checkout_context node_ctxt block_hash =
+let commit_context node_ctxt ~level:_ ~commitment ctxt =
+  let open Lwt_result_syntax in
+  let do_commit =
+    match node_ctxt.config.commit_on with
+    | Block -> true
+    | Commitment -> commitment
+  in
+  if not do_commit then return_none
+  else
+    let*! hash = Context.commit ctxt in
+    return_some hash
+
+let checkout_committed_context node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* context_hash = Store.L2_blocks.find_context node_ctxt.store block_hash in
-  let*? context_hash =
-    let open Result_syntax in
-    match context_hash with
-    | None ->
-        tzfail (Rollup_node_errors.Cannot_checkout_context (block_hash, None))
-    | Some context -> return context
-  in
-  let*! ctxt = Context.checkout node_ctxt.context context_hash in
-  match ctxt with
-  | None ->
-      tzfail
-        (Rollup_node_errors.Cannot_checkout_context
-           (block_hash, Some context_hash))
+  match context_hash with
+  | None -> return_none
+  | Some context_hash -> (
+      let*! ctxt = Context.checkout node_ctxt.context context_hash in
+      match ctxt with
+      | None ->
+          tzfail
+            (Rollup_node_errors.Cannot_checkout_context
+               (block_hash, Some context_hash))
+      | Some ctxt -> return_some ctxt)
+
+let checkout_context node_ctxt block_hash =
+  let open Lwt_result_syntax in
+  let* committed = checkout_committed_context node_ctxt block_hash in
+  match committed with
   | Some ctxt -> return ctxt
+  | None ->
+      tzfail (Rollup_node_errors.Cannot_checkout_context (block_hash, None))
 
 let dal_supported node_ctxt =
   node_ctxt.dal_cctxt <> None
@@ -245,6 +271,9 @@ let save_level {store; _} Layer1.{hash; level} =
 let save_l2_block {store; _} (head : Sc_rollup_block.t) =
   Store.L2_blocks.store store head
 
+let find_pvm_status {store; _} block_hash =
+  Store.L2_blocks.find_pvm_status store block_hash
+
 let notify_processed_tezos_level node_ctxt level =
   node_ctxt.sync.processed_level <- level ;
   Lwt_watcher.notify node_ctxt.sync.sync_level_input level
@@ -267,6 +296,14 @@ let is_processed {store; _} head =
 
 let last_processed_head_opt {store; _} = Store.L2_blocks.find_head store
 
+let last_committed_block {store; _} = Store.L2_blocks.find_last_committed store
+
+let find_previous_committed_block {store; _} level =
+  Store.L2_blocks.find_previous_committed store level
+
+let get_l2_blocks_by_level_range {store; _} ~from_level ~to_level =
+  Store.L2_blocks.find_by_level_range store ~from_level ~to_level
+
 let find_l2_block {store; _} block_hash = Store.L2_blocks.find store block_hash
 
 let get_l2_block node_ctxt block_hash =
@@ -277,18 +314,15 @@ let get_l2_block node_ctxt block_hash =
       failwith "Could not retrieve L2 block for %a" Block_hash.pp block_hash
   | Some block -> return block
 
+let find_l2_block_by_level {store; _} level =
+  Store.L2_blocks.find_by_level store level
+
 let get_l2_block_by_level node_ctxt level =
   let open Lwt_result_syntax in
-  Error.trace_lwt_result_with "Could not retrieve L2 block at level %ld" level
-  @@ let* block_hash = hash_of_level node_ctxt level in
-     get_l2_block node_ctxt block_hash
-
-let find_l2_block_by_level node_ctxt level =
-  let open Lwt_result_syntax in
-  let* block_hash = hash_of_level_opt node_ctxt level in
-  match block_hash with
-  | None -> return_none
-  | Some block_hash -> find_l2_block node_ctxt block_hash
+  let* block = find_l2_block_by_level node_ctxt level in
+  match block with
+  | None -> failwith "Could not retrieve L2 block for level %ld" level
+  | Some block -> return block
 
 let set_finalized node_ctxt hash level =
   let open Lwt_result_syntax in
@@ -800,7 +834,6 @@ let protocol_of_level_with_store (store : _ Store.t) level =
         {protocol; proto_level; first_level_of_protocol = level = Int32.succ l}
 
 let protocol_of_level node_ctxt level =
-  assert (level >= node_ctxt.genesis_info.level) ;
   protocol_of_level_with_store node_ctxt.store level
 
 let last_seen_protocol node_ctxt =
@@ -1019,6 +1052,9 @@ let first_available_level node_ctxt =
   let open Lwt_result_syntax in
   let+ last_gc_target = Store.State.Last_gc_target.get node_ctxt.store in
   Option.value last_gc_target ~default:node_ctxt.genesis_info.level
+
+let first_committed_block node_ctxt =
+  Store.L2_blocks.find_first_committed node_ctxt.store
 
 let get_last_context_split_level node_ctxt =
   Store.State.Last_context_split.get node_ctxt.store

@@ -14,7 +14,6 @@
 extern crate alloc;
 extern crate tezos_crypto_rs as crypto;
 
-#[cfg(feature = "dal")]
 pub mod dal;
 pub mod inbox;
 pub mod storage;
@@ -35,8 +34,13 @@ use thiserror::Error;
 
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
+#[cfg(feature = "debug")]
+use tezos_smart_rollup_debug::debug_str;
 use tezos_smart_rollup_encoding::inbox::{InboxMessage, InternalInboxMessage, Transfer};
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use transactions::external_inbox::ProcessExtMsgError;
 use transactions::process::execute_one_operation;
 use transactions::store::{CACHED_MESSAGES_STORE_PREFIX, DAL_PAYLOAD_PATH};
@@ -65,16 +69,16 @@ impl TryFrom<MichelsonPair<MichelsonString, StringTicket>> for InboxDeposit {
 #[cfg_attr(feature = "tx-kernel", entrypoint::main)]
 pub fn transactions_run<Host>(host: &mut Host)
 where
-    Host: Runtime,
+    Host: StorageV1 + WasmHost + HostReveal,
 {
     #[cfg(feature = "debug")]
-    host.write_debug("======\nTX: Entry\n======\n");
+    debug_str!("======\nTX: Entry\n======\n");
 
     let mut account_storage = match init_account_storage() {
         Ok(v) => v,
         Err(_err) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Could not get account storage: {:?}\n", _err);
+            debug_msg!("Could not get account storage: {:?}\n", _err);
             return;
         }
     };
@@ -82,60 +86,55 @@ where
     let metadata = host.reveal_metadata();
 
     #[cfg(feature = "debug")]
-    debug_msg!(host, "TX: Metadata {metadata:?}\n");
+    debug_msg!("TX: Metadata {metadata:?}\n");
 
     let rollup_address = metadata.address();
     let mut counter = 0;
 
     if let Ok(Some(ValueType::Subtree)) = host.store_has(&CACHED_MESSAGES_STORE_PREFIX) {
         #[cfg(feature = "debug")]
-        debug_msg!(host, "Found cached messages, processing\n");
+        debug_msg!("Found cached messages, processing\n");
         if let Err(_err) = execute_one_operation(host, &mut account_storage) {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Error enumerating cached header payload {}", _err);
+            debug_msg!("Error enumerating cached header payload {}", _err);
         }
         return;
     } else if let Ok(data) = host.store_read_all(&DAL_PAYLOAD_PATH) {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6393
         // Enable processing DAL payload incrementally with reboots.
         #[cfg(feature = "debug")]
-        debug_msg!(host, "Found cached DAL payload, processing\n");
+        debug_msg!("Found cached DAL payload, processing\n");
         match ParsedBatch::parse(&data) {
             Ok((_, batch)) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "Process parsed batch {:?}\n", batch);
+                debug_msg!("Process parsed batch {:?}\n", batch);
                 for withdrawals in process_batch_message(host, &mut account_storage, batch) {
                     process_withdrawals(host, withdrawals)
                 }
             }
             Err(_e) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "Failed to parse DAL payload. Error: {:?}\n", _e);
+                debug_msg!("Failed to parse DAL payload. Error: {:?}\n", _e);
             }
         }
         match host.store_delete(&DAL_PAYLOAD_PATH) {
             Ok(()) => {}
             Err(_e) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(
-                    host,
-                    "Failed to delete processed DAL payload. Error: {:?}\n",
-                    _e
-                );
+                debug_msg!("Failed to delete processed DAL payload. Error: {:?}\n", _e);
             }
         }
         return;
     }
 
     #[cfg(feature = "debug")]
-    host.write_debug("Filtering inbox messages...\n");
+    debug_str!("Filtering inbox messages...\n");
     let mut reboot = false;
 
     while let Ok(Some(message)) = host.read_input() {
         reboot = true;
         #[cfg(feature = "debug")]
         debug_msg!(
-            host,
             "Processing MessageData {} at level {}\n",
             message.id,
             message.level
@@ -150,20 +149,20 @@ where
             &rollup_address,
         ) {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Error processing header payload {}\n", _err);
+            debug_msg!("Error processing header payload {}\n", _err);
         }
     }
 
     #[cfg(feature = "debug")]
-    host.write_debug("Finished filtering\n");
+    debug_str!("Finished filtering\n");
 
     if reboot {
         #[cfg(feature = "debug")]
-        host.write_debug("Reboot for cached mesages\n");
+        debug_str!("Reboot for cached mesages\n");
 
         if let Err(_e) = host.mark_for_reboot() {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Could not mark host for reboot: {}\n", _e);
+            debug_msg!("Could not mark host for reboot: {}\n", _e);
         }
     }
 }
@@ -186,14 +185,17 @@ enum TransactionError<'a> {
     CacheMessage(RuntimeError),
 }
 
-fn filter_inbox_message<'a, Host: Runtime>(
+fn filter_inbox_message<'a, Host>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
     _inbox_level: u32,
     inbox_message: &'a [u8],
     counter: &mut u32,
     rollup_address: &SmartRollupHash,
-) -> Result<(), TransactionError<'a>> {
+) -> Result<(), TransactionError<'a>>
+where
+    Host: StorageV1 + HostReveal,
+{
     let (remaining, message) = InboxMessage::<
         MichelsonPair<MichelsonString, Ticket<MichelsonString>>,
     >::parse(inbox_message)
@@ -202,7 +204,7 @@ fn filter_inbox_message<'a, Host: Runtime>(
     match message {
         InboxMessage::Internal(_msg @ InternalInboxMessage::StartOfLevel) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "InboxMetadata: {}\n", _msg);
+            debug_msg!("InboxMetadata: {}\n", _msg);
             #[cfg(feature = "dal")]
             {
                 // TODO: https://gitlab.com/tezos/tezos/-/issues/6270
@@ -216,7 +218,7 @@ fn filter_inbox_message<'a, Host: Runtime>(
                 let published_level = (_inbox_level - attestation_lag - import_extra_delay) as i32;
                 // TODO: https://gitlab.com/tezos/tezos/-/issues/6400
                 // Make it possible to track multiple slot indexes.
-                let slot_index = storage::dal::get_or_set_slot_index(host, 0 as u8)?;
+                let slot_index = storage::dal::get_or_set_slot_index(host, 0)?;
                 dal::store_dal_slot(
                     host,
                     published_level,
@@ -236,7 +238,6 @@ fn filter_inbox_message<'a, Host: Runtime>(
             if rollup_address != destination.hash() {
                 #[cfg(feature = "debug")]
                 debug_msg!(
-                    host,
                     "Skipping message: Internal message targets another rollup. Expected: {}. Found: {}",
                     rollup_address,
                     destination.hash()
@@ -254,11 +255,26 @@ fn filter_inbox_message<'a, Host: Runtime>(
             Ok(())
         }
 
+        #[cfg(feature = "proto-alpha")]
         InboxMessage::Internal(
-            _msg @ (InternalInboxMessage::EndOfLevel | InternalInboxMessage::InfoPerLevel(..)),
+            _msg @ (InternalInboxMessage::EndOfLevel
+            | InternalInboxMessage::InfoPerLevel(..)
+            | InternalInboxMessage::ProtocolMigration(..)
+            | InternalInboxMessage::DalAttestedSlots(..)),
         ) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "InboxMetadata: {}\n", _msg);
+            debug_msg!("InboxMetadata: {}\n", _msg);
+            Ok(())
+        }
+
+        #[cfg(not(feature = "proto-alpha"))]
+        InboxMessage::Internal(
+            _msg @ (InternalInboxMessage::EndOfLevel
+            | InternalInboxMessage::InfoPerLevel(..)
+            | InternalInboxMessage::ProtocolMigration(..)),
+        ) => {
+            #[cfg(feature = "debug")]
+            debug_msg!("InboxMetadata: {}\n", _msg);
             Ok(())
         }
 
@@ -273,7 +289,6 @@ fn filter_inbox_message<'a, Host: Runtime>(
                     if &rollup_address != address.hash() {
                         #[cfg(feature = "debug")]
                         debug_msg!(
-                            host,
                             "Skipping message: External message targets another rollup. Expected: {}. Found: {}",
                             rollup_address,
                             address.hash()
@@ -329,6 +344,7 @@ mod test {
     use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_host::path::OwnedPath;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_mock::MockHost;
     use tezos_smart_rollup_mock::TransferMetadata;
 
@@ -414,8 +430,8 @@ mod test {
     }
 
     fn ticket_amount(mock_host: &MockHost, account: &ContractTz1Hash, ticket_id: u64) -> u64 {
-        let ticket_path = OwnedPath::try_from(format!("/accounts/{}/{}", account, ticket_id))
-            .expect("Invalid path");
+        let ticket_path =
+            OwnedPath::try_from(format!("/accounts/{account}/{ticket_id}")).expect("Invalid path");
 
         mock_host
             .store_read(&ticket_path, 0, MAX_FILE_CHUNK_SIZE)

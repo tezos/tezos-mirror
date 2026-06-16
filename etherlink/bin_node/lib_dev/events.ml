@@ -119,6 +119,26 @@ let ignored_preconfirmations =
     ~level:Warning
     ()
 
+let assemble_block_diverged =
+  declare_1
+    ~section
+    ~name:"assemble_block_diverged"
+    ~msg:
+      "Assemble block diverged on level {level}, node is going to re-execute \
+       the full blueprint"
+    ~level:Warning
+    ("level", Data_encoding.n)
+
+let seq_block_hash_missing =
+  declare_1
+    ~section
+    ~name:"seq_block_hash_missing"
+    ~msg:
+      "Assemble block can not validate its output for levl {level} because \
+       sequencer block hash is missing"
+    ~level:Warning
+    ("level", Data_encoding.n)
+
 let catching_up_evm_event =
   Internal_event.Simple.declare_2
     ~section
@@ -176,6 +196,15 @@ let event_private_server_is_ready =
     ~pp4:(fun fmt b ->
       (if b then Format.fprintf else Format.ifprintf) fmt "(websockets enabled)")
 
+let drift_monitor_is_ready =
+  declare_1
+    ~section
+    ~name:"drift_monitor_is_ready"
+    ~msg:"the drift monitor is ready, initial drift is {drift}"
+    ~level:Notice
+    ("drift", Data_encoding.z)
+    ~pp1:Z.pp_print
+
 let event_rpc_server_error =
   declare_1
     ~section
@@ -219,6 +248,14 @@ let event_retrying_connect =
     ~level:Notice
     ("endpoint", Data_encoding.string)
     ("delay", Data_encoding.float)
+
+let event_connection_acquired =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"connection_acquired"
+    ~msg:"connection acquired with {endpoint}"
+    ~level:Notice
+    ("endpoint", Data_encoding.string)
 
 let event_deprecation_note =
   Internal_event.Simple.declare_1
@@ -512,20 +549,32 @@ let multichain_node_singlechain_kernel =
        because the multichain feature is not yet enabled in the rollup"
     ()
 
-let event_next_block_timestamp =
-  Internal_event.Simple.declare_1
+let event_next_block_info =
+  Internal_event.Simple.declare_3
     ~section
-    ~name:"next_block_timestamp"
-    ~msg:"received timestamp of the next block {timestamp}"
-    ~level:Notice
+    ~name:"next_block_info"
+    ~msg:
+      "{op} info for the next block: level = {level}, timestamp = {timestamp}"
+    ~level:Debug
+    ("op", Data_encoding.string)
+    ("level", Ethereum_types.quantity_encoding)
     ("timestamp", Time.Protocol.encoding)
 
 let event_tx_inclusion =
-  Internal_event.Simple.declare_1
+  Internal_event.Simple.declare_2
     ~section
     ~name:"inclusion"
-    ~msg:"received inclusion confirmation for the transaction {txn_hash}"
-    ~level:Notice
+    ~msg:"{op} inclusion confirmation for the transaction {txn_hash}"
+    ~level:Debug
+    ("op", Data_encoding.string)
+    ("txn_hash", Ethereum_types.hash_encoding)
+
+let single_tx_execution_done =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"single_tx_execution_done"
+    ~msg:"single transaction execution done for {txn_hash}"
+    ~level:Debug
     ("txn_hash", Ethereum_types.hash_encoding)
 
 let patched_sequencer_key =
@@ -538,6 +587,25 @@ let patched_sequencer_key =
     ~pp2:Signature.Public_key_hash.pp
     ("pk", Signature.Public_key.encoding)
     ("pkh", Signature.Public_key_hash.encoding)
+
+let background_task_error =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"background_task_error"
+    ~msg:"background task {name} failed with error {error}"
+    ~level:Fatal
+    ("name", Data_encoding.string)
+    ("error", Data_encoding.string)
+
+let forced_native_execution_instant_confirmation =
+  Internal_event.Simple.declare_0
+    ~section
+    ~name:"instant_confirmation_requires_native_execution"
+    ~msg:
+      "instant confirmation is enabled, forcing native execution policy to \
+       `always`"
+    ~level:Warning
+    ()
 
 let received_upgrade payload = emit received_upgrade payload
 
@@ -571,6 +639,10 @@ let ignored_periodic_snapshot () = emit ignored_periodic_snapshot ()
 
 let ignored_preconfirmations () = emit ignored_preconfirmations ()
 
+let assemble_block_diverged level = emit assemble_block_diverged level
+
+let seq_block_hash_missing level = emit seq_block_hash_missing level
+
 let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
 
 let is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
@@ -581,8 +653,13 @@ let spawn_rpc_is_ready () = emit spawn_rpc_is_ready ()
 let private_server_is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
   emit event_private_server_is_ready (rpc_addr, rpc_port, backend, websockets)
 
+let drift_monitor_is_ready drift = emit drift_monitor_is_ready drift
+
 let rpc_server_error exn =
   emit__dont_wait__use_with_care event_rpc_server_error (Printexc.to_string exn)
+
+let background_task_error ~name exn =
+  emit background_task_error (name, Printexc.to_string exn)
 
 let shutdown_rpc_server ~private_ =
   emit (event_shutdown_rpc_server ~private_) ()
@@ -604,6 +681,9 @@ let event_kernel_log ~level ~kind ~msg =
 
 let retrying_connect ~endpoint ~delay =
   emit event_retrying_connect (Uri.to_string endpoint, delay)
+
+let connection_acquired ~endpoint =
+  emit event_connection_acquired (Uri.to_string endpoint)
 
 let preload_kernel commit = emit preload_kernel commit
 
@@ -669,9 +749,20 @@ let replicate_transaction_dropped hash reason =
 let replicate_operation_dropped hash reason =
   emit replicate_operation_dropped (hash, reason)
 
-let next_block_timestamp t = emit event_next_block_timestamp t
+let next_block_info timestamp level =
+  emit event_next_block_info ("received", level, timestamp)
 
-let inclusion t = emit event_tx_inclusion t
+let inclusion hash = emit event_tx_inclusion ("received", hash)
+
+let sent_next_block_info timestamp level =
+  emit event_next_block_info ("sent", level, timestamp)
+
+let sent_inclusion hash = emit event_tx_inclusion ("sent", hash)
+
+let single_tx_execution_done hash = emit single_tx_execution_done hash
 
 let patched_sequencer_key pk =
   emit patched_sequencer_key (pk, Signature.Public_key.hash pk)
+
+let forced_native_execution_instant_confirmation () =
+  emit forced_native_execution_instant_confirmation ()

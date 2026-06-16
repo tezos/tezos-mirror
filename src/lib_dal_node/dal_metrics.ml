@@ -93,6 +93,16 @@ module Node_metrics = struct
       ~subsystem
       name
 
+  let slots_unattested =
+    let name = "slots_unattested" in
+    Prometheus.Counter.v_label
+      ~label_name:"slot_index"
+      ~help:
+        "Count of published but unattested slot at index <i> since node started"
+      ~namespace
+      ~subsystem
+      name
+
   let attested_slots_for_baker_per_level_ratio =
     let name = "attested_slot_for_baker_per_level_ratio" in
     Prometheus.Gauge.v_label
@@ -200,6 +210,46 @@ module Node_metrics = struct
     let name = "per_level_processing_time" in
     Prometheus.Gauge.v
       ~help:"Time spent in the new_finalized_head function at each level"
+      ~namespace
+      ~subsystem
+      name
+
+  let slot_attestation_ratio =
+    let name = "slot_attestation_ratio" in
+    Prometheus.Gauge.v_label
+      ~label_name:"slot_index"
+      ~help:
+        "Ratio of attested shards over total shards for each slot at the \
+         current level (between 0.0 and 1.0)"
+      ~namespace
+      ~subsystem
+      name
+
+  let published_slots_per_level =
+    let name = "published_slots_per_level" in
+    Prometheus.Gauge.v
+      ~help:"Number of slots published at the current level"
+      ~namespace
+      ~subsystem
+      name
+
+  (* Custom histogram for attestation lag with buckets matching possible lag values *)
+  module Attestation_lag_histogram = Prometheus.Histogram (struct
+    let spec =
+      let max_attestation_lag = 8 in
+      let lags =
+        Stdlib.List.init max_attestation_lag (fun i -> float_of_int (i + 1))
+      in
+      Prometheus.Histogram_spec.of_list lags
+  end)
+
+  let attestation_lag_distribution =
+    let name = "attestation_lag" in
+    Attestation_lag_histogram.v_label
+      ~label_name:"slot_index"
+      ~help:
+        "Distribution of attestation lags for attested slots (in blocks). Use \
+         histogram_quantile for percentiles, rate for average."
       ~namespace
       ~subsystem
       name
@@ -616,6 +666,14 @@ let slot_attested ~set i =
   let v = float_of_int @@ if set then 1 else 0 in
   Prometheus.Gauge.set (Node_metrics.slots_attested (string_of_int i)) v
 
+let slot_unattested i =
+  Prometheus.Counter.inc_one (Node_metrics.slots_unattested (string_of_int i))
+
+let slot_attested_with_lag ~lag ~slot_index =
+  Node_metrics.Attestation_lag_histogram.observe
+    (Node_metrics.attestation_lag_distribution (string_of_int slot_index))
+    (float_of_int lag)
+
 let attested_slots_for_baker_per_level_ratio ~delegate ratio =
   let attester = Format.asprintf "%a@." Signature.Public_key_hash.pp delegate in
   Prometheus.Gauge.set
@@ -665,6 +723,15 @@ let update_amplification_abort_reconstruction_duration duration =
   Prometheus.DefaultHistogram.observe
     Node_metrics.amplification_abort_reconstruction_duration
     duration
+
+let slot_attestation_ratio ~slot_index ratio =
+  Prometheus.Gauge.set
+    (Node_metrics.slot_attestation_ratio (string_of_int slot_index))
+    ratio
+
+let published_slots_per_level count =
+  float_of_int count
+  |> Prometheus.Gauge.set Node_metrics.published_slots_per_level
 
 let per_level_processing_time =
   Prometheus.Gauge.set Node_metrics.per_level_processing_time

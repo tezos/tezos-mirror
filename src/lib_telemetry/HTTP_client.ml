@@ -8,12 +8,9 @@
 open Tezos_rpc
 open Path
 
-let traceparent_header ({trace_id; span_id; _} : Opentelemetry.Scope.t) =
+let traceparent_header scope =
   ( Opentelemetry.Trace_context.Traceparent.name,
-    Opentelemetry.Trace_context.Traceparent.to_value
-      ~trace_id
-      ~parent_id:span_id
-      () )
+    Traceparent.(from_scope scope |> to_string) )
 
 (* HTTP client span attributes that follow Opentelemetry conventions of
    https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client-span *)

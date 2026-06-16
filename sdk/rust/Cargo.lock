@@ -1136,6 +1136,7 @@ dependencies = [
  "nom",
  "num-bigint",
  "num-traits",
+ "proptest",
  "serde",
  "serde_json",
  "tezos_data_encoding_derive",

@@ -48,6 +48,9 @@ module Delegators_contribution_plugin = struct
     | Secp256k1 x -> Secp256k1 x
     | P256 x -> P256 x
     | Bls x -> Bls x
+    | Mldsa44 x ->
+        Tezos_crypto.Signature.V1.Of_V_latest.get_public_key_hash_exn
+          (Mldsa44 x)
 
   let delegated_breakdown_at_sampling context ~cycle ~delegate_pkh =
     let open Lwt_result_syntax in

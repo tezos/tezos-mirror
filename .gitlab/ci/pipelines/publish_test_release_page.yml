@@ -34,7 +34,7 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 datadog_pipeline_trace:
-  image: datadog/ci:v4.1.0
+  image: datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2
   stage: start
   tags:
   - gcp
@@ -67,17 +67,17 @@ publish:release-page:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/releases/publish_release_page.sh
+  - eval $(opam env)
+  - ./scripts/releases/publish-release-page.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - cp /tmp/release_page*/index.md ./index.md
   variables:
     S3_BUCKET: release-page-test.nomadic-labs.com
     DISTRIBUTION_ID: E19JF46UG3Z747
@@ -86,12 +86,14 @@ publish:release-page:
   artifacts:
     expire_in: 1 day
     paths:
-    - ./index.md
     - index.html
+    - older_releases.html
+    - index.md
+    - older_releases.md
   retry: 0
 
 grafazos.release_page:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -110,7 +112,6 @@ grafazos.release_page:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
-  - sudo apk add aws-cli pandoc
   - ./grafazos/scripts/releases/publish_release_page.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -128,7 +129,7 @@ grafazos.release_page:
   retry: 0
 
 teztale.release_page:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -147,7 +148,6 @@ teztale.release_page:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
-  - sudo apk add aws-cli pandoc
   - ./teztale/scripts/releases/publish_release_page.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -161,5 +161,41 @@ teztale.release_page:
     expire_in: 1 day
     paths:
     - ./index.md
+    - index.html
+  retry: 0
+
+octez-smart-rollup-node.release-page:
+  image: ${ci_image_name}/release-page:${ci_image_tag}
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - ./scripts/rollup_node/releases/publish_release_page.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    S3_BUCKET: release-page-test.nomadic-labs.com
+    DISTRIBUTION_ID: E19JF46UG3Z747
+    AWS_ACCESS_KEY_ID: ${AWS_KEY_RELEASE_PUBLISH}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_RELEASE_PUBLISH}
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - index.md
     - index.html
   retry: 0

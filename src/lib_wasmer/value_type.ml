@@ -23,8 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** WebAssembly value types.
+
+    Uses GADTs to enforce type safety: each WASM value type
+    (i32, i64, f32, f64, anyref, funcref) is mapped to its corresponding
+    OCaml type at compile time. *)
+
 open Api
 
+(** A GADT representing WebAssembly value types, parameterized by
+    the corresponding OCaml type. *)
 type _ t =
   | I32 : int32 t
   | I64 : int64 t
@@ -33,6 +41,7 @@ type _ t =
   | AnyRef : Ref.t t
   | FuncRef : Ref.t t
 
+(** [to_valkind typ] converts a value type to the Wasmer C API kind. *)
 let to_valkind : type a. a t -> Types.Valkind.t = function
   | I32 -> Types.Valkind.i32
   | I64 -> Types.Valkind.i64
@@ -41,8 +50,10 @@ let to_valkind : type a. a t -> Types.Valkind.t = function
   | AnyRef -> Types.Valkind.anyref
   | FuncRef -> Types.Valkind.funcref
 
+(** [to_valtype typ] creates an owned Wasmer valtype pointer. *)
 let to_valtype typ = Functions.Valtype.new_ (to_valkind typ)
 
+(** Raised when a value type does not match the expected type. *)
 exception Type_mismatch of {expected : Types.Valkind.t; got : Types.Valkind.t}
 
 let () =
@@ -55,6 +66,8 @@ let () =
              (Unsigned.UInt8.to_string got))
     | _ -> None)
 
+(** [check typ valtype] asserts that [valtype] matches [typ], raising
+    {!Type_mismatch} otherwise. *)
 let check : type a. a t -> Types.Valtype.t Ctypes.ptr -> unit =
  fun typ valtype ->
   let got = Functions.Valtype.kind valtype in

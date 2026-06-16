@@ -134,7 +134,7 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'doc_gen',
-    'seoul',
+    'tallinn',
 ]
 # TODO tezos/tezos#2170: exclude the active protocol 'NNN' above
 
@@ -299,13 +299,17 @@ linkcheck_ignore = [
     r'^http(s)?://localhost:\d+/?',
     r'^https://grafana\.nomadic-labs\.cloud/',
     r'^https://github\.com/jsonnet-bundler/jsonnet-bundler/',
+    r'^https://medium\.com/metastatedev/meanwhile-at-cryptium-labs-1-part-',
+    r'^https://medium\.com/protofire-blog/recommendations-to-enhance-security-'
+    + 'of-tezos-smart-contracts-d14c0e53a6d3',
+    r'^https://medium\.com/the-cryptonomic-aperiodical/the-magic-and-mystery-'
+    + 'of-the-micheline-binary-format-33bf85699bef',
     # local files, e.g. ../api/api-inline.html#*', \.\./CHANGES.html#version-*
     # (interpreted by linkcheck as external links, generating false positives)
     r'^\.\./',
     # flaky servers, to remove one day if they got more predictable
     r'^https://opentezos\.com/',
     r'^https://crates\.io/crates/tezos-smart-rollup',
-    r'^https://rpc\.ghostnet\.teztnets\.com/chains/main/blocks/',
     r'^https://gitlab\.com/tezos/tezos/-/merge_requests/',
 ]
 linkcheck_allowed_redirects = dict(
@@ -335,6 +339,10 @@ linkcheck_allowed_redirects = dict(
         (
             r'https://ocaml\.org/manual/.*',
             r'https://ocaml\.org/manual/[0-9.]+/.*',
+        ),
+        (
+            r'https://dune\.readthedocs\.io/',
+            r'https://dune\.readthedocs\.io/en/stable',
         ),
         # 2. permanent redidections, maybe fix one day
         (r'https://bitheap\.org/cram/', r'https://github\.com/aiiie/cram'),

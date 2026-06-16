@@ -1,47 +1,74 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 use revm::{
-    primitives::{hex::FromHex, Address, Bytes, KECCAK_EMPTY},
+    primitives::{Address, Bytes, KECCAK_EMPTY},
     state::Bytecode,
 };
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
+
+use crate::error::EvmDbError;
 
 use crate::{
-    custom,
-    helpers::storage::bytes_hash,
     precompiles::constants::{
-        FA_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
-        WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT,
+        ALIAS_FORWARDER_PRECOMPILE_ADDRESS, ALIAS_FORWARDER_SOL_CONTRACT,
+        FA12_WRAPPER_SOL_ADDR, FA12_WRAPPER_SOL_CONTRACT, FA_BRIDGE_SOL_ADDR,
+        FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_ADDR,
+        XTZ_BRIDGE_SOL_CONTRACT,
     },
     storage::{code::CodeStorage, world_state_handler::StorageAccount},
-    Error,
 };
 
-pub fn init_precompile_bytecodes<Host: Runtime>(host: &'_ mut Host) -> Result<(), Error> {
-    init_precompile_bytecode(host, &Address::ZERO, INTERNAL_FORWARDER_SOL_CONTRACT)?;
-    init_precompile_bytecode(host, &WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT)?;
-    init_precompile_bytecode(host, &FA_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_CONTRACT)
+use super::constants::PredeployedContract;
+
+pub fn init_precompile_bytecodes(
+    host: &'_ mut impl StorageV1,
+    tezosx_enabled: bool,
+) -> Result<(), EvmDbError> {
+    init_precompile_bytecode(host, &Address::ZERO, &INTERNAL_FORWARDER_SOL_CONTRACT)?;
+    init_precompile_bytecode(host, &XTZ_BRIDGE_SOL_ADDR, &XTZ_BRIDGE_SOL_CONTRACT)?;
+    init_precompile_bytecode(host, &FA_BRIDGE_SOL_ADDR, &FA_BRIDGE_SOL_CONTRACT)?;
+    if tezosx_enabled {
+        init_precompile_bytecode(
+            host,
+            &ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
+            &ALIAS_FORWARDER_SOL_CONTRACT,
+        )?;
+        init_precompile_bytecode(
+            host,
+            &FA12_WRAPPER_SOL_ADDR,
+            &FA12_WRAPPER_SOL_CONTRACT,
+        )?;
+    }
+    Ok(())
 }
 
-fn init_precompile_bytecode<Host: Runtime>(
-    host: &'_ mut Host,
+fn init_precompile_bytecode(
+    host: &'_ mut impl StorageV1,
     addr: &Address,
-    hex_bytes: &str,
-) -> Result<(), Error> {
+    predeployed: &'static PredeployedContract,
+) -> Result<(), EvmDbError> {
     let mut created_account = StorageAccount::from_address(addr)?;
-    let mut account_info = created_account.info(host).map_err(custom)?;
-    if account_info.code_hash != KECCAK_EMPTY {
+    let mut account_info = created_account.info(host)?;
+
+    if account_info.code_hash == predeployed.code_hash {
         return Ok(());
     }
-    let code = Bytecode::new_legacy(Bytes::from_hex(hex_bytes).map_err(custom)?);
-    let code_hash = bytes_hash(code.original_byte_slice());
-    account_info.code_hash = code_hash;
-    created_account
-        .set_info(host, account_info)
-        .map_err(custom)?;
-    CodeStorage::add(host, code.original_byte_slice(), Some(code_hash))?;
+
+    if account_info.code_hash != KECCAK_EMPTY {
+        CodeStorage::delete(host, &account_info.code_hash)?;
+    }
+
+    let code = Bytecode::new_legacy(Bytes::from_static(predeployed.code));
+    account_info.code_hash = predeployed.code_hash;
+    created_account.set_info(host, account_info)?;
+    CodeStorage::add(
+        host,
+        code.original_byte_slice(),
+        Some(predeployed.code_hash),
+    )?;
+
     Ok(())
 }

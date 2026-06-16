@@ -28,6 +28,8 @@ val to_list : t -> (module Dal_plugin.T) list
     added protocol plugin. *)
 val current_proto_level : t -> int option
 
+val current_proto_parameters : t -> Types.proto_parameters option
+
 type error +=
   | No_plugin_for_level of {level : int32}
   | No_plugin_for_proto of {proto_hash : Protocol_hash.t}
@@ -47,6 +49,10 @@ type error +=
     use-case, just get the plugin for the predecessor of the target level. *)
 val get_plugin_and_parameters_for_level :
   t -> level:int32 -> ((module Dal_plugin.T) * Types.proto_parameters) tzresult
+
+(** [get_proto_level_for_level plugins ~level] returns the proto_level of the
+    plugin registered for the given [level]. *)
+val get_proto_level_for_level : t -> level:int32 -> int tzresult
 
 (** [may_add rpc_ctxt plugins ~first_level ~proto_level] may add to [plugins] a
     new plugin for the protocol with level [proto_level] to be used starting

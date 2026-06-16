@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-# SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023-2026 Functori <contact@functori.com>
 # SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
 # SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 #
@@ -17,9 +17,16 @@ members = [
   "tracing",
   "logging",
   "storage",
+  "michelson-types",
+  "evm-types",
+  "tezosx-journal",
   "revm",
   "revm_evaluation",
   "runtime",
+  "tezosx-constants",
+  "tezosx-interfaces",
+  "tezosx-ethereum-runtime",
+  "tezosx-tezos-runtime",
 ]
 
 [workspace.dependencies]
@@ -49,7 +56,9 @@ nom = { version = "7.1", default-features = false }
 serde = { version = "1.0", features = ["derive", "rc"] }
 
 # ethereum VM
-revm = { version = "33.1.0", default-features = false, features = [ "optional_eip3607" ] }
+revm = { version = "36.0.0", default-features = false, features = [ "optional_eip3607" ] }
+revm-database-interface = { version = "10", default-features = false }
+revm-interpreter = { version = "34.0.0", default-features = false }
 aurora-engine-modexp = { version = "1.0", default-features = false }
 bn = { package = "substrate-bn", version = "0.6", default-features = false }
 
@@ -64,6 +73,9 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 ] }
 
 # kernel crates
+michelson-types = { package = "michelson-types", path = "./michelson-types" }
+evm-types = { package = "evm-types", path = "./evm-types" }
+tezosx-journal = { package = "tezosx-journal", path = "./tezosx-journal" }
 revm-etherlink = { package = "revm-etherlink", path = "./revm" }
 tezos_ethereum = { package = "tezos_ethereum_latest", path = "./ethereum" }
 tezos_tezlink = { package = "tezos_tezlink_latest", path = "./tezos" }
@@ -73,12 +85,16 @@ tezos-tracing = { package = "tezos-tracing-latest", path = "./tracing" }
 tezos-evm-runtime = { package = "tezos-evm-runtime-latest", path = "./runtime" }
 tezos-indexable-storage = { package = "tezos-indexable-storage-latest", path = "./indexable_storage" }
 tezos-storage = { package = "tezos-storage-latest", path = "./storage" }
+tezosx-constants = { package = "tezosx-constants", path = "./tezosx-constants" }
+tezosx-interfaces = { package = "tezosx-interfaces", path = "./tezosx-interfaces" }
+tezosx-ethereum-runtime = { package = "tezosx-ethereum-runtime", path = "./tezosx-ethereum-runtime" }
+tezosx-tezos-runtime = { package = "tezosx-tezos-runtime", path = "./tezosx-tezos-runtime" }
+kernel = { package = "evm_kernel", path = "./kernel"}
 
 # SDK
 # we disable BLS, because we don’t need it and it is a roadblock for the native execution
 tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", default-features = false, features = [
   "std",
-  "crypto",
   "dlmalloc",
   "panic-hook",
   "data-encoding",
@@ -94,10 +110,13 @@ tezos-smart-rollup-encoding = { path = "../../src/kernel_sdk/encoding", default-
   "alloc",
   "tezos-encoding",
   "crypto",
+  "proto-alpha",
 ] }
 tezos-smart-rollup-installer-config = { path = "../../src/kernel_sdk/installer-config" }
 tezos-smart-rollup-mock = { path = "../../src/kernel_sdk/mock" }
 tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
+tezos-smart-rollup-keyspace = { path = "../../src/kernel_sdk/keyspace" }
+tezos-smart-rollup-build-utils = { path = "../../src/kernel_sdk/build-utils" }
 tezos-protocol = { path = "../../sdk/rust/protocol" }
 
 # property based testing
@@ -109,15 +128,19 @@ pretty_assertions = { version = "1.4.0" }
 alloy-sol-types = { version = "1.3.0", default-features = false, features = [
   "json",
 ] }
-alloy-primitives = { version = "1.2.0", default-features = false }
+alloy-primitives = { version = "1.5.0", default-features = false }
 alloy-consensus = { version = "1.0.32", default-features = false }
 
 # mir without bls nor transfer of big maps
 mir = { path = "../../contrib/mir", default-features = false, features = ["allow_lazy_storage_transfer"] }
 typed-arena = "2"
 
+# http
+http = { path = "../../vendors/http" }
+
 # miscs
 format_no_std = "1.2.0"
+cfg-if = "1.0.4"
 
 # kernel execution profiling
 nop-macros = { version = "0.2.0" }

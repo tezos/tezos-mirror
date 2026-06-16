@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Mempool RPC",
     "description": "The RPC API for the mempool served by the Octez node.",
-    "version": "Octez 2223.0~rc1+dev (00bee1ae)"
+    "version": "Octez 24.0~rc1+dev (build: 0) (991d8266)"
   },
   "paths": {
     "/ban_operation": {
@@ -221,7 +221,7 @@
                         }
                       },
                       "signature": {
-                        "$ref": "#/components/schemas/Signature.V2"
+                        "$ref": "#/components/schemas/Signature.V3"
                       },
                       "error": {
                         "$ref": "#/components/schemas/error_opt"
@@ -365,7 +365,7 @@
                             }
                           },
                           "signature": {
-                            "$ref": "#/components/schemas/Signature.V2"
+                            "$ref": "#/components/schemas/Signature.V3"
                           }
                         },
                         "required": [
@@ -400,7 +400,7 @@
                             }
                           },
                           "signature": {
-                            "$ref": "#/components/schemas/Signature.V2"
+                            "$ref": "#/components/schemas/Signature.V3"
                           },
                           "error": {
                             "$ref": "#/components/schemas/error"
@@ -440,7 +440,7 @@
                             }
                           },
                           "signature": {
-                            "$ref": "#/components/schemas/Signature.V2"
+                            "$ref": "#/components/schemas/Signature.V3"
                           },
                           "error": {
                             "$ref": "#/components/schemas/error"
@@ -480,7 +480,7 @@
                             }
                           },
                           "signature": {
-                            "$ref": "#/components/schemas/Signature.V2"
+                            "$ref": "#/components/schemas/Signature.V3"
                           },
                           "error": {
                             "$ref": "#/components/schemas/error"
@@ -520,7 +520,7 @@
                             }
                           },
                           "signature": {
-                            "$ref": "#/components/schemas/Signature.V2"
+                            "$ref": "#/components/schemas/Signature.V3"
                           },
                           "error": {
                             "$ref": "#/components/schemas/error"
@@ -560,7 +560,7 @@
                             }
                           },
                           "signature": {
-                            "$ref": "#/components/schemas/Signature.V2"
+                            "$ref": "#/components/schemas/Signature.V3"
                           }
                         },
                         "required": [
@@ -784,7 +784,7 @@
         ]
       },
       "Signature.Public_key": {
-        "title": "A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded)",
+        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded)",
         "oneOf": [
           {
             "$ref": "#/components/schemas/unistring"
@@ -792,15 +792,15 @@
         ]
       },
       "Signature.Public_key_hash": {
-        "title": "A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded)",
+        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash (Base58Check-encoded)",
         "oneOf": [
           {
             "$ref": "#/components/schemas/unistring"
           }
         ]
       },
-      "Signature.V2": {
-        "title": "A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded)",
+      "Signature.V3": {
+        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 signature (Base58Check-encoded)",
         "oneOf": [
           {
             "$ref": "#/components/schemas/unistring"
@@ -869,7 +869,7 @@
             "$ref": "#/components/schemas/alpha.liquidity_baking_vote"
           },
           "signature": {
-            "$ref": "#/components/schemas/Signature.V2"
+            "$ref": "#/components/schemas/Signature.V3"
           }
         },
         "required": [
@@ -1001,7 +1001,7 @@
             "$ref": "#/components/schemas/alpha.inlined.consensus_operation.contents"
           },
           "signature": {
-            "$ref": "#/components/schemas/Signature.V2"
+            "$ref": "#/components/schemas/Signature.V3"
           }
         },
         "required": [
@@ -1781,6 +1781,11 @@
                 "maximum": 65535
               },
               "slot_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "lag_index": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 255

@@ -14,7 +14,7 @@ use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithPro
 use revm_etherlink::inspectors::call_tracer::{
     CallTrace, CallTracerConfig, CallTracerInput,
 };
-use revm_etherlink::inspectors::storage::store_call_trace;
+use revm_etherlink::inspectors::storage::flush_call_traces;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
 use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
 use revm_etherlink::precompiles::constants::{
@@ -459,7 +459,7 @@ fn trace_deposit<Host: Runtime>(
             call_trace.add_logs(Some(logs.to_vec()));
         }
 
-        let _ = store_call_trace(host, &call_trace, &transaction_hash);
+        let _ = flush_call_traces(host, &[call_trace], &transaction_hash);
     }
 }
 

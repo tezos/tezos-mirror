@@ -74,6 +74,24 @@ val flush : info -> head:Block_header.shell_header -> info tzresult Lwt.t
 val syntactic_check :
   Protocol.Alpha_context.packed_operation -> [`Well_formed | `Ill_formed] Lwt.t
 
+(** [equal_modulo_dummy_values data1 data2] compares the protocol [data1] and
+    [data2] disregarding the fields that may have been initialized with a dummy
+    value, namely the [signature], the [payload_hash] and the [proof_of_work nonce].
+
+    This function is used to check if a context resulting from a preapplied
+    block can be used as the final context when applying an "equal" block.
+
+    This equality check is done across multiple fields but will fail if checking
+    that all fields are equal. This is due to the fact that to [preapply] a
+    block, some values are not yet known and need to be replaced with dummy
+    values. When comparing a preapplied block with a block to apply, the values
+    in the block to apply will have been set to a proper value, leading to an
+    inequality if compared with the dummy ones. *)
+val equal_modulo_dummy_values :
+  Protocol.Alpha_context.Block_header.protocol_data ->
+  Protocol.Alpha_context.Block_header.protocol_data ->
+  bool
+
 (** Perform some preliminary checks on an operation.
 
     For manager operations, check that its fee, fee/gas ratio, and

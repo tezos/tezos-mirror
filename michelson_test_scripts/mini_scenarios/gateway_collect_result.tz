@@ -1,0 +1,24 @@
+# Calls the TezosXGateway enshrined contract's %collect_result entrypoint
+# with a fixed payload, depositing the bytes onto the current CRAC frame's
+# result slot.  The calling EVM precompile (http_call) then observes these
+# bytes as the HTTP response body.
+# Storage: pair address bytes
+#   address = gateway KT1
+#   bytes   = payload to deposit via %collect_result
+parameter unit;
+storage (pair address bytes);
+code {
+       CDR;
+       DUP;
+       UNPAIR;
+       CONTRACT %collect_result bytes;
+       ASSERT_SOME;
+       SWAP;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       NIL operation;
+       SWAP;
+       CONS;
+       PAIR
+     };

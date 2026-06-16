@@ -52,10 +52,13 @@ module Helpers = struct
     Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
 
-  let supported_signature_schemes (_ : Protocol.t) =
-    ["ed25519"; "secp256k1"; "p256"; "bls"]
+  let supported_signature_schemes (protocol : Protocol.t) =
+    match protocol with
+    | Alpha -> ["ed25519"; "secp256k1"; "p256"; "bls"; "mldsa44"]
+    | U025 -> ["ed25519"; "secp256k1"; "p256"; "bls"; "mldsa44"]
+    | T024 | S023 -> ["ed25519"; "secp256k1"; "p256"; "bls"]
 
-  let airdrop_and_reveal client accounts =
+  let airdrop_and_reveal ?(without_checks = false) client accounts =
     Log.info "Airdrop 1000tz to each account" ;
     let batches =
       Ezjsonm.list
@@ -75,18 +78,25 @@ module Helpers = struct
         client
     in
     let* () = Client.bake_for_and_wait client in
-    let* balances =
-      Lwt_list.map_p
-        (fun account ->
-          let* balance = get_balance account.Account.public_key_hash client in
-          return (account.alias, balance))
-        accounts
+    let* () =
+      if without_checks then unit
+      else
+        let* balances =
+          Lwt_list.map_p
+            (fun account ->
+              let* balance =
+                get_balance account.Account.public_key_hash client
+              in
+              return (account.alias, balance))
+            accounts
+        in
+        List.iter
+          (fun (alias, balance) ->
+            Check.((Tez.to_string balance = "1000") string)
+              ~error_msg:(sf "%s has balance %%L instead of %%R" alias))
+          balances ;
+        unit
     in
-    List.iter
-      (fun (alias, balance) ->
-        Check.((Tez.to_string balance = "1000") string)
-          ~error_msg:(sf "%s has balance %%L instead of %%R" alias))
-      balances ;
     Log.info "Revealing public keys" ;
     let* () =
       Lwt_list.iter_p
@@ -473,36 +483,6 @@ module Transfer = struct
     in
     Lwt_list.iter_s test_batch_transfer accounts
 
-  let forbidden_set_delegate_tz4 =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"Set delegate forbidden on tz4"
-      ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
-    @@ fun protocol ->
-    let* parameter_file =
-      Protocol.write_parameter_file
-        ~base:(Right (protocol, None))
-        [(["allow_tz4_delegate_enable"], `Bool false)]
-    in
-    let* _node, client =
-      Client.init_with_protocol `Client ~parameter_file ~protocol ()
-    in
-    let* () =
-      let Account.{alias; secret_key; _} = Constant.tz4_account in
-      Client.import_secret_key client ~alias secret_key
-    in
-    let* () = airdrop_and_reveal client [Constant.tz4_account] in
-    let set_delegate_process =
-      Client.spawn_set_delegate
-        client
-        ~src:Constant.tz4_account.public_key_hash
-        ~delegate:Constant.tz4_account.public_key_hash
-    in
-    let msg =
-      rex "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
-    in
-    Process.check_error set_delegate_process ~exit_code:1 ~msg
-
   let allowed_set_delegate_tz4 =
     Protocol.register_test
       ~__FILE__
@@ -510,14 +490,7 @@ module Transfer = struct
       ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
       ~supports:Protocol.(From_protocol 22)
     @@ fun protocol ->
-    let* parameter_file =
-      Protocol.write_parameter_file
-        ~base:(Right (protocol, None))
-        [(["allow_tz4_delegate_enable"], `Bool true)]
-    in
-    let* _node, client =
-      Client.init_with_protocol `Client ~parameter_file ~protocol ()
-    in
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
     let* () =
       let Account.{alias; secret_key; _} = Constant.tz4_account in
       Client.import_secret_key client ~alias secret_key
@@ -850,7 +823,6 @@ module Transfer = struct
     alias_pkh_source protocols ;
     transfer_tz4 protocols ;
     batch_transfers_tz4 protocols ;
-    forbidden_set_delegate_tz4 protocols ;
     allowed_set_delegate_tz4 protocols ;
     set_delegate_and_stake protocols ;
     set_delegate_and_stake_less_6000 protocols ;
@@ -1169,10 +1141,59 @@ module Gen_keys = struct
     test_gen_keys_testnet protocols
 end
 
+module Media_type = struct
+  open Helpers
+
+  let test_media_type (media_type : Client.media_type) =
+    Protocol.register_test
+      ~__FILE__
+      ~title:
+        (sf
+           "Test media type: %s"
+           (match media_type with
+           | Json -> "Json"
+           | Binary -> "Binary"
+           | Any -> "Any"))
+      ~tags:["client"; "media"; "type"]
+    @@ fun protocol ->
+    let* _node, client =
+      Client.init_with_protocol ~media_type `Client ~protocol ()
+    in
+    Log.info "Generating new accounts" ;
+    let* accounts = gen_accounts protocol client 1 in
+    Log.info "Funding and revealing new accounts" ;
+    let* () =
+      airdrop_and_reveal
+        ~without_checks:true
+        (* To avoid issue with balance RPC results in binary *) client
+        accounts
+    in
+    let test_transfer (from : Account.key) (dest : Account.key) =
+      Log.info "Test transfer from %s to %s" from.alias dest.alias ;
+      let amount = Tez.of_int 1 in
+      let fee = Tez.of_int 1 in
+      Client.transfer
+        ~amount
+        ~giver:from.public_key_hash
+        ~receiver:dest.public_key_hash
+        ~fee
+        client
+    in
+    Lwt_list.iter_s
+      (fun account -> test_transfer account Constant.bootstrap1)
+      accounts
+
+  let register protocols =
+    List.iter
+      (fun media_type -> test_media_type media_type protocols)
+      [Client.Json; Binary; Any]
+end
+
 let register ~protocols =
   Simulation.register protocols ;
   Transfer.register protocols ;
   Dry_run.register protocols ;
   Signatures.register protocols ;
   Account_activation.register protocols ;
-  Gen_keys.register protocols
+  Gen_keys.register protocols ;
+  Media_type.register protocols

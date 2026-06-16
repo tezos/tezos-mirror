@@ -196,7 +196,12 @@ module VM = struct
 
   let init () =
     let () = Log.report "Terraform.VM.init" in
-    Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])
+    Process.run
+      ~env:(String_map.singleton "TF_WORKSPACE" "default")
+      ~name
+      ~color
+      "terraform"
+      (chdir Path.terraform_vm @ ["init"])
 
   let deploy ~auto_approve ~max_run_duration ~machine_type ~disk_type
       ~disk_size_gb ~base_port ~ports_per_vm ~number_of_vms ~docker_image ~os
@@ -347,6 +352,15 @@ module VM = struct
                    ~color
                    "terraform"
                    (chdir Path.terraform_vm @ ["refresh"] @ vars)
+               in
+               (* Delete the Netdata proxy firewall rule before terraform
+                  destroy. This rule is created by gcloud (outside Terraform)
+                  and is attached to the VPC — Terraform cannot destroy the
+                  VPC while the rule exists. *)
+               let* () =
+                 Gcloud.delete_firewall_rule
+                   ~name:(sf "%s-netdata" workspace)
+                   ()
                in
                Process.run
                  ~name

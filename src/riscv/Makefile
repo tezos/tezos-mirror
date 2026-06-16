@@ -26,34 +26,65 @@ SANDBOX_ENABLE_FEATURES ?=
 NIGHTLY_VERSION = nightly-2025-01-30
 
 # Prefix for downloading assets from the riscv-pvm repo
-RISCV_PVM_REPO = https://raw.githubusercontent.com/tezos/riscv-pvm/refs/heads/main
+RISCV_PVM_REPO = "https://raw.githubusercontent.com/tezos/riscv-pvm/$(shell cat 'assets/riscv-pvm.commit')"
+
+ASSETS := \
+  assets/riscv-pvm.commit \
+  assets/riscv-dummy.elf \
+  assets/jstz \
+  assets/jstz_proof_initial \
+  assets/etherlink \
+  assets/etherlink_proof_initial
 
 .PHONY: build
 build:
 	@cargo build --release --workspace $(NATIVE_OPT) $(EXTRA_FLAGS)
 
 # Update checked-in binaries and regression files
-.PHONY: update-assets
-update-assets: assets/riscv-dummy.elf assets/jstz assets/jstz_proof_initial
+.PHONY: update-assets $(ASSETS)
+update-assets: $(ASSETS)
 
 # Update to the latest version of `riscv-pvm`. Assets will be updated accordingly.
+update-riscv-pvm: old_commit = $(shell taplo get "workspace.dependencies.octez-riscv.rev" -f Cargo.toml)
+update-riscv-pvm: new_commit = $(shell cat "assets/riscv-pvm.commit")
+
 .PHONY: update-riscv-pvm
 update-riscv-pvm: update-assets
-	@cargo update octez-riscv
+	@echo "Updating from ${old_commit} to ${new_commit}"
+	@sed -i.bak "s/${old_commit}/${new_commit}/g" Cargo.toml && rm Cargo.toml.bak
+	@cargo update octez-riscv octez-riscv-data octez-riscv-durable-storage
+
+	@$(MAKE) -C "../.." -f "etherlink.mk" update-riscv-pvm
+	@$(MAKE) -C "../../src/rust_deps" update-riscv-pvm
+	@$(MAKE) -C "../../src/rollup_node_rust_deps" update-riscv-pvm
+
+# Update the current commit used for the RISC-V PVM
+assets/riscv-pvm.commit::
+	@curl -H "Accept: application/vnd.github.sha" \
+		-L -o $@ "https://api.github.com/repos/tezos/riscv-pvm/commits/main"
 
 # Update the compiled dummy kernel used in CI tests
 assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
-	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/assets/riscv-dummy.elf
-	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/src/riscv/assets/riscv-dummy.elf.checksum
+	@curl -L -o $@ $(RISCV_PVM_REPO)/assets/riscv-dummy.elf
+	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/assets/riscv-dummy.elf.checksum
 
 # Update the compiled jstz kernel used in CI tests
 assets/jstz assets/jstz.checksum::
-	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/assets/jstz
-	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/src/riscv/assets/jstz.checksum
+	@curl -L -o $@ $(RISCV_PVM_REPO)/assets/jstz
+	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/assets/jstz.checksum
+
+# Update the compiled Etherlink kernel used in CI tests
+assets/etherlink assets/etherlink.checksum::
+	@curl -L -o $@ $(RISCV_PVM_REPO)/assets/etherlink
+	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/assets/etherlink.checksum
 
 # Update the serialised proof for the initial tick of jstz used in the CI tests
 assets/jstz_proof_initial:
-	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/lib/tests/expected/jstz/proof_initial
+	@curl -L -o $@ $(RISCV_PVM_REPO)/pvm/tests/expected/jstz/proof_initial
+
+# Update the serialised proof for the initial tick of Etherlink used in the CI tests
+assets/etherlink_proof_initial:
+	@curl -L -o $@ $(RISCV_PVM_REPO)/pvm/tests/expected/etherlink/proof_initial
 
 .PHONY: build-deps
 build-deps:
@@ -66,8 +97,10 @@ ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
 
-	# Install Nightly for formatting with its Rustfmt, and running Miri
-	@rustup toolchain install $(NIGHTLY_VERSION) -c rustfmt miri rust-src
+	# Install Nightly for formatting with its Rustfmt, and running Miri.
+	# Pass components as one comma-separated -c value (rustup 1.28+); otherwise
+	# "miri" is parsed as a second toolchain name.
+	@rustup toolchain install $(NIGHTLY_VERSION) -c rustfmt,miri,rust-src
 
 	# Iterate through all the toolchains. 'rustup show' (before Rustup 1.28) and
 	# 'rustup toolchain install' (Rustup 1.28+) will install the toolchain.
@@ -99,3 +132,6 @@ audit:
 .PHONY: clean
 clean:
 	@cargo clean
+
+# Always need to update assets/riscv-pvm.commit first
+.NOTPARALLEL: update-assets

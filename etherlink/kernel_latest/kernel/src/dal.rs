@@ -7,9 +7,7 @@ use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use primitive_types::U256;
 use rlp::{DecoderError, PayloadInfo};
 use tezos_evm_logging::{log, Level::*};
-use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
-
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::reveal::HostReveal;
 
 const TAG_SIZE: usize = 1;
 
@@ -24,9 +22,10 @@ enum ParsedInput {
 }
 
 // Import all the pages of a DAL slot and concatenate them.
-fn import_dal_slot<Host: Runtime>(
-    host: &mut Host,
-    params: &RollupDalParameters,
+fn import_dal_slot(
+    host: &mut impl HostReveal,
+    slot_size: u64,
+    page_size: u64,
     published_level: u32,
     slot_index: u8,
 ) -> Option<Vec<u8>> {
@@ -36,10 +35,10 @@ fn import_dal_slot<Host: Runtime>(
     if published_level > i32::MAX as u32 {
         return None;
     }
-    let page_size = params.page_size as usize;
-    let slot_size = params.slot_size as usize;
-    let mut slot: Vec<u8> = vec![0u8; slot_size];
-    let number_of_pages = (params.slot_size / params.page_size) as i16;
+    let page_size_usize = page_size as usize;
+    let slot_size_usize = slot_size as usize;
+    let mut slot: Vec<u8> = vec![0u8; slot_size_usize];
+    let number_of_pages = (slot_size / page_size) as i16;
     let mut page_start = 0usize;
     for page_index in 0..number_of_pages {
         let imported_page_len = host
@@ -47,10 +46,10 @@ fn import_dal_slot<Host: Runtime>(
                 published_level as i32,
                 slot_index,
                 page_index,
-                &mut slot[page_start..page_start + page_size],
+                &mut slot[page_start..page_start + page_size_usize],
             )
             .unwrap_or(0);
-        if imported_page_len == page_size {
+        if imported_page_len == page_size_usize {
             page_start += imported_page_len
         } else {
             return None;
@@ -70,8 +69,7 @@ fn rlp_length(data: &[u8]) -> Result<usize, DecoderError> {
     Result::Ok(header_len + value_len)
 }
 
-fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
-    host: &mut Host,
+fn parse_unsigned_sequencer_blueprint(
     bytes: &[u8],
     next_blueprint_number: &U256,
 ) -> (Option<ParsedInput>, usize) {
@@ -92,13 +90,12 @@ fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
             SequencerBlueprintRes::Unparsable => (None, chunk_length + TAG_SIZE),
         }
     } else {
-        log!(host, Debug, "Read an invalid chunk from slot.");
+        log!(Debug, "Read an invalid chunk from slot.");
         (None, TAG_SIZE)
     }
 }
 
-fn parse_input<Host: Runtime>(
-    host: &mut Host,
+fn parse_input(
     bytes: &[u8],
     next_blueprint_number: &U256,
 ) -> (Option<ParsedInput>, usize) {
@@ -110,11 +107,10 @@ fn parse_input<Host: Runtime>(
         DAL_PADDING_TAG => (Some(ParsedInput::Padding), TAG_SIZE),
         DAL_BLUEPRINT_INPUT_TAG => {
             let bytes = &bytes[TAG_SIZE..];
-            parse_unsigned_sequencer_blueprint(host, bytes, next_blueprint_number)
+            parse_unsigned_sequencer_blueprint(bytes, next_blueprint_number)
         }
         invalid_tag => {
             log!(
-                host,
                 Debug,
                 "DAL slot contains an invalid message tag: '{}'.",
                 invalid_tag
@@ -125,8 +121,7 @@ fn parse_input<Host: Runtime>(
     }
 }
 
-fn parse_slot<Host: Runtime>(
-    host: &mut Host,
+fn parse_slot(
     slot: &[u8],
     next_blueprint_number: &U256,
 ) -> Vec<UnsignedSequencerBlueprint> {
@@ -148,8 +143,7 @@ fn parse_slot<Host: Runtime>(
         if offset >= slot.len() {
             return buffer;
         };
-        let (next_input, length) =
-            parse_input(host, &slot[offset..], next_blueprint_number);
+        let (next_input, length) = parse_input(&slot[offset..], next_blueprint_number);
 
         match next_input {
             None => return buffer, // Once an unparsable input has been read,
@@ -166,16 +160,21 @@ fn parse_slot<Host: Runtime>(
     }
 }
 
-pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
+pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host>(
     host: &mut Host,
-    params: &RollupDalParameters,
+    slot_size: u64,
+    page_size: u64,
     next_blueprint_number: &U256,
     slot_index: u8,
     published_level: u32,
-) -> Option<Vec<UnsignedSequencerBlueprint>> {
-    if let Some(slot) = import_dal_slot(host, params, published_level, slot_index) {
+) -> Option<Vec<UnsignedSequencerBlueprint>>
+where
+    Host: HostReveal,
+{
+    if let Some(slot) =
+        import_dal_slot(host, slot_size, page_size, published_level, slot_index)
+    {
         log!(
-            host,
             Debug,
             "DAL slot at level {} and index {} successfully imported",
             published_level,
@@ -186,9 +185,8 @@ pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
         // size, we need to remove this padding before parsing the
         // slot as a blueprint chunk.
 
-        let chunks = parse_slot(host, &slot, next_blueprint_number);
+        let chunks = parse_slot(&slot, next_blueprint_number);
         log!(
-            host,
             Debug,
             "DAL slot successfully parsed as {} unsigned blueprint chunks",
             chunks.len()
@@ -196,7 +194,6 @@ pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
         Some(chunks)
     } else {
         log!(
-            host,
             Debug,
             "Slot {} at level {} is invalid",
             slot_index,
@@ -215,11 +212,14 @@ pub mod tests {
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_host::runtime::Runtime;
+    use tezos_smart_rollup_host::reveal::HostReveal;
 
     use crate::{
         block::GENESIS_PARENT_HASH,
-        sequencer_blueprint::{BlueprintWithDelayedHashes, UnsignedSequencerBlueprint},
+        sequencer_blueprint::{
+            BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
+            LATEST_BLUEPRINT_VERSION,
+        },
     };
 
     use super::{fetch_and_parse_sequencer_blueprint_from_dal, DAL_BLUEPRINT_INPUT_TAG};
@@ -264,6 +264,7 @@ pub mod tests {
             .collect();
         let timestamp = Timestamp::from(123456);
         BlueprintWithDelayedHashes {
+            version: LATEST_BLUEPRINT_VERSION,
             timestamp,
             transactions,
             parent_hash: GENESIS_PARENT_HASH,
@@ -363,7 +364,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &0.into(),
             0,
             published_level,
@@ -403,7 +405,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &0.into(),
             0,
             published_level,
@@ -469,7 +472,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &0.into(),
             0,
             published_level,
@@ -547,7 +551,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &0.into(),
             0,
             published_level,
@@ -561,7 +566,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &0.into(),
             0,
             published_level,
@@ -595,7 +601,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &next_blueprint_number,
             0,
             published_level,

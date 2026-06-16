@@ -93,6 +93,9 @@
   (select PtTALLiN_machine.ml from
    (octez-protocol-024-PtTALLiN-libs.client -> PtTALLiN_machine.real.ml)
    (-> PtTALLiN_machine.no.ml))
+  (select PsUshuai_machine.ml from
+   (octez-protocol-025-PsUshuai-libs.client -> PsUshuai_machine.real.ml)
+   (-> PsUshuai_machine.no.ml))
   (select alpha_machine.ml from
    (octez-protocol-alpha-libs.client -> alpha_machine.real.ml)
    (-> alpha_machine.no.ml)))
@@ -126,20 +129,6 @@
     PtTALLiN_machine.real.ml))))
 
 (rule
- (target PtSeouLo_machine.real.ml)
- (mode fallback)
- (deps next_machine.real.ml)
- (action
-  (progn
-   (copy next_machine.real.ml PtSeouLo_machine.real.ml)
-   (run
-    sed
-    -i.bak -e s/Tezos_client_next/Tezos_client_PtSeouLo/g -e
-    s/Tezos_protocol_next/Tezos_protocol_PtSeouLo/g -e
-    s/Tezos_protocol_plugin_next/Tezos_protocol_plugin_PtSeouLo/g
-    PtSeouLo_machine.real.ml))))
-
-(rule
  (target next_machine.real.ml)
  (mode fallback)
  (deps alpha_machine.real.ml)
@@ -154,6 +143,8 @@
     next_machine.real.ml))))
 
 (rule (action (write-file alpha_machine.no.ml "module M = struct end")))
+
+(rule (action (write-file PsUshuai_machine.no.ml "module M = struct end")))
 
 (rule (action (write-file PtTALLiN_machine.no.ml "module M = struct end")))
 

@@ -43,8 +43,10 @@ type l2_setup = {
   tez_bootstrap_contracts : tez_contract list option;
   sequencer_pool_address : string option;
   minimum_base_fee_per_gas : Wei.t option;
+  michelson_to_evm_gas_multiplier : int64 option;
   da_fee_per_byte : Wei.t option;
   maximum_gas_per_transaction : int64 option;
+  michelson_runtime_chain_id : string option;
 }
 
 val eth_default_bootstrap_accounts : string list
@@ -59,81 +61,204 @@ type time_between_blocks =
       (** Interval at which the sequencer creates an empty block by
           default. *)
 
-(** EVM node mode. *)
+(** Configuration shared by Sequencer, Sandbox, and Tezlink_sandbox modes. *)
+type sequencer_config = {
+  time_between_blocks : time_between_blocks option;
+      (** See {!time_between_blocks}, if the value is not
+          provided, the sequencer uses it default value. *)
+  genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
+  max_number_of_chunks : int option;
+  wallet_dir : string option;  (** --wallet-dir: client directory. *)
+}
+
+(** EVM node mode.
+
+    Common configuration fields (initial_kernel, preimages_dir, private_rpc_port,
+    tx_queue settings) are now passed directly to {!create} and stored in
+    persistent state, not in mode variants. *)
 type mode =
   | Observer of {
-      initial_kernel : string option;
-      preimages_dir : string option;
-      private_rpc_port : int option;  (** Port for private RPC server*)
       rollup_node_endpoint : string option;
-          (*when None add `--dont-track-rollup-node` *)
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
+          (** When None adds `--dont-track-rollup-node` *)
+      evm_node_endpoint : string;
     }
   | Sequencer of {
-      initial_kernel : string;
-          (** Path to the initial kernel used by the sequencer. *)
-      preimage_dir : string option;
-          (** Path to the directory with the associated preimages. *)
-      private_rpc_port : int option;  (** Port for private RPC server*)
-      time_between_blocks : time_between_blocks option;
-          (** See {!time_between_blocks}, if the value is not
-              provided, the sequencer uses it default value. *)
+      rollup_node_endpoint : string;
+      sequencer_config : sequencer_config;
       sequencer_keys : string list;
           (** Secret keys used to sign the blueprints. *)
-      genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
       max_blueprints_lag : int option;
       max_blueprints_ahead : int option;
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;  (** --wallet-dir: client directory. *)
-      tx_queue_max_lifespan : int option;
-          (** --tx-pool-timeout-limit: transaction timeout inside the queue. *)
-      tx_queue_max_size : int option;
-          (** --tx-pool-max-txs: maximum number of transactions in the queue. *)
-      tx_queue_tx_per_addr_limit : int option;
-          (** --tx-pool-tx-per-addr-limit: maximum number of transactions per address in the queue. *)
       dal_slots : int list option;
       sequencer_sunset_sec : int option;
     }
   | Sandbox of {
-      initial_kernel : string option;
+      sequencer_config : sequencer_config;
       network : string option;
       funded_addresses : string list;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
-      genesis_timestamp : Client.timestamp option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
       sequencer_keys : string list;
     }
   | Tezlink_sandbox of {
-      initial_kernel : string;
+      sequencer_config : sequencer_config;
       funded_addresses : string list;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
-      genesis_timestamp : Client.timestamp option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
       verbose : bool;
     }
-  | Proxy
   | Rpc of mode
 
 type history_mode =
   | Archive
   | Rolling of int  (** Rolling with retention period in days. *)
   | Full of int  (** Full with retention period in days. *)
+  | Seed of int  (** Seed with retention period in days. *)
+
+(** Node configuration shared across modes.
+    Groups mode-agnostic parameters to simplify function signatures. *)
+type node_setup = {
+  path : string;
+  name : string;
+  runner : Runner.t option;
+  history_mode : history_mode option;
+  data_dir : string option;
+  config_file : string option;
+  rpc_addr : string option;
+  rpc_port : int;
+  restricted_rpcs : string option;
+  spawn_rpc : int option;
+  websockets : bool;
+  initial_kernel : string option;
+  preimages_dir : string option;
+  private_rpc_port : int option;
+  tx_queue_max_lifespan : int option;
+  tx_queue_max_size : int option;
+  tx_queue_tx_per_addr_limit : int option;
+}
+
+(** [make_setup ()] creates a [node_setup] with meaningful defaults:
+    path is set to the octez-evm-node binary, name is freshly generated,
+    data_dir is set to [Temp.dir name], rpc_port is allocated, and websockets
+    is set to false. All parameters can be overridden via optional arguments. *)
+val make_setup :
+  ?path:string ->
+  ?name:string ->
+  ?runner:Runner.t ->
+  ?history_mode:history_mode ->
+  ?data_dir:string ->
+  ?config_file:string ->
+  ?rpc_addr:string ->
+  ?rpc_port:int ->
+  ?restricted_rpcs:string ->
+  ?spawn_rpc:int ->
+  ?websockets:bool ->
+  ?initial_kernel:string ->
+  ?preimages_dir:string ->
+  ?private_rpc_port:int ->
+  ?tx_queue_max_lifespan:int ->
+  ?tx_queue_max_size:int ->
+  ?tx_queue_tx_per_addr_limit:int ->
+  unit ->
+  node_setup
+
+(** Kernel configuration grouping all parameters accepted by
+    {!make_kernel_installer_config}.  The [kernel] field selects the
+    kernel binary; every other field maps to an optional parameter of
+    [make_kernel_installer_config].  Fields are [option] so each
+    consuming function can apply its own defaults. *)
+type kernel_setup = {
+  kernel : Kernel.t;
+  l2_chain_ids : int list option;
+  max_delayed_inbox_blueprint_length : int option;
+  kernel_compat : string option;
+  remove_whitelist : bool option;
+  kernel_root_hash : string option;
+  chain_id : int option;
+  eth_bootstrap_balance : Wei.t option;
+  eth_bootstrap_accounts : string list option;
+  tez_bootstrap_balance : Tez.t option;
+  tez_bootstrap_accounts : Account.key list option;
+  tez_bootstrap_contracts : string list option;
+  sequencer : string option;
+  delayed_bridge : string option;
+  ticketer : string option;
+  administrator : string option;
+  sequencer_governance : string option;
+  kernel_governance : string option;
+  kernel_security_governance : string option;
+  minimum_base_fee_per_gas : Wei.t option;
+  michelson_to_evm_gas_multiplier : int64 option;
+  da_fee_per_byte : Wei.t option;
+  delayed_inbox_timeout : int option;
+  delayed_inbox_min_levels : int option;
+  sequencer_pool_address : string option;
+  maximum_allowed_ticks : int64 option;
+  maximum_gas_per_transaction : int64 option;
+  max_blueprint_lookahead_in_seconds : int64 option;
+  set_account_code : (string * string) list option;
+  enable_fa_bridge : bool option;
+  enable_revm : bool option;
+  enable_dal : bool option;
+  dal_slots : int list option;
+  dal_publishers_whitelist : string list option;
+  disable_legacy_dal_signals : bool option;
+  enable_fast_withdrawal : bool option;
+  enable_fast_fa_withdrawal : bool option;
+  enable_michelson_gas_refund : bool option;
+  evm_version : Evm_version.t option;
+  with_runtimes : Tezosx_runtime.t list option;
+  michelson_runtime_chain_id : string option;
+}
+
+(** [make_kernel_setup ()] creates a [kernel_setup] with [Kernel.Latest] as
+    the default kernel.  [eth_bootstrap_accounts] defaults to
+    {!eth_default_bootstrap_accounts}.  [tez_bootstrap_accounts] defaults to
+    {!tez_default_bootstrap_accounts} when [with_runtimes] includes [Tezos],
+    and to the empty list otherwise.  All other option fields are set to
+    [None] and can be overridden via optional arguments. *)
+val make_kernel_setup :
+  ?kernel:Kernel.t ->
+  ?l2_chain_ids:int list ->
+  ?max_delayed_inbox_blueprint_length:int ->
+  ?kernel_compat:string ->
+  ?remove_whitelist:bool ->
+  ?kernel_root_hash:string ->
+  ?chain_id:int ->
+  ?eth_bootstrap_balance:Wei.t ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_balance:Tez.t ->
+  ?tez_bootstrap_accounts:Account.key list ->
+  ?tez_bootstrap_contracts:string list ->
+  ?sequencer:string ->
+  ?delayed_bridge:string ->
+  ?ticketer:string ->
+  ?administrator:string ->
+  ?sequencer_governance:string ->
+  ?kernel_governance:string ->
+  ?kernel_security_governance:string ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
+  ?da_fee_per_byte:Wei.t ->
+  ?delayed_inbox_timeout:int ->
+  ?delayed_inbox_min_levels:int ->
+  ?sequencer_pool_address:string ->
+  ?maximum_allowed_ticks:int64 ->
+  ?maximum_gas_per_transaction:int64 ->
+  ?max_blueprint_lookahead_in_seconds:int64 ->
+  ?set_account_code:(string * string) list ->
+  ?enable_fa_bridge:bool ->
+  ?enable_revm:bool ->
+  ?enable_dal:bool ->
+  ?dal_slots:int list ->
+  ?dal_publishers_whitelist:string list ->
+  ?disable_legacy_dal_signals:bool ->
+  ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
+  ?enable_michelson_gas_refund:bool ->
+  ?evm_version:Evm_version.t ->
+  ?with_runtimes:Tezosx_runtime.t list ->
+  ?michelson_runtime_chain_id:string ->
+  unit ->
+  kernel_setup
 
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode
@@ -154,8 +279,7 @@ val config_file : t -> string option
     kernel run by the node. *)
 val preimages_dir : t -> string
 
-(** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port
-    ?spawn_rpc ?websockets rollup_node_endpoint] creates an EVM node server.
+(** [create ~mode ?node_setup ()] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port
@@ -163,29 +287,12 @@ val preimages_dir : t -> string
 
     If [websockets] is true, activates the websocket server.
 
-    The server communicates with a rollup-node and sets its endpoint via
-    [rollup_node_endpoint].
-
-    [mode] defaults to [Proxy].
-*)
-val create :
-  ?path:string ->
-  ?name:string ->
-  ?runner:Runner.t ->
-  ?mode:mode ->
-  ?history:history_mode ->
-  ?data_dir:string ->
-  ?config_file:string ->
-  ?rpc_addr:string ->
-  ?rpc_port:int ->
-  ?restricted_rpcs:string ->
-  ?spawn_rpc:int ->
-  ?websockets:bool ->
-  string ->
-  t
+    Common configuration is provided via [node_setup]. Use {!make_setup}
+    with optional arguments to construct it. *)
+val create : ?node_setup:node_setup -> mode:mode -> unit -> t
 
 (** [initial_kernel node] returns the path to the kernel used to initialize the
-    EVM state. Fails if [node] is a proxy node. *)
+    EVM state. *)
 val initial_kernel : t -> string option
 
 (** [run ?wait ?extra_arguments evm_node] launches the EVM node server with
@@ -193,7 +300,12 @@ val initial_kernel : t -> string option
     passed via [extra_arguments].
     [wait] defaults to true, if it is set to false, the evm node is ran but we
     do not wait for it to be ready. *)
-val run : ?wait:bool -> ?extra_arguments:string list -> t -> unit Lwt.t
+val run :
+  ?wait:bool ->
+  ?end_test_on_failure:bool ->
+  ?extra_arguments:string list ->
+  t ->
+  unit Lwt.t
 
 (** [wait_for_event ?timeout evm_node ~event f] waits for event [event] until
     [timeout] on node [evm_node].
@@ -256,6 +368,8 @@ val wait_for_pending_sequencer_upgrade :
 
 val wait_for_spawn_rpc_ready : ?timeout:float -> t -> unit Lwt.t
 
+val wait_for_drift_monitor_ready : ?timeout:float -> t -> unit Lwt.t
+
 val wait_for_import_finished : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_finished_exporting_snapshot : ?timeout:float -> t -> string Lwt.t
@@ -265,6 +379,10 @@ val wait_for_block_producer_locked : ?timeout:float -> t -> unit Lwt.t
 val wait_for_block_producer_tx_injected : ?timeout:float -> t -> string Lwt.t
 
 val wait_for_retrying_connect : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_connection_acquired : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_trying_reconnection : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_flush_delayed_inbox :
   ?timeout:float -> ?level:int -> t -> int Lwt.t
@@ -290,9 +408,20 @@ val wait_for_blueprint_catchup : ?timeout:float -> t -> (int * int) Lwt.t
 val wait_for_blueprint_injection_failure :
   ?timeout:float -> ?level:int -> t -> unit Lwt.t
 
-val wait_for_next_block_timestamp : ?timeout:float -> t -> string Lwt.t
+val wait_for_next_block_info : ?timeout:float -> t -> string Lwt.t
 
-val wait_for_inclusion : ?timeout:float -> t -> string Lwt.t
+val wait_for_ic_reset : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_ic_reset_unexpected_level : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_ic_execute_skipped : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_inclusion : ?timeout:float -> ?hash:string -> t -> string Lwt.t
+
+(** [wait_for_single_tx_execution_done evm_node] waits for the
+    [single_tx_execution_done.v0] event to be emitted. Returns the
+    transaction hash. *)
+val wait_for_single_tx_execution_done : ?timeout:float -> t -> string Lwt.t
 
 module Config_file : sig
   (** Node configuration files. *)
@@ -343,6 +472,7 @@ val patch_config_with_experimental_feature :
   ?periodic_snapshot_path:string ->
   ?l2_chains:l2_setup list ->
   ?preconfirmation_stream_enabled:bool ->
+  ?compact_receipt_encoding:bool ->
   unit ->
   JSON.t ->
   JSON.t
@@ -358,29 +488,24 @@ val patch_config_websockets_if_enabled :
 (** Edit garbage collector parameters in the configuration file. *)
 val patch_config_gc : ?history_mode:history_mode -> JSON.t -> JSON.t
 
-(** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    ?websockets rollup_node_endpoint] creates an EVM node server with {!create},
+(** [init ?patch_config ~mode ?node_setup ?end_test_on_failure
+    ?extra_arguments ()] creates an EVM node server with {!create},
     init the config with {!spawn_init_config}, patch it with [patch_config],
     then runs it with {!run}. *)
 val init :
   ?patch_config:(JSON.t -> JSON.t) ->
-  ?name:string ->
-  ?runner:Runner.t ->
-  ?mode:mode ->
-  ?data_dir:string ->
-  ?config_file:string ->
-  ?rpc_addr:string ->
-  ?rpc_port:int ->
-  ?restricted_rpcs:string ->
-  ?history_mode:history_mode ->
-  ?spawn_rpc:int ->
-  ?websockets:bool ->
+  ?node_setup:node_setup ->
+  mode:mode ->
+  ?end_test_on_failure:bool ->
   ?extra_arguments:string list ->
-  string ->
+  unit ->
   t Lwt.t
 
 (** Get the RPC port given as [--rpc-port] to a node. *)
 val rpc_port : t -> int
+
+(** Get the private RPC port, if set. *)
+val private_rpc_port : t -> int option
 
 (** Get the spawn_rpc value given on creation. *)
 val spawn_rpc : t -> int option
@@ -398,12 +523,18 @@ val resolve_or_timeout :
   ?timeout:float -> t -> name:string -> 'a Lwt.t -> 'a Lwt.t
 
 (** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** Install a events handler. *)
 val on_event : t -> (event -> unit) -> unit
 
-type delayed_transaction_kind = Deposit | Transaction | FaDeposit
+type delayed_transaction_kind = Deposit | Transaction | FaDeposit | Operation
 
 type 'a evm_event_kind =
   | Kernel_upgrade : (string * Client.Time.t) evm_event_kind
@@ -426,6 +557,12 @@ val wait_for_evm_event :
     diverging blueprint level expected hash, and found hash. *)
 val wait_for_diverged : t -> (int * string * string) Lwt.t
 
+(** [wait_for_assemble_block_diverged ?timeout evm_node] waits for the event
+    [assemble_block_diverged.v0] using {!wait_for} and returns the diverging
+    block level. This event is emitted when the observer detects divergence
+    during instant confirmation processing. *)
+val wait_for_assemble_block_diverged : ?timeout:float -> t -> int Lwt.t
+
 (** [wait_for_reset evm_node] waits for the event [evm_context_reset_at_level]
     using {!wait_for}. It does not wait for a specific level. *)
 val wait_for_reset : t -> unit Lwt.t
@@ -441,16 +578,24 @@ val wait_for_missing_blueprint : t -> (int * string) Lwt.t
     missing blueprint level. *)
 val wait_for_rollup_node_ahead : t -> int Lwt.t
 
-(** [wait_for_tx_queue_add_transaction ?timeout evm_node] waits for the event
+(** [wait_for_tx_queue_add_transaction ?timeout ?hash evm_node] waits for the event
     [tx_queue_add_transaction.v0] using {!wait_for} and returns the transaction
     hash. *)
-val wait_for_tx_queue_add_transaction : ?timeout:float -> t -> string Lwt.t
+val wait_for_tx_queue_add_transaction :
+  ?timeout:float -> ?hash:string -> t -> string Lwt.t
 
 (** [wait_for_tx_queue_transaction_confirmed ?timeout ?hash evm_node]
     waits for the event [tx_queue_transaction_confirmed.v0] using
     {!wait_for} and returns the transaction hash. If [hash] is
     provided, wait for that hash to be confirmed. *)
 val wait_for_tx_queue_transaction_confirmed :
+  ?timeout:float -> ?hash:string -> t -> string Lwt.t
+
+(** [wait_for_tx_queue_transaction_dropped ?timeout ?hash evm_node]
+    waits for the event [tx_queue_transaction_dropped.v0] using
+    {!wait_for} and returns the transaction hash. If [hash] is
+    provided, wait for that hash to be confirmed. *)
+val wait_for_tx_queue_transaction_dropped :
   ?timeout:float -> ?hash:string -> t -> string Lwt.t
 
 (** [wait_for_tx_queue_injecting_transaction ?timeout evm_node] waits
@@ -619,6 +764,11 @@ val patch_kernel : t -> string -> unit Lwt.t
     by writing [value] at [key]. *)
 val patch_state : t -> key:string -> value:string -> unit Lwt.t
 
+(** [execute_single_transaction evm_node ~raw_tx] calls the private
+    executeSingleTransaction RPC to execute a single transaction on the
+    observer's EVM context. This is used for testing divergence scenarios. *)
+val execute_single_transaction : t -> raw_tx:string -> unit Lwt.t
+
 (** [export_snapshot ~desync evm_node] exports a snapshot of the evm node in a
     temporary directory. It returns the path for the produced snapshot file. If
     [desync=true] it uses the desync format. *)
@@ -645,6 +795,7 @@ val wait_termination : t -> unit Lwt.t
 (** [make_l2_kernel_installer_config ~output ()] creates the config needed for
     an l2 chain in a multichain kernel *)
 val make_l2_kernel_installer_config :
+  ?kernel_compat:string ->
   ?chain_id:int ->
   ?chain_family:string ->
   ?eth_bootstrap_balance:Wei.t ->
@@ -653,6 +804,7 @@ val make_l2_kernel_installer_config :
   ?tez_bootstrap_accounts:Account.key list ->
   ?tez_bootstrap_contracts:string list ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?da_fee_per_byte:Wei.t ->
   ?sequencer_pool_address:string ->
   ?maximum_gas_per_transaction:int64 ->
@@ -662,47 +814,12 @@ val make_l2_kernel_installer_config :
   unit ->
   (Process.t, unit) runnable
 
-(** [make_kernel_installer_config ~output ()] create the config needed for the
-    evm kernel used by the installer *)
+(** [make_kernel_installer_config ks ~output ()] creates the config
+    needed for the evm kernel used by the installer.  All kernel
+    parameters are read from [ks]; [None] fields use sensible
+    defaults. *)
 val make_kernel_installer_config :
-  ?l2_chain_ids:int list ->
-  ?max_delayed_inbox_blueprint_length:int ->
-  ?mainnet_compat:bool ->
-  ?remove_whitelist:bool ->
-  ?kernel_root_hash:string ->
-  ?chain_id:int ->
-  ?eth_bootstrap_balance:Wei.t ->
-  ?eth_bootstrap_accounts:string list ->
-  ?tez_bootstrap_balance:Tez.t ->
-  ?tez_bootstrap_accounts:Account.key list ->
-  ?sequencer:string ->
-  ?delayed_bridge:string ->
-  ?ticketer:string ->
-  ?administrator:string ->
-  ?sequencer_governance:string ->
-  ?kernel_governance:string ->
-  ?kernel_security_governance:string ->
-  ?minimum_base_fee_per_gas:Wei.t ->
-  ?da_fee_per_byte:Wei.t ->
-  ?delayed_inbox_timeout:int ->
-  ?delayed_inbox_min_levels:int ->
-  ?sequencer_pool_address:string ->
-  ?maximum_allowed_ticks:int64 ->
-  ?maximum_gas_per_transaction:int64 ->
-  ?max_blueprint_lookahead_in_seconds:int64 ->
-  ?set_account_code:(string * string) list ->
-  ?enable_fa_bridge:bool ->
-  ?enable_revm:bool ->
-  ?enable_dal:bool ->
-  ?dal_slots:int list ->
-  ?enable_fast_withdrawal:bool ->
-  ?enable_fast_fa_withdrawal:bool ->
-  ?enable_multichain:bool ->
-  ?evm_version:Evm_version.t ->
-  ?with_runtimes:Tezosx_runtime.t list ->
-  output:string ->
-  unit ->
-  (Process.t, unit) Runnable.t
+  kernel_setup -> output:string -> unit -> (Process.t, unit) Runnable.t
 
 val debug_print_store_schemas :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
@@ -711,9 +828,6 @@ val man : ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
 
 val describe_config :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
-
-(** Returns the [mode] with a fresh private RPC port if one was present. *)
-val mode_with_new_private_rpc : mode -> mode
 
 (** A description of the metrics exported by the node. *)
 val list_metrics : ?hooks:Process_hooks.t -> unit -> unit Lwt.t
@@ -724,6 +838,16 @@ val list_events :
 
 (** Switch history mode of an EVM node with command switch history. *)
 val switch_history_mode : t -> history_mode -> (Process.t, unit) runnable
+
+(** [trace_block evm_node block_number] traces all transactions in the block at
+    the given [block_number] using the CLI and returns the parsed JSON list. *)
+val trace_block : t -> int -> (Process.t, JSON.t list) runnable
+
+(** [trace_transaction ?tracer evm_node tx_hash] traces a single transaction
+    identified by [tx_hash] using the CLI. [tracer] selects the tracer
+    (defaults to [callTracer]). *)
+val trace_transaction :
+  ?tracer:string -> t -> string -> (Process.t, JSON.t) runnable
 
 val switch_sequencer_to_observer : old_sequencer:t -> new_sequencer:t -> t
 

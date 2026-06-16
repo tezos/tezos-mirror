@@ -107,7 +107,7 @@ mod raw_encodings {
             } else if value.set.is_some() {
                 Ok(Instr::Set(value.set.unwrap()))
             } else {
-                Err(format!("Unknown instruction {:#?}", value))
+                Err(format!("Unknown instruction {value:#?}"))
             }
         }
     }

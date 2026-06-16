@@ -91,6 +91,26 @@ open struct
       ~level:Notice
       ("exit_status", Data_encoding.int8)
 
+  let config_load_fail =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"config_load_fail"
+      ~msg:"Loading configuration failed with error {error} "
+      ~level:Error
+      ~pp1:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
+
+  let config_save_fail =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"config_save_fail"
+      ~msg:"saving configuration failed with error {error} "
+      ~level:Error
+      ~pp1:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
+
   let dal_node_sqlite3_store_init =
     declare_0
       ~section
@@ -297,6 +317,15 @@ open struct
       ~pp1:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
 
+  let daemon_loop_unexpected_termination =
+    declare_0
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"daemon_loop_unexpected_termination"
+      ~msg:"the daemon loop terminated unexpectedly with no error"
+      ~level:Warning
+      ()
+
   let failed_to_fetch_block =
     declare_4
       ~section
@@ -395,6 +424,20 @@ open struct
       ~level:Debug
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
+
+  let not_enough_shards_for_reconstruction =
+    declare_4
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"not_enough_shards_for_reconstruction"
+      ~msg:
+        "Not enough shards to reconstruct slot at level {published_level}, \
+         index {slot_index}: {provided} shards available, {required} needed"
+      ~level:Warning
+      ("published_level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("provided", Data_encoding.int31)
+      ("required", Data_encoding.int31)
 
   let slot_header_status_not_found =
     declare_2
@@ -827,14 +870,26 @@ open struct
       ~level:Warning
       ()
 
+  let amplificator_stopped =
+    declare_0
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"amplificator_stopped"
+      ~msg:"the amplificator process worker was stopped"
+      ~level:Info
+      ()
+
   let crypto_process_received_query =
-    declare_1
+    declare_2
       ~section:(section @ ["crypto"])
       ~prefix_name_with_section:true
       ~name:"crypto_process_received_query"
-      ~msg:"cryptographic child process: received query #{query_id}."
+      ~msg:
+        "cryptographic child process: received query #{query_id} for level \
+         {level}."
       ~level:Notice
       ("query_id", Data_encoding.int31)
+      ("level", Data_encoding.int32)
 
   let crypto_process_sending_reply =
     declare_1
@@ -855,15 +910,16 @@ open struct
       ("query_id", Data_encoding.int31)
 
   let main_process_sending_query =
-    declare_1
+    declare_2
       ~section:(section @ ["crypto"])
       ~prefix_name_with_section:true
       ~name:"main_process_sending_query"
       ~msg:
-        "main process: sending query #{query_id} to cryptographic child \
-         process."
+        "main process: sending query #{query_id} for level {level} to \
+         cryptographic child process."
       ~level:Info
       ("query_id", Data_encoding.int31)
+      ("level", Data_encoding.int32)
 
   let main_process_received_reply =
     declare_1
@@ -937,17 +993,15 @@ open struct
                expected_shards))
 
   let get_attestable_slots_future_level_warning =
-    declare_2
+    declare_1
       ~section
       ~prefix_name_with_section:true
       ~name:"get_attestable_slots_future_level_warning"
       ~msg:
-        "It looks like the DAL node is lagging (its current level is \
-         {current_level}, while the Layer1 node's level is \
-         {current_baker_level})."
+        "It looks like the DAL node is lagging ({levels_to_process} levels to \
+         process)."
       ~level:Warning
-      ("current_level", Data_encoding.int32)
-      ("current_baker_level", Data_encoding.int32)
+      ("levels_to_process", Data_encoding.int32)
 
   let warn_no_attestation =
     declare_2
@@ -1023,37 +1077,40 @@ open struct
       ~pp3:pp_int_list
 
   let trap_injection =
-    declare_5
+    declare_6
       ~section
       ~prefix_name_with_section:true
       ~name:"trap_injection"
       ~msg:
         "Injecting entrapment evidence for delegate {delegate}, published \
-         level {published_level}, attested level {attested_level}, slot index \
-         {slot_index}, shard index {shard_index}"
+         level {published_level}, attested level {attested_level}, lag index \
+         {lag_index}, slot index {slot_index}, shard index {shard_index}"
       ~level:Notice
       ("delegate", Signature.Public_key_hash.encoding)
       ("published_level", Data_encoding.int32)
       ("attested_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
+      ("lag_index", Data_encoding.int31)
 
   let trap_injection_failure =
-    declare_6
+    declare_7
       ~section
       ~prefix_name_with_section:true
       ~name:"trap_injection_failure"
       ~msg:
         "Failed to inject an entrapment evidence for delegate {delegate}, \
          published level {published_level}, attested level {attested_level}, \
-         slot index {slot_index}, shard index {shard_index}: {error}"
+         lag index {lag_index}, slot index {slot_index}, shard index \
+         {shard_index}: {error}"
       ~level:Warning
-      ~pp6:pp_print_trace
+      ~pp7:pp_print_trace
       ("delegate", Signature.Public_key_hash.encoding)
       ("published_level", Data_encoding.int32)
       ("attested_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
+      ("lag_index", Data_encoding.int31)
       ("error", trace_encoding)
 
   let trap_check_failure =
@@ -1090,11 +1147,25 @@ open struct
       ~msg:
         "{delegate} cannot attest slot {slot_index} at published level \
          {published_level}: shard {shard_index} is a trap."
-      ~level:Notice
+      ~level:Info
       ("delegate", Signature.Public_key_hash.encoding)
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
+
+  let registered_attester_attested_trap =
+    declare_3
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"registered_attester_attested_trap"
+      ~msg:
+        "Registered attester {attester} attested a trap at slot {slot_index}, \
+         attested level {attested_level}. Stopping the DAL node."
+      ~level:Error
+      ("attester", Signature.Public_key_hash.encoding)
+      ("slot_index", Data_encoding.int31)
+      ("attested_level", Data_encoding.int32)
+      ~pp1:Signature.Public_key_hash.pp_short
 
   let register_trap =
     declare_4
@@ -1304,6 +1375,117 @@ open struct
       ("block_level", Data_encoding.int32)
       ~pp2:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
+
+  let cryptobox_registered =
+    declare_1
+      ~section
+      ~name:"cryptobox_registered"
+      ~msg:"Cryptobox registered starting at level {level}"
+      ~level:Info
+      ("level", Data_encoding.int32)
+
+  let skipped_protocol_without_dal_plugin =
+    declare_1
+      ~section
+      ~name:"skipped_protocol_without_dal_plugin"
+      ~msg:
+        "Skipping protocol activation at level {level}: no DAL plugin is \
+         available for this protocol"
+      ~level:Warning
+      ("level", Data_encoding.int32)
+
+  let cannot_export_snapshot_data =
+    declare_3
+      ~section
+      ~name:"cannot_export_snapshot_data"
+      ~msg:"cannot export {kind}{index} for level {level}"
+      ~level:Debug
+      ("level", Data_encoding.int32)
+      ("index", Data_encoding.int31)
+      ("kind", Data_encoding.string)
+      ~pp3:Format.pp_print_string
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
+  let publish_crosses_migration =
+    declare_3
+      ~section
+      ~name:"publish_crosses_migration"
+      ~msg:
+        "Cannot publish slot at level {published_level} as it would cross \
+         protocol T to U migration at level {migration_level} (attested at \
+         level {attested_level})"
+      ~level:Warning
+      ("published_level", Data_encoding.int32)
+      ("migration_level", Data_encoding.int32)
+      ("attested_level", Data_encoding.int32)
+
+  let snapshot_copying =
+    declare_2
+      ~section
+      ~name:"snapshot_copying"
+      ~msg:"snapshot copy {resource}: {step}"
+      ~level:Notice
+      ("resource", Data_encoding.string)
+      ("step", Data_encoding.string)
+
+  let snapshot_status =
+    declare_5
+      ~section
+      ~name:"snapshot_status"
+      ~msg:
+        "snapshot {status} ({kind}): {path} (levels {min_level} to {max_level})"
+      ~level:Notice
+      ("path", Data_encoding.string)
+      ("kind", Data_encoding.string)
+      ("status", Data_encoding.string)
+      ("min_level", Data_encoding.string)
+      ("max_level", Data_encoding.string)
+
+  let closing_store_failed =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"closing_store_failed"
+      ~msg:"failed to close the store: {error}"
+      ~level:Warning
+      ("error", Error_monad.trace_encoding)
+
+  let l1_history_check_bypassed =
+    declare_2
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"l1_history_check_bypassed"
+      ~msg:
+        "the L1 node stores block data for {stored_cycles} cycles, but the DAL \
+         node requires at least {minimal_cycles}; continuing anyway because \
+         --ignore-l1-history-check is set. The DAL node may behave incorrectly \
+         if it needs to fetch data from levels the L1 node has already pruned."
+      ~level:Warning
+      ("stored_cycles", Data_encoding.int31)
+      ("minimal_cycles", Data_encoding.int31)
+
+  let ignore_l1_history_check_refused_on_mainnet =
+    declare_0
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"ignore_l1_history_check_refused_on_mainnet"
+      ~msg:
+        "--ignore-l1-history-check was set but is not honored on mainnet; the \
+         L1 history check will be enforced as usual"
+      ~level:Warning
+      ()
+
+  let rpc_addr_is_public =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"rpc_addr_is_public"
+      ~msg:
+        "RPC server is listening on public address {rpc_addr}: mutating \
+         endpoints are unauthenticated; use --rpc-addr to bind to 127.0.0.1 to \
+         restrict access"
+      ~level:Warning
+      ("rpc_addr", Data_encoding.string)
 end
 
 (* DAL node event emission functions *)
@@ -1406,6 +1588,9 @@ let emit_unexpected_protocol_plugin () = emit unexpected_protocol_plugin ()
 
 let emit_daemon_error ~error = emit daemon_error error
 
+let emit_daemon_loop_unexpected_termination () =
+  emit daemon_loop_unexpected_termination ()
+
 let emit_failed_to_fetch_block ~type_ ~level ~last_notified ~error =
   emit failed_to_fetch_block (type_, level, last_notified, error)
 
@@ -1414,11 +1599,23 @@ let emit_history_mode_warning ~stored_levels ~storage_period =
 
 let emit_configuration_loaded () = emit configuration_loaded ()
 
+let emit_configuration_loading_failed ~error_trace =
+  emit config_load_fail error_trace
+
+let emit_configuration_saving_failed ~error_trace =
+  emit config_save_fail error_trace
+
 let emit_upgrading_configuration ~from ~into =
   emit upgrading_configuration (from, into)
 
 let emit_stored_slot_content ~published_level ~slot_index =
   emit stored_slot_content (published_level, slot_index)
+
+let emit_not_enough_shards_for_reconstruction ~published_level ~slot_index
+    ~provided ~required =
+  emit
+    not_enough_shards_for_reconstruction
+    (published_level, slot_index, provided, required)
 
 let emit_stored_slot_shard ~published_level ~slot_index ~shard_index =
   emit stored_slot_shard (published_level, slot_index, shard_index)
@@ -1445,6 +1642,8 @@ let emit_unexpected_slot_header_status ~published_level ~slot_index
     (published_level, slot_index, expected_status, got_status)
 
 let emit_removed_skip_list_cells ~level = emit removed_skip_list_cells level
+
+let emit_rpc_addr_is_public ~rpc_addr = emit rpc_addr_is_public rpc_addr
 
 let emit_removing_shards_failed ~published_level ~slot_index ~error =
   emit removing_shards_failed (published_level, slot_index, error)
@@ -1541,8 +1740,10 @@ let emit_crypto_process_fatal ~msg = emit crypto_process_fatal msg
 
 let emit_amplificator_uninitialized () = emit amplificator_uninitialized ()
 
-let emit_crypto_process_received_query ~query_id =
-  emit crypto_process_received_query query_id
+let emit_amplificator_stopped () = emit amplificator_stopped ()
+
+let emit_crypto_process_received_query ~query_id ~level =
+  emit crypto_process_received_query (query_id, level)
 
 let emit_crypto_process_sending_reply ~query_id =
   emit crypto_process_sending_reply query_id
@@ -1550,8 +1751,8 @@ let emit_crypto_process_sending_reply ~query_id =
 let emit_crypto_process_sending_reply_error ~query_id =
   emit crypto_process_sending_reply_error query_id
 
-let emit_main_process_sending_query ~query_id =
-  emit main_process_sending_query query_id
+let emit_main_process_sending_query ~query_id ~level =
+  emit main_process_sending_query (query_id, level)
 
 let emit_main_process_received_reply ~query_id =
   emit main_process_received_reply query_id
@@ -1572,11 +1773,8 @@ let emit_get_attestable_slots_not_ok_warning ~attester ~published_level
     get_attestable_slots_not_ok_warning
     (attester, published_level, slots_indices, slot_indexes_with_details)
 
-let emit_get_attestable_slots_future_level_warning ~current_level
-    ~current_baker_level =
-  emit
-    get_attestable_slots_future_level_warning
-    (current_level, current_baker_level)
+let emit_get_attestable_slots_future_level_warning ~levels_to_process =
+  emit get_attestable_slots_future_level_warning levels_to_process
 
 let emit_warn_no_attestation ~attester ~attested_level =
   emit warn_no_attestation (attester, attested_level)
@@ -1597,16 +1795,27 @@ let emit_attester_did_not_attest_because_of_traps ~attester ~attested_level
     (attester, attested_level, slot_indexes)
 
 let emit_trap_injection ~delegate ~published_level ~attested_level ~slot_index
-    ~shard_index =
+    ~shard_index ~lag_index =
   emit
     trap_injection
-    (delegate, published_level, attested_level, slot_index, shard_index)
+    ( delegate,
+      published_level,
+      attested_level,
+      slot_index,
+      shard_index,
+      lag_index )
 
 let emit_trap_injection_failure ~delegate ~published_level ~attested_level
-    ~slot_index ~shard_index ~error =
+    ~slot_index ~shard_index ~lag_index ~error =
   emit
     trap_injection_failure
-    (delegate, published_level, attested_level, slot_index, shard_index, error)
+    ( delegate,
+      published_level,
+      attested_level,
+      slot_index,
+      shard_index,
+      lag_index,
+      error )
 
 let emit_trap_check_failure ~published_level ~slot_index ~shard_index ~delegate
     =
@@ -1623,6 +1832,10 @@ let emit_cannot_attest_slot_because_of_trap ~pkh ~published_level ~slot_index
 
 let emit_register_trap ~delegate ~published_level ~slot_index ~shard_index =
   emit register_trap (delegate, published_level, slot_index, shard_index)
+
+let emit_registered_attester_attested_trap ~delegate ~slot_index ~attested_level
+    =
+  emit registered_attester_attested_trap (delegate, slot_index, attested_level)
 
 let emit_start_catchup ~start_level ~end_level ~levels_to_clean_up =
   emit start_catchup (start_level, end_level, levels_to_clean_up)
@@ -1669,3 +1882,32 @@ let emit_publication ~block_level ~op_hash =
 
 let emit_publication_failed ~block_level ~error =
   emit publication_failed (block_level, error)
+
+let emit_cryptobox_registered ~level = emit cryptobox_registered level
+
+let emit_skipped_protocol_without_dal_plugin ~level =
+  emit skipped_protocol_without_dal_plugin level
+
+let emit_cannot_export_snapshot_data ~level ~index ~kind =
+  emit cannot_export_snapshot_data (level, index, kind)
+
+let emit_snapshot_copying ~resource ~step =
+  emit snapshot_copying (resource, step)
+
+let emit_snapshot_status ~path ~kind ~status ~min_level ~max_level =
+  let fmt = function None -> "?" | Some l -> Int32.to_string l in
+  emit snapshot_status (path, kind, status, fmt min_level, fmt max_level)
+
+let emit_publish_crosses_migration ~published_level ~migration_level
+    ~attested_level =
+  emit
+    publish_crosses_migration
+    (published_level, migration_level, attested_level)
+
+let emit_closing_store_failed errs = emit closing_store_failed errs
+
+let emit_l1_history_check_bypassed ~stored_cycles ~minimal_cycles =
+  emit l1_history_check_bypassed (stored_cycles, minimal_cycles)
+
+let emit_ignore_l1_history_check_refused_on_mainnet () =
+  emit ignore_l1_history_check_refused_on_mainnet ()

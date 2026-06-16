@@ -9,8 +9,8 @@ open Profiler
 
 let rpc_client_profiler = unplugged ()
 
-let init profiler_maker =
-  match profiler_maker ~name:"rpc_client" with
+let init ~profiling_config profiler_maker =
+  match profiler_maker ~profiling_config ~name:"rpc_client" with
   | Some instance -> plug rpc_client_profiler instance
   | None -> ()
 

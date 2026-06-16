@@ -31,6 +31,11 @@
 *)
 
 open Tezos_scoru_wasm
+
+module Wasm_vm = Wasm_vm.Make_vm (struct
+  let config = Wasm_pvm_config.empty
+end)
+
 open Wasm_utils
 open Tztest_helper
 
@@ -47,7 +52,7 @@ let init_tree_with_empty_input ~version =
       )
     |}
   in
-  let*! tree = initial_tree ~version ~from_binary:false module_ in
+  let*! tree = initial_state ~version ~from_binary:false module_ in
   let*! tree = eval_until_input_requested tree in
   let*! tree = set_empty_inbox_step 0l tree in
   return tree
@@ -56,11 +61,7 @@ let test_padding_state ~version () =
   let open Lwt_result_syntax in
   let open Wasm_pvm_state.Internal_state in
   let* tree = init_tree_with_empty_input ~version in
-  let*! pvm_state =
-    Encodings_util.Tree_encoding_runner.decode
-      Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-      tree
-  in
+  let*! pvm_state = State.Encoding_runner.decode tree in
   let should_continue state =
     match state.tick_state with
     | Padding -> Lwt_syntax.return_false

@@ -96,17 +96,20 @@ let produce_commitment_and_proof =
                 commitment) ->
         return (commitment, commitment_proof)
     | _ ->
-        let cryptobox = Node_context.get_cryptobox ctxt in
+        let l1_level = Node_context.get_l1_current_head_level ctxt in
+        let*? cryptobox, shards_proofs_precomputation =
+          Node_context.get_cryptobox_and_precomputations ~level:l1_level ctxt
+          |> Errors.other_result
+        in
         let profile = Node_context.get_profile_ctxt ctxt in
         let* () =
           if not (Profile_manager.is_prover_profile profile) then
             fail (Errors.other [No_prover_profile])
           else return_unit
         in
-        let* proto_parameters =
-          (Node_context.get_proto_parameters ctxt ~level:`Last_proto
-          |> Lwt.return
-          |> lwt_map_error (fun e -> `Other e))
+        let*? proto_parameters =
+          (Node_context.get_proto_parameters ctxt ~level:(`Level l1_level)
+          |> Errors.other_result)
           [@profiler.wrap_f
             {driver_ids = [Opentelemetry]}
               (Opentelemetry_helpers.trace_slot_no_commitment
@@ -163,15 +166,6 @@ let produce_commitment_and_proof =
                   ~slot
                   ~name:"computing_commitment_proof")])
         in
-        let shards_proofs_precomputation =
-          (Node_context.get_shards_proofs_precomputation
-             ctxt
-           [@profiler.wrap_f
-             {driver_ids = [Opentelemetry]}
-               (Opentelemetry_helpers.trace_slot_no_commitment
-                  ~slot
-                  ~name:"shard_proof_precomputation")])
-        in
         let* () =
           (Slot_manager.add_commitment_shards
              ~shards_proofs_precomputation
@@ -199,31 +193,67 @@ let produce_commitment_and_proof =
         in
         return (commitment, commitment_proof)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
+let check_publish_crosses_migration ctxt ~published_level =
+  let open Lwt_result_syntax in
+  let* migration_level_opt =
+    Node_context.get_next_migration_level ctxt |> Errors.other_lwt_result
+  in
+  match migration_level_opt with
+  | None -> return_false
+  | Some migration_level ->
+      let*? proto_params =
+        Node_context.get_proto_parameters ctxt ~level:(`Level published_level)
+        |> Errors.other_result
+      in
+      let attestation_lag = Int32.of_int proto_params.attestation_lag in
+      let attested_level = Int32.add published_level attestation_lag in
+      if published_level <= migration_level && migration_level < attested_level
+      then
+        let*! () =
+          Event.emit_publish_crosses_migration
+            ~published_level
+            ~migration_level
+            ~attested_level
+        in
+        return_true
+      else return_false
+
 module Tests = struct
   let publish_slot_using_client ctxt cctxt block_level slot_index secret_key
       slot_content (module Plugin : Dal_plugin.T) =
     let open Lwt_result_syntax in
-    let* commitment, commitment_proof =
-      produce_commitment_and_proof ctxt '\000' slot_content
+    (* [block_level] is the finalized block level (L1 head - 2). The injected
+       operation will appear on chain at L1 head + 1 = block_level + 3. *)
+    let* should_skip =
+      check_publish_crosses_migration
+        ctxt
+        ~published_level:(Int32.add block_level 3l)
     in
-    let source =
-      Signature.Public_key.hash @@ Signature.Secret_key.to_public_key secret_key
-    in
-    let*! res =
-      Plugin.publish
-        cctxt
-        ~block_level
-        ~source
-        ~slot_index
-        ~commitment
-        ~commitment_proof
-        ~src_sk:secret_key
-        ()
-    in
-    let*! () =
-      match res with
-      | Ok op_hash -> Event.emit_publication ~block_level ~op_hash
-      | Error error -> Event.emit_publication_failed ~block_level ~error
-    in
-    return_unit
+    if should_skip then return_unit
+    else
+      let* commitment, commitment_proof =
+        produce_commitment_and_proof ctxt '\000' slot_content
+      in
+      let source =
+        Signature.Public_key.hash
+        @@ Signature.Secret_key.to_public_key secret_key
+      in
+      let*! res =
+        Plugin.publish
+          cctxt
+          ~block_level
+          ~source
+          ~slot_index
+          ~commitment
+          ~commitment_proof
+          ~src_sk:secret_key
+          ()
+      in
+      let*! () =
+        match res with
+        | Ok op_hash -> Event.emit_publication ~block_level ~op_hash
+        | Error error -> Event.emit_publication_failed ~block_level ~error
+      in
+      return_unit
 end

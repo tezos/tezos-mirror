@@ -33,7 +33,9 @@ module Plugin = struct
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
-  type dal_attestation = Environment.Bitset.t
+  type dal_attestations = Environment.Bitset.t
+
+  type slot_availability = Environment.Bitset.t
 
   type attestation_operation =
     | Op : 'a Kind.consensus Alpha_context.operation -> attestation_operation
@@ -83,8 +85,10 @@ module Plugin = struct
       {
         Tezos_dal_node_services.Types.feature_enable;
         incentives_enable;
+        dynamic_lag_enable = false;
         number_of_slots;
         attestation_lag;
+        attestation_lags = [attestation_lag];
         attestation_threshold;
         traps_fraction;
         cryptobox_parameters;
@@ -112,8 +116,8 @@ module Plugin = struct
     else return (`Head 0)
 
   let inject_entrapment_evidence cctxt ~attested_level
-      (Op attestation : attestation_operation) ~slot_index ~shard ~proof
-      ~tb_slot =
+      (Op attestation : attestation_operation) ~slot_index ~lag_index:_ ~shard
+      ~proof ~tb_slot =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context cctxt in
     let chain = `Main in
@@ -168,6 +172,7 @@ module Plugin = struct
     let* block_hash =
       Protocol_client_context.Alpha_block_services.hash cctxt ~chain ~block ()
     in
+    let*? source = Signature.Of_V_latest.get_public_key_hash source in
     let* counter =
       let* pcounter =
         Plugin.Alpha_services.Contract.counter cpctxt (chain, `Head 0) source
@@ -202,6 +207,7 @@ module Plugin = struct
         Operation.unsigned_encoding
         ({branch = block_hash}, Contents_list (Single operation))
     in
+    let*? src_sk = Signature.Of_V_latest.get_secret_key src_sk in
     let bytes =
       Signature.append ~watermark:Signature.Generic_operation src_sk bytes
     in
@@ -278,7 +284,7 @@ module Plugin = struct
                let dal_attestation =
                  Option.map
                    (fun dal_content ->
-                     (dal_content.attestation :> dal_attestation))
+                     (dal_content.attestation :> dal_attestations))
                    attestation.dal_content
                in
                Ok [(tb_slot, packed_operation, dal_attestation)]
@@ -296,7 +302,7 @@ module Plugin = struct
                      ( slot,
                        Option.map
                          (fun dal_content ->
-                           (dal_content.attestation :> dal_attestation))
+                           (dal_content.attestation :> dal_attestations))
                          dal_content_opt ))
                    committee
                in
@@ -339,12 +345,9 @@ module Plugin = struct
     in
     List.fold_left_es
       (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
-        let delegate_pkh =
-          Tezos_crypto.Signature.Of_V2.public_key_hash delegate
-        in
         let* tb_slot =
           match
-            Signature.Public_key_hash.Map.find delegate_pkh pkh_to_tb_slot_map
+            Signature.Public_key_hash.Map.find delegate pkh_to_tb_slot_map
           with
           | Some slot -> return (Slot.to_int slot)
           | None ->
@@ -355,15 +358,16 @@ module Plugin = struct
                    (Resto.Path.to_string
                       Tezos_rpc.Path.(Plugin.RPC.Dal.path / "shards")))
         in
+        let delegate = Tezos_crypto.Signature.Of_V2.public_key_hash delegate in
         return
         @@ Tezos_crypto.Signature.Public_key_hash.Map.add
-             delegate_pkh
+             delegate
              (indexes, tb_slot)
              acc)
       Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
-  let dal_attestation (block : block_info) =
+  let slot_availability (block : block_info) =
     let open Result_syntax in
     let* metadata =
       Option.to_result
@@ -373,8 +377,22 @@ module Plugin = struct
     in
     return (metadata.protocol_data.dal_attestation :> Environment.Bitset.t)
 
-  let is_attested attestation slot_index =
+  let is_baker_attested attestation ~number_of_slots:_ ~number_of_lags:_
+      ~lag_index:_ slot_index =
     match Environment.Bitset.mem attestation slot_index with
+    | Ok b -> b
+    | Error _ -> false
+
+  let decode_baker_attestations attestation ~number_of_slots:_ ~number_of_lags:_
+      =
+    let open Result_syntax in
+    match Environment.Bitset.to_list attestation with
+    | [] -> return []
+    | slot_indices -> return [{Dal_plugin.lag_index = 0; slot_indices}]
+
+  let is_protocol_attested slot_availability ~number_of_slots:_
+      ~number_of_lags:_ ~lag_index:_ slot_index =
+    match Environment.Bitset.mem slot_availability slot_index with
     | Ok b -> b
     | Error _ -> false
 
@@ -392,6 +410,22 @@ module Plugin = struct
       Plugin.Alpha_services.Delegate.deactivated cpctxt (`Main, `Head 0) pkh
     in
     return @@ match res with Ok _deactivated -> true | Error _ -> false
+
+  let is_migration_pending ctxt =
+    let open Lwt_result_syntax in
+    let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
+    let+ {voting_period; position; remaining} =
+      Plugin.Voting_services.current_period cpctxt (`Main, `Head 0)
+    in
+    let period_end_level =
+      Int32.add voting_period.start_position (Int32.add position remaining)
+    in
+    let is_migration_pending =
+      match voting_period.kind with
+      | Adoption -> true
+      | Proposal | Exploration | Cooldown | Promotion -> false
+    in
+    (is_migration_pending, period_end_level)
 
   (* Section of helpers for Skip lists *)
 

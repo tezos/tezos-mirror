@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2025 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2025-2026 Functori, <contact@functori.com>                  *)
 (* Copyright (c) 2025 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -10,7 +10,7 @@ open Sqlite.Request
 open Caqti_type.Std
 
 (** Current version for migrations. *)
-let version = 1
+let version = 2
 
 module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
 
@@ -20,10 +20,16 @@ let quantity_hum_encoding =
     Ethereum_types.quantity_of_z
     Data_encoding.z
 
-type deposit = {
-  nonce : Ethereum_types.quantity;
+type token_info = {
   proxy : Ethereum_types.Address.t;
   ticket_hash : Ethereum_types.hash;
+}
+
+type token = FA of token_info | XTZ
+
+type deposit = {
+  nonce : Ethereum_types.quantity;
+  token : token;
   receiver : Ethereum_types.Address.t;
   amount : Ethereum_types.quantity;
 }
@@ -112,6 +118,20 @@ module Types = struct
         Ok (Address (Hex address)))
       octets
 
+  let address_option_blob =
+    custom
+      ~encode:(function
+        | None -> Ok ""
+        | Some (Ethereum_types.Address (Hex address)) ->
+            Result.of_option ~error:"not a valid address"
+            @@ Hex.to_string (`Hex address))
+      ~decode:(function
+        | "" -> Ok None
+        | address ->
+            let (`Hex address) = Hex.of_string address in
+            Ok (Some (Address (Hex address))))
+      octets
+
   let hash =
     custom
       ~encode:(fun (Ethereum_types.Hash (Hex hash)) ->
@@ -119,6 +139,20 @@ module Types = struct
       ~decode:(fun hash ->
         let (`Hex hash) = Hex.of_string hash in
         Ok (Hash (Hex hash)))
+      octets
+
+  let hash_option_blob =
+    custom
+      ~encode:(function
+        | None -> Ok ""
+        | Some (Ethereum_types.Hash (Hex hash)) ->
+            Result.of_option ~error:"not a valid hash"
+            @@ Hex.to_string (`Hex hash))
+      ~decode:(function
+        | "" -> Ok None
+        | hash ->
+            let (`Hex hash) = Hex.of_string hash in
+            Ok (Some (Hash (Hex hash))))
       octets
 
   let block_hash =
@@ -130,14 +164,35 @@ module Types = struct
         Ok (Block_hash (Hex hash)))
       octets
 
+  let native_deposit =
+    custom ~encode:(fun b -> Ok b) ~decode:(fun b -> Ok b) bool
+
   let deposit =
-    product (fun nonce proxy ticket_hash receiver amount ->
-        {nonce; proxy; ticket_hash; receiver; amount})
+    product (fun nonce proxy ticket_hash receiver amount native_deposit ->
+        if native_deposit then {nonce; token = XTZ; receiver; amount}
+        else
+          let proxy =
+            match proxy with
+            | Some proxy -> proxy
+            | None -> Stdlib.failwith "FA deposit is missing the proxy"
+          in
+          let ticket_hash =
+            match ticket_hash with
+            | Some ticket_hash -> ticket_hash
+            | None -> Stdlib.failwith "FA deposit is missing the ticket_hash"
+          in
+          {nonce; token = FA {proxy; ticket_hash}; receiver; amount})
     @@ proj level (fun d -> d.nonce)
-    @@ proj address (fun d -> d.proxy)
-    @@ proj hash (fun d -> d.ticket_hash)
+    @@ proj address_option_blob (fun d ->
+           match d.token with XTZ -> None | FA {proxy; _} -> Some proxy)
+    @@ proj hash_option_blob (fun d ->
+           match d.token with
+           | XTZ -> None
+           | FA {ticket_hash; _} -> Some ticket_hash)
     @@ proj address (fun d -> d.receiver)
     @@ proj amount (fun d -> d.amount)
+    @@ proj native_deposit (fun d ->
+           match d.token with XTZ -> true | FA _ -> false)
     @@ proj_end
 
   let log_info =
@@ -183,74 +238,13 @@ module Types = struct
     @@ proj_end
 end
 
-module Migrations = struct
-  module Q = struct
-    let table_exists =
-      (string ->! bool)
-      @@ {sql|
-    SELECT EXISTS (
-      SELECT name FROM sqlite_master
-      WHERE type='table'
-        AND name=?
-    )|sql}
+module Migration = Sqlite.Migration.Make (struct
+  let table_name = "migrations"
 
-    let create_table =
-      (unit ->. unit)
-      @@ {sql|
-      CREATE TABLE migrations (
-        id SERIAL PRIMARY KEY,
-        name TEXT
-      )|sql}
+  let version = version
 
-    let current_migration =
-      (unit ->? int) @@ {|SELECT id FROM migrations ORDER BY id DESC LIMIT 1|}
-
-    let register_migration =
-      (t2 int string ->. unit)
-      @@ {sql|
-      INSERT INTO migrations (id, name) VALUES (?, ?)
-      |sql}
-
-    let all : Sql_migrations.migration list = Sql_migrations.migrations version
-  end
-
-  let create_table store =
-    Sqlite.with_connection store @@ fun conn ->
-    Sqlite.Db.exec conn Q.create_table ()
-
-  let table_exists store =
-    Sqlite.with_connection store @@ fun conn ->
-    Sqlite.Db.find conn Q.table_exists "migrations"
-
-  let missing_migrations store =
-    let open Lwt_result_syntax in
-    let all_migrations = List.mapi (fun i m -> (i, m)) Q.all in
-    let* current =
-      Sqlite.with_connection store @@ fun conn ->
-      Sqlite.Db.find_opt conn Q.current_migration ()
-    in
-    match current with
-    | Some current ->
-        let applied = current + 1 in
-        let known = List.length all_migrations in
-        if applied <= known then return (List.drop_n applied all_migrations)
-        else
-          let*! () =
-            Events.(emit migrations_from_the_future) (applied, known)
-          in
-          failwith
-            "Cannot use a database at migration %d, the fa bridge watchtower \
-             only supports up to %d"
-            applied
-            known
-    | None -> return all_migrations
-
-  let apply_migration store id (module M : Sql_migrations.S) =
-    let open Lwt_result_syntax in
-    Sqlite.with_connection store @@ fun conn ->
-    let* () = List.iter_es (fun up -> Sqlite.Db.exec conn up ()) M.apply in
-    Sqlite.Db.exec conn Q.register_migration (id, M.name)
-end
+  let all_migrations = Migrations.all
+end)
 
 type t = Sqlite.t
 
@@ -260,33 +254,17 @@ let init ~data_dir perm : t tzresult Lwt.t =
   let open Lwt_result_syntax in
   let*! () = Tezos_stdlib_unix.Lwt_utils_unix.create_dir data_dir in
   let path = Filename.concat data_dir sqlite_file_name in
-  let*! exists = Lwt_unix.file_exists path in
   let migration conn =
     Sqlite.assert_in_transaction conn ;
-    let* () =
-      if not exists then
-        let* () = Migrations.create_table conn in
-        let*! () = Events.(emit create_db) () in
-        return_unit
-      else
-        let* table_exists = Migrations.table_exists conn in
-        let* () =
-          when_ (not table_exists) (fun () ->
-              failwith
-                "A database already exists, but its content is incorrect.")
-        in
-        return_unit
-    in
-    let* migrations = Migrations.missing_migrations conn in
-    let* () =
-      List.iter_es
-        (fun (i, ((module M : Sql_migrations.S) as mig)) ->
-          let* () = Migrations.apply_migration conn i mig in
-          let*! () = Events.(emit applied_migration) M.name in
-          return_unit)
-        migrations
-    in
-    return_unit
+    Sqlite.with_connection conn @@ fun db_conn ->
+    Migration.apply
+      db_conn
+      ~on_init:Events.(emit create_db)
+      ~on_future:(fun ~applied ~known ->
+        Events.(emit migrations_from_the_future) (applied, known))
+      ~on_applied:(fun ~name ~duration:_ ->
+        Events.(emit applied_migration) name)
+      ()
   in
   Sqlite.init ~path ~perm migration
 
@@ -298,17 +276,17 @@ module Deposits = struct
       (t2 deposit log_info ->. unit)
       @@ {sql|
       REPLACE INTO deposits
-      (nonce, proxy, ticket_hash, receiver, amount,
+      (nonce, proxy, ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       |sql}
 
     let unclaimed_ignore_whitelist =
       (unit ->* deposit)
       @@ {sql|
       SELECT
-       nonce, proxy, ticket_hash, receiver, amount
+       nonce, proxy, ticket_hash, receiver, amount, native_deposit
       FROM deposits
       where exec_transactionHash IS NULL
       ORDER BY nonce DESC
@@ -318,14 +296,15 @@ module Deposits = struct
       (unit ->* deposit)
       @@ {sql|
       SELECT
-       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount
+       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount, d.native_deposit
       FROM deposits d
-      JOIN whitelist w
-      ON (
-       (d.proxy = w.proxy or w.proxy IS NULL)
-       AND
-       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
-      where d.exec_transactionHash IS NULL
+      WHERE d.exec_transactionHash IS NULL
+      AND (
+       d.native_deposit = 1
+       OR EXISTS (
+        SELECT 1 FROM whitelist w
+        WHERE (d.proxy = w.proxy OR w.proxy IS NULL)
+        AND (d.ticket_hash = w.ticket_hash OR w.ticket_hash IS NULL)))
       ORDER BY nonce DESC
       |sql}
 
@@ -333,7 +312,7 @@ module Deposits = struct
       (unit ->* t2 deposit log_info)
       @@ {sql|
       SELECT
-       nonce, proxy, ticket_hash, receiver, amount,
+       nonce, proxy, ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed
       FROM deposits
@@ -345,16 +324,17 @@ module Deposits = struct
       (unit ->* t2 deposit log_info)
       @@ {sql|
       SELECT
-       nonce, d.proxy, d.ticket_hash, receiver, amount,
-       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
-       log_blockNumber, log_removed
+       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount, d.native_deposit,
+       d.log_transactionHash, d.log_transactionIndex, d.log_logIndex,
+       d.log_blockHash, d.log_blockNumber, d.log_removed
       FROM deposits d
-      JOIN whitelist w
-      ON (
-       (d.proxy = w.proxy or w.proxy IS NULL)
-       AND
-       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
-      where exec_transactionHash IS NULL
+      WHERE d.exec_transactionHash IS NULL
+      AND (
+       d.native_deposit = 1
+       OR EXISTS (
+        SELECT 1 FROM whitelist w
+        WHERE (d.proxy = w.proxy OR w.proxy IS NULL)
+        AND (d.ticket_hash = w.ticket_hash OR w.ticket_hash IS NULL)))
       ORDER BY nonce DESC
       |sql}
 
@@ -362,7 +342,7 @@ module Deposits = struct
       (t2 int int ->* deposit_log)
       @@ {sql|
       SELECT
-       nonce, proxy, ticket_hash, receiver, amount,
+       nonce, proxy, ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed,
        exec_transactionHash, exec_transactionIndex, exec_blockHash,
@@ -375,17 +355,18 @@ module Deposits = struct
       (t2 int int ->* deposit_log)
       @@ {sql|
       SELECT
-       nonce, d.proxy, d.ticket_hash, receiver, amount,
-       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
-       log_blockNumber, log_removed,
-       exec_transactionHash, exec_transactionIndex, exec_blockHash,
-       exec_blockNumber
+       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount, d.native_deposit,
+       d.log_transactionHash, d.log_transactionIndex, d.log_logIndex,
+       d.log_blockHash, d.log_blockNumber, d.log_removed,
+       d.exec_transactionHash, d.exec_transactionIndex, d.exec_blockHash,
+       d.exec_blockNumber
       FROM deposits d
-      JOIN whitelist w
-      ON (
-       (d.proxy = w.proxy or w.proxy IS NULL)
-       AND
-       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
+      WHERE (
+       d.native_deposit = 1
+       OR EXISTS (
+        SELECT 1 FROM whitelist w
+        WHERE (d.proxy = w.proxy OR w.proxy IS NULL)
+        AND (d.ticket_hash = w.ticket_hash OR w.ticket_hash IS NULL)))
       ORDER BY nonce DESC LIMIT ? OFFSET ?
       |sql}
 
@@ -393,7 +374,7 @@ module Deposits = struct
       (t3 address int int ->* deposit_log)
       @@ {sql|
       SELECT
-       nonce, proxy, ticket_hash, receiver, amount,
+       nonce, proxy, ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed,
        exec_transactionHash, exec_transactionIndex, exec_blockHash,
@@ -407,18 +388,19 @@ module Deposits = struct
       (t3 address int int ->* deposit_log)
       @@ {sql|
       SELECT
-       nonce, d.proxy, d.ticket_hash, receiver, amount,
-       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
-       log_blockNumber, log_removed,
-       exec_transactionHash, exec_transactionIndex, exec_blockHash,
-       exec_blockNumber
+       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount, d.native_deposit,
+       d.log_transactionHash, d.log_transactionIndex, d.log_logIndex,
+       d.log_blockHash, d.log_blockNumber, d.log_removed,
+       d.exec_transactionHash, d.exec_transactionIndex, d.exec_blockHash,
+       d.exec_blockNumber
       FROM deposits d
-      JOIN whitelist w
-      ON (
-       (d.proxy = w.proxy or w.proxy IS NULL)
-       AND
-       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
-      WHERE receiver = ?
+      WHERE d.receiver = ?
+      AND (
+       d.native_deposit = 1
+       OR EXISTS (
+        SELECT 1 FROM whitelist w
+        WHERE (d.proxy = w.proxy OR w.proxy IS NULL)
+        AND (d.ticket_hash = w.ticket_hash OR w.ticket_hash IS NULL)))
       ORDER BY nonce DESC LIMIT ? OFFSET ?
       |sql}
 

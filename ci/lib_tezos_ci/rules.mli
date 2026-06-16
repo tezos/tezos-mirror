@@ -84,37 +84,47 @@ val homebrew_daily : If.t
     [TZ_SCHEDULE_KIND] set to [base_images.daily]. *)
 val base_images_daily : If.t
 
-(** A rule that is true for daily OPAM test pipelines.
-
-    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
-    [TZ_SCHEDULE_KIND] set to [opam.daily]. *)
-val opam_daily : If.t
-
 (** A rule that is true for scheduled extended RPC test pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
-    [TZ_SCHEDULE_KIND] set to [EXTENDED_RPC_TESTS]. *)
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_RPC_TESTS].
+
+    NB: Tests will run differently with this value of [TZ_SCHEDULE_KIND]:
+    the node's external RPC mode will be enabled.
+    Cf. [tezt/lib_tezos/node.mli]. *)
 val schedule_extended_rpc_tests : If.t
 
 (** A rule that is true for scheduled extended validation test
     pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
-    [TZ_SCHEDULE_KIND] set to [EXTENDED_VALIDATION_TESTS]. *)
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_VALIDATION_TESTS].
+
+    NB: Tests will run differently with this value of [TZ_SCHEDULE_KIND]:
+    the node's single-process mode will be enabled.
+    Cf. [tezt/lib_tezos/node.mli]. *)
 val schedule_extended_validation_tests : If.t
 
 (** A rule that is true for scheduled extended baker with remote node test
     pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
-    [TZ_SCHEDULE_KIND] set to [EXTENDED_BAKER_REMOTE_MODE_TESTS]. *)
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_BAKER_REMOTE_MODE_TESTS].
+
+    NB: Tests will run differently with this value of [TZ_SCHEDULE_KIND]:
+    the remote mode of the baker will be enabled.
+    Cf. [tezt/lib_tezos/agnostic_baker.ml]. *)
 val schedule_extended_baker_remote_mode_tests : If.t
 
 (** A rule that is true for scheduled extended baker with baker dal
     commands.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
-    [TZ_SCHEDULE_KIND] set to [EXTENDED_DAL_USE_BAKER]. *)
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_DAL_USE_BAKER].
+
+    NB: Tests will run differently with this value of [TZ_SCHEDULE_KIND]:
+    the baker will start the DAL node.
+    Cf. [tezt/lib_tezos/dal_node.ml]. *)
 val schedule_extended_dal_use_baker : If.t
 
 (** A rule that is true for scheduled release tests.
@@ -171,6 +181,13 @@ val schedule_documentation : If.t
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
     [TZ_SCHEDULE_KIND] set to [DOCKER_FRESH_IMAGE_BUILD]. *)
 val schedule_docker_build : If.t
+
+(** A rule that is true for scheduled pipelines that publish a dated master
+    Docker image to Docker Hub, tagged [master-YYYYMMDD].
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [schedule_docker_master_snapshot]. *)
+val schedule_docker_master_snapshot : If.t
 
 (** A rule that is true if [CI_COMMIT_BRANCH] is a given branch. *)
 val on_branch : string -> If.t

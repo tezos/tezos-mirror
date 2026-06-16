@@ -4,7 +4,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Blueprint;
-use crate::chains::{ChainConfigTrait, ChainHeaderTrait, TransactionsTrait};
+use crate::chains::{
+    ChainConfigTrait, ChainHeaderTrait, ExperimentalFeatures, TezosXTransaction,
+};
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::l2block::L2Block;
@@ -13,11 +15,10 @@ use crate::sequencer_blueprint::{
     BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
 };
 use crate::storage::read_last_info_per_level_timestamp;
-use crate::transaction::{Transaction, TransactionContent, Transactions};
+use crate::transaction::TransactionContent;
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
-use sha3::{Digest, Keccak256};
 use std::fmt::Debug;
 use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::eth_gen::OwnedHash;
@@ -25,17 +26,17 @@ use tezos_ethereum::rlp_helpers::{
     self, append_timestamp, append_u256_le, decode_field, decode_field_u256_le,
     decode_timestamp,
 };
-use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{read_rlp, store_read_slice, store_rlp};
 use tezos_tezlink::block::TezBlock;
+use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
 
-pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
+pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/base/blueprints");
 
 const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
 
@@ -47,23 +48,26 @@ const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
 const EVM_BLUEPRINT_GENERATION: RefPath = RefPath::assert_from(b"/generation");
 
 const EVM_CURRENT_BLOCK_HEADER: RefPath =
-    RefPath::assert_from(b"/evm/current_block_header");
+    RefPath::assert_from(b"/base/current_block_header");
+
+const TEZ_CURRENT_BLOCK_HEADER: RefPath =
+    RefPath::assert_from(b"/tez/world_state/tez_blocks/current_chain_header");
 
 /// The store representation of a blueprint.
 /// It's designed to support storing sequencer blueprints,
 /// which can be chunked, and blueprints constructed from
 /// inbox messages. Note that the latter are only to be
 /// used when the kernel isn't running with a sequencer.
-#[derive(PartialEq, Debug, Clone)]
-enum StoreBlueprint<Txs> {
+#[derive(PartialEq, Debug)]
+enum StoreBlueprint {
     SequencerChunk(Vec<u8>),
-    InboxBlueprint(Blueprint<Txs>),
+    InboxBlueprint(Blueprint),
 }
 
 const SEQUENCER_CHUNK_TAG: u8 = 0;
 const INBOX_BLUEPRINT_TAG: u8 = 1;
 
-impl<Txs: Encodable> Encodable for StoreBlueprint<Txs> {
+impl Encodable for StoreBlueprint {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(2);
         match &self {
@@ -79,7 +83,7 @@ impl<Txs: Encodable> Encodable for StoreBlueprint<Txs> {
     }
 }
 
-impl<Txs: Decodable> Decodable for StoreBlueprint<Txs> {
+impl Decodable for StoreBlueprint {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
@@ -132,6 +136,7 @@ pub struct BlockHeader<H> {
 #[derive(PartialEq, Debug, Clone)]
 pub struct TezBlockHeader {
     pub hash: H256,
+    pub next_protocol: Protocol,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -163,7 +168,10 @@ impl From<TezBlock> for BlockHeader<ChainHeader> {
                 number: block.number.into(),
                 timestamp: block.timestamp,
             },
-            chain_header: ChainHeader::Tez(TezBlockHeader { hash: block.hash.0 }),
+            chain_header: ChainHeader::Tez(TezBlockHeader {
+                hash: H256(*block.hash),
+                next_protocol: block.next_protocol,
+            }),
         }
     }
 }
@@ -210,8 +218,8 @@ fn blueprint_generation_path(
     concat(blueprint_path, &EVM_BLUEPRINT_GENERATION).map_err(StorageError::from)
 }
 
-fn read_current_generation_or_default<Host: Runtime>(
-    host: &Host,
+fn read_current_generation_or_default(
+    host: &impl StorageV1,
     default: U256,
 ) -> Result<U256, Error> {
     let path = blueprint_current_generation_path()?;
@@ -226,8 +234,8 @@ fn read_current_generation_or_default<Host: Runtime>(
     }
 }
 
-fn store_current_generation<Host: Runtime>(
-    host: &mut Host,
+fn store_current_generation(
+    host: &mut impl StorageV1,
     generation: U256,
 ) -> Result<(), Error> {
     let path = blueprint_current_generation_path()?;
@@ -236,7 +244,7 @@ fn store_current_generation<Host: Runtime>(
     host.store_write(&path, &buffer, 0).map_err(Error::from)
 }
 
-fn increment_current_generation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+fn increment_current_generation(host: &mut impl StorageV1) -> Result<(), Error> {
     let current_generation = read_current_generation_or_default(host, U256::zero())?;
     let new_generation =
         current_generation
@@ -248,8 +256,8 @@ fn increment_current_generation<Host: Runtime>(host: &mut Host) -> Result<(), Er
     Ok(())
 }
 
-fn read_blueprint_generation_or_default<Host: Runtime>(
-    host: &Host,
+fn read_blueprint_generation_or_default(
+    host: &impl StorageV1,
     blueprint_path: &OwnedPath,
     default: U256,
 ) -> Result<U256, Error> {
@@ -265,8 +273,8 @@ fn read_blueprint_generation_or_default<Host: Runtime>(
     }
 }
 
-fn store_blueprint_generation<Host: Runtime>(
-    host: &mut Host,
+fn store_blueprint_generation(
+    host: &mut impl StorageV1,
     blueprint_path: &OwnedPath,
     generation: U256,
 ) -> Result<(), Error> {
@@ -276,8 +284,8 @@ fn store_blueprint_generation<Host: Runtime>(
     host.store_write(&path, &buffer, 0).map_err(Error::from)
 }
 
-fn read_blueprint_nb_chunks<Host: Runtime>(
-    host: &Host,
+fn read_blueprint_nb_chunks(
+    host: &impl StorageV1,
     blueprint_path: &OwnedPath,
 ) -> Result<u16, Error> {
     let path = blueprint_nb_chunks_path(blueprint_path)?;
@@ -286,38 +294,44 @@ fn read_blueprint_nb_chunks<Host: Runtime>(
     Ok(u16::from_le_bytes(buffer))
 }
 
-fn store_blueprint_nb_chunks<Host: Runtime>(
+fn store_blueprint_nb_chunks<Host>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
     nb_chunks: u16,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
     let path = blueprint_nb_chunks_path(blueprint_path)?;
     let bytes = nb_chunks.to_le_bytes();
     host.store_write(&path, &bytes, 0).map_err(Error::from)
 }
 
-pub fn store_sequencer_blueprint<Host: Runtime>(
+pub fn store_sequencer_blueprint<Host>(
     host: &mut Host,
     blueprint: UnsignedSequencerBlueprint,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
     let blueprint_path = blueprint_path(blueprint.number)?;
     store_blueprint_nb_chunks(host, &blueprint_path, blueprint.nb_chunks)?;
     let current_generation = read_current_generation_or_default(host, U256::zero())?;
     store_blueprint_generation(host, &blueprint_path, current_generation)?;
     let blueprint_chunk_path =
         blueprint_chunk_path(&blueprint_path, blueprint.chunk_index)?;
-    // The `Transactions` type parameter of `StoreBlueprint` is not
-    // used in the `SequencerChunk` case so it is irrelevant here, we could pass
-    // any type implementing the `Encodable` trait.
-    let store_blueprint = StoreBlueprint::<Vec<u8>>::SequencerChunk(blueprint.chunk);
+    let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.chunk);
     store_rlp(&store_blueprint, host, &blueprint_chunk_path).map_err(Error::from)
 }
 
-pub fn store_inbox_blueprint_by_number<Host: Runtime, Txs: Encodable>(
+pub fn store_inbox_blueprint_by_number<Host>(
     host: &mut Host,
-    blueprint: Blueprint<Txs>,
+    blueprint: Blueprint,
     number: U256,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
     let blueprint_path = blueprint_path(number)?;
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
     let current_generation = read_current_generation_or_default(host, U256::zero())?;
@@ -327,16 +341,22 @@ pub fn store_inbox_blueprint_by_number<Host: Runtime, Txs: Encodable>(
     store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
 }
 
-pub fn store_inbox_blueprint<Host: Runtime, Txs: Encodable>(
+pub fn store_inbox_blueprint<Host>(
     host: &mut Host,
-    blueprint: Blueprint<Txs>,
-) -> anyhow::Result<()> {
+    blueprint: Blueprint,
+) -> anyhow::Result<()>
+where
+    Host: StorageV1,
+{
     let number = read_next_blueprint_number(host)?;
     Ok(store_inbox_blueprint_by_number(host, blueprint, number)?)
 }
 
 #[inline(always)]
-pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+pub fn read_next_blueprint_number<Host>(host: &Host) -> Result<U256, Error>
+where
+    Host: StorageV1,
+{
     match read_current_blueprint_header(host) {
         Ok(blueprint_header) => Ok(blueprint_header.number + 1),
         Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
@@ -347,11 +367,14 @@ pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Er
 }
 
 // Used to store a blueprint made out of forced delayed transactions.
-pub fn store_forced_blueprint<Host: Runtime, Txs: Encodable>(
+pub fn store_forced_blueprint<Host>(
     host: &mut Host,
-    blueprint: Blueprint<Txs>,
+    blueprint: Blueprint,
     number: U256,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
     let blueprint_path = blueprint_path(number)?;
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
     let current_generation = read_current_generation_or_default(host, U256::zero())?;
@@ -394,18 +417,35 @@ impl Decodable for EVMBlockHeader {
 
 impl Encodable for TezBlockHeader {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        let Self { hash } = self;
-        stream.begin_list(1);
+        let Self {
+            hash,
+            next_protocol,
+        } = self;
+        stream.begin_list(2);
         stream.append(hash);
+        stream.append(next_protocol);
     }
 }
 
 impl Decodable for TezBlockHeader {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        rlp_helpers::check_list(decoder, 1)?;
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        let item_count = decoder.item_count()?;
         let mut it = decoder.iter();
         let hash = decode_field(&rlp_helpers::next(&mut it)?, "hash")?;
-        Ok(Self { hash })
+        let next_protocol: Protocol = match item_count {
+            // V0 format: only hash, default next_protocol to INITIAL_PROTOCOL
+            1 => INITIAL_PROTOCOL,
+            // V1 format: hash + next_protocol
+            2 => decode_field(&rlp_helpers::next(&mut it)?, "protocol")?,
+            _ => return Err(DecoderError::RlpIncorrectListLen),
+        };
+        Ok(Self {
+            hash,
+            next_protocol,
+        })
     }
 }
 
@@ -446,7 +486,7 @@ impl<H: Decodable> Decodable for BlockHeader<H> {
         rlp_helpers::check_list(&decoder, 1)?; // Nesting added for forward-compatibility with multichain
         let mut it = decoder.iter();
         let chain_header =
-            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "block_header")?;
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chain_header")?;
         Ok(Self {
             blueprint_header: BlueprintHeader { number, timestamp },
             chain_header,
@@ -454,24 +494,48 @@ impl<H: Decodable> Decodable for BlockHeader<H> {
     }
 }
 
-pub fn store_current_block_header<Host: Runtime>(
+pub fn store_current_block_header<Host>(
     host: &mut Host,
     current_block_header: &BlockHeader<ChainHeader>,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
     store_rlp(current_block_header, host, &EVM_CURRENT_BLOCK_HEADER).map_err(Error::from)
 }
 
-pub fn read_current_block_header<Host: Runtime, H: Decodable>(
+pub fn read_current_block_header<Host, H: Decodable>(
     host: &Host,
-) -> Result<BlockHeader<H>, Error> {
+) -> Result<BlockHeader<H>, Error>
+where
+    Host: StorageV1,
+{
     Ok(read_rlp(host, &EVM_CURRENT_BLOCK_HEADER)?)
 }
 
-pub fn read_current_blueprint_header<Host: Runtime>(
-    host: &Host,
-) -> Result<BlueprintHeader, Error> {
+pub fn read_current_blueprint_header<Host>(host: &Host) -> Result<BlueprintHeader, Error>
+where
+    Host: StorageV1,
+{
     let block_header = read_current_block_header::<_, rlp_helpers::IgnoredField>(host)?;
     Ok(block_header.blueprint_header)
+}
+
+pub fn store_current_tez_block_header<Host>(
+    host: &mut Host,
+    header: &TezBlockHeader,
+) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
+    store_rlp(header, host, &TEZ_CURRENT_BLOCK_HEADER).map_err(Error::from)
+}
+
+pub fn read_current_tez_block_header<Host>(host: &Host) -> Result<TezBlockHeader, Error>
+where
+    Host: StorageV1,
+{
+    Ok(read_rlp(host, &TEZ_CURRENT_BLOCK_HEADER)?)
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
@@ -488,8 +552,8 @@ const MAXIMUM_SIZE_OF_DELAYED_TRANSACTION: usize = MAX_INPUT_MESSAGE_SIZE;
 /// Only used for test, as all errors are handled in the same way
 #[cfg_attr(feature = "benchmark", allow(dead_code))]
 #[derive(Debug, PartialEq)]
-pub enum BlueprintValidity<Txs> {
-    Valid(Blueprint<Txs>),
+pub enum BlueprintValidity {
+    Valid(Blueprint),
     InvalidParentHash,
     TimestampFromPast,
     TimestampFromFuture,
@@ -503,34 +567,49 @@ pub enum BlueprintValidity<Txs> {
     StaleBlueprint,
 }
 
-pub enum DelayedTransactionFetchingResult<Txs> {
-    Ok(Txs),
+pub enum DelayedTransactionFetchingResult<Tx> {
+    Ok(Vec<Tx>),
     BlueprintTooLarge,
     DelayedHashMissing(delayed_inbox::Hash),
 }
 
-pub fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
+pub fn fetch_hashes_from_delayed_inbox<Host>(
     host: &mut Host,
     delayed_hashes: Vec<delayed_inbox::Hash>,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
-) -> anyhow::Result<(DelayedTransactionFetchingResult<Transactions>, usize)> {
+    block_number: U256,
+) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
+where
+    Host: StorageV1,
+{
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
+    let experimental_features = ExperimentalFeatures::read_from_storage(host);
     for tx_hash in delayed_hashes {
         let tx = delayed_inbox.find_transaction(host, tx_hash)?;
-        // This is overestimated, as the transactions cannot be chunked in the
-        // delayed bridge.
-        total_size += MAXIMUM_SIZE_OF_DELAYED_TRANSACTION;
-        // If the size would overflow the 512KB, reject the blueprint
-        if MAXIMUM_SIZE_OF_BLUEPRINT < total_size {
-            return Ok((
-                DelayedTransactionFetchingResult::BlueprintTooLarge,
-                total_size,
-            ));
-        }
         match tx {
-            Some(tx) => delayed_txs.push(tx.0),
+            Some(tx) => {
+                if let TransactionContent::TezosDelayed(_) = &tx.0.content {
+                    if !experimental_features.is_tezos_runtime_enabled(block_number) {
+                        log!(Error,
+                            "TezosDelayed transaction found in delayed inbox while Tezos runtime is disabled. Skipping."
+                        );
+                        continue;
+                    }
+                }
+                // This is overestimated, as the transactions cannot be chunked in the
+                // delayed bridge.
+                total_size += MAXIMUM_SIZE_OF_DELAYED_TRANSACTION;
+                // If the size would overflow the 512KB, reject the blueprint
+                if MAXIMUM_SIZE_OF_BLUEPRINT < total_size {
+                    return Ok((
+                        DelayedTransactionFetchingResult::BlueprintTooLarge,
+                        total_size,
+                    ));
+                }
+                delayed_txs.push(tx.0)
+            }
             None => {
                 return Ok((
                     DelayedTransactionFetchingResult::DelayedHashMissing(tx_hash),
@@ -540,40 +619,46 @@ pub fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
         }
     }
     Ok((
-        DelayedTransactionFetchingResult::Ok(Transactions::EthTxs(delayed_txs)),
+        DelayedTransactionFetchingResult::Ok(
+            delayed_txs
+                .into_iter()
+                .map(|tx| TezosXTransaction::Ethereum(Box::new(tx)))
+                .collect(),
+        ),
         total_size,
     ))
 }
 
-pub fn transactions_from_bytes(
+fn transactions_from_bytes<ChainConfig: ChainConfigTrait>(
     transactions: Vec<Vec<u8>>,
-) -> anyhow::Result<Vec<Transaction>> {
-    transactions
-        .into_iter()
-        .map(|tx_common| {
-            let tx_hash = Keccak256::digest(&tx_common).into();
-            let tx_common = EthereumTransactionCommon::from_bytes(&tx_common)?;
-
-            Ok(Transaction {
-                tx_hash,
-                content: TransactionContent::Ethereum(tx_common),
-            })
-        })
-        .collect::<anyhow::Result<Vec<Transaction>>>()
+    blueprint_version: u8,
+) -> anyhow::Result<Vec<TezosXTransaction>> {
+    let mut result = vec![];
+    for tx_common in transactions.iter() {
+        let transaction =
+            ChainConfig::transaction_from_bytes(tx_common, blueprint_version)?;
+        result.push(transaction)
+    }
+    Ok(result)
 }
 
-pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
+pub fn fetch_delayed_txs<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
-) -> anyhow::Result<(BlueprintValidity<ChainConfig::Transactions>, usize)> {
+    block_number: U256,
+) -> anyhow::Result<(BlueprintValidity, usize)>
+where
+    Host: StorageV1,
+{
     let (mut delayed_txs, total_size) =
         match ChainConfig::fetch_hashes_from_delayed_inbox(
             host,
             blueprint_with_hashes.delayed_hashes,
             delayed_inbox,
             current_blueprint_size,
+            block_number,
         )? {
             (DelayedTransactionFetchingResult::Ok(delayed_txs), total_size) => {
                 (delayed_txs, total_size)
@@ -586,8 +671,10 @@ pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
             }
         };
 
-    let transactions_with_hashes =
-        ChainConfig::transactions_from_bytes(blueprint_with_hashes.transactions)?;
+    let transactions_with_hashes = transactions_from_bytes::<ChainConfig>(
+        blueprint_with_hashes.transactions,
+        blueprint_with_hashes.version,
+    )?;
 
     delayed_txs.extend(transactions_with_hashes);
     Ok((
@@ -607,7 +694,7 @@ pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
 pub const DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: i64 = 300i64;
 
 #[allow(clippy::too_many_arguments)]
-fn parse_and_validate_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
+fn parse_and_validate_blueprint<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     bytes: &[u8],
     delayed_inbox: &mut DelayedInbox,
@@ -616,7 +703,11 @@ fn parse_and_validate_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     max_blueprint_lookahead_in_seconds: i64,
     parent_chain_header: &ChainConfig::ChainHeader,
     head_timestamp: Timestamp,
-) -> anyhow::Result<(BlueprintValidity<ChainConfig::Transactions>, usize)> {
+    block_number: U256,
+) -> anyhow::Result<(BlueprintValidity, usize)>
+where
+    Host: StorageV1,
+{
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
@@ -657,7 +748,6 @@ fn parse_and_validate_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
                 // so it must not fails on this.
                 if !evm_node_flag && blueprint_with_hashes.timestamp > accepted_bound {
                     log!(
-                        host,
                         Debug,
                         "Accepted bound is {}, Blueprint.timestamp is {}",
                         accepted_bound,
@@ -673,18 +763,21 @@ fn parse_and_validate_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
                 blueprint_with_hashes,
                 delayed_inbox,
                 current_blueprint_size,
+                block_number,
             )
         }
     }
 }
 
-fn invalidate_blueprint<Host: Runtime, Txs: Debug>(
+fn invalidate_blueprint<Host>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
-    error: &BlueprintValidity<Txs>,
-) -> Result<(), Error> {
+    error: &BlueprintValidity,
+) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
     log!(
-        host,
         Info,
         "Deleting invalid blueprint at path {}, error: {:?}",
         blueprint_path,
@@ -694,18 +787,22 @@ fn invalidate_blueprint<Host: Runtime, Txs: Debug>(
     delete_blueprint(host, blueprint_path)
 }
 
-fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
+fn read_all_chunks_and_validate<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
     nb_chunks: u16,
     config: &mut Configuration,
     previous_chain_header: &ChainConfig::ChainHeader,
     previous_timestamp: Timestamp,
-) -> anyhow::Result<(Option<Blueprint<ChainConfig::Transactions>>, usize)> {
+    block_number: U256,
+) -> anyhow::Result<(Option<Blueprint>, usize)>
+where
+    Host: StorageV1,
+{
     let mut chunks = vec![];
     let mut size = 0;
     if nb_chunks > MAXIMUM_NUMBER_OF_CHUNKS {
-        invalidate_blueprint::<_, ChainConfig::Transactions>(
+        invalidate_blueprint(
             host,
             blueprint_path,
             &BlueprintValidity::BlueprintTooLarge,
@@ -741,7 +838,7 @@ fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
             max_blueprint_lookahead_in_seconds,
             ..
         } => {
-            let validity: (BlueprintValidity<ChainConfig::Transactions>, usize) =
+            let validity: (BlueprintValidity, usize) =
                 parse_and_validate_blueprint::<_, ChainConfig>(
                     host,
                     chunks.concat().as_slice(),
@@ -751,15 +848,15 @@ fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     *max_blueprint_lookahead_in_seconds,
                     previous_chain_header,
                     previous_timestamp,
+                    block_number,
                 )?;
             if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
                 validity
             {
                 log!(
-                    host,
                     Benchmarking,
                     "Number of transactions in blueprint: {}",
-                    blueprint.transactions.number_of_txs()
+                    blueprint.transactions.len()
                 );
                 Ok((Some(blueprint), size_with_delayed_transactions))
             } else {
@@ -770,13 +867,16 @@ fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
     }
 }
 
-pub fn read_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
+pub fn read_blueprint<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     config: &mut Configuration,
     number: U256,
     previous_timestamp: Timestamp,
     previous_chain_header: &ChainConfig::ChainHeader,
-) -> anyhow::Result<(Option<Blueprint<ChainConfig::Transactions>>, usize)> {
+) -> anyhow::Result<(Option<Blueprint>, usize)>
+where
+    Host: StorageV1,
+{
     let blueprint_path = blueprint_path(number)?;
     let exists = blueprint_exists(host, &blueprint_path)?;
     if exists {
@@ -789,16 +889,11 @@ pub fn read_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
             invalidate_blueprint(
                 host,
                 &blueprint_path,
-                &BlueprintValidity::<ChainConfig::Transactions>::StaleBlueprint,
+                &BlueprintValidity::StaleBlueprint,
             )?;
             return Ok((None, 0));
         }
-        log!(
-            host,
-            Benchmarking,
-            "Number of chunks in blueprint: {}",
-            nb_chunks
-        );
+        log!(Benchmarking, "Number of chunks in blueprint: {}", nb_chunks);
         // All chunks are available
         let (blueprint, size) = read_all_chunks_and_validate::<_, ChainConfig>(
             host,
@@ -807,25 +902,24 @@ pub fn read_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
             config,
             previous_chain_header,
             previous_timestamp,
+            number,
         )?;
         Ok((blueprint, size))
     } else {
-        log!(host, Benchmarking, "Number of chunks in blueprint: {}", 0);
-        log!(
-            host,
-            Benchmarking,
-            "Number of transactions in blueprint: {}",
-            0
-        );
+        log!(Benchmarking, "Number of chunks in blueprint: {}", 0);
+        log!(Benchmarking, "Number of transactions in blueprint: {}", 0);
         Ok((None, 0))
     }
 }
 
 #[cfg(test)]
-pub fn read_next_blueprint<Host: Runtime>(
+pub fn read_next_blueprint<Host>(
     host: &mut Host,
     config: &mut Configuration,
-) -> anyhow::Result<(Option<Blueprint<crate::transaction::Transactions>>, usize)> {
+) -> anyhow::Result<(Option<Blueprint>, usize)>
+where
+    Host: StorageV1,
+{
     let (number, previous_timestamp, block_header) =
         match read_current_block_header::<_, EVMBlockHeader>(host) {
             Ok(BlockHeader {
@@ -851,15 +945,21 @@ pub fn read_next_blueprint<Host: Runtime>(
     )
 }
 
-pub fn drop_blueprint<Host: Runtime>(host: &mut Host, number: U256) -> Result<(), Error> {
+pub fn drop_blueprint<Host>(host: &mut Host, number: U256) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
     let path = blueprint_path(number)?;
     delete_blueprint(host, &path)
 }
 
-pub fn delete_blueprint<Host: Runtime>(
+pub fn delete_blueprint<Host>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
     let exists = blueprint_exists(host, blueprint_path)?;
     if !exists {
         return Ok(());
@@ -874,16 +974,22 @@ pub fn delete_blueprint<Host: Runtime>(
     Ok(())
 }
 
-pub fn blueprint_exists<Host: Runtime>(
+pub fn blueprint_exists<Host>(
     host: &Host,
     blueprint_path: &OwnedPath,
-) -> Result<bool, Error> {
+) -> Result<bool, Error>
+where
+    Host: StorageV1,
+{
     host.store_has(&blueprint_nb_chunks_path(blueprint_path)?)
         .map_err(Error::from)
         .map(|exists| exists.is_some())
 }
 
-pub fn clear_all_blueprints<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+pub fn clear_all_blueprints<Host>(host: &mut Host) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
     increment_current_generation(host)?;
     Ok(())
 }
@@ -896,7 +1002,9 @@ mod tests {
     use crate::chains::EvmChainConfig;
     use crate::configuration::{DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
-    use crate::sequencer_blueprint::{rlp_roundtrip, rlp_roundtrip_f};
+    use crate::sequencer_blueprint::{
+        rlp_roundtrip, rlp_roundtrip_f, LATEST_BLUEPRINT_VERSION,
+    };
     use crate::storage::store_last_info_per_level_timestamp;
     use crate::tick_model::constants::MAX_ALLOWED_TICKS;
     use primitive_types::H256;
@@ -904,6 +1012,7 @@ mod tests {
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
+    use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockKernelHost::default();
@@ -947,6 +1056,7 @@ mod tests {
 
         let blueprint_with_invalid_hash: BlueprintWithDelayedHashes =
             BlueprintWithDelayedHashes {
+                version: LATEST_BLUEPRINT_VERSION,
                 delayed_hashes: vec![dummy_tx_hash],
                 parent_hash: dummy_parent_hash,
                 timestamp: Timestamp::from(42),
@@ -981,6 +1091,7 @@ mod tests {
                 transactions_root: vec![0; 32],
             },
             Timestamp::from(0),
+            U256::zero(),
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(
@@ -1015,6 +1126,7 @@ mod tests {
         // Test with invalid parent hash
         let blueprint_with_invalid_parent_hash: BlueprintWithDelayedHashes =
             BlueprintWithDelayedHashes {
+                version: LATEST_BLUEPRINT_VERSION,
                 delayed_hashes: vec![],
                 parent_hash: H256::zero(),
                 timestamp: Timestamp::from(42),
@@ -1047,6 +1159,7 @@ mod tests {
                 transactions_root: vec![0; 32],
             },
             Timestamp::from(0),
+            U256::zero(),
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(validity.0, BlueprintValidity::InvalidParentHash);
@@ -1117,7 +1230,8 @@ mod tests {
             timestamp: Timestamp::from(10),
         };
         let tez_block_header = TezBlockHeader {
-            hash: TezBlock::genesis_block_hash(),
+            hash: H256(*TezBlock::genesis_block_hash()),
+            next_protocol: TARGET_TEZOS_PROTOCOL,
         };
         let block_header = BlockHeader {
             blueprint_header,

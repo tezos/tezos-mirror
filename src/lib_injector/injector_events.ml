@@ -204,6 +204,23 @@ module Make
       ("force", Data_encoding.bool)
       ~pp1:(pp_operations_list ~numbered:true)
 
+  let simulating_batch_length =
+    declare_1
+      ~name:"simulating_batch_length"
+      ~msg:"Simulating batch of {count} operations"
+      ~level:Info
+      ("count", Data_encoding.int31)
+
+  let batch_too_large_splitting =
+    declare_2
+      ~name:"batch_too_large_splitting"
+      ~msg:
+        "Gas quota exceeded with {original_count} operations, splitting batch \
+         and retrying with {new_count} operations"
+      ~level:Warning
+      ("original_count", Data_encoding.int31)
+      ("new_count", Data_encoding.int31)
+
   let discard_error_operation =
     declare_3
       ~name:"discard_error_operation"

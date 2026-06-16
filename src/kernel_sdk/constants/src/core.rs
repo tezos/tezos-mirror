@@ -76,3 +76,6 @@ pub const ORIGINATION_LEVEL_LENGTH: usize = 4;
 
 /// Length of the combined metadata for a rollup.
 pub const METADATA_LENGTH: usize = ROLLUP_ADDRESS_LENGTH + ORIGINATION_LEVEL_LENGTH;
+
+/// Length of root hashes of durable storage.
+pub const STORE_HASH_SIZE: usize = 32;

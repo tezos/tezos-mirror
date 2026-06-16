@@ -38,10 +38,10 @@ pub const PATH_KERNEL_BOOT: RefPath = RefPath::assert_from(b"/kernel/boot.wasm")
 /// [PATH_MAX_SIZE] bytes.
 ///
 /// # Safety
-/// [`Path`] is unsafe to implement, as other code (e.g. [`Runtime`]) rely on any
+/// [`Path`] is unsafe to implement, as other code (e.g. [`StorageV1`]) rely on any
 /// `T: impl Path` being correctly path-encoded.
 ///
-/// [`Runtime`]: crate::runtime::Runtime
+/// [`StorageV1`]: crate::storage::StorageV1
 pub unsafe trait Path: core::fmt::Debug + core::fmt::Display {
     /// Returns a read-only reference to the underlying path-encoded byte-slice.
     fn as_bytes(&self) -> &[u8];
@@ -214,7 +214,7 @@ const fn assert_ok(res: Result<(), PathError>) {
 /// check that the given path is well-formed. it Does not check that
 /// the path is writable, see [`validate_path`] to be sure the path is
 /// writable.
-const fn validate_path_internal(path: &[u8]) -> Result<(), PathError> {
+pub const fn validate_path_internal(path: &[u8]) -> Result<(), PathError> {
     match path {
         [] => Err(PathError::PathEmpty),
         [PATH_SEPARATOR] | [.., PATH_SEPARATOR] => Err(PathError::InvalidEmptyStep),
@@ -242,7 +242,14 @@ const fn validate_path_internal(path: &[u8]) -> Result<(), PathError> {
     }
 }
 
-const fn validate_path(path: &[u8]) -> Result<(), PathError> {
+/// Validate that `path` is a well-formed, writable path.
+///
+/// This is the same validation as [`validate_path_internal`] but also rejects
+/// paths starting with `/readonly`, which is a reserved storage prefix.
+///
+/// Exposed as `pub` so that other crates (e.g. `tezos-smart-rollup-keyspace`) can
+/// reuse this validation logic without duplicating it.
+pub const fn validate_path(path: &[u8]) -> Result<(), PathError> {
     match validate_path_internal(path) {
         Ok(()) => match path {
             [PATH_SEPARATOR, b'r', b'e', b'a', b'd', b'o', b'n', b'l', b'y']

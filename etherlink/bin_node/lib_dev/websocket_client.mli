@@ -131,3 +131,10 @@ val subscribe_l1_l2_levels :
   t ->
   Ethereum_types.Subscription.l1_l2_levels_output tzresult subscription tzresult
   Lwt.t
+
+(** [subscribe_newPreconfirmedReceipts ?timeout client] is like [subscribe] but
+    specialized for NewPreconfirmedReceipts events. *)
+val subscribe_newPreconfirmedReceipts :
+  ?timeout:timeout ->
+  t ->
+  Transaction_receipt.t tzresult subscription tzresult Lwt.t

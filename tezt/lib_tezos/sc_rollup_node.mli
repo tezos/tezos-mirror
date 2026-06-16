@@ -81,6 +81,7 @@ type argument =
   | Apply_unsafe_patches
   | Injector_retention_period of int
   | Acl_allow_all
+  | Slow_vm_fallback
 
 type event = {name : string; value : JSON.t; timestamp : float}
 
@@ -135,6 +136,7 @@ val create :
   ?data_dir:string ->
   ?config_file:string ->
   base_dir:string ->
+  kind:string ->
   ?remote_signer:Uri.t ->
   ?event_pipe:string ->
   ?metrics_addr:string ->
@@ -162,6 +164,7 @@ val create_with_endpoint :
   ?data_dir:string ->
   ?config_file:string ->
   base_dir:string ->
+  kind:string ->
   ?remote_signer:Uri.t ->
   ?event_pipe:string ->
   ?metrics_addr:string ->
@@ -212,6 +215,12 @@ val data_dir : t -> string
 
 (** Get the base-dir of an sc node *)
 val base_dir : t -> string
+
+(** Get the PVM kind of an rollup node *)
+val kind : t -> string
+
+(** Returns if the rollup node only monitors finalized L1 heads. *)
+val monitors_finalized : t -> bool
 
 (** Get the metrics address and port of a node. *)
 val metrics : t -> string * int
@@ -374,22 +383,28 @@ val change_operators : t -> (purpose * string) list -> unit
 val dump_durable_storage :
   sc_rollup_node:t -> dump:string -> ?block:string -> unit -> unit Lwt.t
 
-(** [export_snapshot ?compress_on_the_fly ?compact rollup_node dir] creates a
-    snapshot of the rollup node in directory [dir]. *)
+(** [export_snapshot ?compress_on_the_fly ?compact ?no_check rollup_node dir]
+    creates a snapshot of the rollup node in directory [dir]. *)
 val export_snapshot :
   ?compress_on_the_fly:bool ->
   ?compact:bool ->
+  ?no_check:bool ->
+  ?level:string ->
   t ->
   string ->
   string Runnable.process
 
-(** [import_snapshot ?apply_unsafe_patches ?force rollup_node
-    ~snapshot_file] imports the snapshot [snapshot_file] in the rollup
-    node [rollup_node].  *)
+(** [import_snapshot ?apply_unsafe_patches ?force ?no_check ?dal_node ?level
+    rollup_node ~snapshot_file] imports the snapshot [snapshot_file] in the
+    rollup node [rollup_node]. If [dal_node] is provided, its RPC endpoint is
+    passed via [--dal-node] so that context reconstruction can fetch DAL
+    pages. *)
 val import_snapshot :
   ?apply_unsafe_patches:bool ->
   ?force:bool ->
   ?no_check:bool ->
+  ?dal_node:Dal_node.t ->
+  ?level:string ->
   t ->
   snapshot_file:string ->
   unit Runnable.process

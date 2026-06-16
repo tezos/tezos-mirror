@@ -71,6 +71,17 @@ let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
 let default_minimal_nanotez_per_byte = Q.of_int 1000
 
+let get_minimal_nanotez_per_byte config = config.minimal_nanotez_per_byte
+
+let with_minimal_nanotez_per_byte minimal_nanotez_per_byte config =
+  {config with minimal_nanotez_per_byte}
+
+let get_minimal_nanotez_per_gas_unit config =
+  config.minimal_nanotez_per_gas_unit
+
+let with_minimal_nanotez_per_gas_unit minimal_nanotez_per_gas_unit config =
+  {config with minimal_nanotez_per_gas_unit}
+
 let managers_quota =
   Stdlib.List.nth Main.validation_passes Operation_repr.manager_pass
 
@@ -529,46 +540,84 @@ let prefilter_consensus_operation info config level_and_round =
       We add [config.clock_drift] time as a safety margin.
   *)
 let pre_filter info config
-    ({shell = _; protocol_data = Operation_data {contents; _} as op} :
+    ({shell = _; protocol_data = Operation_data {contents; _} as op} as
+     operation :
       Main.operation) =
-  let prefilter_manager_op manager_op =
-    match pre_filter_manager info config op manager_op with
-    | `Passed_prefilter prio -> `Passed_prefilter (manager_prio prio)
-    | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as err
-      ->
-        err
-  in
-  match contents with
-  | Single (Failing_noop _) ->
-      `Refused [Environment.wrap_tzerror Wrong_operation]
-  | Single (Preattestation consensus_content)
-  | Single (Attestation {consensus_content; dal_content = _}) ->
-      let level_and_round : level_and_round =
-        {level = consensus_content.level; round = consensus_content.round}
+  (* Reject a smart-rollup refutation whose DAL page proof targets a
+     [published_level] beyond the level of the block it would be baked into
+     ([head + 1]): such an operation is un-appliable (see
+     [Block_validation.find_future_dal_refute]) and would otherwise be
+     classified [validated], gossiped, and selected by a baker. We classify it
+     [`Branch_delayed] (not [`Refused]): the op is not permanently invalid
+     -- its [published_level] is greater than [head + 1] and may be reached
+     as the head advances, after which the op could become valid -- so it
+     matches the [`Temporary] error kind (whose generic classification is
+     [`Branch_delayed]) and is retained and re-evaluated on each new head.
+     We compare against [head + 1] to agree with block validation (which
+     uses the level of the block being validated). *)
+  let level = Raw_level.succ (Raw_level.of_int32_exn info.head.level) in
+  match Block_validation.find_future_dal_refute ~level operation with
+  | Some published_level ->
+      `Branch_delayed
+        [
+          Environment.wrap_tzerror
+            (Block_validation.Sc_rollup_refute_dal_proof_future_published_level
+               {published_level; level});
+        ]
+  | None -> (
+      let prefilter_manager_op manager_op =
+        match pre_filter_manager info config op manager_op with
+        | `Passed_prefilter prio -> `Passed_prefilter (manager_prio prio)
+        | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
+          err ->
+            err
       in
-      prefilter_consensus_operation info config level_and_round
-  | Single (Preattestations_aggregate _) ->
-      (* Aggregate are built at baking time and shouldn't be broadcasted between
+      match contents with
+      | Single (Failing_noop _) ->
+          `Refused [Environment.wrap_tzerror Wrong_operation]
+      | Single (Preattestation consensus_content)
+      | Single (Attestation {consensus_content; dal_content = _}) ->
+          let level_and_round : level_and_round =
+            {level = consensus_content.level; round = consensus_content.round}
+          in
+          prefilter_consensus_operation info config level_and_round
+      | Single (Preattestations_aggregate _) ->
+          (* Aggregate are built at baking time and shouldn't be broadcasted between
          mempools. *)
-      `Refused [Environment.wrap_tzerror Wrong_operation]
-  | Single (Attestations_aggregate _) ->
-      (* Aggregate are built at baking time and shouldn't be broadcasted between
+          `Refused [Environment.wrap_tzerror Wrong_operation]
+      | Single (Attestations_aggregate _) ->
+          (* Aggregate are built at baking time and shouldn't be broadcasted between
          mempools. *)
-      `Refused [Environment.wrap_tzerror Wrong_operation]
-  | Single (Seed_nonce_revelation _)
-  | Single (Double_consensus_operation_evidence _)
-  | Single (Double_baking_evidence _)
-  | Single (Dal_entrapment_evidence _)
-  | Single (Activate_account _)
-  | Single (Proposals _)
-  | Single (Vdf_revelation _)
-  | Single (Drain_delegate _)
-  | Single (Ballot _) ->
-      `Passed_prefilter other_prio
-  | Single (Manager_operation _) as op -> prefilter_manager_op op
-  | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
+          `Refused [Environment.wrap_tzerror Wrong_operation]
+      | Single (Seed_nonce_revelation _)
+      | Single (Double_consensus_operation_evidence _)
+      | Single (Double_baking_evidence _)
+      | Single (Dal_entrapment_evidence _)
+      | Single (Activate_account _)
+      | Single (Proposals _)
+      | Single (Vdf_revelation _)
+      | Single (Drain_delegate _)
+      | Single (Ballot _) ->
+          `Passed_prefilter other_prio
+      | Single (Manager_operation _) as op -> prefilter_manager_op op
+      | Cons (Manager_operation _, _) as op -> prefilter_manager_op op)
 
 let syntactic_check _ = Lwt.return `Well_formed
+
+let equal_modulo_dummy_values
+    ({contents = contents1; _} : Block_header.protocol_data)
+    ({contents = contents2; _} : Block_header.protocol_data) =
+  (* proof_of_work_nonce are not compared since the preapply function uses a fake
+     protocol_data created with an empty proof_of_work_nonce *)
+
+  (* payload_hash are not compared since the preapply function uses a dummy
+     payload hash (see [forge_faked_protocol_data]) *)
+  Round.equal contents1.payload_round contents2.payload_round
+  && Option.equal
+       Nonce_hash.equal
+       contents1.seed_nonce_hash
+       contents2.seed_nonce_hash
+  && contents1.per_block_votes = contents2.per_block_votes
 
 let is_manager_operation op =
   match Operation.acceptable_pass op with
@@ -855,31 +904,47 @@ let sources_from_operation ctxt
     ({shell = _; protocol_data = Operation_data {contents; _}} : Main.operation)
     =
   let open Lwt_syntax in
-  match contents with
-  | Single (Failing_noop _) -> return_nil
-  | Single (Preattestation consensus_content)
-  | Single (Attestation {consensus_content; dal_content = _}) ->
-      let attested_level = Level.from_raw ctxt consensus_content.level in
-      sources_from_level_and_slot ctxt ~attested_level consensus_content.slot
-  | Single (Preattestations_aggregate {consensus_content; committee}) ->
-      sources_from_aggregate ctxt consensus_content committee
-  | Single (Attestations_aggregate {consensus_content; committee}) ->
-      sources_from_aggregate
-        ctxt
-        consensus_content
-        (Operation.committee_slots committee)
-  | Single (Seed_nonce_revelation _)
-  | Single (Double_consensus_operation_evidence _)
-  | Single (Double_baking_evidence _)
-  | Single (Dal_entrapment_evidence _)
-  | Single (Activate_account _)
-  | Single (Vdf_revelation _) ->
-      return_nil
-  | Single (Proposals {source; _}) | Single (Ballot {source; _}) ->
-      return [source]
-  | Single (Drain_delegate {delegate; _}) -> return [delegate]
-  | Single (Manager_operation {source; _}) -> return [source]
-  | Cons (Manager_operation {source; _}, _) -> return [source]
+  let* sources =
+    match contents with
+    | Single (Failing_noop _) -> return_nil
+    | Single (Preattestation consensus_content)
+    | Single (Attestation {consensus_content; dal_content = _}) ->
+        let attested_level = Level.from_raw ctxt consensus_content.level in
+        let* sources =
+          sources_from_level_and_slot
+            ctxt
+            ~attested_level
+            consensus_content.slot
+        in
+        return sources
+    | Single (Preattestations_aggregate {consensus_content; committee}) ->
+        let* sources =
+          sources_from_aggregate ctxt consensus_content committee
+        in
+        return sources
+    | Single (Attestations_aggregate {consensus_content; committee}) ->
+        let* sources =
+          sources_from_aggregate
+            ctxt
+            consensus_content
+            (Operation.committee_slots committee)
+        in
+        return sources
+    | Single (Seed_nonce_revelation _)
+    | Single (Double_consensus_operation_evidence _)
+    | Single (Double_baking_evidence _)
+    | Single (Dal_entrapment_evidence _)
+    | Single (Activate_account _)
+    | Single (Vdf_revelation _) ->
+        return_nil
+    | Single (Proposals {source; _}) | Single (Ballot {source; _}) ->
+        return [source]
+    | Single (Drain_delegate {delegate; _}) -> return [delegate]
+    | Single (Manager_operation {source; _}) -> return [source]
+    | Cons (Manager_operation {source; _}, _) -> return [source]
+  in
+  let map_pkh_env = List.map Tezos_crypto.Signature.Of_V2.public_key_hash in
+  return @@ map_pkh_env sources
 
 module Internal_for_tests = struct
   let default_config_with_clock_drift clock_drift =

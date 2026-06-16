@@ -226,10 +226,18 @@ let gen_slot_header_with_status =
   let open Protocol.Alpha_context in
   let open QCheck2.Gen in
   let* status = bool in
+  let* attester = gen_pkh in
   let status =
     let total_shards = 1 in
-    let attested_shards = if status then total_shards else 0 in
-    Dal.Attestation.{total_shards; attested_shards; is_proto_attested = status}
+    let attested_shards, attesters =
+      if status then
+        let attester = Signature.Of_V_latest.get_public_key_hash_exn attester in
+        ( total_shards,
+          Environment.Signature.Public_key_hash.Set.singleton attester )
+      else (0, Environment.Signature.Public_key_hash.Set.empty)
+    in
+    Dal.Attestations.
+      {total_shards; attested_shards; is_proto_attested = status; attesters}
   in
   let* publisher = gen_pkh in
   let+ header = gen_slot_header in
@@ -281,13 +289,24 @@ let gen_slot_history =
   in
   List.fold_left_e
     (fun hist (published_level, attested_slots) ->
-      Dal.Slots_history.(
-        update_skip_list_no_cache
-          ~number_of_slots
-          hist
-          ~published_level
+      let open Result_syntax in
+      let slots =
+        List.map
+          (fun (header, publisher, status) -> (header, publisher, Some status))
           attested_slots
-          ~attestation_lag:Legacy))
+      in
+      let+ hist, _cache =
+        Dal.Slots_history.(
+          update_skip_list
+            hist
+            (History_cache.empty ~capacity:0L)
+            ~published_level
+            ~number_of_slots
+            ~attestation_lag:Legacy
+            ~slots
+            ~fill_unpublished_gaps:false)
+      in
+      hist)
     Dal.Slots_history.genesis
     l
   |> function
@@ -317,14 +336,20 @@ let gen_slot_history_cache =
   in
   List.fold_left_e
     (fun (hist, cache) (published_level, attested_slots) ->
+      let slots =
+        List.map
+          (fun (header, publisher, status) -> (header, publisher, Some status))
+          attested_slots
+      in
       Dal.Slots_history.(
         update_skip_list
-          ~number_of_slots
           hist
           cache
           ~published_level
-          attested_slots
-          ~attestation_lag:Legacy))
+          ~number_of_slots
+          ~attestation_lag:Legacy
+          ~slots
+          ~fill_unpublished_gaps:false))
     (Dal.Slots_history.genesis, cache)
     l
   |> function

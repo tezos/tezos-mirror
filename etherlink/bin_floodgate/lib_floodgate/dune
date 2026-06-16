@@ -15,7 +15,8 @@
   octez-evm-node-libs.evm_node_lib_dev
   octez-evm-node-libs.evm_node_lib_dev_encoding
   octez-evm-node-libs.evm_node_config
-  octez-libs.tezos-workers)
+  octez-libs.tezos-workers
+  octez-libs.octez-telemetry)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

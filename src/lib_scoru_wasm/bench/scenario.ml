@@ -93,7 +93,7 @@ let lift_add_datum add_datum run_state =
 
 type 'a action = 'a run_state -> 'a run_state Lwt.t
 
-type scenario_step = {label : string; action : tree action}
+type scenario_step = {label : string; action : state action}
 
 type scenario = {
   name : string;
@@ -106,7 +106,8 @@ let make_scenario name kernel actions = {name; kernel; actions; ignore = false}
 
 let ignore_scenario scenario = {scenario with ignore = true}
 
-let make_scenario_step (label : string) (action : tree action) = {label; action}
+let make_scenario_step (label : string) (action : state action) =
+  {label; action}
 
 (** Execution of a scenario step. *)
 let run_step ?(verbose = false) run_state {label; action} =

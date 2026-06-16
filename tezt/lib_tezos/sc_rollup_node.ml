@@ -113,6 +113,7 @@ type argument =
   | Apply_unsafe_patches
   | Injector_retention_period of int
   | Acl_allow_all
+  | Slow_vm_fallback
 
 let make_argument = function
   | Data_dir dir -> ["--data-dir"; dir]
@@ -136,6 +137,7 @@ let make_argument = function
   | Injector_retention_period nb_block ->
       ["--injector-retention-period"; string_of_int nb_block]
   | Acl_allow_all -> ["--acl-override"; "allow-all"]
+  | Slow_vm_fallback -> ["--slow-vm-fallback"]
 
 let is_redundant = function
   | Data_dir _, Data_dir _
@@ -156,7 +158,8 @@ let is_redundant = function
   | Pre_images_endpoint _, Pre_images_endpoint _
   | Apply_unsafe_patches, Apply_unsafe_patches
   | Injector_retention_period _, Injector_retention_period _
-  | Acl_allow_all, Acl_allow_all ->
+  | Acl_allow_all, Acl_allow_all
+  | Slow_vm_fallback, Slow_vm_fallback ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Metrics_addr _, _
@@ -178,7 +181,8 @@ let is_redundant = function
   | Pre_images_endpoint _, _
   | Apply_unsafe_patches, _
   | Injector_retention_period _, _
-  | Acl_allow_all, _ ->
+  | Acl_allow_all, _
+  | Slow_vm_fallback, _ ->
       false
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
@@ -211,6 +215,7 @@ module Parameters = struct
     metrics_port : int;
     rpc_host : string;
     rpc_port : int;
+    kind : string;
     mutable mode : mode;
     dal_node : Dal_node.t option;
     loser_mode : string option;
@@ -308,6 +313,16 @@ let endpoint node = rpc_endpoint node
 let data_dir sc_node = sc_node.persistent_state.data_dir
 
 let base_dir sc_node = sc_node.persistent_state.base_dir
+
+let kind sc_node = sc_node.persistent_state.kind
+
+let monitors_finalized sc_node =
+  (* Rollup nodes that monitors finalized L1 heads are the ones for RISC-V
+     rollups. *)
+  (* TODO: TZX-59
+     Add an argument to pass `--l1-monitor-finalized` and also use this as
+     a condition here. *)
+  kind sc_node = "riscv"
 
 let string_of_purpose = function
   | Operating -> "operating"
@@ -482,8 +497,9 @@ let check_event ?timeout ?where sc_node name promise =
   | Error () ->
       Format.ksprintf
         failwith
-        "Timeout waiting for event %s of %s"
+        "Timeout waiting for event %s%s of %s"
         name
+        (match where with None -> "" | Some cond -> " where " ^ cond)
         sc_node.name
 
 let wait_for_ready sc_node =
@@ -559,7 +575,14 @@ let unsafe_wait_sync ?timeout sc_node =
         in
         return level.level
   in
-  wait_for_level ?timeout sc_node node_level
+  let level =
+    if monitors_finalized sc_node then
+      (* Rollup nodes that only monitors finalized blocks are synchronized when
+         they're at head - 2. *)
+      node_level - 2
+    else node_level
+  in
+  wait_for_level ?timeout sc_node level
 
 let wait_sync sc_node ~timeout = unsafe_wait_sync sc_node ~timeout
 
@@ -575,7 +598,7 @@ let handle_event sc_node {name; value; timestamp = _} =
   | _ -> ()
 
 let create_with_endpoint ?runner ?path ?name ?color ?data_dir ?config_file
-    ~base_dir ?remote_signer ?event_pipe ?metrics_addr ?metrics_port
+    ~base_dir ~kind ?remote_signer ?event_pipe ?metrics_addr ?metrics_port
     ?(rpc_host = Constant.default_host) ?rpc_port ?(operators = [])
     ?default_operator ?(dal_node : Dal_node.t option) ?loser_mode
     ?(allow_degraded = false) ?(gc_frequency = 1) ?(history_mode = Full)
@@ -609,6 +632,7 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ?config_file
         metrics_port;
         rpc_host;
         rpc_port;
+        kind;
         operators;
         default_operator;
         mode;
@@ -627,7 +651,7 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ?config_file
   on_event sc_node (handle_event sc_node) ;
   sc_node
 
-let create ?runner ?path ?name ?color ?data_dir ?config_file ~base_dir
+let create ?runner ?path ?name ?color ?data_dir ?config_file ~base_dir ~kind
     ?remote_signer ?event_pipe ?metrics_addr ?metrics_port ?rpc_host ?rpc_port
     ?operators ?default_operator ?dal_node ?loser_mode ?allow_degraded
     ?gc_frequency ?history_mode ?password_file mode (node : Node.t) =
@@ -639,6 +663,7 @@ let create ?runner ?path ?name ?color ?data_dir ?config_file ~base_dir
     ?data_dir
     ?config_file
     ~base_dir
+    ~kind
     ?remote_signer
     ?event_pipe
     ?metrics_addr
@@ -767,7 +792,7 @@ let patch_durable_storage sc_rollup_node ~key ~value =
   | Running _ -> Test.fail "Cannot patch the state of a running node"
 
 let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
-    sc_rollup_node dir =
+    ?(no_check = false) ?level sc_rollup_node dir =
   let process =
     spawn_command
       sc_rollup_node
@@ -780,7 +805,9 @@ let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
          data_dir sc_rollup_node;
        ]
       @ Cli_arg.optional_switch "compress-on-the-fly" compress_on_the_fly
-      @ Cli_arg.optional_switch "compact" compact)
+      @ Cli_arg.optional_switch "compact" compact
+      @ Cli_arg.optional_switch "no-check" no_check
+      @ Cli_arg.optional_arg "level" Fun.id level)
   in
   let parse process =
     let* output = Process.check_and_read_stdout process in
@@ -791,7 +818,7 @@ let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
   Runnable.{value = process; run = parse}
 
 let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
-    ?(no_check = false) sc_rollup_node ~snapshot_file =
+    ?(no_check = false) ?dal_node ?level sc_rollup_node ~snapshot_file =
   let process =
     spawn_command
       sc_rollup_node
@@ -804,7 +831,9 @@ let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
        ]
       @ (if apply_unsafe_patches then make_argument Apply_unsafe_patches else [])
       @ Cli_arg.optional_switch "force" force
-      @ Cli_arg.optional_switch "no-check" no_check)
+      @ Cli_arg.optional_switch "no-check" no_check
+      @ Cli_arg.optional_arg "dal-node" Dal_node.rpc_endpoint dal_node
+      @ Cli_arg.optional_arg "level" Fun.id level)
   in
   Runnable.{value = process; run = Process.check}
 
@@ -823,33 +852,36 @@ let operators t =
 module RPC = struct
   module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct
     let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        node rpc =
+        ?log_response_body_max node rpc =
       RPC_core.call
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         (as_rpc_endpoint node)
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        ?extra_headers node rpc =
+        ?log_response_body_max ?extra_headers node rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         ?extra_headers
         (as_rpc_endpoint node)
         rpc
 
     let call_json ?rpc_hooks ?log_request ?log_response_status
-        ?log_response_body node rpc =
+        ?log_response_body ?log_response_body_max node rpc =
       RPC_core.call_json
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         (as_rpc_endpoint node)
         rpc
   end

@@ -45,7 +45,7 @@ let noop_module =
 let test_protocol_migration_message ~from_version ~to_version
     ~after_protocol_activation:protocol () =
   let open Lwt_syntax in
-  let* tree = initial_tree ~version:from_version noop_module in
+  let* tree = initial_state ~version:from_version noop_module in
   let* tree = eval_until_input_requested tree in
   let* version = Wasm.get_wasm_version tree in
   assert (version = from_version) ;
@@ -68,6 +68,7 @@ let proto_name : Tezos_scoru_wasm.Pvm_input_kind.protocol -> string = function
   | R022 -> "R022"
   | S023 -> "S023"
   | T024 -> "T024"
+  | U025 -> "U025"
   | Proto_alpha -> "Proto_alpha"
 
 let tests =
@@ -78,7 +79,11 @@ let tests =
          If you end up here because of this, please add a protocol migration
          test for you new version. *)
       (match from_version with
-      | Tezos_scoru_wasm.Wasm_pvm_state.V0 | V1 | V2 | V3 | V4 | V5 | V6 -> ()) ;
+      | Tezos_scoru_wasm.Wasm_pvm_state.VExperimental ->
+          ()
+          (* VExperimental can only be activated through an unsafe
+             patch of the rollup node. *)
+      | V0 | V1 | V2 | V3 | V4 | V5 | V6 -> ()) ;
       tztest
         (sf
            "protocol migration message handling by the WASM PVM (%s)"
@@ -89,7 +94,8 @@ let tests =
            ~to_version
            ~after_protocol_activation:protocol))
     [
-      (V5, V5, Proto_alpha);
+      (V5, V6, Proto_alpha);
+      (V5, V6, U025);
       (V5, V5, T024);
       (V5, V5, S023);
       (V5, V5, R022);

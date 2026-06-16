@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezlink_node_migrations)
+ (public_name octez-evm-node-libs.tezlink_node_migrations)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-l2-libs.sqlite)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Octez_sqlite))
+
+(rule
+ (target tezlink_node_migrations.ml)
+ (deps (glob_files *.sql) (glob_files m[0-9]*.ml))
+ (action (run gen-migrations . %{target})))

@@ -25,9 +25,8 @@
 
 open Protocol
 
-(** A null proof-of-work nonce. This should only be used to nonsensical blocks
-    of the correct size and shape. *)
-val empty_proof_of_work_nonce : Bytes.t
+(** A null proof-of-work nonce. *)
+val empty_proof_of_work_nonce : unit -> Bytes.t
 
 (** [mine ~proof_of_work_threshold chain block header builder] returns a block with a valid
     proof-of-work nonce. The function [builder], provided by the caller, is used

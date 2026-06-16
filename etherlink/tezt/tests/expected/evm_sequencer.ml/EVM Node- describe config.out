@@ -12,7 +12,9 @@
            request. */,
       "chunk_size"?:
         integer ∈ [1, 2^30]
-        /* Number of blocks to be filter concurrently when executing a `eth_getLogs` request. */ },
+        /* Number of blocks to be filter concurrently when executing a `eth_getLogs` request.
+           DEPRECATED: this field is now ignore. You can still use `max_nb_blocks` and
+           `max_nb_logs` to limit the computation done by `eth_getLogs`. */ },
   "sequencer"?:
     { "time_between_blocks"?:
         $time_between_blocks
@@ -81,7 +83,10 @@
       "rollup_node_tracking"?:
         boolean
         /* Enable or disable monitoring a companion rollup node to verify the correctness of
-           the speculative history coming from the upstream EVM node. */ },
+           the speculative history coming from the upstream EVM node. */,
+      "fail_on_divergence"?:
+        boolean
+        /* Enable or disable hard failure on assemble block divergence */ },
   "tx_pool_timeout_limit"?:
     $int64
     /* Transaction timeout limit inside the transaction pool. DEPRECATED: You should use
@@ -150,15 +155,16 @@
       "preconfirmation_stream_enabled"?:
         boolean
         /* Activate or not the preconfirmation stream. This includes the sequencer as well as
-           the observer. */ },
-  "proxy"?:
-    { "finalized_view"?:
+           the observer. */,
+      "compact_receipt_encoding"?:
         boolean
-        /* When enabled, the node only expose blocks that are finalized, i.e., the `latest`
-           block parameter becomes a synonym for `finalized`. DEPRECATED: use the top level
-           `finalized_view` option instead. */,
-      "evm_node_endpoint"?: $unistring,
-      "ignore_block_param"?: boolean },
+        /* When enabled, transaction receipts are written to the store using a compact
+           encoding: all-zero logs blooms are stored as empty bytes, and per-log context
+           fields (blockNumber, blockHash, transactionHash, transactionIndex) are stripped
+           since they are derivable from the outer transaction row. Defaults to [false] so
+           that receipts remain readable by older node releases that predate the compact
+           encoding, allowing operators to roll back the binary if needed. The decoder always
+           accepts both formats, so this flag only affects writes. */ },
   "gcp_kms"?:
     { "connection_pool_size"?:
         integer ∈ [1, 2^30]
@@ -303,7 +309,9 @@
     boolean
     /* When enabled, the node only expose blocks that are finalized, i.e., the `latest` block
        parameter becomes a synonym for `finalized`. */,
-  "history"?: $history_mode /* History mode of the EVM node */,
+  "history"?:
+    $history_mode
+    /* History mode of the EVM node (archive, full:N, rolling:N, or seed:N) */,
   "db"?:
     { /* Database connection configuration */
       "pool_size"?:
@@ -407,9 +415,11 @@ $bignum:
      Decimal representation of a big number */
   string
 $history_mode:
-  /* Compact notation for the history mode. Can either be `archive` and `rolling:N` with `N`
-     being the number of days to use as the retention period */
-  "archive" | "rolling:n"
+  /* History mode. `archive`: keeps all data indefinitely. `full:N`: prunes Irmin context
+     older than N days, keeps all SQL data. `rolling:N`: prunes everything older than N days.
+     `seed:N`: minimal mode for sequencers — prunes context, blocks and transactions older
+     than N days, keeps only blueprints and their events. */
+  "archive" | "full:n" | "rolling:n" | "seed:n"
 $int64:
   /* 64 bit integers
      Decimal representation of 64 bit integers */

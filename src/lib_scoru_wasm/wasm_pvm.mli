@@ -24,15 +24,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val pvm_state_encoding :
-  Wasm_pvm_state.Internal_state.pvm_state Tezos_tree_encoding.t
+(** STATE-only PVM machine parameterised by a {!Wasm_vm_sig.S}.
+    Callers instantiate {!Wasm_vm.Make_vm} with their own
+    {!Wasm_pvm_config.t} (and any other required parameters) and pass
+    the result here. *)
+module Make_machine (Wasm_vm : Wasm_vm_sig.S) (S : Wasm_pvm_sig.STATE) :
+  Wasm_pvm_sig.Machine with type state = S.state
 
-val durable_buffers_encoding :
-  Tezos_webassembly_interpreter.Eval.buffers Tezos_tree_encoding.t
-
-val durable_storage_encoding : Durable.t Tezos_tree_encoding.t
-
-module Make (T : Tezos_tree_encoding.TREE) :
-  Wasm_pvm_sig.S with type tree = T.tree
-
-module Make_pvm (Wasm_vm : Wasm_vm_sig.S) : module type of Make
+(** Proof-aware PVM machine parameterised by a {!Wasm_vm_sig.S}.
+    Same shape as {!Make_machine} but the [State] argument
+    must satisfy {!Wasm_pvm_sig.STATE_PROOF}. *)
+module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (State : Wasm_pvm_sig.STATE_PROOF) :
+  Wasm_pvm_sig.S
+    with type context = State.context
+     and type proof = State.proof
+     and type state = State.state

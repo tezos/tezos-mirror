@@ -21,6 +21,7 @@ type env = {
   factory_addr : string;
   router_addr : string;
   nb_hops : int;
+  total_confirmed : int ref;
 }
 
 let max_uint256 =
@@ -104,6 +105,8 @@ let get_total_supply {infos; rpc_node; accounts; _} contract =
             Some
               ((Efunc_core.Evm.encode ~name:"totalSupply" [] [] :> string)
               |> Ethereum_types.hash_of_string);
+          authorization_list = [];
+          access_list = [];
         },
         Block_parameter Latest,
         Ethereum_types.AddressMap.empty )
@@ -136,6 +139,8 @@ let get_balance {infos; rpc_node; _} contract sender =
                   [`address (Account.address sender)]
                  :> string)
               |> Ethereum_types.hash_of_string);
+          authorization_list = [];
+          access_list = [];
         },
         Block_parameter Latest,
         Ethereum_types.AddressMap.empty )
@@ -317,6 +322,7 @@ let swap_xtz ~nb_hops env iteration sender_index =
       ~name:"swapExactETHForTokens" (* "swapETHForExactTokens" *)
       params_ty
       params
+      ~total_confirmed:env.total_confirmed
       ~check_success:false
     (* Don't check success as this is an additional RPC and will slow the
        benchmark down. It can be set to true for debugging. *)
@@ -368,6 +374,20 @@ let deploy_gld_tokens infos ~sequencer ~rpc_node ~sender nb =
     (List.init nb Fun.id)
 
 let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
+  let* () =
+    (* Enable logs for tx queue *)
+    let open Tezos_base_unix.Internal_event_unix in
+    let verbosity =
+      match Cli.Logs.level with
+      | Quiet -> Tezos_event_logging.Internal_event.Fatal
+      | Error -> Error
+      | Warn -> Warning
+      | Report -> Notice
+      | Info -> Info
+      | Debug -> Debug
+    in
+    init ~config:(make_with_defaults ~verbosity ()) ()
+  in
   let* accounts = floodgate_accounts sequencer accounts in
   let sender = accounts.(0) in
   (* Compile contracts *)
@@ -376,19 +396,33 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
   let*? infos =
     Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:1000.
   in
+  let max_size = 999_999 in
+  let tx_per_addr_limit = Int64.max_int in
+  let max_transaction_batch_length = None in
+  let max_lifespan_s = int_of_float parameters.timeout in
+  let config : Evm_node_config.Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
   let*? () =
-    Tx_queue.start
-      ~relay_endpoint:endpoint
-      ~max_transaction_batch_length:(Some 300)
-      ~inclusion_timeout:parameters.timeout
+    Evm_node_lib_dev.Tx_queue.start
+      ~config
+      ~keep_alive:true
+      ~timeout:parameters.timeout
+      ~start_injector_worker:true
       ()
   in
+  let* () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let follower =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
+      ()
   in
-  let tx_queue = Tx_queue.beacon ~tick_interval:0.25 in
+  let tx_queue =
+    Evm_node_lib_dev.Tx_queue.tx_queue_beacon
+      ~evm_node_endpoint:(Rpc endpoint)
+      ~tick_interval:0.25
+  in
   Log.report "Deploying WXTZ" ;
   let* wxtz_addr = deploy_contract ~rpc_node infos ~sequencer sender `ERC20 in
   Log.info "  WXTZ: %s" wxtz_addr ;
@@ -432,6 +466,7 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
       wxtz_addr;
       gld_tokens;
       nb_hops;
+      total_confirmed = ref 0;
     }
   in
 
@@ -453,7 +488,7 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
   let shutdown () =
     Lwt.cancel follower ;
     Lwt.cancel tx_queue ;
-    let* () = Tx_queue.shutdown () in
+    let*? () = Evm_node_lib_dev.Tx_queue.shutdown () in
     let* () = Evm_node.terminate sequencer in
     unit
   in

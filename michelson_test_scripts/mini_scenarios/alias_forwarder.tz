@@ -1,0 +1,14 @@
+parameter unit ;
+storage string ;
+code { CDR ;
+       DUP ;
+       PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
+       CONTRACT string ;
+       IF_NONE { PUSH string "gateway" ; FAILWITH } {} ;
+       BALANCE ;
+       DIG 2 ;
+       TRANSFER_TOKENS ;
+       NIL operation ;
+       SWAP ;
+       CONS ;
+       PAIR }

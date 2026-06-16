@@ -16,7 +16,7 @@ let job_build =
   CI.job
     "build"
     ~__POS__
-    ~image:Tezos_ci.Images.jsonnet
+    ~image:Tezos_ci.Images.Base_images.debian_jsonnet_trixie
     ~stage
     ~description:"Build the Grafazos dashboards."
     ~artifacts:
@@ -25,23 +25,25 @@ let job_build =
          ~expire_in:(Duration (Days 1))
          ~when_:On_success
          ["grafazos/output/**/*.json"])
-    [
-      "cd grafazos/";
-      (* For security, we explicitly install v11.1.0
-         which corresponds to commit [1ce5aec]. *)
-      "jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec";
-      "make";
-    ]
+    ~script:
+      [
+        "cd grafazos/";
+        (* For security, we explicitly install v11.1.0
+           which corresponds to commit [1ce5aec]. *)
+        "jb install \
+         github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec95ce32336fe47c8881361847c475b5254";
+        "make";
+      ]
 
 let job_gitlab_release =
   CI.job
     "gitlab_release"
     ~__POS__
-    ~image:Tezos_ci.Images.ci_release
+    ~image:Tezos_ci.Images.Base_images.ci_release
     ~stage:Publish
     ~description:"Create a GitLab release for Grafazos."
     ~needs:[(Artifacts, job_build Build)]
-    ["./grafazos/scripts/releases/create_gitlab_release.sh"]
+    ~script:["./grafazos/scripts/releases/create_gitlab_release.sh"]
 
 let job_release_page =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -49,7 +51,7 @@ let job_release_page =
   CI.job
     "release_page"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.CI.release_page
     ~stage:Publish
     ~description:
       "Update the Grafazos release page. If running in a test pipeline, the \
@@ -75,40 +77,45 @@ let job_release_page =
           ]
       | `real ->
           [
-            ("S3_BUCKET", "site-prod.octez.tezos.com/releases");
+            ("S3_BUCKET", "site-prod.octez.tezos.com");
             ("URL", "octez.tezos.com");
+            ("BUCKET_PATH", "/releases");
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
-    [
-      "eval $(opam env)";
-      "sudo apk add aws-cli pandoc";
-      "./grafazos/scripts/releases/publish_release_page.sh";
-    ]
+    ~script:
+      [
+        "eval $(opam env)"; "./grafazos/scripts/releases/publish_release_page.sh";
+      ]
 
 let register () =
-  CI.register_before_merging_jobs [(Auto, job_build Test)] ;
+  Cacio.register_merge_request_jobs [(Auto, job_build Test)] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Grafazos."
     [(Auto, job_build Test)] ;
-  CI.register_global_release_jobs
+  Cacio.register_release_jobs
     [(Manual, job_release_page `real `build_dependencies)] ;
-  CI.register_global_test_release_jobs
+  Cacio.register_test_release_jobs
     [(Manual, job_release_page `test `build_dependencies)] ;
-  CI.register_global_scheduled_test_release_jobs
+  Cacio.register_jobs Non_release_tag [(Auto, job_build Build)] ;
+  Cacio.register_jobs Non_release_tag_test [(Auto, job_build Build)] ;
+  Cacio.register_jobs
+    Scheduled_test_release
     [
       (* Explicitly include the build job so that it has trigger [Auto]. *)
       (Auto, job_build Build);
       (Manual, job_release_page `test `build_dependencies);
     ] ;
-  CI.register_global_publish_release_page_jobs
+  Cacio.register_jobs
+    Publish_release_page
     [
       ( Manual,
         (* [no_build_dependencies] because we don't want the build job to run
            as their artifacts are not needed to update the release page. *)
         job_release_page `real `no_build_dependencies );
     ] ;
-  CI.register_global_test_publish_release_page_jobs
+  Cacio.register_jobs
+    Test_publish_release_page
     [
       ( Manual,
         (* [no_build_dependencies] because we don't want the build job to run

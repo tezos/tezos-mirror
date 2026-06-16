@@ -1,0 +1,14 @@
+[package]
+name = "octez-riscv-durable-storage-common"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+bytes.workspace = true
+ocaml.workspace = true
+octez-riscv-api-common.workspace = true
+octez-riscv-data.workspace = true
+octez-riscv-durable-storage.workspace = true

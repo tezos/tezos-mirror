@@ -23,8 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Generic vector wrappers for the Wasmer C API.
+
+    The Wasmer C API uses [wasm_*_vec_t] types for passing arrays of
+    objects. This module provides a functor {!Make_vector} that wraps
+    these vectors with safe OCaml operations (create, access, convert
+    to/from lists and arrays). Specialized instances are provided for
+    value types, values, externs, export types, and import types. *)
+
 open Api
 
+(** Functor that creates a typed vector module from a Wasmer vec type
+    and its associated C functions. *)
 module Make_vector
     (Vector_type : Api_types.Vec)
     (Vector_funs : sig

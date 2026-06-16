@@ -40,7 +40,8 @@
   test_storage_functions
   test_storage
   test_token
-  test_native_contracts))
+  test_native_contracts
+  test_clst))
 
 (executable
  (name main)

@@ -45,13 +45,13 @@ open Ethereum_types
 type valid_filter = {
   from_block : quantity;
   to_block : quantity;
-  bloom : Ethbloom.t;
+  bloom : Ethbloom.t option;
   topics : Filter.topic option list;
   address : address list;
 }
 
 type bloom_filter = {
-  bloom : Ethbloom.t;
+  bloom : Ethbloom.t option;
   topics : Filter.topic option list;
   address : address list;
 }
@@ -74,8 +74,7 @@ let emit_and_return_none event arg =
   return_none
 
 (* Parses the [from_block] and [to_block] fields, as described before.  *)
-let validate_range log_filter_config
-    (module Rollup_node_rpc : Services_backend_sig.S) (filter : Filter.t) =
+let validate_range log_filter_config ctxt (filter : Filter.t) =
   let open Lwt_result_syntax in
   match filter with
   | {block_hash = Some _; from_block = Some _; _}
@@ -83,14 +82,16 @@ let validate_range log_filter_config
       tzfail Incompatible_block_params
   | {block_hash = Some block_hash; _} ->
       let* block =
-        Rollup_node_rpc.Etherlink_block_storage.block_by_hash
+        Evm_ro_context.block_by_hash
+          ctxt
           ~full_transaction_object:false
           block_hash
       in
       return_some (block.number, block.number)
   | {from_block; to_block; _} ->
       let get_block_number block_param =
-        Rollup_node_rpc.block_param_to_block_number
+        Evm_ro_context.block_param_to_block_number
+          ctxt
           ~chain_family:L2_types.EVM
           (Block_parameter
              (Option.value ~default:Block_parameter.Latest block_param))
@@ -104,18 +105,22 @@ let validate_range log_filter_config
         tzfail (Block_range_too_large {limit = log_filter_config.max_nb_blocks})
 
 let make_bloom_address_topics address topics =
-  let bloom = Ethbloom.make () in
-  Option.iter
-    (function
-      | Filter.Single (Address address) -> Ethbloom.accrue ~input:address bloom
-      | _ -> ())
-    address ;
-  Option.iter
-    (List.iter (function
-      | Some Filter.(One (Hash topic)) -> Ethbloom.accrue ~input:topic bloom
-      | _ -> ()))
-    topics ;
-  bloom
+  let wildcard = Option.is_none address && Option.is_none topics in
+  if wildcard then None
+  else
+    let bloom = Ethbloom.make () in
+    Option.iter
+      (function
+        | Filter.Single (Address address) ->
+            Ethbloom.accrue ~input:address bloom
+        | _ -> ())
+      address ;
+    Option.iter
+      (List.iter (function
+        | Some Filter.(One (Hash topic)) -> Ethbloom.accrue ~input:topic bloom
+        | _ -> ()))
+      topics ;
+    Some bloom
 
 (* Constructs the bloom filter *)
 let make_bloom (filter : Filter.t) =
@@ -141,12 +146,9 @@ let validate_bloom_filter (filter : Filter.t) =
 
 (* Parsing a filter into a simpler representation, this is the
    input validation step *)
-let validate_filter log_filter_config
-    (module Rollup_node_rpc : Services_backend_sig.S) filter =
+let validate_filter log_filter_config ctxt filter =
   let open Lwt_result_syntax in
-  let* range =
-    validate_range log_filter_config (module Rollup_node_rpc) filter
-  in
+  let* range = validate_range log_filter_config ctxt filter in
   match range with
   | None -> return_none
   | Some (from_block, to_block) ->
@@ -204,42 +206,29 @@ let filter_one_log : bloom_filter -> transaction_log -> transaction_log option =
   then Some log
   else None
 
-let filter_receipt (filter : bloom_filter) (receipt : Transaction_receipt.t) =
-  if Ethbloom.contains_bloom (hex_to_bytes receipt.logsBloom) filter.bloom then
-    List.filter_map (filter_one_log filter) receipt.logs
-  else []
+let filter_receipt ?(bloom_inclusion_checked = false) (filter : bloom_filter)
+    (receipt : Transaction_receipt.t) =
+  match filter.bloom with
+  | None -> receipt.logs
+  | Some bloom ->
+      if
+        bloom_inclusion_checked
+        || Ethbloom.contains_bloom (hex_to_bytes receipt.logsBloom) bloom
+      then List.filter_map (filter_one_log filter) receipt.logs
+      else []
 
 (* Apply a filter on one transaction *)
 
 let filter_one_tx :
-    valid_filter -> Transaction_receipt.t -> transaction_log list =
- fun filter receipt ->
+    ?bloom_inclusion_checked:bool ->
+    valid_filter ->
+    Transaction_receipt.t ->
+    transaction_log list =
+ fun ?bloom_inclusion_checked filter receipt ->
   let filter =
     {bloom = filter.bloom; topics = filter.topics; address = filter.address}
   in
-  filter_receipt filter receipt
-
-(** [split_in_chunks ~chunk_size ~base ~length] returns a list of
-    lists (chunks) containing the consecutive numbers from [base]
-    to [base + length - 1].
-    Each chunk is at most of length [chunk_size]. Only the last
-    chunk can be shorter than [chunk_size].
-
-    Example [split_in_chunks ~chunk_size:2 ~base:1 ~length:5] is
-    <<1, 2>, <3,4>, <5>>.
- *)
-let split_in_chunks ~chunk_size ~base ~length =
-  (* nb_chunks = ceil(length / chunk_size)  *)
-  let nb_chunks = (length + chunk_size - 1) / chunk_size in
-  let rem = length mod chunk_size in
-  Stdlib.List.init nb_chunks (fun chunk ->
-      let chunk_length =
-        if chunk = nb_chunks - 1 && rem <> 0 then (* Last chunk isn't full *)
-          rem
-        else chunk_size
-      in
-      let chunk_offset = chunk * chunk_size in
-      (Z.(base + of_int chunk_offset), chunk_length))
+  filter_receipt ?bloom_inclusion_checked filter receipt
 
 (* [get_logs (module Rollup_node_rpc) filter] applies the [filter].
 
@@ -251,66 +240,46 @@ let split_in_chunks ~chunk_size ~base ~length =
    This design is meant to strike a balance between concurrent
    performace and not exceeding the bound in number of logs.
 *)
-let get_logs (log_filter_config : Configuration.log_filter_config)
-    (module Rollup_node_rpc : Services_backend_sig.S) filter =
+let get_logs (log_filter_config : Configuration.log_filter_config) ctxt filter =
   let open Lwt_result_syntax in
-  let* filter =
-    validate_filter log_filter_config (module Rollup_node_rpc) filter
-  in
+  let* filter = validate_filter log_filter_config ctxt filter in
   match filter with
   | None -> return []
   | Some filter ->
       let (Qty from) = filter.from_block in
       let (Qty to_) = filter.to_block in
       let length = Z.(to_int (to_ - from)) + 1 in
-      let chunks =
-        split_in_chunks
-          ~chunk_size:log_filter_config.chunk_size
-          ~length
-          ~base:from
+      (* Apply the filter to the entire chunk concurrently *)
+      let* receipts =
+        Evm_ro_context.block_range_receipts ctxt ?mask:filter.bloom from length
       in
-      let* logs, _n_logs =
-        List.fold_left_es
-          (function
-            | acc_logs, n_logs ->
-                fun (offset, len) ->
-                  (* Apply the filter to the entire chunk concurrently *)
-                  let* receipts =
-                    Rollup_node_rpc.Etherlink_block_storage.block_range_receipts
-                      offset
-                      len
-                  in
-                  Octez_telemetry.Trace.with_tzresult
-                    ~service_name:"get_logs"
-                    "filter_and_encode_logs"
-                  @@ fun _ ->
-                  let*! new_logs =
-                    List.concat_map_s
-                      (fun receipt ->
-                        let open Lwt_syntax in
-                        let* () = Lwt.pause () in
-                        let logs = filter_one_tx filter receipt in
-                        (* Already encode logs individually, with yields to the
-                           Lwt scheduler, to allow the full encoding to not be
-                           blocking. *)
-                        List.map_s
-                          (fun log ->
-                            let+ () = Lwt.pause () in
-                            Ethereum_types.pre_encode
-                              Ethereum_types.transaction_log_encoding
-                              log)
-                          logs)
-                      receipts
-                  in
-                  let n_new_logs = List.length new_logs in
-                  if n_logs + n_new_logs > log_filter_config.max_nb_logs then
-                    tzfail
-                      (Too_many_logs {limit = log_filter_config.max_nb_logs})
-                  else return (acc_logs @ new_logs, n_logs + n_new_logs))
-          ([], 0)
-          chunks
-      in
-      return logs
+      Octez_telemetry.Trace.with_tzresult
+        ~service_name:"get_logs"
+        "filter_and_encode_logs"
+      @@ fun _ ->
+      let n_logs = ref 0 in
+      List.concat_map_es
+        (fun receipt ->
+          let open Lwt_syntax in
+          (* For long results, this can be quite intensive so we pause
+               between each transaction. *)
+          let*! () = Lwt.pause () in
+          let logs =
+            filter_one_tx ~bloom_inclusion_checked:true filter receipt
+          in
+          n_logs := !n_logs + List.length logs ;
+          if !n_logs > log_filter_config.max_nb_logs then
+            tzfail (Too_many_logs {limit = log_filter_config.max_nb_logs})
+          else
+            Lwt_result.ok
+            @@ List.map_s
+                 (fun log ->
+                   let+ () = Lwt.pause () in
+                   Ethereum_types.pre_encode
+                     Ethereum_types.transaction_log_encoding
+                     log)
+                 logs)
+        receipts
 
 (* Errors registration *)
 

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -27,18 +27,24 @@ use tezos_smart_rollup_encoding::{
     outbox::OutboxMessageTransaction,
 };
 
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
+
 use crate::{
-    database::DatabasePrecompileStateChanges,
+    database::EtherlinkVMDB,
     helpers::storage::u256_to_bigint,
     journal::Journal,
     precompiles::{
         constants::{
             FA_BRIDGE_SOL_ADDR, SEND_OUTBOX_MESSAGE_BASE_COST,
-            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
+            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR,
         },
-        error::CustomPrecompileError,
-        guard::{guard, out_of_gas},
+        guard::{charge, guard},
     },
+};
+use evm_types::{
+    CustomPrecompileError, DatabasePrecompileStateChanges, IntoWithRemainder,
+    PrecompileStateError,
 };
 
 sol! {
@@ -80,39 +86,7 @@ sol! {
     }
 }
 
-/// Withdrawal interface of the ticketer contract
-pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
-
-/// Interface of the default entrypoint of the fast withdrawal contract.
-///
-/// The parameters corresponds to (from left to right w.r.t. `MichelsonPair`):
-/// * withdrawal_id
-/// * ticket
-/// * timestamp
-/// * withdrawer's address
-/// * generic payload
-/// * l2 caller's address
-pub type FastWithdrawalInterface = MichelsonPair<
-    MichelsonNat,
-    MichelsonPair<
-        FA2_1Ticket,
-        MichelsonPair<
-            MichelsonTimestamp,
-            MichelsonPair<
-                MichelsonContract,
-                MichelsonPair<MichelsonBytes, MichelsonBytes>,
-            >,
-        >,
-    >,
->;
-
-/// Outbox messages that implements the different withdrawal interfaces,
-/// ready to be encoded and posted.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Withdrawal {
-    Standard(OutboxMessage<RouterInterface>),
-    Fast(OutboxMessage<FastWithdrawalInterface>),
-}
+pub use michelson_types::{FastWithdrawalInterface, RouterInterface, Withdrawal};
 
 #[derive(Debug, thiserror::Error)]
 enum SendOutboxRevertReason {
@@ -137,19 +111,16 @@ enum SendOutboxRevertReason {
     #[error("Fixed byte array conversion error: {0}")]
     IntoFixedInvalidSize(usize),
 
-    #[error("Database access error")]
-    DatabaseAccess(CustomPrecompileError),
+    #[error("Database access error: {0}")]
+    DatabaseAccess(#[from] PrecompileStateError),
 }
 
-impl From<CustomPrecompileError> for SendOutboxRevertReason {
-    fn from(e: CustomPrecompileError) -> Self {
-        SendOutboxRevertReason::DatabaseAccess(e)
-    }
-}
-
-impl From<SendOutboxRevertReason> for CustomPrecompileError {
-    fn from(e: SendOutboxRevertReason) -> Self {
-        CustomPrecompileError::Revert(e.to_string())
+impl IntoWithRemainder for SendOutboxRevertReason {
+    fn into_with_remainder(self, gas: revm::interpreter::Gas) -> CustomPrecompileError {
+        match self {
+            SendOutboxRevertReason::DatabaseAccess(e) => e.into_with_remainder(gas),
+            other => CustomPrecompileError::Revert(other.to_string(), gas),
+        }
     }
 }
 
@@ -268,13 +239,14 @@ fn parse_l1_routing_info(
     Ok((receiver, proxy))
 }
 
-fn send_outbox_methods<CTX, DB>(
+fn send_outbox_methods<'j, CTX, Host, R>(
     input: &[u8],
     context: &mut CTX,
 ) -> Result<Bytes, SendOutboxRevertReason>
 where
-    DB: DatabasePrecompileStateChanges,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     match SendOutboxMessage::SendOutboxMessageCalls::abi_decode(input)? {
         SendOutboxMessage::SendOutboxMessageCalls::push_withdrawal_to_outbox(
@@ -454,28 +426,28 @@ where
     }
 }
 
-pub(crate) fn send_outbox_message_precompile<CTX, DB>(
+pub(crate) fn send_outbox_message_precompile<'j, CTX, Host, R>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    CTX: ContextTr,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
-    DB: DatabasePrecompileStateChanges,
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
+    let mut gas = Gas::new(inputs.gas_limit);
     guard(
         SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
-        &[WITHDRAWAL_SOL_ADDR, FA_BRIDGE_SOL_ADDR],
+        &[XTZ_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_ADDR],
         inputs,
+        gas,
     )?;
 
-    let mut gas = Gas::new(inputs.gas_limit);
-    if !gas.record_cost(SEND_OUTBOX_MESSAGE_BASE_COST) {
-        return Ok(out_of_gas(inputs.gas_limit));
-    }
+    charge(&mut gas, SEND_OUTBOX_MESSAGE_BASE_COST)?;
 
-    let output = send_outbox_methods(calldata, context)?;
+    let output =
+        send_outbox_methods(calldata, context).map_err(|e| e.into_with_remainder(gas))?;
 
     Ok(InterpreterResult {
         result: InstructionResult::Return,

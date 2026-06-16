@@ -44,9 +44,3 @@ let liquidity_baking_vote_encoding =
   def
     "liquidity_baking_vote"
     (Compact.make ~tag_size:`Uint8 per_block_vote_compact_encoding)
-
-let adaptive_issuance_vote_encoding =
-  let open Data_encoding in
-  def
-    "adaptive_issuance_vote"
-    (Compact.make ~tag_size:`Uint8 per_block_vote_compact_encoding)

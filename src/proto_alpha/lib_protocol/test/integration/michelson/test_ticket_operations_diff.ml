@@ -272,7 +272,6 @@ let origination_operation block ~sender ~baker ~script ~storage ~forges_tickets
                  storage;
                  implementation = _;
                  arg_type = _;
-                 views = _;
                  entrypoints = _;
                  code_size = _;
                }),

@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_tezlink_farfadet_r1"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+thiserror.workspace = true
+
+tezos_crypto_rs.workspace = true
+hex.workspace = true
+
+primitive-types.workspace = true
+tezos-smart-rollup.workspace = true
+tezos-smart-rollup-host.workspace = true
+num-bigint.workspace = true
+tezos_data_encoding.workspace = true
+nom.workspace = true
+tezos-protocol.workspace = true
+
+rlp.workspace = true
+mir.workspace = true
+
+[dev-dependencies]
+fixed-hash = { version = "0.8", features = ["rand"] }
+rand = "0.9.1"
+pretty_assertions = "1.4.0"
+regex = "1.11.2"

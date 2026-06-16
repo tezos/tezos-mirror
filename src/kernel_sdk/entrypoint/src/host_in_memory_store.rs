@@ -139,4 +139,19 @@ unsafe impl SmartRollupCore for RollupHostWithInMemoryStorage {
     unsafe fn reveal_metadata(&self, destination_addr: *mut u8, max_bytes: usize) -> i32 {
         self.host.reveal_metadata(destination_addr, max_bytes)
     }
+
+    unsafe fn __internal_store_get_hash(
+        &self,
+        path: *const u8,
+        path_len: usize,
+        destination_addr: *mut u8,
+        max_size: usize,
+    ) -> i32 {
+        self.store.borrow().__internal_store_get_hash(
+            path,
+            path_len,
+            destination_addr,
+            max_size,
+        )
+    }
 }

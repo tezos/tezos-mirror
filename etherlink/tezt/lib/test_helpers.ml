@@ -160,11 +160,8 @@ let check_block_info ~previous_block_info ~current_block_info ~chain_id
   Check.((operations = expected_operations) (list (list string)))
     ~error_msg:"List of operations is expected to be empty for now"
 
-let next_evm_level ~evm_node ~sc_rollup_node ~client =
+let next_evm_level ~evm_node =
   match Evm_node.mode evm_node with
-  | Proxy ->
-      let* _l1_level = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-      unit
   | Sequencer _ | Sandbox _ | Tezlink_sandbox _ ->
       let open Rpc.Syntax in
       let*@ _l2_level = produce_block evm_node in
@@ -252,6 +249,50 @@ let check_block_consistency ~left ~right ?error_msg ~block () =
 let check_head_consistency ~left ~right ?error_msg () =
   check_block_consistency ~left ~right ?error_msg ~block:`Latest ()
 
+let rollup_level_opt sc_rollup_node =
+  let key = "/evm/world_state/blocks/current/number" in
+  let* block_number =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key
+         ()
+  in
+  match block_number with
+  | None -> return None
+  | Some bytes ->
+      return
+        (Some
+           (Hex.to_bytes (`Hex bytes)
+           |> Bytes.to_string |> Z.of_bits |> Z.to_int32))
+
+let rollup_level sc_rollup_node =
+  let* level_opt = rollup_level_opt sc_rollup_node in
+  match level_opt with
+  | None ->
+      return (Error Rpc.{code = 404; message = "Level not found"; data = None})
+  | Some level -> return (Ok level)
+
+let check_rollup_head_consistency ~evm_node ~sc_rollup_node ?error_msg () =
+  let open Rpc.Syntax in
+  let*@ evm_node_head = Rpc.get_block_by_number ~block:"latest" evm_node in
+  let*@ sc_rollup_node_block_number = rollup_level sc_rollup_node in
+
+  Check.((evm_node_head.number = sc_rollup_node_block_number) int32)
+    ~error_msg:
+      (Option.value
+         ~default:
+           Format.(
+             sprintf
+               "EVM node head number (%ld) is different from the rollup node \
+                head number (%ld)"
+               evm_node_head.number
+               sc_rollup_node_block_number)
+         error_msg) ;
+
+  unit
+
 let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
     ~sequencer_governance_contract ~client ~upgrade_to ~pool_address
     ~activation_timestamp =
@@ -300,7 +341,7 @@ let bake_until ?__LOC__ ?(timeout_in_blocks = 20) ?(timeout = 30.) ~bake
   | Some x -> return x
   | None -> Test.fail ?__LOC__ "Bake until failed with a timeout"
 
-let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy
+let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node
     ~sequencer ~client () =
   let bake () =
     let* _l1_lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
@@ -308,19 +349,53 @@ let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy
   in
   let result_f () =
     let open Rpc.Syntax in
-    let* proxy_level_opt = Rpc.generic_block_number_opt proxy in
+    let* sc_rollup_node_block_number_opt = rollup_level_opt sc_rollup_node in
     let*@ sequencer_level = Rpc.generic_block_number sequencer in
-    match proxy_level_opt with
-    | Error _ | Ok None -> Lwt.return_none
-    | Ok (Some proxy_level) ->
+    match sc_rollup_node_block_number_opt with
+    | None -> Lwt.return_none
+    | Some proxy_level ->
         if sequencer_level < proxy_level then
           Test.fail
             ~loc:__LOC__
-            "rollup node has more recent block. Not supposed to happened "
+            "Rollup node has more recent block. Not supposed to happen."
         else if sequencer_level = proxy_level then return @@ Some ()
         else Lwt.return_none
   in
   bake_until ?__LOC__ ?timeout_in_blocks ?timeout ~bake ~result_f ()
+
+let bake_until_blueprint_forced ?__LOC__ ?timeout_in_blocks ?timeout
+    ~sc_rollup_node ~evm_node ~client () =
+  let bake () =
+    let* _l1_lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+    unit
+  in
+  let result_f () =
+    let open Rpc.Syntax in
+    let* sc_rollup_node_block_number_opt = rollup_level_opt sc_rollup_node in
+    let*@ evm_level = Rpc.generic_block_number evm_node in
+    match sc_rollup_node_block_number_opt with
+    | None -> Lwt.return_none
+    | Some rollup_level ->
+        if evm_level > rollup_level then
+          (* Not all sequencer blueprints were propagated to the
+             rollup yet, continue baking. *)
+          Lwt.return_none
+        else if evm_level = rollup_level then Lwt.return_none
+        else Lwt.return_some ()
+  in
+  let* () =
+    bake_until ?__LOC__ ?timeout_in_blocks ?timeout ~bake ~result_f ()
+  in
+  let* evm_level =
+    let open Rpc.Syntax in
+    let*@ evm_level = Rpc.generic_block_number evm_node in
+    return evm_level
+  in
+  let forced_blueprint_applied =
+    Evm_node.wait_for_blueprint_applied evm_node (Int32.to_int evm_level + 1)
+  in
+  let* _ = repeat 3 bake and* _ = forced_blueprint_applied in
+  unit
 
 (** [wait_for_transaction_receipt ~evm_node ~transaction_hash] takes an
     transaction_hash and returns only when the receipt is non null, or [count]
@@ -432,8 +507,8 @@ let l1_timestamp client =
       |> Tezos_base.Time.Protocol.of_notation_exn)
 
 let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
-    ~commitment_period ~challenge_window ~evm_node ~sc_rollup_node
-    ~sc_rollup_address ~client () =
+    ~commitment_period ~challenge_window ~sc_rollup_node ~sc_rollup_address
+    ~client () =
   (* Bake enough levels to have a commitment and cement it. *)
   let* _ =
     repeat
@@ -490,7 +565,7 @@ let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
         ~proof
         client
     in
-    let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
+    let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
     unit
   in
   let* () =
@@ -503,13 +578,24 @@ let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
 let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
     ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ?history_mode
-    ?patch_config ?websockets ?(kernel = Constant.WASM.evm_kernel) ?evm_version
+    ?patch_config ?websockets ?(kernel = Kernel.Latest) ?evm_version
+    ?sequencer_pool_address ?chain_id
     ?(eth_bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
         (Array.to_list Eth_account.bootstrap_accounts))
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?(sequencer_keys = []) ?with_runtimes () =
+    ?(sequencer_keys = []) ?with_runtimes ?enable_michelson_gas_refund () =
+  let patch_config =
+    Option.map
+      (fun input_patch json ->
+        json
+        |> Evm_node.patch_config_with_experimental_feature
+             ~preconfirmation_stream_enabled:true
+             ()
+        |> input_patch)
+      patch_config
+  in
   let wallet_dir = Temp.dir "wallet" in
   let output_config = Temp.file "config.yaml" in
   let preimages_dir = Temp.dir "wasm_2_0_0" in
@@ -518,56 +604,68 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     if not Tezosx_runtime.(mem Tezos with_runtimes) then []
     else tez_bootstrap_accounts
   in
-  let*! () =
-    Evm_node.make_kernel_installer_config
+  let kernel_setup =
+    Evm_node.make_kernel_setup
       ?maximum_gas_per_transaction
       ?set_account_code
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
-      ~output:output_config
       ~eth_bootstrap_accounts
       ~tez_bootstrap_accounts
       ?evm_version
       ?with_runtimes
+      ?chain_id
+      ?enable_michelson_gas_refund
+      ?kernel_compat:(Kernel.name_of kernel)
+      ?sequencer_pool_address
       ?sequencer:
         (Option.map (fun k -> k.Account.public_key)
         @@ List.nth_opt sequencer_keys 0)
       ()
   in
+  let*! () =
+    Evm_node.make_kernel_installer_config kernel_setup ~output:output_config ()
+  in
+  let _tag, uses = Kernel.to_uses_and_tags kernel in
   let* {output; _} =
     Sc_rollup_helpers.prepare_installer_kernel
       ~preimages_dir
       ~config:(`Path output_config)
-      kernel
+      uses
   in
   let () = Account.write Constant.all_secret_keys ~base_dir:wallet_dir in
+  let sequencer_config : Evm_node.sequencer_config =
+    {
+      time_between_blocks = Some Nothing;
+      genesis_timestamp;
+      max_number_of_chunks = None;
+      wallet_dir = Some wallet_dir;
+    }
+  in
   let sequencer_mode =
     Evm_node.Sandbox
       {
-        initial_kernel = Some output;
+        sequencer_config;
         network = None;
-        preimage_dir = Some preimages_dir;
-        private_rpc_port = Some (Port.fresh ());
-        time_between_blocks = Some Nothing;
-        genesis_timestamp;
-        max_number_of_chunks = None;
-        wallet_dir = Some wallet_dir;
         funded_addresses = [];
-        tx_queue_max_lifespan;
-        tx_queue_max_size;
-        tx_queue_tx_per_addr_limit;
         sequencer_keys =
           List.map
             (fun k -> Account.uri_of_secret_key k.Account.secret_key)
             sequencer_keys;
       }
   in
-  Evm_node.init
-    ?history_mode
-    ?patch_config
-    ?websockets
-    ~mode:sequencer_mode
-    Uri.(empty |> to_string)
+  let node_setup =
+    Evm_node.make_setup
+      ?history_mode
+      ?websockets
+      ~initial_kernel:output
+      ~preimages_dir
+      ?tx_queue_max_lifespan
+      ?tx_queue_max_size
+      ?tx_queue_tx_per_addr_limit
+      ()
+  in
+  Evm_node.init ~node_setup ?patch_config ~mode:sequencer_mode ()
 
 (* Send the transaction but doesn't wait to be mined and does not
    produce a block after sending the transaction. *)
@@ -596,6 +694,15 @@ let send_transactions_to_sequencer ~(sends : (unit -> 'a Lwt.t) list) sequencer
 let send_transaction_to_sequencer ?timestamp (transaction : unit -> 'a Lwt.t)
     sequencer =
   let open Rpc.Syntax in
+  let* () =
+    match timestamp with
+    | Some timestamp ->
+        (* We must propose a timestamp else the sequencer set it to now *)
+        let*@ () = Rpc.propose_next_block_timestamp ~timestamp sequencer in
+        unit
+    | None -> unit
+  in
+
   let* transaction =
     send_transaction_to_sequencer_dont_produce_block transaction sequencer
   in
@@ -631,34 +738,48 @@ let deposit ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     client
   |> Process.check ?expect_failure
 
-let check_operations ~client ~block ~expected =
-  let* block = Client.RPC.call ~hooks client @@ RPC.get_chain_block ~block () in
+let check_operations ~__LOC__ ~client ?endpoint ~block ~expected () =
+  let* block =
+    Client.RPC.call ~hooks ?endpoint client @@ RPC.get_chain_block ~block ()
+  in
   let operations = JSON.(block |-> "operations" |> as_list) in
   let managers = JSON.(List.nth operations 3 |> as_list) in
   let hashes = List.map (fun o -> JSON.(o |-> "hash" |> as_string)) managers in
-  Check.((hashes = expected) (list string) ~error_msg:"Expected %R Actual %L") ;
+  Check.(
+    (hashes = expected)
+      (list string)
+      ~__LOC__
+      ~error_msg:"Expected %R Actual %L") ;
   unit
 
-let produce_block_and_wait_for ~sequencer n =
+let produce_block_and_wait_for ?timestamp ~sequencer n =
   let open Rpc.Syntax in
   let* () =
-    let*@ _ = produce_block sequencer in
+    let*@ _ = produce_block ?timestamp sequencer in
     unit
   and* () = Evm_node.wait_for_blueprint_applied sequencer n in
   return ()
 
-let register_sandbox ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit ~title
-    ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags
-    ?patch_config ?websockets ?sequencer_keys ?with_runtimes body =
-  Test.register
+let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
+    ?tx_queue_tx_per_addr_limit ~title ?tez_bootstrap_accounts ?set_account_code
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
+    ?sequencer_keys ?(regression = false) ?with_runtimes ?chain_id
+    ?enable_michelson_gas_refund body =
+  let register =
+    if regression then Regression.register ?file:None
+    else Test.register ?seed:None
+  in
+  register
     ~__FILE__
     ~title
     ~tags:
       (tags
       @ (Option.map (fun k -> Kernel.to_uses_and_tags k |> fst) kernel
         |> Option.to_list))
-    ~uses_admin_client:false
-    ~uses_client:false
+    ~uses_admin_client:
+      (* using the client requires to use the admin client *)
+      uses_client
+    ~uses_client
     ~uses_node:false
     ~uses:
       [
@@ -669,7 +790,7 @@ let register_sandbox ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit ~title
   @@ fun () ->
   let* sequencer =
     init_sequencer_sandbox
-      ?kernel:(Option.map (fun k -> Kernel.to_uses_and_tags k |> snd) kernel)
+      ?kernel
       ?tx_queue_tx_per_addr_limit
       ?set_account_code
       ?da_fee_per_byte
@@ -677,16 +798,22 @@ let register_sandbox ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit ~title
       ?patch_config
       ?websockets
       ?sequencer_keys
+      ?tez_bootstrap_accounts
       ?with_runtimes
+      ?chain_id
+      ?enable_michelson_gas_refund
       ()
   in
   body sequencer
 
 type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
 
-let register_sandbox_with_observer ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit
-    ~title ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags
-    ?patch_config ?websockets ?(sequencer_keys = [Constant.bootstrap1]) body =
+let register_sandbox_with_observer ~__FILE__ ?(uses_client = false) ?kernel
+    ?tx_queue_tx_per_addr_limit ~title ?eth_bootstrap_accounts
+    ?tez_bootstrap_accounts ?set_account_code ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ~tags ?patch_config ?fail_on_divergence
+    ?websockets ?genesis_timestamp ?(sequencer_keys = [Constant.bootstrap1])
+    ?with_runtimes body =
   Test.register
     ~__FILE__
     ~title
@@ -694,8 +821,10 @@ let register_sandbox_with_observer ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit
       (tags
       @ (Option.map (fun k -> Kernel.to_uses_and_tags k |> fst) kernel
         |> Option.to_list))
-    ~uses_admin_client:false
-    ~uses_client:false
+    ~uses_admin_client:
+      (* using the client requires to use the admin client *)
+      uses_client
+    ~uses_client
     ~uses_node:false
     ~uses:
       [
@@ -706,15 +835,25 @@ let register_sandbox_with_observer ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit
   @@ fun () ->
   let* sandbox =
     init_sequencer_sandbox
-      ?kernel:(Option.map (fun k -> Kernel.to_uses_and_tags k |> snd) kernel)
+      ?kernel
       ?tx_queue_tx_per_addr_limit
       ?set_account_code
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
       ?patch_config
       ?websockets
+      ?genesis_timestamp
+      ?with_runtimes
+      ?eth_bootstrap_accounts
+      ?tez_bootstrap_accounts
       ~sequencer_keys
       ()
   in
-  let* observer = Setup.run_new_observer_node ~sc_rollup_node:None sandbox in
+  let* observer =
+    Setup.run_new_observer_node
+      ?patch_config
+      ?fail_on_divergence
+      ~sc_rollup_node:None
+      sandbox
+  in
   body {sandbox; observer}

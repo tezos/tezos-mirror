@@ -134,34 +134,37 @@ let run injector =
   run injector {ready = false} arguments ~on_terminate ?runner
 
 module RPC = struct
-  let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body node
-      rpc =
+  let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
+      ?log_response_body_max node rpc =
     RPC_core.call
       ?rpc_hooks
       ?log_request
       ?log_response_status
       ?log_response_body
+      ?log_response_body_max
       (as_rpc_endpoint node)
       rpc
 
   let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-      ?extra_headers node rpc =
+      ?log_response_body_max ?extra_headers node rpc =
     RPC_core.call_raw
       ?rpc_hooks
       ?log_request
       ?log_response_status
       ?log_response_body
+      ?log_response_body_max
       ?extra_headers
       (as_rpc_endpoint node)
       rpc
 
   let call_json ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-      node rpc =
+      ?log_response_body_max node rpc =
     RPC_core.call_json
       ?rpc_hooks
       ?log_request
       ?log_response_status
       ?log_response_body
+      ?log_response_body_max
       (as_rpc_endpoint node)
       rpc
 

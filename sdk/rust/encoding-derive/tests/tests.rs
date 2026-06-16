@@ -16,8 +16,7 @@ pub fn test_macro_expansion() {
         None => macrotest::expand_without_refresh("tests/expand/*.rs"),
         Some(ref v) if v == overwrite => macrotest::expand("tests/expand/*.rs"),
         Some(v) => panic!(
-            "Unrecognized value for environment variable {:?}, expected {:?} got {:?}",
-            macrotest_env_variable, overwrite, v
+            "Unrecognized value for environment variable {macrotest_env_variable:?}, expected {overwrite:?} got {v:?}"
         ),
     }
 }

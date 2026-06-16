@@ -24,7 +24,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type version = V0 | V1 | V2 | V3 | V4 | V5 | V6
+type version = V0 | V1 | V2 | V3 | V4 | V5 | V6 | VExperimental
+
+(** [int_of_version v] is the rank of [v] in the linear order
+    [V0 < V1 < V2 < V3 < V4 < V5 < V6 < ... < VExperimental].
+    [VExperimental] is mapped to [max_int] so it remains strictly
+    above every concrete version — present *and* future. Adding a
+    [V7] constructor then only requires extending the concrete tail
+    ([V6 -> 6 | V7 -> 7]) without touching [VExperimental].
+
+    Kept as an explicit mapping so that reordering or inserting
+    constructors produces a compile error (non-exhaustive match)
+    rather than a silent semantic change (as [Stdlib.compare]
+    would). *)
+let int_of_version = function
+  | V0 -> 0
+  | V1 -> 1
+  | V2 -> 2
+  | V3 -> 3
+  | V4 -> 4
+  | V5 -> 5
+  | V6 -> 6
+  | VExperimental -> max_int
+
+(** [compare_version va vb] is negative if [va] is a less recent
+    version than [vb], positive if [va] is more recent, and [0] if
+    they are equal. [VExperimental] is strictly more recent than
+    every concrete version, so [compare_version V6 VExperimental < 0]
+    and would remain so even after a [V7] is introduced. *)
+let compare_version a b =
+  Compare.Int.compare (int_of_version a) (int_of_version b)
+
+(** [at_least v min] is [true] iff [v] is [min] or a more recent
+    version. Shortcut for [compare_version v min >= 0]. Useful to
+    gate host functions, storage layouts, or any other behaviour
+    that became available at a given PVM version. *)
+let at_least v min = int_of_version v >= int_of_version min
 
 let versions =
   [
@@ -35,7 +70,11 @@ let versions =
     ("2.0.0-r4", V4);
     ("2.0.0-r5", V5);
     ("2.0.0-r6", V6);
+    ("2.0.0-experimental", VExperimental);
   ]
+
+let version_of_string version_str =
+  List.assoc ~equal:String.equal version_str versions
 
 let versions_flip = List.map (fun (x, y) -> (y, x)) versions
 
@@ -167,11 +206,64 @@ module Internal_state = struct
     message_limit : Z.t;  (** Maximum number of messages per inbox *)
   }
 
+  let default_buffers validity_period message_limit () =
+    Tezos_webassembly_interpreter.Eval.
+      {
+        input = Tezos_webassembly_interpreter.Input_buffer.alloc ();
+        output =
+          Tezos_webassembly_interpreter.Output_buffer.alloc
+            ~validity_period
+            ~message_limit
+            ~last_level:None;
+      }
+
+  (** Durable storage configuration for the PVM.
+
+      [Durable_only] provides only the Irmin-backed durable storage.
+      [Dual] additionally carries an opaque NDS handle alongside the
+      Irmin storage. *)
+  type pvm_storage =
+    | Durable_only of {durable : Durable.t}
+    | Dual of {durable : Durable.t; nds : Nds.t}
+
+  let to_eval_storage = function
+    | Durable_only {durable} ->
+        Tezos_webassembly_interpreter.Eval_storage.durable_only
+          (Durable.to_storage durable)
+    | Dual {durable; nds} ->
+        Tezos_webassembly_interpreter.Eval_storage.dual
+          (Durable.to_storage durable)
+          nds
+
+  (** [durable_of storage] extracts the [Durable.t] from either storage
+      variant. *)
+  let durable_of = function
+    | Durable_only {durable} -> durable
+    | Dual {durable; _} -> durable
+
+  let of_eval_storage ~default
+      (eval_storage : Tezos_webassembly_interpreter.Eval_storage.t) =
+    let durable =
+      Durable.of_storage
+        ~default:(durable_of default)
+        (Tezos_webassembly_interpreter.Eval_storage.durable_of eval_storage)
+    in
+    match default with
+    | Durable_only _ -> Durable_only {durable}
+    | Dual {nds; _} -> Dual {durable; nds}
+
+  (** [update_durable storage durable] replaces the [Durable.t] inside
+      [storage] while preserving the variant and any NDS handle. *)
+  let update_durable storage durable =
+    match storage with
+    | Durable_only _ -> Durable_only {durable}
+    | Dual {nds; _} -> Dual {durable; nds}
+
   type pvm_state = {
     last_input_info : input_info option;  (** Info about last read input. *)
     current_tick : Z.t;  (** Current tick of the PVM. *)
     reboot_counter : Z.t;  (** Number of reboots for the current input. *)
-    durable : Durable.t;  (** The durable storage of the PVM. *)
+    storage : pvm_storage;  (** Active durable storage backend. *)
     buffers : Tezos_webassembly_interpreter.Eval.buffers;
         (** Input and outut buffers used by the PVM host functions. *)
     tick_state : tick_state;  (** The current tick state. *)

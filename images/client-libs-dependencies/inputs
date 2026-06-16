@@ -1,7 +1,0 @@
-images/create_client_libs_dependencies_image.sh
-images/client-libs-dependencies
-images/common/install-nvm.sh
-scripts/ci/docker_client_libs_dependencies_build.sh
-scripts/install_build_deps.js.sh
-package.json
-package-lock.json

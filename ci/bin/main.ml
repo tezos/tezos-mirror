@@ -37,17 +37,10 @@ let variables : variables =
        the variable tezos/tezos but tezos. *)
     ( "rust_toolchain_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
-    ( "rust_toolchain_image_name_protected",
-      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
     ( "rust_sdk_bindings_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
     ( "rust_sdk_bindings_image_name_protected",
       "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
-    ("jsonnet_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/jsonnet");
-    ( "jsonnet_image_name_protected",
-      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/jsonnet" );
-    ( "client_libs_dependencies_image_name",
-      "${GCP_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies" );
     ("GIT_STRATEGY", "fetch");
     ("GIT_DEPTH", "1");
     ("GET_SOURCES_ATTEMPTS", "2");
@@ -100,6 +93,8 @@ let variables : variables =
 
 (* This must be done before registering shared pipelines. *)
 
+let () = Release_page_ci.register ()
+
 let () = Grafazos_ci.register ()
 
 let () = Teztale_ci.register ()
@@ -110,13 +105,21 @@ let () = Documentation_ci.register ()
 
 let () = Etherlink_ci.register ()
 
-let () = Client_libs_ci.register ()
+let () = Tezos_ci_jobs.Sanity.register ()
+
+let () = Tezos_ci_jobs.Build.register ()
 
 let () = Tezos_ci_jobs.Misc.register ()
 
 let () = Tezos_ci_jobs.Kernels.register ()
 
+let () = Tezos_ci_jobs.Tezos_x.register ()
+
 let () = Tezos_ci_jobs.Tezt.register ()
+
+let () = Tezos_ci_jobs.Installation.register ()
+
+let () = Tezos_ci_jobs.Docker.register ()
 
 (** {3 General pipelines} *)
 
@@ -125,9 +128,8 @@ let () =
   let open Pipeline in
   register
     "before_merging"
-    If.(on_tezos_namespace && merge_request && not merge_train)
-    ~jobs:
-      (Code_verification.jobs Before_merging @ Cacio.get_before_merging_jobs ())
+    If.(merge_request && not merge_train)
+    ~jobs:(Code_verification.jobs Before_merging @ Cacio.get_jobs Before_merging)
     ~description:
       "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
        This pipeline is created on each push to a branch with an associated \
@@ -138,7 +140,7 @@ let () =
     "merge_train"
     ~auto_cancel:{on_job_failure = true; on_new_commit = false}
     If.(on_tezos_namespace && merge_request && merge_train)
-    ~jobs:(Code_verification.jobs Merge_train @ Cacio.get_before_merging_jobs ())
+    ~jobs:(Code_verification.jobs Merge_train @ Cacio.get_jobs Merge_train)
     ~description:
       "A merge-train-specific version of 'before_merging'.\n\n\
        This pipeline contains the same set of jobs as 'before_merging' but \
@@ -152,7 +154,7 @@ let () =
   register
     "master_branch"
     If.(on_tezos_namespace && push && on_branch "master")
-    ~jobs:(Master_branch.jobs @ Cacio.get_master_jobs ())
+    ~jobs:(Tezos_ci.job_datadog_pipeline_trace :: Cacio.get_jobs Master)
     ~description:
       "Publishes artifacts (docs, static binaries) from master on each merge.\n\n\
        This pipeline publishes the documentation at tezos.gitlab.io, builds \
@@ -170,17 +172,6 @@ let () =
   let octez_minor_release_tag_re = "/^octez-v\\d+\\.[1-9][0-9]*$/" in
   (* Matches Octez beta release tags, e.g. [octez-v1.2-beta5]. *)
   let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
-  (* Matches EVM node release tags, e.g. [octez-evm-node-v1.2] or
-     [octez-evm-node-v1.2-rc4]. *)
-  let octez_evm_node_release_tag_re =
-    "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
-  in
-  (* Matches smart rollup node release tags,
-     e.g. [octez-smart-rollup-node-v1.2], [octez-smart-rollup-node-v20250625] or
-     [octez-smart-rollup-node-v1.2-rc4]. *)
-  let octez_smart_rollup_node_release_tag_re =
-    "/^octez-smart-rollup-node-v\\d+(\\.\\d+)?(?:\\-(rc|beta)\\d+)?$/"
-  in
   (* Matches Octez packaging revision tags, e.g. [octez-v1.0-2]. *)
   let octez_packaging_revision_tag_re = "/^octez-v\\d+\\.\\d+\\-\\d+$/" in
   let open Rules in
@@ -205,12 +196,7 @@ let () =
   let has_non_release_tag =
     let release_tags =
       octez_release_tags
-      @ [
-          octez_evm_node_release_tag_re;
-          octez_smart_rollup_node_release_tag_re;
-          Sdk_bindings_ci.Release.tag_re;
-          octez_packaging_revision_tag_re;
-        ]
+      @ [octez_packaging_revision_tag_re]
       @ Cacio.get_release_tag_rexes ()
     in
     If.(Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags))
@@ -223,7 +209,9 @@ let () =
   (* TODO: rename 'octez_docker_latest_release' ?? *)
   register
     "octez_latest_release"
-    ~jobs:(Octez_latest_release.jobs ())
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+      :: Cacio.get_jobs Octez_latest_release)
     If.(on_tezos_namespace && push && on_branch "latest-release")
     ~description:
       ("Updates 'latest' tag of the Octez Docker distribution on Docker Hub.\n\n\
@@ -238,7 +226,9 @@ let () =
   register
     "octez_latest_release_test"
     If.(not_on_tezos_namespace && push && on_branch "latest-release-test")
-    ~jobs:(Octez_latest_release.jobs ~test:true ())
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+      :: Cacio.get_jobs Octez_latest_release_test)
     ~description:
       "Dry-run pipeline for 'octez_latest_release' pipelines.\n\n\
        This pipeline is used to dry run the 'octez_latest_release' pipeline, \
@@ -250,7 +240,7 @@ let () =
   register
     "octez_major_release_tag"
     If.(on_tezos_namespace && push && has_tag_match octez_major_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs ~major:true Release_tag)
+    ~jobs:(Release_tag.octez_jobs Major_release_tag)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       ("Release tag pipelines for major Octez release.\n\n\
@@ -261,7 +251,7 @@ let () =
   register
     "octez_minor_release_tag"
     If.(on_tezos_namespace && push && has_tag_match octez_minor_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs ~major:false Release_tag)
+    ~jobs:(Release_tag.octez_jobs Minor_release_tag)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       ("Release tag pipelines for minor Octez release.\n\n\
@@ -281,7 +271,7 @@ let () =
     "octez_major_release_tag_test"
     If.(
       not_on_tezos_namespace && push && has_tag_match octez_major_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs ~major:true ~test:true Release_tag)
+    ~jobs:(Release_tag.octez_jobs Major_release_tag_test)
     ~description:
       "Dry-run pipeline for 'octez_major_release_tag'.\n\n\
        This pipeline checks that 'octez_major_release_tag' pipelines work as \
@@ -292,7 +282,7 @@ let () =
     "octez_minor_release_tag_test"
     If.(
       not_on_tezos_namespace && push && has_tag_match octez_minor_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs ~major:false ~test:true Release_tag)
+    ~jobs:(Release_tag.octez_jobs Minor_release_tag_test)
     ~description:
       "Dry-run pipeline for 'octez_minor_release_tag'.\n\n\
        This pipeline checks that 'octez_minor_release_tag' pipelines work as \
@@ -303,7 +293,7 @@ let () =
     "octez_beta_release_tag_test"
     If.(
       not_on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs ~test:true Beta_release_tag)
+    ~jobs:(Release_tag.octez_jobs Beta_release_tag_test)
     ~description:
       "Dry run pipeline for 'octez_beta_release_tag'.\n\n\
        This pipeline checks that 'octez_beta_release_tag' pipelines work as \
@@ -311,22 +301,12 @@ let () =
        managers can create this pipeline by pushing a tag to a fork of \
        'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
   register
-    "octez_evm_node_release_tag"
-    If.(push && has_tag_match octez_evm_node_release_tag_re)
-    ~jobs:(Release_tag.octez_evm_node_jobs ())
-    ~description:
-      ("Release tag pipelines for Etherlink.\n\n\
-        Created when the release manager pushes a tag in the format \
-        octez-evm-node-vX.Y(-rcN). Creates and publishes a release on GitLab \
-        with associated etherlink artifacts (static binaries and Docker \
-        image)." ^ release_description) ;
-  register
     "octez_packaging_revision"
     If.(
       on_tezos_namespace && push
       && Rules.has_tag_match octez_packaging_revision_tag_re)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
-    ~jobs:(Release_tag.octez_packaging_revision_jobs ())
+    ~jobs:(Release_tag.octez_packaging_revision_jobs ~test:false ())
     ~description:
       "Packaging revision pipeline for Octez.\n\n\
        This pipeline is created when a packaging revision tag in the format \
@@ -357,7 +337,7 @@ let () =
   register
     "non_release_tag_test"
     If.(not_on_tezos_namespace && push && has_non_release_tag)
-    ~jobs:(Release_tag.octez_jobs ~test:true Non_release_tag)
+    ~jobs:(Release_tag.octez_jobs Non_release_tag_test)
     ~description:
       "Dry-run pipeline for 'non_release_tag'.\n\n\
        This pipeline checks that 'non_release_tag' pipelines work as intended, \
@@ -380,7 +360,7 @@ let () =
     ~jobs:
       ((Code_verification.jobs Schedule_extended_test
        |> List.map (with_interruptible false))
-      @ Cacio.get_schedule_extended_test_jobs ())
+      @ Cacio.get_jobs Schedule_extended_test)
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
        This pipeline unconditionally executes all jobs in 'before_merging' \
@@ -391,10 +371,7 @@ let () =
   register
     "debian.daily"
     debian_daily
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace
-       :: Debian_repository.(jobs ~limit_dune_build_jobs:true Full)
-      |> List.map (with_interruptible false))
+    ~jobs:(Tezos_ci.job_datadog_pipeline_trace :: Cacio.get_jobs Debian_daily)
     ~description:
       "Daily pipeline containing all Debian jobs (build and extended tests)." ;
   register
@@ -416,18 +393,22 @@ let () =
     "base_images.daily"
     base_images_daily
     ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Base_images.jobs
+      (Tezos_ci.job_datadog_pipeline_trace :: Base_images.jobs ()
       |> List.map (with_interruptible false))
     ~description:
       "Daily pipeline containing all Base Images jobs (build and merge)." ;
-  register
-    "opam.daily"
-    opam_daily
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Opam.jobs_opam_packages ()
-      |> List.map (with_interruptible false))
-    ~description:"Daily pipeline containing all OPAM jobs." ;
-  let custom_extended_test_jobs = Custom_extended_test_pipeline.jobs () in
+
+  (* The "custom extended test" pipelines test the codebase with some particular options.
+     This allows testing behaviors that are not enabled by default on the node,
+     and are thus not tested in Tezt jobs of [before_merging] pipelines in particular.
+
+     Note: this method is simple to implement but is not ideal.
+     It duplicates a lot of tests that do not actually contribute
+     to testing the special options, and there is no reason why at least some tests
+     could be run with special options in dedicated jobs in [before_merging] pipelines. *)
+  let custom_extended_test_jobs =
+    Cacio.get_jobs Custom_extended_test @ [job_datadog_pipeline_trace]
+  in
   register
     "schedule_extended_rpc_test"
     schedule_extended_rpc_tests
@@ -465,83 +446,97 @@ let () =
   register
     "schedule_test_release"
     schedule_test_release
-    ~jobs:(Release_tag.octez_jobs ~test:true Schedule_test)
+    ~jobs:(Release_tag.octez_jobs Scheduled_test_release)
     ~description:
       "Scheduled pipeline that runs a test release pipeline. The jobs are the \
        same as a release pipeline but run in dry-mode." ;
+  if Tezos_ci.container_scanning_flag then (
+    register
+      "schedule_container_scanning_master"
+      schedule_container_scanning_master
+      ~jobs:
+        Container_scanning.(
+          jobs
+            {
+              name = "tezos/tezos";
+              tag = "master";
+              dockerfile = "build.Dockerfile";
+              job_name = "tezos-tezos-master";
+            })
+      ~description:
+        "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:master \
+         Docker image" ;
+    register
+      "schedule_container_scanning_octez_releases"
+      schedule_container_scanning_octez_releases
+      ~jobs:
+        Container_scanning.(
+          jobs
+            {
+              name = "tezos/tezos";
+              tag = "latest";
+              dockerfile = "build.Dockerfile";
+              job_name = "tezos-tezos-latest";
+            })
+      ~description:
+        "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:latest \
+         Docker image" ;
+    register
+      "schedule_container_scanning_evm_node_releases"
+      schedule_container_scanning_evm_node_releases
+      ~jobs:
+        Container_scanning.(
+          jobs
+            {
+              name = "tezos/tezos";
+              tag = "octez-evm-node-latest";
+              dockerfile = "build.Dockerfile";
+              job_name = "tezos-tezos-octez-evm-node-latest";
+            })
+      ~description:
+        "Scheduled pipeline for scanning vulnerabilities in latest \
+         tezos/tezos:octez-evm-node-latest Docker image" ;
+    register
+      "schedule_container_scanning_octez_rc"
+      schedule_container_scanning_octez_rc
+      ~jobs:
+        Container_scanning.(
+          jobs
+            {
+              name = "tezos/tezos";
+              tag = "octez-v22.0-rc3";
+              dockerfile = "build.Dockerfile";
+              job_name = "tezos-tezos-octez--v22.0-rc3";
+            })
+      ~description:
+        "Scheduled pipeline for scanning vulnerabilities in the Docker image \
+         for the latest release candidate of Octez" ;
+    register
+      "schedule_security_scans"
+      schedule_security_scans
+      ~jobs:Security_scans.jobs
+      ~description:
+        "Scheduled pipeline for various security scans. Currently scanning for \
+         vulnerabilities in Docker images") ;
   register
-    "schedule_container_scanning_master"
-    schedule_container_scanning_master
+    "schedule_docker_master_snapshot"
+    schedule_docker_master_snapshot
     ~jobs:
-      Container_scanning.(
-        jobs
-          {
-            name = "tezos/tezos";
-            tag = "master";
-            dockerfile = "build.Dockerfile";
-            job_name = "tezos-tezos-master";
-          })
+      (Tezos_ci.job_datadog_pipeline_trace
+       :: Cacio.get_jobs Scheduled_docker_master_snapshot
+      |> List.map (with_interruptible false))
     ~description:
-      "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:master \
-       Docker image" ;
-  register
-    "schedule_container_scanning_octez_releases"
-    schedule_container_scanning_octez_releases
-    ~jobs:
-      Container_scanning.(
-        jobs
-          {
-            name = "tezos/tezos";
-            tag = "latest";
-            dockerfile = "build.Dockerfile";
-            job_name = "tezos-tezos-latest";
-          })
-    ~description:
-      "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:latest \
-       Docker image" ;
-  register
-    "schedule_container_scanning_evm_node_releases"
-    schedule_container_scanning_evm_node_releases
-    ~jobs:
-      Container_scanning.(
-        jobs
-          {
-            name = "tezos/tezos";
-            tag = "octez-evm-node-latest";
-            dockerfile = "build.Dockerfile";
-            job_name = "tezos-tezos-octez-evm-node-latest";
-          })
-    ~description:
-      "Scheduled pipeline for scanning vulnerabilities in latest \
-       tezos/tezos:octez-evm-node-latest Docker image" ;
-  register
-    "schedule_container_scanning_octez_rc"
-    schedule_container_scanning_octez_rc
-    ~jobs:
-      Container_scanning.(
-        jobs
-          {
-            name = "tezos/tezos";
-            tag = "octez-v22.0-rc3";
-            dockerfile = "build.Dockerfile";
-            job_name = "tezos-tezos-octez--v22.0-rc3";
-          })
-    ~description:
-      "Scheduled pipeline for scanning vulnerabilities in the Docker image for \
-       the latest release candidate of Octez" ;
-  register
-    "schedule_security_scans"
-    schedule_security_scans
-    ~jobs:Security_scans.jobs
-    ~description:
-      "Scheduled pipeline for various security scans. Currently scanning for \
-       vulnerabilities in Docker images" ;
+      "Scheduled pipeline publishing a dated master Docker image to Docker \
+       Hub.\n\n\
+       This pipeline publishes the Octez Docker image tagged as \
+       [master-YYYYMMDD] (where the date is computed at build time) to \
+       DockerHub (https://hub.docker.com/r/tezos/tezos)." ;
   register
     "schedule_docker_build_pipeline"
     schedule_docker_build
     ~jobs:
       (Tezos_ci.job_datadog_pipeline_trace
-     :: Master_branch.octez_distribution_docker_jobs)
+      :: Cacio.get_jobs Scheduled_docker_build)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       "Scheduled pipeline for forcing building fresh Docker image (skipping \
@@ -557,21 +552,15 @@ let () =
     "publish_test_release_page"
     If.(api_release_page && not_on_tezos_namespace)
     ~jobs:
-      ([
-         Tezos_ci.job_datadog_pipeline_trace;
-         Release_tag.job_release_page ~test:true ();
-       ]
-      @ Cacio.get_global_test_publish_release_page_jobs ())
+      ([Tezos_ci.job_datadog_pipeline_trace]
+      @ Cacio.get_jobs Test_publish_release_page)
     ~description:"Pipeline that updates and publishes the test release page." ;
   register
     "publish_release_page"
     If.(api_release_page && on_tezos_namespace)
     ~jobs:
-      ([
-         Tezos_ci.job_datadog_pipeline_trace;
-         Release_tag.job_release_page ~test:false ();
-       ]
-      @ Cacio.get_global_publish_release_page_jobs ())
+      ([Tezos_ci.job_datadog_pipeline_trace]
+      @ Cacio.get_jobs Publish_release_page)
     ~description:"Pipeline that updates and publishes the release page."
 
 (** {2 Entry point of the generator binary} *)
@@ -587,13 +576,30 @@ let () =
         ~filename:".gitlab-ci.yml"
         () ;
       Tezos_ci.check_files ~remove_extra_files:Cli.config.remove_extra_files () ;
-      if Cli.config.verbose then
+      if Cli.config.verbose then (
+        let ciao_jobs = Tezos_ci.get_declared_jobs () in
+        let cacio_jobs = Cacio.get_declared_jobs () in
+        let non_migrated_jobs =
+          (* Remove [cacio_jobs] from [ciao_jobs] to get [non_migrated_jobs]. *)
+          String_map.merge
+            (fun _ a b ->
+              match (a, b) with
+              | None, _ | _, Some _ -> None
+              | (Some _ as x), None -> x)
+            ciao_jobs
+            cacio_jobs
+        in
+        print_endline "CACIO MIGRATION" ;
+        String_map.iter
+          (fun name (file, line, _, _) ->
+            Printf.printf "%s:%d: not migrated: %s\n" file line name)
+          non_migrated_jobs ;
         (* Note: [Tezos_ci] jobs include [Cacio] jobs, since [Cacio] registers
            jobs using [Tezos_ci.job]. *)
         Printf.printf
           "%d/%d jobs were defined using Cacio.\n%!"
-          (Cacio.get_number_of_declared_jobs ())
-          (Tezos_ci.get_number_of_declared_jobs ())
+          (String_map.cardinal cacio_jobs)
+          (String_map.cardinal ciao_jobs))
   | List_pipelines -> Pipeline.list_pipelines ()
   | Overview_pipelines -> Pipeline.overview_pipelines ()
   | Describe_pipeline {name} -> Pipeline.describe_pipeline name

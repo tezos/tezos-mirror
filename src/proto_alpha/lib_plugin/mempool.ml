@@ -71,6 +71,17 @@ let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
 let default_minimal_nanotez_per_byte = Q.of_int 1000
 
+let get_minimal_nanotez_per_byte config = config.minimal_nanotez_per_byte
+
+let with_minimal_nanotez_per_byte minimal_nanotez_per_byte config =
+  {config with minimal_nanotez_per_byte}
+
+let get_minimal_nanotez_per_gas_unit config =
+  config.minimal_nanotez_per_gas_unit
+
+let with_minimal_nanotez_per_gas_unit minimal_nanotez_per_gas_unit config =
+  {config with minimal_nanotez_per_gas_unit}
+
 let managers_quota =
   Stdlib.List.nth Main.validation_passes Operation_repr.manager_pass
 
@@ -570,6 +581,21 @@ let pre_filter info config
 
 let syntactic_check _ = Lwt.return `Well_formed
 
+let equal_modulo_dummy_values
+    ({contents = contents1; _} : Block_header.protocol_data)
+    ({contents = contents2; _} : Block_header.protocol_data) =
+  (* proof_of_work_nonce are not compared since the preapply function uses a fake
+     protocol_data created with an empty proof_of_work_nonce *)
+
+  (* payload_hash are not compared since the preapply function uses a dummy
+     payload hash (see [forge_faked_protocol_data]) *)
+  Round.equal contents1.payload_round contents2.payload_round
+  && Option.equal
+       Nonce_hash.equal
+       contents1.seed_nonce_hash
+       contents2.seed_nonce_hash
+  && contents1.per_block_votes = contents2.per_block_votes
+
 let is_manager_operation op =
   match Operation.acceptable_pass op with
   | Some pass -> Compare.Int.equal pass Operation_repr.manager_pass
@@ -855,31 +881,47 @@ let sources_from_operation ctxt
     ({shell = _; protocol_data = Operation_data {contents; _}} : Main.operation)
     =
   let open Lwt_syntax in
-  match contents with
-  | Single (Failing_noop _) -> return_nil
-  | Single (Preattestation consensus_content)
-  | Single (Attestation {consensus_content; dal_content = _}) ->
-      let attested_level = Level.from_raw ctxt consensus_content.level in
-      sources_from_level_and_slot ctxt ~attested_level consensus_content.slot
-  | Single (Preattestations_aggregate {consensus_content; committee}) ->
-      sources_from_aggregate ctxt consensus_content committee
-  | Single (Attestations_aggregate {consensus_content; committee}) ->
-      sources_from_aggregate
-        ctxt
-        consensus_content
-        (Operation.committee_slots committee)
-  | Single (Seed_nonce_revelation _)
-  | Single (Double_consensus_operation_evidence _)
-  | Single (Double_baking_evidence _)
-  | Single (Dal_entrapment_evidence _)
-  | Single (Activate_account _)
-  | Single (Vdf_revelation _) ->
-      return_nil
-  | Single (Proposals {source; _}) | Single (Ballot {source; _}) ->
-      return [source]
-  | Single (Drain_delegate {delegate; _}) -> return [delegate]
-  | Single (Manager_operation {source; _}) -> return [source]
-  | Cons (Manager_operation {source; _}, _) -> return [source]
+  let* sources =
+    match contents with
+    | Single (Failing_noop _) -> return_nil
+    | Single (Preattestation consensus_content)
+    | Single (Attestation {consensus_content; dal_content = _}) ->
+        let attested_level = Level.from_raw ctxt consensus_content.level in
+        let* sources =
+          sources_from_level_and_slot
+            ctxt
+            ~attested_level
+            consensus_content.slot
+        in
+        return sources
+    | Single (Preattestations_aggregate {consensus_content; committee}) ->
+        let* sources =
+          sources_from_aggregate ctxt consensus_content committee
+        in
+        return sources
+    | Single (Attestations_aggregate {consensus_content; committee}) ->
+        let* sources =
+          sources_from_aggregate
+            ctxt
+            consensus_content
+            (Operation.committee_slots committee)
+        in
+        return sources
+    | Single (Seed_nonce_revelation _)
+    | Single (Double_consensus_operation_evidence _)
+    | Single (Double_baking_evidence _)
+    | Single (Dal_entrapment_evidence _)
+    | Single (Activate_account _)
+    | Single (Vdf_revelation _) ->
+        return_nil
+    | Single (Proposals {source; _}) | Single (Ballot {source; _}) ->
+        return [source]
+    | Single (Drain_delegate {delegate; _}) -> return [delegate]
+    | Single (Manager_operation {source; _}) -> return [source]
+    | Cons (Manager_operation {source; _}, _) -> return [source]
+  in
+  let map_pkh_env = List.map Tezos_crypto.Signature.Of_V3.public_key_hash in
+  return @@ map_pkh_env sources
 
 module Internal_for_tests = struct
   let default_config_with_clock_drift clock_drift =

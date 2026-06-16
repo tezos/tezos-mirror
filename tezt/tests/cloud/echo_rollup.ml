@@ -152,6 +152,7 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
     Sc_rollup_node.Agent.create
       ~name:(name_of_daemon (Echo_rollup_node name))
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
       ~default_operator:operator.alias
       ~operators:[(Sc_rollup_node.Operating, operator.Account.alias)]
       ?dal_node

@@ -126,7 +126,7 @@ let pack_slots_headers_by_level list =
     type t =
       Dal_slot_repr.Header.t
       * Contract_repr.t
-      * Dal_attestation_repr.Accountability.attestation_status
+      * Dal_attestations_repr.Accountability.attestation_status
 
     let compare (a, _, _) (b, _, _) =
       let open Dal_slot_repr.Header in
@@ -180,11 +180,12 @@ let gen_dal_slots_history () =
     List.rev_map
       (fun (level, slot_index, publisher, is_proto_attested) ->
         let attestation_status =
-          Dal_attestation_repr.Accountability.
+          Dal_attestations_repr.Accountability.
             {
               attested_shards = (if is_proto_attested then 1 else 0);
               total_shards = 1;
               is_proto_attested;
+              attesters = Environment.Signature.Public_key_hash.Set.empty;
             }
         in
         let published_level =
@@ -217,15 +218,23 @@ let gen_dal_slots_history () =
               if c <> 0 then c else Index.compare a.index b.index)
             slot_headers
         in
-        History.(
-          update_skip_list_no_cache
-            ~number_of_slots
-            history
-            ~published_level
+        let slots =
+          List.map
+            (fun (header, publisher, status) ->
+              (header, publisher, Some status))
             slot_headers
-            ~attestation_lag:Legacy)
+        in
+        History.(
+          update_skip_list
+            history
+            (History_cache.empty ~capacity:0L)
+            ~published_level
+            ~number_of_slots
+            ~attestation_lag:Legacy
+            ~slots
+            ~fill_unpublished_gaps:false)
         |> function
-        | Ok history -> loop history llist
+        | Ok (history, _cache) -> loop history llist
         | Error e ->
             return
             @@ Stdlib.failwith

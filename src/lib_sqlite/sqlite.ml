@@ -55,20 +55,27 @@ module Pool = struct
 
   let dispose {conn = (module Db : Caqti_lwt.CONNECTION); _} = Db.disconnect ()
 
-  let connect uri =
+  let connect ?register uri =
     let open Lwt_syntax in
     let* res = Caqti_lwt_unix.connect uri in
     match res with
-    | Ok conn -> return {conn; use_count = 0}
+    | Ok conn ->
+        let (module Conn) = conn in
+        (match (register, Conn.driver_connection) with
+        | None, _ -> ()
+        | Some register, Some (Caqti_driver_sqlite3.Driver_connection db) ->
+            register db
+        | _ -> assert false) ;
+        return {conn; use_count = 0}
     | Error e -> Lwt.fail (Connection_error e)
 
-  let create ?max_use_count size uri =
+  let create ?max_use_count ?register size uri =
     Lwt_pool.create
       size
       ~validate:(validate ~max_use_count)
       ~check
       ~dispose
-      (fun () -> connect uri)
+      (fun () -> connect ?register uri)
 end
 
 type sqlite_journal_mode = Wal | Other
@@ -325,6 +332,28 @@ module Q = struct
       (unit ->! journal_mode) ~name:"Sqlite.Journal_mode.set_wal"
       @@ {|PRAGMA journal_mode=wal|}
   end
+
+  let table_exists =
+    (string ->! bool)
+    @@ {|SELECT EXISTS (SELECT name FROM sqlite_master WHERE type='table' AND name=?)|}
+
+  let create_migration_table table_name =
+    (unit ->. unit)
+    @@ Printf.sprintf
+         {|
+      CREATE TABLE %s (
+        id SERIAL PRIMARY KEY,
+        name TEXT
+      )|}
+         table_name
+
+  let current_migration_id table_name =
+    (unit ->? int)
+    @@ Printf.sprintf "SELECT id FROM %s ORDER BY id DESC LIMIT 1" table_name
+
+  let register_migration table_name =
+    (t2 int string ->. unit)
+    @@ Printf.sprintf "INSERT INTO %s (id, name) VALUES (?, ?)" table_name
 end
 
 type perm = Read_only of {pool_size : int} | Read_write
@@ -367,7 +396,117 @@ let vacuum ~conn ~output_db_file =
 let vacuum_self ~conn =
   with_connection conn @@ fun conn -> Db.exec conn Q.vacuum_self ()
 
-let init ~path ~perm ?max_conn_reuse_count migration_code =
+module Schemas = struct
+  let get_all_req =
+    Request.(Caqti_type.Std.unit ->* Caqti_type.Std.string)
+    @@ {|SELECT sql FROM sqlite_schema WHERE
+         name NOT LIKE 'sqlite_%' AND
+         name NOT LIKE '%migrations'|}
+
+  let get_all conn =
+    with_connection conn @@ fun conn -> Db.collect_list conn get_all_req ()
+end
+
+module Migration = struct
+  type step =
+    | Sql of (unit, unit, [`Zero]) Request.t
+    | Ocaml of (Db.conn -> unit tzresult Lwt.t)
+
+  type t = {name : string; steps : step list}
+
+  let make_sql ~name sql =
+    let migration_step s =
+      Request.(Caqti_type.Std.unit ->. Caqti_type.Std.unit) ~oneshot:true s
+    in
+    let steps =
+      String.split_on_char ';' sql
+      |> List.filter_map (fun i ->
+             match String.trim i with
+             | "" -> None
+             | x -> Some (Sql (migration_step x)))
+    in
+    {name; steps}
+
+  let apply_one conn migration =
+    List.iter_es
+      (fun step ->
+        match step with Sql req -> Db.exec conn req () | Ocaml f -> f conn)
+      migration.steps
+
+  let table_exists conn table_name = Db.find conn Q.table_exists table_name
+
+  module type MIGRATION_CONFIG = sig
+    val table_name : string
+
+    val version : int
+
+    val all_migrations : t list
+  end
+
+  module Make (C : MIGRATION_CONFIG) = struct
+    let migrations =
+      Stdlib.List.filteri (fun i _ -> i <= C.version) C.all_migrations
+
+    let apply conn ?(read_only = false) ?(on_init = fun () -> Lwt.return_unit)
+        ?(on_future = fun ~applied:_ ~known:_ -> Lwt.return_unit)
+        ?(on_applied = fun ~name:_ ~duration:_ -> Lwt.return_unit) () =
+      let open Lwt_result_syntax in
+      let all_migrations = List.mapi (fun i m -> (i, m)) migrations in
+      let* tbl_exists = table_exists conn C.table_name in
+      let* () =
+        if not tbl_exists then
+          let* () = Db.exec conn (Q.create_migration_table C.table_name) () in
+          let*! () = on_init () in
+          return_unit
+        else return_unit
+      in
+      let* current =
+        Db.find_opt conn (Q.current_migration_id C.table_name) ()
+      in
+      let* pending =
+        match current with
+        | Some current ->
+            let applied = current + 1 in
+            let known = List.length all_migrations in
+            if applied <= known then
+              return (List.filteri (fun i _ -> i >= applied) all_migrations)
+            else
+              let*! () = on_future ~applied ~known in
+              failwith
+                "Cannot use a store with %d migrations applied when only %d \
+                 are known"
+                applied
+                known
+        | None -> return all_migrations
+      in
+      let*? () =
+        if read_only && pending <> [] then
+          error_with
+            "The store has %d missing migrations but was opened in read-only \
+             mode."
+            (List.length pending)
+        else Ok ()
+      in
+      let register_migration_req = Q.register_migration C.table_name in
+      List.iter_es
+        (fun (i, ({name; _} as mig)) ->
+          let start_time = Unix.gettimeofday () in
+          let* () = apply_one conn mig in
+          let* () = Db.exec conn register_migration_req (i, name) in
+          let duration =
+            Unix.gettimeofday () -. start_time |> Ptime.Span.of_float_s
+          in
+          let*! () =
+            match duration with
+            | Some duration -> on_applied ~name ~duration
+            | None -> Lwt.return_unit
+          in
+          return_unit)
+        pending
+  end
+end
+
+let init ~path ~perm ?max_conn_reuse_count ?register migration_code =
   let open Lwt_result_syntax in
   let uri = uri path perm in
   let pool_size =
@@ -398,7 +537,9 @@ let init ~path ~perm ?max_conn_reuse_count migration_code =
           | None -> () )
     else (no_trace, no_add_attrs)
   in
-  let db_pool = Pool.create pool_size ?max_use_count:max_conn_reuse_count uri in
+  let db_pool =
+    Pool.create pool_size ?max_use_count:max_conn_reuse_count ?register uri
+  in
   let store = {db_pool; trace; add_attrs} in
   use store @@ fun conn ->
   let* () = set_wal_journal_mode conn in

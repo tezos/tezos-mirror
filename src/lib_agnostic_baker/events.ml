@@ -107,16 +107,30 @@ let period_status =
     ("period", string)
     ("remaining", int31)
 
-(* Error *)
-let cannot_connect =
+let head_stream_ended =
   declare_1
     ~section
-    ~alternative_color
-    ~level:Error
-    ~name:"cannot_connect"
-    ~msg:"Cannot connect to node. {message}"
-    ~pp1:Format.pp_print_string
-    ("message", Data_encoding.string)
+    ~level:Notice
+    ~name:"head_stream_ended"
+    ~msg:"agnostic daemon lost stream connection with node {node}"
+    ("node", string)
+
+let head_stream_reconnected =
+  declare_1
+    ~section
+    ~level:Notice
+    ~name:"head_stream_reconnected"
+    ~msg:"agnostic daemon managed to reconnect to node {node}"
+    ("node", string)
+
+let old_baker_stopped =
+  declare_1
+    ~section
+    ~level:Notice
+    ~name:"old_baker_stopped"
+    ~msg:"agnostic daemon witnessed shutdown of protocol {protocol} baker"
+    ~pp1:Protocol_hash.pp
+    ("protocol", Protocol_hash.encoding)
 
 (* Warning *)
 let node_version_check_bypass =
@@ -127,21 +141,15 @@ let node_version_check_bypass =
     ~msg:"Compatibility between node version and baker version by passed"
     ()
 
-let deprecated_adaptive_issuance_vote =
-  declare_0
+let retry_on_disconnection =
+  declare_1
     ~section
-    ~name:"deprecated_adaptive_issuance_vote"
+    ~alternative_color
     ~level:Warning
-    ~msg:
-      "DEPRECATED ARGUMENT: The 'adaptive-issuance-vote' argument (placeholder \
-       'vote') is deprecated. It is already ignored by the baker, and will be \
-       removed in the next major version of Octez."
-    ()
-
-let warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote =
-  if Option.is_some adaptive_issuance_vote then
-    emit deprecated_adaptive_issuance_vote ()
-  else Lwt.return_unit
+    ~name:"retry_on_disconnection"
+    ~msg:"{msg}"
+    ~pp1:Format.pp_print_string
+    ("msg", Data_encoding.string)
 
 (* Debug *)
 let node_version_check =
@@ -168,6 +176,66 @@ let node_version_check =
     ( "baker_commit",
       Data_encoding.option Tezos_version.Octez_node_version.commit_info_encoding
     )
+
+let new_head =
+  declare_0
+    ~section
+    ~name:"new_head"
+    ~level:Debug
+    ~msg:"agnostic daemon received a new head"
+    ()
+
+let node_connection_lost =
+  declare_1
+    ~section
+    ~name:"agnostic_daemon_node_connection_lost"
+    ~level:Warning
+    ~msg:"connection lost to node {uri}, will retry in 5 seconds"
+    ("uri", Data_encoding.string)
+
+let node_connection_restored =
+  declare_1
+    ~section
+    ~name:"agnostic_daemon_node_connection_restored"
+    ~level:Notice
+    ~msg:"connection restored to node {uri}"
+    ("uri", Data_encoding.string)
+
+let node_connection_retry_failed =
+  declare_2
+    ~section
+    ~name:"agnostic_daemon_node_connection_retry_failed"
+    ~level:Warning
+    ~msg:"failed to reconnect to node {uri}: {error}, retrying in 5 seconds"
+    ("uri", Data_encoding.string)
+    ~pp2:pp_print_top_error_of_trace
+    ("error", trace_encoding)
+
+let monitoring_head_from_node =
+  declare_3
+    ~section
+    ~name:"agnostic_daemon_monitoring_head_from_node"
+    ~level:Debug
+    ~msg:"monitoring head at level {level} from node {uri} (block {block})"
+    ~pp1:Format.pp_print_int
+    ("level", Data_encoding.int31)
+    ("uri", Data_encoding.string)
+    ~pp3:Block_hash.pp_short
+    ("block", Block_hash.encoding)
+
+let skipping_lower_or_equal_level =
+  declare_3
+    ~section
+    ~name:"agnostic_daemon_skipping_lower_or_equal_level"
+    ~level:Debug
+    ~msg:
+      "skipping monitoring for head at level {level} from node {uri} (block \
+       {block}): level is not greater than last seen level"
+    ~pp1:Format.pp_print_int
+    ("level", Data_encoding.int31)
+    ("uri", Data_encoding.string)
+    ~pp3:Block_hash.pp_short
+    ("block", Block_hash.encoding)
 
 module Per_block_votes = struct
   include Internal_event.Simple
@@ -196,17 +264,6 @@ module Per_block_votes = struct
       ~msg:"Error reading the block vote file: {errors}"
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
-
-  let deprecated_adaptive_issuance_vote_field =
-    declare_0
-      ~section
-      ~name:"deprecated_adaptive_issuance_vote_field"
-      ~level:Warning
-      ~msg:
-        "DEPRECATED CONFIG: The 'adaptive_issuance_vote' field of the vote \
-         configuration file is deprecated. It is already ignored by the baker, \
-         and will be removed in the next major version of Octez."
-      ()
 end
 
 module Commands = struct

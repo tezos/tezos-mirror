@@ -36,21 +36,26 @@
 //! ```rust
 //! use tezos_protocol::contract::Contract;
 //! use tezos_smart_rollup::prelude::*;
+//! use tezos_smart_rollup::host::StorageV1;
+//! use tezos_smart_rollup::host::WasmHost;
 //! use tezos_smart_rollup::outbox::*;
 //! use tezos_smart_rollup::inbox::InboxMessage;
 //! use tezos_smart_rollup::michelson::MichelsonString;
 //! use tezos_smart_rollup::types::Entrypoint;
 //!
-//! fn kernel_run(host: &mut impl Runtime) {
+//! fn kernel_run<Host>(host: &mut Host)
+//! where
+//!     Host: WasmHost + StorageV1
+//! {
 //!   while let Ok(Some(message)) = host.read_input() {
-//!     debug_msg!(host, "found {message:?}");
+//!     debug_msg!("found {message:?}");
 //!     let message = make_outbox_message(message.level, message.id);
 //!
 //!     OUTBOX_QUEUE.queue_message(host, message).expect("able to queue message");
 //!   }
 //!
 //!   let num_flushed = OUTBOX_QUEUE.flush_queue(host);
-//!   debug_msg!(host, "wrote {num_flushed} messages to the outbox");
+//!   debug_msg!("wrote {num_flushed} messages to the outbox");
 //! }
 //!
 //! fn make_outbox_message(level: u32, index: u32) -> OutboxMessageTransaction<MichelsonString> {
@@ -80,7 +85,9 @@ use tezos_smart_rollup_host::path::{concat, Path, PathError};
 use tezos_smart_rollup_host::Error;
 use tezos_smart_rollup_host::{
     path::{self, OwnedPath, RefPath, PATH_MAX_SIZE},
-    runtime::{Runtime, RuntimeError},
+    runtime::RuntimeError,
+    storage::StorageV1,
+    wasm::WasmHost,
 };
 
 use alloc::vec::Vec;
@@ -141,7 +148,7 @@ impl<'a, P: Path> OutboxQueue<'a, P> {
     /// [`flush_queue`]: Self::flush_queue
     pub fn queue_message<Batch: AtomicBatch>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         message: impl Into<OutboxMessageFull<Batch>>,
     ) -> Result<usize, RuntimeError> {
         let (start, len) = self.read_meta(host);
@@ -184,7 +191,10 @@ impl<'a, P: Path> OutboxQueue<'a, P> {
     /// `flush_queue` twice, on the same *durable storage state*, then a single message could be
     /// executed twice - leading to double spending of an L2 account's funds on L1 - this would result
     /// later in some accounts being unable to execute otherwise valid withdrawals on L1.
-    pub fn flush_queue(&self, host: &mut impl Runtime) -> usize {
+    pub fn flush_queue<Host>(&self, host: &mut Host) -> usize
+    where
+        Host: StorageV1 + WasmHost,
+    {
         // Consider: `store_read_extend(&mut Vec)`
         let mut num_flushed = 0;
         let (mut start, mut len) = self.read_meta(host);
@@ -236,7 +246,7 @@ impl<'a, P: Path> OutboxQueue<'a, P> {
     }
 
     #[inline(always)]
-    fn read_meta(&self, host: &impl Runtime) -> (u32, u32) {
+    fn read_meta(&self, host: &impl StorageV1) -> (u32, u32) {
         const BUFF_SIZE: usize = 2 * core::mem::size_of::<u32>();
         let mut buffer = [0; BUFF_SIZE];
 
@@ -255,7 +265,7 @@ impl<'a, P: Path> OutboxQueue<'a, P> {
     }
 
     #[inline(always)]
-    fn save_meta(&self, host: &mut impl Runtime, start: u32, len: u32) {
+    fn save_meta(&self, host: &mut impl StorageV1, start: u32, len: u32) {
         if len == 0 {
             // We only call this when we've just emptied the queue
             let _ = host.store_delete(self.root);
@@ -285,6 +295,7 @@ mod test {
     use tezos_data_encoding::nom::NomReader;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+    use tezos_smart_rollup_host::storage::StorageV1;
 
     #[test]
     fn flushing_empty_queue_no_op() {

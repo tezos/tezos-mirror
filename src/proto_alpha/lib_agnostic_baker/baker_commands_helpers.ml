@@ -26,9 +26,13 @@ let parse_state_recorder state_recorder =
 let run_baker (cctxt : Tezos_client_base.Client_context.full) ?dal_node_rpc_ctxt
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?votes
     ?extra_operations ?pre_emptive_forge_time ?force_apply_from_round
-    ?remote_calls_timeout ?data_dir ?state_recorder ~chain ~keep_alive sources =
+    ?remote_calls_timeout ?data_dir ?state_recorder ~chain ~keep_alive
+    ~extra_nodes sources =
   let open Lwt_result_syntax in
   let cctxt = new Protocol_client_context.wrap_full cctxt in
+  let extra_nodes =
+    List.map (new Protocol_client_context.wrap_full) extra_nodes
+  in
   let votes =
     let to_protocol = function
       | Octez_agnostic_baker.Per_block_votes.Per_block_vote_on ->
@@ -43,6 +47,9 @@ let run_baker (cctxt : Tezos_client_base.Client_context.full) ?dal_node_rpc_ctxt
         Baking_configuration.
           {vote_file; liquidity_baking_vote = to_protocol liquidity_baking_vote})
       votes
+  in
+  let*? sources =
+    List.map_e Signature.Of_V_latest.get_public_key_hash sources
   in
   let* delegates = Baking_commands.get_delegates cctxt sources in
   Client_daemon.Baker.run
@@ -60,6 +67,7 @@ let run_baker (cctxt : Tezos_client_base.Client_context.full) ?dal_node_rpc_ctxt
     ?state_recorder:(Option.map parse_state_recorder state_recorder)
     ~chain
     ~keep_alive
+    ~extra_nodes
     delegates
 
 let run_vdf_daemon ~cctxt ~keep_alive =

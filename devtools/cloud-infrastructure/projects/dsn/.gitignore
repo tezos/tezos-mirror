@@ -1,5 +1,0 @@
-# Terraform
-**/.terraform*
-**override.tf
-*.tfstate*
-*.tfvars%

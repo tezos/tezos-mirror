@@ -28,8 +28,7 @@ open Alpha_context
 open Baking_state
 open Baking_state_types
 module Events = Baking_events.Actions
-
-module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
+module Profiler = Baking_profiler.Baker_profiler
 
 module Operations_source = struct
   type error +=
@@ -226,10 +225,9 @@ let sign ?timeout ?watermark ~signing_request cctxt secret_key_uri msg =
       Lwt.return (Error errs)
   | `Signature_result (Ok res) -> Lwt.return (Ok res)
 
-let sign_block_header round_duration global_state proposer unsigned_block_header
-    =
+let sign_block_header (cctxt : Protocol_client_context.full) round_duration
+    global_state proposer unsigned_block_header =
   let open Lwt_result_syntax in
-  let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
   let force = global_state.config.force in
   let {Block_header.shell; protocol_data = {contents; _}} =
@@ -268,8 +266,15 @@ let sign_block_header round_duration global_state proposer unsigned_block_header
             in
             return_true
         | false ->
-            let*! () = Events.(emit potential_double_baking (level, round)) in
-            return force)
+            if global_state.config.multi_node then
+              let*! () =
+                Events.(
+                  emit skipping_outdated_block_forge_request (level, round))
+              in
+              return force
+            else
+              let*! () = Events.(emit potential_double_baking (level, round)) in
+              return force)
   in
   match result with
   | false -> tzfail (Block_previously_baked {level; round})
@@ -294,15 +299,15 @@ let sign_block_header round_duration global_state proposer unsigned_block_header
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
-let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
-    =
+let prepare_unsigned_block (automaton_state : automaton_state)
+    (global_state : global_state) (block_to_bake : block_to_bake) =
   let open Lwt_result_syntax in
   let {predecessor; round; delegate; kind; force_apply} = block_to_bake in
+  let cctxt = automaton_state.cctxt in
   let level = Int32.succ predecessor.shell.level in
   let*! () = Events.(emit prepare_forging_block (level, round, delegate)) in
-  let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
-  let simulation_mode = global_state.validation_mode in
+  let simulation_mode = automaton_state.validation_mode in
   let round_durations = global_state.round_durations in
   let*? timestamp =
     Environment.wrap_tzresult
@@ -335,9 +340,6 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
               payload_hash;
             },
           payload_round )
-  in
-  let*! () =
-    Events.(emit forging_block (level, round, delegate, force_apply))
   in
   let* injection_level =
     Node_rpc.current_level
@@ -422,7 +424,10 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     Round.round_duration global_state.round_durations round
     |> Period.to_seconds |> Int64.to_float
   in
-  let* {unsigned_block_header; operations; manager_operations_infos} =
+  let*! () =
+    Events.(emit forging_block (level, round, delegate, force_apply))
+  in
+  let* unsigned_block =
     Utils.event_on_stalling_promise
       ~initial_delay:(round_duration /. 2.)
       ~event:(fun sum -> Events.(emit stalling_forge_block (level, round, sum)))
@@ -445,8 +450,25 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
           global_state.constants.parametric
         [@profiler.record_s {verbosity = Info} "forge block"])
   in
+  return (unsigned_block, seed_nonce_opt, injection_level, liquidity_baking_vote)
+
+let sign_unsigned_block_and_register_seed_nonce
+    Block_forge.{unsigned_block_header; operations; manager_operations_infos}
+    automaton_state global_state block_to_bake seed_nonce_opt
+    (injection_level : Level.t) liquidity_baking_vote =
+  let cctxt = automaton_state.cctxt in
+  let {predecessor; round; delegate; _} = block_to_bake in
+  let level = Int32.succ predecessor.shell.level in
+  let chain_id = global_state.chain_id in
+  let round_duration =
+    Round.round_duration global_state.round_durations round
+    |> Period.to_seconds |> Int64.to_float
+  in
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit signing_block (level, round, delegate)) in
   let* signed_block_header =
     (sign_block_header
+       cctxt
        round_duration
        global_state
        delegate.consensus_key
@@ -499,73 +521,253 @@ let dal_checks_and_warnings state =
   else return_unit
 
 let only_if_dal_feature_enabled state ~default_value f =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let open Constants in
   let Parametric.{dal = {feature_enable; _}; _} =
     state.global_state.constants.parametric
   in
   if feature_enable then
-    let*! () = dal_checks_and_warnings state in
+    let* () = dal_checks_and_warnings state in
     Option.fold
       ~none:(return default_value)
       ~some:f
       state.global_state.dal_node_rpc_ctxt
   else return default_value
 
-let process_dal_rpc_result state delegate level round =
-  let open Lwt_result_syntax in
-  function
-  | None -> return_none
-  | Some Tezos_dal_node_services.Types.Not_in_committee ->
-      let*! () = Events.(emit not_in_dal_committee (delegate, level)) in
-      return_none
-  | Some (Attestable_slots {slots; published_level}) ->
-      let number_of_slots =
-        state.global_state.constants.parametric.dal.number_of_slots
+let process_and_accumulate_dal_rpc_result state ~number_of_lags ~lag_index
+    ~published_level ~current_level ~predecessor_hash ~block_hash ~delegate_id
+    acc slots =
+  let open Lwt_syntax in
+  let open Dal_included_attestations_cache in
+  let number_of_slots =
+    state.global_state.constants.parametric.dal.number_of_slots
+  in
+  let attestable_slots =
+    List.fold_left_i
+      (fun i acc status ->
+        match Dal.Slot_index.of_int_opt ~number_of_slots i with
+        | Some _ when status = Dal_attestable_slots_worker.Attestable ->
+            SlotSet.add i acc
+        | _ -> acc)
+      SlotSet.empty
+      slots
+  in
+  let+ slots_to_attest =
+    match
+      filter_attestable_slots
+        state.global_state.dal_included_attestations_cache
+        ~delegate_id
+        ~published_level
+        ~attestable_slots
+        ~head_level:current_level
+        ~head_hash:block_hash
+        ~predecessor_hash
+      [@profiler.record_f
+        {verbosity = Debug}
+          (Format.asprintf "filter_attestable_slots (PL : %ld)" published_level)]
+    with
+    | Ok filtered -> return filtered
+    | Error trace ->
+        let* () =
+          Events.(
+            emit
+              dal_attestation_deduplication_error
+              (delegate_id, published_level, trace))
+        in
+        return attestable_slots
+  in
+  SlotSet.fold
+    (fun slot_index acc' ->
+      match Dal.Slot_index.of_int_opt ~number_of_slots slot_index with
+      | Some index ->
+          Dal.Attestations.commit
+            acc'
+            ~number_of_slots
+            ~number_of_lags
+            ~lag_index
+            index
+      | None -> acc')
+    slots_to_attest
+    acc
+
+let attested_slot_indices slots =
+  List.fold_left_i
+    (fun i acc status ->
+      if status = Dal_attestable_slots_worker.Attestable then i :: acc else acc)
+    []
+    slots
+  |> List.rev
+
+let trap_slot_indices slots =
+  List.fold_left_i
+    (fun i acc status ->
+      if status = Dal_attestable_slots_worker.Trap then i :: acc else acc)
+    []
+    slots
+  |> List.rev
+
+let emit_dal_attestation_logs ~automaton_name ~delegate_id ~attested_level
+    ~no_dal_attestations_levels ~dal_trap_slots_per_level ~dal_content
+    ~published_levels ~level ~round =
+  let open Lwt_syntax in
+  let* () =
+    if no_dal_attestations_levels <> [] then
+      let published_levels_str =
+        no_dal_attestations_levels |> List.map Int32.to_string
+        |> String.concat ", "
       in
-      let dal_attestation =
-        List.fold_left_i
-          (fun i acc flag ->
-            match Dal.Slot_index.of_int_opt ~number_of_slots i with
-            | Some index when flag -> Dal.Attestation.commit acc index
-            | None | Some _ -> acc)
-          Dal.Attestation.empty
-          slots
+      Events.(
+        emit
+          no_attestable_dal_slots_for_levels
+          (automaton_name, delegate_id, attested_level, published_levels_str))
+    else return_unit
+  in
+  let* () =
+    if dal_trap_slots_per_level <> [] then
+      let trap_details =
+        dal_trap_slots_per_level
+        |> List.map (fun (published_level, slots) ->
+               Format.asprintf
+                 "%ld -> [%a]"
+                 published_level
+                 (Format.pp_print_list
+                    ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+                    Format.pp_print_int)
+                 slots)
+        |> String.concat "; "
       in
-      let dal_content = {attestation = dal_attestation} in
-      let*! () =
-        Events.(
-          emit
-            attach_dal_attestation
-            (delegate, dal_content, published_level, level, round))
-      in
-      return_some dal_content
+      Events.(
+        emit dal_slots_not_attested_due_to_traps (delegate_id, trap_details))
+    else return_unit
+  in
+  Events.(
+    emit
+      attach_dal_attestation
+      (delegate_id, dal_content, published_levels, level, round))
 
 let may_get_dal_content state consensus_vote =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let {delegate; vote_consensus_content; _} = consensus_vote in
   let level, round =
     ( Raw_level.to_int32 vote_consensus_content.level,
       vote_consensus_content.round )
   in
   let delegate_id = Delegate.delegate_id delegate in
+  let dal_attestable_slots_worker =
+    state.automaton_state.dal_attestable_slots_worker
+  in
   only_if_dal_feature_enabled
     state
-    ~default_value:None
+    ~default_value:consensus_vote
     (fun _dal_node_rpc_ctxt ->
-      let*! dal_attestable_slots =
-        (Dal_attestable_slots_worker.get_dal_attestable_slots
-           state.global_state.dal_attestable_slots_worker
-           ~delegate_id
-           ~attestation_level:level
-         [@profiler.record_s
-           {verbosity = Debug}
-             (Format.asprintf
-                "get_dal_attestable_slots - delegate_id : %a"
-                Delegate_id.pp
-                delegate_id)])
+      let* () =
+        (* Only emit this message for the maximum attestation lag. *)
+        if
+          Dal_attestable_slots_worker.is_not_in_committee
+            dal_attestable_slots_worker
+            ~delegate_id
+            ~committee_level:level
+        then Events.(emit not_in_dal_committee (delegate_id, level))
+        else return_unit
       in
-      process_dal_rpc_result state delegate_id level round dal_attestable_slots)
+      let attestation_lags =
+        state.global_state.constants.parametric.dal.attestation_lags
+      in
+      let attested_level = Int32.succ level in
+      let published_levels =
+        List.map
+          (fun attestation_lag ->
+            Int32.(sub attested_level (of_int attestation_lag)))
+          attestation_lags
+      in
+      let number_of_lags = List.length attestation_lags in
+      let* ( dal_attestations,
+             no_dal_attestations_levels,
+             dal_attested_slots_per_level,
+             dal_trap_slots_per_level ) =
+        List.fold_left_i_s
+          (fun lag_index
+               (acc, missing_levels, slots_per_level, traps_per_level)
+               published_level
+             ->
+            let* dal_attestable_slots =
+              (Dal_attestable_slots_worker.get_dal_attestable_slots
+                 dal_attestable_slots_worker
+                 ~delegate_id
+                 ~published_level
+               [@profiler.record_s
+                 {verbosity = Debug}
+                   (Format.asprintf
+                      "DAL att. slots (%a, PL : %ld)"
+                      Delegate_id.pp
+                      delegate_id
+                      published_level)])
+            in
+            match dal_attestable_slots with
+            | None ->
+                return
+                  ( acc,
+                    published_level :: missing_levels,
+                    slots_per_level,
+                    traps_per_level )
+            | Some slots ->
+                let attested_indices = attested_slot_indices slots in
+                let trap_indices = trap_slot_indices slots in
+                let slots_per_level =
+                  if attested_indices <> [] then
+                    (published_level, attested_indices) :: slots_per_level
+                  else slots_per_level
+                in
+                let traps_per_level =
+                  if trap_indices <> [] then
+                    (published_level, trap_indices) :: traps_per_level
+                  else traps_per_level
+                in
+                let+ acc' =
+                  process_and_accumulate_dal_rpc_result
+                    state
+                    ~number_of_lags
+                    ~lag_index
+                    ~published_level
+                    ~current_level:level
+                    ~predecessor_hash:
+                      state.level_state.latest_proposal.predecessor.hash
+                    ~block_hash:state.level_state.latest_proposal.block.hash
+                    ~delegate_id
+                    acc
+                    slots
+                in
+                (acc', missing_levels, slots_per_level, traps_per_level))
+          (Dal.Attestations.empty, [], [], [])
+          published_levels
+      in
+      let dal_attested_slots_per_level =
+        List.rev dal_attested_slots_per_level
+      in
+      let dal_trap_slots_per_level = List.rev dal_trap_slots_per_level in
+      let dal_content = {attestations = dal_attestations} in
+      let* () =
+        emit_dal_attestation_logs
+          ~automaton_name:state.automaton_state.name
+          ~delegate_id
+          ~attested_level
+          ~no_dal_attestations_levels
+          ~dal_trap_slots_per_level
+          ~dal_content
+          ~published_levels
+          ~level
+          ~round
+      in
+      return
+        {
+          consensus_vote with
+          dal_info =
+            Some
+              {
+                content = dal_content;
+                attested_slots_per_level = dal_attested_slots_per_level;
+              };
+        })
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate; vote_consensus_content; _} = consensus_vote in
@@ -590,7 +792,8 @@ let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   in
   may_sign || global_state.config.force
 
-let authorized_consensus_votes global_state
+let authorized_consensus_votes (automaton_state : automaton_state)
+    (global_state : global_state)
     (unsigned_consensus_vote_batch : unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
   (* Hypothesis: all consensus votes have the same round and level *)
@@ -602,8 +805,8 @@ let authorized_consensus_votes global_state
   } =
     unsigned_consensus_vote_batch
   in
+  let cctxt = automaton_state.cctxt in
   let level = Raw_level.to_int32 level in
-  let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
   let block_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks
@@ -653,34 +856,36 @@ let authorized_consensus_votes global_state
           | Attestation ->
               Baking_highwatermarks.Block_previously_attested {round; level}
         in
-        Events.(emit skipping_consensus_vote (unsigned_consensus_vote, [error])))
+        if global_state.config.multi_node then
+          Events.(emit skipping_outdated_consensus_vote unsigned_consensus_vote)
+        else
+          Events.(
+            emit skipping_consensus_vote (unsigned_consensus_vote, [error])))
       unauthorized_votes
   in
   return authorized_votes
 
-let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
+let forge_and_sign_consensus_vote (automaton_state : automaton_state)
+    (global_state : global_state) ~branch unsigned_consensus_vote :
     signed_consensus_vote tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
   let {
     vote_kind;
     vote_consensus_content = {level; round; _} as vote_consensus_content;
     delegate;
-    dal_content;
+    dal_info;
   } =
     unsigned_consensus_vote
   in
+  let dal_content = Option.map (fun {content; _} -> content) dal_info in
   let shell = {Tezos_base.Operation.branch} in
   let watermark =
     match vote_kind with
     | Preattestation -> Operation.(to_watermark (Preattestation chain_id))
     | Attestation -> Operation.(to_watermark (Attestation chain_id))
   in
-  let bls_mode =
-    Key.is_bls delegate.consensus_key
-    && global_state.constants.parametric.aggregate_attestation
-  in
+  let bls_mode = Key.is_bls delegate.consensus_key in
   let* dal_content, companion_key_opt =
     match vote_kind with
     | Preattestation ->
@@ -760,7 +965,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     @@ sign
          ?timeout:global_state.config.remote_calls_timeout
          ~signing_request
-         cctxt
+         automaton_state.cctxt
          ~watermark
          sk_consensus_uri
          unsigned_operation_bytes
@@ -775,7 +980,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Some _, None ->
         (* only possible in non-BLS mode *)
         return consensus_sig
-    | Some {attestation = dal_attestation}, Some companion_key -> (
+    | Some {attestations = dal_attestation}, Some companion_key -> (
         let sk_companion_uri = companion_key.secret_key_uri in
         let* companion_sig =
           Utils.event_on_stalling_promise
@@ -788,7 +993,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
           @@ sign
                ?timeout:global_state.config.remote_calls_timeout
                ~signing_request
-               cctxt
+               automaton_state.cctxt
                ~watermark
                sk_companion_uri
                unsigned_operation_bytes
@@ -807,7 +1012,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
             Signature.Bls consensus_pk,
             Signature.Bls companion_pk ) -> (
             let dal_dependent_bls_sig_opt =
-              Alpha_context.Dal.Attestation.Dal_dependent_signing.aggregate_sig
+              Alpha_context.Dal.Attestations.Dal_dependent_signing.aggregate_sig
                 ~subgroup_check:false
                 ~consensus_pk
                 ~companion_pk
@@ -837,16 +1042,25 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
   let signed_operation : Operation.packed = {shell; protocol_data} in
   (* Also update unsigned_consensus_vote: dal_content may have been
      set to None. *)
-  let unsigned_consensus_vote = {unsigned_consensus_vote with dal_content} in
+  let dal_info =
+    match (dal_content, dal_info) with
+    | None, _ -> None
+    | Some content, Some {attested_slots_per_level; _} ->
+        Some {content; attested_slots_per_level}
+    | Some content, None -> Some {content; attested_slots_per_level = []}
+  in
+  let unsigned_consensus_vote = {unsigned_consensus_vote with dal_info} in
   return {unsigned_consensus_vote; signed_operation}
 
-let sign_consensus_votes (global_state : global_state)
+let sign_consensus_votes (automaton_state : automaton_state)
+    (global_state : global_state)
     ({batch_kind; batch_content; batch_branch; _} as
      unsigned_consensus_vote_batch :
       unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
   let* authorized_consensus_votes =
     (authorized_consensus_votes
+       automaton_state
        global_state
        unsigned_consensus_vote_batch
      [@profiler.record_s {verbosity = Info} "authorized consensus votes"])
@@ -857,6 +1071,7 @@ let sign_consensus_votes (global_state : global_state)
         let*! () = Events.(emit signing_consensus_op) unsigned_consensus_vote in
         let*! signed_consensus_vote_r =
           (forge_and_sign_consensus_vote
+             automaton_state
              global_state
              ~branch:batch_branch
              unsigned_consensus_vote
@@ -885,7 +1100,7 @@ let sign_consensus_votes (global_state : global_state)
 let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
     =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
+  let cctxt = state.automaton_state.cctxt in
   let chain_id = state.global_state.chain_id in
   protect
     ~on_error:(fun err ->
@@ -959,7 +1174,7 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
     in
     let* bh =
       (Node_rpc.inject_block
-         state.global_state.cctxt
+         state.automaton_state.cctxt
          ~force:state.global_state.config.force
          ~chain:(`Hash state.global_state.chain_id)
          signed_block_header
@@ -1040,10 +1255,7 @@ let prepare_waiting_for_quorum state =
       level_watched = latest_proposal.shell.level;
       round_watched = latest_proposal.round;
       payload_hash_watched = latest_proposal.payload_hash;
-      branch_watched =
-        (if state.global_state.constants.parametric.aggregate_attestation then
-           Some latest_proposal.grandparent
-         else None);
+      branch_watched = Some latest_proposal.grandparent;
     }
   in
   (consensus_threshold, consensus_committee, get_slot_voting_power, candidate)
@@ -1053,7 +1265,7 @@ let start_waiting_for_preattestation_quorum state =
       =
     prepare_waiting_for_quorum state
   in
-  let operation_worker = state.global_state.operation_worker in
+  let operation_worker = state.automaton_state.operation_worker in
   Operation_worker.monitor_preattestation_quorum
     operation_worker
     ~consensus_threshold
@@ -1066,7 +1278,7 @@ let start_waiting_for_attestation_quorum state =
       =
     prepare_waiting_for_quorum state
   in
-  let operation_worker = state.global_state.operation_worker in
+  let operation_worker = state.automaton_state.operation_worker in
   Operation_worker.monitor_attestation_quorum
     operation_worker
     ~consensus_threshold
@@ -1104,13 +1316,13 @@ let notice_delegates_without_slots all_delegates delegate_infos level =
 let update_to_level state level_update =
   let open Lwt_result_syntax in
   let {new_level_proposal; compute_new_state} = level_update in
-  let cctxt = state.global_state.cctxt in
+  let cctxt = state.automaton_state.cctxt in
   let delegates = state.global_state.delegates in
   let new_level = new_level_proposal.block.shell.level in
   let chain = `Hash state.global_state.chain_id in
   (* Sync the context to clean-up potential GC artifacts *)
   let*! () =
-    match state.global_state.validation_mode with
+    match state.automaton_state.validation_mode with
     | Node -> Lwt.return_unit
     | Local index -> index.sync_fun ()
   in
@@ -1133,6 +1345,17 @@ let update_to_level state level_update =
        ~level:(Int32.succ new_level)
        ~chain
      [@profiler.record_s {verbosity = Debug} "compute current delegate slots"])
+  in
+  let () =
+    Dal_included_attestations_cache.set_committee
+      state.global_state.dal_included_attestations_cache
+      ~level:new_level
+      (fun slot -> Baking_state.Delegate_infos.slot_owner delegate_infos ~slot) ;
+    Dal_included_attestations_cache.set_committee
+      state.global_state.dal_included_attestations_cache
+      ~level:(Int32.succ new_level)
+      (fun slot ->
+        Baking_state.Delegate_infos.slot_owner next_level_delegate_infos ~slot)
   in
   let*! () =
     notice_delegates_without_slots delegates delegate_infos new_level
@@ -1162,13 +1385,10 @@ let update_to_level state level_update =
            can change at level boundaries (e.g. migrations, reorganisations, key/profile
            updates). Doing it here makes the streams ready before we build next-level
            attestations. *)
-        let*! () =
-          Dal_attestable_slots_worker.update_streams_subscriptions
-            state.global_state.dal_attestable_slots_worker
-            dal_node_rpc_ctxt
-            ~delegate_ids:next_level_delegate_ids
-        in
-        return_unit)
+        Dal_attestable_slots_worker.update_streams_subscriptions
+          state.automaton_state.dal_attestable_slots_worker
+          dal_node_rpc_ctxt
+          ~delegate_ids:next_level_delegate_ids)
   in
   return (new_state, new_action)
 
@@ -1208,14 +1428,24 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
 
 let prepare_block_request state block_to_bake =
   let open Lwt_result_syntax in
-  let request = Forge_and_sign_block block_to_bake in
-  state.global_state.forge_worker_hooks.push_request request ;
+  let request =
+    {
+      automaton_state = state.automaton_state;
+      request = Forge_and_sign_block block_to_bake;
+    }
+  in
+  let* () = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 let prepare_preattestations_request state unsigned_preattestations =
   let open Lwt_result_syntax in
-  let request = Forge_and_sign_preattestations {unsigned_preattestations} in
-  state.global_state.forge_worker_hooks.push_request request ;
+  let request =
+    {
+      automaton_state = state.automaton_state;
+      request = Forge_and_sign_preattestations {unsigned_preattestations};
+    }
+  in
+  let* () = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 let prepare_attestations_request state unsigned_attestations =
@@ -1224,10 +1454,14 @@ let prepare_attestations_request state unsigned_attestations =
     dal_content_map_p (may_get_dal_content state) unsigned_attestations
   in
   let request =
-    Forge_and_sign_attestations
-      {unsigned_attestations = unsigned_attestations_with_dal}
+    {
+      automaton_state = state.automaton_state;
+      request =
+        Forge_and_sign_attestations
+          {unsigned_attestations = unsigned_attestations_with_dal};
+    }
   in
-  state.global_state.forge_worker_hooks.push_request request ;
+  let* () = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4539

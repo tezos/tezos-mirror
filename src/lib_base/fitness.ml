@@ -31,7 +31,10 @@
     Fitness comparison is defined as:
     - shorter fitness lists are considered smaller;
     - when lists have identical length, comparison proceeds lexicographically
-      over each byte sequence. *)
+      over each byte sequence.
+
+    Details about the fitness decoding can be found in
+    [bin_signer/handler.ml] *)
 
 type t = Bytes.t list
 

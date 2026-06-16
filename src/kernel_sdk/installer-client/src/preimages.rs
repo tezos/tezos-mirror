@@ -31,7 +31,7 @@ pub fn content_to_preimages(
         let path = preimage_dir.join(name);
 
         if let Err(e) = fs::write(&path, preimage) {
-            eprintln!("Failed to write preimage to {:?} due to {}.", path, e);
+            eprintln!("Failed to write preimage to {path:?} due to {e}.");
         }
     };
 

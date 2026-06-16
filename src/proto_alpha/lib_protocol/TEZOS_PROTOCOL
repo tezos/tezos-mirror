@@ -1,5 +1,5 @@
 {
-    "expected_env_version": 15,
+    "expected_env_version": 17,
     "hash": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
     "modules": [
         "Misc",
@@ -51,12 +51,13 @@
         "Voting_period_repr",
         "Ticket_hash_repr",
         "Manager_counter_repr",
+        "Contract_kind_repr",
         "Contract_repr",
         "Indexable",
         "Entrypoint_repr",
 
         "Dal_slot_index_repr",
-        "Dal_attestation_repr",
+        "Dal_attestations_repr",
         "Dal_slot_repr",
 
         "Michelson_v1_gas_costs_generated",
@@ -127,6 +128,7 @@
         "Carbonated_map_costs",
         "Carbonated_map",
         "Staking_parameters_repr",
+        "Clst_delegates_parameters_repr",
         "Misbehaviour_repr",
         "Denunciations_repr",
 
@@ -167,6 +169,7 @@
         "Adaptive_issuance_costs",
         "Contract_delegate_storage",
         "Stake_storage",
+        "Clst_storage",
         "Unstaked_frozen_deposits_storage",
         "Pending_denunciations_storage",
         "Unstake_requests_storage",
@@ -177,9 +180,11 @@
         "Fees_storage",
         "Adaptive_issuance_storage",
         "Delegate_staking_parameters",
+        "Clst_delegates_storage",
         "Shared_stake",
         "Delegate_consensus_key",
         "Delegate_storage",
+        "Swrr_sampler",
         "Delegate_sampler",
         "Delegate_rewards",
         "Consensus_parameters_storage",
@@ -190,6 +195,9 @@
         "Slash_percentage",
         "Delegate_slashed_deposits_storage",
         "Staking",
+        "Clst_finalization",
+        "Clst_redemption_requests_storage",
+        "Clst_stake_allocation",
         "Delegate_cycles",
 
         "Vote_storage",
@@ -212,8 +220,11 @@
         "Sc_rollup_whitelist_storage",
         "Sc_rollup_storage",
         "Sc_rollup_stake_storage",
-        "Dal_slot_storage",
+
         "Dal_storage",
+        "Dal_attestations_storage",
+        "Dal_slot_storage",
+
         "Sc_rollup_refutation_storage",
         "Zk_rollup_errors",
 
@@ -274,8 +285,11 @@
         "Ticket_accounting",
         "Ticket_transfer",
 
-        "Script_native",
+        "Clst_contract_storage",
         "Script_interpreter_defs",
+        "Script_interpreter_errors",
+        "Clst_events",
+        "Script_native",
         "Script_interpreter",
         "Sc_rollup_management_protocol",
         "Sc_rollup_operations",

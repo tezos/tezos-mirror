@@ -32,7 +32,7 @@
 //! Merkle tree encodings of DAC pages are versioned, to allow for multiple
 //! hashing schemes to be used.
 
-use host::runtime::{Runtime, RuntimeError};
+use host::{reveal::HostReveal, runtime::RuntimeError};
 
 /// Maximum size of dac pages is 4Kb.
 pub const MAX_PAGE_SIZE: usize = 4096;
@@ -318,28 +318,28 @@ impl<'a> V0SliceHashPage<'a> {
     }
 }
 
-/// Fetches a page of data from file `hash` into `buffer` using [Runtime::reveal_preimage].
+/// Fetches a page of data from file `hash` into `buffer` using [HostReveal::reveal_preimage].
 /// Returns a tuple of the raw page and remaining buffer.
-pub fn fetch_page_raw<'a, Host: Runtime>(
+pub fn fetch_page_raw<'a, Host: HostReveal>(
     host: &Host,
     hash: &[u8; PREIMAGE_HASH_SIZE],
     buffer: &'a mut [u8],
 ) -> Result<(&'a [u8], &'a mut [u8]), RuntimeError> {
-    let size = Runtime::reveal_preimage(host, hash, buffer)?;
+    let size = host.reveal_preimage(hash, buffer)?;
     let (page, rest) = buffer.split_at_mut(size);
 
     Ok((page, rest))
 }
 
 /// Recursively traverses a Merkle Tree of hashes up to `max_dac_levels` depth where each hash
-/// corresponds to a preimage that can be revealed via [Runtime::reveal_preimage]. The closure
+/// corresponds to a preimage that can be revealed via [HostReveal::reveal_preimage]. The closure
 /// `save_content` is applied on each content page found.
 ///
 /// N.B `max_dac_levels`, should probably be kept under 3 (3 gives 59MB of data). You are likely,
 /// however, to run into tick-limit issues while doing so, depending on what `save_content` does.
 ///
 /// Instead, it is recommended to use `DacCertificate::reveal_to_store` where possible.
-pub fn reveal_loop<Host: Runtime>(
+pub fn reveal_loop<Host: HostReveal>(
     host: &mut Host,
     level: usize,
     hash: &[u8; PREIMAGE_HASH_SIZE],
@@ -425,10 +425,7 @@ mod tests {
             (Page::V0ContentPage(page), SlicePage::V0ContentPage(slice_page)) => {
                 assert_eq!(page.as_ref(), slice_page.inner)
             }
-            _ => panic!(
-                "Should be content pages, got: {:?} & {:?}",
-                page, slice_page
-            ),
+            _ => panic!("Should be content pages, got: {page:?} & {slice_page:?}",),
         }
     }
 
@@ -449,10 +446,7 @@ mod tests {
 
                 assert_eq!(hashes, slice_hashes);
             }
-            _ => panic!(
-                "Should be content pages, got: {:?} & {:?}",
-                page, slice_page
-            ),
+            _ => panic!("Should be content pages, got: {page:?} & {slice_page:?}",),
         }
     }
 }

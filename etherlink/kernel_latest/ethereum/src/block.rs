@@ -88,6 +88,8 @@ pub struct BlockConstants {
     /// Identifier for the chain. Normally this would identify the chain (Ethereum
     /// main net, or some other net). We can use it to identify rollup EVM kernel.
     pub chain_id: U256,
+    /// Tezos X experimental features enabled for this block
+    pub tezos_experimental_features: bool,
     /// A random number depending on previous block
     /// NB: this field is not relevant for Etherlink but is required to enable other
     /// relevant test from the Ethereum test suit
@@ -112,6 +114,7 @@ impl BlockConstants {
             gas_limit,
             block_fees,
             chain_id,
+            tezos_experimental_features: false,
             prevrandao: None,
         }
     }
@@ -124,6 +127,32 @@ impl BlockConstants {
     #[inline(always)]
     pub const fn blob_base_fee(&self) -> U256 {
         self.block_fees.blob_base_fee
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl BlockConstants {
+    pub const TEST_GAS_LIMIT: u64 = 30_000_000;
+    pub const TEST_CHAIN_ID: u64 = 42793;
+
+    pub fn test_block_with_fees() -> Self {
+        Self::first_block(
+            U256::from(1),
+            U256::from(Self::TEST_CHAIN_ID),
+            BlockFees::new(U256::from(1), U256::from(1), U256::from(1)),
+            Self::TEST_GAS_LIMIT,
+            H160::zero(),
+        )
+    }
+
+    pub fn test_block_with_no_fees() -> Self {
+        Self::first_block(
+            U256::from(1),
+            U256::from(Self::TEST_CHAIN_ID),
+            BlockFees::new(U256::zero(), U256::zero(), U256::zero()),
+            Self::TEST_GAS_LIMIT,
+            H160::zero(),
+        )
     }
 }
 

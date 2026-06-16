@@ -13,9 +13,8 @@ module Storage = Octez_riscv_pvm.Storage
 
 type repo = Context.repo
 
-type tree = Context.tree
+type tree = Context.state
 
-module State = Riscv_context.PVMState
 module Backend = Octez_riscv_pvm.Backend
 module Ctxt_wrapper = Context_wrapper.Riscv
 
@@ -48,6 +47,42 @@ let of_pvm_input_request (input_request : Backend.input_request) :
       in
       Sc_rollup.Needs_reveal reveal_data
 
+(** Converts a protocol output_info to a RISC-V PVM backend-specific output_info. *)
+let to_pvm_output_info (output_info : Sc_rollup.output_info) :
+    Backend.output_info =
+  let outbox_level =
+    match
+      Bounded.Non_negative_int32.of_value
+        (Raw_level.to_int32 output_info.outbox_level)
+    with
+    | Some level -> level
+    | None -> assert false (* Raw_level is always positive *)
+  in
+  Backend.{message_index = output_info.message_index; outbox_level}
+
+(** Converts a RISC-V PVM backend-specific output_info to a protocol output_info. *)
+let of_pvm_output_info (output_info : Backend.output_info) :
+    Sc_rollup.output_info =
+  Sc_rollup.
+    {
+      message_index = output_info.message_index;
+      outbox_level =
+        (* Conversion from a non-negative int32 cannot fail *)
+        Raw_level.of_int32_exn
+          (Bounded.Non_negative_int32.to_value output_info.outbox_level);
+    }
+
+(** Tries to convert a RISC-V PVM backend-specific output to a protocol output.
+  * Returns [None] in case of failure. *)
+let of_pvm_output (output : Backend.output) : Sc_rollup.output option =
+  let open Option_syntax in
+  let+ message =
+    Data_encoding.Binary.of_string_opt
+      Sc_rollup.Outbox.Message.encoding
+      output.encoded_message
+  in
+  Sc_rollup.{output_info = of_pvm_output_info output.info; message}
+
 let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
     (get_current_level : 'a -> int32 option Lwt.t)
     (get_message_counter : 'a -> int64 Lwt.t)
@@ -77,21 +112,12 @@ let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
 
 module PVM :
   Sc_rollup.PVM.S
-    with type state = tree
+    with type state = Context.state
      and type context = Riscv_context.rw_index
      and type proof = Backend.proof = struct
   let parse_boot_sector s = Some s
 
   let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
-
-  type void = |
-
-  let void =
-    Data_encoding.(
-      conv_with_guard
-        (function (_ : void) -> .)
-        (fun _ -> Error "void has no inhabitant")
-        unit)
 
   type state = tree
 
@@ -113,7 +139,7 @@ module PVM :
 
   let state_hash state = Lwt.return @@ Backend.state_hash state
 
-  let initial_state ~empty:_ = Lwt.return (Storage.empty ())
+  let initial_state ~empty = Lwt.return empty
 
   let install_boot_sector state boot_sector =
     Backend.install_boot_sector state boot_sector
@@ -155,17 +181,42 @@ module PVM :
     | None -> tzfail Sc_rollup_riscv.RISCV_proof_production_failed
     | Some proof -> return proof
 
-  type output_proof = void
+  type output_proof = Backend.output_proof
 
-  let output_proof_encoding = void
+  let output_proof_encoding : Backend.output_proof Data_encoding.t =
+    let open Data_encoding in
+    conv_with_guard
+      Backend.serialise_output_proof
+      Backend.deserialise_output_proof
+      bytes
 
-  let output_info_of_output_proof = function (_ : output_proof) -> .
+  let output_info_of_output_proof output_proof =
+    of_pvm_output_info (Backend.output_info_of_output_proof output_proof)
 
-  let state_of_output_proof = function (_ : output_proof) -> .
+  let state_of_output_proof output_proof =
+    Backend.state_of_output_proof output_proof
 
-  let verify_output_proof = function (_ : output_proof) -> .
+  let verify_output_proof output_proof =
+    let open Environment.Error_monad.Lwt_result_syntax in
+    match Backend.verify_output_proof_res output_proof with
+    | Error err ->
+        tzfail (Sc_rollup_riscv.RISCV_output_proof_verification_failed err)
+    | Ok output -> (
+        match of_pvm_output output with
+        | None ->
+            tzfail
+              (Sc_rollup_riscv.RISCV_output_proof_verification_failed
+                 "Failed to convert output from RISC-V representation")
+        | Some output -> return output)
 
-  let produce_output_proof _context _state _output = assert false
+  let produce_output_proof _context state (output : Sc_rollup.output) =
+    match
+      Backend.produce_output_proof state (to_pvm_output_info output.output_info)
+    with
+    | Error err ->
+        Lwt.return_error
+          (Sc_rollup_riscv.RISCV_output_proof_production_failed err)
+    | Ok output_proof -> Lwt.return_ok output_proof
 
   let check_dissection ~default_number_of_sections:_ ~start_chunk:_
       ~stop_chunk:_ =
@@ -186,39 +237,25 @@ include PVM
 
 let kind = Sc_rollup.Kind.Riscv
 
-let get_tick state =
-  let open Lwt_syntax in
-  let* tick = Backend.get_tick state in
-  return (Sc_rollup.Tick.of_z tick)
-
 type status = Backend.status
 
-let get_status ~is_reveal_enabled:_ state = Backend.get_status state
-
 let string_of_status status = Backend.string_of_status status
-
-let get_outbox _level _state = Lwt.return []
-
-let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug
-    ~is_reveal_enabled:_ ?stop_at_snapshot ~max_steps initial_state =
-  let debug_printer =
-    match write_debug with
-    | Tezos_scoru_wasm.Builtins.Noop -> None
-    | Tezos_scoru_wasm.Builtins.Printer p -> Some p
-  in
-  Backend.compute_step_many
-    ?stop_at_snapshot
-    ?write_debug:debug_printer
-    ~max_steps
-    initial_state
 
 module Mutable_state :
   Pvm_sig.MUTABLE_STATE_S
     with type hash = PVM.hash
+     and type repo = repo
+     and type status = status
      and type t = Ctxt_wrapper.mut_state = struct
+  include Riscv_context.PVMState
+
   type t = Backend.Mutable_state.t
 
   type hash = PVM.hash
+
+  type repo = Context.repo
+
+  type nonrec status = status
 
   let get_tick state =
     let open Lwt_syntax in
@@ -227,18 +264,40 @@ module Mutable_state :
 
   let state_hash state = Lwt.return @@ Backend.Mutable_state.state_hash state
 
-  let is_input_state =
+  let get_current_level state = Backend.Mutable_state.get_current_level state
+
+  let get_outbox level state =
+    let open Lwt_syntax in
+    let maybe_level = Bounded.Non_negative_int32.of_value level in
+    match maybe_level with
+    | Some level ->
+        let* outbox_messages = Backend.Mutable_state.get_outbox state level in
+        Lwt.return (List.filter_map of_pvm_output outbox_messages)
+    | None -> Lwt.return []
+
+  let get_status ~is_reveal_enabled:_ state =
+    Backend.Mutable_state.get_status state
+
+  let is_input_state ~is_reveal_enabled state =
     make_is_input_state
       Backend.Mutable_state.get_status
       Backend.Mutable_state.get_current_level
       Backend.Mutable_state.get_message_counter
       Backend.Mutable_state.get_reveal_request
+      ~is_reveal_enabled
+      state
 
   let set_input input state =
     Backend.Mutable_state.set_input state @@ to_pvm_input input
 
-  let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug
-      ~is_reveal_enabled:_ ?stop_at_snapshot ~max_steps initial_state =
+  let set_initial_state ~empty:_ = Lwt.return_unit
+
+  let install_boot_sector state boot_sector =
+    Backend.Mutable_state.install_boot_sector state boot_sector
+
+  let eval_many ?check_invalid_kernel:_ ?fallback_to_slow_vm:_
+      ~reveal_builtins:_ ~write_debug ~is_reveal_enabled:_ ?stop_at_snapshot
+      ~max_steps initial_state =
     let debug_printer =
       match write_debug with
       | Tezos_scoru_wasm.Builtins.Noop -> None
@@ -250,17 +309,17 @@ module Mutable_state :
       ~max_steps
       initial_state
 
+  module Inspect_durable_state = struct
+    let lookup _state _keys =
+      raise (Invalid_argument "No durable storage for riscv PVM")
+  end
+
   module Internal_for_tests = struct
     let insert_failure state = Backend.Mutable_state.insert_failure state
   end
 end
 
 let new_dissection = Game_helpers.default_new_dissection
-
-module Inspect_durable_state = struct
-  let lookup _state _keys =
-    raise (Invalid_argument "No durable storage for riscv PVM")
-end
 
 module Unsafe_patches = struct
   (** No unsafe patches for the riscv PVM. *)
@@ -270,6 +329,9 @@ module Unsafe_patches = struct
     match p with
     | Increase_max_nb_ticks _ -> assert false
     | Patch_durable_storage _ -> assert false
+    | Patch_PVM_version _ -> assert false
 
   let apply _state (x : t) = match x with _ -> .
+
+  let apply_mutable _ (x : t) = match x with _ -> .
 end

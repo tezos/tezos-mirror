@@ -494,8 +494,8 @@ The complete sets of Michelson types and instructions are detailed in the
 - Instructions are also organized by `categories <https://tezos.gitlab.io/michelson-reference/#instructions-by-category>`__.
 - Each instruction is precisely defined using typing and semantic inference rules.
 
-Removed instructions and types
-------------------------------
+Deprecated and removed instructions and types
+---------------------------------------------
 
 :doc:`../protocols/005_babylon` deprecated the following instructions. Because no smart
 contract used these on Mainnet before they got deprecated, they have been
@@ -532,6 +532,12 @@ removed. The Michelson type-checker will reject any contract using them.
    ::
 
       Γ ⊢ STEPS_TO_QUOTA :: 'S ⇒ nat : 'S
+
+:doc:`../protocols/012_ithaca` deprecated the use of the `SUB <https://tezos.gitlab.io/michelson-reference/#instr-SUB>`__ instruction on ``mutez``  arguments, and introduced the `SUB_MUTEZ <https://tezos.gitlab.io/michelson-reference/#instr-SUB_MUTEZ>`__ instruction for dealing with that case.
+
+:doc:`../protocols/013_jakarta` renamed an old version of the ``sapling_transaction`` type as ``sapling_transaction_deprecated`` and added a new ``sapling_transaction`` type.
+
+:doc:`../protocols/015_lima` renamed an old version of the ``TICKET`` instruction as ``TICKET_DEPRECATED`` and added a new ``TICKET`` instruction.
 
 :doc:`../protocols/016_mumbai` deprecated the following
 type. Because no smart contract used it on Mainnet before it got
@@ -2037,7 +2043,7 @@ need to independently test various parts of the smart contracts they
 develop and to the developers of new implementations of the Michelson
 interpreter who need to check that their new implementations behave as
 the reference implementation by passing `a conformance test suite
-<https://gitlab.com/tezos/tzt-reference-test-suite>`__.
+<https://gitlab.com/tezos/tezos/-/tree/master/tzt_reference_test_suite>`__.
 
 Similarly to Michelson scripts, the concrete syntax of TZT unit tests
 is :doc:`../shell/micheline`.

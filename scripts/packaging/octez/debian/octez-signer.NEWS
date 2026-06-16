@@ -1,0 +1,9 @@
+octez (1:202601121351+217cac0179f) UNRELEASED; urgency=high
+
+  The Octez Debian packages (octez-node, octez-client, octez-baker,
+  octez-signer, octez-smart-rollup-node, and octez-dal-node) are deprecated
+  and will be removed in a future release. Users are advised to migrate to
+  an alternative installation method. Please refer to
+  https://octez.tezos.com/docs/introduction/howtoget.html for more information.
+
+ -- Nomadic Labs <pkg@nomadic-labs.com>  Mon, 12 Jan 2026 13:51:35 +0100

@@ -22,12 +22,14 @@ module Events = struct
       ()
 
   let applied_migration =
-    declare_1
+    declare_2
       ~section
       ~name:"smart_rollup_node_store_applied_migration"
-      ~msg:"Applied migration {name} to the store"
+      ~msg:"Applied migration {name} to the store in {time}"
       ~level:Notice
       ("name", Data_encoding.string)
+      ("time", Time.System.Span.encoding)
+      ~pp2:Time.System.Span.pp_hum
 
   let migrations_from_the_future =
     declare_2
@@ -55,6 +57,17 @@ module Events = struct
       ~msg:"Garbage collection finished for store"
       ~level:Info
       ()
+
+  let reset_to_last_committed =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_store_reset_to_last_committed"
+      ~msg:
+        "Reset store to last block ({block_hash} at level {level}) whose \
+         context is committed to disk"
+      ~level:Warning
+      ("block_hash", Block_hash.encoding)
+      ("level", Data_encoding.int32)
 end
 
 let with_connection store conn =
@@ -198,6 +211,65 @@ module Types = struct
       ~decode:(function true -> Ok `Confirmed | false -> Ok `Unconfirmed)
       bool
 
+  (* Compact PVM status encoding: maps well-known status strings to single-byte
+     tags, equivalent to a compression function.  The status strings originate
+     from each PVM's [string_of_status]:
+
+     - **WASM 2.0** ([wasm_2_0_0_pvm.ml]): "Computing",
+       "Waiting for input message", "Waiting for metadata",
+       "Waiting for DAL parameters", "Waiting for preimage reveal <hash>",
+       "Waiting for page data <page_id>".
+     - **Arith** ([arith_pvm.ml], test-only): "Halted",
+       "Waiting for input message", "Waiting for reveal <reveal>",
+       "Parsing", "Evaluating".
+     - **RISC-V** ([riscv_pvm.ml], via Rust backend): "Evaluating",
+       "WaitingForInput", "WaitingForReveal".
+
+     Statuses with a known tag are stored as a single byte.  Unknown statuses
+     (e.g. those containing dynamic data like reveal hashes, or new statuses
+     from future PVM versions) fall through to tag 0 which is followed by the
+     full string.
+
+     If a new fixed status is added to a PVM, add a corresponding tag here to
+     keep storage compact. *)
+  let pvm_status =
+    custom
+      ~encode:(fun status ->
+        let encoded =
+          match status with
+          | "Computing" -> "\001"
+          | "Waiting for input message" -> "\002"
+          | "Waiting for metadata" -> "\003"
+          | "Waiting for DAL parameters" -> "\004"
+          | "Halted" -> "\005"
+          | "Parsing" -> "\006"
+          | "Evaluating" -> "\007"
+          | "WaitingForInput" -> "\008"
+          | "WaitingForReveal" -> "\009"
+          | other -> "\000" ^ other
+        in
+        Ok encoded)
+      ~decode:(fun encoded ->
+        if String.length encoded = 0 then Error "Empty pvm_status in database"
+        else
+          let tag = Char.code encoded.[0] in
+          let status =
+            match tag with
+            | 1 -> "Computing"
+            | 2 -> "Waiting for input message"
+            | 3 -> "Waiting for metadata"
+            | 4 -> "Waiting for DAL parameters"
+            | 5 -> "Halted"
+            | 6 -> "Parsing"
+            | 7 -> "Evaluating"
+            | 8 -> "WaitingForInput"
+            | 9 -> "WaitingForReveal"
+            | 0 -> String.sub encoded 1 (String.length encoded - 1)
+            | _ -> encoded
+          in
+          Ok status)
+      octets
+
   let z =
     custom
       ~encode:(fun i -> Ok (Z.to_string i))
@@ -231,75 +303,13 @@ module Types = struct
     @@ proj_end
 end
 
-let table_exists_req =
-  (string ->! bool)
-  @@ {sql|
-    SELECT EXISTS (
-      SELECT name FROM sqlite_master
-      WHERE type='table'
-        AND name=?
-    )|sql}
+module Migration = Sqlite.Migration.Make (struct
+  let table_name = "migrations"
 
-module Migrations = struct
-  module Q = struct
-    let create_table =
-      (unit ->. unit)
-      @@ {sql|
-      CREATE TABLE migrations (
-        id SERIAL PRIMARY KEY,
-        name TEXT
-      )|sql}
+  let version = 2
 
-    let current_migration =
-      (unit ->? int) @@ {|SELECT id FROM migrations ORDER BY id DESC LIMIT 1|}
-
-    let register_migration =
-      (t2 int string ->. unit)
-      @@ {sql|
-      INSERT INTO migrations (id, name) VALUES (?, ?)
-      |sql}
-
-    let version = 0
-
-    let all : Rollup_node_sqlite_migrations.migration list =
-      Rollup_node_sqlite_migrations.migrations version
-  end
-
-  let create_table store =
-    Sqlite.with_connection store @@ fun conn ->
-    Sqlite.Db.exec conn Q.create_table ()
-
-  let table_exists store =
-    Sqlite.with_connection store @@ fun conn ->
-    Sqlite.Db.find conn table_exists_req "migrations"
-
-  let missing_migrations store =
-    let open Lwt_result_syntax in
-    let all_migrations = List.mapi (fun i m -> (i, m)) Q.all in
-    let* current =
-      Sqlite.with_connection store @@ fun conn ->
-      Sqlite.Db.find_opt conn Q.current_migration ()
-    in
-    match current with
-    | Some current ->
-        let applied = current + 1 in
-        let known = List.length all_migrations in
-        if applied <= known then return (List.drop_n applied all_migrations)
-        else
-          let*! () =
-            Events.(emit migrations_from_the_future) (applied, known)
-          in
-          failwith
-            "Cannot use a store modified by a more up-to-date version of the \
-             EVM node"
-    | None -> return all_migrations
-
-  let apply_migration store id (module M : Rollup_node_sqlite_migrations.S) =
-    let open Lwt_result_syntax in
-    Sqlite.with_connection store @@ fun conn ->
-    let* () = List.iter_es (fun up -> Sqlite.Db.exec conn up ()) M.apply in
-    Sqlite.Db.exec conn Q.register_migration (id, M.name)
-end
+  let all_migrations = Rollup_node_sqlite_migrations.all
+end)
 
 let sqlite_file_name = "store.sqlite"
 
@@ -312,43 +322,22 @@ type rw = Access_mode.rw t
 type ro = Access_mode.ro t
 
 let init (type m) (mode : m Access_mode.t) ~data_dir : m t tzresult Lwt.t =
-  let open Lwt_result_syntax in
   let path = Filename.concat data_dir sqlite_file_name in
-  let*! exists = Lwt_unix.file_exists path in
+  let read_only =
+    match mode with Access_mode.Read_only -> true | Read_write -> false
+  in
   let migration conn =
     Sqlite.assert_in_transaction conn ;
-    let* () =
-      if not exists then
-        let* () = Migrations.create_table conn in
-        let*! () = Events.(emit init_store) () in
-        return_unit
-      else
-        let* table_exists = Migrations.table_exists conn in
-        let* () =
-          when_ (not table_exists) (fun () ->
-              failwith "A store already exists, but its content is incorrect.")
-        in
-        return_unit
-    in
-    let* migrations = Migrations.missing_migrations conn in
-    let*? () =
-      match (mode, migrations) with
-      | Read_only, _ :: _ ->
-          error_with
-            "The store has %d missing migrations but was opened in read-only \
-             mode."
-            (List.length migrations)
-      | _, _ -> Ok ()
-    in
-    let* () =
-      List.iter_es
-        (fun (i, ((module M : Rollup_node_sqlite_migrations.S) as mig)) ->
-          let* () = Migrations.apply_migration conn i mig in
-          let*! () = Events.(emit applied_migration) M.name in
-          return_unit)
-        migrations
-    in
-    return_unit
+    Sqlite.with_connection conn @@ fun db_conn ->
+    Migration.apply
+      db_conn
+      ~read_only
+      ~on_init:Events.(emit init_store)
+      ~on_future:(fun ~applied ~known ->
+        Events.(emit migrations_from_the_future) (applied, known))
+      ~on_applied:(fun ~name ~duration ->
+        Events.(emit applied_migration) (name, duration))
+      ()
   in
   let perm =
     match mode with
@@ -387,6 +376,12 @@ module Commitments = struct
       (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       DELETE FROM commitments WHERE inbox_level < ?
+      |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM commitments WHERE inbox_level > ?
       |sql}
 
     let lcc =
@@ -429,6 +424,10 @@ module Commitments = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Commitments_published_at_levels = struct
@@ -480,6 +479,13 @@ module Commitments_published_at_levels = struct
       DELETE FROM commitments_published_at_levels
       WHERE first_published_at_level < ?
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM commitments_published_at_levels
+      WHERE first_published_at_level > ?
+      |sql}
   end
 
   let register ?conn store commitment levels =
@@ -497,6 +503,10 @@ module Commitments_published_at_levels = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Inboxes = struct
@@ -535,6 +545,12 @@ module Inboxes = struct
       @@ {sql|
       DELETE FROM inboxes WHERE inbox_level < ?
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM inboxes WHERE inbox_level > ?
+      |sql}
   end
 
   let store ?conn store inbox =
@@ -555,6 +571,10 @@ module Inboxes = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Messages = struct
@@ -586,6 +606,12 @@ module Messages = struct
       @@ {sql|
       DELETE FROM messages WHERE inbox_level < ?
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM messages WHERE inbox_level > ?
+      |sql}
   end
 
   let store ?conn store ~level payload_hashes_hash messages =
@@ -599,6 +625,10 @@ module Messages = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Outbox_messages = struct
@@ -655,6 +685,12 @@ module Outbox_messages = struct
       SET executed_messages = $2
       WHERE outbox_level = $1
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM outbox_messages WHERE outbox_level > ?
+      |sql}
   end
 
   let pending ?conn store ~min_level ~max_level =
@@ -690,6 +726,10 @@ module Outbox_messages = struct
     | Some executed_messages ->
         let*? executed_messages = Bitset.add executed_messages index in
         Sqlite.Db.exec conn Q.update_executed (outbox_level, executed_messages)
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Protocols = struct
@@ -819,6 +859,12 @@ module Dal_slots_headers = struct
       WHERE block_hash = ?
       ORDER BY slot_index DESC
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM dal_slots_headers WHERE published_level > ?
+      |sql}
   end
 
   let store ?conn store block slot_header =
@@ -836,6 +882,10 @@ module Dal_slots_headers = struct
   let list_slot_indexes ?conn store block =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.select_slot_indexes block
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Dal_slots_statuses = struct
@@ -874,6 +924,13 @@ module Dal_slots_statuses = struct
       WHERE block_hash = ?
       ORDER BY slot_index DESC
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM dal_slots_statuses
+      WHERE block_hash IN (SELECT block_hash FROM l2_blocks WHERE level > ?)
+      |sql}
   end
 
   let store ?conn store block slot_index slot_status =
@@ -887,6 +944,10 @@ module Dal_slots_statuses = struct
   let list_slot_statuses ?conn store block =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.select_slot_statuses block
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module L2_levels = struct
@@ -916,6 +977,12 @@ module L2_levels = struct
       @@ {sql|
       DELETE FROM l2_levels WHERE level < ?
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM l2_levels WHERE level > ?
+      |sql}
   end
 
   let store ?conn store level block =
@@ -929,13 +996,17 @@ module L2_levels = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module L2_blocks = struct
   module Q = struct
     open Types
 
-    let table = "l2_levels" (* For opentelemetry *)
+    let table = "l2_blocks" (* For opentelemetry *)
 
     let l2_block =
       let open Sc_rollup_block in
@@ -946,11 +1017,13 @@ module L2_blocks = struct
           predecessor
           commitment_hash
           previous_commitment_hash
-          context
+          context_hash
           inbox_witness
           inbox_hash
           initial_tick
           num_ticks
+          state_hash
+          pvm_status
         ->
           {
             header =
@@ -960,24 +1033,28 @@ module L2_blocks = struct
                 predecessor;
                 commitment_hash;
                 previous_commitment_hash;
-                context;
+                context_hash;
                 inbox_witness;
                 inbox_hash;
               };
             content = ();
             initial_tick;
             num_ticks;
+            state_hash;
+            pvm_status;
           })
       @@ proj block_hash (fun b -> b.header.block_hash)
       @@ proj level (fun b -> b.header.level)
       @@ proj block_hash (fun b -> b.header.predecessor)
       @@ proj (option commitment_hash) (fun b -> b.header.commitment_hash)
       @@ proj commitment_hash (fun b -> b.header.previous_commitment_hash)
-      @@ proj context_hash (fun b -> b.header.context)
+      @@ proj (option context_hash) (fun b -> b.header.context_hash)
       @@ proj payload_hashes_hash (fun b -> b.header.inbox_witness)
       @@ proj inbox_hash (fun b -> b.header.inbox_hash)
       @@ proj z (fun b -> b.initial_tick)
       @@ proj int64 (fun b -> b.num_ticks)
+      @@ proj (option state_hash) (fun b -> b.state_hash)
+      @@ proj (option pvm_status) (fun b -> b.pvm_status)
       @@ proj_end
 
     let insert =
@@ -986,8 +1063,8 @@ module L2_blocks = struct
       REPLACE INTO l2_blocks
       (block_hash, level, predecessor, commitment_hash,
        previous_commitment_hash, context, inbox_witness,
-       inbox_hash, initial_tick, num_ticks)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       inbox_hash, initial_tick, num_ticks, state_hash, pvm_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       |sql}
 
     let select =
@@ -996,7 +1073,7 @@ module L2_blocks = struct
       SELECT
        block_hash, level, predecessor, commitment_hash,
        previous_commitment_hash, context, inbox_witness,
-       inbox_hash, initial_tick, num_ticks
+       inbox_hash, initial_tick, num_ticks, state_hash, pvm_status
       FROM l2_blocks
       WHERE block_hash = ?
       |sql}
@@ -1005,11 +1082,27 @@ module L2_blocks = struct
       (level ->? l2_block) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT
-       block_hash, level, predecessor, commitment_hash,
+       b.block_hash, b.level, predecessor, commitment_hash,
        previous_commitment_hash, context, inbox_witness,
-       inbox_hash, initial_tick, num_ticks
-      FROM l2_blocks
-      WHERE level = ?
+       inbox_hash, initial_tick, num_ticks, state_hash, pvm_status
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      AND l.level = ?
+|sql}
+
+    let select_by_level_range =
+      (t2 level level ->* l2_block) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, predecessor, commitment_hash,
+       previous_commitment_hash, context, inbox_witness,
+       inbox_hash, initial_tick, num_ticks, state_hash, pvm_status
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      WHERE l.level >= ? AND l.level <= ?
+      ORDER BY l.level ASC
       |sql}
 
     let select_level =
@@ -1021,7 +1114,7 @@ module L2_blocks = struct
       |sql}
 
     let select_context =
-      (block_hash ->? context_hash) ~name:__FUNCTION__ ~table
+      (block_hash ->? option context_hash) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT context
       FROM l2_blocks
@@ -1034,10 +1127,65 @@ module L2_blocks = struct
       SELECT
        b.block_hash, b.level, b.predecessor, b.commitment_hash,
        b.previous_commitment_hash, b.context, b.inbox_witness,
-       b.inbox_hash, b.initial_tick, b.num_ticks
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
       FROM l2_blocks as b
       INNER JOIN rollup_node_state as s
       ON s.name = "l2_head" AND s.value = b.block_hash
+      |sql}
+
+    let select_last_committed =
+      (unit ->? l2_block) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      AND b.context IS NOT NULL
+      ORDER BY l.level DESC LIMIT 1
+      |sql}
+
+    let select_previous_committed =
+      (level ->? l2_block) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      AND b.context IS NOT NULL
+      WHERE l.level < ?
+      ORDER BY l.level DESC LIMIT 1
+      |sql}
+
+    let select_first_committed =
+      (unit ->? l2_block) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      AND b.context IS NOT NULL
+      ORDER BY l.level ASC LIMIT 1
+      |sql}
+
+    let select_last_committed_hash_level =
+      (unit ->? t2 block_hash level) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      AND b.context IS NOT NULL
+      ORDER BY l.level DESC LIMIT 1
       |sql}
 
     let select_finalized =
@@ -1046,10 +1194,28 @@ module L2_blocks = struct
       SELECT
        b.block_hash, b.level, b.predecessor, b.commitment_hash,
        b.previous_commitment_hash, b.context, b.inbox_witness,
-       b.inbox_hash, b.initial_tick, b.num_ticks
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
       FROM l2_blocks AS b
       INNER JOIN rollup_node_state as s
       ON s.name = "finalized_level" AND s.value = b.block_hash
+      |sql}
+
+    let select_last_committed_finalized =
+      (unit ->? l2_block) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
+      FROM l2_blocks AS b
+      INNER JOIN l2_levels AS l
+      ON l.block_hash = b.block_hash
+      AND b.context IS NOT NULL
+      WHERE l.level <= (
+        SELECT s.level FROM rollup_node_state AS s
+        WHERE s.name = "finalized_level"
+      )
+      ORDER BY l.level DESC LIMIT 1
       |sql}
 
     let select_level_and_predecessor =
@@ -1068,7 +1234,7 @@ module L2_blocks = struct
       SELECT
        b.block_hash, b.level, b.predecessor, b.commitment_hash,
        b.previous_commitment_hash, b.context, b.inbox_witness,
-       b.inbox_hash, b.initial_tick, b.num_ticks,
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status,
        c.compressed_state, c.inbox_level, c.predecessor, c.number_of_ticks,
        i.inbox_level, i.history_proof,
        m.message_list
@@ -1087,6 +1253,18 @@ module L2_blocks = struct
       @@ {sql|
       DELETE FROM l2_blocks WHERE level < ?
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM l2_blocks WHERE level > ?
+      |sql}
+
+    let get_pvm_status =
+      (block_hash ->? pvm_status) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT pvm_status FROM l2_blocks WHERE block_hash = ?
+      |sql}
   end
 
   let store ?conn store l2_block =
@@ -1101,21 +1279,47 @@ module L2_blocks = struct
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_by_level level
 
+  let find_by_level_range ?conn store ~from_level ~to_level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.select_by_level_range (from_level, to_level)
+
   let find_level ?conn store block_hash =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_level block_hash
 
   let find_context ?conn store block_hash =
     with_connection store conn @@ fun conn ->
-    Sqlite.Db.find_opt conn Q.select_context block_hash
+    let open Lwt_result_syntax in
+    let+ context = Sqlite.Db.find_opt conn Q.select_context block_hash in
+    Option.join context
 
   let find_head ?conn store =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_head ()
 
+  let find_last_committed ?conn store =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_last_committed ()
+
+  let find_previous_committed ?conn store level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_previous_committed level
+
+  let find_first_committed ?conn store =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_first_committed ()
+
+  let find_last_committed_hash_level ?conn store =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_last_committed_hash_level ()
+
   let find_finalized ?conn store =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_finalized ()
+
+  let find_last_committed_finalized ?conn store =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_last_committed_finalized ()
 
   let find_predecessor ?conn store block_hash =
     let open Lwt_result_syntax in
@@ -1146,6 +1350,14 @@ module L2_blocks = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
+
+  let find_pvm_status ?conn store block_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.get_pvm_status block_hash
 end
 
 module State = struct
@@ -1371,16 +1583,114 @@ let gc store ~level =
   let*! () = Events.(emit finish_gc) () in
   return_unit
 
-let export_store ~data_dir ~output_db_file =
+let reset_to_level store ~level =
+  let open Lwt_result_syntax in
+  Sqlite.use store @@ fun conn ->
+  Sqlite.with_transaction conn @@ fun conn ->
+  (* Update head to point to the block at the target level *)
+  let* block = L2_blocks.find_by_level ~conn store level in
+  let* block =
+    match block with
+    | Some b -> return b
+    | None -> failwith "No block found at level %ld." level
+  in
+  let* () =
+    State.L2_head.set ~conn store (block.header.block_hash, block.header.level)
+  in
+  let* () =
+    (* Set finalized level to target if it's after it *)
+    let* finalized = State.Finalized_level.get ~conn store in
+    match finalized with
+    | Some (_, finalized_level) when finalized_level > level ->
+        State.Finalized_level.set ~conn store (block.header.block_hash, level)
+    | _ -> return_unit
+  in
+  let most_recent_commitment_hash =
+    Sc_rollup_block.most_recent_commitment block.header
+  in
+  let* most_recent_commitment =
+    Commitments.find ~conn store most_recent_commitment_hash
+  in
+  let* most_recent_commitment =
+    match most_recent_commitment with
+    | Some c -> return c
+    | None ->
+        failwith
+          "No commitment found for hash %a."
+          Commitment.Hash.pp
+          most_recent_commitment_hash
+  in
+  let* () =
+    let* lcc = State.LCC.get ~conn store in
+    match lcc with
+    | Some (_, lcc_level) when lcc_level > level ->
+        (* Set LCC to last known commitment *)
+        State.LCC.set
+          ~conn
+          store
+          (most_recent_commitment_hash, most_recent_commitment.inbox_level)
+    | _ -> return_unit
+  in
+  (* Not useful for snapshots because it's removed but make reset_to_level
+     correct for other uses. *)
+  let* () =
+    let* lpc = State.LPC.get ~conn store in
+    match lpc with
+    | Some (_, lpc_level) when lpc_level > level ->
+        (* Set LPC to last known commitment *)
+        State.LPC.set
+          ~conn
+          store
+          (most_recent_commitment_hash, most_recent_commitment.inbox_level)
+    | _ -> return_unit
+  in
+  (* Delete DAL statuses before L2_blocks because the query uses a subquery on
+     l2_blocks to resolve block hashes to levels. *)
+  let* () = Dal_slots_statuses.delete_after ~conn store ~level in
+  let* () = Dal_slots_headers.delete_after ~conn store ~level in
+  let* () = Inboxes.delete_after ~conn store ~level in
+  let* () = Messages.delete_after ~conn store ~level in
+  let* () = Commitments_published_at_levels.delete_after ~conn store ~level in
+  let* () = Commitments.delete_after ~conn store ~level in
+  let* () = Outbox_messages.delete_after ~conn store ~level in
+  let* () = L2_blocks.delete_after ~conn store ~level in
+  let* () = L2_levels.delete_after ~conn store ~level in
+  return_unit
+
+let export_store ~data_dir ~output_db_file ?at_level () =
   let open Lwt_result_syntax in
   let* store = init Read_only ~data_dir in
   Sqlite.use store @@ fun conn ->
   let* () = Sqlite.vacuum ~conn ~output_db_file in
-  (* Remove operator specific information *)
+  let*! () = close store in
+  (* Patch exported store *)
   let* store =
     Sqlite.init ~path:output_db_file ~perm:Read_write (fun _ -> return_unit)
   in
+  (* Remove operator specific information *)
   let* () = State.LPC.delete store in
+  (* Remove data if needed *)
+  let* () =
+    match at_level with
+    | Some level ->
+        let* head = State.L2_head.get store in
+        let is_head =
+          match head with
+          | Some (_, head_level) -> head_level = level
+          | None -> false
+        in
+        if is_head then return_unit else reset_to_level store ~level
+    | None -> return_unit
+  in
   let* () = Sqlite.use store @@ fun conn -> Sqlite.vacuum_self ~conn in
   let*! () = close store in
   return_unit
+
+let reset_to_last_committed store =
+  let open Lwt_result_syntax in
+  let* last_committed = L2_blocks.find_last_committed_hash_level store in
+  match last_committed with
+  | None -> return_unit
+  | Some (block, level) ->
+      let*! () = Events.(emit reset_to_last_committed) (block, level) in
+      reset_to_level store ~level

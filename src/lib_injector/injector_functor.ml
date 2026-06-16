@@ -556,6 +556,9 @@ module Make (Parameters : PARAMETERS) = struct
     let op_operations =
       List.map (fun o -> o.Inj_operation.operation) operations
     in
+    let*! () =
+      Event.(emit1 simulating_batch_length) state (List.length operations)
+    in
     let*! () = Event.(emit2 simulating_operations) state op_operations force in
     let fee_parameter = fee_parameter_of_operations state.state operations in
     let safety_guard = safety_guard_of_operations operations in
@@ -598,7 +601,14 @@ module Make (Parameters : PARAMETERS) = struct
             @@ TzTrace.cons
                  (Exn (Failure "Quotas exceeded when simulating one operation"))
                  trace
-        | Some operations -> simulate_operations state signer operations)
+        | Some new_operations ->
+            let*! () =
+              Event.(emit2 batch_too_large_splitting)
+                state
+                (List.length operations)
+                (List.length new_operations)
+            in
+            simulate_operations state signer new_operations)
     | Ok {operations_statuses; unsigned_operation} ->
         let*? results =
           List.combine
@@ -726,8 +736,8 @@ module Make (Parameters : PARAMETERS) = struct
         (oph, operations)
 
   (** Retrieve as many batch of operations from the heap while batch
-          size remains below the size limit. *)
-  let get_n_ops_batch_from_queue ~size_limit state nb_signers =
+          size remains below the size limit and count remains below max_batch_count. *)
+  let get_n_ops_batch_from_queue ~size_limit ?max_batch_count state nb_signers =
     let open Lwt_result_syntax in
     let module Proto_client = (val state.proto_client) in
     let min_size = Block_hash.size + Signature.size Signature.zero in
@@ -741,25 +751,36 @@ module Make (Parameters : PARAMETERS) = struct
         let batch = List.rev rev_batch in
         batch :: rev_batches
     in
-    let rec get_until_enough (batch_size, rev_ops) (nb_batches, rev_batches) =
+    let rec get_until_enough (batch_size, batch_count, rev_ops)
+        (nb_batches, rev_batches) =
       let op_opt = Op_heap.peek_min state.heap in
+      let batch_limit_reached =
+        match max_batch_count with
+        | Some limit -> batch_count >= limit
+        | None -> false
+      in
       match op_opt with
       | None ->
           (* Heap is empty, finalize current batch *)
           return @@ add_batch rev_ops rev_batches
+      | Some _ when batch_limit_reached ->
+          (* Batch count limit reached, finalize current batch *)
+          continue_or_stop (nb_batches + 1, add_batch rev_ops rev_batches)
       | Some op ->
           let new_size = batch_size + op_size op in
           if new_size <= size_limit then
             (* pop the message as we only peeked it. *)
             let* _op = Op_heap.pop state.heap in
-            get_until_enough (new_size, op :: rev_ops) (nb_batches, rev_batches)
+            get_until_enough
+              (new_size, batch_count + 1, op :: rev_ops)
+              (nb_batches, rev_batches)
           else
             (* we haven't pop the message, so we can safely call
                continue_or_stop. *)
             continue_or_stop (nb_batches + 1, add_batch rev_ops rev_batches)
     and continue_or_stop (nb_batches, rev_batches) =
       if nb_batches = nb_signers then return rev_batches
-      else get_until_enough (min_size, []) (nb_batches, rev_batches)
+      else get_until_enough (min_size, 0, []) (nb_batches, rev_batches)
     in
     let* rev_batches = continue_or_stop (0, []) in
     return @@ List.rev rev_batches
@@ -901,8 +922,13 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     Octez_telemetry.Trace.with_tzresult ~service_name "inject" @@ fun scope ->
     let signers = available_signers state in
+    let max_batch_count = Parameters.max_batch_length state.state in
     let* ops_batch =
-      get_n_ops_batch_from_queue ~size_limit state (List.length signers)
+      get_n_ops_batch_from_queue
+        ~size_limit
+        ?max_batch_count
+        state
+        (List.length signers)
     in
     Opentelemetry.Scope.add_attrs scope (fun () -> [tags_attribute state.tags]) ;
     link_batches_scope scope ops_batch ;

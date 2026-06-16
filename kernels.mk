@@ -4,12 +4,15 @@
 #
 # SPDX-License-Identifier: MIT
 
+RISCV_KERNELS_DIR=src/lib_riscv/kernels
+RISCV_KERNELS=riscv-echo
+RISCV_KERNELS_ARTIFACTS=$(RISCV_KERNELS) $(addsuffix .checksum, $(RISCV_KERNELS))
+
 KERNELS=tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm dal_echo_kernel_bandwidth.wasm
 SDK_DIR=src/kernel_sdk
 DEMO_DIR=src/kernel_tx_demo
 
 .PHONY: all
-all: build-dev-deps check test build
 all: build-dev-deps check test build
 
 .PHONY: kernel_sdk
@@ -44,8 +47,13 @@ dal_echo_kernel_bandwidth.wasm:
 	@cp src/kernel_dal_echo/target/wasm32-unknown-unknown/release/dal_echo_kernel_bandwidth.wasm $@
 	@wasm-strip $@
 
+riscv-echo riscv-echo.checksum:
+	@ make -C ${RISCV_KERNELS_DIR} build
+	@mv ${RISCV_KERNELS_DIR}/$@ $@
+	@mv ${RISCV_KERNELS_DIR}/$@.checksum $@.checksum
+
 .PHONY: build
-build: ${KERNELS} kernel_sdk
+build: ${KERNELS} ${RISCV_KERNELS} kernel_sdk
 
 .PHONY: clang-supports-wasm
 clang-supports-wasm:
@@ -55,6 +63,7 @@ clang-supports-wasm:
 build-dev-deps: clang-supports-wasm build-deps
 	@make -C ${SDK_DIR} build-dev-deps
 	@make -C ${DEMO_DIR} build-dev-deps
+	@make -C ${RISCV_KERNELS_DIR} build-dev-deps
 
 .PHONY: build-deps
 build-deps:
@@ -74,6 +83,7 @@ test:
 check: build-dev-deps
 	@make -C ${SDK_DIR} check
 	@make -C ${DEMO_DIR} check
+	@make -C ${RISCV_KERNELS_DIR} check
 
 	# Check formatting of all crates.
 	@exec scripts/check-format-rust.sh
@@ -89,6 +99,8 @@ publish-sdk:
 .PHONY: clean
 clean:
 	@rm -f ${KERNELS}
+	@rm -f ${RISCV_KERNELS_ARTIFACTS}
 	@make -C ${SDK_DIR} clean
 	@make -C ${DEMO_DIR} clean
+	@make -C ${RISCV_KERNELS_DIR} clean
 	@rm -f smart-rollup-installer tx-demo-collector

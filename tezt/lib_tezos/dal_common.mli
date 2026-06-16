@@ -33,6 +33,7 @@ module Parameters : sig
     cryptobox : Cryptobox.parameters;
     number_of_slots : int;
     attestation_lag : int;
+    attestation_lags : int list;
     attestation_threshold : int;
   }
 
@@ -69,6 +70,101 @@ module Parameters : sig
     proto_parameters:JSON.t -> int
 end
 
+(** Decoding of the slot availability bitset used in block metadata. It currently
+    has the same behaviour as the [Attestations] module. *)
+module Slot_availability : sig
+  val decode :
+    Protocol.t -> Endpoint.t -> Parameters.t -> string -> bool array array Lwt.t
+end
+
+module IntMap : Map.S with type key = int
+
+(** [collect_slot_availabilities node ~attested_levels] collect DAL attestation
+    metadata for a list of [~attested_levels]. Returns an [IntMap] mapping each
+    attested level to its optional [dal_attestation] value. *)
+val collect_slot_availabilities :
+  Node.t -> attested_levels:int list -> string option IntMap.t Lwt.t
+
+(** Maps each lag to (attested_level, lag_index, dal_params, protocol). *)
+val to_attested_levels :
+  protocol:Protocol.t ->
+  dal_parameters:Parameters.t ->
+  published_level:int ->
+  (int * int * Parameters.t * Protocol.t) list
+
+(** [is_slot_attested ~published_level ~slot_index ~to_attested_levels slot_availabilities]
+    checks if a slot published at [~published_level] with [~slot_index] was attested
+    at any valid attestation level.
+
+    Uses [to_attested_levels ~published_level] to compute all possible
+    (attested_level, lag_index, dal_params, protocol) tuples where the slot
+    could have been attested. For each tuple:
+    - [attested_level]: The level at which to check for the attestation
+    - [lag_index]: Which lag position to check at that level (since each lag
+      position corresponds to a different published level)
+    - [dal_params]: DAL parameters at [attested_level]
+    - [protocol]: Protocol at [attested_level]
+
+    The [slot_availabilities] map should contain metadata for all relevant levels
+    (typically obtained via {!collect_slot_availabilities}).
+
+    Returns whether the slot is found attested at ANY of the checked
+    (level, lag_index) pairs. *)
+val is_slot_attested :
+  endpoint:Endpoint.t ->
+  published_level:int ->
+  slot_index:int ->
+  to_attested_levels:
+    (published_level:int -> (int * int * Parameters.t * Protocol.t) list) ->
+  string option IntMap.t ->
+  bool Lwt.t
+
+(** [is_slot_attested_in_bitset ~endpoint ~protocol ~dal_parameters
+    ~attested_level ~published_level ~slot_index ~dal_attestation] checks if a
+    delegate's [~dal_attestation] at [attested_level] is attested for
+    [slot_index] from [published_level]. *)
+val is_slot_attested_in_bitset :
+  endpoint:Endpoint.t ->
+  protocol:Protocol.t ->
+  dal_parameters:Parameters.t ->
+  attested_level:int ->
+  published_level:int ->
+  slot_index:int ->
+  dal_attestation:string ->
+  bool Lwt.t
+
+(** Encoding/decoding of the DAL content included in attestation operations.
+    For protocols >= 025, these functions use the RPCs
+    [decode_dal_attestation] and [encode_dal_attestation] to perform
+    encoding/decoding. For pre-025 protocols, the simple bitset format is
+    handled locally. *)
+module Attestations : sig
+  (** [encode_for_one_lag protocol endpoint ?lag_index dal_parameters slot_array]
+      encodes an array of Booleans into a DAL attestation bitset string.
+      For protocols >= 025, uses the encode_dal_attestation RPC via [endpoint].
+      [?lag_index] defaults to the last position in the [attestation_lags]
+      list. *)
+  val encode_for_one_lag :
+    Protocol.t ->
+    Endpoint.t ->
+    ?lag_index:int ->
+    Parameters.t ->
+    bool array ->
+    string Lwt.t
+
+  (** [encode protocol endpoint attestations_per_lag] encodes attestations for
+      multiple lag indices. For protocols >= 025, uses the
+      encode_dal_attestation RPC via [endpoint]. *)
+  val encode : Protocol.t -> Endpoint.t -> bool array array -> string Lwt.t
+
+  (** [decode protocol endpoint parameters str] decodes a DAL attestation bitset
+      string. For protocols >= 025, uses the decode_dal_attestation RPC via
+      [endpoint]. Returns an array of size [number_of_lags], where each element
+      is a bool array of size [number_of_slots]. *)
+  val decode :
+    Protocol.t -> Endpoint.t -> Parameters.t -> string -> bool array array Lwt.t
+end
+
 module Helpers : sig
   val endpoint : Dal_node.t -> string
 
@@ -101,6 +197,11 @@ module Helpers : sig
   (* Calls {!Cryptobox.init_prover_dal} to initialize the DAL crypto in "prover"
      mode. *)
   val init_prover : ?__LOC__:string -> unit -> unit Lwt.t
+
+  (* Resets DAL initialisation parameters to verifier mode. This ensures a
+     clean state when the parameters may have been altered by other tests
+     sharing the same process. *)
+  val init_verifier : unit -> unit
 
   val get_commitment_and_shards_with_proofs :
     ?precomputation:Cryptobox.shards_proofs_precomputation ->
@@ -205,6 +306,7 @@ module RPC : sig
     | Attested of int (* of attestation lag *)
     | Unattested
     | Unpublished
+    | Not_found
 
   (** Information contained in a slot header fetched from the DAL node. *)
   type slot_header = {
@@ -286,13 +388,16 @@ module RPC : sig
   type attestable_slots = Not_in_committee | Attestable_slots of slot_set
 
   (** Call RPC "GET
-        /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots" to
-        get the slots currently attestable by the given public key hash at the
+        /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
+        to get the slots currently attestable by the given public key hash at the
         given attested level. The result is either a [Not_in_committee] or a
         [Attestable_slots flags], where [flags] is a boolean list of length
         [num_slots]. A slot is attestable if it is published at level [level -
         attestation_lag]) and all the shards assigned to the given attester at
-        level [level] are available in the DAL node's store. *)
+        level [level] are available in the DAL node's store. Please note that with
+        the introduction of [attestation_lags] list the result is only for
+        the published level corresponding to the maximum lag, so there is not an
+        equivalence between this RPC and the DAL attestation from the chain. *)
   val get_attestable_slots :
     attester:Account.key -> attested_level:int -> attestable_slots RPC_core.t
 

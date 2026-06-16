@@ -10,7 +10,7 @@ applied_sequencer_upgrade:
         { "sequencer": $Signature.Public_key,
           "level": $positive_bignum } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $positive_bignum:
       /* Positive big number
@@ -34,6 +34,32 @@ applied_upgrade:
       /* Positive big number
          Decimal representation of a positive big number */
       string
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+assemble_block_diverged:
+  description: Assemble block diverged on level {level}, node is going to re-execute the full blueprint
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* assemble_block_diverged version 0 */
+      "assemble_block_diverged.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+background_task_error:
+  description: background task {name} failed with error {error}
+  level: fatal
+  section: evm_node.dev
+  json format:
+    { /* background_task_error version 0 */
+      "background_task_error.v0": { "name": $unistring,
+                                    "error": $unistring } }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
@@ -119,10 +145,14 @@ blueprint_application:
         { "level": $positive_bignum,
           "timestamp": $timestamp.rfc,
           "txs_nb": integer ∈ [-2^30, 2^30],
-          "gas_used": $positive_bignum,
+          "gas_used": $bignum,
           "block_hash": $unistring,
-          "execution_gas": $positive_bignum,
+          "execution_gas": $bignum,
           "process_time": $timespan.system } }
+    $bignum:
+      /* Big number
+         Decimal representation of a big number */
+      string
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
@@ -306,7 +336,7 @@ blueprints_publisher_request_failed:
                         "number": $unistring,
                         "nb_chunks": integer ∈ [-2^30, 2^30],
                         "chunk_index": integer ∈ [-2^30, 2^30],
-                        "signature": $Signature.V2 } ... ],
+                        "signature": $Signature.V3 } ... ],
                   "inbox_payload": [ $unistring ... ] }
                 || [ $unistring ... ]
                 /* Inbox */ }
@@ -314,8 +344,8 @@ blueprints_publisher_request_failed:
                  "request": "new_l2_head",
                  "rollup_head": integer ∈ [-2^31-1, 2^31] },
           "errors": any } }
-    $Signature.V2:
-      /* A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded) */
+    $Signature.V3:
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 signature (Base58Check-encoded) */
       $unistring
     $positive_bignum:
       /* Positive big number
@@ -404,6 +434,19 @@ compressing_snapshot:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+connection_acquired:
+  description: connection acquired with {endpoint}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* connection_acquired version 0 */
+      "connection_acquired.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 counter_inc_assertion_warning:
   description: assertion failed while updating a Counter metric: the increment ({increment} occuring at {label}) is negative; the value will not be updated
   level: warning
@@ -438,6 +481,18 @@ dream_websocket:
   json format:
     { /* dream_websocket version 0 */
       "dream_websocket.v0": any }
+  
+drift_monitor_is_ready:
+  description: the drift monitor is ready, initial drift is {drift}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* drift_monitor_is_ready version 0 */
+      "drift_monitor_is_ready.v0": $bignum }
+    $bignum:
+      /* Big number
+         Decimal representation of a big number */
+      string
   
 evm_context_gc_finished:
   description: garbage collection finished for level {gc_level} at head level {head_level} (took {duration})
@@ -507,6 +562,45 @@ evm_context_get_block_failed:
     { /* evm_context_get_block_failed version 0 */
       "evm_context_get_block_failed.v0": { "level": $unistring,
                                            "trace": any } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_ic_execute_skipped:
+  description: skipping single transaction execution for {hash}, IC is not ready
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_ic_execute_skipped version 0 */
+      "evm_context_ic_execute_skipped.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_ic_reset:
+  description: received next_block_info while IC was in Executing state at level {level}, discarding partial IC work and re-entering Executing
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_ic_reset version 0 */
+      "evm_context_ic_reset.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_ic_reset_unexpected_level:
+  description: received next_block_info for a different level while IC was in Executing state at level {level}, resetting to Awaiting
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_ic_reset_unexpected_level version 0 */
+      "evm_context_ic_reset_unexpected_level.v0": $unistring }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
@@ -634,13 +728,13 @@ evm_context_request_failed:
                   || { /* new_delayed_transaction */
                        "kind": $unistring,
                        "event":
-                         [ "transaction" || "deposit" || "fa_deposit",
+                         [ "transaction" || "deposit" || "fa_deposit" || "operation",
                            $unistring,
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
                   || { /* flush_delayed_inbox */
                        "kind": $unistring,
                        "event":
-                         [ [ [ "transaction" || "deposit" || "fa_deposit",
+                         [ [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                                $unistring,
                                /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                            $timestamp.protocol,
@@ -660,13 +754,13 @@ evm_context_request_failed:
                      || { /* new_delayed_transaction */
                           "kind": $unistring,
                           "event":
-                            [ "transaction" || "deposit" || "fa_deposit",
+                            [ "transaction" || "deposit" || "fa_deposit" || "operation",
                               $unistring,
                               /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
                      || { /* flush_delayed_inbox */
                           "kind": $unistring,
                           "event":
-                            [ [ [ "transaction" || "deposit" || "fa_deposit",
+                            [ [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                                   $unistring,
                                   /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                               $timestamp.protocol,
@@ -678,9 +772,10 @@ evm_context_request_failed:
                        "nb_chunks": integer ∈ [-2^30, 2^30],
                        "chunk_index": integer ∈ [-2^30, 2^30] } ... ],
                  "delayed_transactions":
-                   [ [ "transaction" || "deposit" || "fa_deposit",
+                   [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                        $unistring,
-                       /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
+                       /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
+                 "block_hash"?: $unistring }
             || { /* Last_known_L1_level */
                  "request": "last_known_l1_level" }
             || { /* Patch_state */
@@ -695,7 +790,7 @@ evm_context_request_failed:
                  "evm_node_endpoint": $unistring,
                  "blueprint_with_events":
                    { "delayed_transactions":
-                       [ [ "transaction" || "deposit" || "fa_deposit",
+                       [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                            $unistring,
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                      "kernel_upgrade"?: [ $unistring, $timestamp.protocol ],
@@ -718,14 +813,14 @@ evm_context_request_failed:
                      "transaction":
                        { /* Evm */
                          "kind": "evm",
-                         "transaction": $unistring }
+                         "transaction": /^([a-zA-Z0-9][a-zA-Z0-9])*$/ }
                        || { /* Michelson */
                             "kind": "michelson",
-                            "transaction": $unistring } }
+                            "transaction": /^([a-zA-Z0-9][a-zA-Z0-9])*$/ } }
                    || { /* Delayed_transaction */
                         "kind": "Delayed_transaction",
                         "transaction":
-                          [ "transaction" || "deposit" || "fa_deposit",
+                          [ "transaction" || "deposit" || "fa_deposit" || "operation",
                             $unistring,
                             /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] },
                  "hash": $unistring }
@@ -735,7 +830,7 @@ evm_context_request_failed:
                  "number": $unistring },
           "errors": any } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $bignum:
       /* Big number
@@ -791,9 +886,11 @@ evm_context_start_history_mode:
     { /* evm_context_start_history_mode version 0 */
       "evm_context_start_history_mode.v0": $history_mode }
     $history_mode:
-      /* Compact notation for the history mode. Can either be `archive` and `rolling:N` with
-         `N` being the number of days to use as the retention period */
-      "archive" | "rolling:n"
+      /* History mode. `archive`: keeps all data indefinitely. `full:N`: prunes Irmin context
+         older than N days, keeps all SQL data. `rolling:N`: prunes everything older than N
+         days. `seed:N`: minimal mode for sequencers — prunes context, blocks and
+         transactions older than N days, keeps only blueprints and their events. */
+      "archive" | "full:n" | "rolling:n" | "seed:n"
   
 evm_context_switch_history_mode:
   description: switching history mode from {from} to {to_}
@@ -804,9 +901,11 @@ evm_context_switch_history_mode:
       "evm_context_switch_history_mode.v0": { "from": $history_mode,
                                               "to_": $history_mode } }
     $history_mode:
-      /* Compact notation for the history mode. Can either be `archive` and `rolling:N` with
-         `N` being the number of days to use as the retention period */
-      "archive" | "rolling:n"
+      /* History mode. `archive`: keeps all data indefinitely. `full:N`: prunes Irmin context
+         older than N days, keeps all SQL data. `rolling:N`: prunes everything older than N
+         days. `seed:N`: minimal mode for sequencers — prunes context, blocks and
+         transactions older than N days, keeps only blueprints and their events. */
+      "archive" | "full:n" | "rolling:n" | "seed:n"
   
 evm_context_unexpected_l1_block:
   description: received L1 block of level {provided_level} to process, but was expected level {expected_level}
@@ -964,19 +1063,19 @@ evm_events_new_event:
         || { /* new_delayed_transaction */
              "kind": $unistring,
              "event":
-               [ "transaction" || "deposit" || "fa_deposit",
+               [ "transaction" || "deposit" || "fa_deposit" || "operation",
                  $unistring,
                  /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
         || { /* flush_delayed_inbox */
              "kind": $unistring,
              "event":
-               [ [ [ "transaction" || "deposit" || "fa_deposit",
+               [ [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                      $unistring,
                      /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                  $timestamp.protocol,
                  $positive_bignum ] } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $bignum:
       /* Big number
@@ -1045,7 +1144,7 @@ failed_sequencer_upgrade:
           "current_sequencer": $Signature.Public_key /* Some */ || null /* None */,
           "level": $positive_bignum } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $positive_bignum:
       /* Positive big number
@@ -1118,8 +1217,23 @@ gcp_kms_is_ready:
     { /* gcp_kms_is_ready version 0 */
       "gcp_kms_is_ready.v0": $Signature.Public_key }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+gcp_kms_sign_transient_error:
+  description: transient error while signing with GCP KMS (attempt {attempt}): {reason}
+  level: warning
+  section: evm_node.dev.gcp_kms
+  json format:
+    { /* gcp_kms_sign_transient_error version 0 */
+      "gcp_kms_sign_transient_error.v0":
+        { "attempt": integer ∈ [-2^30, 2^30],
+          "reason": $unistring } }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
@@ -1206,17 +1320,26 @@ importing_snapshot:
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 inclusion:
-  description: received inclusion confirmation for the transaction {txn_hash}
-  level: notice
+  description: {op} inclusion confirmation for the transaction {txn_hash}
+  level: debug
   section: evm_node.dev
   json format:
     { /* inclusion version 0 */
-      "inclusion.v0": $unistring }
+      "inclusion.v0": { "op": $unistring,
+                        "txn_hash": $unistring } }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+instant_confirmation_requires_native_execution:
+  description: instant confirmation is enabled, forcing native execution policy to `always`
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* instant_confirmation_requires_native_execution version 0 */
+      "instant_confirmation_requires_native_execution.v0": any }
   
 invalidated_token:
   description: authentication token was invalidated before its expired date
@@ -1412,13 +1535,16 @@ new_access_token:
     { /* new_access_token version 0 */
       "new_access_token.v0": any }
   
-next_block_timestamp:
-  description: received timestamp of the next block {timestamp}
-  level: notice
+next_block_info:
+  description: {op} info for the next block: level = {level}, timestamp = {timestamp}
+  level: debug
   section: evm_node.dev
   json format:
-    { /* next_block_timestamp version 0 */
-      "next_block_timestamp.v0": $timestamp.protocol }
+    { /* next_block_info version 0 */
+      "next_block_info.v0":
+        { "op": $unistring,
+          "level": $unistring,
+          "timestamp": $timestamp.protocol } }
     $timestamp.protocol:
       /* A timestamp as seen by the protocol: second-level precision, epoch based. */
       $unistring
@@ -1467,10 +1593,10 @@ patched_sequencer_key:
         { "pk": $Signature.Public_key,
           "pkh": $Signature.Public_key_hash } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $Signature.Public_key_hash:
-      /* A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash (Base58Check-encoded) */
       $unistring
     $unistring:
       /* Universal string representation
@@ -1503,7 +1629,7 @@ pending_sequencer_upgrade:
           "pool_address": $unistring,
           "timestamp": $timestamp.protocol } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $timestamp.protocol:
       /* A timestamp as seen by the protocol: second-level precision, epoch based. */
@@ -1586,6 +1712,14 @@ prevalidator_cannot_start:
   json format:
     { /* prevalidator_cannot_start version 0 */
       "prevalidator_cannot_start.v0": any }
+  
+prevalidator_failed_da_fee_read:
+  description: failed to read DA fee from durable storage, falling back to zero (expected at genesis)
+  level: warning
+  section: evm_node.dev.prevalidator
+  json format:
+    { /* prevalidator_failed_da_fee_read version 0 */
+      "prevalidator_failed_da_fee_read.v0": any }
   
 prevalidator_is_ready:
   description: prevalidator is ready
@@ -1895,6 +2029,18 @@ sandbox_started:
          Decimal representation of a big number */
       string
   
+seq_block_hash_missing:
+  description: Assemble block can not validate its output for levl {level} because sequencer block hash is missing
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* seq_block_hash_missing version 0 */
+      "seq_block_hash_missing.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
 sequencer_disabled_native_execution:
   description: native execution is disabled for block application in sequencer mode
   level: warning
@@ -1977,6 +2123,16 @@ signal_publisher_is_ready:
     { /* signal_publisher_is_ready version 0 */
       "signal_publisher_is_ready.v0": any }
   
+signal_publisher_report_ready_operations:
+  description: among {operations} injected DAL operations, {ready_operations} are ready to be signaled
+  level: info
+  section: evm_node.dev.signal_publisher
+  json format:
+    { /* signal_publisher_report_ready_operations version 0 */
+      "signal_publisher_report_ready_operations.v0":
+        { "operations": integer ∈ [0, 2^16-1],
+          "ready_operations": integer ∈ [0, 2^16-1] } }
+  
 signal_publisher_shutting_down:
   description: stopping the signals publisher worker
   level: info
@@ -2015,6 +2171,19 @@ signal_publisher_untracking:
     $injector_operation_hash:
       /* An identifier (hash) for an operation in the injector (Base58Check-encoded) */
       $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+single_tx_execution_done:
+  description: single transaction execution done for {txn_hash}
+  level: debug
+  section: evm_node.dev
+  json format:
+    { /* single_tx_execution_done version 0 */
+      "single_tx_execution_done.v0": $unistring }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
@@ -2112,6 +2281,19 @@ tracer_input:
   json format:
     { /* tracer_input version 0 */
       "tracer_input.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+transaction_already_present:
+  description: transaction {tx_hash} is already in the tx_queue
+  level: debug
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* transaction_already_present version 0 */
+      "transaction_already_present.v0": $unistring }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
@@ -2422,6 +2604,20 @@ websocket_unsubscribe:
   
 
 ./octez-evm-node list events --level error --json
+background_task_error:
+  description: background task {name} failed with error {error}
+  level: fatal
+  section: evm_node.dev
+  json format:
+    { /* background_task_error version 0 */
+      "background_task_error.v0": { "name": $unistring,
+                                    "error": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 block_producer_locked:
   description: transaction pool and block production are locked
   level: error
@@ -2493,7 +2689,7 @@ blueprints_publisher_request_failed:
                         "number": $unistring,
                         "nb_chunks": integer ∈ [-2^30, 2^30],
                         "chunk_index": integer ∈ [-2^30, 2^30],
-                        "signature": $Signature.V2 } ... ],
+                        "signature": $Signature.V3 } ... ],
                   "inbox_payload": [ $unistring ... ] }
                 || [ $unistring ... ]
                 /* Inbox */ }
@@ -2501,8 +2697,8 @@ blueprints_publisher_request_failed:
                  "request": "new_l2_head",
                  "rollup_head": integer ∈ [-2^31-1, 2^31] },
           "errors": any } }
-    $Signature.V2:
-      /* A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded) */
+    $Signature.V3:
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 signature (Base58Check-encoded) */
       $unistring
     $positive_bignum:
       /* Positive big number
@@ -2570,13 +2766,13 @@ evm_context_request_failed:
                   || { /* new_delayed_transaction */
                        "kind": $unistring,
                        "event":
-                         [ "transaction" || "deposit" || "fa_deposit",
+                         [ "transaction" || "deposit" || "fa_deposit" || "operation",
                            $unistring,
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
                   || { /* flush_delayed_inbox */
                        "kind": $unistring,
                        "event":
-                         [ [ [ "transaction" || "deposit" || "fa_deposit",
+                         [ [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                                $unistring,
                                /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                            $timestamp.protocol,
@@ -2596,13 +2792,13 @@ evm_context_request_failed:
                      || { /* new_delayed_transaction */
                           "kind": $unistring,
                           "event":
-                            [ "transaction" || "deposit" || "fa_deposit",
+                            [ "transaction" || "deposit" || "fa_deposit" || "operation",
                               $unistring,
                               /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
                      || { /* flush_delayed_inbox */
                           "kind": $unistring,
                           "event":
-                            [ [ [ "transaction" || "deposit" || "fa_deposit",
+                            [ [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                                   $unistring,
                                   /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                               $timestamp.protocol,
@@ -2614,9 +2810,10 @@ evm_context_request_failed:
                        "nb_chunks": integer ∈ [-2^30, 2^30],
                        "chunk_index": integer ∈ [-2^30, 2^30] } ... ],
                  "delayed_transactions":
-                   [ [ "transaction" || "deposit" || "fa_deposit",
+                   [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                        $unistring,
-                       /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
+                       /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
+                 "block_hash"?: $unistring }
             || { /* Last_known_L1_level */
                  "request": "last_known_l1_level" }
             || { /* Patch_state */
@@ -2631,7 +2828,7 @@ evm_context_request_failed:
                  "evm_node_endpoint": $unistring,
                  "blueprint_with_events":
                    { "delayed_transactions":
-                       [ [ "transaction" || "deposit" || "fa_deposit",
+                       [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                            $unistring,
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                      "kernel_upgrade"?: [ $unistring, $timestamp.protocol ],
@@ -2654,14 +2851,14 @@ evm_context_request_failed:
                      "transaction":
                        { /* Evm */
                          "kind": "evm",
-                         "transaction": $unistring }
+                         "transaction": /^([a-zA-Z0-9][a-zA-Z0-9])*$/ }
                        || { /* Michelson */
                             "kind": "michelson",
-                            "transaction": $unistring } }
+                            "transaction": /^([a-zA-Z0-9][a-zA-Z0-9])*$/ } }
                    || { /* Delayed_transaction */
                         "kind": "Delayed_transaction",
                         "transaction":
-                          [ "transaction" || "deposit" || "fa_deposit",
+                          [ "transaction" || "deposit" || "fa_deposit" || "operation",
                             $unistring,
                             /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] },
                  "hash": $unistring }
@@ -2671,7 +2868,7 @@ evm_context_request_failed:
                  "number": $unistring },
           "errors": any } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $bignum:
       /* Big number

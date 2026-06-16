@@ -30,6 +30,7 @@ type state = {
   rpc_server : Rpc_server.t;
   configuration : Configuration.t;
   node_ctxt : Node_context.rw;
+  current_ctxt : Node_context.context_state option Reference.rw;
 }
 
 let is_before_origination (node_ctxt : _ Node_context.t)
@@ -37,14 +38,32 @@ let is_before_origination (node_ctxt : _ Node_context.t)
   let origination_level = node_ctxt.genesis_info.level in
   header.level < origination_level
 
-let previous_context (node_ctxt : _ Node_context.t)
-    ~(predecessor : Layer1.header) =
+let context_of_block' (node_ctxt : _ Node_context.t) (block : Layer1.header) =
   let open Lwt_result_syntax in
-  if is_before_origination node_ctxt predecessor then
+  if is_before_origination node_ctxt block then
     (* This is before we have interpreted the boot sector, so we start
        with an empty context in genesis *)
     return (Context.empty node_ctxt.context)
-  else Node_context.checkout_context node_ctxt predecessor.Layer1.hash
+  else Node_context.checkout_context node_ctxt block.hash
+
+let context_of_block ~set_current {node_ctxt; current_ctxt; _}
+    (block : Layer1.header) =
+  let open Lwt_result_syntax in
+  match Reference.get current_ctxt with
+  | Some {ctxt; status = Valid; block = {hash = current_hash; _}}
+    when Block_hash.equal block.hash current_hash ->
+      return ctxt
+  | _ ->
+      let+ ctxt = context_of_block' node_ctxt block in
+      if set_current then
+        Reference.set current_ctxt @@ Some {ctxt; status = Valid; block} ;
+      ctxt
+
+let start_block_evaluation state block ctxt =
+  Reference.set state.current_ctxt @@ Some {ctxt; status = Dirty; block}
+
+let finish_block_evaluation state block ctxt =
+  Reference.set state.current_ctxt @@ Some {ctxt; status = Valid; block}
 
 let start_workers (plugin : (module Protocol_plugin_sig.S))
     (node_ctxt : _ Node_context.t) =
@@ -138,7 +157,8 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       ]) ;
   let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up state head in
-  let* rollup_ctxt = previous_context node_ctxt ~predecessor in
+  let* ctxt = context_of_block ~set_current:true state predecessor in
+  start_block_evaluation state head ctxt ;
   let module Plugin = (val state.plugin) in
   let start_timestamp = Time.System.now () in
   let* inbox_hash, inbox, inbox_witness, messages =
@@ -159,22 +179,29 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   (* Avoid storing and publishing commitments if the head is not final. *)
   (* Avoid triggering the pvm execution if this has been done before for
      this head. *)
-  let* ctxt, _num_messages, num_ticks, initial_tick =
+  let* {num_ticks; initial_tick; state_hash; _} =
     Interpreter.process_head
       (module Plugin)
       node_ctxt
-      rollup_ctxt
+      ctxt
       ~predecessor:(Layer1.head_of_header predecessor)
       (Layer1.head_of_header head)
       (inbox, messages)
   in
-  let*! context_hash = Context.commit ctxt in
+  finish_block_evaluation state head ctxt ;
   let* commitment_hash =
     Publisher.process_head
       state.plugin
       node_ctxt
       ~predecessor:predecessor.hash
       head
+      ctxt
+  in
+  let* context_hash =
+    Node_context.commit_context
+      node_ctxt
+      ~level:head.level
+      ~commitment:(Option.is_some commitment_hash)
       ctxt
   in
   let* () = maybe_split_context node_ctxt commitment_hash head.level in
@@ -195,13 +222,33 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
         predecessor = predecessor.hash;
         commitment_hash;
         previous_commitment_hash;
-        context = context_hash;
+        context_hash;
         inbox_witness;
         inbox_hash;
       }
   in
+  let* pvm_state = Context.PVMState.get ctxt in
+  let constants = (Reference.get node_ctxt.current_protocol).constants in
+  let* pvm_status =
+    Lwt.catch
+      (fun () ->
+        Plugin.Pvm.get_status node_ctxt ~constants pvm_state
+        |> Lwt_result.map Option.some)
+      (fun _ ->
+        (* Guard against partial implementations of status to string
+           conversions *)
+        Option.none_es)
+  in
   let l2_block =
-    Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+    Sc_rollup_block.
+      {
+        header;
+        content = ();
+        num_ticks;
+        initial_tick;
+        state_hash = Some state_hash;
+        pvm_status;
+      }
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
   let* () =
@@ -275,7 +322,7 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7731
            This just overwrites the outbox messages with the correct ones for
            the level but we need to properly handle reorgs in the storage. *)
-        let* ctxt = Node_context.checkout_context node_ctxt head.hash in
+        let* ctxt = context_of_block ~set_current:true state head in
         let* () =
           register_outbox_messages state.plugin node_ctxt ctxt head.level
         in
@@ -361,54 +408,73 @@ let on_layer_1_head ({node_ctxt; _} as state) ~finalized (head : Layer1.header)
         let l = Int32.pred origination_level in
         (`Level l, l)
   in
-  let missing_blocks = Int32.sub head.level old_level in
-  let*! () =
-    if missing_blocks > 1l then Daemon_event.catch_up missing_blocks
-    else Lwt.return_unit
+  (* When the L1 head is behind our last processed level, check if it is
+     on the same chain. If so, there is nothing to do — the L1 is just
+     catching up (e.g. it was recently bootstrapped). This avoids an
+     expensive O(distance) reorg computation that would produce an empty
+     new_chain anyway. *)
+  let* l1_same_chain_but_behind =
+    if head.level < old_level then
+      let* stored_hash = Node_context.hash_of_level_opt node_ctxt head.level in
+      match stored_hash with
+      | Some h when Block_hash.(h = head.hash) -> return_true
+      | _ -> return_false
+    else return_false
   in
-  let stripped_head = Layer1.head_of_header head in
-  let*! reorg =
-    Node_context.get_tezos_reorg_for_new_head node_ctxt old_head stripped_head
-  in
-  let*? reorg = report_missing_data reorg in
-  let*! () = Daemon_event.reorg reorg.old_chain in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
-     Rollback state information on reorganization, i.e. for
-     reorg.old_chain. *)
-  let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
-  let get_header Layer1.{hash; level} =
-    if Block_hash.equal hash head.hash then return head
-    else
-      let+ header = Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt hash in
-      {Layer1.hash; level; header}
-  in
-  let new_chain_prefetching =
-    Layer1.make_prefetching_schedule node_ctxt.l1_ctxt reorg.new_chain
-  in
-  let* () =
-    List.iter_es
-      (fun (block, to_prefetch) ->
-        let module Plugin = (val state.plugin) in
-        Octez_telemetry.Trace.with_tzresult "process_block" @@ fun _ ->
-        Plugin.Layer1_helpers.prefetch_tezos_blocks
-          node_ctxt.l1_ctxt
-          to_prefetch ;
-        let* header = get_header block in
-        let catching_up = block.level < head.level in
-        update_l2_chain state ~catching_up ~finalized header)
-      new_chain_prefetching
-  in
-  notify_synchronization node_ctxt head.level ;
-  let* () = Publisher.publish_commitments () in
-  let* () = Publisher.cement_commitments () in
-  let* () = Outbox_execution.publish_executable_messages node_ctxt in
-  let*! () = Daemon_event.new_heads_processed reorg.new_chain in
-  let* () = Batcher.produce_batches () in
-  let* () = Dal_injection_queue.produce_dal_slots ~level:head.level in
-  let*! () = Injector.inject ~header:head.header () in
-  let*! () = Daemon_event.new_heads_side_process_finished reorg.new_chain in
-  Reference.set node_ctxt.degraded false ;
-  return_unit
+  if l1_same_chain_but_behind then
+    let*! () =
+      Daemon_event.l1_behind ~l1_level:head.level ~l2_level:old_level
+    in
+    return_unit
+  else
+    let missing_blocks = Int32.sub head.level old_level in
+    let*! () =
+      if missing_blocks > 1l then Daemon_event.catch_up missing_blocks
+      else Lwt.return_unit
+    in
+    let stripped_head = Layer1.head_of_header head in
+    let*! reorg =
+      Node_context.get_tezos_reorg_for_new_head node_ctxt old_head stripped_head
+    in
+    let*? reorg = report_missing_data reorg in
+    let*! () = Daemon_event.reorg reorg.old_chain in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
+       Rollback state information on reorganization, i.e. for
+       reorg.old_chain. *)
+    let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
+    let get_header Layer1.{hash; level} =
+      if Block_hash.equal hash head.hash then return head
+      else
+        let+ header = Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt hash in
+        {Layer1.hash; level; header}
+    in
+    let new_chain_prefetching =
+      Layer1.make_prefetching_schedule node_ctxt.l1_ctxt reorg.new_chain
+    in
+    let* () =
+      List.iter_es
+        (fun (block, to_prefetch) ->
+          let module Plugin = (val state.plugin) in
+          Octez_telemetry.Trace.with_tzresult "process_block" @@ fun _ ->
+          Plugin.Layer1_helpers.prefetch_tezos_blocks
+            node_ctxt.l1_ctxt
+            to_prefetch ;
+          let* header = get_header block in
+          let catching_up = block.level < head.level in
+          update_l2_chain state ~catching_up ~finalized header)
+        new_chain_prefetching
+    in
+    notify_synchronization node_ctxt head.level ;
+    let* () = Publisher.publish_commitments () in
+    let* () = Publisher.cement_commitments () in
+    let* () = Outbox_execution.publish_executable_messages node_ctxt in
+    let*! () = Daemon_event.new_heads_processed reorg.new_chain in
+    let* () = Batcher.produce_batches () in
+    let* () = Dal_injection_queue.produce_dal_slots ~level:head.level in
+    let*! () = Injector.inject ~header:head.header () in
+    let*! () = Daemon_event.new_heads_side_process_finished reorg.new_chain in
+    Reference.set node_ctxt.degraded false ;
+    return_unit
 
 let daemonize state =
   if state.configuration.l1_monitor_finalized then
@@ -679,7 +745,8 @@ let rec process_daemon ({node_ctxt; _} as state) =
           | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup
           | Disagree_with_cemented _ | Disagree_with_commitment _
           | Inconsistent_inbox _ ))
-      | Purpose.Missing_operators _ )
+      | Purpose.Missing_operators _
+      | Exn (Wasm_2_0_0_utilities.Fast_execution_panic _) )
       :: _ as e ->
         fatal_error_exit e
     | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
@@ -734,11 +801,13 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
         minimal_block_delay = current_protocol.constants.minimal_block_delay;
         delay_increment_per_round =
           current_protocol.constants.delay_increment_per_round;
+        max_batch_length = configuration.injector.max_batch_length;
       }
       ~data_dir:node_ctxt.data_dir
       ~signers
       ~retention_period:configuration.injector.retention_period
       ~allowed_attempts:configuration.injector.attempts
+      ~injection_ttl:configuration.injector.injection_ttl
       ~collect_metrics:(Option.is_some state.configuration.metrics_addr)
   in
   let* () = start_workers plugin node_ctxt in
@@ -781,7 +850,7 @@ module Internal_for_tests = struct
       (node_ctxt : _ Node_context.t) ~is_first_block ~predecessor head messages
       =
     let open Lwt_result_syntax in
-    let* ctxt = previous_context node_ctxt ~predecessor in
+    let* ctxt = context_of_block' node_ctxt predecessor in
     let* () = Node_context.save_level node_ctxt (Layer1.head_of_header head) in
     let* inbox_hash, inbox, inbox_witness, messages =
       Plugin.Inbox.Internal_for_tests.process_messages
@@ -790,7 +859,7 @@ module Internal_for_tests = struct
         ~predecessor
         messages
     in
-    let* ctxt, _num_messages, num_ticks, initial_tick =
+    let* {num_ticks; initial_tick; state_hash; _} =
       Interpreter.process_head
         (module Plugin)
         node_ctxt
@@ -826,13 +895,24 @@ module Internal_for_tests = struct
           predecessor = predecessor.hash;
           commitment_hash;
           previous_commitment_hash;
-          context = context_hash;
+          context_hash = Some context_hash;
           inbox_witness;
           inbox_hash;
         }
     in
+    let* pvm_state = Context.PVMState.get ctxt in
+    let constants = (Reference.get node_ctxt.current_protocol).constants in
+    let* pvm_status = Plugin.Pvm.get_status node_ctxt ~constants pvm_state in
     let l2_block =
-      Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+      Sc_rollup_block.
+        {
+          header;
+          content = ();
+          num_ticks;
+          initial_tick;
+          state_hash = Some state_hash;
+          pvm_status = Some pvm_status;
+        }
     in
     let* () = Node_context.save_l2_block node_ctxt l2_block in
     let* () = Node_context.set_l2_head node_ctxt l2_block in
@@ -859,6 +939,34 @@ let setup_opentelemetry ~data_dir config =
       Tezos_version_value.Bin_version.octez_smart_rollup_node_version_string
     config.Configuration.opentelemetry
 
+let check_and_patch_config (kind : Kind.t) (config : Configuration.t) =
+  let open Lwt_result_syntax in
+  match kind with
+  | Riscv ->
+      (* Force to commit context to disk only on commitments and monitoring of
+         finalized levels. *)
+      let*! () =
+        if config.commit_on = Block then
+          Daemon_event.riscv_force_commit_strategy ()
+        else Lwt.return_unit
+      in
+      return {config with l1_monitor_finalized = true; commit_on = Commitment}
+  | _ ->
+      let*? () =
+        if config.l1_monitor_finalized then
+          (* No reorg so can use any commit to disk strategy *)
+          Ok ()
+        else
+          match config.commit_on with
+          | Block -> Ok ()
+          | Commitment ->
+              error_with
+                "Cannot use a sparse commit on commitment strategy when \
+                 following the head of the L1 chain. Use \
+                 --l1-monitor-finalized or --commit-on block."
+      in
+      return config
+
 let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
     (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
@@ -867,7 +975,10 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
   in
   let* cctxt =
-    Layer_1.client_context cctxt ~timeout:configuration.l1_rpc_timeout
+    Layer_1.client_context
+      cctxt
+      ~reconnection_delay:configuration.reconnection_delay
+      ~timeout:configuration.l1_rpc_timeout
   in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
@@ -931,6 +1042,8 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       cctxt
       configuration.sc_rollup_address
   in
+  let* configuration = check_and_patch_config kind configuration in
+  let*! () = Daemon_event.commit_strategy configuration.commit_on in
   Metrics.wrap (fun () ->
       Metrics.Info.set_lcc_level_l1 lcc.level ;
       Option.iter
@@ -959,6 +1072,7 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       current_protocol
       configuration
   in
+  let current_ctxt = Reference.new_ None in
   let dir = Rpc_directory.directory node_ctxt in
   let* rpc_server =
     Rpc_server.start
@@ -968,7 +1082,7 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       ~cors:configuration.cors
       dir
   in
-  let state = {node_ctxt; rpc_server; configuration; plugin} in
+  let state = {node_ctxt; rpc_server; configuration; plugin; current_ctxt} in
   let* () = check_operator_balance state in
   let* () = Node_context.save_protocols_from_l1 node_ctxt in
   let (_ : Lwt_exit.clean_up_callback_id) =
@@ -977,21 +1091,32 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
   run state
 
 module Replay = struct
-  let preload_wasmer node_ctxt l2_block =
+  let preload_wasmer node_ctxt (l2_block : Sc_rollup_block.full) =
     let open Lwt_result_syntax in
     match node_ctxt.Node_context.kind with
     | Example_arith | Riscv -> return_unit
     | Wasm_2_0_0 ->
+        let* l2_block_header =
+          match l2_block.header.context_hash with
+          | Some _ -> return l2_block.header
+          | None -> (
+              (* Fallback to use last committed block for preloading. *)
+              let+ last_committed =
+                Node_context.last_committed_block node_ctxt
+              in
+              match last_committed with
+              | None -> l2_block.header
+              | Some b -> b.header)
+        in
         Format.eprintf
           "Preloading \
            kernel............................................................. \
            %!" ;
-        let* () =
-          Wasm_2_0_0_utilities.preload_kernel
-            node_ctxt
-            l2_block.Sc_rollup_block.header
+        let* preloaded =
+          Wasm_2_0_0_utilities.preload_kernel node_ctxt l2_block_header
         in
-        Format.eprintf "[\x1B[1;32mOK\x1B[0m]@." ;
+        if preloaded then Format.eprintf "[\x1B[1;32mOK\x1B[0m]@."
+        else Format.eprintf "[\x1B[1;31mKO\x1B[0m]@." ;
         return_unit
 
   let mk_node_ctxt ~data_dir ~profiling cctxt block =
@@ -1064,6 +1189,8 @@ module Replay = struct
         ~allowed_headers:None
         ~apply_unsafe_patches:false
         ~bail_on_disagree:false
+        ~slow_vm_fallback:false
+        ~commit_on:None
         ~profiling
         ~force_etherlink:false
         ~l1_monitor_finalized:None
@@ -1118,17 +1245,17 @@ module Replay = struct
         level
         Block_hash.pp
         hash ;
-    let* rollup_ctxt =
+    let* ctxt =
       Node_context.checkout_context node_ctxt block.header.predecessor
     in
     let* (module Plugin) =
       Protocol_plugins.proto_plugin_for_level node_ctxt block.header.level
     in
-    let* ctxt, _num_messages, num_ticks, initial_tick =
+    let* {num_ticks; initial_tick; _} =
       Interpreter.process_head
         (module Plugin)
         node_ctxt
-        rollup_ctxt
+        ctxt
         ~predecessor:
           Layer1.
             {

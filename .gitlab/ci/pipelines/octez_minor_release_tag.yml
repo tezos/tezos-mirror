@@ -66,7 +66,7 @@ oc.docker:ci:arm64:
     - runner_system_failure
 
 datadog_pipeline_trace:
-  image: datadog/ci:v4.1.0
+  image: datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2
   stage: start
   tags:
   - gcp
@@ -86,154 +86,8 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build:static-x86_64-linux-binaries:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_very_high_cpu_ramfs
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/build_static_binaries.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/octez-released-executables
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
-  artifacts:
-    expire_in: 90 days
-    paths:
-    - octez-binaries/$ARCH/*
-
-oc.build:static-arm64-linux-binaries:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/build_static_binaries.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/octez-released-executables
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
-  artifacts:
-    expire_in: 90 days
-    paths:
-    - octez-binaries/$ARCH/*
-
-oc.docker:amd64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: build
-  tags:
-  - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: amd64_
-    EXECUTABLE_FILES: script-inputs/released-executables
-
-oc.docker:arm64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: build
-  tags:
-  - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: arm64_
-    EXECUTABLE_FILES: script-inputs/released-executables
-
 oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-v24-release-2642faac
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-be43e621
   stage: build
   tags:
   - gcp
@@ -255,6 +109,243 @@ oc.create-homebrew-formula:
     - public/homebrew/*
     when: on_success
 
+oc.build-data_packages:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
+  stage: build
+  tags:
+  - $TAGS
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh zcash
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DISTRIBUTION: debian
+    RELEASE: trixie
+    TAGS: gcp
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+
+oc.build:static-arm64-linux-released-binaries:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  allow_failure: false
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/octez-released-executables
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+  artifacts:
+    expire_in: 90 days
+    paths:
+    - octez-binaries/$ARCH/*
+
+oc.build:static-x86_64-linux-released-binaries:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_very_high_cpu_ramfs
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  allow_failure: false
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: x86_64
+    EXECUTABLE_FILES: script-inputs/octez-released-executables
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+  artifacts:
+    expire_in: 90 days
+    paths:
+    - octez-binaries/$ARCH/*
+
+publish:release-page:
+  image: ${ci_image_name}/release-page:${ci_image_tag}
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - ./scripts/releases/publish-release-page.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    S3_BUCKET: site-prod.octez.tezos.com
+    BUCKET_PATH: /releases
+    URL: octez.tezos.com
+    DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - index.html
+    - older_releases.html
+    - index.md
+    - older_releases.md
+  retry: 0
+
+oc.docker:arm64:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  allow_failure: false
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "true"
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    IMAGE_ARCH_PREFIX: arm64_
+    EXECUTABLE_FILES: script-inputs/released-executables
+  retry:
+    max: 1
+    when:
+    - script_failure
+    - runner_system_failure
+
+oc.docker:amd64:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  allow_failure: false
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "true"
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    IMAGE_ARCH_PREFIX: amd64_
+    EXECUTABLE_FILES: script-inputs/released-executables
+  retry:
+    max: 1
+    when:
+    - script_failure
+    - runner_system_failure
+
 docker:merge_manifests:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
@@ -265,12 +356,13 @@ docker:merge_manifests:
   - oc.docker:arm64
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - ./scripts/ci/docker_initialize.sh
   - ./scripts/ci/docker_merge_manifests.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -288,14 +380,14 @@ gitlab:release:
   tags:
   - gcp_not_interruptible
   needs:
+  - oc.create-homebrew-formula
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
   - docker:merge_manifests
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
-  - oc.create-homebrew-formula
   dependencies:
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
   - oc.create-homebrew-formula
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -313,422 +405,15 @@ gitlab:release:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-trigger:octez_monitoring:
-  stage: build
-  variables:
-    PIPELINE_TYPE: octez_monitoring
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  inherit:
-    variables:
-    - ci_image_name
-    - ci_image_name_protected
-    - jsonnet_image_name
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/octez_monitoring.yml
-    strategy: depend
-
-oc.docker-build-debian-dependencies:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - $TAGS
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: debian
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-v24-release-2642faac
-  parallel:
-    matrix:
-    - RELEASE:
-      - bookworm
-      - trixie
-      TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
-
-oc.docker-build-merge-manifest.debian:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  needs:
-  - oc.docker-build-debian-dependencies
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/docker-merge-base-images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: debian
-    IMAGE_NAME: $DEP_IMAGE
-  parallel:
-    matrix:
-    - RELEASE:
-      - bookworm
-      - trixie
-      TAGS:
-      - gcp_very_high_cpu
-
-oc.build-debian:
-  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
-  stage: build
-  tags:
-  - $TAGS
-  needs:
-  - oc.docker-build-merge-manifest.debian
-  dependencies: []
-  timeout: 60 minutes
-  cache:
-    key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages.sh binaries
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: debian
-    DUNE_BUILD_JOBS: -j 12
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_IDLE_TIMEOUT: "0"
-  artifacts:
-    paths:
-    - packages/$DISTRIBUTION/$RELEASE
-  parallel:
-    matrix:
-    - RELEASE:
-      - bookworm
-      - trixie
-      TAGS:
-      - gcp_very_high_cpu_ramfs
-      - gcp_arm64
-
-oc.build-data_packages:
-  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
-  stage: build
-  tags:
-  - $TAGS
-  needs:
-  - oc.docker-build-merge-manifest.debian
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages.sh zcash
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: debian
-    RELEASE: trixie
-    TAGS: gcp
-  artifacts:
-    paths:
-    - packages/$DISTRIBUTION/$RELEASE
-
-apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-v24-release-2642faac
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  needs:
-  - oc.build-debian
-  - oc.build-data_packages
-  dependencies:
-  - oc.build-debian
-  - oc.build-data_packages
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - apt-get install -y --update apt-utils debsigs
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    ARCHITECTURES: amd64 arm64
-    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: ""
-  id_tokens:
-    GCP_ID_TOKEN:
-      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
-  retry: 0
-
-oc.docker-build-ubuntu-dependencies:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - $TAGS
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: ubuntu
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-v24-release-2642faac
-  parallel:
-    matrix:
-    - RELEASE:
-      - noble
-      - jammy
-      TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
-
-oc.docker-build-merge-manifest.ubuntu:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  needs:
-  - oc.docker-build-ubuntu-dependencies
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/docker-merge-base-images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: ubuntu
-    IMAGE_NAME: $DEP_IMAGE
-  parallel:
-    matrix:
-    - RELEASE:
-      - noble
-      - jammy
-      TAGS:
-      - gcp_very_high_cpu
-
-oc.build-ubuntu:
-  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
-  stage: build
-  tags:
-  - $TAGS
-  needs:
-  - oc.docker-build-merge-manifest.ubuntu
-  dependencies: []
-  timeout: 60 minutes
-  cache:
-    key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages.sh binaries
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: ubuntu
-    DUNE_BUILD_JOBS: -j 12
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_IDLE_TIMEOUT: "0"
-  artifacts:
-    paths:
-    - packages/$DISTRIBUTION/$RELEASE
-  parallel:
-    matrix:
-    - RELEASE:
-      - noble
-      - jammy
-      TAGS:
-      - gcp_very_high_cpu_ramfs
-      - gcp_arm64
-
-apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-v24-release-2642faac
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  needs:
-  - oc.build-ubuntu
-  - oc.build-data_packages
-  dependencies:
-  - oc.build-ubuntu
-  - oc.build-data_packages
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - apt-get install -y --update apt-utils debsigs
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    ARCHITECTURES: amd64 arm64
-    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: ""
-  id_tokens:
-    GCP_ID_TOKEN:
-      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
-  retry: 0
-
-opam:release:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/opam-release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  retry: 0
-
-publish:release-page:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  rules:
-  - when: manual
-    allow_failure: true
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
-  dependencies:
-  - oc.docker:ci:amd64
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/releases/publish_release_page.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - cp /tmp/release_page*/index.md ./index.md
-  variables:
-    S3_BUCKET: site-prod.octez.tezos.com
-    BUCKET_PATH: /releases
-    URL: octez.tezos.com
-    DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
-  artifacts:
-    expire_in: 1 day
-    paths:
-    - ./index.md
-    - index.html
-  retry: 0
-
 dispatch-call:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.docker:ci:amd64
-  - publish:release-page
   - gitlab:release
+  - publish:release-page
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -742,3 +427,155 @@ dispatch-call:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  retry: 0
+
+oc.build-ubuntu:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
+  stage: build
+  tags:
+  - $TAGS
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh binaries
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    DISTRIBUTION: ubuntu
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "26.04"
+      TAGS:
+      - gcp_very_high_cpu_ramfs
+      - gcp_arm64
+
+apt_repo_ubuntu:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-05e36a5c
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - oc.build-data_packages
+  - oc.build-ubuntu
+  dependencies:
+  - oc.build-data_packages
+  - oc.build-ubuntu
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - apt-get install -y --update apt-utils debsigs
+  - ./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04 26.04
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    ARCHITECTURES: amd64 arm64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: ""
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
+  retry: 0
+
+oc.build-debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
+  stage: build
+  tags:
+  - $TAGS
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh binaries
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    DISTRIBUTION: debian
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+      TAGS:
+      - gcp_very_high_cpu_ramfs
+      - gcp_arm64
+
+apt_repo_debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - oc.build-data_packages
+  - oc.build-debian
+  dependencies:
+  - oc.build-data_packages
+  - oc.build-debian
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - apt-get install -y --update apt-utils debsigs
+  - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    ARCHITECTURES: amd64 arm64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: ""
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
+  retry: 0

@@ -107,6 +107,7 @@ type daemon =
   | Etherlink_sc_rollup_node of string
   | Etherlink_evm_node of string
   | Etherlink_producer_node of string
+  | Stresstester of int
 
 let name_of_daemon = function
   | Baker_l1_node i -> Format.asprintf "baker-node-%d" i
@@ -122,6 +123,7 @@ let name_of_daemon = function
       Format.asprintf "etherlink-%s-rollup-node" name
   | Etherlink_evm_node name -> Format.asprintf "etherlink-%s-evm-node" name
   | Etherlink_producer_node name -> Format.asprintf "etherlink-%s-node" name
+  | Stresstester i -> Format.asprintf "stresstester-%d" i
 
 module Logs = struct
   let scp_profiling ~destination_root ~daemon_name agent =

@@ -10,9 +10,11 @@
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   tezt-tezos
+  tezt-cloud
   tezt_etherlink
   etherlink_lib_wasm_runtime_callbacks_test_tezt_lib
   octez-evm-node-libs.evm_node_lib_dev_encoding
+  octez-evm-node-libs.evm_node_lib_dev
   tezos-protocol-alpha.protocol)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
@@ -25,6 +27,7 @@
   -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
+  -open Tezt_cloud
   -open Tezt_etherlink)
  (modules
   evm_rollup
@@ -33,15 +36,19 @@
   dal_sequencer
   eth_call
   gc
-  tezlink
+  michelson_runtime
   preconfirmation
-  tezosx))
+  tezosx
+  michelson_runtime_storage_payment
+  dev_commands
+  cross_runtime
+  compact_receipt_encoding))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  octez-rust-deps
+  octez-evm-node-libs.evm_node_rust_deps
   etherlink_tezt_tests_tezt_lib
   tezt)
  (link_flags

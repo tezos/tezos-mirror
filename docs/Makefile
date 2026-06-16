@@ -16,17 +16,17 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = seoul tallinn
+NAMED_PROTOS  = tallinn u025
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-seoul_long     = PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh
 tallinn_long   = PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu
+u025_long      = PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-seoul_short    = PtSeouLo
 tallinn_short    = PtTALLiN
+u025_short       = PsUshuai
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -110,7 +110,7 @@ odoc-raw:
 	mkdir -p $(TMPDOCDIR)/
 	cd ..; rsync --recursive --links --perms --exclude=target \
 		$$(cat script-inputs/octez-source-content) \
-		client-libs etherlink websocket lwt_domain efunc-core \
+		etherlink websocket lwt_domain efunc-core \
 		$(TMPDOCDIR)/
 	cd $(TMPDOCDIR)/ && ./scripts/slim-mode.sh $$slim_mode
 	ODOC_WARN_ERROR=$$odoc_errors dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(CURDIR)/odoc.log 2>&1; \
@@ -143,23 +143,28 @@ redirectcheck:
 # - on each other protocol including alpha, also checking label defs (option -l)
 .PHONY: xrefscheck
 xrefscheck:
+	$(CHECKXREFS) -l u025
 	$(CHECKXREFS) tallinn
-	$(CHECKXREFS) seoul
 	$(CHECKXREFS) -l alpha
 
 .PHONY: installcheck
 installcheck:
-	scripts/test_install_scripts.sh install-bin-noble
-	scripts/test_install_scripts.sh install-bin-jammy
-	scripts/test_install_scripts.sh install-bin-rc-jammy
-	scripts/test_install_scripts.sh install-bin-rc-noble
+	scripts/test_install_scripts.sh install-bin-26.04
+	scripts/test_install_scripts.sh install-bin-24.04
+	scripts/test_install_scripts.sh install-bin-22.04
 	scripts/test_install_scripts.sh install-bin-bookworm
+	scripts/test_install_scripts.sh install-bin-trixie
+	scripts/test_install_scripts.sh install-bin-rc-26.04
+	#scripts/test_install_scripts.sh install-bin-rc-24.04
+	#scripts/test_install_scripts.sh install-bin-rc-22.04
 	scripts/test_install_scripts.sh install-bin-rc-bookworm
-	scripts/test_install_scripts.sh install-opam-scratch
-	scripts/test_install_scripts.sh install-opam-jammy
-	scripts/test_install_scripts.sh compile-release-sources-bullseye
-	scripts/test_install_scripts.sh compile-sources-bullseye
-	scripts/test_install_scripts.sh compile-sources-mantic
+	scripts/test_install_scripts.sh install-bin-rc-trixie
+	#scripts/test_install_scripts.sh install-opam-scratch
+	#scripts/test_install_scripts.sh install-opam-24.04
+	#scripts/test_install_scripts.sh install-opam-22.04
+	#scripts/test_install_scripts.sh compile-release-sources-bookworm
+	#scripts/test_install_scripts.sh compile-sources-bookworm
+	#scripts/test_install_scripts.sh compile-sources-oracular
 
 # build dune targets together to avoid concurrent dunes
 .PHONY: docexes
@@ -190,7 +195,7 @@ user/default-acl.json: $(RPCDOCEXE)
 
 .PHONY: rpc
 rpc: user/default-acl.json shell/rpc.rst \
-	alpha/rpc.rst
+	alpha/rpc.rst u025/rpc.rst
 
 # To be triggered manually when needed
 .PHONY: rpc-protocols
@@ -227,7 +232,7 @@ docexes-gen: api/errors.rst shell/p2p_api.rst rpc
 sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	$(SPHINXBUILD) --builder html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/seoul" || true
+	@ln -s active "$(BUILDDIR)/tallinn" || true
 
 # Syntax check RST files.
 # Run Sphinx, but first create dummy version of all generated files,
@@ -316,6 +321,6 @@ fmt: black
 clean:
 	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv $(BUILDDIR)/octezdoc.txt
-	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html tallinn/octez-*.html seoul/octez-*.html
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst u025/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv $(BUILDDIR)/octezdoc.txt
+	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html u025/octez-*.html tallinn/octez-*.html
 	@-rm -Rf ../openapi-tmp

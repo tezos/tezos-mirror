@@ -245,10 +245,10 @@ Putting together all the above instructions, you may want to quickly start a nod
 
 .. code-block:: shell
 
-    # Download a snapshot for your target network, e.g. ghostnet:
-    wget https://snapshots.tzinit.org/ghostnet/rolling -O rolling
-    # Configure the node for running on your testnet, e.g. ghostnet:
-    octez-node config init --network ghostnet --rpc-addr 127.0.0.1
+    # Download a snapshot for your target network, e.g. currentnet:
+    wget https://snapshots.tzinit.org/currentnet/rolling -O rolling
+    # Configure the node for running on your testnet, e.g. currentnet:
+    octez-node config init --network https://teztnets.com/currentnet --rpc-addr 127.0.0.1
     # Import the snapshot file into the node:
     octez-node snapshot import rolling
     # Run the node:
@@ -323,14 +323,19 @@ If you want to force using encryption on a testnet, you must supply the option `
 
       $ octez-client gen keys bob --encrypted
 
-Tezos supports four different ECC (`Elliptic-Curve Cryptography <https://en.wikipedia.org/wiki/Elliptic-curve_cryptography>`_) schemes: *Ed25519*, *secp256k1* (the
-one used in Bitcoin), *P-256* (also called *secp256r1*), and *BLS* (variant
-*MinPk*, for aggregated signatures). The secp256k1 and P256
-curves have been added for interoperability with Bitcoin and
-Hardware Security Modules (*HSMs*) mostly. Unless your use case
-requires those, you should probably use *Ed25519*. We use a verified
-library for Ed25519, and it is generally recommended over other curves
-by the crypto community, for performance and security reasons.
+Tezos supports five different cryptographic schemes. Four of them are ECC
+(`Elliptic-Curve Cryptography
+<https://en.wikipedia.org/wiki/Elliptic-curve_cryptography>`_) schemes:
+*Ed25519*, *secp256k1* (the one used in Bitcoin), *P-256* (also called
+*secp256r1*), *BLS* (variant *MinPk*, for aggregated signatures). The secp256k1
+and P256 curves have been added for interoperability with Bitcoin and Hardware
+Security Modules (*HSMs*) mostly. Unless your use case requires those, you
+should probably use *Ed25519*. We use a verified library for Ed25519, and it is
+generally recommended over other curves by the crypto community, for performance
+and security reasons. Starting with Protocol U, under feature flag disabled on
+mainnet, Tezos supports a quantum-resistant signature scheme: a
+module-lattice-based *ML-DSA-44*, which is secure against classical and quantum
+computer attacks.
 
 Make sure to make a back-up of the client data directory and that the password
 protecting your secret keys is properly managed (if you stored them encrypted).
@@ -485,11 +490,11 @@ In Tezos there are two kinds of accounts: *user accounts* (also called implicit 
   secret key and they run Michelson code each time they receive a
   transaction.
 
-In the following, we originate our first contract. 
+In the following, we originate our first contract.
 For this, let us consider the following ``id.tz`` contract:
 
   .. code-block:: michelson
-    
+
     parameter string;
     storage string;
     code {CAR; NIL operation; PAIR};

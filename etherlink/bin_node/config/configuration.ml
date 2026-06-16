@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type supported_network = Mainnet | Testnet | Shadownet
+type supported_network = Mainnet | Testnet | Shadownet | Previewnet
 
 let pp_supported_network fmt network =
   Format.pp_print_string
@@ -14,7 +14,8 @@ let pp_supported_network fmt network =
     (match network with
     | Mainnet -> "mainnet"
     | Testnet -> "testnet"
-    | Shadownet -> "shadownet")
+    | Shadownet -> "shadownet"
+    | Previewnet -> "previewnet")
 
 let positive_encoding = Data_encoding.ranged_int 0 ((1 lsl 30) - 1)
 
@@ -56,12 +57,14 @@ type history_mode =
   | Archive
   | Rolling of garbage_collector_parameters
   | Full of garbage_collector_parameters
+  | Seed of garbage_collector_parameters
 
 let history_mode_partial_eq h1 h2 =
   match (h1, h2) with
   | Archive, Archive -> true
   | Rolling _, Rolling _ -> true
   | Full _, Full _ -> true
+  | Seed _, Seed _ -> true
   | _ -> false
 
 type rpc_server = Resto | Dream
@@ -76,7 +79,8 @@ let chain_id network =
        (match network with
        | Mainnet -> 0xa729
        | Testnet -> 0x1f47b
-       | Shadownet -> 0x1F34F))
+       | Shadownet -> 0x1F34F
+       | Previewnet -> 0x1f440))
 
 let chain_id_encoding : L2_types.chain_id Data_encoding.t =
   let open L2_types in
@@ -173,6 +177,7 @@ type experimental_features = {
   l2_chains : l2_chain list option;
   periodic_snapshot_path : string option;
   preconfirmation_stream_enabled : bool;
+  compact_receipt_encoding : bool;
 }
 
 type gcp_key = {
@@ -205,12 +210,10 @@ type gcp_kms = {
   gcloud_path : string;
 }
 
-type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
-
-type proxy = {
-  finalized_view : bool option;
-  evm_node_endpoint : Uri.t option;
-  ignore_block_param : bool;
+type observer = {
+  evm_node_endpoint : Uri.t;
+  rollup_node_tracking : bool;
+  fail_on_divergence : bool;
 }
 
 type fee_history_max_count = Unlimited | Limit of int
@@ -256,7 +259,6 @@ type t = {
   kernel_execution : kernel_execution_config;
   sequencer : sequencer;
   observer : observer option;
-  proxy : proxy;
   gcp_kms : gcp_kms;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
@@ -304,17 +306,23 @@ let history_mode_of_string_opt str =
       let* days = int_of_string_opt days in
       if days > 0 then return (Full (gc_param_from_retention_period ~days))
       else None
+  | ["seed"; days] ->
+      let* days = int_of_string_opt days in
+      if days > 0 then return (Seed (gc_param_from_retention_period ~days))
+      else None
   | _ -> None
 
 let string_of_history_mode_debug = function
   | Archive -> "archive"
   | Rolling gc -> Format.sprintf "rolling:%d" gc.number_of_chunks
   | Full gc -> Format.sprintf "full:%d" gc.number_of_chunks
+  | Seed gc -> Format.sprintf "seed:%d" gc.number_of_chunks
 
 let string_of_history_mode_info = function
   | Archive -> "Archive"
-  | Rolling _ -> Format.sprintf "Rolling"
-  | Full _ -> Format.sprintf "Full"
+  | Rolling _ -> "Rolling"
+  | Full _ -> "Full"
+  | Seed _ -> "Seed"
 
 let pp_history_mode_debug fmt h =
   Format.pp_print_string fmt @@ string_of_history_mode_debug h
@@ -335,6 +343,7 @@ let default_experimental_features =
     l2_chains = default_l2_chains;
     periodic_snapshot_path = None;
     preconfirmation_stream_enabled = false;
+    compact_receipt_encoding = false;
   }
 
 let default_rpc_addr = "127.0.0.1"
@@ -394,6 +403,9 @@ let default_preimages_endpoint = function
   | Shadownet ->
       Uri.of_string
         "https://snapshots.tzinit.org/etherlink-shadownet/wasm_2_0_0"
+  | Previewnet ->
+      Uri.of_string
+        "https://relay.previewnet.tezosx.nomadic-labs.com/wasm_2_0_0"
 
 let default_time_between_blocks = Time_between_blocks 5.
 
@@ -574,10 +586,12 @@ let observer_evm_node_endpoint = function
   | Mainnet -> "https://relay.mainnet.etherlink.com"
   | Testnet -> "https://relay.ghostnet.etherlink.com"
   | Shadownet -> "https://relay.shadownet.etherlink.com"
+  | Previewnet -> "https://relay.previewnet.tezosx.nomadic-labs.com"
 
 let observer_config_dft ~evm_node_endpoint
-    ?(rollup_node_tracking = default_rollup_node_tracking) () =
-  {evm_node_endpoint; rollup_node_tracking}
+    ?(rollup_node_tracking = default_rollup_node_tracking)
+    ?(fail_on_divergence = false) () =
+  {evm_node_endpoint; rollup_node_tracking; fail_on_divergence}
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
@@ -606,7 +620,9 @@ let log_filter_config_encoding : log_filter_config Data_encoding.t =
           "chunk_size"
           ~description:
             "Number of blocks to be filter concurrently when executing a \
-             `eth_getLogs` request."
+             `eth_getLogs` request. DEPRECATED: this field is now ignore. You \
+             can still use `max_nb_blocks` and `max_nb_logs` to limit the \
+             computation done by `eth_getLogs`."
           strictly_positive_encoding
           default_filter_config.chunk_size))
 
@@ -855,14 +871,15 @@ let observer_encoding ?network () =
     | None -> req ~description name encoding
   in
   conv
-    (fun {evm_node_endpoint; rollup_node_tracking} ->
-      (Uri.to_string evm_node_endpoint, rollup_node_tracking))
-    (fun (evm_node_endpoint, rollup_node_tracking) ->
+    (fun {evm_node_endpoint; rollup_node_tracking; fail_on_divergence} ->
+      (Uri.to_string evm_node_endpoint, rollup_node_tracking, fail_on_divergence))
+    (fun (evm_node_endpoint, rollup_node_tracking, fail_on_divergence) ->
       {
         evm_node_endpoint = Uri.of_string evm_node_endpoint;
         rollup_node_tracking;
+        fail_on_divergence;
       })
-    (obj2
+    (obj3
        (evm_node_endpoint_field
           ~description:
             "Upstream EVM node endpoint used to fetch speculative blueprints \
@@ -876,7 +893,13 @@ let observer_encoding ?network () =
              upstream EVM node."
           "rollup_node_tracking"
           bool
-          default_rollup_node_tracking))
+          default_rollup_node_tracking)
+       (dft
+          ~description:
+            "Enable or disable hard failure on assemble block divergence"
+          "fail_on_divergence"
+          bool
+          false))
 
 let rpc_server_encoding =
   let open Data_encoding in
@@ -884,16 +907,20 @@ let rpc_server_encoding =
 
 let history_mode_schema =
   Data_encoding.(
-    Json.schema @@ string_enum [("archive", ()); ("rolling:n", ())])
+    Json.schema
+    @@ string_enum
+         [("archive", ()); ("full:n", ()); ("rolling:n", ()); ("seed:n", ())])
 
 let history_mode_encoding =
   let open Data_encoding in
   def
     "history_mode"
     ~description:
-      "Compact notation for the history mode. Can either be `archive` and \
-       `rolling:N` with `N` being the number of days to use as the retention \
-       period"
+      "History mode. `archive`: keeps all data indefinitely. `full:N`: prunes \
+       Irmin context older than N days, keeps all SQL data. `rolling:N`: \
+       prunes everything older than N days. `seed:N`: minimal mode for \
+       sequencers — prunes context, blocks and transactions older than N days, \
+       keeps only blueprints and their events."
   @@ conv_with_guard
        ~schema:history_mode_schema
        string_of_history_mode_debug
@@ -1023,6 +1050,7 @@ let experimental_features_encoding =
            l2_chains : l2_chain list option;
            periodic_snapshot_path;
            preconfirmation_stream_enabled;
+           compact_receipt_encoding;
          }
        ->
       ( ( drop_duplicate_on_injection,
@@ -1035,7 +1063,8 @@ let experimental_features_encoding =
           spawn_rpc,
           l2_chains,
           periodic_snapshot_path,
-          preconfirmation_stream_enabled ) ))
+          preconfirmation_stream_enabled,
+          compact_receipt_encoding ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -1046,7 +1075,8 @@ let experimental_features_encoding =
              spawn_rpc,
              l2_chains,
              periodic_snapshot_path,
-             preconfirmation_stream_enabled ) )
+             preconfirmation_stream_enabled,
+             compact_receipt_encoding ) )
        ->
       {
         drop_duplicate_on_injection;
@@ -1058,6 +1088,7 @@ let experimental_features_encoding =
         l2_chains;
         periodic_snapshot_path;
         preconfirmation_stream_enabled;
+        compact_receipt_encoding;
       })
     (merge_objs
        (obj6
@@ -1108,7 +1139,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj5
+       (obj6
           (dft
              "rpc_server"
              ~description:
@@ -1140,35 +1171,21 @@ let experimental_features_encoding =
                "Activate or not the preconfirmation stream. This includes the \
                 sequencer as well as the observer."
              bool
-             default_experimental_features.preconfirmation_stream_enabled)))
-
-let proxy_encoding =
-  let open Data_encoding in
-  conv
-    (fun {finalized_view; evm_node_endpoint; ignore_block_param} ->
-      ( finalized_view,
-        Option.map Uri.to_string evm_node_endpoint,
-        ignore_block_param ))
-    (fun (finalized_view, evm_node_endpoint, ignore_block_param) ->
-      {
-        finalized_view;
-        evm_node_endpoint = Option.map Uri.of_string evm_node_endpoint;
-        ignore_block_param;
-      })
-  @@ obj3
-       (opt
-          ~description:
-            "When enabled, the node only expose blocks that are finalized, \
-             i.e., the `latest` block parameter becomes a synonym for \
-             `finalized`. DEPRECATED: use the top level `finalized_view` \
-             option instead."
-          "finalized_view"
-          bool)
-       (opt "evm_node_endpoint" string)
-       (dft "ignore_block_param" bool false)
-
-let default_proxy ?evm_node_endpoint ?(ignore_block_param = false) () =
-  {finalized_view = None; evm_node_endpoint; ignore_block_param}
+             default_experimental_features.preconfirmation_stream_enabled)
+          (dft
+             "compact_receipt_encoding"
+             ~description:
+               "When enabled, transaction receipts are written to the store \
+                using a compact encoding: all-zero logs blooms are stored as \
+                empty bytes, and per-log context fields (blockNumber, \
+                blockHash, transactionHash, transactionIndex) are stripped \
+                since they are derivable from the outer transaction row. \
+                Defaults to [false] so that receipts remain readable by older \
+                node releases that predate the compact encoding, allowing \
+                operators to roll back the binary if needed. The decoder \
+                always accepts both formats, so this flag only affects writes."
+             bool
+             default_experimental_features.compact_receipt_encoding)))
 
 (* A chunk is at most 4 KBytes. A transaction is around 150 bytes. Having 4
    connections up gives roughly 100TPS (4 * 4000 / 150), which should cover
@@ -1596,7 +1613,6 @@ let encoding ?network () : t Data_encoding.t =
            log_filter;
            sequencer;
            observer;
-           proxy;
            gcp_kms;
            keep_alive;
            rollup_node_endpoint;
@@ -1619,7 +1635,6 @@ let encoding ?network () : t Data_encoding.t =
             rpc_timeout,
             verbose,
             experimental_features,
-            proxy,
             gcp_kms,
             fee_history ),
           ( kernel_execution,
@@ -1644,7 +1659,6 @@ let encoding ?network () : t Data_encoding.t =
                rpc_timeout,
                verbose,
                experimental_features,
-               proxy,
                gcp_kms,
                fee_history ),
              ( kernel_execution,
@@ -1666,7 +1680,6 @@ let encoding ?network () : t Data_encoding.t =
         log_filter;
         sequencer;
         observer;
-        proxy;
         gcp_kms;
         keep_alive;
         rollup_node_endpoint;
@@ -1715,7 +1728,7 @@ let encoding ?network () : t Data_encoding.t =
                 \"tx_pool.tx_per_addr_limit\" instead."
              int64))
        (merge_objs
-          (obj8
+          (obj7
              (dft
                 "keep_alive"
                 ~description:
@@ -1744,7 +1757,6 @@ let encoding ?network () : t Data_encoding.t =
                 "experimental_features"
                 experimental_features_encoding
                 default_experimental_features)
-             (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "gcp_kms" gcp_kms_encoding default_gcp_kms)
              (dft "fee_history" fee_history_encoding default_fee_history))
           (obj10
@@ -1768,7 +1780,9 @@ let encoding ?network () : t Data_encoding.t =
                 false)
              (opt
                 "history"
-                ~description:"History mode of the EVM node"
+                ~description:
+                  "History mode of the EVM node (archive, full:N, rolling:N, \
+                   or seed:N)"
                 history_mode_encoding)
              (dft
                 "db"
@@ -1840,19 +1854,6 @@ let precheck json =
   Lwt.catch
     (fun () ->
       let open Json_syntax in
-      (* Conflicts between [.proxy.finalized_view] and [.finalized_view] *)
-      let proxy_conf =
-        json |-> ["proxy"; "finalized_view"] |?> Ezjsonm.get_bool
-      in
-      let toplevel_conf = json |-> ["finalized_view"] |?> Ezjsonm.get_bool in
-      let* () =
-        match (proxy_conf, toplevel_conf) with
-        | Some b, Some b' ->
-            when_ (b <> b') @@ fun () ->
-            failwith
-              "`proxy.finalized_view` and `finalized_view` are inconsistent."
-        | _ -> return_unit
-      in
       let next_wasm_runtime_conf =
         json
         |-> ["experimental_features"; "next_wasm_runtime"]
@@ -2026,7 +2027,6 @@ module Cli = struct
       kernel_execution;
       sequencer = sequencer_config_dft ();
       observer;
-      proxy = default_proxy ();
       gcp_kms = default_gcp_kms;
       keep_alive = false;
       rollup_node_endpoint = default_rollup_node_endpoint;
@@ -2078,8 +2078,8 @@ module Cli = struct
       ?sequencer_keys ?evm_node_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?history_mode
-      ?dal_slots ?sunset_sec ?rpc_timeout configuration =
+      ?restricted_rpcs ?finalized_view ?history_mode ?dal_slots ?sunset_sec
+      ?rpc_timeout ?fail_on_divergence configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -2183,6 +2183,10 @@ module Cli = struct
                   value
                     ~default:observer_config.rollup_node_tracking
                     (map not dont_track_rollup_node));
+              fail_on_divergence =
+                Option.value
+                  ~default:observer_config.fail_on_divergence
+                  fail_on_divergence;
             }
       | None ->
           Option.map
@@ -2192,19 +2196,6 @@ module Cli = struct
                 ?rollup_node_tracking:(Option.map not dont_track_rollup_node)
                 ())
             evm_node_endpoint
-    in
-    let proxy =
-      {
-        evm_node_endpoint =
-          Option.either evm_node_endpoint configuration.proxy.evm_node_endpoint;
-        ignore_block_param =
-          Option.value
-            ~default:configuration.proxy.ignore_block_param
-            proxy_ignore_block_param;
-        finalized_view =
-          (if finalized_view then Some true
-           else configuration.proxy.finalized_view);
-      }
     in
     let log_filter =
       {
@@ -2267,7 +2258,6 @@ module Cli = struct
       kernel_execution;
       sequencer;
       observer;
-      proxy;
       gcp_kms = configuration.gcp_kms;
       keep_alive = configuration.keep_alive || keep_alive;
       rollup_node_endpoint;
@@ -2291,9 +2281,8 @@ module Cli = struct
       ?private_rpc_port ?sequencer_keys ?evm_node_endpoint
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode ?sunset_sec
-      ?rpc_timeout () =
+      ?catchup_cooldown ?restricted_rpcs ?finalized_view ?dal_slots ?network
+      ?history_mode ?sunset_sec ?rpc_timeout ?fail_on_divergence () =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
          ~data_dir
@@ -2328,11 +2317,11 @@ module Cli = struct
          ?catchup_cooldown
          ?restricted_rpcs
          ?finalized_view
-         ?proxy_ignore_block_param
          ?dal_slots
          ?history_mode
          ?sunset_sec
          ?rpc_timeout
+         ?fail_on_divergence
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?enable_websocket ?tx_queue_max_lifespan
@@ -2343,8 +2332,8 @@ module Cli = struct
       ?sequencer_keys ?evm_node_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?dal_slots
-      ?network ?history_mode ?sunset_sec ?rpc_timeout config_file =
+      ?restricted_rpcs ?finalized_view ?dal_slots ?network ?history_mode
+      ?sunset_sec ?rpc_timeout ?fail_on_divergence config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -2400,11 +2389,11 @@ module Cli = struct
           ?log_filter_chunk_size
           ?restricted_rpcs
           ?finalized_view
-          ?proxy_ignore_block_param
           ?history_mode
           ?dal_slots
           ?sunset_sec
           ?rpc_timeout
+          ?fail_on_divergence
           configuration
       in
       return configuration
@@ -2443,12 +2432,12 @@ module Cli = struct
           ?log_filter_chunk_size
           ?restricted_rpcs
           ?finalized_view
-          ?proxy_ignore_block_param
           ?dal_slots
           ?network
           ?history_mode
           ?sunset_sec
           ?rpc_timeout
+          ?fail_on_divergence
           ()
       in
       return config

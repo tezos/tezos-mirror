@@ -95,9 +95,9 @@ module type Dal = sig
 
   val producer_machine_type : string option
 
-  val observer_slot_indices : int list
+  val observers_slot_indices : int list list
 
-  val observers_multi_slot_indices : int list list
+  val observer_machine_type : string list
 
   val archivers_slot_indices : int list list
 
@@ -159,9 +159,15 @@ module type Dal = sig
 
   val attestation_lag : int option
 
+  val attestation_lags : int list option
+
   val config : Scenarios_configuration.DAL.t
 
   val traps_fraction : Q.t option
+
+  val publish_slots_regularly : bool
+
+  val stresstest : Stresstest.t option
 end
 
 module Dal () : Dal = struct
@@ -386,28 +392,40 @@ module Dal () : Dal = struct
     in
     Option.fold ~none:config.producer_machine_type ~some:Option.some from_cli
 
-  let observer_slot_indices =
-    config.observer_slot_indices
+  let observers_slot_indices =
+    config.observers_slot_indices
     @ Clap.default
         ~section
-        ~long:"observer-slot-indices"
-        ~placeholder:"<slot_index>,<slot_index>,<slot_index>, ..."
-        ~description:
-          "For each slot index specified, an observer will be created to \
-           observe this slot index."
-        (Clap.list_of_int "observer_slot_indices")
-        []
-
-  let observers_multi_slot_indices =
-    config.observers_multi_slot_indices
-    @ Clap.default
-        ~section
-        ~long:"observers-multi-slot-indices"
+        ~long:"observers-slot-indices"
         ~placeholder:"[<slot_index>;..],[<slot_index>;...],..."
         ~description:
-          "For each list of slots, an observer will be created to observe them."
-        (Clap.list_of_list_of_int "observer_multi_slot_indices")
+          "For each list of slots, an observer will be created to observe \
+           them. Note that one can mix the following syntax:\n\
+           <slot_index>,[<slot_index>], [<slot_index>;...]"
+        (Clap.list_of_list_of_int "observer_slot_indices")
         []
+
+  let observer_machine_type =
+    let observer_machine_type_typ =
+      Clap.list ~name:"observer_machine_type" ~dummy:["foo"] Fun.id Fun.id
+    in
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"observer-machine-type"
+        ~placeholder:"<machine_type>,<machine_type>,<machine_type>, ..."
+        ~description:
+          "Specify the machine type used by an observer. The nth machine type \
+           will be assigned to the nth observer specified with \
+           [--observer_slot_indices] or [--observers_multi_slot_indices]. If \
+           less machine types are specified, the default one (or the one \
+           specified by --machine-type) will be used.\n\
+           Note that observers from [--observer_slot_indices] argument will be \
+           mapped to the machine type first."
+        observer_machine_type_typ
+        ()
+    in
+    Option.fold ~none:config.observer_machine_type ~some:Fun.id from_cli
 
   let archivers_slot_indices =
     config.archivers_slot_indices
@@ -760,11 +778,28 @@ module Dal () : Dal = struct
         ~section
         ~long:"attestation-lag"
         ~description:
-          "Attestation lag - the number of L1 blocks between a slot's \
-           publication and its attestation."
+          "Set the `attestation_lag` protocol parameter -- the number of L1 \
+           blocks between a slot's publication and its attestation. This is \
+           equivalent to the maximum of --attestation-lags. If \
+           --attestation-lags is also provided, then it takes precedence. For \
+           protocols that do not support multiple lags, only this parameter is \
+           used."
         ()
     in
     Option.fold ~none:config.attestation_lag ~some:Option.some from_cli
+
+  let attestation_lags =
+    let from_cli =
+      Clap.list_int
+        ~section
+        ~long:"attestation-lags"
+        ~description:
+          "Set the `attestation_lags` protocol parameter (from protocol U \
+           onwards). For protocols that do not support multiple lags, this \
+           parameter is ignored."
+        ()
+    in
+    match from_cli with [] -> config.attestation_lags | lags -> Some lags
 
   let traps_fraction =
     let typ =
@@ -785,6 +820,28 @@ module Dal () : Dal = struct
         ()
     in
     Option.fold ~none:config.traps_fraction ~some:Option.some from_cli
+
+  let publish_slots_regularly =
+    Clap.flag
+      ~section
+      ~set_long:"publish-slots-regularly"
+      ~description:
+        "Let the DAL node handle autonomously (i.e without orchestration) the \
+         publication of slots at a regular frequency"
+      config.publish_slots_regularly
+
+  let stresstest =
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"stresstest"
+        ~description:
+          "Stresstest the L1 network with TPS operations (transfers) per \
+           second. One can also provide a seed with the syntax TPS/SEED"
+        Stresstest.typ
+        ()
+    in
+    Option.fold ~none:config.stresstest ~some:Option.some from_cli
 end
 
 module type Layer1 = sig
@@ -796,7 +853,7 @@ module type Layer1 = sig
 
   val maintenance_delay : int
 
-  val migration_offset : int option
+  val migration : Protocol_migration.t option
 
   val signing_delay : (float * float) option
 
@@ -971,20 +1028,25 @@ module Layer1 () = struct
            default_maintenance_delay)
       (Option.value ~default:default_maintenance_delay from_config)
 
-  let migration_offset =
+  let migration =
     let from_cli =
-      Clap.optional_int
+      Clap.optional
         ~section
-        ~long:"migration-offset"
+        ~long:"protocol-migration"
         ~description:
-          "After how many levels we will perform a UAU to upgrade to the next \
-           protocol."
+          "With Cycle_offset 0, a migration to the next protocol will be set \
+           and done at the end of the current cycle. With Cycle_offset \
+           <target>, the migration will be done at the end of the target \
+           cycle. With Level_offset <n>, the migration will be done after the \
+           level n."
+        ~placeholder:"Cycle_offset 0|Cycle_offset <n>|Level_offset <n>"
+        Protocol_migration.typ
         ()
     in
     let from_config =
       Option.fold
         ~none:None
-        ~some:(fun (c : Scenarios_configuration.LAYER1.t) -> c.migration_offset)
+        ~some:(fun (c : Scenarios_configuration.LAYER1.t) -> c.migration)
         config
     in
     Option.fold ~none:from_config ~some:Option.some from_cli
@@ -1171,6 +1233,28 @@ module type Tezlink = sig
   val activate_ssl : bool
 
   val parent_dns_domain : string option
+
+  val external_sequencer_endpoint : string option
+
+  val deposit_frontend : bool
+
+  val bridge_contract : string option
+
+  val rollup_address : string option
+
+  val l1_network : string option
+
+  val l1_endpoint : string option
+
+  val l1_tzkt_api : string option
+
+  val faucet_private_key : string option
+
+  val umami : bool
+
+  val external_tzkt : string option
+
+  val external_tzkt_api : string option
 end
 
 module Tezlink () : Tezlink = struct
@@ -1276,6 +1360,97 @@ module Tezlink () : Tezlink = struct
          services as subdomains of this parent domain. However, all used \
          domains need to be registered with the dns-domain option."
       ()
+
+  let external_sequencer_endpoint =
+    Clap.optional_string
+      ~section
+      ~long:"external-sequencer-endpoint"
+      ~description:
+        "Don't run a sequencer and instead have services point to an external \
+         one"
+      ()
+
+  let deposit_frontend =
+    Clap.flag
+      ~section
+      ~set_long:"deposit-frontend"
+      ~unset_long:"no-deposit-frontend"
+      ~description:
+        "Run the deposit frontend for Tezlink (requires tzkt and \
+         external-sequencer-endpoint on a non sandbox Tezlink)"
+      false
+
+  let l1_endpoint =
+    Clap.optional_string
+      ~section
+      ~long:"l1-endpoint"
+      ~description:"The L1 endpoint on which the Tezlink rollup is running"
+      ()
+
+  let l1_network =
+    Clap.optional_string
+      ~section
+      ~long:"l1-network"
+      ~description:"The L1 network on which the Tezlink rollup is running"
+      ()
+
+  let bridge_contract =
+    Clap.optional_string
+      ~section
+      ~long:"bridge-contract"
+      ~description:
+        "The bridge contract that will be called by the Tezlink frontend \
+         deposit"
+      ()
+
+  let rollup_address =
+    Clap.optional_string
+      ~section
+      ~long:"rollup-address"
+      ~description:"The address of the Tezlink rollup originated on l1_endpoint"
+      ()
+
+  let l1_tzkt_api =
+    Clap.optional_string
+      ~section
+      ~long:"l1-tzkt-api"
+      ~description:
+        "The url of the tzkt api for the Layer 1 chain on which Tezlink is \
+         running"
+      ()
+
+  let faucet_private_key =
+    Clap.optional_string
+      ~section
+      ~long:"faucet-private-key"
+      ~description:
+        "Set the private key used for the faucet account (requires --faucet)"
+      ()
+
+  let umami =
+    Clap.flag
+      ~section
+      ~set_long:"umami"
+      ~unset_long:"no-umami"
+      ~description:"Run an Umami v2 instance (requires --tzkt)"
+      false
+
+  let external_tzkt =
+    Clap.optional_string
+      ~section
+      ~long:"external-tzkt"
+      ~description:
+        "Point to a specific TzKT explorer in the faucet and Umami when \
+         browsing injected operations"
+      ()
+
+  let external_tzkt_api =
+    Clap.optional_string
+      ~section
+      ~long:"external-tzkt-api"
+      ~description:
+        "Don't run TzKT and instead have services point to an external API"
+      ()
 end
 
 module type Etherlink = sig
@@ -1284,6 +1459,14 @@ module type Etherlink = sig
   val network : string option
 
   val evm_node_version : [`Latest | `V of string]
+
+  val gen_report : bool
+
+  val report_path : string
+
+  val datadog_export : bool
+
+  val datadog_sample_period : float
 
   include Etherlink_benchmark_lib.Benchmark_utils.PARAMETERS
 end
@@ -1337,6 +1520,55 @@ module Etherlink () : Etherlink = struct
       ~description:"Choose the EVM node version to use for the benchmark"
       ~placeholder:"<latest|vX.Y>"
       `Latest
+
+  let gen_report =
+    Clap.flag
+      ~section
+      ~set_long:"gen-report"
+      ~unset_long:"no-gen-report"
+      ~description:
+        "Save benchmark result in csv file in current directory and generate a \
+         graphical report."
+      false
+
+  let report_path =
+    Clap.default_string
+      ~section
+      ~long:"report-path"
+      ~description:"Path in which to generate reports"
+      ~placeholder:"<path>"
+      "."
+
+  let datadog_export =
+    Clap.flag
+      ~section
+      ~set_long:"datadog-export"
+      ~unset_long:"no-datadog-export"
+      ~description:
+        "Export capacity result to datadog. Environment variable DD_API_KEY \
+         must be set."
+      false
+
+  let () =
+    if
+      datadog_export
+      && Option.is_none (Sys.getenv_opt "DD_API_KEY")
+      && Option.is_none (Sys.getenv_opt "DATADOG_API_KEY")
+    then
+      failwith
+        "Environment variable DD_API_KEY or DATADOG_API_KEY must be set when \
+         using --datadog-export."
+
+  let datadog_sample_period =
+    Clap.default_int
+      ~section
+      ~long:"datadog-sample-period"
+      ~description:
+        "Number of seconds for the sampling period for metrics to send to \
+         datadog"
+      ~placeholder:"<sec>"
+      5
+    |> float_of_int
 
   include Etherlink_benchmark_lib.Benchmark_utils.Parameters ()
 end

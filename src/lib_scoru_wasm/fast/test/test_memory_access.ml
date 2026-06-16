@@ -93,6 +93,21 @@ let test_store_bytes =
         (fun mem -> Memory_access_slow.store_bytes mem address data)
         (fun mem -> Memory_access_fast.store_bytes mem address data))
 
+let test_store_bytes_from_bytes =
+  let open Gen in
+  let open QCheck2.Gen in
+  QCheck2.Test.make
+    ~count:50
+    ~name:
+      "store_bytes_from_bytes behaves the same on both memory implementations"
+    (triple mem_content mem_address string)
+    (fun (memory, address, data) ->
+      let data = Bytes.of_string data in
+      are_equivalent
+        memory
+        (fun mem -> Memory_access_slow.store_bytes_from_bytes mem address data)
+        (fun mem -> Memory_access_fast.store_bytes_from_bytes mem address data))
+
 let test_load_bytes =
   let open Gen in
   let open QCheck2.Gen in
@@ -127,7 +142,12 @@ let test_store_num =
 let tests : unit Alcotest_lwt.test_case list =
   List.map
     Qcheck_helpers.to_alcotest_lwt
-    [test_store_bytes; test_load_bytes; test_store_num]
+    [
+      test_store_bytes;
+      test_store_bytes_from_bytes;
+      test_load_bytes;
+      test_store_num;
+    ]
 
 let () =
   Alcotest_lwt.run

@@ -18,7 +18,8 @@
 use crate::StorageError;
 use core::marker::PhantomData;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path};
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
+use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
+use tezos_smart_rollup_host::storage::StorageV1;
 
 pub(crate) struct Layer<T: From<OwnedPath>> {
     pub(crate) path: OwnedPath,
@@ -56,7 +57,7 @@ impl<T: From<OwnedPath>> Layer<T> {
     /// responsability of the caller to do so.
     pub(crate) fn force_make_copy(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         name: &impl Path,
     ) -> Result<Self, StorageError> {
         let copy = Self {
@@ -77,7 +78,7 @@ impl<T: From<OwnedPath>> Layer<T> {
     /// [make_copy] function.
     pub(crate) fn consume(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         layer: Layer<T>,
     ) -> Result<(), StorageError> {
         if let Ok(Some(_)) = host.store_has(&layer.path) {
@@ -100,7 +101,7 @@ impl<T: From<OwnedPath>> Layer<T> {
     /// when the object does so.
     pub(crate) fn create_new(
         &mut self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
         id: &impl Path,
     ) -> Result<Option<T>, StorageError> {
         let account_path = concat(&self.path, id)?;
@@ -118,7 +119,7 @@ impl<T: From<OwnedPath>> Layer<T> {
     /// that there is some data in durable storage for the object in this layer.
     pub(crate) fn get(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
         id: &impl Path,
     ) -> Result<Option<T>, StorageError> {
         let account_path = concat(&self.path, id)?;
@@ -136,7 +137,7 @@ impl<T: From<OwnedPath>> Layer<T> {
     /// instead. (Use case).
     pub(crate) fn get_or_create(
         &self,
-        _host: &impl Runtime,
+        _host: &impl StorageV1,
         id: &impl Path,
     ) -> Result<T, StorageError> {
         // We could get rid of the host parameter, but in the future, it would be nice
@@ -151,7 +152,7 @@ impl<T: From<OwnedPath>> Layer<T> {
     /// storage.
     pub(crate) fn delete(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         id: &impl Path,
     ) -> Result<(), StorageError> {
         let account_path = concat(&self.path, id)?;
@@ -163,7 +164,7 @@ impl<T: From<OwnedPath>> Layer<T> {
     ///
     /// Discard the current/self layer. This is the same as cancelling the
     /// current transaction.
-    pub(crate) fn discard(self, host: &mut impl Runtime) -> Result<(), StorageError> {
+    pub(crate) fn discard(self, host: &mut impl StorageV1) -> Result<(), StorageError> {
         if let Ok(Some(_)) = host.store_has(&self.path) {
             host.store_delete(&self.path).map_err(StorageError::from)
         } else {

@@ -230,11 +230,7 @@ let get_attested_data_default_store_period t proto_parameters =
                just in case (finalisation period, off by one, attestation_lag,
                refutation games reset after a protocol upgrade, ...). *)
             2 * get_refutation_game_period proto_parameters
-          else
-            (* For observability purpose, we aim for a non-slot operator profile
-               to keep shards for about 10 minutes. 150 blocks is 10 minutes on
-               Ghostnet, 20 minutes on Mainnet. *)
-            150
+          else Constants.shard_retention_period_in_levels
         in
         (has_operator, period)
     | Bootstrap ->

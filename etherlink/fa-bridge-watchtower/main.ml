@@ -237,10 +237,13 @@ let dispatch args =
 let handle_error = function
   | Ok _ -> ()
   | Error [Tezos_clic.Version] ->
-      Format.printf
-        "fa-bridge-watchtower.%s (%s)@."
-        Tezos_version_value.Current_git_info.abbreviated_commit_hash
-        Tezos_version_value.Current_git_info.committer_date ;
+      let evm_node_version =
+        (* reuse octez evm node version, this is a small hack because
+           we need a version so we can add this bin into
+           `experimental` *)
+        Tezos_version_value.Bin_version.octez_evm_node_version_string
+      in
+      Format.printf "%s\n" evm_node_version ;
       exit 0
   | Error [Tezos_clic.Help command] ->
       Tezos_clic.usage

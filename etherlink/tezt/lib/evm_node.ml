@@ -28,9 +28,17 @@
 
 type time_between_blocks = Nothing | Time_between_blocks of float
 
-type history_mode = Archive | Rolling of int | Full of int
+type history_mode = Archive | Rolling of int | Full of int | Seed of int
 
 type tez_contract = {address : string; path : string; initial_storage : string}
+
+(** Configuration shared by Sequencer, Sandbox, and Tezlink_sandbox modes. *)
+type sequencer_config = {
+  time_between_blocks : time_between_blocks option;
+  genesis_timestamp : Client.timestamp option;
+  max_number_of_chunks : int option;
+  wallet_dir : string option;
+}
 
 type l2_setup = {
   l2_chain_id : int;
@@ -41,8 +49,10 @@ type l2_setup = {
   tez_bootstrap_contracts : tez_contract list option;
   sequencer_pool_address : string option;
   minimum_base_fee_per_gas : Wei.t option;
+  michelson_to_evm_gas_multiplier : int64 option;
   da_fee_per_byte : Wei.t option;
   maximum_gas_per_transaction : int64 option;
+  michelson_runtime_chain_id : string option;
 }
 
 let eth_default_bootstrap_accounts =
@@ -62,70 +72,171 @@ let default_l2_setup ~l2_chain_id =
     tez_bootstrap_contracts = None;
     sequencer_pool_address = None;
     minimum_base_fee_per_gas = None;
+    michelson_to_evm_gas_multiplier = None;
     da_fee_per_byte = None;
     maximum_gas_per_transaction = None;
+    michelson_runtime_chain_id = None;
   }
 
 type mode =
   | Observer of {
-      initial_kernel : string option;
-      preimages_dir : string option;
-      private_rpc_port : int option;
       rollup_node_endpoint : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
+      evm_node_endpoint : string;
     }
   | Sequencer of {
-      initial_kernel : string;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
+      rollup_node_endpoint : string;
+      sequencer_config : sequencer_config;
       sequencer_keys : string list;
-      genesis_timestamp : Client.timestamp option;
       max_blueprints_lag : int option;
       max_blueprints_ahead : int option;
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
       dal_slots : int list option;
       sequencer_sunset_sec : int option;
     }
   | Sandbox of {
-      initial_kernel : string option;
+      sequencer_config : sequencer_config;
       network : string option;
       funded_addresses : string list;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
-      genesis_timestamp : Client.timestamp option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
       sequencer_keys : string list;
     }
   | Tezlink_sandbox of {
-      initial_kernel : string;
+      sequencer_config : sequencer_config;
       funded_addresses : string list;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
-      genesis_timestamp : Client.timestamp option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
       verbose : bool;
     }
-  | Proxy
   | Rpc of mode
+
+type node_setup = {
+  path : string;
+  name : string;
+  runner : Runner.t option;
+  history_mode : history_mode option;
+  data_dir : string option;
+  config_file : string option;
+  rpc_addr : string option;
+  rpc_port : int;
+  restricted_rpcs : string option;
+  spawn_rpc : int option;
+  websockets : bool;
+  initial_kernel : string option;
+  preimages_dir : string option;
+  private_rpc_port : int option;
+  tx_queue_max_lifespan : int option;
+  tx_queue_max_size : int option;
+  tx_queue_tx_per_addr_limit : int option;
+}
+
+type kernel_setup = {
+  kernel : Kernel.t;
+  l2_chain_ids : int list option;
+  max_delayed_inbox_blueprint_length : int option;
+  kernel_compat : string option;
+  remove_whitelist : bool option;
+  kernel_root_hash : string option;
+  chain_id : int option;
+  eth_bootstrap_balance : Wei.t option;
+  eth_bootstrap_accounts : string list option;
+  tez_bootstrap_balance : Tez.t option;
+  tez_bootstrap_accounts : Account.key list option;
+  tez_bootstrap_contracts : string list option;
+  sequencer : string option;
+  delayed_bridge : string option;
+  ticketer : string option;
+  administrator : string option;
+  sequencer_governance : string option;
+  kernel_governance : string option;
+  kernel_security_governance : string option;
+  minimum_base_fee_per_gas : Wei.t option;
+  michelson_to_evm_gas_multiplier : int64 option;
+  da_fee_per_byte : Wei.t option;
+  delayed_inbox_timeout : int option;
+  delayed_inbox_min_levels : int option;
+  sequencer_pool_address : string option;
+  maximum_allowed_ticks : int64 option;
+  maximum_gas_per_transaction : int64 option;
+  max_blueprint_lookahead_in_seconds : int64 option;
+  set_account_code : (string * string) list option;
+  enable_fa_bridge : bool option;
+  enable_revm : bool option;
+  enable_dal : bool option;
+  dal_slots : int list option;
+  dal_publishers_whitelist : string list option;
+  disable_legacy_dal_signals : bool option;
+  enable_fast_withdrawal : bool option;
+  enable_fast_fa_withdrawal : bool option;
+  enable_michelson_gas_refund : bool option;
+  evm_version : Evm_version.t option;
+  with_runtimes : Tezosx_runtime.t list option;
+  michelson_runtime_chain_id : string option;
+}
+
+let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
+    ?kernel_compat ?remove_whitelist ?kernel_root_hash ?chain_id
+    ?eth_bootstrap_balance
+    ?(eth_bootstrap_accounts = eth_default_bootstrap_accounts)
+    ?tez_bootstrap_balance ?tez_bootstrap_accounts ?tez_bootstrap_contracts
+    ?sequencer ?delayed_bridge ?ticketer ?administrator ?sequencer_governance
+    ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
+    ?michelson_to_evm_gas_multiplier ?da_fee_per_byte ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?set_account_code ?enable_fa_bridge ?enable_revm ?enable_dal ?dal_slots
+    ?dal_publishers_whitelist ?disable_legacy_dal_signals
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?enable_michelson_gas_refund ?evm_version ?with_runtimes
+    ?michelson_runtime_chain_id () =
+  let tez_bootstrap_accounts =
+    match tez_bootstrap_accounts with
+    | Some _ -> tez_bootstrap_accounts
+    | None ->
+        if Tezosx_runtime.(mem Tezos with_runtimes) then
+          Some tez_default_bootstrap_accounts
+        else Some []
+  in
+  {
+    kernel = Option.value ~default:Kernel.Latest kernel;
+    l2_chain_ids;
+    max_delayed_inbox_blueprint_length;
+    kernel_compat;
+    remove_whitelist;
+    kernel_root_hash;
+    chain_id;
+    eth_bootstrap_balance;
+    eth_bootstrap_accounts = Some eth_bootstrap_accounts;
+    tez_bootstrap_balance;
+    tez_bootstrap_accounts;
+    tez_bootstrap_contracts;
+    sequencer;
+    delayed_bridge;
+    ticketer;
+    administrator;
+    sequencer_governance;
+    kernel_governance;
+    kernel_security_governance;
+    minimum_base_fee_per_gas;
+    michelson_to_evm_gas_multiplier;
+    da_fee_per_byte;
+    delayed_inbox_timeout;
+    delayed_inbox_min_levels;
+    sequencer_pool_address;
+    maximum_allowed_ticks;
+    maximum_gas_per_transaction;
+    max_blueprint_lookahead_in_seconds;
+    set_account_code;
+    enable_fa_bridge;
+    enable_revm;
+    enable_dal;
+    dal_slots;
+    dal_publishers_whitelist;
+    disable_legacy_dal_signals;
+    enable_fast_withdrawal;
+    enable_fast_fa_withdrawal;
+    enable_michelson_gas_refund;
+    evm_version;
+    with_runtimes;
+    michelson_runtime_chain_id;
+  }
 
 module Per_level_map = Map.Make (Int)
 
@@ -150,10 +261,15 @@ module Parameters = struct
     rpc_addr : string;
     rpc_port : int;
     websockets : bool;
-    endpoint : string;
     runner : Runner.t option;
     restricted_rpcs : string option;
     spawn_rpc : int option;
+    initial_kernel : string option;
+    preimages_dir : string option;
+    private_rpc_port : int option;
+    tx_queue_max_lifespan : int option;
+    tx_queue_max_size : int option;
+    tx_queue_tx_per_addr_limit : int option;
   }
 
   type session_state = {mutable ready : bool}
@@ -171,28 +287,19 @@ let mode t = t.persistent_state.mode
 let is_sequencer t =
   match t.persistent_state.mode with
   | Sequencer _ | Sandbox _ | Tezlink_sandbox _ -> true
-  | Observer _ | Proxy | Rpc _ -> false
+  | Observer _ | Rpc _ -> false
 
 let is_observer t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Proxy | Rpc _ -> false
+  | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Rpc _ -> false
   | Observer _ -> true
 
-let initial_kernel t =
-  let rec from_mode = function
-    | Sandbox {initial_kernel; _} | Observer {initial_kernel; _} ->
-        initial_kernel
-    | Tezlink_sandbox {initial_kernel; _} | Sequencer {initial_kernel; _} ->
-        Some initial_kernel
-    | Rpc mode -> from_mode mode
-    | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
-  in
-  from_mode t.persistent_state.mode
+let initial_kernel t = t.persistent_state.initial_kernel
 
 let can_apply_blueprint t =
   match t.persistent_state.mode with
   | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Observer _ -> true
-  | Proxy | Rpc _ -> false
+  | Rpc _ -> false
 
 let connection_arguments ?rpc_addr ?rpc_port ?runner () =
   let rpc_port =
@@ -471,6 +578,10 @@ let wait_for_spawn_rpc_ready ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"spawn_rpc_is_ready.v0"
   @@ Fun.const (Some ())
 
+let wait_for_drift_monitor_ready ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"drift_monitor_is_ready.v0"
+  @@ Fun.const (Some ())
+
 let wait_for_import_finished ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"import_finished.v0"
   @@ Fun.const (Some ())
@@ -498,12 +609,24 @@ let wait_for_retrying_connect ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"retrying_connect.v0"
   @@ Fun.const (Some ())
 
-type delayed_transaction_kind = Deposit | Transaction | FaDeposit
+let wait_for_connection_acquired ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"connection_acquired.v0"
+  @@ Fun.const (Some ())
+
+let wait_for_trying_reconnection ?timeout evm_node =
+  wait_for_event
+    ?timeout
+    evm_node
+    ~event:"rollup_node_follower_trying_reconnection.v0"
+  @@ Fun.const (Some ())
+
+type delayed_transaction_kind = Deposit | Transaction | FaDeposit | Operation
 
 let delayed_transaction_kind_of_string = function
   | "transaction" -> Transaction
   | "deposit" -> Deposit
   | "fa_deposit" -> FaDeposit
+  | "operation" -> Operation
   | s -> Test.fail "%s is neither a transaction or deposit" s
 
 let wait_for_rollup_node_follower_connection_acquired ?timeout evm_node =
@@ -600,6 +723,12 @@ let wait_for_diverged evm_node =
   let found_hash = json |-> "found_hash" |> as_string in
   Some (level, expected_hash, found_hash)
 
+let wait_for_assemble_block_diverged ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"assemble_block_diverged.v0"
+  @@ fun json ->
+  let level = JSON.(json |> as_int) in
+  Some level
+
 let wait_for_reset evm_node =
   wait_for evm_node "evm_context_reset_at_level.v0" @@ fun _json -> Some ()
 
@@ -616,12 +745,24 @@ let wait_for_rollup_node_ahead evm_node =
   let level = json |> as_int in
   Some level
 
-let wait_for_tx_queue_add_transaction ?timeout evm_node =
+let wait_for_tx_queue_add_transaction ?timeout ?hash evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_add_transaction.v0"
-  @@ fun json -> JSON.(json |> as_string |> Option.some)
+  @@ fun json ->
+  let found_hash = JSON.(json |> as_string) in
+  match hash with
+  | Some hash -> if found_hash = hash then Some found_hash else None
+  | None -> Some found_hash
 
 let wait_for_tx_queue_transaction_confirmed ?timeout ?hash evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_transaction_confirmed.v0"
+  @@ fun json ->
+  let found_hash = JSON.(json |> as_string) in
+  match hash with
+  | Some hash -> if found_hash = hash then Some found_hash else None
+  | None -> Some found_hash
+
+let wait_for_tx_queue_transaction_dropped ?timeout ?hash evm_node =
+  wait_for_event ?timeout evm_node ~event:"tx_queue_transaction_dropped.v0"
   @@ fun json ->
   let found_hash = JSON.(json |> as_string) in
   match hash with
@@ -714,132 +855,85 @@ let wait_for_blueprint_injection_failure ?timeout ?level evm_node =
       if json |-> "level" |> as_int = expected_level then Some () else None
   | None -> Some ()
 
-let wait_for_next_block_timestamp ?timeout evm_node =
-  wait_for_event ?timeout evm_node ~event:"next_block_timestamp.v0"
+let wait_for_next_block_info ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"next_block_info.v0" @@ fun json ->
+  Some JSON.(json |-> "timestamp" |> as_string)
+
+let wait_for_ic_reset ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"evm_context_ic_reset.v0"
+  @@ fun _json -> Some ()
+
+let wait_for_ic_reset_unexpected_level ?timeout evm_node =
+  wait_for_event
+    ?timeout
+    evm_node
+    ~event:"evm_context_ic_reset_unexpected_level.v0"
+  @@ fun _json -> Some ()
+
+let wait_for_ic_execute_skipped ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"evm_context_ic_execute_skipped.v0"
+  @@ fun _json -> Some ()
+
+let wait_for_inclusion ?timeout ?hash evm_node =
+  wait_for_event ?timeout evm_node ~event:"inclusion.v0" @@ fun json ->
+  let found_hash = JSON.(json |-> "txn_hash" |> as_string) in
+  match hash with
+  | Some expected_hash ->
+      if String.equal expected_hash found_hash then Some found_hash else None
+  | None -> Some found_hash
+
+let wait_for_single_tx_execution_done ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"single_tx_execution_done.v0"
   @@ fun json -> Some (JSON.as_string json)
 
-let wait_for_inclusion ?timeout evm_node =
-  wait_for_event ?timeout evm_node ~event:"inclusion.v0" @@ fun json ->
-  Some (JSON.as_string json)
+let make_setup ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
+    ?history_mode ?data_dir ?config_file ?rpc_addr ?rpc_port ?restricted_rpcs
+    ?spawn_rpc ?(websockets = false) ?initial_kernel ?preimages_dir
+    ?(private_rpc_port = Port.fresh ()) ?tx_queue_max_lifespan
+    ?tx_queue_max_size ?tx_queue_tx_per_addr_limit () =
+  let rpc_port = Option.value ~default:(Port.fresh ()) rpc_port in
+  let name = Option.value ~default:(fresh_name ()) name in
+  {
+    path;
+    name;
+    runner;
+    history_mode;
+    data_dir;
+    config_file;
+    rpc_addr;
+    rpc_port;
+    restricted_rpcs;
+    spawn_rpc;
+    websockets;
+    initial_kernel;
+    preimages_dir;
+    private_rpc_port = Some private_rpc_port;
+    tx_queue_max_lifespan;
+    tx_queue_max_size;
+    tx_queue_tx_per_addr_limit;
+  }
 
-let mode_with_new_private_rpc (mode : mode) =
-  match mode with
-  | Observer
-      {
-        initial_kernel;
-        preimages_dir;
-        private_rpc_port = Some _;
-        rollup_node_endpoint;
-        tx_queue_max_lifespan;
-        tx_queue_max_size;
-        tx_queue_tx_per_addr_limit;
-      } ->
-      Observer
-        {
-          initial_kernel;
-          preimages_dir;
-          private_rpc_port = Some (Port.fresh ());
-          rollup_node_endpoint;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-        }
-  | Sequencer
-      {
-        initial_kernel;
-        preimage_dir;
-        private_rpc_port = Some _;
-        time_between_blocks;
-        sequencer_keys;
-        genesis_timestamp;
-        max_blueprints_lag;
-        max_blueprints_ahead;
-        max_blueprints_catchup;
-        catchup_cooldown;
-        max_number_of_chunks;
-        wallet_dir;
-        tx_queue_max_lifespan;
-        tx_queue_max_size;
-        tx_queue_tx_per_addr_limit;
-        dal_slots;
-        sequencer_sunset_sec;
-      } ->
-      Sequencer
-        {
-          initial_kernel;
-          preimage_dir;
-          private_rpc_port = Some (Port.fresh ());
-          time_between_blocks;
-          sequencer_keys;
-          genesis_timestamp;
-          max_blueprints_lag;
-          max_blueprints_ahead;
-          max_blueprints_catchup;
-          catchup_cooldown;
-          max_number_of_chunks;
-          wallet_dir;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-          dal_slots;
-          sequencer_sunset_sec;
-        }
-  | Sandbox
-      {
-        initial_kernel;
-        network;
-        preimage_dir;
-        private_rpc_port = Some _;
-        time_between_blocks;
-        genesis_timestamp;
-        max_number_of_chunks;
-        wallet_dir;
-        funded_addresses;
-        tx_queue_max_lifespan;
-        tx_queue_max_size;
-        tx_queue_tx_per_addr_limit;
-        sequencer_keys;
-      } ->
-      Sandbox
-        {
-          initial_kernel;
-          network;
-          preimage_dir;
-          private_rpc_port = Some (Port.fresh ());
-          time_between_blocks;
-          genesis_timestamp;
-          max_number_of_chunks;
-          wallet_dir;
-          funded_addresses;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-          sequencer_keys;
-        }
-  | _ -> mode
-
-let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy) ?history ?data_dir ?config_file ?rpc_addr ?rpc_port
-    ?restricted_rpcs ?spawn_rpc ?(websockets = false) endpoint =
+let create ?(node_setup = make_setup ()) ~mode () =
   let arguments, rpc_addr, rpc_port =
-    connection_arguments ?rpc_addr ?rpc_port ?runner ()
+    connection_arguments
+      ?rpc_addr:node_setup.rpc_addr
+      ~rpc_port:node_setup.rpc_port
+      ?runner:node_setup.runner
+      ()
   in
-  let new_name () =
+  let mode_prefix =
     match mode with
-    | Proxy -> "proxy_" ^ fresh_name ()
-    | Sequencer _ -> "sequencer_" ^ fresh_name ()
-    | Sandbox _ -> "sandbox_" ^ fresh_name ()
-    | Tezlink_sandbox _ -> "tezlink_sandbox_" ^ fresh_name ()
-    | Observer _ -> "observer_" ^ fresh_name ()
-    | Rpc _ -> "rpc_" ^ fresh_name ()
+    | Sequencer _ -> "sequencer_"
+    | Sandbox _ -> "sandbox_"
+    | Tezlink_sandbox _ -> "tezlink_sandbox_"
+    | Observer _ -> "observer_"
+    | Rpc _ -> "rpc_"
   in
-  let name = Option.value ~default:(new_name ()) name in
-  let data_dir =
-    match data_dir with None -> Temp.dir name | Some dir -> dir
-  in
+  let name = mode_prefix ^ node_setup.name in
+  let data_dir = Option.value ~default:(Temp.dir name) node_setup.data_dir in
   let evm_node =
     create
-      ~path
+      ~path:node_setup.path
       ~name
       {
         arguments;
@@ -851,16 +945,21 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         last_finalized_level = 0;
         pending_blueprint_finalized = Per_level_map.empty;
         mode;
-        history;
+        history = node_setup.history_mode;
         data_dir;
-        config_file;
+        config_file = node_setup.config_file;
         rpc_addr;
         rpc_port;
-        websockets;
-        endpoint;
-        restricted_rpcs;
-        runner;
-        spawn_rpc;
+        websockets = node_setup.websockets;
+        restricted_rpcs = node_setup.restricted_rpcs;
+        runner = node_setup.runner;
+        spawn_rpc = node_setup.spawn_rpc;
+        initial_kernel = node_setup.initial_kernel;
+        preimages_dir = node_setup.preimages_dir;
+        private_rpc_port = node_setup.private_rpc_port;
+        tx_queue_max_lifespan = node_setup.tx_queue_max_lifespan;
+        tx_queue_max_size = node_setup.tx_queue_max_size;
+        tx_queue_tx_per_addr_limit = node_setup.tx_queue_tx_per_addr_limit;
       }
   in
   evm_node
@@ -868,6 +967,8 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
 let name evm_node = evm_node.name
 
 let rpc_port evm_node = evm_node.persistent_state.rpc_port
+
+let private_rpc_port evm_node = evm_node.persistent_state.private_rpc_port
 
 let spawn_rpc evm_node = evm_node.persistent_state.spawn_rpc
 
@@ -896,27 +997,22 @@ let run_args evm_node =
     config_file_arg evm_node @ data_dir_arg evm_node
     @ evm_node.persistent_state.arguments
   in
+  let initial_kernel = evm_node.persistent_state.initial_kernel in
+  let sequencer_args {genesis_timestamp; wallet_dir; _} =
+    Cli_arg.optional_arg
+      "genesis-timestamp"
+      (fun timestamp ->
+        Client.time_of_timestamp timestamp |> Client.Time.to_notation)
+      genesis_timestamp
+    @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+  in
   let mode_args =
     match evm_node.persistent_state.mode with
-    | Proxy -> ["run"; "proxy"]
-    | Sequencer {initial_kernel; genesis_timestamp; wallet_dir; _} ->
-        ["run"; "sequencer"; "--initial-kernel"; initial_kernel]
-        @ Cli_arg.optional_arg
-            "genesis-timestamp"
-            (fun timestamp ->
-              Client.time_of_timestamp timestamp |> Client.Time.to_notation)
-            genesis_timestamp
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-    | Sandbox
-        {
-          initial_kernel;
-          network;
-          funded_addresses;
-          genesis_timestamp;
-          wallet_dir;
-          sequencer_keys;
-          _;
-        } ->
+    | Sequencer {sequencer_config; _} ->
+        ["run"; "sequencer"]
+        @ Cli_arg.optional_arg "initial-kernel" Fun.id initial_kernel
+        @ sequencer_args sequencer_config
+    | Sandbox {sequencer_config; network; funded_addresses; sequencer_keys} ->
         let sequencer_keys =
           List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
           |> List.flatten
@@ -925,44 +1021,28 @@ let run_args evm_node =
         @ Cli_arg.optional_arg "kernel" Fun.id initial_kernel
         @ Cli_arg.optional_arg "network" Fun.id network
         @ sequencer_keys
-        @ Cli_arg.optional_arg
-            "genesis-timestamp"
-            (fun timestamp ->
-              Client.time_of_timestamp timestamp |> Client.Time.to_notation)
-            genesis_timestamp
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+        @ sequencer_args sequencer_config
         @ fund_args funded_addresses
-    | Tezlink_sandbox
-        {
-          initial_kernel;
-          genesis_timestamp;
-          wallet_dir;
-          funded_addresses;
-          verbose;
-          _;
-        } ->
-        ["run"; "tezlink"; "sandbox"; "--kernel"; initial_kernel]
-        @ Cli_arg.optional_arg
-            "genesis-timestamp"
-            (fun timestamp ->
-              Client.time_of_timestamp timestamp |> Client.Time.to_notation)
-            genesis_timestamp
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+    | Tezlink_sandbox {sequencer_config; funded_addresses; verbose} ->
+        ["run"; "tezlink"; "sandbox"]
+        @ Cli_arg.optional_arg "kernel" Fun.id initial_kernel
+        @ sequencer_args sequencer_config
         @ fund_args funded_addresses
         @ Cli_arg.optional_switch "verbose" verbose
-    | Observer {initial_kernel; _} ->
+    | Observer _ ->
         ["run"; "observer"]
         @ Cli_arg.optional_arg "initial-kernel" Fun.id initial_kernel
     | Rpc _ -> ["experimental"; "run"; "rpc"]
   in
   mode_args @ shared_args
 
-let run ?(wait = true) ?(extra_arguments = []) evm_node =
+let run ?(wait = true) ?(end_test_on_failure = false) ?(extra_arguments = [])
+    evm_node =
   on_event evm_node (handle_is_ready_event evm_node) ;
   on_event evm_node (handle_blueprint_injected_event evm_node) ;
   on_event evm_node (handle_blueprint_applied_event evm_node) ;
   on_event evm_node (handle_blueprint_finalized_event evm_node) ;
-  let on_terminate _status =
+  let on_terminate (status : Unix.process_status) =
     (* Cancel all event listeners. *)
     trigger_ready evm_node None ;
     let pending_blueprint_injected =
@@ -989,7 +1069,10 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
       (fun _ pending_list ->
         List.iter (fun pending -> Lwt.wakeup_later pending None) pending_list)
       pending_blueprint_finalized ;
-    unit
+    match status with
+    | WEXITED 100 when end_test_on_failure ->
+        Test.fail "%s exited unexpectedly" evm_node.name
+    | _ -> unit
   in
   let env =
     match Sys.getenv_opt "RUST_LOG" with
@@ -1035,7 +1118,34 @@ let spawn_command evm_node args =
 let spawn_run ?(extra_arguments = []) evm_node =
   spawn_command evm_node (run_args evm_node @ extra_arguments)
 
+(** [update_or_create_json ~origin key f json] is equivalent to
+    [JSON.update key f json] but [json] can be [Null] in which case an
+    object is created *)
+let update_or_create_json ~origin key f json =
+  JSON.update
+    key
+    (fun json ->
+      let json =
+        if JSON.is_null json then JSON.annotate ~origin (`O []) else json
+      in
+      f json)
+    json
+
 module Config_file = struct
+  let json_put ~name value_json json =
+    JSON.put
+      (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
+      json
+
+  let conditional_json_put ~name cond value_json json =
+    if cond then json_put ~name value_json json else json
+
+  let conditional_json_put_default ~name cond value_json ~default json =
+    json_put ~name (if cond then value_json else default) json
+
+  let optional_json_put ~name v f json =
+    match v with None -> json | Some v -> json_put ~name (f v) json
+
   let filename evm_node =
     match evm_node.persistent_state.config_file with
     | Some config_file -> config_file
@@ -1067,6 +1177,18 @@ module Config_file = struct
     let* config = read node in
     let config = update config in
     write node config
+
+  let json_update_experimental_feature f config =
+    update_or_create_json
+      ~origin:"config_update"
+      "experimental_features"
+      f
+      config
+
+  let update_experimental_feature evm_node
+      (experimental_config_update : JSON.t -> JSON.t) =
+    update evm_node
+    @@ json_update_experimental_feature experimental_config_update
 end
 
 let spawn_init_config_minimal ?data_dir ?config_file
@@ -1078,59 +1200,72 @@ let spawn_init_config_minimal ?data_dir ?config_file
   @ extra_arguments
 
 let spawn_init_config ?(extra_arguments = []) evm_node =
+  let ps = evm_node.persistent_state in
   let shared_args =
-    data_dir_arg evm_node @ config_file_arg evm_node
-    @ evm_node.persistent_state.arguments
-    @ Cli_arg.optional_arg
-        "restricted-rpcs"
-        Fun.id
-        evm_node.persistent_state.restricted_rpcs
+    data_dir_arg evm_node @ config_file_arg evm_node @ ps.arguments
+    @ Cli_arg.optional_arg "restricted-rpcs" Fun.id ps.restricted_rpcs
     @ Cli_arg.optional_arg
         "history"
         (function
           | Archive -> "archive"
           | Rolling n -> sf "rolling:%d" n
-          | Full n -> sf "full:%d" n)
-        evm_node.persistent_state.history
-    @ Cli_arg.optional_switch "ws" evm_node.persistent_state.websockets
+          | Full n -> sf "full:%d" n
+          | Seed n -> sf "seed:%d" n)
+        ps.history
+    @ Cli_arg.optional_switch "ws" ps.websockets
+    @ Cli_arg.optional_arg "preimages-dir" Fun.id ps.preimages_dir
+    @ Cli_arg.optional_arg "private-rpc-port" string_of_int ps.private_rpc_port
+    @ Cli_arg.optional_arg
+        "tx-pool-timeout-limit"
+        string_of_int
+        ps.tx_queue_max_lifespan
+    @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int ps.tx_queue_max_size
+    @ Cli_arg.optional_arg
+        "tx-pool-tx-per-addr-limit"
+        string_of_int
+        ps.tx_queue_tx_per_addr_limit
   in
-
   let time_between_blocks_fmt = function
     | Nothing -> "none"
     | Time_between_blocks f -> Format.sprintf "%.3f" f
   in
+  (* Common args from sequencer_config *)
+  let sequencer_args {time_between_blocks; max_number_of_chunks; wallet_dir; _}
+      =
+    Cli_arg.optional_arg
+      "time-between-blocks"
+      time_between_blocks_fmt
+      time_between_blocks
+    @ Cli_arg.optional_arg
+        "max-number-of-chunks"
+        string_of_int
+        max_number_of_chunks
+    @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+  in
   let mode_args =
-    match evm_node.persistent_state.mode with
-    | Proxy -> ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
-    | Rpc _ -> []
+    match ps.mode with
+    | Rpc _ ->
+        Tezt.Test.fail
+          ~__LOC__
+          "An rpc node should not have a config initialisation"
     | Sequencer
         {
-          initial_kernel = _;
-          preimage_dir;
-          private_rpc_port;
-          time_between_blocks;
+          rollup_node_endpoint;
+          sequencer_config;
           sequencer_keys;
-          genesis_timestamp = _;
           max_blueprints_lag;
           max_blueprints_ahead;
           max_blueprints_catchup;
           catchup_cooldown;
-          max_number_of_chunks;
-          wallet_dir;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
           dal_slots;
           sequencer_sunset_sec;
         } ->
-        let sequencer_keys =
+        let sequencer_keys_args =
           List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
           |> List.flatten
         in
-        sequencer_keys
-        @ ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
+        sequencer_keys_args
+        @ ["--rollup-node-endpoint"; rollup_node_endpoint]
         @ Cli_arg.optional_arg
             "maximum-blueprints-lag"
             string_of_int
@@ -1147,145 +1282,42 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "catch-up-cooldown"
             string_of_int
             catchup_cooldown
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            time_between_blocks_fmt
-            time_between_blocks
-        @ Cli_arg.optional_arg
-            "max-number-of-chunks"
-            string_of_int
-            max_number_of_chunks
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+        @ sequencer_args sequencer_config
         @ Cli_arg.optional_arg
             "dal-slots"
             (fun l -> String.concat "," (List.map string_of_int l))
             dal_slots
         @ Cli_arg.optional_arg "sunset-sec" string_of_int sequencer_sunset_sec
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_queue_max_lifespan
-        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_queue_tx_per_addr_limit
-    | Sandbox
-        {
-          initial_kernel = _;
-          network = _;
-          preimage_dir;
-          private_rpc_port;
-          time_between_blocks;
-          genesis_timestamp = _;
-          max_number_of_chunks;
-          wallet_dir;
-          funded_addresses = _;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-          sequencer_keys;
-        } ->
-        let sequencer_keys =
+    | Sandbox {sequencer_config; sequencer_keys; _} ->
+        let sequencer_keys_args =
           List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
           |> List.flatten
         in
-        sequencer_keys
+        sequencer_keys_args
         @ [
             (* This argument is not necessary for the sandbox mode, however,
-             the init configuration needs it. *)
+           the init configuration needs it. *)
             "--rollup-node-endpoint";
-            evm_node.persistent_state.endpoint;
+            "http://dummyvalue:8932";
           ]
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            time_between_blocks_fmt
-            time_between_blocks
-        @ Cli_arg.optional_arg
-            "max-number-of-chunks"
-            string_of_int
-            max_number_of_chunks
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_queue_max_lifespan
-        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_queue_tx_per_addr_limit
-    | Tezlink_sandbox
-        {
-          initial_kernel = _;
-          funded_addresses = _;
-          preimage_dir;
-          private_rpc_port;
-          time_between_blocks;
-          genesis_timestamp = _;
-          max_number_of_chunks;
-          wallet_dir;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-          verbose;
-        } ->
+        @ sequencer_args sequencer_config
+    | Tezlink_sandbox {sequencer_config; verbose; _} ->
         [
           (* These two fields are not necessary for the sandbox mode, however,
-             the init configuration needs them. *)
+           the init configuration needs them. *)
           "--sequencer-key";
           "unencrypted:edsk3tNH5Ye6QaaRQev3eZNcXgcN6sjCJRXChYFz42L6nKfRVwuL1n";
           "--rollup-node-endpoint";
-          evm_node.persistent_state.endpoint;
+          "http://dummyvalue:8932";
         ]
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            time_between_blocks_fmt
-            time_between_blocks
-        @ Cli_arg.optional_arg
-            "max-number-of-chunks"
-            string_of_int
-            max_number_of_chunks
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_queue_max_lifespan
-        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_queue_tx_per_addr_limit
+        @ sequencer_args sequencer_config
         @ Cli_arg.optional_switch "verbose" verbose
-    | Observer
-        {
-          preimages_dir;
-          initial_kernel = _;
-          rollup_node_endpoint;
-          private_rpc_port;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-        } ->
-        ["--evm-node-endpoint"; evm_node.persistent_state.endpoint]
+    | Observer {rollup_node_endpoint; evm_node_endpoint} ->
+        ["--evm-node-endpoint"; evm_node_endpoint]
         @ (match rollup_node_endpoint with
           | Some endpoint -> ["--rollup-node-endpoint"; endpoint]
           | None -> ["--dont-track-rollup-node"])
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimages_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_queue_max_lifespan
-        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_queue_tx_per_addr_limit
+        @ Cli_arg.optional_switch "fail-on-divergence" true
   in
   spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
   @ extra_arguments
@@ -1297,19 +1329,9 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
       else Runner.address evm_node.persistent_state.runner
     in
     if private_ then
-      match evm_node.persistent_state.mode with
-      | Sequencer {private_rpc_port = Some private_rpc_port; _}
-      | Observer {private_rpc_port = Some private_rpc_port; _}
-      | Sandbox {private_rpc_port = Some private_rpc_port; _}
-      | Tezlink_sandbox {private_rpc_port = Some private_rpc_port; _} ->
-          (host, private_rpc_port, "/private")
-      | Sequencer {private_rpc_port = None; _}
-      | Sandbox {private_rpc_port = None; _}
-      | Tezlink_sandbox {private_rpc_port = None; _} ->
-          Test.fail "Sequencer doesn't have a private RPC server"
-      | Proxy -> Test.fail "Proxy doesn't have a private RPC server"
-      | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
-      | Rpc _ -> Test.fail "Rpc node doesn't have a private RPC server"
+      match evm_node.persistent_state.private_rpc_port with
+      | Some private_rpc_port -> (host, private_rpc_port, "/private")
+      | None -> Test.fail "%s doesn't have a private RPC server" evm_node.name
     else (host, evm_node.persistent_state.rpc_port, "")
   in
   Format.sprintf "http://%s:%d%s" addr port path
@@ -1326,46 +1348,13 @@ let endpoint = rpc_endpoint ?local:None
 
 type rpc_server = Resto | Dream
 
-let conditional_json_put ~name cond value_json json =
-  if cond then
-    JSON.put
-      (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
-      json
-  else json
-
-let conditional_json_put_default ~name cond value_json ~default json =
-  JSON.put
-    ( name,
-      JSON.annotate ~origin:"evm_node.config_patch"
-      @@ if cond then value_json else default )
-    json
-
-let optional_json_put ~name v f json =
-  match v with
-  | None -> json
-  | Some v ->
-      let value_json = f v in
-      JSON.put
-        (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
-        json
-
-(** [update_or_create_json ~origin key f json] is equivalent to
-    [JSON.update key f json] but [json] can be [Null] in which case an
-    object is created *)
-let update_or_create_json ~origin key f json =
-  JSON.update
-    key
-    (fun json ->
-      let json = if JSON.is_null json then JSON.parse ~origin "{}" else json in
-      f json)
-    json
-
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?spawn_rpc ?periodic_snapshot_path ?l2_chains
-    ?(preconfirmation_stream_enabled = false) () =
-  JSON.update "experimental_features" @@ fun json ->
+    ?preconfirmation_stream_enabled ?compact_receipt_encoding () =
+  let open Config_file in
+  json_update_experimental_feature @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
     ~name:"drop_duplicate_on_injection"
@@ -1398,16 +1387,21 @@ let patch_config_with_experimental_feature
                     ("chain_family", `String l2_chain_family);
                   ])
               l2_chains))
-  |> conditional_json_put
+  |> optional_json_put
        preconfirmation_stream_enabled
        ~name:"preconfirmation_stream_enabled"
-       (`Bool true)
+       (fun bool -> `Bool bool)
+  |> optional_json_put
+       compact_receipt_encoding
+       ~name:"compact_receipt_encoding"
+       (fun bool -> `Bool bool)
 
 let patch_config_websockets_if_enabled ?max_message_length
     ?(monitor_heartbeat = true) ?rate_limit =
   JSON.update "websockets" @@ fun json ->
   if JSON.is_null json then json
   else
+    let open Config_file in
     optional_json_put
       max_message_length
       ~name:"max_message_length"
@@ -1424,47 +1418,32 @@ let patch_config_websockets_if_enabled ?max_message_length
 
 let patch_config_gc ?history_mode json =
   json
-  |> optional_json_put ~name:"history" history_mode (function
+  |> Config_file.optional_json_put ~name:"history" history_mode (function
        | Archive -> `String "archive"
        | Rolling retention -> `String (Format.sprintf "rolling:%d" retention)
-       | Full retention -> `String (Format.sprintf "full:%d" retention))
+       | Full retention -> `String (Format.sprintf "full:%d" retention)
+       | Seed retention -> `String (Format.sprintf "seed:%d" retention))
 
-let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
-    ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc ?websockets
-    ?extra_arguments rollup_node =
-  let evm_node =
-    create
-      ?name
-      ?runner
-      ?mode
-      ?history:history_mode
-      ?data_dir
-      ?config_file
-      ?rpc_addr
-      ?rpc_port
-      ?restricted_rpcs
-      ?spawn_rpc
-      ?websockets
-      rollup_node
-  in
+let init ?patch_config ?node_setup ~mode ?end_test_on_failure ?extra_arguments
+    () =
+  let evm_node = create ?node_setup ~mode () in
   let* () = Process.check @@ spawn_init_config evm_node in
   let* () =
     match patch_config with
     | Some patch_config -> Config_file.update evm_node patch_config
     | None -> unit
   in
-
   let* () =
-    if Option.is_some spawn_rpc then
-      Config_file.update evm_node
-      @@ update_or_create_json
-           ~origin:"init"
-           "experimental_features"
-           (optional_json_put spawn_rpc ~name:"spawn_rpc" (fun port ->
-                `O [("protected_port", `Float (float_of_int port))]))
-    else return ()
+    match evm_node.persistent_state.spawn_rpc with
+    | Some port ->
+        Config_file.(
+          update_experimental_feature evm_node
+          @@ json_put
+               ~name:"spawn_rpc"
+               (`O [("protected_port", `Float (float_of_int port))]))
+    | None -> return ()
   in
-  let* () = run ?extra_arguments evm_node in
+  let* () = run ?extra_arguments ?end_test_on_failure evm_node in
   return evm_node
 
 let init_from_rollup_node_data_dir ?(omit_delayed_tx_events = false) evm_node
@@ -1572,6 +1551,9 @@ let upgrade_payload ~root_hash ~activation_timestamp =
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
   let* payload = Process.check_and_read_stdout process in
+  let payload =
+    String.split_on_char '\n' (String.trim payload) |> List.rev |> List.hd
+  in
   return (String.trim payload)
 
 let transform_dump ~dump_json ~dump_rlp =
@@ -1696,6 +1678,15 @@ let patch_state evm_node ~key ~value =
       let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
       Process.check process
 
+let execute_single_transaction evm_node ~raw_tx =
+  let* _response =
+    call_evm_rpc
+      ~private_:true
+      evm_node
+      {method_ = "executeSingleTransaction"; parameters = `A [`String raw_tx]}
+  in
+  unit
+
 let snapshot_store () =
   (* Use a single common snapshot store for all snapshots. *)
   Temp.dir "snapshots_store"
@@ -1760,140 +1751,173 @@ let wait_termination (evm_node : t) =
 
 let ten_years_in_seconds = 3600 * 24 * 365 * 10 |> Int64.of_int
 
-let make_kernel_installer_config ?(l2_chain_ids = [])
-    ?max_delayed_inbox_blueprint_length ?(mainnet_compat = false)
-    ?(remove_whitelist = false) ?kernel_root_hash ?chain_id
-    ?eth_bootstrap_balance ?eth_bootstrap_accounts ?tez_bootstrap_balance
-    ?tez_bootstrap_accounts ?sequencer ?delayed_bridge ?ticketer ?administrator
-    ?sequencer_governance ?kernel_governance ?kernel_security_governance
-    ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?(max_blueprint_lookahead_in_seconds = ten_years_in_seconds)
-    ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_revm = false)
-    ?(enable_dal = false) ?dal_slots ?(enable_fast_withdrawal = false)
-    ?(enable_fast_fa_withdrawal = false) ?(enable_multichain = false)
-    ?evm_version ?(with_runtimes = []) ~output () =
+let make_kernel_installer_config (kernel_setup : kernel_setup) ~output () =
   let set_account_code =
-    List.flatten
-    @@ List.map
-         (fun (address, code) ->
-           ["--set-code"; Format.sprintf "%s,%s" address code])
-         set_account_code
+    List.concat_map
+      (fun (address, code) ->
+        ["--set-code"; Format.sprintf "%s,%s" address code])
+      (Option.value ~default:[] kernel_setup.set_account_code)
   in
   let l2_chain_ids =
-    List.flatten
-    @@ List.map
-         (fun l2_chain_id -> ["--l2-chain-id"; string_of_int l2_chain_id])
-         l2_chain_ids
+    List.concat_map
+      (fun l2_chain_id -> ["--l2-chain-id"; string_of_int l2_chain_id])
+      (Option.value ~default:[] kernel_setup.l2_chain_ids)
   in
   let with_runtimes =
     List.concat_map
       (fun runtime -> ["--with-runtime"; Tezosx_runtime.to_string runtime])
-      with_runtimes
+      (Option.value ~default:[] kernel_setup.with_runtimes)
   in
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
     @ Cli_arg.optional_arg
         "max-delayed-inbox-blueprint-length"
         Int.to_string
-        max_delayed_inbox_blueprint_length
-    @ Cli_arg.optional_switch "mainnet-compat" mainnet_compat
-    @ Cli_arg.optional_switch "remove-whitelist" remove_whitelist
-    @ Cli_arg.optional_arg "kernel-root-hash" Fun.id kernel_root_hash
-    @ Cli_arg.optional_arg "chain-id" string_of_int chain_id
+        kernel_setup.max_delayed_inbox_blueprint_length
+    @ Cli_arg.optional_arg "kernel-compat" Fun.id kernel_setup.kernel_compat
+    @ Cli_arg.optional_switch
+        "remove-whitelist"
+        (Option.value ~default:false kernel_setup.remove_whitelist)
+    @ Cli_arg.optional_arg
+        "kernel-root-hash"
+        Fun.id
+        kernel_setup.kernel_root_hash
+    @ Cli_arg.optional_arg "chain-id" string_of_int kernel_setup.chain_id
     @ l2_chain_ids
-    @ Cli_arg.optional_arg "sequencer" Fun.id sequencer
-    @ Cli_arg.optional_arg "delayed-bridge" Fun.id delayed_bridge
-    @ Cli_arg.optional_arg "ticketer" Fun.id ticketer
-    @ Cli_arg.optional_arg "admin" Fun.id administrator
-    @ Cli_arg.optional_arg "sequencer-governance" Fun.id sequencer_governance
-    @ Cli_arg.optional_arg "kernel-governance" Fun.id kernel_governance
+    @ Cli_arg.optional_arg "sequencer" Fun.id kernel_setup.sequencer
+    @ Cli_arg.optional_arg "delayed-bridge" Fun.id kernel_setup.delayed_bridge
+    @ Cli_arg.optional_arg "ticketer" Fun.id kernel_setup.ticketer
+    @ Cli_arg.optional_arg "admin" Fun.id kernel_setup.administrator
+    @ Cli_arg.optional_arg
+        "sequencer-governance"
+        Fun.id
+        kernel_setup.sequencer_governance
+    @ Cli_arg.optional_arg
+        "kernel-governance"
+        Fun.id
+        kernel_setup.kernel_governance
     @ Cli_arg.optional_arg
         "kernel-security-governance"
         Fun.id
-        kernel_security_governance
+        kernel_setup.kernel_security_governance
     @ Cli_arg.optional_arg
         "minimum-base-fee-per-gas"
         Wei.to_string
-        minimum_base_fee_per_gas
-    @ ["--da-fee-per-byte"; Wei.to_string da_fee_per_byte]
+        kernel_setup.minimum_base_fee_per_gas
+    @ Cli_arg.optional_arg
+        "michelson-to-evm-gas-multiplier"
+        Int64.to_string
+        kernel_setup.michelson_to_evm_gas_multiplier
+    @ [
+        "--da-fee-per-byte";
+        Wei.to_string
+          (Option.value ~default:Wei.zero kernel_setup.da_fee_per_byte);
+      ]
     @ Cli_arg.optional_arg
         "delayed-inbox-timeout"
         string_of_int
-        delayed_inbox_timeout
+        kernel_setup.delayed_inbox_timeout
     @ Cli_arg.optional_arg
         "delayed-inbox-min-levels"
         string_of_int
-        delayed_inbox_min_levels
+        kernel_setup.delayed_inbox_min_levels
     @ Cli_arg.optional_arg
         "sequencer-pool-address"
         Fun.id
-        sequencer_pool_address
+        kernel_setup.sequencer_pool_address
     @ Cli_arg.optional_arg
         "maximum-allowed-ticks"
         Int64.to_string
-        maximum_allowed_ticks
+        kernel_setup.maximum_allowed_ticks
     @ set_account_code
     @ Cli_arg.optional_arg
         "maximum-gas-per-transaction"
         Int64.to_string
-        maximum_gas_per_transaction
+        kernel_setup.maximum_gas_per_transaction
     @ [
         "--max-blueprint-lookahead-in-seconds";
-        Int64.to_string max_blueprint_lookahead_in_seconds;
+        Int64.to_string
+          (Option.value
+             ~default:ten_years_in_seconds
+             kernel_setup.max_blueprint_lookahead_in_seconds);
       ]
-    @ Cli_arg.optional_switch "enable-fa-bridge" enable_fa_bridge
-    @ Cli_arg.optional_switch "enable-revm" enable_revm
-    @ Cli_arg.optional_switch "enable-multichain" enable_multichain
-    @ Cli_arg.optional_switch "enable-dal" enable_dal
-    @ Cli_arg.optional_switch "enable-fast-withdrawal" enable_fast_withdrawal
+    @ Cli_arg.optional_switch
+        "enable-fa-bridge"
+        (Option.value ~default:false kernel_setup.enable_fa_bridge)
+    @ Cli_arg.optional_switch
+        "enable-revm"
+        (Option.value ~default:false kernel_setup.enable_revm)
+    @ Cli_arg.optional_switch
+        "enable-michelson-gas-refund"
+        (Option.value ~default:false kernel_setup.enable_michelson_gas_refund)
+    @ Cli_arg.optional_switch
+        "enable-dal"
+        (Option.value ~default:false kernel_setup.enable_dal)
+    @ Cli_arg.optional_switch
+        "enable-fast-withdrawal"
+        (Option.value ~default:false kernel_setup.enable_fast_withdrawal)
     @ Cli_arg.optional_switch
         "enable-fast-fa-withdrawal"
-        enable_fast_fa_withdrawal
+        (Option.value ~default:false kernel_setup.enable_fast_fa_withdrawal)
     @ Cli_arg.optional_arg
         "dal-slots"
         (fun l -> String.concat "," (List.map string_of_int l))
-        dal_slots
+        kernel_setup.dal_slots
+    @ Cli_arg.optional_arg
+        "dal-publishers-whitelist"
+        (fun l -> String.concat "," l)
+        kernel_setup.dal_publishers_whitelist
+    @ Cli_arg.optional_switch
+        "disable-legacy-dal-signals"
+        (Option.value ~default:false kernel_setup.disable_legacy_dal_signals)
     @ Cli_arg.optional_arg
         "eth-bootstrap-balance"
         Wei.to_string
-        eth_bootstrap_balance
-    @ Cli_arg.optional_arg "evm-version" Evm_version.to_string evm_version
-    @ (match eth_bootstrap_accounts with
+        kernel_setup.eth_bootstrap_balance
+    @ Cli_arg.optional_arg
+        "evm-version"
+        Evm_version.to_string
+        kernel_setup.evm_version
+    @ (match kernel_setup.eth_bootstrap_accounts with
       | None -> []
       | Some eth_bootstrap_accounts ->
-          List.flatten
-          @@ List.map
-               (fun eth_bootstrap_account ->
-                 ["--eth-bootstrap-account"; eth_bootstrap_account])
-               eth_bootstrap_accounts)
+          List.concat_map
+            (fun account -> ["--eth-bootstrap-account"; account])
+            eth_bootstrap_accounts)
     @ Cli_arg.optional_arg
         "tez-bootstrap-balance"
         Tez.to_string
-        tez_bootstrap_balance
-    @ (match tez_bootstrap_accounts with
+        kernel_setup.tez_bootstrap_balance
+    @ (match kernel_setup.tez_bootstrap_accounts with
       | None -> []
       | Some tez_bootstrap_accounts ->
+          List.concat_map
+            (fun account ->
+              ["--tez-bootstrap-account"; account.Account.public_key])
+            tez_bootstrap_accounts)
+    @ (match kernel_setup.tez_bootstrap_contracts with
+      | None -> []
+      | Some tez_bootstrap_contracts ->
           List.flatten
           @@ List.map
-               (fun tez_bootstrap_account ->
-                 [
-                   "--tez-bootstrap-account";
-                   tez_bootstrap_account.Account.public_key;
-                 ])
-               tez_bootstrap_accounts)
+               (fun tez_bootstrap_contract ->
+                 ["--tez-bootstrap-contract"; tez_bootstrap_contract])
+               tez_bootstrap_contracts)
+    @ Cli_arg.optional_arg
+        "michelson-runtime-chain-id"
+        Fun.id
+        kernel_setup.michelson_runtime_chain_id
     @ with_runtimes
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
   Runnable.{value = process; run = Process.check}
 
-let make_l2_kernel_installer_config ?chain_id ?chain_family
+let make_l2_kernel_installer_config ?kernel_compat ?chain_id ?chain_family
     ?eth_bootstrap_balance ?tez_bootstrap_balance ?eth_bootstrap_accounts
     ?tez_bootstrap_accounts ?tez_bootstrap_contracts ?minimum_base_fee_per_gas
-    ?(da_fee_per_byte = Wei.zero) ?sequencer_pool_address
-    ?maximum_gas_per_transaction ?(set_account_code = []) ?world_state_path
-    ~output () =
+    ?michelson_to_evm_gas_multiplier ?(da_fee_per_byte = Wei.zero)
+    ?sequencer_pool_address ?maximum_gas_per_transaction
+    ?(set_account_code = []) ?world_state_path ~output () =
   let set_account_code =
     List.flatten
     @@ List.map
@@ -1903,12 +1927,17 @@ let make_l2_kernel_installer_config ?chain_id ?chain_family
   in
   let cmd =
     ["make"; "l2"; "kernel"; "installer"; "config"; output]
+    @ Cli_arg.optional_arg "kernel-compat" Fun.id kernel_compat
     @ Cli_arg.optional_arg "l2-chain-id" string_of_int chain_id
     @ Cli_arg.optional_arg "l2-chain-family" Fun.id chain_family
     @ Cli_arg.optional_arg
         "minimum-base-fee-per-gas"
         Wei.to_string
         minimum_base_fee_per_gas
+    @ Cli_arg.optional_arg
+        "michelson-to-evm-gas-multiplier"
+        Int64.to_string
+        michelson_to_evm_gas_multiplier
     @ Cli_arg.optional_arg "world-state-path" Fun.id world_state_path
     @ ["--da-fee-per-byte"; Wei.to_string da_fee_per_byte]
     @ Cli_arg.optional_arg
@@ -1960,16 +1989,9 @@ let make_l2_kernel_installer_config ?chain_id ?chain_family
   Runnable.{value = process; run = Process.check}
 
 let preimages_dir evm_node =
-  let rec from_node ~data_dir = function
-    | Sandbox {preimage_dir; _}
-    | Tezlink_sandbox {preimage_dir; _}
-    | Sequencer {preimage_dir; _}
-    | Observer {preimages_dir = preimage_dir; _} ->
-        Option.value ~default:(data_dir // "wasm_2_0_0") preimage_dir
-    | Rpc mode -> from_node ~data_dir mode
-    | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
-  in
-  from_node ~data_dir:(data_dir evm_node) evm_node.persistent_state.mode
+  Option.value
+    ~default:(data_dir evm_node // "wasm_2_0_0")
+    evm_node.persistent_state.preimages_dir
 
 let list_metrics ?hooks () =
   let cmd = ["list"; "metrics"] in
@@ -1991,6 +2013,7 @@ let switch_history_mode evm_node history =
     | Archive -> "archive"
     | Rolling n -> sf "rolling:%d" n
     | Full n -> sf "full:%d" n
+    | Seed n -> sf "seed:%d" n
   in
   let args =
     ["switch"; "history"; "to"; hist; "--data-dir"; data_dir evm_node]
@@ -2003,30 +2026,40 @@ let switch_history_mode evm_node history =
   let process = spawn_command evm_node args in
   {Runnable.value = process; run}
 
+let trace_block evm_node block_number =
+  let process =
+    spawn_command
+      evm_node
+      (["trace"; "block"; string_of_int block_number]
+      @ ["--data-dir"; data_dir evm_node])
+  in
+  let parse process =
+    let* stdout = Process.check_and_read_stdout process in
+    return (JSON.parse ~origin:"trace block CLI" stdout |> JSON.as_list)
+  in
+  Runnable.{value = process; run = parse}
+
+let trace_transaction ?tracer evm_node tx_hash =
+  let tracer_args =
+    match tracer with Some t -> ["--tracer"; t] | None -> []
+  in
+  let process =
+    spawn_command
+      evm_node
+      (["trace"; "transaction"; tx_hash]
+      @ tracer_args
+      @ ["--data-dir"; data_dir evm_node])
+  in
+  let parse process =
+    let* stdout = Process.check_and_read_stdout process in
+    return (JSON.parse ~origin:"trace transaction CLI" stdout)
+  in
+  Runnable.{value = process; run = parse}
+
 let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
-  let ( initial_kernel,
-        preimages_dir,
-        private_rpc_port,
-        tx_queue_max_lifespan,
-        tx_queue_max_size,
-        tx_queue_tx_per_addr_limit ) =
+  let rollup_node_endpoint =
     match mode old_sequencer with
-    | Sequencer
-        {
-          initial_kernel;
-          preimage_dir;
-          private_rpc_port;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-          _;
-        } ->
-        ( initial_kernel,
-          preimage_dir,
-          private_rpc_port,
-          tx_queue_max_lifespan,
-          tx_queue_max_size,
-          tx_queue_tx_per_addr_limit )
+    | Sequencer {rollup_node_endpoint; _} -> Some rollup_node_endpoint
     | _ -> invalid_arg "Evm_node is not a sequencer"
   in
   {
@@ -2037,16 +2070,6 @@ let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
         old_sequencer.persistent_state with
         mode =
           Observer
-            {
-              initial_kernel = Some initial_kernel;
-              preimages_dir;
-              private_rpc_port;
-              rollup_node_endpoint =
-                Some old_sequencer.persistent_state.endpoint;
-              tx_queue_max_lifespan;
-              tx_queue_max_size;
-              tx_queue_tx_per_addr_limit;
-            };
-        endpoint = endpoint new_sequencer;
+            {rollup_node_endpoint; evm_node_endpoint = endpoint new_sequencer};
       };
   }

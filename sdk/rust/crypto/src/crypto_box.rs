@@ -13,7 +13,6 @@
 //! CryptoboxPublicKeyHash - generated as a hash of [`PublicKey`], for example used as a peer_id
 
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 use std::fmt::{self, Debug};
 
 use hex::{FromHex, FromHexError};
@@ -61,7 +60,7 @@ pub struct PublicKey(Vec<u8>);
 impl PublicKey {
     /// Generates public key hash for public key
     pub fn public_key_hash(&self) -> CryptoboxPublicKeyHash {
-        CryptoboxPublicKeyHash::try_from(crate::blake2b::digest_128(self.0.as_ref())).unwrap()
+        CryptoboxPublicKeyHash(crate::blake2b::digest_128(self.0.as_ref()))
     }
 }
 
@@ -156,7 +155,7 @@ impl Debug for PrecomputedKey {
 impl From<FromHexError> for CryptoError {
     fn from(e: FromHexError) -> Self {
         CryptoError::InvalidKey {
-            reason: format!("{}", e),
+            reason: format!("{e}"),
         }
     }
 }

@@ -55,6 +55,12 @@ delegation is by using the ``SET_DELEGATE`` Michelson instruction (see
 `the Michelson documentation <https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__ for more
 details).
 
+.. note::
+
+   The possibility to choose a delegate for a user account :ref:`was introduced <babylon_introduced_delegation>` in the :doc:`Babylon protocol <../protocols/005_babylon>` back in 2019.
+   Even though this was long time ago, the simplest way to delegate tez at the time was to deposit them on a special kind of "scriptless" smart contract.
+   All these contracts have been converted during the Babylon update to regular smart contracts (keeping the same ``KT1`` address), and contain now a predefined manager script, which allows recovering funds using a :ref:`manual procedure <migrating_scriptless_contracts>`.
+   Some wallets such as the Kukai web wallet make it easier to recover the funds: they automatically recognize the old delegation situation when connecting to the delegating account.
 
 Notice that only user accounts can be delegates, so your delegate
 must be a *tz* address.
@@ -135,7 +141,7 @@ your user account::
 
 .. note::
 
-   It is possible to also register a :ref:`consensus key <consensus_key_details>` and/or a :ref:`companion key <companion_key>` at this step.
+   It is possible to also register a :ref:`consensus key <consensus_key_details>` and/or a :ref:`companion key <companion_key>` at this step. A consensus key is recommended for keeping your manager key offline. See :doc:`../user/key-management` for details on when you need each key and a complete setup example.
 
 You also need to stake some tez, at least ``MINIMAL_FROZEN_STAKE`` (see :ref:`ps_constants`), and to have at least ``MINIMAL_STAKE = 6000`` :ref:`baking power <minimal_baking_power>`, taking into account your own and all your delegators' staked balances, as well as their delegated balances with a lesser weight.
 
@@ -232,17 +238,20 @@ Note that:
 - starting with version 22.0 it is recommended to run the Octez node with a DAL node (opting out requires the explicit option ``--without-dal``).
 - starting with version 23.0, and the activation of protocol S, when running a baker with the DAL activated, and a tz4 consensus key, it is required to have also a tz4 :ref:`companion key <companion_key>` registered for the delegate to produce DAL attestations. Otherwise the baker will only produce regular attestations, without any DAL information, and the baker will be seen as not participating in the DAL.
 
+.. _quickstart_baker:
+
 Quickstart baker
 ~~~~~~~~~~~~~~~~
 
-Putting together all the above instructions, you may want to quickly start a baker daemon on a testnet such as ghostnet as follows (after :ref:`starting an Octez node <quickstart_node>`)::
+Putting together all the above instructions, you may want to quickly start a baker daemon on a testnet such as :ref:`currentnet <network_aliases>` as follows (after :ref:`starting an Octez node <quickstart_node>`)::
 
     octez-client gen keys mybaker
     BAKER_ADDRESS=$(octez-client show address mybaker | grep Hash | cut -d' ' -f2)
-    # Fund BAKER_ADDRESS with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+    # Fund BAKER_ADDRESS with > 6000 tez, e.g. at https://faucet.currentnet.teztnets.com
     octez-client register key mybaker as delegate
     octez-client stake 6000 for mybaker
     octez-dal-node run --endpoint http://127.0.0.1:8732 --attester-profiles=$BAKER_ADDRESS
+    # In a new terminal:
     octez-baker run with local node $HOME/.tezos-node mybaker --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
 
 

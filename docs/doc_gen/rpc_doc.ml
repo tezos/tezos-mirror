@@ -354,7 +354,12 @@ let make_index_shell ?introduction_path node =
   let open Lwt_syntax in
   let* shell_dir =
     let node_version = Node.get_version node in
-    let shell_dir = Node.build_rpc_directory ~node_version node in
+    let shell_dir =
+      Node.build_rpc_directory
+        ~node_version
+        ~profiling_config:Tezos_profiler.Profiler.default_profiling_config
+        node
+    in
     let shell_dir =
       Tezos_rpc.Directory.register0
         shell_dir

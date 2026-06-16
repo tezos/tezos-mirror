@@ -330,7 +330,7 @@ fn generate_tag_nom_read(tag: &Tag<'_>, enum_name: &syn::Ident) -> TokenStreamWi
         }
         encoding => {
             generate_nom_read(encoding).map_stream(|nom_read| {
-            let name = format!("{}::{}", enum_name, tag_name);
+            let name = format!("{enum_name}::{tag_name}");
                 quote_spanned!(tag_name.span()=> nom::combinator::map(tezos_data_encoding::nom::variant(#name, #nom_read), #enum_name::#tag_name))})
         }
     }

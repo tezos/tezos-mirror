@@ -188,11 +188,13 @@ let encoding_with_optional_extended_block_param encoding =
     Ethereum_types.Block_parameter.(Block_parameter Latest)
 
 module Kernel_version = struct
-  type input = unit
+  open Ethereum_types
+
+  type input = Block_parameter.extended
 
   type output = string
 
-  let input_encoding = Data_encoding.unit
+  let input_encoding = Data_encoding.tup1 Block_parameter.extended_encoding
 
   let output_encoding = Data_encoding.string
 
@@ -202,15 +204,47 @@ module Kernel_version = struct
 end
 
 module Kernel_root_hash = struct
+  open Ethereum_types
+
+  type input = Block_parameter.extended
+
+  type output = Ethereum_types.hex option
+
+  let input_encoding = Data_encoding.tup1 Block_parameter.extended_encoding
+
+  let output_encoding = Data_encoding.(option Ethereum_types.hex_encoding_no0x)
+
+  let method_ = "tez_kernelRootHash"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Michelson_activation_level = struct
   type input = unit
 
-  type output = string option
+  type output = int64 option
 
   let input_encoding = Data_encoding.unit
 
-  let output_encoding = Data_encoding.(option (string' Hex))
+  let output_encoding = Data_encoding.(option int64)
 
-  let method_ = "tez_kernelRootHash"
+  let method_ = "tez_getMichelsonActivationLevel"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Sequencer = struct
+  open Ethereum_types
+
+  type input = Block_parameter.extended
+
+  type output = Signature.Public_key.t
+
+  let input_encoding = Block_parameter.extended_encoding
+
+  let output_encoding = Signature.Public_key.encoding
+
+  let method_ = "tez_sequencer"
 
   type ('input, 'output) method_ += Method : (input, output) method_
 end
@@ -637,7 +671,9 @@ module Get_uncle_by_block_number_and_index = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
-module Send_raw_transaction = struct
+(* Shared types and encodings between eth_sendRawTransaction and tez_sendRawTezlinkOperation and
+   all future RPCs used to relay transactions when the Tx_queue gets a Tick. *)
+module Send_raw_common = struct
   open Ethereum_types
 
   type input = hex
@@ -647,8 +683,20 @@ module Send_raw_transaction = struct
   let input_encoding = Data_encoding.tup1 hex_encoding
 
   let output_encoding = hash_encoding
+end
+
+module Send_raw_transaction = struct
+  include Send_raw_common
 
   let method_ = "eth_sendRawTransaction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Send_raw_tezlink_operation = struct
+  include Send_raw_common
+
+  let method_ = "tez_sendRawTezlinkOperation"
 
   type ('input, 'output) method_ += Method : (input, output) method_
 end
@@ -857,6 +905,20 @@ module Produce_block = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Propose_next_block_timestamp = struct
+  type input = Time.Protocol.t
+
+  type output = unit
+
+  let input_encoding = Time.Protocol.encoding
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "proposeNextBlockTimestamp"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Produce_proposal = struct
   type input = Time.Protocol.t
 
@@ -867,6 +929,24 @@ module Produce_proposal = struct
   let output_encoding = Data_encoding.unit
 
   let method_ = "produceProposal"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Execute_single_transaction = struct
+  (** Takes a raw transaction hex string. The server parses it and
+      executes it via the IC single transaction execution path. *)
+  open Ethereum_types
+
+  type input = hex
+
+  type output = unit
+
+  let input_encoding = Data_encoding.tup1 hex_encoding
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "executeSingleTransaction"
 
   type ('input, 'output) method_ += Method : (input, output) method_
 end
@@ -884,6 +964,20 @@ module Inject_transaction = struct
   let output_encoding = hash_encoding
 
   let method_ = "injectTransaction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Wait_transaction_confirmation = struct
+  type input = Ethereum_types.hash
+
+  type output = unit
+
+  let input_encoding = Ethereum_types.hash_encoding
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "waitTransactionConfirmation"
 
   type ('input, 'output) method_ += Method : (input, output) method_
 end
@@ -977,6 +1071,34 @@ module Replay_block = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Lock_block_production = struct
+  type input = unit
+
+  type output = unit
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "lockBlockProduction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Unlock_block_production = struct
+  type input = unit
+
+  type output = unit
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "unlockBlockProduction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Trace_transaction = struct
   type input = Tracer_types.input
 
@@ -1053,6 +1175,36 @@ module Get_finalized_blocks_of_l1_level = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Get_meta_block_by_number = struct
+  type input = Ethereum_types.Block_parameter.t
+
+  type output = Meta_block.t
+
+  let input_encoding =
+    Data_encoding.tup1 Ethereum_types.Block_parameter.encoding
+
+  let output_encoding = Meta_block.encoding
+
+  let method_ = "tez_getMetaBlockByNumber"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_meta_block_by_hash = struct
+  type input = Meta_block.block_hash_identifier
+
+  type output = Meta_block.t
+
+  let input_encoding =
+    Data_encoding.tup1 Meta_block.block_hash_identifier_encoding
+
+  let output_encoding = Meta_block.encoding
+
+  let method_ = "tez_getMetaBlockByHash"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Eth_fee_history = struct
   open Ethereum_types
 
@@ -1119,6 +1271,187 @@ module Unsubscribe = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Tezosx = struct
+  (* Shared record shape for the [http_trace*] replay RPCs. Used both as
+     the [Http_trace_transaction] response and as the list element of the
+     [Http_trace_block_by_number] / [Http_trace_block_by_hash] responses,
+     so the three methods keep identical wire shapes without maintaining
+     three independently-evolvable encoders. *)
+  type http_trace_entry = {
+    tx_hash : Ethereum_types.hash;
+    traces : Simulation.http_trace list;
+  }
+
+  let http_trace_entry_encoding =
+    Data_encoding.(
+      conv
+        (fun {tx_hash; traces} -> (tx_hash, traces))
+        (fun (tx_hash, traces) -> {tx_hash; traces})
+        (obj2
+           (req "txHash" Ethereum_types.hash_encoding)
+           (req "traces" (list Simulation.http_trace_encoding))))
+
+  module Get_tezos_ethereum_address = struct
+    open Ethereum_types
+
+    type input = Tezos_types.Contract.t
+
+    type output = address
+
+    let input_encoding = Data_encoding.tup1 Tezos_types.Contract.encoding
+
+    let output_encoding = address_encoding
+
+    let method_ = "tez_getTezosEthereumAddress"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
+
+  module Get_ethereum_tezos_address = struct
+    open Ethereum_types
+
+    type input = address
+
+    type output = Tezos_types.Contract.t
+
+    let input_encoding = Data_encoding.tup1 address_encoding
+
+    let output_encoding = Tezos_types.Contract.encoding
+
+    let method_ = "tez_getEthereumTezosAddress"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
+
+  module Trace_call = struct
+    type evm_input = {
+      call : Ethereum_types.call;
+      block : Ethereum_types.Block_parameter.extended;
+    }
+
+    type michelson_input = {
+      operation : Ethereum_types.hex;
+      skip_signature : bool;
+      block : Ethereum_types.Block_parameter.extended;
+    }
+
+    type input = Evm of evm_input | Michelson of michelson_input
+
+    type trace_output = {
+      result : Data_encoding.json option;
+      traces : Simulation.http_trace list;
+    }
+
+    type output = trace_output
+
+    let evm_input_encoding =
+      Data_encoding.(
+        conv
+          (fun {call; block} -> (call, block))
+          (fun (call, block) -> {call; block})
+          (obj2
+             (req "call" Ethereum_types.call_encoding)
+             (dft
+                "block"
+                Ethereum_types.Block_parameter.extended_encoding
+                (Ethereum_types.Block_parameter.Block_parameter Latest))))
+
+    let michelson_input_encoding =
+      Data_encoding.(
+        conv
+          (fun {operation; skip_signature; block} ->
+            (operation, skip_signature, block))
+          (fun (operation, skip_signature, block) ->
+            {operation; skip_signature; block})
+          (obj3
+             (req "operation" Ethereum_types.hex_encoding)
+             (dft "skipSignatureCheck" bool true)
+             (dft
+                "block"
+                Ethereum_types.Block_parameter.extended_encoding
+                (Ethereum_types.Block_parameter.Block_parameter Latest))))
+
+    let input_encoding =
+      Data_encoding.(
+        tup1
+          (union
+             [
+               case
+                 (Tag 0)
+                 ~title:"evm"
+                 (merge_objs
+                    (obj1 (req "type" (constant "evm")))
+                    evm_input_encoding)
+                 (function Evm e -> Some ((), e) | _ -> None)
+                 (fun ((), e) -> Evm e);
+               case
+                 (Tag 1)
+                 ~title:"michelson"
+                 (merge_objs
+                    (obj1 (req "type" (constant "michelson")))
+                    michelson_input_encoding)
+                 (function Michelson m -> Some ((), m) | _ -> None)
+                 (fun ((), m) -> Michelson m);
+             ]))
+
+    let output_encoding =
+      Data_encoding.(
+        conv
+          (fun {result; traces} -> (result, traces))
+          (fun (result, traces) -> {result; traces})
+          (obj2
+             (opt "result" json)
+             (req "traces" (list Simulation.http_trace_encoding))))
+
+    let method_ = "http_traceCall"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
+
+  module Http_trace_transaction = struct
+    type input = Ethereum_types.hash
+
+    type output = http_trace_entry
+
+    let input_encoding = Data_encoding.tup1 Ethereum_types.hash_encoding
+
+    let output_encoding = http_trace_entry_encoding
+
+    let method_ = "http_traceTransaction"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
+
+  module Http_trace_block_by_number = struct
+    type input = Ethereum_types.Block_parameter.t
+
+    type output = http_trace_entry list
+
+    let input_encoding =
+      Data_encoding.tup1 Ethereum_types.Block_parameter.encoding
+
+    let output_encoding = Data_encoding.list http_trace_entry_encoding
+
+    let method_ = "http_traceBlockByNumber"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
+
+  module Http_trace_block_by_hash = struct
+    type input = Ethereum_types.block_hash
+
+    type output = http_trace_entry list
+
+    let input_encoding = Data_encoding.tup1 Ethereum_types.block_hash_encoding
+
+    let output_encoding = Data_encoding.list http_trace_entry_encoding
+
+    let method_ = "http_traceBlockByHash"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -1134,12 +1467,16 @@ let evm_supported_methods : (module METHOD) list =
     (module Generic_block_number);
     (module Kernel_version);
     (module Kernel_root_hash);
+    (module Michelson_activation_level);
+    (module Sequencer);
     (module Network_id);
     (module Chain_id);
     (module Chain_family);
     (module Durable_state_value);
     (module Durable_state_subkeys);
     (module Get_finalized_blocks_of_l1_level);
+    (module Get_meta_block_by_number);
+    (module Get_meta_block_by_hash);
     (* Etherlink rpcs *)
     (module Accounts);
     (module Get_balance);
@@ -1171,10 +1508,16 @@ let evm_supported_methods : (module METHOD) list =
     (module Web3_clientVersion);
     (module Web3_sha3);
     (module Produce_block);
+    (module Propose_next_block_timestamp);
     (module Produce_proposal);
+    (module Execute_single_transaction);
     (module Inject_transaction);
+    (module Inject_tezlink_operation);
+    (module Wait_transaction_confirmation);
     (module Eth_max_priority_fee_per_gas);
     (module Replay_block);
+    (module Lock_block_production);
+    (module Unlock_block_production);
     (module Trace_transaction);
     (module Eth_fee_history);
     (module Coinbase);
@@ -1182,6 +1525,14 @@ let evm_supported_methods : (module METHOD) list =
     (module Subscribe);
     (module Unsubscribe);
     (module Trace_block);
+    (* Tezos X rpcs *)
+    (module Tezosx.Get_tezos_ethereum_address);
+    (module Tezosx.Get_ethereum_tezos_address);
+    (module Tezosx.Trace_call);
+    (module Tezosx.Http_trace_transaction);
+    (module Tezosx.Http_trace_block_by_number);
+    (module Tezosx.Http_trace_block_by_hash);
+    (module Send_raw_tezlink_operation);
   ]
 
 let evm_unsupported_methods : string list =
@@ -1238,14 +1589,21 @@ let multichain_sequencer_supported_methods : (module METHOD) list =
   [
     (module Generic_block_number);
     (module Send_raw_transaction);
+    (module Send_raw_tezlink_operation);
     (module Send_raw_transaction_sync);
+    (module Get_meta_block_by_number);
+    (module Get_meta_block_by_hash);
     (* Private RPCs *)
     (module Produce_block);
+    (module Propose_next_block_timestamp);
     (module Inject_transaction);
+    (module Wait_transaction_confirmation);
     (module Inject_tezlink_operation);
     (module Durable_state_value);
     (module Durable_state_subkeys);
     (module Replay_block);
+    (module Lock_block_production);
+    (module Unlock_block_production);
   ]
 
 let michelson_unsupported_methods = evm_unsupported_methods

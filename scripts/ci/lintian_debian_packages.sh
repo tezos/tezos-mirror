@@ -30,10 +30,10 @@ DISTRIBUTION=${1}
 shift
 # The release of the linux distribution for which
 # we are creating the apt repository
-# E.g. 'jammy focal', 'bookworm'
+# E.g. '22_04', 'bookworm'
 RELEASES=$*
 
-for release in $RELEASES; do # unstable, jammy, focal ...
+for release in $RELEASES; do # unstable, 22_04, 24_04 ...
   find "packages/${DISTRIBUTION}/${release}" -name '*amd64.deb' |
     parallel -j4 '
       echo "Lintian package {}"

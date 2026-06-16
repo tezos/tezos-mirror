@@ -33,9 +33,9 @@ type info_per_level = {
 (** Type of the state for a simulation. *)
 type t = {
   node_ctxt : Node_context.ro;
-  ctxt : Context.ro;
+  ctxt : < index : Access_mode.ro ; state : Access_mode.rw > Context.t;
   inbox_level : int32;
-  state : Context.pvmstate;
+  state : Access_mode.rw Context.pvmstate;
   reveal_map : string Utils.Reveal_hash_map.t option;
   nb_messages_inbox : int;
   level_position : level_position;

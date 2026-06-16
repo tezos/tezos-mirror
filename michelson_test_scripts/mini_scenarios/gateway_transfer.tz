@@ -1,0 +1,21 @@
+# Transfers to the TezosXGateway enshrined contract's %default entrypoint.
+# Storage: pair address string
+#   address = gateway KT1
+#   string  = EVM destination address
+parameter unit;
+storage (pair address string);
+code {
+       CDR;
+       DUP;
+       UNPAIR;
+       CONTRACT string;
+       ASSERT_SOME;
+       SWAP;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       NIL operation;
+       SWAP;
+       CONS;
+       PAIR
+     };

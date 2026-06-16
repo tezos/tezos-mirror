@@ -20,11 +20,10 @@ use num_bigint::{BigInt, TryFromBigIntError};
 use tezos_crypto_rs::blake2b::Blake2bError;
 use tezos_crypto_rs::hash::Ed25519Signature;
 use tezos_data_encoding::nom::NomReader;
-#[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::michelson::ticket::TicketHashError;
 use tezos_smart_rollup_host::path::OwnedPath;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
 use thiserror::Error;
 
 /// Errors that may occur when verifying and executing transactions.
@@ -98,9 +97,9 @@ pub struct VerifiableOperation<'a> {
 }
 
 impl<'a> VerifiableOperation<'a> {
-    fn verify_sig(
+    fn verify_sig<Host: StorageV1>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut Host,
         account: &mut crate::storage::Account,
     ) -> Result<(), TransactionError> {
         let pk = match &self.operation.signer {
@@ -125,11 +124,14 @@ impl<'a> VerifiableOperation<'a> {
     /// Execute the operation directly on durable storage. Assumes that a current
     /// transaction is in progress in durable storage and will operate on that. Also,
     /// assumes that the transaction will be rolled back, if an error is returned.
-    pub fn execute<Host: Runtime>(
+    pub fn execute<Host>(
         self,
         host: &mut Host,
         account_storage: &mut AccountStorage,
-    ) -> Result<Vec<Withdrawal>, TransactionError> {
+    ) -> Result<Vec<Withdrawal>, TransactionError>
+    where
+        Host: StorageV1,
+    {
         let signer_address = self.operation.signer.address();
 
         let signer_path: OwnedPath = account_path(&signer_address)?;
@@ -158,7 +160,7 @@ impl<'a> VerifiableOperation<'a> {
                     signer_account.remove_ticket(host, ticket_id, amount)?;
 
                     #[cfg(feature = "debug")]
-                    debug_msg!(host, "withdrawing {ticket:?} from {signer_address} to {destination}@{entrypoint:?}\n");
+                    debug_msg!("withdrawing {ticket:?} from {signer_address} to {destination}@{entrypoint:?}\n");
 
                     withdrawals.push(Withdrawal {
                         ticket,
@@ -214,7 +216,7 @@ impl<'a> VerifiableOperation<'a> {
     }
 
     /// Parse an operation, remembering the parsed slice.
-    pub fn parse(input: &'a [u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+    pub fn parse(input: &'a [u8]) -> tezos_data_encoding::nom::NomResult<'a, Self> {
         map(
             pair(consumed(Operation::nom_read), Ed25519Signature::nom_read),
             |((parsed, operation), signature)| Self {
@@ -226,14 +228,17 @@ impl<'a> VerifiableOperation<'a> {
     }
 }
 
-fn handle_transfer(
-    host: &mut impl Runtime,
+fn handle_transfer<Host>(
+    host: &mut Host,
     account_storage: &mut AccountStorage,
     signer_account: &mut Account,
     destination: ContractTz1Hash,
     ticket: u64,
     amount: u64,
-) -> Result<(), TransactionError> {
+) -> Result<(), TransactionError>
+where
+    Host: StorageV1,
+{
     let dest_account_path: OwnedPath = account_path(&destination)?;
 
     let mut dest_account = account_storage.get_or_create(host, &dest_account_path)?;
@@ -242,7 +247,7 @@ fn handle_transfer(
     let _dest_amount = dest_account.add_ticket(host, ticket, amount)?;
 
     #[cfg(feature = "debug")]
-    debug_msg!(host, "Transferring {amount} of {ticket} to {destination}\n");
+    debug_msg!("Transferring {amount} of {ticket} to {destination}\n");
 
     let _source_id = signer_account.get_or_set_id(host)?;
 
@@ -259,13 +264,17 @@ fn handle_transfer(
         1 => b'G',
         2 => b'B',
         a => {
-            host.write_debug(&format!("Unknown ticket {a}"));
+            debug_msg!("Unknown ticket {a}");
             return Ok(());
         }
     };
 
-    #[cfg(not(feature = "debug"))]
-    host.write_debug(unsafe { std::str::from_utf8_unchecked(&[_id_0, _id_1, _colour, _amount]) });
+    #[cfg(all(not(feature = "debug"), pvm_kind = "wasm"))]
+    {
+        let bytes: &[u8; 4] = &[_id_0, _id_1, _colour, _amount];
+        // SAFETY: bytes.as_ptr() is a valid ptr to an array of bytes and `len` is the size in bytes
+        unsafe { tezos_smart_rollup_core::target_impl::write_debug(bytes.as_ptr(), bytes.len()) };
+    }
 
     Ok(())
 }
@@ -304,7 +313,7 @@ mod test {
             assert_eq!(remaining_input, remaining, "Incorrect remaining bytes");
 
             assert_eq!(operation, decoded.operation, "Operations do not match");
-            assert_eq!(sig.as_slice(), decoded.signature.as_ref(), "Sigs do not match");
+            assert_eq!(sig, decoded.signature.as_ref(), "Sigs do not match");
         }
     }
 }

@@ -1,13 +1,12 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
 use revm::{
     bytecode::Bytecode,
-    context::{
-        journaled_state::{account::JournaledAccount, AccountInfoLoad, JournalLoadError},
-        JournalInner,
+    context::journaled_state::{
+        account::JournaledAccount, AccountInfoLoad, JournalLoadError,
     },
     context_interface::{
         context::{SStoreResult, SelfDestructResult, StateLoad},
@@ -15,66 +14,84 @@ use revm::{
         Database,
     },
     inspector::JournalExt,
+    interpreter::Gas,
     primitives::{
-        hardfork::SpecId, Address, HashMap, HashSet, Log, StorageKey, StorageValue, B256,
-        U256,
+        hardfork::SpecId, Address, AddressMap, AddressSet, HashSet, Log, StorageKey,
+        StorageValue, B256, U256,
     },
     state::{Account, EvmState},
-    JournalEntry,
+    DatabaseCommit, JournalEntry,
 };
 use std::vec::Vec;
 
-use crate::{
-    database::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges},
-    helpers::legacy::FaDepositWithProxy,
-    layered_state::LayeredState,
-    precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
-    storage::sequencer_key_change::SequencerKeyChange,
+use tezosx_journal::{LayeredStateError, TezosXJournal};
+
+use crate::database::EtherlinkVMDB;
+use crate::error::{EvmRunError, OriginStorageError};
+use crate::storage::world_state_handler::StorageAccount;
+use evm_types::{
+    CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
+    DatabasePrecompileStateChanges, FaDepositWithProxy, IntoWithRemainder,
+    SequencerKeyChange,
 };
-
-type TicketBalanceKey = (Address, U256);
-
-#[derive(Debug, PartialEq, Eq, Default)]
-pub struct PrecompileStateChanges {
-    pub ticket_balances: HashMap<TicketBalanceKey, U256>,
-    pub removed_deposits: HashSet<U256>,
-    pub deposits: Vec<(U256, FaDepositWithProxy)>,
-    pub withdrawals: Vec<Withdrawal>,
-    pub global_counter: Option<U256>,
-    pub sequencer_key_change: Option<SequencerKeyChange>,
-}
+use michelson_types::Withdrawal;
+use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
+use tezos_ethereum::block::BlockConstants;
+use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::{
+    resolve_routing, AliasInfo, CrossRuntimeContext, Registry, RoutingDecision, RuntimeId,
+};
 
 /// A journal of state changes internal to the EVM
 ///
 /// On each additional call, the depth of the journaled state is increased (`depth`) and a new journal is added.
 ///
 /// The journal contains every state change that happens within that call, making it possible to revert changes made in a specific call.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Journal<DB> {
+pub struct Journal<'a, Host: StorageV1, R: Registry> {
     /// Database
-    pub database: DB,
+    pub database: EtherlinkVMDB<'a, Host, R>,
 
-    /// Layered state for state changes not managed by REVM
-    /// (i.e. induced by Etherlink-specific precompiles)
-    pub layered_state: LayeredState,
+    /// TezosX journal combining EVM and Michelson journal state.
+    pub journal: &'a mut TezosXJournal,
 
-    /// Inner journal state.
-    pub inner: JournalInner<JournalEntry>,
+    /// Deferred error from michelson journal checkpoint operations.
+    /// The `JournalTr` trait methods `checkpoint_commit` and `checkpoint_revert`
+    /// cannot return errors, so we store them here for later retrieval.
+    deferred_error: Option<RuntimeError>,
+}
+
+impl<'a, Host: StorageV1, R: Registry> Journal<'a, Host, R> {
+    pub fn new_with_inner(
+        database: EtherlinkVMDB<'a, Host, R>,
+        journal: &'a mut TezosXJournal,
+    ) -> Self {
+        Self {
+            database,
+            journal,
+            deferred_error: None,
+        }
+    }
+
+    /// Take any deferred error from michelson journal checkpoint operations.
+    pub fn take_deferred_error(&mut self) -> Option<RuntimeError> {
+        self.deferred_error.take()
+    }
 }
 
 /// The implementation is only calling the underline REVM object which is the same as the REVM journal one.
 /// The only changes are the invocation of `LayeredDB` methods in some functions.
-impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<DB> {
-    type Database = DB;
+impl<'a, Host: StorageV1, R: Registry> JournalTr for Journal<'a, Host, R> {
+    type Database = EtherlinkVMDB<'a, Host, R>;
     type State = EvmState;
-    type JournalEntry = JournalEntry;
+    type JournaledAccount<'b>
+        = JournaledAccount<'b, EtherlinkVMDB<'a, Host, R>>
+    where
+        EtherlinkVMDB<'a, Host, R>: 'b,
+        'a: 'b;
 
-    fn new(database: DB) -> Journal<DB> {
-        Self {
-            inner: JournalInner::new(),
-            layered_state: LayeredState::new(),
-            database,
-        }
+    fn new(_database: EtherlinkVMDB<'a, Host, R>) -> Journal<'a, Host, R> {
+        unimplemented!("Use Journal::new_with_inner instead")
     }
 
     fn db(&self) -> &Self::Database {
@@ -104,7 +121,9 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         StateLoad<StorageValue>,
         JournalLoadError<<Self::Database as Database>::Error>,
     > {
-        self.inner
+        self.journal
+            .evm
+            .inner
             .sload(&mut self.database, address, key, skip_cold_load)
     }
 
@@ -129,20 +148,25 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         StateLoad<SStoreResult>,
         JournalLoadError<<Self::Database as Database>::Error>,
     > {
-        self.inner
-            .sstore(&mut self.database, address, key, value, skip_cold_load)
+        self.journal.evm.inner.sstore(
+            &mut self.database,
+            address,
+            key,
+            value,
+            skip_cold_load,
+        )
     }
 
     fn tload(&mut self, address: Address, key: StorageKey) -> StorageValue {
-        self.inner.tload(address, key)
+        self.journal.evm.inner.tload(address, key)
     }
 
     fn tstore(&mut self, address: Address, key: StorageKey, value: StorageValue) {
-        self.inner.tstore(address, key, value)
+        self.journal.evm.inner.tstore(address, key, value)
     }
 
     fn log(&mut self, log: Log) {
-        self.inner.log(log)
+        self.journal.evm.inner.log(log)
     }
 
     fn selfdestruct(
@@ -150,35 +174,50 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         address: Address,
         target: Address,
         skip_cold_load: bool,
-    ) -> Result<StateLoad<SelfDestructResult>, JournalLoadError<DB::Error>> {
-        self.inner
-            .selfdestruct(&mut self.database, address, target, skip_cold_load)
+    ) -> Result<
+        StateLoad<SelfDestructResult>,
+        JournalLoadError<<Self::Database as Database>::Error>,
+    > {
+        self.journal.evm.inner.selfdestruct(
+            &mut self.database,
+            address,
+            target,
+            skip_cold_load,
+        )
     }
 
     fn warm_coinbase_account(&mut self, address: Address) {
-        self.inner.warm_addresses.set_coinbase(address);
+        self.journal.evm.inner.warm_addresses.set_coinbase(address);
     }
 
-    fn warm_precompiles(&mut self, precompiles: HashSet<Address>) {
-        self.inner
+    fn warm_precompiles(&mut self, precompiles: AddressSet) {
+        self.journal
+            .evm
+            .inner
             .warm_addresses
             .set_precompile_addresses(precompiles);
     }
 
     #[inline]
-    fn precompile_addresses(&self) -> &HashSet<Address> {
-        self.inner.warm_addresses.precompiles()
+    fn precompile_addresses(&self) -> &AddressSet {
+        self.journal.evm.inner.warm_addresses.precompiles()
     }
 
     /// Returns call depth.
     #[inline]
     fn depth(&self) -> usize {
-        self.inner.depth
+        self.journal.evm.inner.depth
     }
 
     #[inline]
     fn set_spec_id(&mut self, spec_id: SpecId) {
-        self.inner.spec = spec_id;
+        self.journal.evm.inner.cfg.spec = spec_id;
+    }
+
+    #[inline]
+    fn set_eip7708_config(&mut self, disabled: bool, delayed_burn_disabled: bool) {
+        self.journal.evm.inner.cfg.eip7708_disabled = disabled;
+        self.journal.evm.inner.cfg.eip7708_delayed_burn_disabled = delayed_burn_disabled;
     }
 
     #[inline]
@@ -187,8 +226,11 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         from: Address,
         to: Address,
         balance: U256,
-    ) -> Result<Option<TransferError>, DB::Error> {
-        self.inner.transfer(&mut self.database, from, to, balance)
+    ) -> Result<Option<TransferError>, <Self::Database as Database>::Error> {
+        self.journal
+            .evm
+            .inner
+            .transfer(&mut self.database, from, to, balance)
     }
 
     #[inline]
@@ -198,12 +240,12 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         to: Address,
         balance: U256,
     ) -> Option<TransferError> {
-        self.inner.transfer_loaded(from, to, balance)
+        self.journal.evm.inner.transfer_loaded(from, to, balance)
     }
 
     #[inline]
     fn touch_account(&mut self, address: Address) {
-        self.inner.touch(address);
+        self.journal.evm.inner.touch(address);
     }
 
     #[inline]
@@ -213,8 +255,12 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         old_balance: U256,
         bump_nonce: bool,
     ) {
-        self.inner
-            .caller_accounting_journal_entry(address, old_balance, bump_nonce);
+        #[allow(deprecated)]
+        self.journal.evm.inner.caller_accounting_journal_entry(
+            address,
+            old_balance,
+            bump_nonce,
+        );
     }
 
     /// Increments the balance of the account.
@@ -224,64 +270,90 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         address: Address,
         balance: U256,
     ) -> Result<(), <Self::Database as Database>::Error> {
-        self.inner
+        self.journal
+            .evm
+            .inner
             .balance_incr(&mut self.database, address, balance)
     }
 
     /// Increments the nonce of the account.
     #[inline]
     fn nonce_bump_journal_entry(&mut self, address: Address) {
-        self.inner.nonce_bump_journal_entry(address)
+        #[allow(deprecated)]
+        self.journal.evm.inner.nonce_bump_journal_entry(address)
     }
 
     #[inline]
     fn load_account(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<&Account>, DB::Error> {
-        self.inner.load_account(&mut self.database, address)
+    ) -> Result<StateLoad<&Account>, <Self::Database as Database>::Error> {
+        self.journal
+            .evm
+            .inner
+            .load_account(&mut self.database, address)
     }
 
     #[inline]
     fn load_account_code(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<&Account>, DB::Error> {
-        self.inner.load_code(&mut self.database, address)
+    ) -> Result<StateLoad<&Account>, <Self::Database as Database>::Error> {
+        self.journal
+            .evm
+            .inner
+            .load_code(&mut self.database, address)
     }
 
     #[inline]
     fn load_account_delegated(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<AccountLoad>, DB::Error> {
-        self.inner
+    ) -> Result<StateLoad<AccountLoad>, <Self::Database as Database>::Error> {
+        self.journal
+            .evm
+            .inner
             .load_account_delegated(&mut self.database, address)
     }
 
     #[inline]
     fn checkpoint(&mut self) -> JournalCheckpoint {
-        self.layered_state.checkpoint();
-        self.inner.checkpoint()
+        self.journal.michelson.push_external_checkpoint();
+        self.journal.evm.layered_state.checkpoint();
+        self.journal.evm.inner.checkpoint()
     }
 
     #[inline]
     fn checkpoint_commit(&mut self) {
-        self.layered_state.checkpoint_commit();
-        self.inner.checkpoint_commit()
+        self.journal.evm.layered_state.checkpoint_commit();
+        self.journal.evm.inner.checkpoint_commit();
+        if let Err(e) = self.journal.michelson.commit_frame(self.database.host) {
+            self.deferred_error.get_or_insert(e);
+        }
     }
 
     #[inline]
     fn checkpoint_revert(&mut self, checkpoint: JournalCheckpoint) {
-        // Following the doc of REVM it's safe to consider that `checkpoint` is always the latest created.
-        // https://github.com/bluealloy/revm/blob/a8916288952ca65ead1b0fd7aae20341e396b1c6/crates/context/src/journal/inner.rs#L465
-        self.layered_state.checkpoint_revert();
-        self.inner.checkpoint_revert(checkpoint)
+        self.journal.evm.layered_state.checkpoint_revert();
+        self.journal.evm.inner.checkpoint_revert(checkpoint);
+        // The Michelson journal recovers each snapshot's revert target
+        // from the snapshot itself, so no path is supplied here. CRACs
+        // may snapshot subtrees other than `/evm/world_state` (e.g.
+        // `/tez/tez_accounts` for the Michelson), and hard-coding
+        // `/evm/world_state` here would store_move a Tezlink snapshot onto
+        // the EVM world state and wipe out kernel-managed paths like
+        // `/evm/world_state/fees/da_fee_per_byte`.
+        if let Err(e) = self.journal.michelson.revert_frame(self.database.host) {
+            self.deferred_error.get_or_insert(e);
+        }
     }
 
     #[inline]
     fn set_code_with_hash(&mut self, address: Address, code: Bytecode, hash: B256) {
-        self.inner.set_code_with_hash(address, code, hash);
+        self.journal
+            .evm
+            .inner
+            .set_code_with_hash(address, code, hash);
     }
 
     #[inline]
@@ -292,30 +364,43 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         balance: U256,
         spec_id: SpecId,
     ) -> Result<JournalCheckpoint, TransferError> {
-        self.inner
+        self.journal
+            .evm
+            .inner
             .create_account_checkpoint(caller, address, balance, spec_id)
     }
 
     #[inline]
     fn take_logs(&mut self) -> Vec<Log> {
-        self.inner.take_logs()
+        // Clone instead of drain: inner CRAC EVM executions share the
+        // JournalInner with the outer EVM transaction. Draining would
+        // invalidate checkpoint.log_i indices held by outer CALL frames.
+        // The logs are properly drained by finalize() at the top level.
+        self.journal.evm.inner.logs.clone()
     }
 
     #[inline]
     fn commit_tx(&mut self) {
-        self.inner.commit_tx()
+        // Noop: CRAC sub-calls reuse the outer EVM transaction JournalInner.
+        // All the transaction state (logs, journal entries, depth, transient
+        // storage, warm addresses, selfdestructed addresses, transaction_id)
+        // belongs to the outer frame and must not be reset.
+        // Full cleanup happens in finalize() for top-level UserInput transactions.
     }
 
     #[inline]
     fn discard_tx(&mut self) {
-        self.inner.discard_tx();
+        self.journal.evm.inner.discard_tx();
     }
 
     /// Clear current journal resetting it to initial state and return changes state.
     #[inline]
     fn finalize(&mut self) -> Self::State {
-        self.database.commit(self.layered_state.finalize());
-        self.inner.finalize()
+        DatabaseCommitPrecompileStateChanges::commit(
+            &mut self.database,
+            self.journal.evm.layered_state.finalize(),
+        );
+        self.journal.evm.inner.finalize()
     }
 
     fn load_account_info_skip_cold_load(
@@ -325,8 +410,10 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         skip_cold_load: bool,
     ) -> Result<AccountInfoLoad<'_>, JournalLoadError<<Self::Database as Database>::Error>>
     {
-        let spec = self.inner.spec;
-        self.inner
+        let spec = self.journal.evm.inner.cfg.spec;
+        self.journal
+            .evm
+            .inner
             .load_account_optional(&mut self.database, address, load_code, skip_cold_load)
             .map(|a| {
                 AccountInfoLoad::new(
@@ -339,12 +426,16 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
 
     #[inline]
     fn logs(&self) -> &[Log] {
-        &self.inner.logs
+        &self.journal.evm.inner.logs
     }
 
     #[inline]
-    fn warm_access_list(&mut self, access_list: HashMap<Address, HashSet<StorageKey>>) {
-        self.inner.warm_addresses.set_access_list(access_list)
+    fn warm_access_list(&mut self, access_list: AddressMap<HashSet<StorageKey>>) {
+        self.journal
+            .evm
+            .inner
+            .warm_addresses
+            .set_access_list(access_list)
     }
 
     #[inline]
@@ -352,7 +443,24 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         &mut self,
         address: Address,
     ) -> Result<StateLoad<&Account>, <Self::Database as Database>::Error> {
-        self.inner.load_code(&mut self.database, address)
+        self.journal
+            .evm
+            .inner
+            .load_code(&mut self.database, address)
+    }
+
+    #[inline]
+    fn load_account_mut_skip_cold_load(
+        &mut self,
+        address: Address,
+        skip_cold_load: bool,
+    ) -> Result<StateLoad<Self::JournaledAccount<'_>>, <Self::Database as Database>::Error>
+    {
+        self.journal
+            .evm
+            .inner
+            .load_account_mut_optional(&mut self.database, address, skip_cold_load)
+            .map_err(JournalLoadError::unwrap_db_error)
     }
 
     #[inline]
@@ -360,38 +468,40 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         &mut self,
         address: Address,
         load_code: bool,
-    ) -> Result<
-        StateLoad<JournaledAccount<'_, Self::JournalEntry>>,
-        <Self::Database as Database>::Error,
-    > {
-        self.inner
+    ) -> Result<StateLoad<Self::JournaledAccount<'_>>, <Self::Database as Database>::Error>
+    {
+        self.journal
+            .evm
+            .inner
             .load_account_mut_optional_code(&mut self.database, address, load_code, false)
             .map_err(JournalLoadError::unwrap_db_error)
     }
 }
 
-impl<DB> JournalExt for Journal<DB> {
+impl<Host: StorageV1, R: Registry> JournalExt for Journal<'_, Host, R> {
     #[inline]
     fn journal(&self) -> &[JournalEntry] {
-        &self.inner.journal
+        &self.journal.evm.inner.journal
     }
 
     #[inline]
     fn evm_state(&self) -> &EvmState {
-        &self.inner.state
+        &self.journal.evm.inner.state
     }
 
     #[inline]
     fn evm_state_mut(&mut self) -> &mut EvmState {
-        &mut self.inner.state
+        &mut self.journal.evm.inner.state
     }
 }
 
-impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
+impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
     pub fn get_and_increment_global_counter(
         &mut self,
-    ) -> Result<U256, CustomPrecompileError> {
-        self.layered_state
+    ) -> Result<U256, LayeredStateError> {
+        self.journal
+            .evm
+            .layered_state
             .get_and_increment_global_counter(&self.database)
     }
 
@@ -400,8 +510,8 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
         ticket_hash: U256,
         owner: Address,
         amount: U256,
-    ) -> Result<(), CustomPrecompileError> {
-        self.layered_state.ticket_balance_add(
+    ) -> Result<(), LayeredStateError> {
+        self.journal.evm.layered_state.ticket_balance_add(
             &ticket_hash,
             &owner,
             amount,
@@ -414,8 +524,8 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
         ticket_hash: U256,
         owner: Address,
         amount: U256,
-    ) -> Result<(), CustomPrecompileError> {
-        self.layered_state.ticket_balance_remove(
+    ) -> Result<(), LayeredStateError> {
+        self.journal.evm.layered_state.ticket_balance_remove(
             &ticket_hash,
             &owner,
             amount,
@@ -426,36 +536,340 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
     pub fn remove_deposit_from_queue(
         &mut self,
         deposit_id: U256,
-    ) -> Result<(), CustomPrecompileError> {
-        self.layered_state
+    ) -> Result<(), LayeredStateError> {
+        self.journal
+            .evm
+            .layered_state
             .remove_deposit(&deposit_id, &self.database)
     }
 
     pub fn queue_deposit(&mut self, deposit: FaDepositWithProxy, deposit_id: U256) {
-        self.layered_state.queue_deposit(deposit, deposit_id)
+        self.journal
+            .evm
+            .layered_state
+            .queue_deposit(deposit, deposit_id)
     }
 
     pub fn push_withdrawal(&mut self, withdrawal: Withdrawal) {
-        self.layered_state.push_withdrawal(withdrawal)
+        self.journal.evm.layered_state.push_withdrawal(withdrawal)
     }
 
     pub fn find_deposit_in_queue(
         &self,
         deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
-        if self.layered_state.is_deposit_removed(deposit_id) {
-            return Err(CustomPrecompileError::Revert(
-                "Deposit removed in layered state".to_string(),
-            ));
+    ) -> Result<FaDepositWithProxy, LayeredStateError> {
+        if self
+            .journal
+            .evm
+            .layered_state
+            .is_deposit_removed(deposit_id)
+        {
+            return Err(LayeredStateError::DepositAlreadyRemoved);
         }
-        self.database.deposit_in_queue(deposit_id)
+        Ok(self.database.deposit_in_queue(deposit_id)?)
     }
 
     pub fn store_sequencer_key_change(&mut self, upgrade: SequencerKeyChange) {
-        self.layered_state.store_sequencer_key_change(upgrade)
+        self.journal
+            .evm
+            .layered_state
+            .store_sequencer_key_change(upgrade)
     }
 
     pub fn log(&mut self, log: Log) {
-        self.inner.log(log)
+        self.journal.evm.inner.log(log)
+    }
+}
+
+/// Trait for cross-runtime call support on the journal.
+///
+/// This is implemented for Journal backed by EtherlinkVMDB, which has access
+/// to the host, registry, and block constants needed for cross-runtime calls.
+pub trait CrossRuntimeCall {
+    /// Resolve the alias for an EVM address in `target_runtime`.
+    /// `remaining_evm_gas` is the caller's remaining gas budget (used to
+    /// cap alias generation).
+    ///
+    /// Returns `(alias, generation_gas_consumed)` where `generation_gas_consumed`
+    /// is in `target_runtime` units (milligas for Tezos, EVM gas for Ethereum),
+    /// 0 on cache hit.
+    fn tezosx_resolve_source_alias(
+        &mut self,
+        source: Address,
+        target_runtime: RuntimeId,
+        remaining_evm_gas: u64,
+    ) -> Result<(String, u64), CustomPrecompileError>;
+
+    /// Read-only variant of [`Self::tezosx_resolve_source_alias`]: on
+    /// cache hit returns the persisted alias for `target_runtime`, on
+    /// cache miss computes the deterministic alias from the EVM
+    /// address without writing anything to storage.
+    ///
+    /// The deterministic alias is the same value
+    /// [`Self::tezosx_resolve_source_alias`] would persist — by design
+    /// of [`Registry::ensure_alias`]:
+    /// - `RuntimeId::Tezos` → `blake2b-160(lowercase_hex(address))`
+    ///   formatted as a `KT1...` base58check string;
+    /// - `RuntimeId::Ethereum` → `keccak256(lowercase_hex(address))[..20]`
+    ///   formatted as a `0x...` hex string.
+    ///
+    /// Callers can rely on the read-only path producing the canonical
+    /// alias for the target runtime even when no state-mutating call
+    /// has ever seen this address before.
+    ///
+    /// This variant is safe to call from a STATICCALL context, where
+    /// any storage write would revert the enclosing frame. It is used
+    /// by read-only precompile entries such as `callMichelsonView`.
+    fn tezosx_resolve_source_alias_readonly(
+        &self,
+        source: Address,
+        target_runtime: RuntimeId,
+        remaining_evm_gas: u64,
+    ) -> Result<String, CustomPrecompileError>;
+
+    fn tezosx_call_http(
+        &mut self,
+        http_request: http::Request<Vec<u8>>,
+    ) -> http::Response<Vec<u8>>;
+
+    /// Get the CRAC-ID for the current transaction.
+    fn crac_id(&self) -> String;
+
+    /// Store the original EVM source address (E_0) on the first
+    /// outgoing gateway call. Subsequent calls are no-ops.
+    fn set_original_evm_source(&mut self, source: Address);
+
+    /// Retrieve the original EVM source address, if previously stored.
+    fn original_evm_source(&self) -> Option<Address>;
+}
+
+impl<'a, Host, R: Registry> CrossRuntimeCall for Journal<'a, Host, R>
+where
+    Host: StorageV1,
+{
+    fn tezosx_resolve_source_alias(
+        &mut self,
+        source: Address,
+        target_runtime: RuntimeId,
+        remaining_evm_gas: u64,
+    ) -> Result<(String, u64), CustomPrecompileError> {
+        let context = CrossRuntimeContext {
+            gas_limit: self.database.block.gas_limit,
+            timestamp: self.database.block.timestamp,
+            block_number: self.database.block.number,
+        };
+        let remaining = Gas::new(remaining_evm_gas);
+        let origin = StorageAccount::from_address(&source)
+            .map_err(OriginStorageError::from)
+            .and_then(|a| a.get_origin(self.database.host))
+            .map_err(|e| e.into_with_remainder(remaining))?;
+        let alias_info = match resolve_routing(origin, target_runtime)
+            .map_err(|e| CustomPrecompileError::Revert(e.to_string(), remaining))?
+        {
+            RoutingDecision::RoundTrip(target) => return Ok((target, 0)),
+            RoutingDecision::Transitive(info) => info,
+            RoutingDecision::Native => AliasInfo {
+                runtime: RuntimeId::Ethereum,
+                native_address: source.to_string().to_lowercase().into_bytes(),
+            },
+        };
+        // Convert remaining EVM gas to target runtime units to cap
+        // the generation cost.
+        let target_gas_budget = tezosx_interfaces::gas::convert(
+            RuntimeId::Ethereum,
+            target_runtime,
+            remaining_evm_gas,
+        )
+        .ok_or_else(|| {
+            CustomPrecompileError::Revert(
+                "alias generation: EVM gas overflows target runtime units".into(),
+                remaining,
+            )
+        })?;
+        let (alias_str, target_gas_remaining) = self
+            .database
+            .registry
+            .ensure_alias(
+                self.database.host,
+                self.journal,
+                alias_info,
+                None,
+                target_runtime,
+                context,
+                target_gas_budget,
+            )
+            .map_err(|e| {
+                CustomPrecompileError::Revert(
+                    format!("Failed to generate alias for source address: {e:?}"),
+                    remaining,
+                )
+            })?;
+        let consumed_target = target_gas_budget - target_gas_remaining;
+        Ok((alias_str, consumed_target))
+    }
+
+    fn tezosx_resolve_source_alias_readonly(
+        &self,
+        source: Address,
+        target_runtime: RuntimeId,
+        remaining_evm_gas: u64,
+    ) -> Result<String, CustomPrecompileError> {
+        let remaining = Gas::new(remaining_evm_gas);
+        let origin = StorageAccount::from_address(&source)
+            .map_err(OriginStorageError::from)
+            .and_then(|a| a.get_origin(self.database.host))
+            .map_err(|e| e.into_with_remainder(remaining))?;
+        let native_bytes = match resolve_routing(origin, target_runtime)
+            .map_err(|e| CustomPrecompileError::Revert(e.to_string(), remaining))?
+        {
+            RoutingDecision::RoundTrip(target) => return Ok(target),
+            RoutingDecision::Transitive(info) => info.native_address,
+            RoutingDecision::Native => source.to_string().to_lowercase().into_bytes(),
+        };
+        // Deterministic fallback: reproduce the alias that the target
+        // runtime's `ensure_alias` would compute (and persist on the
+        // state-mutating path), but skip the storage writes.
+        //
+        // Each branch duplicates the deterministic name-derivation
+        // step from the corresponding runtime's `ensure_alias` — the
+        // canonical implementation — and must stay in sync with it.
+        // If either formula changes, this read-only path must change
+        // too.
+        match target_runtime {
+            RuntimeId::Tezos => {
+                let kt1 = ContractKt1Hash::from(blake2b::digest_160(&native_bytes));
+                Ok(kt1.to_base58_check())
+            }
+            RuntimeId::Ethereum => {
+                let hash = revm::primitives::keccak256(&native_bytes);
+                Ok(Address::from_slice(&hash.0[..20]).to_string())
+            }
+        }
+    }
+
+    fn tezosx_call_http(
+        &mut self,
+        http_request: http::Request<Vec<u8>>,
+    ) -> http::Response<Vec<u8>> {
+        self.database
+            .registry
+            .serve(self.database.host, self.journal, http_request)
+    }
+
+    fn crac_id(&self) -> String {
+        self.journal.crac_id().to_string()
+    }
+
+    fn set_original_evm_source(&mut self, source: Address) {
+        self.journal.evm.set_original_evm_source(source);
+    }
+
+    fn original_evm_source(&self) -> Option<Address> {
+        self.journal.evm.original_evm_source()
+    }
+}
+
+pub fn commit_evm_journal_from_external<Host>(
+    host: &mut Host,
+    registry: &impl Registry,
+    block_constants: &BlockConstants,
+    journal: &mut TezosXJournal,
+) -> Result<Vec<Withdrawal>, EvmRunError>
+where
+    Host: StorageV1,
+{
+    let db = EtherlinkVMDB::new(host, registry, block_constants)?;
+    let mut journal = Journal::new_with_inner(db, journal);
+    let state = journal.finalize();
+    DatabaseCommit::commit(journal.db_mut(), state);
+    Ok(journal.db_mut().take_withdrawals())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_interfaces::{AliasInfo, Origin};
+
+    fn alias_origin(runtime: RuntimeId, native: &[u8]) -> Origin {
+        Origin::Alias(AliasInfo {
+            runtime,
+            native_address: native.to_vec(),
+        })
+    }
+
+    #[test]
+    fn routing_returns_round_trip_for_matching_alias() {
+        let mut host = MockKernelHost::default();
+        let source = Address::from_slice(&[0xaa; 20]);
+        let mut account = StorageAccount::from_address(&source).unwrap();
+        account
+            .set_origin(&mut host, &alias_origin(RuntimeId::Tezos, b"tz1abcdef"))
+            .unwrap();
+
+        let origin = StorageAccount::from_address(&source)
+            .unwrap()
+            .get_origin(&host)
+            .unwrap();
+        match resolve_routing(origin, RuntimeId::Tezos).unwrap() {
+            RoutingDecision::RoundTrip(target) => assert_eq!(target, "tz1abcdef"),
+            other => panic!(
+                "expected RoundTrip, got {:?}",
+                std::mem::discriminant(&other)
+            ),
+        }
+    }
+
+    #[test]
+    fn routing_returns_native_for_native_origin() {
+        let mut host = MockKernelHost::default();
+        let source = Address::from_slice(&[0xcc; 20]);
+        let mut account = StorageAccount::from_address(&source).unwrap();
+        account.set_origin(&mut host, &Origin::Native).unwrap();
+
+        let origin = account.get_origin(&host).unwrap();
+        assert!(matches!(
+            resolve_routing(origin, RuntimeId::Tezos).unwrap(),
+            RoutingDecision::Native,
+        ));
+    }
+
+    #[test]
+    fn routing_returns_native_for_unrecorded_source() {
+        let host = MockKernelHost::default();
+        let source = Address::from_slice(&[0xdd; 20]);
+
+        let origin = StorageAccount::from_address(&source)
+            .unwrap()
+            .get_origin(&host)
+            .unwrap();
+        assert!(matches!(
+            resolve_routing(origin, RuntimeId::Tezos).unwrap(),
+            RoutingDecision::Native,
+        ));
+    }
+
+    #[test]
+    fn routing_returns_transitive_for_mismatched_runtime() {
+        // The recorded info is the basis for derivation toward a third target.
+        // Unreachable in two runtime mode.
+        let mut host = MockKernelHost::default();
+        let source = Address::from_slice(&[0xbb; 20]);
+        let mut account = StorageAccount::from_address(&source).unwrap();
+        account
+            .set_origin(&mut host, &alias_origin(RuntimeId::Tezos, b"tz1abcdef"))
+            .unwrap();
+
+        let origin = account.get_origin(&host).unwrap();
+        match resolve_routing(origin, RuntimeId::Ethereum).unwrap() {
+            RoutingDecision::Transitive(info) => {
+                assert_eq!(info.runtime, RuntimeId::Tezos);
+                assert_eq!(info.native_address, b"tz1abcdef".to_vec());
+            }
+            other => panic!(
+                "expected Transitive, got {:?}",
+                std::mem::discriminant(&other)
+            ),
+        }
     }
 }

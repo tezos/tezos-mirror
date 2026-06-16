@@ -211,11 +211,9 @@ let rec loop_on_rollup_node_stream ~keep_alive ?on_new_head
 
 let start ~keep_alive ?on_new_head ~rollup_node_endpoint
     ~rollup_node_endpoint_timeout () =
-  Lwt.async @@ fun () ->
-  let open Lwt_syntax in
-  let* () = Rollup_node_follower_events.started () in
-  Misc.unwrap_error_monad @@ fun () ->
+  Misc.background_task ~name:"rollup_node_follower" @@ fun () ->
   let open Lwt_result_syntax in
+  let*! () = Rollup_node_follower_events.started () in
   let* oldest_rollup_node_known_l1_level =
     Rollup_services.oldest_known_l1_level
       ~keep_alive

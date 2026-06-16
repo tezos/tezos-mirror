@@ -39,7 +39,7 @@ type scenario
 
 (** [make_scenario_step step_name action] creates a scenario_step
       (1 action) *)
-val make_scenario_step : string -> Wasm.tree action -> scenario_step
+val make_scenario_step : string -> Wasm.state action -> scenario_step
 
 (** [make_scenario scenario_name kernel_path actions] creates a scenario with
       - a [scenario_name]
@@ -55,16 +55,16 @@ val ignore_scenario : scenario -> scenario
 (** action corresponding to a top level call of PVM, in slow mode,
     including reboots if necessary. *)
 val exec_slow :
-  reveal_builtins:Tezos_scoru_wasm.Builtins.reveals -> Wasm.tree action
+  reveal_builtins:Tezos_scoru_wasm.Builtins.reveals -> Wasm.state action
 
 (** action corresponding to a top level call of PVM, using fast execution,
     including reboots if necessary. *)
 val exec_fast :
-  reveal_builtins:Tezos_scoru_wasm.Builtins.reveals -> Wasm.tree action
+  reveal_builtins:Tezos_scoru_wasm.Builtins.reveals -> Wasm.state action
 
 (** [load_messages level messages] returns the action corresponding to
       adding a list of [messages] in the inbox at a given [level]. *)
-val load_messages : int32 -> Exec.message list -> Wasm.tree action
+val load_messages : int32 -> Exec.message list -> Wasm.state action
 
 (** [apply_step step tree] evaluate a scenario [step] on a given [tree],
     returning the collected benchmark data and the new state as a tree. *)
@@ -73,8 +73,8 @@ val apply_step :
   ?totals:bool ->
   ?irmin:bool ->
   scenario_step ->
-  Wasm.tree ->
-  (Data.benchmark * Wasm.tree) Lwt.t
+  Wasm.state ->
+  (Data.benchmark * Wasm.state) Lwt.t
 
 (** [run_scenarios filename benches] Execute a list of scenario with options:
       - verbose: print info during execution

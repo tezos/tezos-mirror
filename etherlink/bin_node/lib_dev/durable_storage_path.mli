@@ -12,17 +12,43 @@ open Ethereum_types
 
 type path = string
 
-val tezlink_root : path
-
 val etherlink_root : path
+
+val etherlink_safe_root : path
+
+(** [/tez/tez_accounts/contracts/index] — root of the Michelson contracts
+    indexable storage. Standalone Tezlink and TezosX-mode KT1
+    originations both write here. *)
+val michelson_contracts_index : path
+
+(** [/tez/tez_accounts/tezosx] — root of the TezosX projected accounts
+    and cross-runtime alias subtree. *)
+val michelson_ledger_root : path
+
+(** Root of the Michelson world-state keyspace ([/tez/world_state]). *)
+val tez_world_state_root : path
+
+(** Shadow root of the Michelson world-state keyspace
+    ([/tmp/tez/world_state]). *)
+val tez_world_state_safe_root : path
+
+(** TezosX: root for Tezos blocks stored under the Michelson world state
+    ([/tez/world_state/tez_blocks]). *)
+val tezosx_tezos_blocks_root : path
 
 val root_of_chain_family : _ L2_types.chain_family -> path
 
 val reboot_counter : string
 
-val evm_node_flag : path
+module BASE : sig
+  val make : string -> path
+end
+
+val evm_node_flag : storage_version:int -> path
 
 val chain_id : path
+
+val michelson_runtime_chain_id : path
 
 val minimum_base_fee_per_gas : path
 
@@ -30,29 +56,64 @@ val backlog : path
 
 val da_fee_per_byte : path
 
-val kernel_version : path
+val michelson_to_evm_gas_multiplier : path
 
-val kernel_verbosity : path
+val kernel_version : storage_version:int -> path
 
-val storage_version : path
+val kernel_verbosity : storage_version:int -> path
 
-val kernel_root_hash : path
+val storage_version_base : path
 
-val kernel_upgrade : path
+val storage_version_legacy : path
 
-val sequencer_upgrade : path
+val kernel_root_hash : storage_version:int -> path
 
-val delayed_inbox : path
+val kernel_upgrade : storage_version:int -> path
+
+val sequencer_upgrade : storage_version:int -> path
+
+val delayed_inbox : storage_version:int -> path
 
 val sequencer_pool_address : path
 
-val sequencer_key : path
+val sequencer_key_legacy : path
+
+val sequencer_key_world_state : path
+
+val sequencer_key : storage_version:int -> path
 
 val maximum_gas_per_transaction : path
 
-(** Kernel communication canal for individual transaction execution *)
+val michelson_runtime_sunrise_level : path
+
+val michelson_runtime_target_sunrise_level : path
+
+val maximum_allowed_ticks : storage_version:int -> path
+
+(** Kernel communication canal for individual transaction execution (instant confirmations) *)
 module Single_tx : sig
-  val input_tx : path
+  val input_tx : storage_version:int -> path
+end
+
+(** Kernel communication canal for Tezos X operation simulation *)
+module Tezosx_simulation : sig
+  val input : path
+
+  val result : path
+end
+
+(** Kernel communication channel for Tezos X Michelson entrypoints query *)
+module Tezosx_entrypoints : sig
+  val input : path
+
+  val result : path
+end
+
+val delayed_input : storage_version:int -> path
+
+(** Kernel communication canal for block assembling (instant confirmations) *)
+module Assemble_block : sig
+  val input : storage_version:int -> path
 end
 
 (** Paths related to accounts. *)
@@ -89,13 +150,14 @@ module Code : sig
 end
 
 module Blueprint : sig
-  val current_generation : path
+  val current_generation : storage_version:int -> path
 
-  val chunk : blueprint_number:Z.t -> chunk_index:int -> path
+  val chunk :
+    storage_version:int -> blueprint_number:Z.t -> chunk_index:int -> path
 
-  val nb_chunks : blueprint_number:Z.t -> path
+  val nb_chunks : storage_version:int -> blueprint_number:Z.t -> path
 
-  val generation : blueprint_number:Z.t -> path
+  val generation : storage_version:int -> blueprint_number:Z.t -> path
 end
 
 (** Paths related to blocks. *)
@@ -125,7 +187,7 @@ end
 (** Paths related to block headers. *)
 module BlockHeader : sig
   (** Path to the current block header. *)
-  val current : path
+  val current : storage_version:int -> path
 end
 
 (** Can't be used if storage version >= 41 *)
@@ -152,21 +214,37 @@ end
 
 module Delayed_transaction : sig
   (** Path to the list of hashes of the delayed inbox. *)
-  val hashes : path
+  val hashes : storage_version:int -> path
 
   (** Path to the delayed transaction. *)
-  val transaction : hash -> path
+  val transaction : storage_version:int -> hash -> path
 end
 
 module Evm_events : sig
   (** Path to the list of events of the kernel. *)
-  val events : path
+  val events : storage_version:int -> path
 
   (** Path to the length. *)
-  val length : path
+  val length : storage_version:int -> path
 
   (** Path to the nth event of the kernel. *)
-  val nth_event : int -> path
+  val nth_event : storage_version:int -> int -> path
+end
+
+module Http_trace : sig
+  (** Durable storage flag that enables per-transaction HTTP trace capture
+      during a block replay. Written by the EVM node through
+      [alter_evm_state] before invoking [Exe.replay] for the
+      [http_traceTransaction] / [http_traceBlockByNumber] /
+      [http_traceBlockByHash] RPCs, and read by the kernel on every applied
+      transaction. *)
+  val enabled_flag : path
+
+  (** Path at which the kernel persists the RLP-encoded list of HTTP traces
+      for the transaction [transaction_hash] (a hex string, without [0x]
+      prefix). A missing key means the transaction performed no cross-runtime
+      HTTP call. *)
+  val for_tx : transaction_hash:path -> path
 end
 
 module Trace : sig
@@ -199,17 +277,21 @@ module Trace : sig
 end
 
 module Chain_configuration : sig
-  val minimum_base_fee_per_gas : L2_types.chain_id -> path
+  val minimum_base_fee_per_gas :
+    storage_version:int -> L2_types.chain_id -> path
 
-  val da_fee_per_byte : L2_types.chain_id -> path
+  val da_fee_per_byte : storage_version:int -> L2_types.chain_id -> path
 
-  val maximum_gas_per_transaction : L2_types.chain_id -> path
+  val maximum_gas_per_transaction :
+    storage_version:int -> L2_types.chain_id -> path
 
-  val chain_family : L2_types.chain_id -> path
+  val chain_family : storage_version:int -> L2_types.chain_id -> path
 
-  val world_state : L2_types.chain_id -> path
+  val world_state : storage_version:int -> L2_types.chain_id -> path
 end
 
 module Feature_flags : sig
   val multichain : path
+
+  val tezos_runtime : path
 end

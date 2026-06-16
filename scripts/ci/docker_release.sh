@@ -37,7 +37,11 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
   --docker-target "${DOCKER_BUILD_TARGET}" \
   $(if [ -n "${rust_toolchain_image_name:-}" ]; then echo "--rust-toolchain-image-name ${rust_toolchain_image_name}"; fi) \
-  $(if [ -n "${rust_toolchain_image_tag:-}" ]; then echo "--rust-toolchain-image-tag ${rust_toolchain_image_tag}"; fi)
+  $(if [ -n "${rust_toolchain_image_tag:-}" ]; then echo "--rust-toolchain-image-tag ${rust_toolchain_image_tag}"; fi) \
+  $(
+    # GCP_SCCACHE_BUCKET is defined in the GitLab CI/CD settings.
+    if [ -n "${GCP_SCCACHE_BUCKET:-}" ]; then echo "--sccache-bucket ${GCP_SCCACHE_BUCKET}"; fi
+  )
 
 # auth gitlab or dockerhub registry
 # notice the different namespace for gitlab and that we remove the `-`
@@ -47,5 +51,8 @@ REQUIRED_EXECUTABLES="$OCTEZ_EXECUTABLES" ./scripts/ci/docker_smoke_test.sh "${D
 # Push minimal, bare and debug images
 ./scripts/ci/docker_push_all.sh
 
-# Sign image signatures
+# Sign images
 ./scripts/ci/docker_sign.sh
+
+# Verify signature
+./scripts/ci/docker_verify_signature.sh

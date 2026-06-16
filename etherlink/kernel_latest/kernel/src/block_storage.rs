@@ -5,14 +5,17 @@
 
 use primitive_types::{H256, U256};
 use revm_etherlink::storage::block::BLOCKS_STORED;
-use tezos_ethereum::transaction::{TransactionObject, TransactionReceipt};
+use tezos_ethereum::{
+    block::EthBlock,
+    transaction::{TransactionObject, TransactionReceipt},
+};
 use tezos_evm_logging::{log, Level::Info};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup_host::path::{concat, Path, RefPath};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{read_u256_le, write_h256_be, write_u256_le};
 
-use crate::{chains::ChainFamily, l2block::L2Block};
+use crate::{chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH, l2block::L2Block};
 use rlp::Encodable;
 
 mod path {
@@ -59,17 +62,19 @@ mod path {
     }
 }
 
-pub fn store_current<Host: Runtime>(
+pub fn store_current<Host>(
     host: &mut Host,
     root: &impl Path,
     block: &L2Block,
-) -> Result<(), crate::Error> {
+) -> Result<(), crate::Error>
+where
+    Host: StorageV1,
+{
     store_current_number(host, root, block.number())?;
     write_h256_be(host, &path::current_hash(root)?, block.hash())?;
     update_block_indexes(host, root, block)?;
-    host.store_write_all(&path::current_block(root)?, &block.to_bytes()?)?;
+    host.store_write_all(&path::current_block(root)?, &block.to_bytes())?;
     log!(
-        host,
         Info,
         "Storing block {} at {} containing {} transaction(s) for {} gas used.",
         block.number(),
@@ -80,8 +85,8 @@ pub fn store_current<Host: Runtime>(
     Ok(())
 }
 
-pub(crate) fn update_block_indexes<Host: Runtime>(
-    host: &mut Host,
+pub(crate) fn update_block_indexes(
+    host: &mut impl StorageV1,
     root: &impl Path,
     block: &L2Block,
 ) -> Result<(), crate::Error> {
@@ -105,8 +110,8 @@ pub(crate) fn update_block_indexes<Host: Runtime>(
     Ok(())
 }
 
-pub(crate) fn store_current_number<Host: Runtime>(
-    host: &mut Host,
+pub(crate) fn store_current_number(
+    host: &mut impl StorageV1,
     root: &impl Path,
     number: U256,
 ) -> Result<(), crate::Error> {
@@ -114,8 +119,8 @@ pub(crate) fn store_current_number<Host: Runtime>(
     Ok(())
 }
 
-pub fn store_current_transactions_objects<Host: Runtime>(
-    host: &mut Host,
+pub fn store_current_transactions_objects(
+    host: &mut impl StorageV1,
     root: &impl Path,
     transactions_objects: &[TransactionObject],
 ) -> Result<(), crate::Error> {
@@ -132,8 +137,8 @@ pub fn store_current_transactions_objects<Host: Runtime>(
     Ok(())
 }
 
-pub fn store_current_transactions_receipts<Host: Runtime>(
-    host: &mut Host,
+pub fn store_current_transactions_receipts(
+    host: &mut impl StorageV1,
     root: &impl Path,
     receipts: &[TransactionReceipt],
 ) -> Result<(), crate::Error> {
@@ -150,47 +155,24 @@ pub fn store_current_transactions_receipts<Host: Runtime>(
     Ok(())
 }
 
-pub fn read_current_transactions_receipts<Host: Runtime>(
-    host: &Host,
-    root: &impl Path,
-) -> Result<Vec<TransactionReceipt>, crate::Error> {
-    let receipts_bytes =
-        host.store_read_all(&path::current_block_transactions_receipts(root)?)?;
-    let receipts = rlp::Rlp::new(&receipts_bytes).as_list::<TransactionReceipt>()?;
-    Ok(receipts)
-}
-
-pub fn read_current_transactions_objects<Host: Runtime>(
-    host: &Host,
-    root: &impl Path,
-) -> Result<Vec<TransactionObject>, crate::Error> {
-    let transactions_objects_bytes =
-        host.store_read_all(&path::current_block_transactions_objects(root)?)?;
-    let transactions_objects =
-        rlp::Rlp::new(&transactions_objects_bytes).as_list::<TransactionObject>()?;
-    Ok(transactions_objects)
-}
-
-pub fn read_current(
-    host: &mut impl Runtime,
-    root: &impl Path,
-    chain_family: &ChainFamily,
-) -> Result<L2Block, crate::Error> {
-    let block_path = path::current_block(root)?;
+pub fn read_current_etherlink_block(
+    host: &mut impl StorageV1,
+) -> anyhow::Result<EthBlock> {
+    let block_path = path::current_block(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
     let bytes = &host.store_read_all(&block_path)?;
-    let block_from_bytes = L2Block::try_from_bytes(chain_family, bytes)?;
+    let block_from_bytes = EthBlock::from_bytes(bytes)?;
     Ok(block_from_bytes)
 }
 
 pub fn read_current_number(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     root: &impl Path,
 ) -> Result<U256, crate::Error> {
     Ok(read_u256_le(host, &path::current_number(root)?)?)
 }
 
 pub fn read_current_hash(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     root: &impl Path,
 ) -> Result<H256, crate::Error> {
     let hash_path = path::current_hash(root)?;
@@ -202,6 +184,14 @@ pub fn read_current_hash(
 }
 
 #[cfg(test)]
+pub fn read_tez_current_block(host: &mut impl StorageV1) -> anyhow::Result<Vec<u8>> {
+    use crate::chains::TEZ_BLOCKS_PATH;
+    let block_path = path::current_block(&TEZ_BLOCKS_PATH)?;
+    let bytes = host.store_read_all(&block_path)?;
+    Ok(bytes)
+}
+
+#[cfg(test)]
 pub mod internal_for_tests {
     use tezos_ethereum::transaction::{TransactionHash, TransactionStatus};
 
@@ -209,8 +199,8 @@ pub mod internal_for_tests {
 
     use super::*;
 
-    pub fn store_current_number<Host: Runtime>(
-        host: &mut Host,
+    pub fn store_current_number(
+        host: &mut impl StorageV1,
         root: &impl Path,
         number: U256,
     ) -> Result<(), crate::Error> {
@@ -218,7 +208,7 @@ pub mod internal_for_tests {
     }
 
     pub fn read_transaction_receipt(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         tx_hash: &TransactionHash,
     ) -> Result<TransactionReceipt, Error> {
         let receipts_path =
@@ -237,10 +227,13 @@ pub mod internal_for_tests {
     }
 
     /// Reads status from the receipt in storage.
-    pub fn read_transaction_receipt_status<Host: Runtime>(
+    pub fn read_transaction_receipt_status<Host>(
         host: &mut Host,
         tx_hash: &TransactionHash,
-    ) -> Result<TransactionStatus, Error> {
+    ) -> Result<TransactionStatus, Error>
+    where
+        Host: StorageV1,
+    {
         let receipt = read_transaction_receipt(host, tx_hash)?;
         Ok(receipt.status)
     }

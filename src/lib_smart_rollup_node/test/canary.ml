@@ -82,13 +82,8 @@ let tests =
   @@ List.map
        (fun proto ->
          [
-           Helpers.alcotest
-             `Quick
-             Example_arith
-             proto
-             ~boot_sector:""
-             canary_test;
-           Helpers.alcotest `Quick Wasm_2_0_0 proto ~boot_sector:"" canary_test;
+           Helpers.alcotest `Quick Example_arith proto canary_test;
+           Helpers.alcotest `Quick Wasm_2_0_0 proto canary_test;
          ])
        (Protocol_plugins.registered_protocols ())
 

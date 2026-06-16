@@ -1760,6 +1760,7 @@ module Make
     let on_close w =
       let pv = Worker.state w in
       Lwt_watcher.shutdown_input pv.operation_stream ;
+      () [@profiler.stop] ;
       Operation_hash.Set.iter
         pv.shell.parameters.tools.chain_tools.clear_or_cancel
         pv.shell.fetching ;

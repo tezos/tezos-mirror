@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{call_tracer::CallTrace, struct_logger::StructLog};
+use super::struct_logger::StructLog;
 use crate::{helpers::storage::concat, Error};
 
 use revm::primitives::B256;
@@ -32,21 +32,19 @@ pub fn trace_tx_path(hash: &Option<B256>, field: &RefPath) -> Result<OwnedPath, 
     concat(&trace_tx_path, field)
 }
 
-pub fn store_call_trace<Host: Runtime>(
+pub fn flush_call_traces<Host: Runtime>(
     host: &mut Host,
-    call_trace: &CallTrace,
+    traces: &[impl rlp::Encodable],
     hash: &Option<B256>,
 ) -> Result<(), Error> {
-    let encoded_call_trace = rlp::encode(call_trace);
-
     let path = trace_tx_path(hash, &CALL_TRACE)?;
     let call_trace_storage = IndexableStorage::new_owned_path(path);
 
+    let encoded: Vec<Vec<u8>> = traces.iter().map(|t| rlp::encode(t).to_vec()).collect();
     call_trace_storage
-        .push_value(host, &encoded_call_trace)
+        .push_values(host, &encoded)
         .map_err(|err| Error::Custom(err.to_string()))?;
 
-    log!(host, Debug, "Store call trace: {:?}", call_trace);
     Ok(())
 }
 

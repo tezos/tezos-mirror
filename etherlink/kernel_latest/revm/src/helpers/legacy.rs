@@ -3,11 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{custom, Error};
+use crate::error::EvmKernelError;
+pub use evm_types::FaDepositWithProxy;
 use num_bigint::BigInt;
 use primitive_types::{H160, H256, U256 as PU256};
 use revm::primitives::{alloy_primitives::Keccak256, Address, Log, B256, U256};
-use rlp::{Decodable, Encodable, Rlp, RlpDecodable, RlpEncodable};
+use rlp::{Encodable, RlpDecodable, RlpEncodable};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_smart_rollup_encoding::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 
@@ -55,10 +56,9 @@ impl FaDeposit {
         routing_info: MichelsonBytes,
         inbox_level: u32,
         inbox_msg_id: u32,
-    ) -> Result<(Self, Option<PU256>), Error> {
-        let amount = bigint_to_u256(ticket.amount()).map_err(|e| {
-            Error::Custom(format!("failed to convert ticket amount: {e:?}"))
-        })?;
+    ) -> Result<(Self, Option<PU256>), EvmKernelError> {
+        let amount = bigint_to_u256(ticket.amount())
+            .map_err(|_| EvmKernelError::TicketAmountOverflow)?;
         let (receiver, proxy, chain_id) = parse_l2_routing_info(routing_info)?;
         let ticket_hash = ticket_hash(&ticket)?;
 
@@ -94,7 +94,7 @@ const RECEIVER_PROXY_AND_CHAIN_ID_LENGTH: usize =
 /// Split routing info (raw bytes passed along with the ticket) into receiver and optional proxy address and chain id.
 fn parse_l2_routing_info(
     routing_info: MichelsonBytes,
-) -> Result<(H160, Option<H160>, Option<PU256>), Error> {
+) -> Result<(H160, Option<H160>, Option<PU256>), EvmKernelError> {
     let routing_info_len = routing_info.0.len();
     if routing_info_len == RECEIVER_LENGTH {
         Ok((H160::from_slice(&routing_info.0), None, None))
@@ -115,7 +115,9 @@ fn parse_l2_routing_info(
             )),
         ))
     } else {
-        Err(Error::Custom("invalid routing info length".to_string()))
+        Err(EvmKernelError::InvalidRoutingInfoLength {
+            actual: routing_info_len,
+        })
     }
 }
 
@@ -129,31 +131,20 @@ const TICKET_PAYLOAD_SIZE_HINT: usize = 200;
 ///  * content: Micheline expression is in its forged form, legacy optimized mode
 ///
 /// Solidity equivalent: uint256(keccak256(abi.encodePacked(ticketer, content)));
-pub fn ticket_hash(ticket: &FA2_1Ticket) -> Result<H256, Error> {
+pub fn ticket_hash(ticket: &FA2_1Ticket) -> Result<H256, EvmKernelError> {
     let mut payload = Vec::with_capacity(TICKET_PAYLOAD_SIZE_HINT);
-    ticket.creator().0.bin_write(&mut payload).map_err(custom)?;
-    ticket.contents().bin_write(&mut payload).map_err(custom)?;
+    ticket
+        .creator()
+        .0
+        .bin_write(&mut payload)
+        .map_err(|_| EvmKernelError::TicketCreatorEncoding)?;
+    ticket
+        .contents()
+        .bin_write(&mut payload)
+        .map_err(|_| EvmKernelError::TicketContentsEncoding)?;
     let mut hasher = Keccak256::new();
     hasher.update(&payload);
     Ok(H256(hasher.finalize().into()))
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, RlpEncodable, RlpDecodable, Default)]
-pub struct FaDepositWithProxy {
-    pub amount: PU256,
-    pub receiver: H160,
-    // If proxy doesn't have code it will still be used as
-    // ticket owner.
-    pub proxy: H160,
-    pub ticket_hash: H256,
-    pub inbox_level: u32,
-    pub inbox_msg_id: u32,
-}
-
-impl FaDepositWithProxy {
-    pub(crate) fn from_raw(raw_deposit: Vec<u8>) -> Result<Self, Error> {
-        FaDepositWithProxy::decode(&Rlp::new(&raw_deposit)).map_err(custom)
-    }
 }
 
 pub fn u256_to_alloy(value: &PU256) -> U256 {
@@ -193,6 +184,26 @@ pub fn h256_to_alloy(value: &H256) -> B256 {
 
 pub fn alloy_to_h256(value: &B256) -> H256 {
     H256::from_slice(value.as_slice())
+}
+
+/// Convert a kernel-side access list (`Vec<tezos_ethereum::access_list::AccessListItem>`)
+/// into the revm-native `AccessList`.
+pub fn access_list_to_revm(
+    access_list: Vec<tezos_ethereum::access_list::AccessListItem>,
+) -> revm::context::transaction::AccessList {
+    revm::context::transaction::AccessList::from(
+        access_list
+            .into_iter()
+            .map(|item| revm::context::transaction::AccessListItem {
+                address: Address::from_slice(&item.address.0),
+                storage_keys: item
+                    .storage_keys
+                    .into_iter()
+                    .map(|key| B256::from_slice(&key.0))
+                    .collect(),
+            })
+            .collect::<Vec<revm::context::transaction::AccessListItem>>(),
+    )
 }
 
 fn bigint_to_u256(value: &BigInt) -> Result<PU256, primitive_types::Error> {

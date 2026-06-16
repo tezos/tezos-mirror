@@ -119,7 +119,8 @@
 //! // same arena everywhere.
 //! let packed_new_storage = new_storage
 //!     .into_micheline_optimized_legacy(&Arena::new())
-//!     .encode();
+//!     .encode()
+//!     .unwrap();
 //! assert_eq!(
 //!     packed_new_storage,
 //!     vec![0x00, 0x82, 0x81, 0x8d, 0xe6, 0xdf, 0x96, 0x8c, 0xad, 0xa5, 0xc5, 0xb4, 0xac, 0x02]
@@ -155,7 +156,7 @@ mod tests {
 
     use crate::interpreter;
     use crate::parser::test_helpers::{parse, parse_contract_script};
-    use crate::stack::{stk, tc_stk, FailingTypeStack, Stack, TypeStack};
+    use crate::stack::{stk, tc_stk, FailingTypeStack, IStack, Stack, TypeStack};
     use crate::typechecker;
     use crate::typechecker::typecheck_instruction;
     use std::collections::HashMap;
@@ -163,9 +164,9 @@ mod tests {
     use tezos_crypto_rs::hash::ContractKt1Hash;
 
     fn report_gas<'a, R, F: FnOnce(&mut Ctx<'a>) -> R>(ctx: &mut Ctx<'a>, f: F) -> R {
-        let initial_milligas = ctx.gas.milligas();
+        let initial_milligas = ctx.gas.milligas().unwrap();
         let r = f(ctx);
-        let gas_diff = initial_milligas - ctx.gas.milligas();
+        let gas_diff = initial_milligas - ctx.gas.milligas().unwrap();
         println!("Gas consumed: {}.{:0>3}", gas_diff / 1000, gas_diff % 1000);
         r
     }
@@ -181,7 +182,7 @@ mod tests {
         assert!(ast
             .interpret(&mut Ctx::default(), &temp, &mut istack)
             .is_ok());
-        assert!(istack.len() == 1 && istack[0] == TypedValue::int(55));
+        assert!(istack.len() == 1 && istack.get(0).unwrap().as_ref() == &TypedValue::int(55));
     }
 
     #[test]
@@ -190,7 +191,7 @@ mod tests {
         let temp = Arena::new();
         let mut ctx = Ctx::default();
         let ast = ast.typecheck_instruction(ctx.gas(), None, &[]).unwrap();
-        let mut istack = stk![];
+        let mut istack: IStack<'_> = Stack::new();
         assert!(ast.interpret(&mut ctx, &temp, &mut istack).is_ok());
         assert_eq!(istack, stk![TypedValue::Mutez(600)]);
     }
@@ -207,7 +208,10 @@ mod tests {
         report_gas(&mut ctx, |ctx| {
             assert!(ast.interpret(ctx, &temp, &mut istack).is_ok());
         });
-        assert_eq!(Gas::default().milligas() - ctx.gas.milligas(), 1287);
+        assert_eq!(
+            Gas::default().milligas().unwrap() - ctx.gas.milligas().unwrap(),
+            1287
+        );
     }
 
     #[test]
@@ -222,7 +226,7 @@ mod tests {
         ctx.gas = Gas::new(1);
         assert_eq!(
             ast.interpret(ctx, &temp, &mut istack),
-            Err(interpreter::InterpretError::OutOfGas(crate::gas::OutOfGas)),
+            Err(interpreter::InterpretError::OutOfGas),
         );
     }
 
@@ -249,9 +253,14 @@ mod tests {
     fn typecheck_test_expect_success() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let mut stack = tc_stk![Type::Nat];
-        assert!(
-            typechecker::typecheck_instruction(&ast, &mut Gas::default(), None, &mut stack).is_ok()
-        );
+        assert!(typechecker::typecheck_instruction(
+            &ast,
+            &mut Gas::default(),
+            None,
+            &mut stack,
+            false
+        )
+        .is_ok());
         assert_eq!(stack, tc_stk![Type::Int])
     }
 
@@ -259,13 +268,13 @@ mod tests {
     fn typecheck_gas() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let mut ctx = Ctx::default();
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas.milligas().unwrap();
         report_gas(&mut ctx, |ctx| {
             assert!(ast
                 .typecheck_instruction(ctx.gas(), None, &[parse("nat").unwrap()])
                 .is_ok());
         });
-        assert_eq!(start_milligas - ctx.gas.milligas(), 12680);
+        assert_eq!(start_milligas - ctx.gas.milligas().unwrap(), 12680);
     }
 
     #[test]
@@ -273,7 +282,7 @@ mod tests {
         let ast = parse(FIBONACCI_SRC).unwrap();
         assert_eq!(
             ast.typecheck_instruction(&mut Gas::new(1000), None, &[parse("nat").unwrap()]),
-            Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
+            Err(typechecker::TcError::OutOfGas)
         );
     }
 
@@ -383,7 +392,10 @@ mod tests {
         use TypedValue as TV;
         match interp_res.unwrap() {
             (_, TV::Map(m)) => {
-                assert_eq!(m.get(&TV::String("foo".to_owned())).unwrap(), &TV::int(1))
+                assert_eq!(
+                    m.get(&TV::String("foo".to_owned())).unwrap().as_ref(),
+                    &TV::int(1)
+                )
             }
             _ => panic!("unexpected contract output"),
         };
@@ -395,14 +407,15 @@ mod tests {
         instr: &'a str,
         input_type_stack: TypeStack,
         output_type_stack: TypeStack,
-        mut input_stack: Stack<TypedValue<'a>>,
-        output_stack: Stack<TypedValue<'a>>,
+        mut input_stack: IStack<'a>,
+        output_stack: IStack<'a>,
         mut ctx: Ctx<'a>,
     ) {
         let ast = parse(instr).unwrap();
         let mut input_failing_type_stack = FailingTypeStack::Ok(input_type_stack);
         let ast =
-            typecheck_instruction(&ast, ctx.gas(), None, &mut input_failing_type_stack).unwrap();
+            typecheck_instruction(&ast, ctx.gas(), None, &mut input_failing_type_stack, false)
+                .unwrap();
         assert_eq!(
             input_failing_type_stack,
             FailingTypeStack::Ok(output_type_stack)
@@ -541,9 +554,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "BALANCE",
-            stk![],
+            Stack::new(),
             stk![Type::Mutez],
-            stk![],
+            Stack::new(),
             stk![TypedValue::Mutez(45),],
             {
                 let mut c = Ctx::default();
@@ -564,11 +577,7 @@ mod tests {
             stk![Type::new_option(Type::new_contract(Type::Int))],
             stk![TypedValue::Address(addr)],
             stk![TypedValue::new_option(None),],
-            {
-                let mut c = Ctx::default();
-                c.set_known_contracts(HashMap::new());
-                c
-            },
+            Ctx::default(),
         );
 
         let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
@@ -580,11 +589,7 @@ mod tests {
             stk![Type::new_option(Type::new_contract(Type::Unit))],
             stk![TypedValue::Address(addr.clone())],
             stk![TypedValue::new_option(Some(TypedValue::Contract(addr))),],
-            {
-                let mut c = Ctx::default();
-                c.set_known_contracts(HashMap::new());
-                c
-            },
+            Ctx::default(),
         );
 
         let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
@@ -598,11 +603,7 @@ mod tests {
             )))],
             stk![TypedValue::Address(addr.clone())],
             stk![TypedValue::new_option(Some(TypedValue::Contract(addr))),],
-            {
-                let mut c = Ctx::default();
-                c.set_known_contracts(HashMap::new());
-                c
-            },
+            Ctx::default(),
         );
 
         let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
@@ -614,11 +615,7 @@ mod tests {
             stk![Type::new_option(Type::new_contract(Type::Int))],
             stk![TypedValue::Address(addr.clone())],
             stk![TypedValue::new_option(None),],
-            {
-                let mut c = Ctx::default();
-                c.set_known_contracts(HashMap::new());
-                c
-            },
+            Ctx::default(),
         );
 
         // When contract for the address does exist and is of expected type.
@@ -633,14 +630,10 @@ mod tests {
             ))),],
             {
                 let mut c = Ctx::default();
-                c.set_known_contracts({
-                    let mut x = HashMap::new();
-                    x.insert(
-                        addr.hash,
-                        HashMap::from([(Entrypoint::default(), Type::Unit)]),
-                    );
-                    x
-                });
+                c.set_known_contracts([(
+                    addr.hash,
+                    HashMap::from([(Entrypoint::default(), Type::Unit)]),
+                )]);
                 c
             },
         );
@@ -658,14 +651,10 @@ mod tests {
             ))),],
             {
                 let mut c = Ctx::default();
-                c.set_known_contracts({
-                    let mut x = HashMap::new();
-                    x.insert(
-                        addr.hash,
-                        HashMap::from([(Entrypoint::try_from("foo").unwrap(), Type::Unit)]),
-                    );
-                    x
-                });
+                c.set_known_contracts([(
+                    addr.hash,
+                    HashMap::from([(Entrypoint::try_from("foo").unwrap(), Type::Unit)]),
+                )]);
                 c
             },
         );
@@ -686,14 +675,10 @@ mod tests {
             ))),],
             {
                 let mut c = Ctx::default();
-                c.set_known_contracts({
-                    let mut x = HashMap::new();
-                    x.insert(
-                        addr.hash,
-                        HashMap::from([(Entrypoint::try_from("foo").unwrap(), Type::Unit)]),
-                    );
-                    x
-                });
+                c.set_known_contracts([(
+                    addr.hash,
+                    HashMap::from([(Entrypoint::try_from("foo").unwrap(), Type::Unit)]),
+                )]);
                 c
             },
         );
@@ -709,17 +694,14 @@ mod tests {
             stk![TypedValue::new_option(None),],
             {
                 let mut c = Ctx::default();
-                c.set_known_contracts({
-                    let mut x = HashMap::new();
-                    x.insert(
-                        addr.hash,
-                        HashMap::from([
-                            (Entrypoint::try_from("bar").unwrap(), Type::Unit),
-                            (Entrypoint::try_from("foo").unwrap(), Type::Unit),
-                        ]),
-                    );
-                    x
-                });
+                c.set_known_contracts([(
+                    addr.hash,
+                    [
+                        (Entrypoint::try_from("bar").unwrap(), Type::Unit),
+                        (Entrypoint::try_from("foo").unwrap(), Type::Unit),
+                    ]
+                    .into(),
+                )]);
                 c
             },
         );
@@ -730,9 +712,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "LEVEL",
-            stk![],
+            Stack::new(),
             stk![Type::Nat],
-            stk![],
+            Stack::new(),
             stk![TypedValue::nat(45),],
             {
                 let mut c = Ctx::default();
@@ -747,9 +729,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "MIN_BLOCK_TIME",
-            stk![],
+            Stack::new(),
             stk![Type::Nat],
-            stk![],
+            Stack::new(),
             stk![TypedValue::nat(45),],
             {
                 let mut c = Ctx::default();
@@ -765,9 +747,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "SELF_ADDRESS",
-            stk![],
+            Stack::new(),
             stk![Type::Address],
-            stk![],
+            Stack::new(),
             stk![TypedValue::Address(addr.clone())],
             {
                 let mut c = Ctx::default();
@@ -783,9 +765,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "SENDER",
-            stk![],
+            Stack::new(),
             stk![Type::Address],
-            stk![],
+            Stack::new(),
             stk![TypedValue::Address(addr.clone())],
             {
                 let mut c = Ctx::default();
@@ -801,9 +783,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "SOURCE",
-            stk![],
+            Stack::new(),
             stk![Type::Address],
-            stk![],
+            Stack::new(),
             stk![TypedValue::Address(Address {
                 hash: addr.clone().into(),
                 entrypoint: Entrypoint::default()
@@ -821,18 +803,18 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "PUSH timestamp 1571659294",
-            stk![],
+            Stack::new(),
             stk![Type::Timestamp],
-            stk![],
+            Stack::new(),
             stk![TypedValue::timestamp(1571659294)],
             Ctx::default(),
         );
         run_e2e_test(
             &Arena::new(),
             "PUSH timestamp \"2019-10-21T12:01:34Z\"",
-            stk![],
+            Stack::new(),
             stk![Type::Timestamp],
-            stk![],
+            Stack::new(),
             stk![TypedValue::timestamp(1571659294)],
             Ctx::default(),
         );
@@ -843,9 +825,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "NOW",
-            stk![],
+            Stack::new(),
             stk![Type::Timestamp],
-            stk![],
+            Stack::new(),
             stk![TypedValue::timestamp(4500),],
             {
                 let mut c = Ctx::default();
@@ -915,9 +897,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "TOTAL_VOTING_POWER",
-            stk![],
+            Stack::new(),
             stk![Type::Nat],
-            stk![],
+            Stack::new(),
             stk![TypedValue::nat(80)],
             {
                 let mut c = Ctx::default();
@@ -1101,9 +1083,6 @@ mod tests {
                 ctx.operation_group_hash = OperationHash::from_base58_check(
                     "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
                 )
-                .unwrap()
-                .as_ref()
-                .try_into()
                 .unwrap();
                 ctx
             },

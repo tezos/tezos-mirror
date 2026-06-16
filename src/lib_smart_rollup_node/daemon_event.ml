@@ -73,6 +73,17 @@ module Simple = struct
       ("from", Data_encoding.int32)
       ("to", Data_encoding.int32)
 
+  let l1_behind =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_daemon_l1_behind"
+      ~msg:
+        "L1 node is on the same chain but behind at level {l1_level} (last \
+         processed level is {l2_level}), waiting for it to catch up"
+      ~level:Notice
+      ("l1_level", Data_encoding.int32)
+      ("l2_level", Data_encoding.int32)
+
   let catch_up =
     declare_1
       ~section
@@ -221,6 +232,22 @@ module Simple = struct
          exiting safely now"
       ~level:Notice
       ()
+
+  let commit_strategy =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_daemon_commit_strategy"
+      ~msg:"Context commit strategy: {strategy}"
+      ~level:Notice
+      ("strategy", Configuration.commit_on_strategy_encoding)
+
+  let riscv_force_commit_strategy =
+    declare_0
+      ~section
+      ~name:"smart_rollup_node_daemon_riscv_force_commit_strategy"
+      ~msg:"Forcing commit strategy to commitment for RISC-V rollup"
+      ~level:Warning
+      ()
 end
 
 let head_processing hash level = Simple.(emit head_processing (hash, level))
@@ -254,6 +281,8 @@ let new_heads_processed = new_heads_iteration Simple.new_heads_processed
 let new_heads_side_process_finished =
   new_heads_iteration Simple.new_heads_side_process_finished
 
+let l1_behind ~l1_level ~l2_level = Simple.(emit l1_behind) (l1_level, l2_level)
+
 let catch_up levels = Simple.(emit catch_up) levels
 
 let included_operation ?errors status operation =
@@ -285,3 +314,8 @@ let main_loop_retry d =
   Simple.(emit main_loop_retry) (Time.System.Span.of_seconds_exn d)
 
 let exit_bailout_mode () = Simple.(emit exit_bailout_mode) ()
+
+let commit_strategy strategy = Simple.(emit commit_strategy) strategy
+
+let riscv_force_commit_strategy () =
+  Simple.(emit riscv_force_commit_strategy) ()

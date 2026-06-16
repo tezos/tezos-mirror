@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+exception Error_wrapper of tztrace
+
 type lost_result = Draw | Timeout | Conflict_resolved
 
 let lost_result_to_string = function

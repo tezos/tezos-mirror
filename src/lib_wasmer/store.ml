@@ -23,16 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* For documentation please refer to the [Tezos_wasmer] module. *)
+(** WebAssembly runtime store.
+
+    A store holds all runtime state for WebAssembly objects (modules,
+    instances, functions, memories, etc.). It is created from an
+    {!Engine.t} and must be passed to most Wasmer operations. Callers
+    must invoke {!delete} when the store is no longer needed. *)
 
 open Api
 open Utils
 
 type t = Types.Store.t Ctypes.ptr
 
+(** [create engine] instantiates a new WebAssembly runtime store.
+    Raises {!Error.Wasmer_error} if store creation fails. *)
 let create engine =
   let store = Functions.Store.new_ engine in
   check_null_ptr Error.(make_exception Create_store) store ;
   store
 
+(** [delete store] destroys the store and frees its resources. *)
 let delete = Functions.Store.delete

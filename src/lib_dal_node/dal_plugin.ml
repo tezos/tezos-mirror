@@ -27,6 +27,8 @@ type operation_application_result = Succeeded | Failed
 
 type slot_index = int
 
+type lag_index = int
+
 type attestation_lag = int
 
 type slot_header = {
@@ -35,12 +37,16 @@ type slot_header = {
   commitment : Cryptobox.Verifier.commitment;
 }
 
+type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
+
 module type T = sig
   module Proto : Registered_protocol.T
 
   type block_info
 
-  type dal_attestation
+  type dal_attestations
+
+  type slot_availability
 
   type attestation_operation
 
@@ -69,7 +75,7 @@ module type T = sig
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (tb_slot * attestation_operation * dal_attestation option) list tzresult
+    (tb_slot * attestation_operation * dal_attestations option) list tzresult
     Lwt.t
 
   val get_committees :
@@ -77,11 +83,29 @@ module type T = sig
     level:int32 ->
     (int list * int) Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-  val dal_attestation : block_info -> dal_attestation tzresult
+  val slot_availability : block_info -> slot_availability tzresult
 
-  val is_attested : dal_attestation -> slot_index -> bool
+  val is_baker_attested :
+    dal_attestations ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    lag_index:int ->
+    slot_index ->
+    bool
 
-  val number_of_attested_slots : dal_attestation -> int
+  val decode_baker_attestations :
+    dal_attestations ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    unfolded_lag_attestation list tzresult
+
+  val is_protocol_attested :
+    slot_availability ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    lag_index:int ->
+    slot_index ->
+    bool
 
   val get_round : Fitness.t -> int32 tzresult
 
@@ -92,6 +116,7 @@ module type T = sig
     attested_level:Int32.t ->
     attestation_operation ->
     slot_index:slot_index ->
+    lag_index:lag_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->
     tb_slot:tb_slot ->
@@ -112,6 +137,9 @@ module type T = sig
     Tezos_rpc.Context.generic ->
     pkh:Signature.Public_key_hash.t ->
     bool tzresult Lwt.t
+
+  val is_migration_pending :
+    Tezos_rpc.Context.generic -> (bool * int32) tzresult Lwt.t
 
   (* Section of helpers for Skip lists *)
 

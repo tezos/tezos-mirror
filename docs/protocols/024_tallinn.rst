@@ -1,3 +1,5 @@
+.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
+
 Protocol Tallinn
 =================
 
@@ -6,7 +8,7 @@ to Seoul (see :ref:`naming_convention`).
 For the list of changes brought by Seoul with respect to Rio, see :doc:`./023_seoul`.
 
 For a higher-level overview of the most salient new features see the
-`announcement blog <https://research-development.nomadic-labs.com/blog.html>`__.
+`announcement blog <https://research-development.nomadic-labs.com/tallinn-announcement.html>`__.
 
 An overview of breaking changes and deprecations introduced in
 protocol Tallinn can be found :ref:`here<tallinn_breaking_changes>`. These
@@ -15,7 +17,7 @@ tagged with **Breaking change** or **Deprecation**.
 
 The code is available in directory :src:`src/proto_024_PtTALLiN` of
 the ``master`` branch of Octez and the full documentation in
-:doc:`this page <../tallinn/index>`.
+:doc:`this page <../active/index>`.
 
 
 Environment Version
@@ -106,11 +108,10 @@ RPC Changes
   It returns the first level at which the All Bakers Attest feature activates. If this
   level is not yet set, it returns ``null`` instead. (MR :gl:`!19757`)
 
-- ``POST …/helpers/scripts/run_code``: the gas parameter supplied by the caller
+- ``POST ../helpers/scripts/run_code``: the gas parameter supplied by the caller
   is now capped to ``hard_gas_limit_per_operation``. Previously an explicit gas
   value was accepted as-is, allowing simulations to run with more gas than any
-  real on-chain operation can consume, producing misleading results. (MR
-  :gl:`!21375`)
+  real on-chain operation can consume, producing misleading results. (MR :gl:`!21375`)
 
 Blocks and block receipts
 -------------------------
@@ -164,7 +165,7 @@ Protocol parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Breaking change** Block time has been reduced from 8 seconds to 6
-seconds on mainnet (on ghostnet, it remains unchanged at 4
+seconds on mainnet and shadownet (on ghostnet, it remains unchanged at 4
 seconds). That is, a block can be produced with a delay of 6 seconds
 with respect to the previous block, if the latter is at round 0.
 

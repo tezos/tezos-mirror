@@ -51,6 +51,8 @@ val octez_layer2_irmin_context : Manifest.target
 
 val octez_layer2_riscv_context : Manifest.target
 
+val octez_layer2_shell : Manifest.target
+
 val octez_openapi : Manifest.target
 
 val octez_sqlite : Manifest.target
@@ -62,6 +64,8 @@ val octez_rpc_http_client_unix : Manifest.target
 val octez_rpc_http : Manifest.target
 
 val octez_rpc_http_server : Manifest.target
+
+val octez_rpc_process : Manifest.target
 
 val octez_rust_deps : Manifest.target
 
@@ -104,6 +108,8 @@ val registered_octez_proto_libs : Manifest.Sub_lib.container
 val registered_octez_shell_libs : Manifest.Sub_lib.container
 
 val tezt_performance_regression : Manifest.target
+
+val tezt_migration_registry : Manifest.target
 
 val tezt_tezos : Manifest.target
 
@@ -168,4 +174,6 @@ module Protocol : sig
   val client : t -> Manifest.target option
 
   val test_helpers_exn : t -> Manifest.target
+
+  val test_migration_exn : t -> Manifest.target
 end

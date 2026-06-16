@@ -127,7 +127,7 @@ end
 let prometheus : prometheus_config Profiler.driver =
   (module Prometheus : DRIVER with type config = prometheus_config)
 
-let instance_maker driver ~verbosity ~directory:_ ~name =
+let instance_maker driver ~verbosity ~directory:_ ~profiling_config:_ ~name =
   Profiler.instance driver (name, verbosity)
 
 let () =

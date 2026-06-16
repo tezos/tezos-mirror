@@ -37,8 +37,8 @@
  (action
   (write-file
    %{targets}
-   "include module type of Tezos_benchmark.Crypto_samplers.V2")))
+   "include module type of Tezos_benchmark.Crypto_samplers.V3")))
 
 (rule
  (targets crypto_samplers.ml)
- (action (write-file %{targets} "include Tezos_benchmark.Crypto_samplers.V2")))
+ (action (write-file %{targets} "include Tezos_benchmark.Crypto_samplers.V3")))

@@ -25,6 +25,8 @@
 
 module Types = Tezos_dal_node_services.Types
 
+let exits = Errors.Exit_codes.all
+
 let env_value_starts_with_yes ~env_var =
   match Sys.getenv_opt env_var with
   | None -> false
@@ -61,10 +63,10 @@ let merge_experimental_features _ _configuration = ()
 let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
     ?endpoint ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
     ?metrics_addr ?profile ?(peers = []) ?history_mode ?service_name
-    ?service_namespace ?experimental_features ?fetch_trusted_setup
-    ?(verbose = false) ?(ignore_l1_config_peers = false)
-    ?(disable_amplification = false) ?batching_configuration
-    ?publish_slots_regularly configuration =
+    ?service_namespace ?telemetry_env ?experimental_features
+    ?fetch_trusted_setup ?(verbose = false) ?(ignore_l1_config_peers = false)
+    ?(disable_amplification = false) ?(banned_addrs = [])
+    ?batching_configuration ?publish_slots_regularly configuration =
   let profile =
     match profile with
     | None -> configuration.Configuration_file.profile
@@ -92,13 +94,13 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
     slots_backup_uris;
     trust_slots_backup_uris;
     profile;
-    (* metrics are disabled unless a metrics_addr option is specified *)
-    metrics_addr;
+    metrics_addr = Option.either metrics_addr configuration.metrics_addr;
     peers = peers @ configuration.peers;
     history_mode = Option.value ~default:configuration.history_mode history_mode;
     service_name = Option.value ~default:configuration.service_name service_name;
     service_namespace =
       Option.value ~default:configuration.service_namespace service_namespace;
+    telemetry_env = Option.either telemetry_env configuration.telemetry_env;
     fetch_trusted_setup =
       Option.value
         ~default:configuration.fetch_trusted_setup
@@ -112,6 +114,7 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
       configuration.ignore_l1_config_peers || ignore_l1_config_peers;
     disable_amplification =
       configuration.disable_amplification || disable_amplification;
+    banned_addrs = banned_addrs @ configuration.banned_addrs;
     batching_configuration =
       Option.value
         ~default:configuration.batching_configuration
@@ -222,7 +225,7 @@ module Term = struct
     let open Cmdliner in
     Arg.(value & flag & info ~docs ~doc (long :: extra_long))
 
-  let p2p_point_format ~default_port =
+  let p2p_point_format ~default_addr ~default_port =
     let decoder str =
       match P2p_point.Id.of_string ~default_port str with
       | Ok x -> Ok x
@@ -230,12 +233,7 @@ module Term = struct
           (* Let's check if the user has entered a port *)
           match String.split_on_char ':' str with
           | [""; port] -> (
-              try
-                let port = int_of_string port in
-                let default =
-                  (fst Configuration_file.default.public_addr, port)
-                in
-                Ok default
+              try Ok (default_addr, int_of_string port)
               with Failure _ ->
                 Error
                   (Format.asprintf "The port provided: '%s' is invalid" port))
@@ -268,13 +266,17 @@ module Term = struct
   let config_file = arg_to_cmdliner config_file_arg
 
   let rpc_addr_arg =
-    let default_port = Configuration_file.default.rpc_addr |> snd in
-    let parse, pp = p2p_point_format ~default_port in
+    let default_addr, default_port = Configuration_file.default.rpc_addr in
+    let parse, pp = p2p_point_format ~default_addr ~default_port in
     make_arg
       ~doc:
-        "The TCP address and optionally the port at which the RPC server of \
-         this instance can be reached. The default address is 0.0.0.0. The \
-         default port is 10732."
+        (Format.asprintf
+           "The TCP address and optionally the port at which the RPC server of \
+            this instance can be reached. The default address is %a. The \
+            default port is %d."
+           P2p_addr.pp
+           default_addr
+           default_port)
       ~parse
       ~placeholder:"ADDR[:PORT]"
       ~pp
@@ -294,14 +296,18 @@ module Term = struct
   let expected_pow = arg_to_cmdliner expected_pow_arg
 
   let net_addr_arg =
-    let default_port = Configuration_file.default.listen_addr |> snd in
-    let parse, pp = p2p_point_format ~default_port in
+    let default_addr, default_port = Configuration_file.default.listen_addr in
+    let parse, pp = p2p_point_format ~default_addr ~default_port in
     make_arg
       ~doc:
-        "The TCP address and optionally the port bound by the DAL node. If \
-         --public-addr is not provided, this is also the address and port at \
-         which this instance can be reached by other P2P nodes. The default \
-         address is 0.0.0.0. The default port is 11732."
+        (Format.asprintf
+           "The TCP address and optionally the port bound by the DAL node. If \
+            --public-addr is not provided, this is also the address and port \
+            at which this instance can be reached by other P2P nodes. The \
+            default address is %a. The default port is %d."
+           P2p_addr.pp
+           default_addr
+           default_port)
       ~parse
       ~placeholder:"ADDR[:PORT]"
       ~pp
@@ -310,15 +316,19 @@ module Term = struct
   let net_addr = arg_to_cmdliner net_addr_arg
 
   let public_addr_arg =
-    let default_port = Configuration_file.default.public_addr |> snd in
-    let parse, pp = p2p_point_format ~default_port in
+    let default_addr, default_port = Configuration_file.default.public_addr in
+    let parse, pp = p2p_point_format ~default_addr ~default_port in
     make_arg
       ~doc:
-        "The TCP address and optionally the port at which this instance can be \
-         reached by other P2P nodes. By default, the point is \
-         '127.0.0.1:11732'. You can override the port using the syntax \
-         ':2222'. If the IP address is detected as a special address (such as \
-         a localhost one) it won't be advertised, only the port will."
+        (Format.asprintf
+           "The TCP address and optionally the port at which this instance can \
+            be reached by other P2P nodes. By default, the point is '%a:%d'. \
+            You can override the port using the syntax ':2222'. If the IP \
+            address is detected as a special address (such as a localhost one) \
+            it won't be advertised, only the port will."
+           P2p_addr.pp
+           default_addr
+           default_port)
       ~parse
       ~placeholder:"ADDR[:PORT]"
       ~pp
@@ -351,12 +361,25 @@ module Term = struct
   let slots_backup_uris_arg =
     make_arg_list
       ~doc:
-        "List of base URIs to fetch missing DAL slots if they are unavailable \
-         locally or cannot be reconstructed from shards. Supported URI schemes \
-         include 'http://', 'https://', and 'file://'. The option accepts a \
-         list of fallback sources separated with commas."
+        "Base URIs to fetch missing DAL data (slots or shards) when \
+         unavailable locally or not reconstructible. Supported schemes: \
+         'http://', 'https://', and 'file://'. You may append a fragment to \
+         specify the resource kind: '#slots' or '#shards'. If omitted, \
+         '#slots' is assumed for backward compatibility. Multiple URIs can be \
+         provided, separated by commas; they are tried in order until one \
+         succeeds. For HTTP(S), the fragment selects a server-side subtree: \
+         '#slots'  -> \
+         <base>/v0/slots/by_published_level/<level>_<slot_index>_<slot_size> ; \
+         '#shards' -> \
+         <base>/v0/shards/by_published_level/<level>_<slot_index>. For \
+         file://, the fragment affects the filename pattern: '#slots'  -> \
+         <base>/<level>_<slot_index>_<slot_size> ; '#shards' -> \
+         <base>/<level>_<slot_index>. Examples: 'http://host:8080#shards', \
+         'file:///var/dal-backup#slots', or \
+         'http://host:8080#slots,http://host:8080#shards'."
       ~placeholder:"URI"
       ~format:uri_format
+      ~extra_long:["backup-uri"; "archive-uri"]
       "slots-backup-uri"
 
   let slots_backup_uris = arg_to_cmdliner slots_backup_uris_arg
@@ -364,12 +387,14 @@ module Term = struct
   let trust_slots_backup_uris_switch =
     make_switch
       ~doc:
-        "If set, skip cryptographic verification of slots downloaded from the \
-         backup URIs provided via --slots-backup-uri. This can speed up slot \
-         retrieval when replaying history or for debugging purposes. Use with \
-         caution during normal operation or when data integrity is critical, \
-         unless the backup source is fully trusted."
+        "If set, skip cryptographic verification of slots/shards downloaded \
+         (or reconstructed) from the backup URIs provided via \
+         --slots-backup-uri. This can speed up slot retrieval when replaying \
+         history or for debugging purposes. Use with caution during normal \
+         operation or when data integrity is critical, unless the backup \
+         source is fully trusted."
       "trust-slots-backup-uris"
+      ~extra_long:["trust-backup-uris"; "trust-archive-uris"]
 
   let trust_slots_backup_uris =
     switch_to_cmdliner trust_slots_backup_uris_switch
@@ -380,6 +405,23 @@ module Term = struct
       "ignore-l1-config-peers"
 
   let ignore_l1_config_peers = switch_to_cmdliner ignore_l1_config_peers_switch
+
+  let ignore_l1_history_check_switch =
+    make_switch
+      ~doc:
+        "If set, downgrade the startup check that the L1 node retains enough \
+         past cycles from an error to a warning. Intended for test networks \
+         where the operator does not control the L1 node and cannot recompile \
+         the DAL node (for instance when running official Docker images). \
+         Bypassing this check may result in the DAL node behaving incorrectly \
+         if it needs to fetch data from levels the L1 node has already pruned. \
+         This flag is not honored on mainnet: on mainnet, the L1 history check \
+         is always enforced as an error to avoid missed attestations and lost \
+         rewards."
+      "ignore-l1-history-check"
+
+  let ignore_l1_history_check =
+    switch_to_cmdliner ignore_l1_history_check_switch
 
   let attester_profile_printer = Signature.Public_key_hash.pp
 
@@ -404,7 +446,7 @@ module Term = struct
       let error () =
         Format.kasprintf
           (fun s -> Error s)
-          "Unrecognized profile for %s (expected non-negative integer, got %s)"
+          "Unrecognized value for %s (expected non-negative integer, got %s)"
           name
           string
       in
@@ -478,12 +520,17 @@ module Term = struct
   let peers = arg_to_cmdliner peers_arg
 
   let metrics_addr_arg =
+    let default_addr, _ = Configuration_file.default.listen_addr in
     let default_port = Configuration_file.default_metrics_port in
-    let parse, pp = p2p_point_format ~default_port in
+    let parse, pp = p2p_point_format ~default_addr ~default_port in
     make_arg
       ~doc:
-        "The TCP address and optionally the port of the node's metrics server. \
-         The default address is 0.0.0.0. The default port is 11733."
+        (Format.asprintf
+           "The TCP address and optionally the port of the node's metrics \
+            server. The default address is %a. The default port is %d."
+           P2p_addr.pp
+           default_addr
+           default_port)
       ~placeholder:"ADDR[:PORT]"
       ~pp
       ~parse
@@ -494,12 +541,14 @@ module Term = struct
   let history_mode_arg =
     let open Result_syntax in
     let doc =
-      "The duration for the shards to be kept in the node storage. Either a \
-       number, the string \"full\" or the string \"auto\". A number is \
-       interpreted as the number of blocks the shards should be kept; the \
-       string \"full\" means no shard deletion, the string \"auto\" means the \
-       default of the profile: 3 months for an operator, twice the attestation \
-       lag for an attester and other profiles."
+      Format.sprintf
+        "The duration for the shards to be kept in the node storage. Either a \
+         number, the string \"full\" or the string \"auto\". A number is \
+         interpreted as the number of levels the shards should be kept; the \
+         string \"full\" means no shard deletion, the string \"auto\" means \
+         the default of the profile: about 3 months for an operator, %d levels \
+         for the other controller profiles."
+        Constants.shard_retention_period_in_levels
     in
     let decoder =
       Configuration_file.(
@@ -556,6 +605,24 @@ module Term = struct
 
   let service_namespace = arg_to_cmdliner service_namespace_arg
 
+  let telemetry_env_name_env =
+    make_env
+      ~docs:"Opentelemetry"
+      ~doc:"Enable to provide an opentelemetry environement name"
+      "OTEL_ENV_NAME"
+
+  let telemetry_env_name_arg =
+    make_arg
+      ~doc:
+        "A name that describes the environment in which the node is running. \
+         This name can appear in observability data such as traces."
+      ~env:telemetry_env_name_env
+      ~parse:Result.ok
+      ~pp:Format.pp_print_string
+      "telemetry-env"
+
+  let telemetry_env = arg_to_cmdliner telemetry_env_name_arg
+
   let fetch_trusted_setup_arg =
     make_arg
       ~doc:
@@ -571,11 +638,13 @@ module Term = struct
   let disable_shard_validation_switch =
     make_switch
       ~doc:
-        "Disable the shard verification. This is used conjoyintly with the \
-         `TEZOS_DISABLE_SHARD_VERIFICATION_I_KNOW_WHAT_I_AM_DOING` environment \
-         variable. To actually disable the shard verification this option must \
-         be used and the environment variable must be set. If only the \
-         environment variable is set, the DAL node will refuse to start. "
+        (Format.asprintf
+           "Disable the shard verification. This is used conjointly with the \
+            `%s` environment variable. To actually disable the shard \
+            verification this option must be used and the environment variable \
+            must be set. If only the environment variable is set, the DAL node \
+            will refuse to start."
+           disable_shard_validation_environment_variable)
       "disable-shard-validation"
 
   let disable_shard_validation =
@@ -595,6 +664,22 @@ module Term = struct
       "disable-amplification"
 
   let disable_amplification = switch_to_cmdliner disable_amplification_switch
+
+  let banned_addrs_arg =
+    make_arg_list
+      ~doc:
+        "A list of IP addresses to ban. Connections from/to these addresses \
+         will be rejected by the P2P layer."
+      ~placeholder:"ADDR1,ADDR2,..."
+      ~format:
+        ( (fun s ->
+            match P2p_addr.of_string_opt s with
+            | Some addr -> Ok addr
+            | None -> Error (Format.asprintf "Cannot parse IP address: %s" s)),
+          P2p_addr.pp )
+      "ban-addr"
+
+  let banned_addrs = arg_to_cmdliner banned_addrs_arg
 
   let ignore_topics_arg =
     make_arg_list
@@ -672,10 +757,10 @@ let wrap_with_error main_promise =
   let open Lwt_syntax in
   let* r = Lwt_exit.wrap_and_exit main_promise in
   match r with
-  | Ok () -> Lwt_exit.exit_and_wait 0
+  | Ok () -> Lwt_exit.exit_and_wait Errors.Exit_codes.ok
   | Error err ->
       let* () = Lwt_io.eprint (Format.asprintf "%a" pp_print_trace err) in
-      Lwt_exit.exit_and_wait 1
+      Lwt_exit.exit_and_wait Errors.Exit_codes.some_error
 
 (** [wrap_action action] is the main entry point wrapper for DAL node commands.
     It sets up the exception filter to handle all exceptions except runtime ones,
@@ -696,7 +781,7 @@ module Run = struct
 
   let info =
     let version = Tezos_version_value.Bin_version.octez_version_string in
-    Cmdliner.Cmd.info ~doc:"Run the Octez DAL node" ~man ~version "run"
+    Cmdliner.Cmd.info ~exits ~doc:"Run the Octez DAL node" ~man ~version "run"
 
   let action =
    fun data_dir
@@ -717,14 +802,17 @@ module Run = struct
        history_mode
        service_name
        service_namespace
+       telemetry_env
        fetch_trusted_setup
        disable_shard_validation
        verbose
        ignore_l1_config_peers
        disable_amplification
+       banned_addrs
        ignore_topics
        batching_configuration
-       publish_slots_regularly ->
+       publish_slots_regularly
+       ignore_l1_history_check ->
     let open Lwt_result_syntax in
     let data_dir =
       Option.value ~default:Configuration_file.default.data_dir data_dir
@@ -752,10 +840,12 @@ module Run = struct
         ?history_mode
         ?service_name
         ?service_namespace
+        ?telemetry_env
         ?fetch_trusted_setup
         ~verbose
         ~ignore_l1_config_peers
         ~disable_amplification
+        ?banned_addrs
         ?batching_configuration
         ?publish_slots_regularly
     in
@@ -803,8 +893,17 @@ module Run = struct
           allow_publication_regularly
       else return_unit
     in
+    let*! () = Lwt_utils_unix.create_dir data_dir in
+    let lock_file = Filename.concat data_dir "lock" in
+    Lwt_lock_file.with_lock
+      ~when_locked:
+        (`Fail
+           (Exn (Failure "DAL node data directory is locked by another process")))
+      ~filename:lock_file
+    @@ fun () ->
     Daemon.run
       ~disable_shard_validation
+      ~ignore_l1_history_check
       ~ignore_pkhs
       ~data_dir
       ~config_file
@@ -820,10 +919,11 @@ module Run = struct
        $ net_addr $ public_addr $ endpoint $ slots_backup_uris
        $ trust_slots_backup_uris $ metrics_addr $ attester_profile
        $ operator_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
-       $ disable_shard_validation $ verbose $ ignore_l1_config_peers
-       $ disable_amplification $ ignore_topics $ batching_configuration
-       $ publish_slots_regularly))
+       $ history_mode $ service_name $ service_namespace $ telemetry_env
+       $ fetch_trusted_setup $ disable_shard_validation $ verbose
+       $ ignore_l1_config_peers $ disable_amplification $ banned_addrs
+       $ ignore_topics $ batching_configuration $ publish_slots_regularly
+       $ ignore_l1_history_check))
 
   let cmd = Cmdliner.Cmd.v info term
 end
@@ -862,6 +962,7 @@ module Config = struct
        verbose
        ignore_l1_config_peers
        disable_amplification
+       banned_addrs
        batching_configuration ->
     let open Lwt_result_syntax in
     let data_dir =
@@ -893,6 +994,7 @@ module Config = struct
         ~verbose
         ~ignore_l1_config_peers
         ~disable_amplification
+        ?banned_addrs
         ?batching_configuration
     in
     action ~config_file ~configuration_override
@@ -907,8 +1009,12 @@ module Config = struct
        $ trust_slots_backup_uris $ metrics_addr $ attester_profile
        $ operator_profile $ observer_profile $ bootstrap_profile $ peers
        $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
-       $ verbose $ ignore_l1_config_peers $ disable_amplification
+       $ verbose $ ignore_l1_config_peers $ disable_amplification $ banned_addrs
        $ batching_configuration))
+
+  let print_trace ~error_trace =
+    Format.eprintf "Failure: %a" Error_monad.pp_print_trace error_trace ;
+    Lwt.return_unit
 
   module Init = struct
     let man =
@@ -918,20 +1024,53 @@ module Config = struct
           "This command creates a configuration file with the parameters \
            provided on the command-line, if no configuration file exists \
            already in the specified or default location. Otherwise, the \
-           command-line parameters override the existing ones, and old \
-           parameters are lost. This configuration is then used by the run \
-           command.";
+           command fails, use reset instead. This configuration is then used \
+           by the run command.";
       ]
 
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
-      Cmdliner.Cmd.info ~doc:"Configuration initialisation" ~man ~version "init"
+      Cmdliner.Cmd.info
+        ~exits
+        ~doc:"Configuration initialisation"
+        ~man
+        ~version
+        "init"
 
     let action =
       mk_action @@ fun ~config_file ~configuration_override ->
-      Configuration_file.save
-        ~config_file
-        (configuration_override Configuration_file.default)
+      Configuration_file.exit_on_configuration_error ~emit:print_trace
+      @@ Configuration_file.save
+           ~allow_overwrite:false
+           ~config_file
+           (configuration_override Configuration_file.default)
+
+    let term = mk_term action
+
+    let cmd = Cmdliner.Cmd.v info term
+  end
+
+  module Reset = struct
+    let man =
+      [
+        `S "DESCRIPTION";
+        `P
+          "This command replace the existing configuration file in the \
+           specified or default location with the parameters provided on the \
+           command-line. This configuration is then used by the run command.";
+      ]
+
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~exits ~doc:"Configuration reset" ~man ~version "reset"
+
+    let action =
+      mk_action @@ fun ~config_file ~configuration_override ->
+      Configuration_file.exit_on_configuration_error ~emit:print_trace
+      @@ Configuration_file.save
+           ~allow_overwrite:true
+           ~config_file
+           (configuration_override Configuration_file.default)
 
     let term = mk_term action
 
@@ -950,13 +1089,22 @@ module Config = struct
 
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
-      Cmdliner.Cmd.info ~doc:"Configuration update" ~man ~version "update"
+      Cmdliner.Cmd.info
+        ~exits
+        ~doc:"Configuration update"
+        ~man
+        ~version
+        "update"
 
     let action =
       mk_action @@ fun ~config_file ~configuration_override ->
       let open Lwt_result_syntax in
-      let* configuration = Configuration_file.load ~config_file in
+      let* configuration =
+        Configuration_file.exit_on_configuration_error ~emit:print_trace
+        @@ Configuration_file.load ~config_file ()
+      in
       Configuration_file.save
+        ~allow_overwrite:true
         ~config_file
         (configuration_override configuration)
 
@@ -970,12 +1118,184 @@ module Config = struct
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info
+        ~exits
         ~doc:"Manage the Octez DAL node configuration"
         ~man
         ~version
         "config"
     in
-    Cmdliner.Cmd.group ~default info [Init.cmd; Update.cmd]
+    Cmdliner.Cmd.group ~default info [Init.cmd; Reset.cmd; Update.cmd]
+end
+
+module Snapshot = struct
+  let man =
+    [
+      `S "SNAPSHOT DESCRIPTION";
+      `P "Entrypoint for snapshot management commands.";
+    ]
+
+  let slots_format = Term.positive_int_format "slots"
+
+  let slots_arg =
+    Term.make_arg_list
+      ~doc:
+        "The indexes of the slots to handle. If empty, all slots are handled."
+      ~placeholder:"INDEX1,INDEX2,..."
+      ~format:slots_format
+      "slots"
+
+  let slots = Term.arg_to_cmdliner slots_arg
+
+  let min_published_level_arg doc =
+    let open Term in
+    let parse, pp = positive_int_format "min-published-level" in
+    make_arg ~doc ~parse ~placeholder:"INT" ~pp "min-published-level"
+
+  let min_published_level doc =
+    Term.arg_to_cmdliner (min_published_level_arg doc)
+
+  let max_published_level_arg doc =
+    let open Term in
+    let parse, pp = positive_int_format "max-published-level" in
+    make_arg ~doc ~parse ~placeholder:"INT" ~pp "max-published-level"
+
+  let max_published_level doc =
+    Term.arg_to_cmdliner (max_published_level_arg doc)
+
+  let file_path doc =
+    let open Cmdliner in
+    Arg.(required & pos 0 (some string) None & info ~docv:"DIR" ~doc [])
+
+  module Export = struct
+    let man =
+      [
+        `S "DESCRIPTION";
+        `P
+          "Export DAL node data to another data directory. By default, the \
+           export produces a plain data directory. Use --compress to produce a \
+           compressed tar archive instead.";
+      ]
+
+    let compress =
+      let open Cmdliner in
+      let doc =
+        "Export as a compressed tar archive instead of a plain data directory."
+      in
+      Arg.(value & flag & info ~doc ["compress"])
+
+    let skip_shards =
+      let open Cmdliner in
+      let doc = "Do not export or import shards." in
+      Arg.(value & flag & info ~doc ["skip-shards"])
+
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~exits ~doc:"Export snapshot" ~man ~version "export"
+
+    let action min_published_level max_published_level slots data_dir endpoint
+        config_file compress skip_shards file_path =
+      let data_dir =
+        Option.value ~default:Configuration_file.default.data_dir data_dir
+      in
+      let config_file =
+        Option.value
+          ~default:(Configuration_file.default_config_file data_dir)
+          config_file
+      in
+      let min_level = Option.map Int32.of_int min_published_level in
+      let max_level = Option.map Int32.of_int max_published_level in
+      Snapshot.export
+        ~compress
+        ~skip_shards
+        ~data_dir
+        ~config_file
+        ~endpoint
+        ~min_published_level:min_level
+        ~max_published_level:max_level
+        ~slots
+        file_path
+
+    let term =
+      Cmdliner.Term.(
+        map
+          wrap_action
+          (const action
+          $ min_published_level "Minimum published level to export."
+          $ max_published_level "Maximum published level to export."
+          $ slots $ Term.data_dir $ Term.endpoint $ Term.config_file $ compress
+          $ skip_shards
+          $ file_path "Path to the destination data directory."))
+
+    let cmd = Cmdliner.Cmd.v info term
+  end
+
+  module Import = struct
+    let man =
+      [`S "DESCRIPTION"; `P "Import DAL node data from another data directory."]
+
+    let no_check =
+      let open Cmdliner in
+      let doc = "Skip validation checks during import." in
+      Arg.(value & flag & info ~doc ["no-check"])
+
+    let skip_shards =
+      let open Cmdliner in
+      let doc = "Do not export or import shards." in
+      Arg.(value & flag & info ~doc ["skip-shards"])
+
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~exits ~doc:"Import snapshot" ~man ~version "import"
+
+    let action min_published_level max_published_level slots data_dir endpoint
+        config_file no_check skip_shards file_path =
+      let data_dir =
+        Option.value ~default:Configuration_file.default.data_dir data_dir
+      in
+      let config_file =
+        Option.value
+          ~default:(Configuration_file.default_config_file data_dir)
+          config_file
+      in
+      let min_level = Option.map Int32.of_int min_published_level in
+      let max_level = Option.map Int32.of_int max_published_level in
+      Snapshot.import
+        ~check:(not no_check)
+        ~skip_shards
+        ~data_dir
+        ~config_file
+        ~endpoint
+        ~min_published_level:min_level
+        ~max_published_level:max_level
+        ~slots
+        file_path
+
+    let term =
+      Cmdliner.Term.(
+        map
+          wrap_action
+          (const action
+          $ min_published_level "Minimum published level to import."
+          $ max_published_level "Maximum published level to import."
+          $ slots $ Term.data_dir $ Term.endpoint $ Term.config_file $ no_check
+          $ skip_shards
+          $ file_path "Path to the source data directory to import from."))
+
+    let cmd = Cmdliner.Cmd.v info term
+  end
+
+  let cmd =
+    let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info
+        ~exits
+        ~doc:"Snapshot management"
+        ~man
+        ~version
+        "snapshot"
+    in
+    Cmdliner.Cmd.group ~default info [Export.cmd; Import.cmd]
 end
 
 module Debug = struct
@@ -1004,7 +1324,12 @@ module Debug = struct
 
         let info =
           let version = Tezos_version_value.Bin_version.octez_version_string in
-          Cmdliner.Cmd.info ~doc:"Print SQL statements" ~man ~version "schemas"
+          Cmdliner.Cmd.info
+            ~exits
+            ~doc:"Print SQL statements"
+            ~man
+            ~version
+            "schemas"
 
         let action () =
           Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
@@ -1024,6 +1349,7 @@ module Debug = struct
         let info =
           let version = Tezos_version_value.Bin_version.octez_version_string in
           Cmdliner.Cmd.info
+            ~exits
             ~doc:"Print DAL node store debug information"
             ~man
             ~version
@@ -1036,7 +1362,12 @@ module Debug = struct
       let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
       let info =
         let version = Tezos_version_value.Bin_version.octez_version_string in
-        Cmdliner.Cmd.info ~doc:"Print debug information" ~man ~version "print"
+        Cmdliner.Cmd.info
+          ~exits
+          ~doc:"Print debug information"
+          ~man
+          ~version
+          "print"
       in
       Cmdliner.Cmd.group ~default info [Store.cmd]
   end
@@ -1045,7 +1376,7 @@ module Debug = struct
     let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
-      Cmdliner.Cmd.info ~doc:"Debug commands" ~man ~version "debug"
+      Cmdliner.Cmd.info ~exits ~doc:"Debug commands" ~man ~version "debug"
     in
     Cmdliner.Cmd.group ~default info [Print.cmd]
 end
@@ -1057,10 +1388,11 @@ module Action = struct
       ?public_addr ?endpoint ?slots_backup_uris
       ?(trust_slots_backup_uris = false) ?metrics_addr ?attesters ?operators
       ?observers ?(bootstrap = false) ?peers ?history_mode ?service_name
-      ?service_namespace ?fetch_trusted_setup
+      ?service_namespace ?telemetry_env ?fetch_trusted_setup
       ?(disable_shard_validation = false) ?(verbose = false)
       ?(ignore_l1_config_peers = false) ?(disable_amplification = false)
-      ?ignore_topics ?batching_configuration ?publish_slots_regularly () =
+      ?banned_addrs ?ignore_topics ?batching_configuration
+      ?publish_slots_regularly ?(ignore_l1_history_check = false) () =
     Run.action
       data_dir
       config_file
@@ -1080,14 +1412,17 @@ module Action = struct
       history_mode
       service_name
       service_namespace
+      telemetry_env
       fetch_trusted_setup
       disable_shard_validation
       verbose
       ignore_l1_config_peers
       disable_amplification
+      banned_addrs
       ignore_topics
       batching_configuration
       publish_slots_regularly
+      ignore_l1_history_check
 
   let mk_config_action action =
    fun ?data_dir
@@ -1112,6 +1447,7 @@ module Action = struct
        ?(verbose = false)
        ?(ignore_l1_config_peers = false)
        ?(disable_amplification = false)
+       ?banned_addrs
        ?batching_configuration
        () ->
     action
@@ -1137,9 +1473,12 @@ module Action = struct
       verbose
       ignore_l1_config_peers
       disable_amplification
+      banned_addrs
       batching_configuration
 
   let config_init = mk_config_action Config.Init.action
+
+  let config_reset = mk_config_action Config.Reset.action
 
   let config_update = mk_config_action Config.Update.action
 
@@ -1150,6 +1489,9 @@ let commands =
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =
     let version = Tezos_version_value.Bin_version.octez_version_string in
-    Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~version "octez-dal-node"
+    Cmdliner.Cmd.info ~exits ~doc:"The Octez DAL node" ~version "octez-dal-node"
   in
-  Cmdliner.Cmd.group ~default info [Run.cmd; Config.cmd; Debug.cmd]
+  Cmdliner.Cmd.group
+    ~default
+    info
+    [Run.cmd; Config.cmd; Snapshot.cmd; Debug.cmd]

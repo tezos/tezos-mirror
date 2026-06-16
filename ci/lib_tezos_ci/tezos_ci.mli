@@ -184,61 +184,30 @@ module Pipeline : sig
 end
 
 module Cache : sig
-  (** Add variable enabling dune cache.
+  (** Adds a GitLab CI cache for the DUNE_CACHE_ROOT folder.
 
     This function can be applied to jobs that run dune.
 
-    - [key] and [path] configure the key under which the cache is
-    stored, and the path that will be cached. By default, the [key]
-    contains the name of the job, thus scoping the cache to all
-    instances of that job. By default, [path] is the folder
-    ["$CI_PROJECT_DIR/_dune_cache"], and this function also sets the
-    environment dir [DUNE_CACHE_ROOT] such that dune stores its caches
-    there.
+    It adds variables enabling dune cache. It also adds a [cache] where
+    the {!cache_key} is the job name and with a [pull-push] cache policy: i.e. the
+    cache is pulled when the job starts, and is pushed when the job
+    finishes.
 
-    - [cache_size] sets the maximum size of the cache.
-
-   - [copy_mode], if [true] (default is [false]) sets
-    {{:https://dune.readthedocs.io/en/stable/caching.html#cache-storage-mode}Dune
-    Cache Storage Mode} to [copy]. If [false], [hardlink] mode is
-    used, which is typically more performant but requires that the
-    build and cache folder be on the same volume. *)
-  val enable_dune_cache :
-    ?key:string ->
-    ?path:string ->
-    ?cache_size:string ->
-    ?copy_mode:bool ->
-    ?policy:Gitlab_ci.Types.cache_policy ->
-    tezos_job ->
-    tezos_job
+   *)
+  val enable_dune_cache : tezos_job -> tezos_job
 
   (** Add variable enabling sccache.
 
     This function should be applied to jobs that build rust files and
     which has a configured sccache Gitlab CI cache.
 
-    - [key] and [path] configure the key under which the cache is
-    stored, and the path that will be cached. By default, the [key]
-    contains the name of the job, thus scoping the cache to all
-    instances of that job. By default, [path] is the folder
-    ["$CI_PROJECT_DIR/_sccache"], and this function also sets the
-    environment dir [SCCACHE_DIR] such that sccache stores its caches
-    there.
-
-    - [cache_size] sets the environment variable [SCCACHE_CACHE_SIZE]
-    that configures the maximum size of the cache.
-
-    - [error_log], [idle_timeout] and [log] sets the environment
-    variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
-    [SCCACHE_LOG] respectively. See the sccache documentation for more
-    information on these variables. *)
+    - [error_log] and [log] sets the environment
+    variables [SCCACHE_ERROR_LOG] and [SCCACHE_LOG] respectively.
+    See the sccache documentation for more information on these variables. *)
   val enable_sccache :
-    ?key:string ->
     ?error_log:string ->
-    ?idle_timeout:string ->
     ?log:string ->
-    ?path:string ->
-    ?cache_size:string ->
+    ?policy:Gitlab_ci.Types.cache_policy ->
     tezos_job ->
     tezos_job
 
@@ -278,27 +247,12 @@ module Image : sig
   (** A registered Docker image in which a job can execute. *)
   type t
 
+  (* FIXME do not expose this builder.
+     Requires non-trivial refactoring as used in some jobs.
+     Check via [git grep -B3 "mk_external" ci/lib_tezos_ci_jobs] *)
+
   (** Register an external image of the given [image_path]. *)
   val mk_external : image_path:string -> t
-
-  (** Register internal image for [image_path] built by [image_builder_amd64].
-
-      Optionally, a builder for an arm64 version of the image can be
-      registered by supplying [image_builder_arm64]. If
-      [image_builder_arm64] is supplied, then it must have a distinct
-      name from [image_builder_amd64].
-
-      Note: the name of the image builder(s) must uniquely identify the
-      job definition. If two image builders with the same name but
-      differing job definitions (as per polymorphic comparison of the
-      underlying {!Gitlab_ci.Types.job}) are registered, then this
-      function throws a run-time error. *)
-  val mk_internal :
-    ?image_builder_arm64:tezos_job ->
-    image_builder_amd64:tezos_job ->
-    image_path:string ->
-    unit ->
-    t
 end
 
 (** Changesets are used to specify [changes:] clauses in rules.
@@ -447,7 +401,6 @@ val job :
   ?storage:Runner.Storage.t ->
   ?interruptible_runner:bool ->
   ?git_strategy:git_strategy ->
-  ?coverage:string ->
   ?retry:Gitlab_ci.Types.retry ->
   ?parallel:Gitlab_ci.Types.parallel ->
   ?description:string ->
@@ -543,20 +496,6 @@ val append_after_script : string list -> tezos_job -> tezos_job
     Has no effect on {!trigger_job}s. *)
 val with_interruptible : bool -> tezos_job -> tezos_job
 
-(** A [script:] that executes a given command and propagates its exit code.
-
-    This might seem like a noop but is in fact necessary to please his majesty GitLab.
-
-    For more info, see:
-     - https://gitlab.com/tezos/tezos/-/merge_requests/9923#note_1538894754;
-     - https://gitlab.com/tezos/tezos/-/merge_requests/12141; and
-     - https://gitlab.com/groups/gitlab-org/-/epics/6074
-
-   TODO: replace this with [FF_USE_NEW_BASH_EVAL_STRATEGY=true], see
-   {{:https://docs.gitlab.com/runner/configuration/feature-flags.html}GitLab
-   Runner feature flags}. *)
-val script_propagate_exit_code : string -> string list
-
 val job_docker_authenticated :
   ?skip_docker_initialization:bool ->
   ?ci_docker_hub:bool ->
@@ -591,8 +530,6 @@ module Stages : sig
 
   val test : Stage.t
 
-  val test_coverage : Stage.t
-
   val packaging : Stage.t
 
   val publish : Stage.t
@@ -609,8 +546,6 @@ module Images_external : sig
 
   val datadog_ci : Image.t
 
-  val ci_release : Image.t
-
   val hadolint : Image.t
 
   val semgrep_agent : Image.t
@@ -623,27 +558,17 @@ module Images : sig
 
   val datadog_ci : Image.t
 
-  val ci_release : Image.t
-
   val hadolint : Image.t
 
   val semgrep_agent : Image.t
 
   val macosx_15 : Image.t
 
-  val client_libs_dependencies : Image.t
-
   val rust_toolchain : Image.t
-
-  val rust_toolchain_master : Image.t
 
   val rust_sdk_bindings : Image.t
 
   val trivy : Image.t
-
-  val jsonnet : Image.t
-
-  val jsonnet_master : Image.t
 
   module CI : sig
     val job_docker_ci :
@@ -678,37 +603,38 @@ module Images : sig
 
     val rpm_version : string
 
-    val homebrew_version : string
-
-    val rust_toolchain_version : string
-
-    val debian_unstable : Image.t
-
     val debian_bookworm : Image.t
 
     val debian_trixie : Image.t
 
-    val ubuntu_noble : Image.t
+    val debian_jsonnet_trixie : Image.t
 
-    val ubuntu_jammy : Image.t
+    val ubuntu_22_04 : Image.t
 
-    val ubuntu_plucky : Image.t
+    val ubuntu_24_04 : Image.t
 
-    val rockylinux_9_3 : Image.t
+    val ubuntu_26_04 : Image.t
 
-    val rockylinux_9_6 : Image.t
+    val rockylinux_9 : Image.t
 
-    val rockylinux_10_0 : Image.t
+    (* FIXME: Images.rockylinux_10 is currently not used in the CI
+       code. However the corresponding base image is used but called
+       via an interpolated string:
+       cf. https://gitlab.com/tezos/tezos/-/blob/fc6f196b819642ce7c3a39f588de00bd8ebc28e8/.gitlab/ci/pipelines/rpm.daily.yml#L58
+       "${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-03271731"
+       We choose to keep this expression
+       for now anticipating a future refactoring that would use it. *)
+    val rockylinux_10 : Image.t
 
     val fedora_39 : Image.t
 
-    val fedora_41 : Image.t
-
     val fedora_42 : Image.t
 
-    val homebrew : Image.t
+    val debian_homebrew_trixie : Image.t
 
-    val rust_toolchain_trixie : Image.t
+    val debian_rust_trixie : Image.t
+
+    val ci_release : Image.t
   end
 end
 
@@ -717,62 +643,12 @@ val id_tokens : Gitlab_ci.Types.id_tokens
 
 val job_datadog_pipeline_trace : tezos_job
 
-module Coverage : sig
-  (** Coverage-related helpers. *)
-
-  (** Add the [COVERAGE_OPTIONS] variable to enable [bisect_ppx].
-
-      This function should be applied in jobs that build executables such that:
-      - at least part of the code is in OCaml;
-      - at least one of these executables is used in test jobs;
-      - we want coverage reports for those tests.
-
-      Note that this includes not only build jobs but also some test jobs
-      in which we both build and run tests. *)
-  val enable_instrumentation : tezos_job -> tezos_job
-
-  (** Add the [BISECT_FILE] variable to specify the location of the coverage trace.
-
-      This function should be applied to jobs that produce or consume coverage traces.
-      This includes test jobs and jobs like [unified_coverage].
-      This also enables coverage trace output for instrumented executables. *)
-  val enable_location : tezos_job -> tezos_job
-
-  (** Add the coverage report artifact and the [SLACK_COVERAGE_CHANNEL] variable.
-
-      This is meant to be used in [unified_coverage] jobs. *)
-  val enable_report : tezos_job -> tezos_job
-
-  (** Declare that a job produces coverage traces.
-
-      This has the following effects:
-      - add the coverage trace artifact;
-      - append [merge_coverage.sh];
-      - applies {!enable_location};
-      - registers the job so that it is used by {!close}.
-
-      This function should be applied to test jobs that produce coverage traces. *)
-  val enable_output_artifact :
-    ?expire_in:Gitlab_ci.Types.expiration -> tezos_job -> tezos_job
-
-  (** Generate the [unified_coverage] job.
-
-      After this, {!enable_output_artifact} cannot be called anymore,
-      except on jobs with the same name as a job on which {!enable_output_artifact}
-      was already applied.
-
-      The first time this is called, this creates the job
-      and generates [script-inputs/ci-coverage-producing-jobs].
-      After that, [close] just returns the already-computed [unified_coverage] job.
-
-      The argument is the changeset to use to trigger the [unified_coverage] job.
-      It is supposed to be [changeset_octez], which is unfortunately not defined
-      in [Tezos_ci] but in [ci/bin]. *)
-  val close : Changeset.t -> tezos_job
-end
+(* Toggle to enable security scan jobs. Jobs activated if set to [true]. Currently set to [false]. *)
+val container_scanning_flag : bool
 
 (** Add common variables used by jobs compiling kernels *)
 val enable_kernels : tezos_job -> tezos_job
 
-(** Get the number of times the [job] function was called. *)
-val get_number_of_declared_jobs : unit -> int
+(** Get the names and locations of the jobs that were registered with the [job] function. *)
+val get_declared_jobs :
+  unit -> (string * int * int * int) Gitlab_ci.Base.String_map.t

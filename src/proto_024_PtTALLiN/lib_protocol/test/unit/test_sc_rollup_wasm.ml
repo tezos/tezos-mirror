@@ -212,7 +212,7 @@ let test_output () =
 
   let*! dummy = Context.init "/tmp" in
   let dummy_context = Context.empty dummy in
-  let (empty_tree : Wasm.tree) = Context.Tree.empty dummy_context in
+  let (empty_tree : Wasm.state) = Context.Tree.empty dummy_context in
   let parsed = Parse.string_to_module modul in
   let parsed =
     match parsed.it with Script.Textual m -> m | _ -> assert false
@@ -395,7 +395,7 @@ let test_reveal_host_function_can_request_dal_pages () =
   let payload_value, kernel =
     request_dal_module 10l Dal.Slot_index.zero 4 100l 200l 4_096l
   in
-  let* tree = Wasm_utils.initial_tree ~version:V3 kernel in
+  let* tree = Wasm_utils.initial_state ~version:V3 kernel in
   let* tree = Wasm_utils.set_empty_inbox_step 0l tree in
   let* tree =
     Wasm_utils.eval_until_input_requested ~reveal_builtins:None tree

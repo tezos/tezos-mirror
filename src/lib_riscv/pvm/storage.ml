@@ -14,7 +14,32 @@ end
 module State = struct
   type t = Api.state
 
+  let live_count = Atomic.make 0
+
+  let get_live_count () = Atomic.get live_count
+
+  let track state =
+    Atomic.incr live_count ;
+    Gc.finalise_last (fun () -> Atomic.decr live_count) state ;
+    state
+
   let equal state1 state2 = Api.octez_riscv_storage_state_equal state1 state2
+end
+
+module Mutable_state = struct
+  type t = Api.mut_state
+
+  let live_count = Atomic.make 0
+
+  let get_live_count () = Atomic.get live_count
+
+  let track state =
+    Atomic.incr live_count ;
+    Gc.finalise_last (fun () -> Atomic.decr live_count) state ;
+    state
+
+  let equal state1 state2 =
+    Api.octez_riscv_storage_mut_state_equal state1 state2
 end
 
 module Id = struct
@@ -36,9 +61,11 @@ let close repo =
   Api.octez_riscv_storage_close repo ;
   Lwt.return_unit
 
-let checkout repo id = Lwt.return (Api.octez_riscv_storage_checkout repo id)
+let checkout repo id =
+  Lwt.return
+    (Option.map Mutable_state.track (Api.octez_riscv_storage_checkout repo id))
 
-let empty () = Api.octez_riscv_storage_state_empty ()
+let empty () = Mutable_state.track (Api.octez_riscv_storage_mut_state_empty ())
 
 let commit ?message:_ repo state =
   Lwt.return (Api.octez_riscv_storage_commit repo state)
@@ -68,10 +95,15 @@ let find state key =
 (* Only used to inspect the durable storage, currently not supported *)
 let lookup _state _key = raise (Invalid_argument "lookup not implemented")
 
-let set _state key substate =
+let set state key substate =
   (* The entire context is the PVM state, no other keys are supported *)
-  if key == pvm_state_key then Lwt.return substate
-  else raise (Invalid_argument "key not supported")
+  if key != pvm_state_key then raise (Invalid_argument "key not supported") ;
+  (* substate should have been obtained by modifying state *)
+  if state != substate then
+    raise
+      (Invalid_argument
+         "state update not supported, modify mutable state instead") ;
+  Lwt.return_unit
 
 (* Only used for internal testing of the rollup node, not supported *)
 let add _state _key _bytes = raise (Invalid_argument "add not implemented")

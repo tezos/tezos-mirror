@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_riscv_nds_disk_api)
+ (public_name octez-riscv-nds-disk-api)
+ (instrumentation (backend bisect_ppx))
+ (flags
+  (:standard)
+  -w -9-27-66)
+ (modules octez_riscv_durable_storage_on_disk_api))
+
+(copy_files
+ ../../../riscv/durable-on-disk/octez_riscv_durable_storage_on_disk_api.*)

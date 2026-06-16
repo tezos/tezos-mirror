@@ -1,25 +1,26 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 use num_bigint::{BigInt, Sign, TryFromBigIntError};
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeySignatureVerifier;
+use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::{
     operation::{
         serialize_unsigned_operation, ManagerOperation, ManagerOperationContent,
-        OperationContent,
+        ManagerOperationContentConv, ManagerOperationField, OperationContent,
     },
     operation_result::{Balance, CounterError, UpdateOrigin, ValidityError},
 };
 
 use crate::{
-    account_storage::{Manager, TezlinkAccount, TezlinkImplicitAccount},
+    account_storage::{Manager, TezlinkAccount, TezosImplicitAccount},
     context::Context,
     gas::TezlinkOperationGas,
     BalanceUpdate,
@@ -30,7 +31,6 @@ use crate::{
 /// successor of the stored counter. If not, it returns the appropriate
 /// error.
 fn check_and_increment_counter(
-    host: &impl Runtime,
     account_counter: &mut Narith,
     operation_counter: &Narith,
 ) -> Result<(), ValidityError> {
@@ -38,7 +38,6 @@ fn check_and_increment_counter(
     let expected_counter = Narith(&account_counter.0 + 1_u64);
     if &expected_counter == operation_counter {
         log!(
-            host,
             Debug,
             "Validation: OK - Operation has the expected counter {:?}.",
             expected_counter
@@ -52,14 +51,12 @@ fn check_and_increment_counter(
     };
     if error.expected > error.found {
         log!(
-            host,
             tezos_evm_logging::Level::Debug,
             "Invalid operation: Source counter is in the past"
         );
         Err(ValidityError::CounterInThePast(error))
     } else {
         log!(
-            host,
             tezos_evm_logging::Level::Debug,
             "Invalid operation: Source counter is in the future"
         );
@@ -100,9 +97,9 @@ fn compute_fees_balance_updates(
 /// making it a special case. In this case, we obtain the public key
 /// from the operation's payload. When processing a batch, the reveal operation is the
 /// first operation on it.
-fn get_revealed_key<Host: Runtime>(
+fn get_revealed_key<Host: StorageV1, A: TezosImplicitAccount>(
     host: &Host,
-    account: &TezlinkImplicitAccount,
+    account: &A,
     first_content: &ManagerOperationContent,
 ) -> Result<PublicKey, ValidityError> {
     match first_content {
@@ -133,20 +130,21 @@ fn check_storage_limit(
     }
 }
 
-fn validate_source<Host: Runtime>(
+fn validate_source<Host: StorageV1, C: Context>(
     host: &Host,
-    context: &Context,
+    context: &C,
     content: &[ManagerOperationContent],
-) -> Result<(PublicKey, TezlinkImplicitAccount), ValidityError> {
-    let source = &content[0].source();
+) -> Result<(PublicKey, C::ImplicitAccountType), ValidityError> {
+    let source = &content[0].source()?;
 
     for c in content {
-        if c.source() != *source {
+        if c.source()? != *source {
             return Err(ValidityError::MultipleSources);
         }
     }
 
-    let account = TezlinkImplicitAccount::from_public_key_hash(context, source)
+    let account = context
+        .implicit_from_public_key_hash(source)
         .map_err(|_| ValidityError::FailedToFetchAccount)?;
 
     // Account must exist in the durable storage
@@ -162,8 +160,7 @@ fn validate_source<Host: Runtime>(
     Ok((pk, account))
 }
 
-fn validate_individual_operation<Host: Runtime>(
-    host: &Host,
+fn validate_individual_operation(
     content: ManagerOperation<OperationContent>,
     account_pkh: &PublicKeyHash,
     account_balance: &mut Narith,
@@ -171,12 +168,11 @@ fn validate_individual_operation<Host: Runtime>(
     mut gas: TezlinkOperationGas,
 ) -> Result<ValidatedOperation, ValidityError> {
     gas.consume(crate::gas::Cost::manager_operation())?;
-    check_and_increment_counter(host, account_counter, &content.counter)?;
+    check_and_increment_counter(account_counter, &content.counter)?;
     // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
     let hard_storage_limit = 60000_u64;
     check_storage_limit(&hard_storage_limit.into(), &content.storage_limit)?;
     log!(
-        host,
         Debug,
         "Validation: OK - the storage_limit {:?} does not exceed the {:?} threshold.",
         &content.storage_limit,
@@ -190,9 +186,7 @@ fn validate_individual_operation<Host: Runtime>(
         .ok_or(ValidityError::CantPayFees(content.fee.clone()))?
         .into();
 
-    log!(
-        host,
-        Debug,
+    log!(Debug,
         "Validation: OK - the source can pay {:?} in fees, being left with a new balance of {:?}.",
         &content.fee,
         account_balance
@@ -218,23 +212,26 @@ pub struct ValidatedOperation {
     pub content: ManagerOperation<OperationContent>,
 }
 
-pub struct ValidatedBatch {
-    pub source_account: TezlinkImplicitAccount,
+pub struct ValidatedBatch<A: TezosImplicitAccount> {
+    pub source_account: A,
+    // Used in TezosX to produce aliases
+    pub source_public_key: Vec<u8>,
     pub validated_operations: Vec<ValidatedOperation>,
 }
 
 pub fn verify_signature(
     content: &[ManagerOperationContent],
     signature: tezos_crypto_rs::hash::UnknownSignature,
-    branch: tezos_tezlink::enc_wrappers::BlockHash,
+    branch: tezos_crypto_rs::hash::BlockHash,
     pk: &PublicKey,
     validation_gas: &mut TezlinkOperationGas,
 ) -> Result<bool, ValidityError> {
     let serialized_unsigned_operation = serialize_unsigned_operation(&branch, content)
         .map_err(|_| ValidityError::InvalidSignature)?;
-    validation_gas.consume(crate::gas::Cost(
-        mir::gas::interpret_cost::check_signature(pk, &serialized_unsigned_operation)?,
-    ))?;
+    validation_gas.consume(crate::gas::Cost::check_signature(
+        pk,
+        &serialized_unsigned_operation,
+    )?)?;
     let signature = &signature.into();
     // The verify_signature function never returns false. If the verification
     // is incorrect the function will return an Error and it's up to us to
@@ -245,19 +242,24 @@ pub fn verify_signature(
     Ok(check)
 }
 
-pub fn execute_validation<Host: Runtime>(
+pub fn execute_validation<Host, C: Context>(
     host: &mut Host,
-    context: &Context,
+    context: &C,
     operation: tezos_tezlink::operation::Operation,
     skip_signature_check: bool,
-) -> Result<ValidatedBatch, ValidityError> {
+    required_fees: Option<u64>,
+) -> Result<ValidatedBatch<C::ImplicitAccountType>, ValidityError>
+where
+    Host: StorageV1,
+{
     if operation.content.is_empty() {
         return Err(ValidityError::EmptyBatch);
     }
 
     // Initialize the validation gas using the gas limit of the first operation in the batch
-    let mut validation_gas = TezlinkOperationGas::start(operation.content[0].gas_limit())
-        .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
+    let mut validation_gas =
+        TezlinkOperationGas::start(operation.content[0].gas_limit()?)
+            .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
 
     let (pk, source_account) = validate_source(host, context, &operation.content)?;
 
@@ -268,11 +270,10 @@ pub fn execute_validation<Host: Runtime>(
         &pk,
         &mut validation_gas,
     ) {
-        Ok(true) => log!(host, Debug, "Validation: OK - Signature is valid."),
+        Ok(true) => log!(Debug, "Validation: OK - Signature is valid."),
         _ => {
             if skip_signature_check {
                 log!(
-                    host,
                     Debug,
                     "Validation: Signature is invalid but signature check is disabled."
                 )
@@ -282,8 +283,11 @@ pub fn execute_validation<Host: Runtime>(
         }
     }
 
-    let mut unvalidated_operation: Vec<ManagerOperation<OperationContent>> =
-        operation.content.into_iter().map(Into::into).collect();
+    let mut unvalidated_operation: Vec<ManagerOperation<OperationContent>> = operation
+        .content
+        .into_iter()
+        .map(<ManagerOperation<OperationContent>>::try_from_manager_operation_content)
+        .collect::<Result<_, _>>()?;
 
     let mut source_balance = source_account
         .balance(host)
@@ -297,7 +301,6 @@ pub fn execute_validation<Host: Runtime>(
     // Charge the gas for the validation on the first operation of the batch
     let gas_charged_operation = unvalidated_operation.remove(0);
     validated_operations.push(validate_individual_operation(
-        host,
         gas_charged_operation,
         source_account.pkh(),
         &mut source_balance,
@@ -308,7 +311,6 @@ pub fn execute_validation<Host: Runtime>(
         let operation_gas = TezlinkOperationGas::start(&content.gas_limit)
             .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
         let validated_operation = validate_individual_operation(
-            host,
             content,
             source_account.pkh(),
             &mut source_balance,
@@ -316,6 +318,26 @@ pub fn execute_validation<Host: Runtime>(
             operation_gas,
         )?;
         validated_operations.push(validated_operation);
+    }
+
+    // The total fees of the batch must cover the DA cost of posting this
+    // operation to L1 but also the execution gas cost that will be used.
+    // During simulation, this check is omitted.
+    if let Some(required_fees) = required_fees {
+        let total_fees: Narith = validated_operations
+            .iter()
+            .fold(Narith::from(0_u64), |acc, op| {
+                Narith(acc.0 + &op.content.fee.0)
+            });
+        if total_fees < Narith(required_fees.into()) {
+            log!(
+                Error,
+                "Insufficient fees: batch provides {:?} mutez but needs {:?} mutez",
+                total_fees,
+                required_fees
+            );
+            return Err(ValidityError::InsufficientFee);
+        }
     }
 
     source_account
@@ -326,8 +348,13 @@ pub fn execute_validation<Host: Runtime>(
         .increment_counter(host, validated_operations.len())
         .map_err(|_| ValidityError::FailedToIncrementCounter)?;
 
+    let mut source_public_key = Vec::new();
+    pk.bin_write(&mut source_public_key)
+        .map_err(|_| ValidityError::FailedToFetchManagerKey)?;
+
     Ok(ValidatedBatch {
         source_account,
+        source_public_key,
         validated_operations,
     })
 }

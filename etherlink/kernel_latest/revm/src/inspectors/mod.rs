@@ -3,60 +3,67 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    database::EtherlinkVMDB, precompiles::provider::EtherlinkPrecompiles,
-    EVMInnerContext, Error,
+    error::EvmDbError, precompiles::provider::EtherlinkPrecompiles, EVMInnerContext,
 };
-use call_tracer::{CallTracer, CallTracerInput};
-use noop::NoInspector;
+use call_tracer::CallTracerInput;
 use revm::{
     context::{
         result::{EVMError, ExecutionResult, HaltReason},
         ContextSetters, ContextTr, Evm, JournalTr,
     },
+    context_interface::{Cfg, LocalContextTr, Transaction},
     handler::{
-        instructions::EthInstructions, EthFrame, EvmTr, EvmTrError, FrameResult, FrameTr,
-        Handler,
+        execution::create_init_frame, instructions::EthInstructions, EthFrame, EvmTr,
+        EvmTrError, FrameResult, FrameTr, Handler,
     },
     inspector::InspectorHandler,
     interpreter::{
-        interpreter::{EthInterpreter, ReturnDataImpl},
-        interpreter_action::FrameInit,
-        interpreter_types::StackTr,
-        CallInputs, CallOutcome, CreateInputs, CreateOutcome, Interpreter,
-        InterpreterTypes, Stack,
+        interpreter::EthInterpreter,
+        interpreter_action::{FrameInit, FrameInput},
+        SharedMemory, Stack,
     },
     primitives::B256,
-    state::EvmState,
+    state::{Bytecode, EvmState},
     ExecuteCommitEvm, ExecuteEvm, InspectEvm, Inspector,
 };
-use struct_logger::{StructLogger, StructLoggerInput};
-use tezos_evm_runtime::runtime::Runtime;
+use struct_logger::StructLoggerInput;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
 
 pub mod call_tracer;
-pub mod noop;
 pub mod storage;
 pub mod struct_logger;
 
 pub const CALL_TRACER_CONFIG_PREFIX: u8 = 0x01;
 
-pub type EvmInspection<'a, Host> = Evm<
-    EVMInnerContext<'a, Host>,
-    EtherlinkInspector,
-    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host>>,
+pub type EvmInspection<'a, Host, INSP, R> = Evm<
+    EVMInnerContext<'a, Host, R>,
+    INSP,
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, R>>,
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
 
-pub struct EtherlinkEvmInspector<'a, Host: Runtime> {
-    inner: EvmInspection<'a, Host>,
+pub struct EtherlinkEvmInspector<'a, Host, R, INSP>
+where
+    Host: StorageV1,
+    R: Registry,
+    INSP: EtherlinkInspector<'a, Host, R>,
+{
+    inner: EvmInspection<'a, Host, INSP, R>,
 }
 
-impl<'a, Host: Runtime> ExecuteEvm for EtherlinkEvmInspector<'a, Host> {
+impl<'a, Host, R, INSP> ExecuteEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
+where
+    Host: StorageV1,
+    R: Registry,
+    INSP: EtherlinkInspector<'a, Host, R>,
+{
     type ExecutionResult = ExecutionResult;
     type State = EvmState;
-    type Error = EVMError<Error>;
-    type Tx = <EVMInnerContext<'a, Host> as ContextTr>::Tx;
-    type Block = <EVMInnerContext<'a, Host> as ContextTr>::Block;
+    type Error = EVMError<EvmDbError>;
+    type Tx = <EVMInnerContext<'a, Host, R> as ContextTr>::Tx;
+    type Block = <EVMInnerContext<'a, Host, R> as ContextTr>::Block;
 
     fn set_block(&mut self, block: Self::Block) {
         self.inner.set_block(block);
@@ -83,7 +90,12 @@ impl<'a, Host: Runtime> ExecuteEvm for EtherlinkEvmInspector<'a, Host> {
     }
 }
 
-impl<'a, Host: Runtime> ExecuteCommitEvm for EtherlinkEvmInspector<'a, Host> {
+impl<'a, Host, R, INSP> ExecuteCommitEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
+where
+    Host: StorageV1,
+    R: Registry,
+    INSP: EtherlinkInspector<'a, Host, R>,
+{
     fn commit(&mut self, state: Self::State) {
         self.inner.commit(state);
     }
@@ -91,7 +103,22 @@ impl<'a, Host: Runtime> ExecuteCommitEvm for EtherlinkEvmInspector<'a, Host> {
 
 #[derive(Debug)]
 pub struct EtherlinkHandler<CTX, ERROR, FRAME> {
+    /// When `true`, [`Self::first_frame_input`] sets `is_static = true`
+    /// on the top-level frame so REVM enforces strict `STATICCALL`
+    /// semantics. Used by [`TransactionOrigin::CrossRuntimeStatic`](crate::TransactionOrigin::CrossRuntimeStatic).
+    is_static_top_frame: bool,
     _phantom: core::marker::PhantomData<(CTX, ERROR, FRAME)>,
+}
+
+impl<CTX, ERROR, FRAME> EtherlinkHandler<CTX, ERROR, FRAME> {
+    /// Build a handler that runs the top-level frame in static mode
+    /// (see the field doc on [`Self::is_static_top_frame`]).
+    pub fn new_static() -> Self {
+        Self {
+            is_static_top_frame: true,
+            _phantom: core::marker::PhantomData,
+        }
+    }
 }
 
 impl<EVM, ERROR, FRAME> Handler for EtherlinkHandler<EVM, ERROR, FRAME>
@@ -103,11 +130,67 @@ where
     type Evm = EVM;
     type Error = ERROR;
     type HaltReason = HaltReason;
+
+    /// Flip `is_static = true` on the top-level call frame when built
+    /// via [`Self::new_static`]. The rest of the body is a verbatim
+    /// copy of the default in `revm-handler` 17.0.0 (load bytecode +
+    /// EIP-7702 resolution + `create_init_frame`) because Rust does
+    /// not let us reuse the default while overriding it. **Re-sync
+    /// this body when bumping REVM to 38** — the upstream default
+    /// will likely have drifted.
+    fn first_frame_input(
+        &mut self,
+        evm: &mut Self::Evm,
+        gas_limit: u64,
+    ) -> Result<FrameInit, Self::Error> {
+        let ctx = evm.ctx_mut();
+        let mut memory =
+            SharedMemory::new_with_buffer(ctx.local().shared_memory_buffer().clone());
+        memory.set_memory_limit(ctx.cfg().memory_limit());
+
+        let (tx, journal) = ctx.tx_journal_mut();
+        let bytecode = if let Some(&to) = tx.kind().to() {
+            let account = &journal.load_account_with_code(to)?.info;
+            if let Some(delegated_address) =
+                account.code.as_ref().and_then(Bytecode::eip7702_address)
+            {
+                let account = &journal.load_account_with_code(delegated_address)?.info;
+                Some((
+                    account.code.clone().unwrap_or_default(),
+                    account.code_hash(),
+                ))
+            } else {
+                Some((
+                    account.code.clone().unwrap_or_default(),
+                    account.code_hash(),
+                ))
+            }
+        } else {
+            None
+        };
+
+        let mut frame_input = create_init_frame(tx, bytecode, gas_limit);
+
+        if self.is_static_top_frame {
+            // `Create` is incompatible with static (code write); only
+            // the `Call` shape carries the flag.
+            if let FrameInput::Call(ref mut call_inputs) = frame_input {
+                call_inputs.is_static = true;
+            }
+        }
+
+        Ok(FrameInit {
+            depth: 0,
+            memory,
+            frame_input,
+        })
+    }
 }
 
 impl<CTX, ERROR, FRAME> Default for EtherlinkHandler<CTX, ERROR, FRAME> {
     fn default() -> Self {
         Self {
+            is_static_top_frame: false,
             _phantom: core::marker::PhantomData,
         }
     }
@@ -126,8 +209,13 @@ where
     type IT = EthInterpreter;
 }
 
-impl<Host: Runtime> InspectEvm for EtherlinkEvmInspector<'_, Host> {
-    type Inspector = EtherlinkInspector;
+impl<'a, Host, R, INSP> InspectEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
+where
+    Host: StorageV1,
+    R: Registry,
+    INSP: EtherlinkInspector<'a, Host, R>,
+{
+    type Inspector = INSP;
 
     fn set_inspector(&mut self, inspector: Self::Inspector) {
         self.inner.inspector = inspector;
@@ -144,7 +232,6 @@ impl<Host: Runtime> InspectEvm for EtherlinkEvmInspector<'_, Host> {
 
 #[derive(Debug, Clone, Copy)]
 pub enum TracerInput {
-    NoOp,
     CallTracer(CallTracerInput),
     StructLogger(StructLoggerInput),
 }
@@ -154,36 +241,32 @@ impl TracerInput {
         match self {
             TracerInput::StructLogger(input) => input.transaction_hash,
             TracerInput::CallTracer(input) => input.transaction_hash,
-            TracerInput::NoOp => None,
         }
     }
 }
 
-pub enum EtherlinkInspector {
-    NoOp(NoInspector),
-    CallTracer(Box<CallTracer>),
-    StructLogger(Box<StructLogger>),
+pub trait EtherlinkInspector<'a, Host, R>:
+    Inspector<EVMInnerContext<'a, Host, R>>
+where
+    Host: StorageV1 + 'a,
+    R: Registry + 'a,
+{
+    fn is_struct_logger(&self) -> bool;
+    fn get_transaction_hash(&self) -> Option<B256>;
 }
 
-impl EtherlinkInspector {
-    pub fn is_struct_logger(&self) -> bool {
-        matches!(self, EtherlinkInspector::StructLogger(_))
+impl<'a, Host, R> EtherlinkInspector<'a, Host, R>
+    for Box<dyn EtherlinkInspector<'a, Host, R>>
+where
+    Host: StorageV1 + 'a,
+    R: Registry + 'a,
+{
+    fn is_struct_logger(&self) -> bool {
+        self.as_ref().is_struct_logger()
     }
 
-    pub fn get_transaction_hash(&self) -> Option<B256> {
-        match self {
-            EtherlinkInspector::NoOp(_) => None,
-            EtherlinkInspector::CallTracer(call_tracer) => call_tracer.transaction_hash,
-            EtherlinkInspector::StructLogger(struct_logger) => {
-                struct_logger.transaction_hash
-            }
-        }
-    }
-}
-
-impl Default for EtherlinkInspector {
-    fn default() -> Self {
-        Self::NoOp(NoInspector)
+    fn get_transaction_hash(&self) -> Option<B256> {
+        self.as_ref().get_transaction_hash()
     }
 }
 
@@ -199,193 +282,6 @@ impl StructStack for Stack {
             .map(|e| B256::from_slice(e.to_be_bytes::<32>().as_slice()))
             .collect();
         stack
-    }
-}
-
-impl<'a, Host, CTX, INTR> Inspector<CTX, INTR> for EtherlinkInspector
-where
-    Host: Runtime + 'a,
-    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host>>,
-    INTR: InterpreterTypes<Stack: StackTr + StructStack, ReturnData = ReturnDataImpl>,
-{
-    fn call(
-        &mut self,
-        context: &mut CTX,
-        inputs: &mut CallInputs,
-    ) -> Option<CallOutcome> {
-        match self {
-            Self::NoOp(no_inspector) => {
-                <NoInspector as Inspector<CTX, INTR>>::call(no_inspector, context, inputs)
-            }
-            Self::CallTracer(call_tracer) => {
-                <CallTracer as Inspector<CTX, INTR>>::call(call_tracer, context, inputs)
-            }
-            Self::StructLogger(struct_logger) => {
-                <StructLogger as Inspector<CTX, INTR>>::call(
-                    struct_logger,
-                    context,
-                    inputs,
-                )
-            }
-        }
-    }
-
-    fn call_end(
-        &mut self,
-        context: &mut CTX,
-        inputs: &CallInputs,
-        outcome: &mut CallOutcome,
-    ) {
-        match self {
-            Self::NoOp(no_inspector) => <NoInspector as Inspector<CTX, INTR>>::call_end(
-                no_inspector,
-                context,
-                inputs,
-                outcome,
-            ),
-            Self::CallTracer(call_tracer) => {
-                <CallTracer as Inspector<CTX, INTR>>::call_end(
-                    call_tracer,
-                    context,
-                    inputs,
-                    outcome,
-                )
-            }
-            Self::StructLogger(struct_logger) => {
-                <StructLogger as Inspector<CTX, INTR>>::call_end(
-                    struct_logger,
-                    context,
-                    inputs,
-                    outcome,
-                )
-            }
-        }
-    }
-
-    fn create(
-        &mut self,
-        context: &mut CTX,
-        inputs: &mut CreateInputs,
-    ) -> Option<CreateOutcome> {
-        match self {
-            Self::NoOp(no_inspector) => <NoInspector as Inspector<CTX, INTR>>::create(
-                no_inspector,
-                context,
-                inputs,
-            ),
-            Self::CallTracer(call_tracer) => {
-                <CallTracer as Inspector<CTX, INTR>>::create(call_tracer, context, inputs)
-            }
-            Self::StructLogger(struct_logger) => {
-                <StructLogger as Inspector<CTX, INTR>>::create(
-                    struct_logger,
-                    context,
-                    inputs,
-                )
-            }
-        }
-    }
-
-    fn create_end(
-        &mut self,
-        context: &mut CTX,
-        inputs: &CreateInputs,
-        outcome: &mut CreateOutcome,
-    ) {
-        match self {
-            Self::NoOp(no_inspector) => {
-                <NoInspector as Inspector<CTX, INTR>>::create_end(
-                    no_inspector,
-                    context,
-                    inputs,
-                    outcome,
-                )
-            }
-            Self::CallTracer(call_tracer) => {
-                <CallTracer as Inspector<CTX, INTR>>::create_end(
-                    call_tracer,
-                    context,
-                    inputs,
-                    outcome,
-                )
-            }
-            Self::StructLogger(struct_logger) => {
-                <StructLogger as Inspector<CTX, INTR>>::create_end(
-                    struct_logger,
-                    context,
-                    inputs,
-                    outcome,
-                )
-            }
-        }
-    }
-
-    fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
-        match self {
-            Self::NoOp(no_inspector) => {
-                <NoInspector as Inspector<CTX, INTR>>::initialize_interp(
-                    no_inspector,
-                    interp,
-                    context,
-                )
-            }
-            Self::CallTracer(call_tracer) => {
-                <CallTracer as Inspector<CTX, INTR>>::initialize_interp(
-                    call_tracer,
-                    interp,
-                    context,
-                )
-            }
-            Self::StructLogger(struct_logger) => {
-                <StructLogger as Inspector<CTX, INTR>>::initialize_interp(
-                    struct_logger,
-                    interp,
-                    context,
-                )
-            }
-        }
-    }
-
-    fn step(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
-        match self {
-            Self::NoOp(no_inspector) => {
-                <NoInspector as Inspector<CTX, INTR>>::step(no_inspector, interp, context)
-            }
-            Self::CallTracer(call_tracer) => {
-                <CallTracer as Inspector<CTX, INTR>>::step(call_tracer, interp, context)
-            }
-            Self::StructLogger(struct_logger) => {
-                <StructLogger as Inspector<CTX, INTR>>::step(
-                    struct_logger,
-                    interp,
-                    context,
-                )
-            }
-        }
-    }
-
-    fn step_end(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
-        match self {
-            Self::NoOp(no_inspector) => <NoInspector as Inspector<CTX, INTR>>::step_end(
-                no_inspector,
-                interp,
-                context,
-            ),
-            Self::CallTracer(call_tracer) => {
-                <CallTracer as Inspector<CTX, INTR>>::step_end(
-                    call_tracer,
-                    interp,
-                    context,
-                )
-            }
-            Self::StructLogger(struct_logger) => {
-                <StructLogger as Inspector<CTX, INTR>>::step_end(
-                    struct_logger,
-                    interp,
-                    context,
-                )
-            }
-        }
     }
 }
 

@@ -187,6 +187,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         assert (Int32.of_int round = hd.round) ;
         return (hd.delegate, baking_rights)
 
+  let dal_shards_of _cctxt _level = return_nil
+
   let raw_block_round shell_header =
     let wrap = Environment.wrap_tzresult in
     let open Result_syntax in
@@ -245,6 +247,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                   };
                 delegate = public_key_hash_of_v0 delegate;
                 power = preendorsement_power;
+                is_aggregated = false;
               }
             :: acc
         | Receipt
@@ -265,6 +268,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                   };
                 delegate = public_key_hash_of_v0 delegate;
                 power = endorsement_power;
+                is_aggregated = false;
               }
             :: acc
         | _ -> acc)

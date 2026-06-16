@@ -14,26 +14,9 @@ pub fn trace_kernel(attr: TokenStream, item: TokenStream) -> TokenStream {
         syn::parse_macro_input!(attr as syn::LitStr)
     };
 
-    let has_host = func.sig.inputs.iter().any(|arg| {
-        if let syn::FnArg::Typed(pat_type) = arg {
-            if let syn::Pat::Ident(ident) = &*pat_type.pat {
-                return ident.ident == "host";
-            }
-        }
-        false
-    });
-
-    if !has_host {
-        return syn::Error::new_spanned(
-            &func.sig.ident,
-            "the function annotated with #[trace_kernel] must have a `host` parameter",
-        )
-        .to_compile_error()
-        .into();
-    }
-
     let block = &func.block;
-    func.block = syn::parse_quote!({ tezos_evm_logging::internal_trace_kernel(host, #name, |host| #block) });
+    func.block =
+        syn::parse_quote!({ tezos_evm_logging::internal_trace_kernel(#name, || #block) });
 
     quote::quote!(#func).into()
 }

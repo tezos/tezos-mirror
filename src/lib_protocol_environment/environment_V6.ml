@@ -1059,7 +1059,11 @@ struct
     struct
       type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
 
-      module Wasm = Tezos_scoru_wasm.Wasm_pvm.Make (struct
+      module Wasm =
+      Tezos_protocol_environment_structs.V6.Wasm_pvm_machine.Make (Tezos_scoru_wasm
+                                                                   .Tree_state
+                                                                   .Make
+                                                                     (struct
         include Tree
 
         let select = function
@@ -1067,7 +1071,7 @@ struct
           | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
 
         let wrap t = PVM_tree t
-      end)
+      end))
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3214
          The rest of the module is pure boilerplate converting between

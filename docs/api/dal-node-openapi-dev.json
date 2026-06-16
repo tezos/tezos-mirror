@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 2223.0~rc1+dev (00bee1ae)"
+    "version": "Octez 24.0~rc1+dev (build: 0) (991d8266)"
   },
   "paths": {
     "/health": {
@@ -2563,7 +2563,7 @@
                             "no_shards_assigned"
                           ]
                         },
-                        "attestation_level": {
+                        "committee_level": {
                           "type": "integer",
                           "minimum": -2147483648,
                           "maximum": 2147483647
@@ -2571,7 +2571,7 @@
                       },
                       "required": [
                         "kind",
-                        "attestation_level"
+                        "committee_level"
                       ]
                     },
                     {
@@ -2644,7 +2644,29 @@
                                 ]
                               }
                             },
-                            "no_shards_attestation_levels": {
+                            "trap_slot_ids": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "slot_level": {
+                                    "type": "integer",
+                                    "minimum": -2147483648,
+                                    "maximum": 2147483647
+                                  },
+                                  "slot_index": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 255
+                                  }
+                                },
+                                "required": [
+                                  "slot_level",
+                                  "slot_index"
+                                ]
+                              }
+                            },
+                            "no_shards_committee_levels": {
                               "type": "array",
                               "items": {
                                 "type": "integer",
@@ -2655,7 +2677,8 @@
                           },
                           "required": [
                             "slot_ids",
-                            "no_shards_attestation_levels"
+                            "trap_slot_ids",
+                            "no_shards_committee_levels"
                           ]
                         }
                       },
@@ -2709,6 +2732,9 @@
                     "incentives_enable": {
                       "type": "boolean"
                     },
+                    "dynamic_lag_enable": {
+                      "type": "boolean"
+                    },
                     "number_of_slots": {
                       "type": "integer",
                       "minimum": -1073741824,
@@ -2718,6 +2744,14 @@
                       "type": "integer",
                       "minimum": -1073741824,
                       "maximum": 1073741823
+                    },
+                    "attestation_lags": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": -1073741824,
+                        "maximum": 1073741823
+                      }
                     },
                     "attestation_threshold": {
                       "type": "integer",
@@ -2797,8 +2831,10 @@
                   "required": [
                     "feature_enable",
                     "incentives_enable",
+                    "dynamic_lag_enable",
                     "number_of_slots",
                     "attestation_lag",
+                    "attestation_lags",
                     "attestation_threshold",
                     "traps_fraction",
                     "cryptobox_parameters",
@@ -2922,7 +2958,7 @@
     },
     "/slots": {
       "post": {
-        "description": "Post a slot to the DAL node, computes its commitment and commitment proof, then computes the correspoding shards with their proof. The result of this RPC can be directly used to publish a slot header. If the sent data is smaller than the size of a DAL slot, it is padded with the character provided as padding query parameter (defaults to \\000). If the slot_index query parameter is provided, the DAL node checks that its profile allows to publish data on the given slot index. However, slot_index is optional and has NO SEMANTIC EFFECT on the produced commitment. It exists solely to help reverse proxies route POST /slots requests to a DAL node subscribed to the corresponding topics.",
+        "description": "Post a slot to the DAL node, computes its commitment and commitment proof, then computes the corresponding shards with their proof. The result of this RPC can be directly used to publish a slot header. If the sent data is smaller than the size of a DAL slot, it is padded with the character provided as padding query parameter (defaults to \\000). If the slot_index query parameter is provided, the DAL node checks that its profile allows to publish data on the given slot index. However, slot_index is optional and has NO SEMANTIC EFFECT on the produced commitment. It exists solely to help reverse proxies route POST /slots requests to a DAL node subscribed to the corresponding topics. The RPC will fail if publishing at the current level would cross the T to U protocol migration boundary (when the attestation lag changes between protocols), as such slots may not be properly attested.",
         "parameters": [
           {
             "name": "padding",
@@ -3210,7 +3246,7 @@
         ]
       },
       "Signature.Public_key_hash": {
-        "title": "A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded)",
+        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash (Base58Check-encoded)",
         "oneOf": [
           {
             "$ref": "#/components/schemas/unistring"

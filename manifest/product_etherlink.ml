@@ -82,6 +82,8 @@ let lib_etherlink_wasm_runtime =
                  [S "source_tree"; S "../kernel_dionysus_r1"];
                  [S "source_tree"; S "../kernel_ebisu"];
                  [S "source_tree"; S "../kernel_farfadet"];
+                 [S "source_tree"; S "../kernel_farfadet_r1"];
+                 [S "source_tree"; S "../kernel_farfadet_r2_su"];
                  [S "source_tree"; S "../../src/rustzcash_deps"];
                  [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
                  [S "source_tree"; S "../../src/riscv"];
@@ -89,7 +91,7 @@ let lib_etherlink_wasm_runtime =
                  [S "source_tree"; S "../../sdk/rust"];
                  [S "source_tree"; S "src"];
                ];
-               [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
+               [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
              ];
            ])
 
@@ -178,43 +180,61 @@ let supported_installers =
           ];
         ]
 
-let evm_node_migrations =
+let tezlink_node_migrations =
   octez_evm_node_lib
-    "evm_node_migrations"
-    ~path:"etherlink/bin_node/migrations"
-    ~synopsis:"SQL migrations for the EVM node store"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        caqti_lwt;
-        crunch;
-        re;
-        octez_sqlite |> open_;
-      ]
+    "tezlink_node_migrations"
+    ~path:"etherlink/bin_node/tezlink_migrations"
+    ~synopsis:"SQL migrations for the EVM node store related to Tezlink"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_sqlite |> open_]
     ~dune:
       Dune.
         [
           [
             S "rule";
-            [S "target"; S "migrations.ml"];
-            [S "deps"; [S "glob_files"; S "*.sql"]];
+            [S "target"; S "tezlink_node_migrations.ml"];
             [
-              S "action";
-              [
-                S "run";
-                S "ocaml-crunch";
-                S "-e";
-                S "sql";
-                S "-m";
-                S "plain";
-                S "-o";
-                S "%{target}";
-                S "-s";
-                S ".";
-              ];
+              S "deps";
+              [S "glob_files"; S "*.sql"];
+              [S "glob_files"; S "m[0-9]*.ml"];
             ];
+            [S "action"; [S "run"; S "gen-migrations"; S "."; S "%{target}"]];
           ];
         ]
+
+let evm_node_migrations =
+  octez_evm_node_lib
+    "evm_node_migrations"
+    ~path:"etherlink/bin_node/migrations"
+    ~synopsis:"SQL migrations for the EVM node store"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_sqlite |> open_]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "evm_node_migrations.ml"];
+            [
+              S "deps";
+              [S "glob_files"; S "*.sql"];
+              [S "glob_files"; S "m[0-9]*.ml"];
+            ];
+            [S "action"; [S "run"; S "gen-migrations"; S "."; S "%{target}"]];
+          ];
+        ]
+
+let evm_node_sqlite_receipt_bloom =
+  octez_evm_node_lib
+    "sqlite_receipt_bloom"
+    ~path:"etherlink/bin_node/lib_dev/sqlite_receipt_bloom"
+    ~synopsis:"SQLite static extension for receipt bloom filtering"
+    ~deps:[sqlite3]
+    ~foreign_stubs:
+      {
+        language = C;
+        flags = [S "-Wall"; S "-Wextra"; S ":standard"];
+        include_dirs = [];
+        names = ["receipt_bloom"; "receipt_bloom_stub"];
+      }
 
 let evm_node_lib_dev_encoding =
   octez_evm_node_lib
@@ -251,19 +271,25 @@ let tezt_etherlink =
     ~release_status:Unreleased
 
 let evm_node_lib_dev_tezlink =
-  let tezlink_target_proto =
-    List.find (fun proto -> Protocol.short_hash proto = "PtSeouLo") Protocol.all
+  let proto_deps proto_hash =
+    let proto =
+      List.find
+        (fun proto -> Protocol.short_hash proto = proto_hash)
+        Protocol.all
+    in
+    let protocol_plugin =
+      match Protocol.plugin proto with
+      | Some target -> target
+      | None -> (* unreachable *) assert false
+    in
+    let protocol_parameters =
+      match Protocol.parameters proto with
+      | Some target -> target
+      | None -> (* unreachable *) assert false
+    in
+    [protocol_plugin; protocol_parameters; Protocol.test_helpers_exn proto]
   in
-  let tezlink_protocol_plugin =
-    match Protocol.plugin tezlink_target_proto with
-    | Some target -> target
-    | None -> (* unreachable *) assert false
-  in
-  let tezlink_protocol_parameters =
-    match Protocol.parameters tezlink_target_proto with
-    | Some target -> target
-    | None -> (* unreachable *) assert false
-  in
+  let proto_deps = List.concat_map proto_deps ["PtSeouLo"; "PtTALLiN"] in
   let tezlink_genesis_proto =
     List.find (fun proto -> Protocol.short_hash proto = "Ps9mPmXa") Protocol.all
   in
@@ -278,18 +304,16 @@ let evm_node_lib_dev_tezlink =
     ~path:"etherlink/bin_node/lib_dev/tezlink"
     ~synopsis:"Tezlink dependencies for the EVM node"
     ~deps:
-      [
-        evm_node_lib_dev_encoding |> open_;
-        tezlink_protocol_plugin;
-        tezlink_protocol_parameters;
-        tezlink_genesis_protocol_plugin;
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_shell_services;
-        octez_version;
-        octez_micheline;
-        Protocol.test_helpers_exn tezlink_target_proto;
-        lwt_watcher;
-      ]
+      ([
+         evm_node_lib_dev_encoding |> open_;
+         octez_base |> open_ ~m:"TzPervasives";
+         octez_shell_services;
+         octez_version;
+         octez_micheline;
+         lwt_watcher;
+         tezlink_genesis_protocol_plugin;
+       ]
+      @ proto_deps)
 
 let evm_node_config =
   octez_evm_node_lib
@@ -346,6 +370,7 @@ let evm_node_lib_dev =
         octez_smart_rollup_lib |> open_;
         octez_smart_rollup_node_store_lib;
         evm_node_migrations;
+        tezlink_node_migrations;
         prometheus_app;
         octez_dal_node_services;
         supported_installers;
@@ -354,6 +379,8 @@ let evm_node_lib_dev =
         opentelemetry_lwt;
         octez_telemetry;
         lwt_domain;
+        octez_layer2_shell;
+        evm_node_sqlite_receipt_bloom;
       ]
 
 let floodgate_lib =
@@ -373,6 +400,7 @@ let floodgate_lib =
         evm_node_lib_dev_encoding |> open_;
         evm_node_config |> open_;
         octez_workers;
+        octez_telemetry;
       ]
 
 let _octez_evm_node_tests =
@@ -384,6 +412,7 @@ let _octez_evm_node_tests =
       "test_wasm_runtime";
       "test_blueprint_roundtrip";
       "test_bitset_nonce";
+      "test_compact_receipt_encoding";
     ]
     ~path:"etherlink/bin_node/test"
     ~opam:"octez-evm-node-tests"
@@ -428,9 +457,13 @@ let _etherlink_tezts =
       "dal_sequencer";
       "eth_call";
       "gc";
-      "tezlink";
+      "michelson_runtime";
       "preconfirmation";
       "tezosx";
+      "michelson_runtime_storage_payment";
+      "dev_commands";
+      "cross_runtime";
+      "compact_receipt_encoding";
     ]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"
@@ -440,10 +473,12 @@ let _etherlink_tezts =
         octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_cloud |> open_;
         tezt_etherlink |> open_;
         (* This executable includes the tests of [lib_wasm_runtime_callbacks]. *)
         wasm_runtime_callbacks_tests;
         evm_node_lib_dev_encoding;
+        evm_node_lib_dev;
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true
@@ -451,6 +486,22 @@ let _etherlink_tezts =
       ["evm_kernel_inputs/*"; "../../tezos_contracts/*"; "../../config/*"]
     ~dep_globs_rec:["../../kernel_latest/*"]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
+
+let _etherlink_tezt_cloud_scenarios =
+  tezt
+    ["instant_confirmations"]
+    ~path:"etherlink/tezt/tezt-cloud"
+    ~opam:"tezt-cloud-etherlink"
+    ~synopsis:"Tezt-cloud scenarios for Etherlink"
+    ~deps:
+      [
+        octez_test_helpers |> open_;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_cloud |> open_;
+        tezt_etherlink |> open_;
+      ]
+    ~with_macos_security_framework:true
 
 let _courier =
   public_exe
@@ -506,23 +557,6 @@ let _evm_node =
         evm_node_config |> open_;
       ]
     ~bisect_ppx:Yes
-
-let _tezt_testnet_scenarios =
-  public_exe
-    "octez-testnet-scenarios"
-    ~internal_name:"main"
-    ~path:"src/bin_testnet_scenarios"
-    ~synopsis:"Run scenarios on testnets"
-    ~bisect_ppx:No
-    ~static:false
-    ~deps:
-      [
-        bls12_381_archive;
-        octez_test_helpers |> open_;
-        tezt_wrapper |> open_ |> open_ ~m:"Base";
-        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_etherlink |> open_;
-      ]
 
 let tezt_benchmark_lib =
   private_lib
@@ -656,7 +690,9 @@ let _floodgate_bin =
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         evm_node_config |> open_;
+        octez_stdlib_unix |> open_;
         floodgate_lib |> open_;
+        octez_version;
       ]
 
 let _outbox_monitor =
@@ -678,9 +714,6 @@ let _outbox_monitor =
         octez_clic;
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix;
-        caqti_lwt;
-        crunch;
-        re;
         octez_sqlite |> open_;
         evm_node_lib_dev_encoding |> open_;
         evm_node_lib_dev |> open_;
@@ -692,21 +725,14 @@ let _outbox_monitor =
           [
             S "rule";
             [S "target"; S "migrations.ml"];
-            [S "deps"; [S "glob_files"; S "migrations/*.sql"]];
+            [
+              S "deps";
+              [S "glob_files"; S "migrations/*.sql"];
+              [S "glob_files"; S "migrations/m[0-9]*.ml"];
+            ];
             [
               S "action";
-              [
-                S "run";
-                S "ocaml-crunch";
-                S "-e";
-                S "sql";
-                S "-m";
-                S "plain";
-                S "-o";
-                S "%{target}";
-                S "-s";
-                S ".";
-              ];
+              [S "run"; S "gen-migrations"; S "migrations"; S "%{target}"];
             ];
           ];
         ]
@@ -717,9 +743,10 @@ let _fa_bridge_watchtower =
     ~internal_name:"main"
     ~path:"etherlink/fa-bridge-watchtower"
     ~opam:"fa-bridge-watchtower"
-    ~release_status:Unreleased
+    ~release_status:Experimental
+    ~bisect_ppx:Yes
     ~with_macos_security_framework:true
-    ~synopsis:"A binary to claim FA deposits sent by the bridge"
+    ~synopsis:"A binary to claim deposits sent by the bridge"
     ~deps:
       [
         bls12_381_archive;
@@ -730,9 +757,6 @@ let _fa_bridge_watchtower =
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix;
         octez_stdlib_unix |> open_;
-        caqti_lwt;
-        crunch;
-        re;
         octez_sqlite |> open_;
         evm_node_lib_dev_encoding |> open_;
         evm_node_lib_dev |> open_;
@@ -746,21 +770,14 @@ let _fa_bridge_watchtower =
           [
             S "rule";
             [S "target"; S "migrations.ml"];
-            [S "deps"; [S "glob_files"; S "migrations/*.sql"]];
+            [
+              S "deps";
+              [S "glob_files"; S "migrations/*.sql"];
+              [S "glob_files"; S "migrations/m[0-9]*.ml"];
+            ];
             [
               S "action";
-              [
-                S "run";
-                S "ocaml-crunch";
-                S "-e";
-                S "sql";
-                S "-m";
-                S "plain";
-                S "-o";
-                S "%{target}";
-                S "-s";
-                S ".";
-              ];
+              [S "run"; S "gen-migrations"; S "migrations"; S "%{target}"];
             ];
           ];
         ]

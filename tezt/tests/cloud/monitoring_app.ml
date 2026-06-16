@@ -9,6 +9,21 @@
 (* time interval in hours at which to submit report *)
 let report_interval = 6
 
+(* `group_by n l` outputs the list of lists with the same elements as `l`
+    but with `n` elements per list (except the last one).
+    For instance
+    `group_by 4 [a_1, ..., a_10] = [[a_1, ..., a_4], [a_5, ..., a_8],  [a_9, a_10]]`
+*)
+let group_by n =
+  let rec bis local_acc main_acc k = function
+    | [] -> List.rev (List.rev local_acc :: main_acc)
+    | l when k = 0 -> bis [] (List.rev local_acc :: main_acc) n l
+    | hd :: tl -> bis (hd :: local_acc) main_acc (k - 1) tl
+  in
+  bis [] [] n
+
+let encapsulate_in_code_block strings = ("```" :: strings) @ ["```"]
+
 let pp_delegate fmt delegate_pkh =
   match Hashtbl.find_opt Metrics.aliases delegate_pkh with
   | None -> Format.fprintf fmt "%s" delegate_pkh
@@ -23,11 +38,9 @@ let network_to_image_url : Network.t -> string = function
       "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/shadownet.png"
   | `Ghostnet ->
       "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/ghostnet.png"
-  | `Seoulnet ->
-      "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/seoulnet.png"
   | `Nextnet _ | `Tallinnnet ->
       "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/tallinnnet.png"
-  | `Sandbox | `Weeklynet _ -> "no_image_yet"
+  | `Ushuaianet | `Sandbox | `Weeklynet _ -> "no_image_yet"
 
 module Format_app = struct
   (* Helper for Slack App message format block-kit
@@ -126,7 +139,16 @@ module Prometheus = struct
         (function k, [v] -> Some (k, v) | _k, _ -> None)
         (Uri.query uri)
     in
-    let path = String.split_on_char '/' (Uri.path uri) in
+    let path =
+      (* Remove empty string introduced by a leading slash, if any, to avoid
+         redirection due to path containing double slashes.
+         [RPC_core.make_uri] makes [String.concat "/" (endpoint.path :: rpc.path)]
+         and in our case [endpoint.path] is empty, so if [rpc.path] also starts
+         with an empty string, then the concat adds 2 slashes. *)
+      match String.split_on_char '/' (Uri.path uri) with
+      | "" :: path -> path
+      | path -> path
+    in
     let endpoint = Endpoint.make ~host ~scheme ~port () in
     (`endpoint endpoint, `query query_string, `path path)
 
@@ -231,21 +253,24 @@ module Baker_helpers = struct
     let open Prometheus in
     let query =
       Format.sprintf
-        "sum_over_time(tezt_dal_commitments_attested{attester=\"%s\"}[%dh])"
+        "sum_over_time(%s{attester=\"%s\"}[%dh])"
+        Metrics.Name.dal_commitments_attested
         tz1
         report_interval
     in
     let* attested = fetch ~decoder:decoder_prometheus_float ~query ~origin in
     let query =
       Format.sprintf
-        "sum_over_time(tezt_dal_commitments_attestable{attester=\"%s\"}[%dh])"
+        "sum_over_time(%s{attester=\"%s\"}[%dh])"
+        Metrics.Name.dal_commitments_attestable
         tz1
         report_interval
     in
     let* attestable = fetch ~decoder:decoder_prometheus_float ~query ~origin in
     let query =
       Format.sprintf
-        "avg_over_time(tezt_dal_attestation_sent{attester=\"%s\"}[%dh])"
+        "avg_over_time(%s{attester=\"%s\"}[%dh])"
+        Metrics.Name.dal_attestation_sent
         tz1
         report_interval
     in
@@ -254,7 +279,8 @@ module Baker_helpers = struct
     in
     let query =
       Format.sprintf
-        "sum_over_time(tezt_attestation_sent_when_out_of_dal_committee{attester=\"%s\"}[6h])"
+        "sum_over_time(%s{attester=\"%s\"}[6h])"
+        Metrics.Name.attestation_sent_when_out_of_dal_committee
         tz1
     in
     let* out_attestations =
@@ -297,23 +323,24 @@ module Baker_helpers = struct
           let* bakers = get_bakers_with_staking_power endpoint cycle in
           let total_baking_power =
             List.fold_left
-              (fun acc RPC.{baking_power; _} -> acc + baking_power)
+              (fun acc RPC.{delegate = _; staked; weighted_delegated} ->
+                acc + staked + weighted_delegated)
               0
               bakers
           in
           let* bakers_info =
-            Lwt_list.filter_map_p
-              (fun RPC.{delegate; baking_power} ->
+            Lwt_list.map_s
+              (fun RPC.{delegate; staked; weighted_delegated} ->
                 let* attest_infos =
                   fetch_baker_info
                     ~origin:(Format.sprintf "fetch_baker_info.%s" delegate)
                     ~tz1:delegate
                 in
+                let baking_power = staked + weighted_delegated in
                 let stake_fraction =
                   float_of_int baking_power /. float_of_int total_baking_power
                 in
-                Lwt.return_some
-                  {address = PKH delegate; attest_infos; stake_fraction})
+                return {address = PKH delegate; attest_infos; stake_fraction})
               bakers
           in
           current_cycle := cycle ;
@@ -352,10 +379,10 @@ module Tasks = struct
 
   let fetch_slot_info ~slot_index =
     let open Prometheus in
-    let query s =
+    let query metric_name =
       Format.sprintf
-        "increase(tezt_total_%s_commitments_per_slot{slot_index=\"%d\"}[%dh])"
-        s
+        "increase(%s{slot_index=\"%d\"}[%dh])"
+        metric_name
         slot_index
         report_interval
     in
@@ -364,13 +391,13 @@ module Tasks = struct
       fetch
         ~origin:"fetch_slot_info.attested"
         ~decoder
-        ~query:(query "attested")
+        ~query:(query Metrics.Name.total_attested_commitments_per_slot)
     in
     let* published =
       fetch
         ~origin:"fetch_slot_info.published"
         ~decoder
-        ~query:(query "published")
+        ~query:(query Metrics.Name.total_published_commitments_per_slot)
     in
     Lwt.return (`slot_index slot_index, `attested attested, `published published)
 
@@ -390,10 +417,11 @@ module Tasks = struct
 
   let fetch_dal_commitments_total_info () =
     let open Prometheus in
-    let query s =
+    let query kind =
       Format.sprintf
-        {|increase(tezt_dal_commitments_total{kind="%s"}[%dh])|}
-        s
+        {|increase(%s{kind="%s"}[%dh])|}
+        Metrics.Name.dal_commitments_total
+        kind
         report_interval
     in
     let decoder = decoder_prometheus_float in
@@ -545,19 +573,6 @@ module Tasks = struct
         dal_on
     in
     let dal_off = List.sort stake_descending dal_off in
-    (* `group_by n l` outputs the list of lists with the same elements as `l`
-       but with `n` elements per list (except the last one).
-       For instance
-       `group_by 4 [a_1, ..., a_10] = [[a_1, ..., a_4], [a_5, ..., a_8],  [a_9, a_10]]`
-    *)
-    let group_by n =
-      let rec bis local_acc main_acc k = function
-        | [] -> List.rev (List.rev local_acc :: main_acc)
-        | l when k = 0 -> bis [] (List.rev local_acc :: main_acc) n l
-        | hd :: tl -> bis (hd :: local_acc) main_acc (k - 1) tl
-      in
-      bis [] [] n
-    in
     let agglomerate_infos bakers =
       let nb, stake =
         List.fold_left
@@ -571,7 +586,6 @@ module Tasks = struct
         nb
         (stake *. 100.)
     in
-    let encapsulate_in_code_block strings = ("```" :: strings) @ ["```"] in
     let display catch_phrase printer bakers =
       if bakers = [] then []
       else
@@ -703,31 +717,49 @@ module Alert = struct
     let data =
       let header =
         Format.sprintf
-          "*[lost-dal-rewards]* On network `%s`, delegates have lost DAL \
+          "*[lost-dal-rewards]* On network `%s`, %d delegates have lost DAL \
            rewards at cycle `%d`, level `%d`. \
            <https://%s.tzkt.io/%d/implicit_operations/dal_attestation_reward \
            |See online>"
           (Network.to_string network)
+          (List.length lost_dal_rewards)
           cycle
           level
           (Network.to_string network)
           level
       in
-      let content =
-        List.map
-          (fun (`delegate delegate, `change change) ->
-            Format.asprintf
-              ":black_small_square: %a has missed ~%.1f tez DAL attestation \
-               rewards"
-              pp_delegate
-              delegate
-              (float_of_int change /. 1_000_000.))
-          lost_dal_rewards
-      in
-      Format_app.section (header :: content) ()
+      Format_app.section [header] ()
     in
-    let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
-    Lwt.return_unit
+    let* ts = post_message ~slack_channel_id ~slack_bot_token data in
+    (* Lost DAL rewards are sorted to get the biggest amount first. *)
+    let lost_dal_rewards =
+      List.sort
+        (fun (_, `change c1) (_, `change c2) -> -Int.compare c1 c2)
+        lost_dal_rewards
+    in
+    let lost_dal_rewards =
+      List.map
+        encapsulate_in_code_block
+        (group_by
+           15
+           (List.map
+              (fun (`delegate delegate, `change change) ->
+                Format.asprintf
+                  "%a has missed ~%.2f tez"
+                  pp_delegate
+                  delegate
+                  (float_of_int change /. 1_000_000.))
+              lost_dal_rewards))
+    in
+    Lwt_list.iter_s
+      (fun to_post ->
+        let data =
+          let open Format_app in
+          section to_post ()
+        in
+        let* _ts = post_message ~ts ~slack_channel_id ~slack_bot_token data in
+        unit)
+      lost_dal_rewards
 
   let check_for_lost_dal_rewards ~cloud ~network ~metadata =
     match Cloud.notifier cloud with

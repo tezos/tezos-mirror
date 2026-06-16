@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 type protocol =
+  | U025
   | T024
   | S023
   | Nairobi
@@ -44,6 +45,9 @@ type internal_message_kind =
       (** Internal message containing the timestamp of the current block and the
           hash of the previous block. *)
   | Protocol_migration of protocol
+  | Dal_attested_slots
+      (** Internal message containing the attested DAL slots and their
+          publishers. *)
 
 (** A type representing messages from Layer 1 to Layer 2. Internal ones are
     originated from Layer 1 smart-contracts and external ones are messages from

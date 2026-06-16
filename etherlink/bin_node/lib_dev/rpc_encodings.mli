@@ -133,10 +133,23 @@ module type METHOD = sig
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
-module Kernel_version : METHOD with type input = unit and type output = string
+module Sequencer :
+  METHOD
+    with type input = Ethereum_types.Block_parameter.extended
+     and type output = Signature.Public_key.t
+
+module Kernel_version :
+  METHOD
+    with type input = Ethereum_types.Block_parameter.extended
+     and type output = string
 
 module Kernel_root_hash :
-  METHOD with type input = unit and type output = string option
+  METHOD
+    with type input = Ethereum_types.Block_parameter.extended
+     and type output = Ethereum_types.hex option
+
+module Michelson_activation_level :
+  METHOD with type input = unit and type output = int64 option
 
 module Network_id : METHOD with type input = unit and type output = string
 
@@ -264,6 +277,11 @@ module Send_raw_transaction :
     with type input = Ethereum_types.hex
      and type output = Ethereum_types.hash
 
+module Send_raw_tezlink_operation :
+  METHOD
+    with type input = Ethereum_types.hex
+     and type output = Ethereum_types.hash
+
 module Send_raw_transaction_sync :
   METHOD
     with type input =
@@ -312,13 +330,22 @@ module Produce_block :
     with type input = produce_block_input
      and type output = Ethereum_types.quantity
 
+module Propose_next_block_timestamp :
+  METHOD with type input = Time.Protocol.t and type output = unit
+
 module Produce_proposal :
   METHOD with type input = Time.Protocol.t and type output = unit
+
+module Execute_single_transaction :
+  METHOD with type input = Ethereum_types.hex and type output = unit
 
 module Inject_transaction :
   METHOD
     with type input = Transaction_object.t * string * bool
      and type output = Ethereum_types.hash
+
+module Wait_transaction_confirmation :
+  METHOD with type input = Ethereum_types.hash and type output = unit
 
 module Inject_tezlink_operation :
   METHOD
@@ -345,6 +372,12 @@ module Replay_block :
     with type input = Ethereum_types.quantity
      and type output =
       Ethereum_types.legacy_transaction_object Ethereum_types.block
+
+module Lock_block_production :
+  METHOD with type input = unit and type output = unit
+
+module Unlock_block_production :
+  METHOD with type input = unit and type output = unit
 
 module Trace_transaction :
   METHOD
@@ -386,6 +419,16 @@ type l1_block_l2_levels = {
 module Get_finalized_blocks_of_l1_level :
   METHOD with type input = int32 and type output = l1_block_l2_levels
 
+module Get_meta_block_by_number :
+  METHOD
+    with type input = Ethereum_types.Block_parameter.t
+     and type output = Meta_block.t
+
+module Get_meta_block_by_hash :
+  METHOD
+    with type input = Meta_block.block_hash_identifier
+     and type output = Meta_block.t
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -413,3 +456,82 @@ type websocket_response = {
 }
 
 type websocket_handler = JSONRPC.request -> websocket_response Lwt.t
+
+module Tezosx : sig
+  (** Shared wire shape for the three [http_trace*] replay RPCs. The
+      [Http_trace_transaction] response is a single [http_trace_entry],
+      and the two block-level variants return a list of them. All three
+      share the same JSON encoding so any future change to the
+      per-transaction wire format happens in one place. *)
+  type http_trace_entry = {
+    tx_hash : Ethereum_types.hash;
+    traces : Simulation.http_trace list;
+  }
+
+  val http_trace_entry_encoding : http_trace_entry Data_encoding.t
+
+  module Get_tezos_ethereum_address :
+    METHOD
+      with type input = Tezos_types.Contract.t
+       and type output = Ethereum_types.address
+
+  module Get_ethereum_tezos_address :
+    METHOD
+      with type input = Ethereum_types.address
+       and type output = Tezos_types.Contract.t
+
+  module Trace_call : sig
+    type evm_input = {
+      call : Ethereum_types.call;
+      block : Ethereum_types.Block_parameter.extended;
+    }
+
+    type michelson_input = {
+      operation : Ethereum_types.hex;
+      skip_signature : bool;
+      block : Ethereum_types.Block_parameter.extended;
+    }
+
+    type input = Evm of evm_input | Michelson of michelson_input
+
+    type trace_output = {
+      result : Data_encoding.json option;
+      traces : Simulation.http_trace list;
+    }
+
+    type output = trace_output
+
+    include METHOD with type input := input and type output := output
+  end
+
+  (** Implements [http_traceTransaction]: re-runs the block containing the
+      given transaction with HTTP trace capture enabled and returns the
+      collected HTTP exchanges.
+
+      TODO: https://linear.app/tezos/issue/L2-1243
+      The [input] is currently restricted to an [Ethereum_types.hash] so
+      Tezos-originated CRACs submitted through Tezlink are not reachable
+      by this RPC (their traces are indexed under the Tezos operation
+      hash, not the fake Ethereum hash that surfaces in the EVM block).
+      Once the Tezos operation hash → block-level mapping is indexed in
+      the SQLite store we can widen [input] to accept a Tezos operation
+      hash as well and resolve it to the containing block before replay. *)
+  module Http_trace_transaction :
+    METHOD
+      with type input = Ethereum_types.hash
+       and type output = http_trace_entry
+
+  (** Implements [http_traceBlockByNumber]: re-runs the block at the given
+      block number with HTTP trace capture enabled and returns one entry per
+      transaction, in transaction order. *)
+  module Http_trace_block_by_number :
+    METHOD
+      with type input = Ethereum_types.Block_parameter.t
+       and type output = http_trace_entry list
+
+  (** Same as {!Http_trace_block_by_number} but indexed by block hash. *)
+  module Http_trace_block_by_hash :
+    METHOD
+      with type input = Ethereum_types.block_hash
+       and type output = http_trace_entry list
+end

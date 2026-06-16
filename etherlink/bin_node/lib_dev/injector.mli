@@ -39,6 +39,13 @@ val send_raw_transaction_sync :
   block_parameter:Ethereum_types.Block_parameter.t ->
   (Transaction_receipt.t, string) result tzresult Lwt.t
 
+val inject_wait_transaction_confirmation :
+  keep_alive:bool ->
+  timeout:float ->
+  base:Uri.t ->
+  hash:Ethereum_types.hash ->
+  (unit, string) result tzresult Lwt.t
+
 val inject_transaction :
   keep_alive:bool ->
   timeout:float ->

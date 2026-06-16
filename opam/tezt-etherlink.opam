@@ -17,7 +17,6 @@ depends: [
   "bls12-381"
   "crunch" { >= "3.3.0" }
   "floodgate" { = version }
-  "octez-rust-deps" {with-test}
   "ppx_import" {with-test}
   "ppx_deriving" {with-test}
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }

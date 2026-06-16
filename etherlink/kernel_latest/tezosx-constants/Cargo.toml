@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezosx-constants"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]

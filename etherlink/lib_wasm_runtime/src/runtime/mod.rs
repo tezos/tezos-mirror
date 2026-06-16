@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 
 //! Abstraction layer hiding how a kernel is concretely executed.
 
@@ -50,7 +50,7 @@ pub trait Runtime {
 
             end_span()?;
 
-            if self.host().needs_kernel_reload() {
+            if self.host().needs_kernel_reload()? {
                 return Ok(RunStatus::PendingKernelUpgrade(
                     self.host().tree().clone(),
                     self.host().inputs_buffer().clone(),
@@ -122,6 +122,8 @@ enum NativeKernel {
     DionysusR1,
     Ebisu,
     Farfadet,
+    FarfadetR1,
+    FarfadetR2,
 }
 
 impl NativeKernel {
@@ -134,6 +136,8 @@ impl NativeKernel {
             Self::DionysusR1 => RuntimeVersion::V1,
             Self::Ebisu => RuntimeVersion::V1,
             Self::Farfadet => RuntimeVersion::V1,
+            Self::FarfadetR1 => RuntimeVersion::V1,
+            Self::FarfadetR2 => RuntimeVersion::V1,
         }
     }
 }
@@ -152,6 +156,10 @@ const EBISU_ROOT_HASH_HEX: &'static str =
     "8eb91f4b0955a02d394565b31cf806a3d281f1f1d7fed709f0b7af29c7b53996";
 const FARFADET_ROOT_HASH_HEX: &'static str =
     "002ce9946e42dad48751bf81120f26d44bd86aa2e386e9015a0c2e8b0aefb89c";
+const FARFADET_R1_ROOT_HASH_HEX: &'static str =
+    "7a5e3327696fb0869c8de96888ad672acfaebb6d6ff23f43df75ae535fae1e5f";
+const FARFADET_R2_ROOT_HASH_HEX: &'static str =
+    "7e06577f7a7c81303636aadf4faf0cc352a74a4cb1dffe8e1a459725cd558ff5";
 
 impl NativeKernel {
     fn of_root_hash(root_hash: &ContextHash) -> Option<NativeKernel> {
@@ -166,6 +174,8 @@ impl NativeKernel {
             DIONYSUS_R1_ROOT_HASH_HEX => Some(NativeKernel::DionysusR1),
             EBISU_ROOT_HASH_HEX => Some(NativeKernel::Ebisu),
             FARFADET_ROOT_HASH_HEX => Some(NativeKernel::Farfadet),
+            FARFADET_R1_ROOT_HASH_HEX => Some(NativeKernel::FarfadetR1),
+            FARFADET_R2_ROOT_HASH_HEX => Some(NativeKernel::FarfadetR2),
             _ => None,
         }
     }
@@ -283,6 +293,69 @@ impl Runtime for NativeRuntime {
                 kernel_farfadet::evm_node_entrypoint::assemble_block_fn(self.mut_host(), hasher);
                 Ok(())
             }
+            ("kernel_run", NativeKernel::FarfadetR1) => {
+                trace!("farfadet_r1::kernel_loop");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r1::kernel(self.mut_host(), hasher);
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::FarfadetR1) => {
+                trace!("farfadet_r1::populate_delayed_inbox");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r1::evm_node_entrypoint::populate_delayed_inbox_with_durable_storage(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("single_tx_execution", NativeKernel::FarfadetR1) => {
+                trace!("farfadet_r1::single_tx_execution");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r1::evm_node_entrypoint::single_tx_execution_fn(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("assemble_block", NativeKernel::FarfadetR1) => {
+                trace!("farfadet_r1::assemble_block");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r1::evm_node_entrypoint::assemble_block_fn(self.mut_host(), hasher);
+                Ok(())
+            }
+            ("kernel_run", NativeKernel::FarfadetR2) => {
+                trace!("farfadet_r2_su::kernel_loop");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r2_su::kernel(self.mut_host(), hasher);
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::FarfadetR2) => {
+                trace!("farfadet_r2_su::populate_delayed_inbox");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r2_su::evm_node_entrypoint::populate_delayed_inbox_with_durable_storage(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("single_tx_execution", NativeKernel::FarfadetR2) => {
+                trace!("farfadet_r2_su::single_tx_execution");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r2_su::evm_node_entrypoint::single_tx_execution_fn(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("assemble_block", NativeKernel::FarfadetR2) => {
+                trace!("farfadet_r2_su::assemble_block");
+                let hasher = self.host().hasher();
+                kernel_farfadet_r2_su::evm_node_entrypoint::assemble_block_fn(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
             (missing_entrypoint, _) => todo!("entrypoint {missing_entrypoint} not covered yet"),
         }
     }
@@ -296,6 +369,7 @@ pub fn load_runtime(
     native_execution: bool,
 ) -> Result<Box<dyn Runtime>, Error> {
     let root_hash = bindings::store_get_hash(&host.tree(), KERNEL)?;
+    host.root_hash = Some(root_hash.clone());
     match NativeKernel::of_root_hash(&root_hash) {
         Some(kernel) if native_execution => {
             host.version = kernel.runtime_version();

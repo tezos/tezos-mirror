@@ -77,8 +77,7 @@ module Global_directory = Make_directory (struct
     Lwt_result.return (Node_context.readonly node_ctxt)
 end)
 
-(* The block directory needs to be registered in the protocol plugin. *)
-module Block_directory = Make_sub_directory (struct
+module Make_block_directory (X : sig end) = Make_sub_directory (struct
   include Rollup_node_services.Block
 
   type context = Node_context.rw
@@ -90,6 +89,29 @@ module Block_directory = Make_sub_directory (struct
     let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
     (Node_context.readonly node_ctxt, block)
 end)
+
+(* The block directory needs to be registered in the protocol plugin. *)
+module Block_directory = Make_block_directory (struct end)
+
+module Make_block_helpers_directory (X : sig end) = Make_sub_directory (struct
+  include Rollup_node_services.Block.Helpers
+
+  (* The context needs to be accessed with write permissions because we need to
+     commit on disk to generate the proofs. *)
+  type context = Node_context.rw
+
+  (* The context needs to be accessed with write permissions because we need to
+     commit on disk to generate the proofs. *)
+  type subcontext = Node_context.rw * Block_hash.t
+
+  let context_of_prefix node_ctxt (((), block) : prefix) =
+    let open Lwt_result_syntax in
+    let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
+    (node_ctxt, block)
+end)
+
+(* The block helpers directory needs to be registered in the protocol plugin. *)
+module Block_helpers_directory = Make_block_helpers_directory (struct end)
 
 module Local_directory = Make_directory (struct
   include Rollup_node_services.Local
@@ -255,6 +277,15 @@ let () =
       in
       Option.map (fun c -> (c, commitment_hash)) commitment
 
+let () =
+  Global_directory.register0
+    Rollup_node_services.Global.last_cemented_commitment
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let lcc = Reference.get node_ctxt.lcc in
+  let+ commitment = Node_context.find_commitment node_ctxt lcc.commitment in
+  Option.map (fun c -> (c, lcc.commitment)) commitment
+
 (* Sets up a block watching service. It creates a stream to
    observe block events and asynchronously fetches the next
    block when available *)
@@ -347,23 +378,24 @@ let () =
   Block_directory.register0 Rollup_node_services.Block.total_ticks
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
-  let* state = get_state node_ctxt block in
-  let* (module Plugin) =
-    Protocol_plugins.proto_plugin_for_block node_ctxt block
-  in
-  let*! tick = Plugin.Pvm.get_tick node_ctxt.kind state in
-  return tick
+  let* l2_block = Node_context.get_l2_block node_ctxt block in
+  return (Sc_rollup_block.final_tick l2_block)
 
 let () =
   Block_directory.register0 Rollup_node_services.Block.state_hash
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
-  let* state = get_state node_ctxt block in
-  let* (module Plugin) =
-    Protocol_plugins.proto_plugin_for_block node_ctxt block
-  in
-  let*! hash = Plugin.Pvm.state_hash node_ctxt.kind state in
-  return hash
+  let* l2_block = Node_context.get_l2_block node_ctxt block in
+  match l2_block.state_hash with
+  | Some hash -> return hash
+  | None ->
+      (* Fallback for blocks stored before migration *)
+      let* state = get_state node_ctxt block in
+      let* (module Plugin) =
+        Protocol_plugins.proto_plugin_for_block node_ctxt block
+      in
+      let*! hash = Plugin.Pvm.state_hash node_ctxt.kind state in
+      return hash
 
 let () =
   Block_directory.register0 Rollup_node_services.Block.state_current_level

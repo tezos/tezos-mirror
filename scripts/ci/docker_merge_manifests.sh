@@ -32,5 +32,16 @@ for docker_image in ${docker_images}; do
     # by concatenating all the arguments together (space separated), then read and execute it
     eval "docker manifest create ${docker_image}:${docker_tag}${amends}"
     docker manifest push "${docker_image}:${docker_tag}"
+
+    # Sign image
+    ./scripts/ci/docker_sign.sh "${docker_image}:${docker_tag}"
+  done
+done
+
+# Signature verification
+for docker_image in ${docker_images}; do
+  echo "### Verifying signature for docker image: ${docker_image}"
+  for docker_tag in ${docker_tags}; do
+    ./scripts/ci/docker_verify_signature.sh "${docker_image}:${docker_tag}"
   done
 done

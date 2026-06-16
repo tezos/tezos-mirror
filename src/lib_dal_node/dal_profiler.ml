@@ -9,8 +9,8 @@ open Profiler
 
 let dal_profiler = unplugged ()
 
-let init profiler_maker =
-  match profiler_maker ~name:"dal" with
+let init ~profiling_config profiler_maker =
+  match profiler_maker ~profiling_config ~name:"dal" with
   | Some instance -> plug dal_profiler instance
   | None -> ()
 

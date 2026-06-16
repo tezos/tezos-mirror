@@ -226,12 +226,7 @@ end
 
 module Block = struct
   open Tezos_rpc.Path
-
-  type prefix = unit * Rollup_node_services.Arg.block_id
-
-  let path : prefix Tezos_rpc.Path.context = open_root
-
-  let prefix = root / "global" / "block" /: Rollup_node_services.Arg.block_id
+  include Rollup_node_services.Block
 
   let durable_state_value (pvm_kind : Sc_rollup.Kind.t) =
     Tezos_rpc.Service.get_service
@@ -323,11 +318,7 @@ module Block = struct
       (path / "committed_status")
 
   module Helpers = struct
-    type nonrec prefix = prefix
-
-    let prefix = prefix
-
-    let path = path / "helpers"
+    include Rollup_node_services.Block.Helpers
 
     let outbox_proof_simple =
       Tezos_rpc.Service.get_service

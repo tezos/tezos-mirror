@@ -11,8 +11,10 @@ open Scenarios_helpers
 open Tezos
 open Yes_crypto
 
+type etherlink_mode = Sequencer | Observer of string
+
 type etherlink_configuration = {
-  etherlink_sequencer : bool;
+  etherlink_sequencer : etherlink_mode;
   etherlink_producers : int;
   (* Empty list means DAL FF is set to false. *)
   etherlink_dal_slots : int list;
@@ -96,7 +98,9 @@ let init_etherlink_dal_node ~external_rpc ~network ~snapshot
           cloud
           agent
       in
-      let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
+      let* dal_node =
+        Dal_node.Agent.create ~name:(name ^ "-dal") ~node cloud agent
+      in
       let* () =
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow network)
@@ -259,17 +263,23 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
     |> List.map (fun account -> account.Tezt_etherlink.Eth_account.address)
   in
   let*! () =
-    let sequencer = if is_sequencer then Some account.public_key else None in
+    let sequencer =
+      if is_sequencer = Sequencer then Some account.public_key else None
+    in
     let () = toplog "Init Etherlink: configuring the kernel" in
+    let kernel_setup =
+      Tezt_etherlink.Evm_node.make_kernel_setup
+        ?sequencer
+        ~eth_bootstrap_accounts
+        ~enable_dal:(Option.is_some dal_slots)
+        ~chain_id
+        ?dal_slots
+        ?l2_chain_ids:(if tezlink then Some [chain_id] else None)
+        ()
+    in
     Tezt_etherlink.Evm_node.make_kernel_installer_config
-      ?sequencer
-      ~eth_bootstrap_accounts
+      kernel_setup
       ~output:rollup_config
-      ~enable_dal:(Option.is_some dal_slots)
-      ~chain_id
-      ?dal_slots
-      ~enable_multichain:tezlink
-      ?l2_chain_ids:(if tezlink then Some [chain_id] else None)
       ()
   in
   let* () = Process.spawn "cat" [rollup_config] |> Process.check in
@@ -299,6 +309,7 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
     Sc_rollup_node.Agent.create
       ~name:(name_of_daemon (Etherlink_sc_rollup_node name))
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
       ~default_operator:account.alias
       ~operators
       ?dal_node
@@ -353,35 +364,43 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   let () = toplog "Init Etherlink: launching the rollup node: done" in
-  let private_rpc_port = Agent.next_available_port agent |> Option.some in
+  let private_rpc_port = Agent.next_available_port agent in
   let time_between_blocks = Some (Evm_node.Time_between_blocks 10.) in
-  let sequencer_mode =
-    Evm_node.Sequencer
-      {
-        initial_kernel = output;
-        preimage_dir = Some preimages_dir;
-        private_rpc_port;
-        time_between_blocks;
-        sequencer_keys = [account.alias];
-        genesis_timestamp = None;
-        max_blueprints_lag = Some 300;
-        max_blueprints_ahead = Some 2000;
-        max_blueprints_catchup = None;
-        catchup_cooldown = None;
-        max_number_of_chunks = None;
-        wallet_dir = Some (Client.base_dir client);
-        tx_queue_max_lifespan = None;
-        tx_queue_max_size = None;
-        tx_queue_tx_per_addr_limit = None;
-        dal_slots;
-        sequencer_sunset_sec = None;
-      }
+  let mode =
+    let rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node in
+    match is_sequencer with
+    | Sequencer ->
+        let sequencer_config : Evm_node.sequencer_config =
+          {
+            time_between_blocks;
+            genesis_timestamp = None;
+            max_number_of_chunks = None;
+            wallet_dir = Some (Client.base_dir client);
+          }
+        in
+        Evm_node.Sequencer
+          {
+            rollup_node_endpoint;
+            sequencer_config;
+            sequencer_keys = [account.alias];
+            max_blueprints_lag = Some 300;
+            max_blueprints_ahead = Some 2000;
+            max_blueprints_catchup = None;
+            catchup_cooldown = None;
+            dal_slots;
+            sequencer_sunset_sec = None;
+          }
+    | Observer evm_node_endpoint ->
+        Evm_node.Observer
+          {rollup_node_endpoint = Some rollup_node_endpoint; evm_node_endpoint}
   in
-  let endpoint = Sc_rollup_node.endpoint sc_rollup_node in
-  let mode = if is_sequencer then sequencer_mode else Evm_node.Proxy in
   let () = toplog "Init Etherlink: launching the EVM node" in
   let* evm_node =
     Tezos.Evm_node.Agent.init
+      ~wait:false
+      ~initial_kernel:output
+      ~preimages_dir
+      ~private_rpc_port
       ~patch_config:(fun json ->
         JSON.update
           "public_rpc"
@@ -415,10 +434,10 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
              ())
       ~name:(name_of_daemon (Etherlink_evm_node name))
       ~mode
-      endpoint
       cloud
       agent
   in
+  let* () = Evm_node.wait_for_ready ~timeout:1200. evm_node in
   let () = toplog "Init Etherlink: launching the EVM node: done" in
   let operator =
     {
@@ -426,7 +445,7 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
       client;
       sc_rollup_node;
       evm_node;
-      is_sequencer;
+      is_sequencer = is_sequencer = Sequencer;
       account;
       batching_operators;
       sc_rollup_address;
@@ -469,9 +488,14 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
     let sequencer =
       if operator.is_sequencer then Some operator.account.public_key else None
     in
+    let kernel_setup =
+      Tezt_etherlink.Evm_node.make_kernel_setup
+        ?sequencer
+        ~eth_bootstrap_accounts
+        ()
+    in
     Tezt_etherlink.Evm_node.make_kernel_installer_config
-      ?sequencer
-      ~eth_bootstrap_accounts
+      kernel_setup
       ~output:output_config
       ()
   in
@@ -479,6 +503,7 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
     Sc_rollup_node.Agent.create
       ~name:(name_of_daemon (Etherlink_sc_rollup_node name))
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
       cloud
       agent
       Observer
@@ -501,26 +526,22 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
       operator.sc_rollup_address
       [Log_kernel_debug]
   in
+  let evm_node_endpoint = Evm_node.endpoint operator.evm_node in
   let mode =
     Evm_node.Observer
       {
-        private_rpc_port = None;
-        initial_kernel = Some output;
-        preimages_dir = Some preimages_dir;
         rollup_node_endpoint = Some (Sc_rollup_node.endpoint sc_rollup_node);
-        tx_queue_max_lifespan = None;
-        tx_queue_max_size = None;
-        tx_queue_tx_per_addr_limit = None;
+        evm_node_endpoint;
       }
   in
   let () = toplog "Init Etherlink: init producer %s" name in
-  let endpoint = Evm_node.endpoint operator.evm_node in
   (* TODO: try using this local EVM node for Floodgate confirmations. *)
   let* evm_node =
     Evm_node.Agent.init
       ~name:(name_of_daemon (Etherlink_evm_node name))
       ~mode
-      endpoint
+      ~initial_kernel:output
+      ~preimages_dir
       cloud
       agent
   in
@@ -531,7 +552,7 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
   (* Launch floodgate *)
   let* () =
     Floodgate.Agent.run
-      ~rpc_endpoint:endpoint
+      ~rpc_endpoint:evm_node_endpoint
       ~max_active_eoa:210
       ~max_transaction_batch_length:70
       ~tick_interval:1.0

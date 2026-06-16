@@ -5,63 +5,46 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{
-    apply_transaction, ExecutionInfo, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE,
-};
+use crate::apply::{ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE};
+use crate::block_in_progress;
+use crate::block_storage;
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
-    store_current_block_header, BlockHeader, ChainHeader, EVMBlockHeader,
+    store_current_block_header, BlockHeader, ChainHeader,
 };
-use crate::chains::{
-    BlockInProgressTrait, ChainConfigTrait, ChainHeaderTrait, EvmChainConfig, EvmLimits,
-};
+use crate::chains::{ChainConfigTrait, ChainHeaderTrait, EvmLimits, TransactionTrait};
 use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
 use crate::storage;
-use crate::transaction::{Transaction, Transactions};
+use crate::storage::read_block_in_progress;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
-use crate::{block_in_progress, tick_model};
 use anyhow::Context;
-use block_in_progress::EthBlockInProgress;
+use block_in_progress::BlockInProgress;
 use primitive_types::{H160, H256, U256};
-use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
-use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_evm_logging::{__trace_kernel, log, Level::*, Verbosity};
-use tezos_evm_runtime::runtime::{IsEvmNode, Runtime};
+use tezos_evm_logging::{__trace_kernel, log, Level::*};
+use tezos_evm_runtime::extensions::WithGas;
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{OwnedPath, Path};
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_tracing::trace_kernel;
+use tezosx_interfaces::Registry;
 
 pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
 
 pub const GAS_LIMIT: u64 = 1 << 50;
-
-/// Struct used to allow the compiler to check that the tick counter value is
-/// correctly moved and updated. Copy and Clone should NOT be derived.
-pub struct TickCounter {
-    pub c: u64,
-}
-
-impl TickCounter {
-    pub fn new(c: u64) -> Self {
-        Self { c }
-    }
-    pub fn finalize(consumed_ticks: u64) -> Self {
-        Self {
-            c: consumed_ticks + tick_model::constants::FINALIZE_UPPER_BOUND,
-        }
-    }
-}
 
 #[derive(PartialEq, Debug)]
 pub enum BlockInProgressComputationResult {
@@ -87,28 +70,19 @@ pub enum ComputationResult {
 }
 
 // A block in progress can either come directly from the storage (when the previous run did not have enough ticks to apply the full block) or from a blueprint
-enum BlockInProgressProvenance {
+pub enum BlockInProgressProvenance {
     Storage,
     Blueprint,
 }
 
-fn on_invalid_transaction<Host: Runtime>(
-    host: &mut Host,
-    transaction: &Transaction,
-    block_in_progress: &mut EthBlockInProgress,
-    data_size: u64,
+fn on_invalid_transaction(
+    is_delayed: bool,
+    tx_hash: TransactionHash,
+    block_in_progress: &mut BlockInProgress,
 ) {
-    if transaction.is_delayed() {
-        block_in_progress.register_delayed_transaction(transaction.tx_hash);
+    if is_delayed {
+        block_in_progress.register_delayed_transaction(tx_hash);
     }
-
-    block_in_progress.account_for_invalid_transaction(data_size);
-    log!(
-        host,
-        Benchmarking,
-        "Estimated ticks after tx: {}",
-        block_in_progress.estimated_ticks_in_run
-    );
 }
 
 fn max_gas_per_reboot(limits: &EvmLimits) -> u64 {
@@ -117,7 +91,7 @@ fn max_gas_per_reboot(limits: &EvmLimits) -> u64 {
     limits.maximum_gas_limit * 61 / 60
 }
 
-fn can_fit_in_reboot(
+pub fn can_fit_in_reboot(
     limits: &EvmLimits,
     used_gas_in_run: U256,
     tx_gas_limit: u64,
@@ -128,36 +102,42 @@ fn can_fit_in_reboot(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn compute<Host: Runtime>(
+pub fn compute<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
+    registry: &impl Registry,
+    chain_config: &ChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress: &mut EthBlockInProgress,
-    block_constants: &BlockConstants,
+    block_in_progress: &mut BlockInProgress,
+    block_constants: &ChainConfig::BlockConstants,
     sequencer_pool_address: Option<H160>,
-    limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
-    spec_id: &SpecId,
-) -> Result<BlockInProgressComputationResult, anyhow::Error> {
-    log!(
-        host,
-        Debug,
-        "Queue length {}.",
-        block_in_progress.queue_length()
-    );
+    // Per-replay flag threaded down from [produce] / [handle_run_transaction]:
+    // when [true], each transaction's HTTP CRAC traces are persisted under
+    // [HTTP_TRACES_ROOT] via [maybe_store_http_traces_for_tx]. Plumbed as a
+    // parameter (rather than read from durable storage inside apply_*) so the
+    // flag doesn't need to live inside the [SafeStorage]-mirrored world state
+    // subtree, and so the check happens exactly once per replay.
+    http_trace_enabled: bool,
+) -> Result<BlockInProgressComputationResult, anyhow::Error>
+where
+    Host: StorageV1 + WithGas,
+{
+    log!(Debug, "Queue length {}.", block_in_progress.queue_length());
     // iteration over all remaining transaction in the block
     while block_in_progress.has_tx() {
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
+        let tx_hash = transaction.tx_hash();
+        let is_delayed = transaction.is_delayed();
         let data_size: u64 = transaction.data_size();
 
-        log!(host, Benchmarking, "Transaction data size: {}", data_size);
+        log!(Benchmarking, "Transaction data size: {}", data_size);
 
-        if !can_fit_in_reboot(
-            limits,
+        if !chain_config.can_fit_in_reboot(
             host.executed_gas().into(),
-            transaction.execution_gas_limit(&block_constants.block_fees)?,
-        ) {
+            &transaction,
+            block_constants,
+        )? {
             log!(
-                host,
                 Debug,
                 "There are not enough gas left in the current kernel run \
                  to try the transaction, but it will be retried after reboot."
@@ -167,50 +147,43 @@ fn compute<Host: Runtime>(
             return Ok(BlockInProgressComputationResult::RebootNeeded);
         }
 
+        let skip_signature_check = false;
+        let skip_fees_check = false;
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
         match __trace_kernel!(
-            host,
             "apply_transaction",
-            apply_transaction(
+            chain_config.apply_transaction(
+                block_in_progress,
                 host,
+                registry,
                 outbox_queue,
                 block_constants,
-                &transaction,
+                transaction,
                 block_in_progress.index,
                 sequencer_pool_address,
                 tracer_input,
-                spec_id,
-                limits,
+                skip_signature_check,
+                skip_fees_check,
+                http_trace_enabled,
             )?
         ) {
-            ExecutionResult::Valid(ExecutionInfo {
-                receipt_info,
-                object_info,
-                estimated_ticks_used,
-                execution_gas_used,
-            }) => {
-                if transaction.is_delayed() {
-                    block_in_progress.register_delayed_transaction(transaction.tx_hash);
+            ExecutionResult::Valid(execution_info) => {
+                if is_delayed {
+                    block_in_progress.register_delayed_transaction(tx_hash);
                 }
 
+                let multiplier =
+                    chain_config.michelson_to_evm_gas_multiplier(block_constants);
                 block_in_progress.register_valid_transaction(
-                    &transaction,
-                    object_info,
-                    receipt_info,
-                    estimated_ticks_used,
-                    execution_gas_used,
+                    execution_info,
                     host,
+                    multiplier,
+                    tracer_input,
                 )?;
-                log!(
-                    host,
-                    Benchmarking,
-                    "Estimated ticks after tx: {}",
-                    block_in_progress.estimated_ticks_in_run
-                );
             }
             ExecutionResult::Invalid => {
-                on_invalid_transaction(host, &transaction, block_in_progress, data_size)
+                on_invalid_transaction(is_delayed, tx_hash, block_in_progress)
             }
         };
     }
@@ -224,42 +197,38 @@ enum BlueprintParsing<BIP> {
     None,
 }
 
-pub fn eth_bip_from_blueprint<Host: Runtime>(
+pub fn bip_from_blueprint<Host, ChainConfig: ChainConfigTrait>(
     host: &Host,
-    chain_config: &EvmChainConfig,
-    tick_counter: &TickCounter,
+    chain_config: &ChainConfig,
     next_bip_number: U256,
-    header: EVMBlockHeader,
-    blueprint: Blueprint<Transactions>,
-) -> EthBlockInProgress {
-    let gas_price = crate::gas_price::base_fee_per_gas(
-        host,
-        blueprint.timestamp,
-        chain_config.get_limits().minimum_base_fee_per_gas,
-    );
+    hash: H256,
+    tezos_parent_hash: H256,
+    blueprint: Blueprint,
+) -> BlockInProgress
+where
+    Host: StorageV1,
+{
+    let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
-    let bip = EthBlockInProgress::from_blueprint(
+    let bip = BlockInProgress::from_blueprint(
         blueprint,
         next_bip_number,
-        header.hash,
-        tick_counter.c,
+        hash,
+        tezos_parent_hash,
         gas_price,
     );
 
-    tezos_evm_logging::log!(host, tezos_evm_logging::Level::Debug, "bip: {bip:?}");
+    tezos_evm_logging::log!(tezos_evm_logging::Level::Debug, "bip: {bip:?}");
     bip
 }
 
-#[cfg_attr(feature = "benchmark", inline(never))]
-fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
+fn get_next_bip_info<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
-    tick_counter: &TickCounter,
-    chain_config: &ChainConfig,
-    config: &mut Configuration,
-    kernel_upgrade: &Option<KernelUpgrade>,
-) -> Result<BlueprintParsing<ChainConfig::BlockInProgress>, anyhow::Error> {
-    let (next_bip_number, timestamp, chain_header) = match read_current_block_header(host)
-    {
+) -> (U256, Timestamp, ChainConfig::ChainHeader)
+where
+    Host: StorageV1,
+{
+    match read_current_block_header(host) {
         Err(_) => (
             U256::zero(),
             Timestamp::from(0),
@@ -273,16 +242,31 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
             blueprint_header.timestamp,
             chain_header,
         ),
-    };
-    log!(host, Debug, "Next blueprint number: {:?}", next_bip_number);
+    }
+}
+
+#[cfg_attr(feature = "benchmark", inline(never))]
+fn build_next_bip_from_blueprints<Host, ChainConfig: ChainConfigTrait>(
+    host: &mut Host,
+    chain_config: &ChainConfig,
+    next_bip_number: U256,
+    timestamp: Timestamp,
+    chain_header: &ChainConfig::ChainHeader,
+    config: &mut Configuration,
+    kernel_upgrade: &Option<KernelUpgrade>,
+) -> anyhow::Result<BlueprintParsing<BlockInProgress>>
+where
+    Host: HostReveal + StorageV1 + WasmHost,
+{
+    log!(Debug, "Next blueprint number: {:?}", next_bip_number);
     let (blueprint, size) = read_blueprint::<_, ChainConfig>(
         host,
         config,
         next_bip_number,
         timestamp,
-        &chain_header,
+        chain_header,
     )?;
-    log!(host, Benchmarking, "Size of blueprint: {}", size);
+    log!(Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
         Some(blueprint) => {
             if let Some(kernel_upgrade) = kernel_upgrade {
@@ -293,14 +277,19 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     return Ok(BlueprintParsing::None);
                 }
             }
-            let bip: ChainConfig::BlockInProgress = chain_config
-                .block_in_progress_from_blueprint(
-                    host,
-                    tick_counter,
-                    next_bip_number,
-                    chain_header,
-                    blueprint,
-                )?;
+            let tezos_parent_hash =
+                block_storage::read_current_hash(host, &crate::chains::TEZ_BLOCKS_PATH)
+                    .unwrap_or_else(|_| {
+                        H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
+                    });
+            let bip: BlockInProgress = bip_from_blueprint(
+                host,
+                chain_config,
+                next_bip_number,
+                chain_header.hash(),
+                tezos_parent_hash,
+                blueprint,
+            );
             Ok(BlueprintParsing::Next(Box::new(bip)))
         }
         None => Ok(BlueprintParsing::None),
@@ -308,56 +297,52 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute_bip<Host: Runtime>(
+pub fn compute_bip<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
+    registry: &impl Registry,
+    chain_config: &ChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    mut block_in_progress: EthBlockInProgress,
-    tick_counter: &mut TickCounter,
+    mut block_in_progress: BlockInProgress,
     sequencer_pool_address: Option<H160>,
-    limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
-    chain_id: U256,
     da_fee_per_byte: U256,
     coinbase: H160,
-    spec_id: &SpecId,
-) -> anyhow::Result<BlockComputationResult> {
-    let constants: BlockConstants = block_in_progress.constants(
-        chain_id,
-        limits.minimum_base_fee_per_gas,
-        da_fee_per_byte,
-        GAS_LIMIT,
-        coinbase,
-    );
+    chain_header: ChainConfig::ChainHeader,
+    http_trace_enabled: bool,
+) -> anyhow::Result<BlockComputationResult>
+where
+    Host: StorageV1 + WithGas,
+{
+    let constants: ChainConfig::BlockConstants =
+        chain_config.constants(host, &block_in_progress, da_fee_per_byte, coinbase)?;
     let result = compute(
         host,
+        registry,
+        chain_config,
         outbox_queue,
         &mut block_in_progress,
         &constants,
         sequencer_pool_address,
-        limits,
         tracer_input,
-        spec_id,
+        http_trace_enabled,
     )?;
     match result {
         BlockInProgressComputationResult::RebootNeeded => {
-            log!(host, Info, "Ask for reboot.");
-            log!(
-                host,
-                Benchmarking,
-                "Ask for reboot. Estimated ticks: {}",
-                &block_in_progress.estimated_ticks_in_run
-            );
+            log!(Info, "Ask for reboot.");
             storage::store_block_in_progress(host, &block_in_progress)?;
             Ok(BlockComputationResult::RebootNeeded)
         }
         BlockInProgressComputationResult::Finished {
             included_delayed_transactions,
         } => {
-            crate::gas_price::register_block(host, &block_in_progress)?;
-            *tick_counter =
-                TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
-            let new_block = block_in_progress
-                .finalize_and_store(host, &constants)
+            crate::gas_price::register_block(
+                host,
+                block_in_progress.cumulative_execution_gas,
+                block_in_progress.timestamp,
+                block_in_progress.queue_length(),
+            )?;
+            let new_block = chain_config
+                .finalize_and_store(host, block_in_progress, &constants, chain_header)
                 .context("Failed to finalize the block in progress")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions,
@@ -367,14 +352,16 @@ pub fn compute_bip<Host: Runtime>(
     }
 }
 
-fn revert_block<Host: Runtime>(
+fn revert_block<Host>(
     safe_host: &mut SafeStorage<&mut Host>,
     block_in_progress_provenance: &BlockInProgressProvenance,
     number: U256,
     error: anyhow::Error,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1,
+{
     log!(
-        safe_host,
         Error,
         "Block{} {} failed with '{:?}'. Reverting.",
         match block_in_progress_provenance {
@@ -393,25 +380,31 @@ fn revert_block<Host: Runtime>(
     Ok(())
 }
 
-fn clean_delayed_transactions(
-    host: &mut impl Runtime,
+fn clean_delayed_transactions<Host>(
+    host: &mut Host,
     delayed_inbox: &mut DelayedInbox,
     delayed_txs: Vec<TransactionHash>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1,
+{
     for hash in delayed_txs {
         delayed_inbox.delete(host, hash.into())?;
     }
     Ok(())
 }
 
-fn promote_block<Host: Runtime>(
+pub fn promote_block<Host>(
     safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress_provenance: &BlockInProgressProvenance,
     block_header: BlockHeader<ChainHeader>,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + WasmHost + IsEvmNode,
+{
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
         storage::delete_block_in_progress(safe_host)?;
     }
@@ -427,12 +420,7 @@ fn promote_block<Host: Runtime>(
     let written = outbox_queue.flush_queue(safe_host.host);
     // Log to Info only if we flushed messages.
     let level = if written > 0 { Info } else { Debug };
-    log!(
-        safe_host,
-        level,
-        "Flushed outbox queue messages ({} flushed)",
-        written
-    );
+    log!(level, "Flushed outbox queue messages ({} flushed)", written);
 
     if let ConfigurationMode::Sequencer { delayed_inbox, .. } = &mut config.mode {
         clean_delayed_transactions(safe_host.host, delayed_inbox, delayed_txs)?;
@@ -442,14 +430,25 @@ fn promote_block<Host: Runtime>(
 }
 
 #[trace_kernel("stage_two")]
-pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
+pub fn produce<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     chain_config: &ChainConfig,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
-) -> Result<ComputationResult, anyhow::Error> {
+) -> Result<ComputationResult, anyhow::Error>
+where
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+{
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
+
+    // Read the HTTP-trace replay flag once, before any [SafeStorage]
+    // wrapping, and thread the resulting boolean through [compute_bip] →
+    // [compute] → apply sites. The flag therefore doesn't need to live in
+    // the [SafeStorage]-mirrored world state subtree, and the common
+    // (unset) case costs a single [store_has] per block instead of one
+    // per transaction.
+    let http_trace_enabled = crate::storage::is_http_trace_enabled(host);
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
 
@@ -457,19 +456,26 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
-    let mut tick_counter = TickCounter::new(0u64);
+    let (next_bip_number, timestamp, chain_header) =
+        get_next_bip_info::<Host, ChainConfig>(host);
 
     let mut safe_host = SafeStorage {
         host,
-        world_state: OwnedPath::from(&chain_config.storage_root_path()),
+        world_states: chain_config
+            .storage_root_paths(next_bip_number)
+            .iter()
+            .map(OwnedPath::from)
+            .collect(),
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
+    let registry = chain_config.init_registry();
+
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
-        match ChainConfig::read_block_in_progress(&safe_host)? {
+        match read_block_in_progress(&safe_host)? {
             Some(block_in_progress) => {
-                log!(safe_host, Debug, "Restauring BIP from storage.");
+                log!(Debug, "Restauring BIP from storage.");
                 (BlockInProgressProvenance::Storage, block_in_progress)
             }
             None => {
@@ -477,30 +483,28 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
                 // because the sequencer pool address is located outside of `/evm/world_state`.
                 upgrade::possible_sequencer_upgrade(safe_host.host)?;
 
-                log!(safe_host, Debug, "Creating BIP from Blueprint.");
+                log!(Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
-                let block_in_progress = match next_bip_from_blueprints(
-                    safe_host.host,
-                    &tick_counter,
-                    chain_config,
-                    config,
-                    &kernel_upgrade,
-                )? {
-                    BlueprintParsing::Next(bip) => {
-                        log!(safe_host, Debug, "Creating BIP from Blueprint: Success.");
-                        bip
-                    }
-                    BlueprintParsing::None => {
-                        log!(
-                            safe_host,
-                            Benchmarking,
-                            "Estimated ticks: {}",
-                            tick_counter.c
-                        );
-                        log!(safe_host, Debug, "Creating BIP from Blueprint: Failure.");
-                        return Ok(ComputationResult::Finished);
-                    }
-                };
+                let block_in_progress =
+                    match build_next_bip_from_blueprints::<Host, ChainConfig>(
+                        safe_host.host,
+                        chain_config,
+                        next_bip_number,
+                        timestamp,
+                        &chain_header,
+                        config,
+                        &kernel_upgrade,
+                    )? {
+                        BlueprintParsing::Next(bip) => {
+                            log!(Debug, "Creating BIP from Blueprint: Success.");
+                            bip
+                        }
+                        BlueprintParsing::None => {
+                            log!(Debug, "Creating BIP from Blueprint: Failure.");
+                            return Ok(ComputationResult::Finished);
+                        }
+                    };
+
                 // We are going to execute a new block, we copy the storage to allow
                 // to revert if the block fails.
                 safe_host.start()?;
@@ -508,17 +512,19 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
             }
         };
 
-    let processed_blueprint = block_in_progress.number();
-    let computation_result = chain_config.compute_bip(
+    let processed_blueprint = block_in_progress.number;
+    let computation_result = compute_bip(
         &mut safe_host,
+        &registry,
+        chain_config,
         &outbox_queue,
         block_in_progress,
-        &mut tick_counter,
         sequencer_pool_address,
-        config.maximum_allowed_ticks,
         tracer_input,
         da_fee_per_byte,
         coinbase,
+        chain_header,
+        http_trace_enabled,
     );
 
     match computation_result {
@@ -535,6 +541,17 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
                 config,
                 included_delayed_transactions,
             )?;
+            // Write sunrise_level only after the block has been committed, so
+            // it is atomic with the Tezos genesis block existing in storage.
+            if chain_config.is_tezos_runtime_enabled(processed_blueprint)
+                && crate::storage::read_michelson_runtime_sunrise_level(safe_host.host)
+                    .is_none()
+            {
+                crate::storage::store_michelson_runtime_sunrise_level(
+                    safe_host.host,
+                    processed_blueprint,
+                )?;
+            }
             upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
 
             if safe_host.is_evm_node() {
@@ -546,14 +563,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
         Ok(BlockComputationResult::RebootNeeded) => {
             // The computation will resume at next reboot, we leave the
             // storage untouched.
-            if let BlockInProgressProvenance::Blueprint = &block_in_progress_provenance {
-                log!(
-                    safe_host,
-                    Benchmarking,
-                    "Estimated ticks: {}",
-                    tick_counter.c
-                )
-            };
             Ok(ComputationResult::RebootNeeded)
         }
         Err(err) => {
@@ -567,14 +576,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
             // which point did it fail nor why. We cannot make assumption
             // on how many ticks it consumed before failing. Therefore
             // the safest solution is to simply reboot after a failure.
-            if let BlockInProgressProvenance::Blueprint = &block_in_progress_provenance {
-                log!(
-                    safe_host,
-                    Benchmarking,
-                    "Estimated ticks: {}",
-                    tick_counter.c
-                )
-            };
             Ok(ComputationResult::RebootNeeded)
         }
     }
@@ -583,30 +584,36 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_storage;
+    use crate::block_in_progress::BlockInProgress;
     use crate::block_storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
+    use crate::block_storage::{self, read_tez_current_block};
     use crate::blueprint::Blueprint;
-    use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
+    use crate::blueprint_storage::{
+        store_current_tez_block_header, store_inbox_blueprint, BlueprintHeader,
+        TezBlockHeader,
+    };
     use crate::chains::TezlinkContent;
     use crate::chains::TezlinkOperation;
     use crate::chains::{
-        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig, TezTransactions,
-        TEZLINK_SAFE_STORAGE_ROOT_PATH,
+        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
+        TezlinkBlockConstants, TezosXBlockConstants, TezosXTransaction, TEZ_BLOCKS_PATH,
+        TEZ_SAFE_STORAGE_ROOT_PATH, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
     };
-    use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
+    use crate::fees::{DA_FEE_PER_BYTE, DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER};
+    use crate::registry_impl::RegistryImpl;
     use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
     use crate::transaction::TransactionContent;
     use crate::transaction::TransactionContent::Ethereum;
     use crate::transaction::TransactionContent::EthereumDelayed;
-    use crate::transaction::Transactions;
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use primitive_types::{H160, U256};
+    use revm::primitives::hardfork::SpecId;
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
     use revm_etherlink::storage::world_state_handler::StorageAccount;
     use sha3::{Digest, Keccak256};
@@ -615,42 +622,48 @@ mod tests {
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
     use tezos_data_encoding::types::Narith;
-    use tezos_ethereum::block::BlockFees;
+    use tezos_ethereum::block::{BlockConstants, BlockFees};
     use tezos_ethereum::transaction::{
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime::Runtime;
-    use tezos_execution::account_storage::Manager;
+
     use tezos_execution::account_storage::TezlinkAccount;
-    use tezos_execution::account_storage::TezlinkImplicitAccount;
-    use tezos_execution::account_storage::TezlinkOriginatedAccount;
-    use tezos_execution::context;
+    use tezos_execution::account_storage::{
+        Manager, TezosImplicitAccount, TezosOriginatedAccount,
+    };
+    use tezos_execution::context::{self, Context as _};
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKey;
     use tezos_smart_rollup::types::PublicKeyHash;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_host::path::concat;
-    use tezos_smart_rollup_host::path::RefPath;
+    use tezos_smart_rollup_host::path::{concat, RefPath};
     use tezos_tezlink::operation::sign_operation;
-    use tezos_tezlink::operation::Parameter;
+    use tezos_tezlink::operation::Parameters;
+    use tezos_tezlink::protocol::{Protocol, TARGET_TEZOS_PROTOCOL};
 
-    fn read_current_number(host: &impl Runtime) -> anyhow::Result<U256> {
+    fn read_current_number<Host>(host: &Host) -> anyhow::Result<U256>
+    where
+        Host: StorageV1,
+    {
         Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
     }
 
-    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
+    use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_smart_rollup_host::wasm::WasmHost;
     use tezos_tezlink::block::TezBlock;
     use tezos_tezlink::operation::ManagerOperation;
     use tezos_tezlink::operation::ManagerOperationContent;
+    use tezos_tezlink::operation::ManagerOperationContentConv;
     use tezos_tezlink::operation::Operation;
     use tezos_tezlink::operation::OperationContent;
     use tezos_tezlink::operation::OriginationContent;
     use tezos_tezlink::operation::RevealContent;
     use tezos_tezlink::operation::Script;
     use tezos_tezlink::operation::TransferContent;
+    use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
     #[derive(Clone)]
     struct Bootstrap {
@@ -697,7 +710,7 @@ mod tests {
         source: Bootstrap,
         content: Vec<OperationContent>,
     ) -> Operation {
-        let branch = TezBlock::genesis_block_hash().into();
+        let branch = TezBlock::genesis_block_hash();
         let content = content
             .into_iter()
             .map(|c| -> ManagerOperationContent {
@@ -709,7 +722,7 @@ mod tests {
                     gas_limit: gas_limit.into(),
                     storage_limit: storage_limit.into(),
                 }
-                .into()
+                .into_manager_operation_content()
             })
             .collect::<Vec<ManagerOperationContent>>();
 
@@ -750,7 +763,7 @@ mod tests {
         source: Bootstrap,
         amount: Narith,
         destination: Contract,
-        parameters: Option<Parameter>,
+        parameters: Parameters,
     ) -> Operation {
         make_operation(
             fee,
@@ -791,27 +804,28 @@ mod tests {
         )
     }
 
-    fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transactions> {
+    fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
         Blueprint {
-            transactions: Transactions::EthTxs(transactions),
+            transactions: transactions
+                .into_iter()
+                .map(TezosXTransaction::from)
+                .collect(),
             timestamp: Timestamp::from(0i64),
         }
     }
 
-    fn tezlink_blueprint(
-        operations: Vec<Operation>,
-        timestamp: Timestamp,
-    ) -> Blueprint<TezTransactions> {
+    fn tezlink_blueprint(operations: Vec<Operation>, timestamp: Timestamp) -> Blueprint {
         let operations = operations
             .into_iter()
             .map(|op| {
-                let tx_hash = op.hash().unwrap().0 .0;
+                let tx_hash = op.hash().unwrap().into();
                 let content = TezlinkContent::Tezos(op);
-                TezlinkOperation { tx_hash, content }
+                let op = TezlinkOperation { tx_hash, content };
+                TezosXTransaction::Tezos(op)
             })
             .collect();
         Blueprint {
-            transactions: TezTransactions(operations),
+            transactions: operations,
             timestamp,
         }
     }
@@ -821,14 +835,14 @@ mod tests {
         Some(H160::from_slice(data))
     }
 
-    fn set_balance<Host: Runtime>(host: &mut Host, address: &H160, balance: U256) {
+    fn set_balance(host: &mut impl StorageV1, address: &H160, balance: U256) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
         let mut info = account.info(host).unwrap();
         info.balance = u256_to_alloy(&balance);
         account.set_info(host, info).unwrap();
     }
 
-    fn get_balance<Host: Runtime>(host: &mut Host, address: &H160) -> U256 {
+    fn get_balance(host: &mut impl StorageV1, address: &H160) -> U256 {
         let account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
         let info = account.info(host).unwrap();
         alloy_to_u256(&info.balance)
@@ -844,10 +858,24 @@ mod tests {
             EvmLimits::default(),
             spec_id,
             ExperimentalFeatures::default(),
+            ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
     }
 
-    fn dummy_tez_config() -> MichelsonChainConfig {
+    /// Pre-populate the `/tez/world_state` and `/tez/tez_accounts` safe roots
+    /// so that `SafeStorage::start()`'s `store_copy` of each root succeeds.
+    /// Required by every test that produces blocks with the Michelson
+    /// runtime active. Mirrors the production bootstrap performed by
+    /// [`crate::kernel`].
+    fn init_tez_safe_roots(host: &mut impl StorageV1) {
+        host.store_write_all(&TEZ_SAFE_STORAGE_ROOT_PATH, b"placeholder")
+            .expect("Write in durable storage should have succeeded");
+        host.store_write_all(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH, b"placeholder")
+            .expect("Write in durable storage should have succeeded");
+    }
+
+    fn dummy_tez_config(host: &mut impl StorageV1) -> MichelsonChainConfig {
+        init_tez_safe_roots(host);
         MichelsonChainConfig::create_config(
             ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
@@ -878,6 +906,7 @@ mod tests {
             DUMMY_BASE_FEE_PER_GAS.into(),
             &[],
             &[],
+            0,
         )
         .unwrap();
         let gas_limit = gas_limit + gas_for_fees;
@@ -949,7 +978,7 @@ mod tests {
         let data: Vec<u8> = hex::decode("608060405234801561001057600080fd5b5061017f806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033").unwrap();
 
         let gas_for_fees =
-            crate::fees::gas_for_fees(DUMMY_DA_FEE.into(), gas_price, &data, &[])
+            crate::fees::gas_for_fees(DUMMY_DA_FEE.into(), gas_price, &data, &[], 0)
                 .unwrap();
         let gas_limit = gas_limit + gas_for_fees;
 
@@ -979,18 +1008,34 @@ mod tests {
         )
     }
 
-    fn store_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
+    fn store_blueprints_from_number<Host, ChainConfig: ChainConfigTrait>(
         host: &mut Host,
-        blueprints: Vec<Blueprint<ChainConfig::Transactions>>,
-    ) {
+        start_number: U256,
+        blueprints: Vec<Blueprint>,
+    ) where
+        Host: StorageV1,
+    {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
-            store_inbox_blueprint_by_number(host, blueprint, U256::from(i))
-                .expect("Should have stored blueprint");
+            store_inbox_blueprint_by_number(
+                host,
+                blueprint,
+                start_number + U256::from(i),
+            )
+            .expect("Should have stored blueprint");
         }
     }
 
-    fn store_block_fees<Host: Runtime>(
+    fn store_blueprints<Host, ChainConfig: ChainConfigTrait>(
         host: &mut Host,
+        blueprints: Vec<Blueprint>,
+    ) where
+        Host: StorageV1,
+    {
+        store_blueprints_from_number::<Host, ChainConfig>(host, U256::zero(), blueprints)
+    }
+
+    fn store_block_fees(
+        host: &mut impl StorageV1,
         block_fees: &BlockFees,
     ) -> anyhow::Result<()> {
         storage::store_minimum_base_fee_per_gas(
@@ -1001,7 +1046,10 @@ mod tests {
         Ok(())
     }
 
-    fn produce_block_with_several_valid_txs<Host: Runtime>(host: &mut Host) {
+    fn produce_block_with_several_valid_txs<Host>(host: &mut Host)
+    where
+        Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+    {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
 
@@ -1032,15 +1080,8 @@ mod tests {
         .expect("The block production failed.");
     }
 
-    fn assert_current_block_reading_validity<Host: Runtime>(
-        host: &mut Host,
-        chain_config: &impl ChainConfigTrait,
-    ) {
-        match block_storage::read_current(
-            host,
-            &chain_config.storage_root_path(),
-            &chain_config.get_chain_family(),
-        ) {
+    fn assert_current_block_reading_validity(host: &mut impl StorageV1) {
+        match block_storage::read_current_etherlink_block(host) {
             Ok(_) => (),
             Err(e) => {
                 panic!("Block reading failed: {e:?}\n")
@@ -1053,18 +1094,8 @@ mod tests {
     fn test_produce_tezlink_block() {
         let mut host = MockKernelHost::default();
 
-        let chain_config = dummy_tez_config();
+        let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
-
-        // We need to store something at the tezlink root path,
-        // otherwise the copy of the root done by the safe storage will fail
-        let path = concat(
-            &chain_config.storage_root_path(),
-            &RefPath::assert_from(b"/fee"),
-        )
-        .expect("Path concatenation should have succeeded");
-        host.store_write_all(&path, &[4; 32])
-            .expect("Write in durable storage should have succeeded");
 
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
@@ -1091,19 +1122,23 @@ mod tests {
     // Test if tezlink block production works with a reveal operation
     fn test_produce_tezlink_block_with_reveal_operation() {
         let mut host = MockKernelHost::default();
+        // Disable DA fees so that low-fee test operations are not rejected.
+        storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
-        let chain_config = dummy_tez_config();
+        let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
 
         let bootstrap = bootstrap1();
         let src = bootstrap.pkh.clone();
 
-        let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
-            .expect("Context creation should have succeeded");
+        let context =
+            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .expect("Context creation should have succeeded");
 
         let contract = Contract::Implicit(src.clone());
 
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account interface should be correct");
 
         // Allocate bootstrap 1
@@ -1144,25 +1179,212 @@ mod tests {
         assert_eq!(Manager::Revealed(pk), manager);
     }
 
+    fn dummy_evm_config_with_tezos_runtime(host: &mut impl StorageV1) -> EvmChainConfig {
+        host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
+            .expect("Should have written feature flag");
+        init_tez_safe_roots(host);
+        let experimental_features = ExperimentalFeatures::read_from_storage(host);
+        EvmChainConfig::create_config(
+            DUMMY_CHAIN_ID,
+            EvmLimits::default(),
+            SpecId::default(),
+            experimental_features,
+            ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
+        )
+    }
+
+    #[test]
+    // Test that a TezBlock is created and stored when Tezos operations are executed via EVM chain config
+    fn test_tezblock_stored_after_tezos_operation() {
+        use tezosx_tezos_runtime::account::{set_tezos_account_info, TezosAccountInfo};
+
+        let mut host = MockKernelHost::default();
+
+        // Store bootstrap2 in the tezlink context to ensure the
+        // Tezlink context is not empty and can thus be backed up
+        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+            .expect("TezlinkContext creation should have succeed")
+            .implicit_from_public_key_hash(&bootstrap2().pkh)
+            .expect("Account interface should be correct")
+            .allocate(&mut host)
+            .expect("Contract initialization should have succeed");
+
+        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let mut config = dummy_configuration();
+
+        let bootstrap = bootstrap1();
+
+        // Initialize the Tezos account in the TezosX storage path
+        // (used by TezosRuntimeContext in apply.rs for TezosDelayed operations)
+        let account_info = TezosAccountInfo {
+            balance: U256::from(10),
+            nonce: 0,
+            pub_key: None,
+        };
+        set_tezos_account_info(&mut host, &bootstrap.pkh, account_info)
+            .expect("Should have set account info");
+
+        // Create a Tezos reveal operation wrapped as TezosDelayed for EVM chain
+        let reveal = make_reveal_operation(1, 1, 500, 0, bootstrap);
+        let tx_hash = reveal.hash().unwrap().into();
+        let tezos_tx = Transaction {
+            tx_hash,
+            content: TransactionContent::TezosDelayed(reveal),
+        };
+
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![tezos_tx])]);
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+
+        // Produce the block
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        // Verify that a TezBlock was stored (at TEZ_BLOCKS_PATH which is under /tez/world_state)
+        let tez_block_number =
+            block_storage::read_current_number(&host, &TEZ_BLOCKS_PATH)
+                .expect("TezBlock number should be readable");
+        // Block number is 0 for the first block (same as EVM block numbering)
+        assert_eq!(U256::from(0), tez_block_number);
+
+        let tez_block_hash = block_storage::read_current_hash(&host, &TEZ_BLOCKS_PATH)
+            .expect("TezBlock hash should be readable");
+        // The hash should not be zero (it's computed from the block content)
+        assert_ne!(H256::zero(), tez_block_hash);
+    }
+
+    #[test]
+    fn test_tezblocks_are_chained() {
+        use tezosx_tezos_runtime::account::{set_tezos_account_info, TezosAccountInfo};
+
+        let mut host = MockKernelHost::default();
+
+        // Store bootstrap2 in the tezlink context to ensure the
+        // Tezlink context is not empty and can thus be backed up
+        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+            .expect("TezlinkContext creation should have succeed")
+            .implicit_from_public_key_hash(&bootstrap2().pkh)
+            .expect("Account interface should be correct")
+            .allocate(&mut host)
+            .expect("Contract initialization should have succeed");
+
+        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let mut config = dummy_configuration();
+
+        let bootstrap = bootstrap1();
+
+        let account_info = TezosAccountInfo {
+            balance: U256::from(100),
+            nonce: 0,
+            pub_key: None,
+        };
+        set_tezos_account_info(&mut host, &bootstrap.pkh, account_info)
+            .expect("Should have set account info");
+
+        // Block 0: reveal operation
+        let reveal = make_reveal_operation(1, 1, 500, 0, bootstrap.clone());
+        let tx_hash = reveal.hash().unwrap().into();
+        let tezos_tx = Transaction {
+            tx_hash,
+            content: TransactionContent::TezosDelayed(reveal),
+        };
+
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![tezos_tx])]);
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        // Record block 0 hash
+        let block_0_hash = block_storage::read_current_hash(&host, &TEZ_BLOCKS_PATH)
+            .expect("TezBlock 0 hash should be readable");
+        assert_ne!(H256::zero(), block_0_hash);
+
+        // Block 1: transfer operation
+        let bootstrap2 = bootstrap2();
+        let transfer = make_transaction_operation(
+            1,
+            2,
+            3000,
+            0,
+            bootstrap,
+            10_u64.into(),
+            Contract::Implicit(bootstrap2.pkh),
+            Parameters::default(),
+        );
+        let tx_hash = transfer.hash().unwrap().into();
+        let tezos_tx = Transaction {
+            tx_hash,
+            content: TransactionContent::TezosDelayed(transfer),
+        };
+
+        store_inbox_blueprint_by_number(
+            &mut host,
+            blueprint(vec![tezos_tx]),
+            U256::from(1),
+        )
+        .expect("Should have stored blueprint");
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        // Block 1 hash should be different from block 0
+        let block_1_hash = block_storage::read_current_hash(&host, &TEZ_BLOCKS_PATH)
+            .expect("TezBlock 1 hash should be readable");
+        assert_ne!(block_0_hash, block_1_hash);
+
+        // Read block 1 from storage and check its previous_hash equals block 0's hash
+        let block_path = concat(
+            &TEZ_BLOCKS_PATH,
+            &RefPath::assert_from(b"/blocks/current/block"),
+        )
+        .expect("Block path should be valid");
+        let block_bytes = host
+            .store_read_all(&block_path)
+            .expect("Should read block bytes");
+        let rlp = rlp::Rlp::new(&block_bytes);
+        // TezBlock RLP layout: [version, hash, number, previous_hash, timestamp, operations]
+        let previous_hash: H256 = rlp
+            .at(3)
+            .expect("Should decode previous_hash element")
+            .as_val()
+            .expect("Should decode previous_hash");
+        assert_eq!(
+            block_0_hash, previous_hash,
+            "Block 1's previous_hash should be block 0's hash"
+        );
+    }
+
     #[test]
     // Test a scenario where bootstrap 1 reveal its manager and then send mutez to bootstrap 2
     fn test_produce_tezlink_block_with_reveal_and_transfer() {
         let mut host = MockKernelHost::default();
+        // Disable DA fees so that low-fee test operations are not rejected.
+        storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
-        let chain_config = dummy_tez_config();
+        let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
 
         let boostrap1 = bootstrap1();
         let src = boostrap1.pkh.clone();
 
-        let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
-            .expect("Context creation should have succeed");
+        let context =
+            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .expect("TezlinkContext creation should have succeed");
 
         let bootstrap1_contract = Contract::Implicit(src.clone());
 
-        let bootstrap1 =
-            TezlinkImplicitAccount::from_contract(&context, &bootstrap1_contract)
-                .expect("Account interface should be correct");
+        let bootstrap1 = context
+            .implicit_from_contract(&bootstrap1_contract)
+            .expect("Account interface should be correct");
 
         // Allocate bootstrap 1 and give some mutez for a transfer
         bootstrap1
@@ -1195,9 +1417,9 @@ mod tests {
 
         let bootstrap2_contract = Contract::Implicit(dst.clone());
 
-        let bootstrap2 =
-            TezlinkImplicitAccount::from_contract(&context, &bootstrap2_contract)
-                .expect("Contract creation should have succeed");
+        let bootstrap2 = context
+            .implicit_from_contract(&bootstrap2_contract)
+            .expect("Contract creation should have succeed");
 
         // Verify that bootstrap 2 is not allocated
         assert!(!bootstrap2
@@ -1213,7 +1435,7 @@ mod tests {
             boostrap1,
             35_u64.into(),
             bootstrap2_contract,
-            None,
+            Parameters::default(),
         );
 
         // Bootstrap 1 reveals its manager and then
@@ -1259,8 +1481,10 @@ mod tests {
     #[test]
     fn test_tezlink_level_now_chain_id_instructions() {
         let mut host = MockKernelHost::default();
+        // Disable DA fees so that low-fee test operations are not rejected.
+        storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
-        let chain_config = dummy_tez_config();
+        let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
 
         // A contract storing the chain id and the level and timestamp
@@ -1275,21 +1499,24 @@ mod tests {
             ",
             )
             .expect("Should have succeeded to parse the script")
-            .encode();
+            .encode()
+            .unwrap();
         let storage = parser
             .parse("Pair 0 0 0x00000000")
             .expect("Should have succeeded to parse the storage")
-            .encode();
+            .encode()
+            .unwrap();
 
         let boostrap1 = bootstrap1();
         let src = boostrap1.pkh.clone();
-        let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
-            .expect("Context creation should have succeed");
+        let context =
+            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .expect("TezlinkContext creation should have succeed");
 
         let bootstrap1_contract = Contract::Implicit(src.clone());
-        let bootstrap1 =
-            TezlinkImplicitAccount::from_contract(&context, &bootstrap1_contract)
-                .expect("Account interface should be correct");
+        let bootstrap1 = context
+            .implicit_from_contract(&bootstrap1_contract)
+            .expect("Account interface should be correct");
         // Allocate bootstrap 1 and give some mutez for a transfer
         bootstrap1
             .allocate(&mut host)
@@ -1316,11 +1543,9 @@ mod tests {
         );
 
         // Address generated by the origination
-        let generated_contract =
-            Contract::Originated(mir::interpreter::compute_contract_address(
-                &origination.hash().unwrap().0.to_fixed_bytes(),
-                1,
-            ));
+        let generated_contract = Contract::Originated(
+            mir::interpreter::compute_contract_address(&origination.hash().unwrap(), 1),
+        );
 
         let call = make_transaction_operation(
             1,
@@ -1330,7 +1555,7 @@ mod tests {
             boostrap1,
             0.into(),
             generated_contract.clone(),
-            None,
+            Parameters::default(),
         );
 
         let timestamp_of_call = 10i64;
@@ -1365,7 +1590,8 @@ mod tests {
             parser.parse(&expected_storage).unwrap(),
             mir::ast::Micheline::decode_raw(
                 &parser.arena,
-                &TezlinkOriginatedAccount::from_contract(&context, &generated_contract)
+                &context
+                    .originated_from_contract(&generated_contract)
                     .unwrap()
                     .storage(&host)
                     .unwrap()
@@ -1583,6 +1809,7 @@ mod tests {
             dummy_block_fees.base_fee_per_gas(),
             &[],
             &[],
+            0,
         )
         .unwrap();
 
@@ -1632,11 +1859,9 @@ mod tests {
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
         let mut host = MockKernelHost::default();
 
-        let chain_config = dummy_evm_config(SpecId::default());
-
         produce_block_with_several_valid_txs(&mut host);
 
-        assert_current_block_reading_validity(&mut host, &chain_config);
+        assert_current_block_reading_validity(&mut host);
     }
 
     #[test]
@@ -1676,7 +1901,7 @@ mod tests {
 
         let expected_dest_balance = U256::from(500000000u64);
         let expected_gas = 21000;
-        let da_fee = crate::fees::da_fee(DUMMY_DA_FEE.into(), &[], &[]);
+        let da_fee = crate::fees::da_fee(DUMMY_DA_FEE.into(), &[], &[], 0);
         let expected_fees = dummy_block_fees().base_fee_per_gas() * expected_gas + da_fee;
         let expected_sender_balance =
             initial_sender_balance - expected_dest_balance - expected_fees;
@@ -1685,7 +1910,10 @@ mod tests {
         assert_eq!(sender_balance, expected_sender_balance, "sender balance");
     }
 
-    fn first_block<MockHost: Runtime>(host: &mut MockHost) -> BlockConstants {
+    fn first_block<MockHost>(host: &mut MockHost) -> TezosXBlockConstants
+    where
+        MockHost: StorageV1,
+    {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
@@ -1693,20 +1921,32 @@ mod tests {
         let block_fees = retrieve_block_fees(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
         assert!(block_fees.is_ok(), "block fees should be defined");
-        BlockConstants::first_block(
-            timestamp,
-            chain_id.unwrap(),
-            block_fees.unwrap(),
-            crate::block::GAS_LIMIT,
-            H160::zero(),
-        )
+        TezosXBlockConstants {
+            evm_runtime_block_constants: BlockConstants::first_block(
+                timestamp,
+                chain_id.unwrap(),
+                block_fees.unwrap(),
+                crate::block::GAS_LIMIT,
+                H160::zero(),
+            ),
+            michelson_runtime_block_constants: TezlinkBlockConstants {
+                level: (0.into()),
+                context: TezosRuntimeContext::from_root(
+                    &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+                )
+                .unwrap(),
+                da_fee_per_byte_mutez: 0,
+                michelson_to_evm_gas_multiplier: DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
+                safe_roots: vec![],
+            },
+        }
     }
 
     #[test]
     fn test_stop_computation() {
         // init host
         let mut host = MockKernelHost::default();
-
+        let registry = RegistryImpl::default();
         let block_constants = first_block(&mut host);
 
         //provision sender account
@@ -1717,30 +1957,37 @@ mod tests {
         let valid_tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
             content: TransactionContent::Ethereum(dummy_eth_transaction_zero()),
-        };
+        }
+        .into();
         let transactions = vec![valid_tx].into();
 
         // init block in progress
-        let mut block_in_progress = EthBlockInProgress::new(
+        let mut block_in_progress = BlockInProgress::new(
             U256::from(1),
             transactions,
-            block_constants.block_fees.base_fee_per_gas(),
+            block_constants
+                .evm_runtime_block_constants
+                .block_fees
+                .base_fee_per_gas(),
         );
         // run is almost full wrt gas consumption in the current run
         let limits = EvmLimits::default();
         let cumulative_gas_in_run = max_gas_per_reboot(&limits) - 1000;
         host.add_execution_gas(cumulative_gas_in_run);
 
+        let chain_config = dummy_evm_config(SpecId::default());
+
         // act
         let result = compute(
             &mut host,
+            &registry,
+            &chain_config,
             &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
             None,
-            &EvmLimits::default(),
             None,
-            &SpecId::default(),
+            false,
         )
         .expect("Should safely ask for a reboot");
 
@@ -1762,10 +2009,6 @@ mod tests {
             cumulative_gas_in_run,
             "should not have consumed any gas"
         );
-        assert_eq!(
-            block_in_progress.estimated_ticks_in_block, 0,
-            "should not have consumed any tick"
-        );
 
         // the transaction should not have been processed
         let dest_address =
@@ -1774,6 +2017,141 @@ mod tests {
         let dest_balance = get_balance(&mut host, &dest_address);
         assert_eq!(sender_balance, U256::from(10000000000000000000u64));
         assert_eq!(dest_balance, U256::from(0u64))
+    }
+
+    #[test]
+    fn test_two_tezos_ops_second_rejected_after_first_consumed_budget() {
+        // Regression test for the consumption-tracking half of the
+        // `Tezos X: Fix can_fit_in_reboot for the Michelson runtime`
+        // MR. The Michelson branch of `register_valid_transaction`
+        // must call `host.add_execution_gas(...)`; otherwise the
+        // host's per-run counter never advances on Tezos ops and a
+        // stream of medium-sized ops slips past the per-reboot budget.
+        //
+        // Setup: queue two Tezos ops sized so that exactly one fits
+        // in the run's remaining capacity (against its declared
+        // gas_limit). After op1 applies, its actual consumption must
+        // push `host.executed_gas()` over the threshold so op2 is
+        // rejected and repushed. Revert `host.add_execution_gas` and
+        // op2 instead sees the original (still-fitting) counter and
+        // is incorrectly applied — this test fails.
+        use tezosx_tezos_runtime::account::{set_tezos_account_info, TezosAccountInfo};
+
+        let mut host = MockKernelHost::default();
+
+        // Allocate bootstrap2 in Tezlink storage so the SafeStorage
+        // backup of TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH succeeds,
+        // mirroring `test_tezblock_stored_after_tezos_operation`.
+        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+            .expect("TezlinkContext creation should have succeeded")
+            .implicit_from_public_key_hash(&bootstrap2().pkh)
+            .expect("Account interface should be correct")
+            .allocate(&mut host)
+            .expect("Contract initialization should have succeeded");
+
+        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let registry = RegistryImpl::default();
+        let mut block_constants = first_block(&mut host);
+        // Match production safe_roots so SafeStorage::start/revert in
+        // `validate_and_apply_operation` operates on initialised paths.
+        block_constants.michelson_runtime_block_constants.safe_roots = vec![
+            TEZ_SAFE_STORAGE_ROOT_PATH.into(),
+            TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH.into(),
+        ];
+
+        // Allocate bootstrap1 in TezosX storage with enough balance to
+        // cover fees for both ops.
+        let bootstrap = bootstrap1();
+        set_tezos_account_info(
+            &mut host,
+            &bootstrap.pkh,
+            TezosAccountInfo {
+                balance: U256::from(1_000_000),
+                nonce: 0,
+                pub_key: None,
+            },
+        )
+        .expect("Should have set bootstrap1 account info");
+
+        // Two reveal ops with sequential counters. With multiplier =
+        // 10, each declared gas_limit of 5_000 michelson maps to
+        // 50_000 EVM gas. The second op would fail validation
+        // (account already revealed by op1), but it never reaches
+        // apply — it gets repushed by `can_fit_in_reboot`.
+        let michelson_gas_limit = 5_000_u64;
+        let evm_gas_limit_per_op =
+            michelson_gas_limit * DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER;
+
+        let op1 =
+            make_reveal_operation(100, 1, michelson_gas_limit, 0, bootstrap.clone());
+        let tx_hash_1 = op1.hash().unwrap().into();
+        let tezos_tx_1 = TezosXTransaction::Tezos(TezlinkOperation {
+            tx_hash: tx_hash_1,
+            content: TezlinkContent::Tezos(op1),
+        });
+
+        let op2 = make_reveal_operation(100, 2, michelson_gas_limit, 0, bootstrap);
+        let tx_hash_2 = op2.hash().unwrap().into();
+        let tezos_tx_2 = TezosXTransaction::Tezos(TezlinkOperation {
+            tx_hash: tx_hash_2,
+            content: TezlinkContent::Tezos(op2),
+        });
+
+        let transactions = vec![tezos_tx_1, tezos_tx_2].into();
+        let mut block_in_progress = BlockInProgress::new(
+            U256::from(1),
+            transactions,
+            block_constants
+                .evm_runtime_block_constants
+                .block_fees
+                .base_fee_per_gas(),
+        );
+
+        // Headroom = exactly op1's declared limit. Op1 fits at the
+        // edge; once its actual consumption advances the host
+        // counter, op2's declared limit no longer fits.
+        let limits = EvmLimits::default();
+        let cumulative_gas_in_run = max_gas_per_reboot(&limits) - evm_gas_limit_per_op;
+        host.add_execution_gas(cumulative_gas_in_run);
+
+        let result = compute(
+            &mut host,
+            &registry,
+            &chain_config,
+            &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
+            &mut block_in_progress,
+            &block_constants,
+            None,
+            None,
+            false,
+        )
+        .expect("compute should not error");
+
+        assert_eq!(
+            result,
+            BlockInProgressComputationResult::RebootNeeded,
+            "second op must trigger a reboot once op1's consumption is \
+             reflected in host.executed_gas()"
+        );
+        assert_eq!(
+            block_in_progress.queue_length(),
+            1,
+            "the second op should have been re-pushed"
+        );
+        assert_eq!(
+            block_in_progress.michelson_index, 1,
+            "exactly one Tezos op should have been applied"
+        );
+        assert!(
+            host.executed_gas() > cumulative_gas_in_run,
+            "host gas counter must advance from op1's Tezos consumption \
+             — this assertion fails if `host.add_execution_gas(...)` is \
+             missing from the Michelson branch of \
+             `register_valid_transaction`. Got executed_gas = {}, \
+             started at {}",
+            host.executed_gas(),
+            cumulative_gas_in_run,
+        );
     }
 
     #[test]
@@ -1830,7 +2208,7 @@ mod tests {
     }
 
     /// A blueprint that should produce 1 block with an invalid transaction
-    fn almost_empty_blueprint() -> Blueprint<Transactions> {
+    fn almost_empty_blueprint() -> Blueprint {
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
         // transaction should be invalid
@@ -1844,7 +2222,10 @@ mod tests {
         blueprint(transactions)
     }
 
-    fn check_current_block_number<Host: Runtime>(host: &mut Host, nb: usize) {
+    fn check_current_block_number<Host>(host: &mut Host, nb: usize)
+    where
+        Host: StorageV1,
+    {
         let current_nb =
             read_current_number(host).expect("Should have manage to check block number");
         assert_eq!(current_nb, U256::from(nb), "Incorrect block number");
@@ -1927,6 +2308,7 @@ mod tests {
             DUMMY_BASE_FEE_PER_GAS.into(),
             &data,
             &[],
+            0,
         )
         .unwrap();
 
@@ -2020,7 +2402,11 @@ mod tests {
         // The block is in progress, therefore it is in the safe storage.
         let safe_host = SafeStorage {
             host: &mut host,
-            world_state: OwnedPath::from(&chain_config.storage_root_path()),
+            world_states: chain_config
+                .storage_root_paths(U256::zero())
+                .iter()
+                .map(OwnedPath::from)
+                .collect(),
         };
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
@@ -2118,7 +2504,11 @@ mod tests {
         // The block is in progress, therefore it is in the safe storage.
         let safe_host = SafeStorage {
             host: &mut host,
-            world_state: OwnedPath::from(&chain_config.storage_root_path()),
+            world_states: chain_config
+                .storage_root_paths(U256::zero())
+                .iter()
+                .map(OwnedPath::from)
+                .collect(),
         };
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
@@ -2280,5 +2670,134 @@ mod tests {
         let receipt_eip2930 = read_transaction_receipt(&mut host, &tx_hash_eip2930)
             .expect("Should have found receipt");
         assert_eq!(receipt_eip2930.type_, TransactionType::Eip2930);
+    }
+
+    #[test]
+    fn test_tezlink_upgrade_protocol() {
+        fn read_protocol_and_next_protocol(tez_block: &[u8]) -> (Protocol, Protocol) {
+            let rlp = rlp::Rlp::new(tez_block);
+            let protocol: Protocol = rlp.val_at(5).unwrap();
+            let next_protocol: Protocol = rlp.val_at(6).unwrap();
+            (protocol, next_protocol)
+        }
+
+        let mut host = MockKernelHost::default();
+
+        let chain_config = dummy_tez_config(&mut host);
+        let mut config = dummy_configuration();
+
+        let previous_protocol = Protocol::S023;
+        let current_protocol = TARGET_TEZOS_PROTOCOL;
+
+        // Store a dummy block header with [next_protocol] set to the
+        // previous protocol to simulate that the previous block was
+        // produced from a kernel whose protocol is the previous one.
+        let block_header = BlockHeader {
+            blueprint_header: BlueprintHeader {
+                number: U256::zero(),
+                timestamp: Timestamp::from(0i64),
+            },
+            chain_header: ChainHeader::Tez(TezBlockHeader {
+                hash: H256(*TezBlock::genesis_block_hash()),
+                next_protocol: previous_protocol,
+            }),
+        };
+        store_current_block_header(&mut host, &block_header).unwrap();
+
+        store_blueprints_from_number::<_, MichelsonChainConfig>(
+            &mut host,
+            block_header.blueprint_header.number + 1,
+            vec![
+                tezlink_blueprint(vec![], Timestamp::from(1i64)),
+                tezlink_blueprint(vec![], Timestamp::from(1i64)),
+            ],
+        );
+
+        // As the previous block was produced from a kernel on the
+        // previous protocol, the new block must have its [protocol]
+        // set to the previous protocol and its [next_protocol] set to
+        // the current protocol.
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::RebootNeeded, computation);
+        let block = read_tez_current_block(&mut host).unwrap();
+        let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
+        assert_eq!(protocol, previous_protocol);
+        assert_eq!(next_protocol, current_protocol);
+
+        // As the previous block was produced from the current kernel,
+        // the new block must have its [protocol] and [next_protocol]
+        // set to the current protocol.
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::RebootNeeded, computation);
+        let block = read_tez_current_block(&mut host).unwrap();
+        let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
+        assert_eq!(protocol, current_protocol);
+        assert_eq!(next_protocol, current_protocol);
+
+        // No more blueprints: produce returns Finished, 2 blocks total.
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+        assert_eq!(U256::from(2), read_current_number(&host).unwrap());
+    }
+
+    #[test]
+    fn test_tezos_x_upgrade_tez_protocol() {
+        fn read_protocol_and_next_protocol(tez_block: &[u8]) -> (Protocol, Protocol) {
+            let rlp = rlp::Rlp::new(tez_block);
+            let protocol: Protocol = rlp.val_at(5).unwrap();
+            let next_protocol: Protocol = rlp.val_at(6).unwrap();
+            (protocol, next_protocol)
+        }
+
+        let mut host = MockKernelHost::default();
+
+        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let mut config = dummy_configuration();
+
+        let previous_protocol = Protocol::S023;
+        let current_protocol = TARGET_TEZOS_PROTOCOL;
+
+        // Store a TezBlockHeader with next_protocol set to the previous
+        // protocol to simulate that the previous block was produced from
+        // a kernel whose protocol is the previous one.
+        let header = TezBlockHeader {
+            hash: H256(*TezBlock::genesis_block_hash()),
+            next_protocol: previous_protocol,
+        };
+        store_current_tez_block_header(&mut host, &header).unwrap();
+
+        // First block: protocol = previous (from stored header),
+        // next_protocol = current (TARGET_TEZOS_PROTOCOL)
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![])]);
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        let block = read_tez_current_block(&mut host).unwrap();
+        let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
+        assert_eq!(protocol, previous_protocol);
+        assert_eq!(next_protocol, current_protocol);
+
+        // Second block: both protocol and next_protocol should be current
+        store_inbox_blueprint_by_number(&mut host, blueprint(vec![]), U256::from(1))
+            .expect("Should have stored blueprint");
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        let block = read_tez_current_block(&mut host).unwrap();
+        let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
+        assert_eq!(protocol, current_protocol);
+        assert_eq!(next_protocol, current_protocol);
     }
 }

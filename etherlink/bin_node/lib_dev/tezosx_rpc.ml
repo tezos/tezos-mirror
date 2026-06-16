@@ -5,12 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let add_rpc_directory (module Backend : Services_backend_sig.S) ~l2_chain_id dir
-    = function
+let add_rpc_directory ro_ctxt ~l2_chain_id ~add_operation dir = function
   | Tezosx.Tezos ->
       Tezos_rpc.Directory.merge
         (Tezlink_directory.register_tezlink_services
            ~l2_chain_id
-           (module Backend.Tezos)
-           ~add_operation:(fun _ -> failwith "TODO: can't inject operation"))
+           (Tezos_backend.make ro_ctxt)
+           ~add_operation
+           ~get_da_fee_per_byte:Prevalidator.get_da_fee_per_byte
+           ~get_michelson_base_fee_per_gas:
+             Prevalidator.get_michelson_base_fee_per_gas)
         dir

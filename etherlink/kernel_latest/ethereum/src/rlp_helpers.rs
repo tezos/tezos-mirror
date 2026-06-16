@@ -156,6 +156,18 @@ pub fn decode_tx_hash(item: rlp::Rlp<'_>) -> Result<TransactionHash, DecoderErro
     Ok(tx)
 }
 
+pub fn decode_field_bool(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+) -> Result<bool, DecoderError> {
+    let bytes: Vec<u8> = decode_field(decoder, field_name)?;
+    Ok(bytes.first().copied().unwrap_or(0) != 0)
+}
+
+pub fn append_bool(stream: &mut RlpStream, v: bool) {
+    stream.append(&vec![v as u8]);
+}
+
 pub fn decode_field_u256_le(
     decoder: &Rlp<'_>,
     field_name: &'static str,

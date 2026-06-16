@@ -34,6 +34,25 @@ type genesis_info = Metadata.genesis_info = {
   commitment_hash : Commitment.Hash.t;
 }
 
+type context_status = Valid | Dirty
+
+(** The current head context state, shared between the daemon (which evaluates
+    blocks) and state readers (such as RPC handlers). [status] is set to [Dirty]
+    at the start of block evaluation and to [Valid] once evaluation is complete.
+
+    Invariant:
+    [status = Valid] => [ctxt] is the context resulting from the full evaluation
+    of [block].
+
+    In particular, when [status = Dirty], [ctxt] is being evaluated for [block]
+    and may be in an intermediate state. *)
+type context_state = {
+  ctxt : Context.rw;  (** The mutable context with read-write PVM state. *)
+  status : context_status;
+      (** Whether this context is fully committed or still being evaluated. *)
+  block : Layer1.header;  (** The block this context corresponds to. *)
+}
+
 (** Abstract type for store to force access through this module. *)
 type 'a store constraint 'a = [< `Read | `Write > `Read]
 
@@ -107,7 +126,7 @@ type 'a t = {
   lockfile : Lwt_unix.file_descr;
       (** A lock file acquired when the node starts. *)
   store : 'store store;  (** The store for the persistent storage. *)
-  context : 'context Context.t;
+  context : 'context Context.index;
       (** The persistent context for the rollup node. *)
   lcc : lcc Reference.rw;
       (** Last cemented commitment on L1 (independently of synchronized status
@@ -132,6 +151,8 @@ type 'a t = {
   sync : sync_info;  (** Synchronization status with respect to the L1 node.  *)
 }
   constraint 'a = < store : 'store ; context : 'context >
+  constraint 'store = [< `Read | `Write > `Read]
+  constraint 'context = [< `Read | `Write > `Read]
 
 (** Read/write node context {!t}. *)
 type rw = < store : [`Read | `Write] ; context : [`Read | `Write] > t
@@ -194,10 +215,27 @@ val processing_lockfile_path : data_dir:string -> string
 (** The path for the lockfile used in garbage collection. *)
 val gc_lockfile_path : data_dir:string -> string
 
+val commit_context :
+  _ rw_context ->
+  level:int32 ->
+  commitment:bool ->
+  Context.rw ->
+  Smart_rollup_context_hash.t option tzresult Lwt.t
+
+(** [checkout_committed_context node_ctxt block_hash] returns [Some context] if
+    block [block_hash] has a committed context, or [None] if the context was not
+    committed to disk (e.g. with sparse commit strategies). *)
+val checkout_committed_context :
+  < store : _ ; context : 'a > t ->
+  Block_hash.t ->
+  < index : 'a ; state : Access_mode.rw > Context.t option tzresult Lwt.t
+
 (** [checkout_context node_ctxt block_hash] returns the context at block
-    [block_hash]. *)
+    [block_hash]. Fails if the block does not have a committed context. *)
 val checkout_context :
-  < store : _ ; context : 'a > t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
+  < store : _ ; context : 'a > t ->
+  Block_hash.t ->
+  < index : 'a ; state : Access_mode.rw > Context.t tzresult Lwt.t
 
 (** Returns [true] if the rollup node supports the DAL and if DAL is enabled for
     the current protocol. *)
@@ -254,7 +292,7 @@ val find_l2_block_by_level :
 val get_full_l2_block :
   ?get_outbox_messages:
     ('a t ->
-    Context.pvmstate ->
+    Access_mode.rw Context.pvmstate ->
     outbox_level:int32 ->
     (int * Outbox_message.summary) list Lwt.t) ->
   'a t ->
@@ -269,12 +307,34 @@ val save_level : _ rw_store -> Layer1.head -> unit tzresult Lwt.t
     system should not have to come back to it. *)
 val save_l2_block : _ rw_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
 
+(** [find_pvm_status t block_hash] retrieves the stored PVM status for the
+    block identified by [block_hash], if any. *)
+val find_pvm_status : _ t -> Block_hash.t -> string option tzresult Lwt.t
+
 (** [set_l2_head t l2_block] sets [l2_block] as the new head of the L2 chain. *)
 val set_l2_head : _ rw_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
 
 (** [last_processed_head_opt store] returns the last processed head if it
     exists. *)
 val last_processed_head_opt : _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
+(** [last_committed_block store] returns the last block whose context is
+    committed on disk. *)
+val last_committed_block : _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
+(** [find_previous_committed_block store level] returns the most recent block
+    with a committed context strictly before [level], if any. *)
+val find_previous_committed_block :
+  _ t -> int32 -> Sc_rollup_block.t option tzresult Lwt.t
+
+(** [get_l2_blocks_by_level_range node_ctxt ~from_level ~to_level] returns all
+    L2 blocks with levels between [from_level] and [to_level] (inclusive),
+    ordered by level ascending. *)
+val get_l2_blocks_by_level_range :
+  _ t ->
+  from_level:int32 ->
+  to_level:int32 ->
+  Sc_rollup_block.t list tzresult Lwt.t
 
 (** [mark_finalized_head store hash level] remembers that the block with [hash]
     at [level] is finalized. By construction, every block whose level is smaller
@@ -622,6 +682,9 @@ val get_gc_info :
 
 (** The first non garbage collected level available in the node. *)
 val first_available_level : _ t -> int32 tzresult Lwt.t
+
+(** The first block with a context committed to disk. *)
+val first_committed_block : _ t -> Sc_rollup_block.t option tzresult Lwt.t
 
 (** [check_level_available node_ctxt level] resolves with an error if the
     [level] is before the first non garbage collected level. *)

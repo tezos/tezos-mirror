@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2026 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -13,20 +14,21 @@ let bridge_path () =
 
 let admin_path () = Base.(project_root // "etherlink/tezos_contracts/admin.tz")
 
-let withdrawal_abi_path () =
-  Base.(project_root // "etherlink/tezos_contracts/withdrawal.abi")
-
 let fast_withdrawal_path () =
   Base.(project_root // "etherlink/tezos_contracts/fast_withdrawal_mockup.tz")
 
-let fast_withdrawal_abi_path () =
-  Base.(project_root // "etherlink/tezos_contracts/fast_withdrawal.abi")
-
-let fa_withdrawal_abi_path () =
-  Base.(project_root // "etherlink/tezos_contracts/fa_withdrawal.abi")
-
 let service_provider_path () =
   Base.(project_root // "etherlink/tezos_contracts/service_provider.tz")
+
+let predep_xtz_bridge_abi_path () =
+  Base.(
+    project_root
+    // "etherlink/kernel_latest/revm/contracts/predeployed/abi/xtz_bridge.abi")
+
+let predep_fa_bridge_abi_path () =
+  Base.(
+    project_root
+    // "etherlink/kernel_latest/revm/contracts/predeployed/abi/fa_bridge.abi")
 
 let delayed_path ~kernel:_ =
   (* The path to the delayed transaction bridge depends on the version

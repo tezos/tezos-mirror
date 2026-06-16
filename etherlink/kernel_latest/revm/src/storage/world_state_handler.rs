@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023,2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023, 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -9,23 +9,23 @@ use revm::{
     state::{AccountInfo, Bytecode},
 };
 use rlp::{Decodable, Encodable, Rlp};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_smart_rollup_host::{
-    path::{OwnedPath, RefPath},
+    path::{concat, OwnedPath, PathError, RefPath},
     runtime::RuntimeError,
+    storage::StorageV1,
 };
+use tezosx_interfaces::Origin;
+
+use evm_types::{FaDepositWithProxy, PrecompileStateError};
 
 use crate::{
-    custom,
-    helpers::{
-        legacy::FaDepositWithProxy,
-        storage::{
-            concat, read_b256_be_default, read_u256_be_default, read_u256_le_default,
-            read_u64_le_default, write_u256_le,
-        },
+    error::{EvmDbError, OriginStorageError},
+    helpers::storage::{
+        read_b256_be_default, read_u256_be_default, read_u256_le_default,
+        read_u64_le_default, write_u256_le,
     },
     storage::code::CodeStorage,
-    Error,
 };
 
 /// Path where EVM accounts are stored.
@@ -33,7 +33,7 @@ pub const EVM_ACCOUNTS_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts");
 
 /// Path where the L1 address of our withdrawals ticketer is stored.
-pub(crate) const WITHDRAWALS_TICKETER_PATH: RefPath =
+pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/ticketer");
 
 /// Size of contract hash encoded in base58.
@@ -44,12 +44,13 @@ pub const KT1_B58_SIZE: usize = 36;
 pub const SEQUENCER_KEY_CHANGE_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/sequencer_key_change");
 
-/// Path where waiting governance sequencer upgrades are stored. (Must be read through `internal_store_read_all`)
+/// Path where waiting governance sequencer upgrades are stored.
 pub const GOVERNANCE_SEQUENCER_UPGRADE_PATH: RefPath =
-    RefPath::assert_from(b"/evm/sequencer_upgrade");
+    RefPath::assert_from(b"/evm/world_state/sequencer_upgrade");
 
-/// Path where the sequencer key is stored. (Must be read through `internal_store_read_all`)
-pub(crate) const SEQUENCER_KEY_PATH: RefPath = RefPath::assert_from(b"/evm/sequencer");
+/// Path where the sequencer key is stored.
+pub const SEQUENCER_KEY_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state/sequencer");
 
 /// Path where an account nonce is stored. This should be prefixed with the path to
 /// where the account is stored for the world state or for the current transaction.
@@ -74,6 +75,13 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 /// This path must contains balance, nonce and code hash. This is the new
 /// format for saving the accounts infos that overrides the previous one.
 const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
+
+/// Path that holds the classification record for an account. Stored
+/// at a sibling of the info path so the info RLP stays at 77 bytes and
+/// the read inside the basic call on Database keeps its fast path. The
+/// path is touched only by code that handles classification, which
+/// runs on cross-runtime translation and on alias materialization.
+const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
 
 /// The contracts of "internal" accounts have their own storage area. The account
 /// location prefixed to this path gives the root path (prefix) to where such storage
@@ -101,14 +109,14 @@ const BALANCE_DEFAULT_VALUE: U256 = U256::ZERO;
 /// Default nonce value for an account.
 const NONCE_DEFAULT_VALUE: u64 = 0;
 
-pub fn account_path(address: &Address) -> Result<OwnedPath, Error> {
+pub fn account_path(address: &Address) -> Result<OwnedPath, PathError> {
     let path_string = format!("/{address:x}");
-    OwnedPath::try_from(path_string).map_err(custom)
+    OwnedPath::try_from(path_string)
 }
 
-pub fn path_from_u256(index: &U256) -> Result<OwnedPath, Error> {
+pub fn path_from_u256(index: &U256) -> Result<OwnedPath, PathError> {
     let path_string = format!("/{}", hex::encode::<[u8; 32]>(index.to_be_bytes()));
-    OwnedPath::try_from(path_string).map_err(custom)
+    OwnedPath::try_from(path_string)
 }
 
 pub struct StorageAccount {
@@ -117,9 +125,8 @@ pub struct StorageAccount {
 
 // Used as a value for the durable storage, can't use REVM `AccountInfo`
 // because we need to implement `RlpEncodable` `RlpDecodable`
-// TODO: Remove pub when `evm_execution` doesn't use it anymore.
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
-pub struct AccountInfoInternal {
+struct AccountInfoInternal {
     pub balance: U256,
     pub nonce: u64,
     pub code_hash: B256,
@@ -182,6 +189,7 @@ impl From<AccountInfoInternal> for AccountInfo {
             balance: info.balance,
             nonce: info.nonce,
             code_hash: info.code_hash,
+            account_id: None,
             code: None,
         }
     }
@@ -198,7 +206,7 @@ impl From<AccountInfo> for AccountInfoInternal {
 }
 
 impl StorageAccount {
-    pub fn from_address(address: &Address) -> Result<Self, Error> {
+    pub fn from_address(address: &Address) -> Result<Self, PathError> {
         let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)?)?;
         Ok(path.into())
     }
@@ -207,7 +215,7 @@ impl StorageAccount {
         Self { path }
     }
 
-    pub fn info(&self, host: &mut impl Runtime) -> Result<AccountInfo, Error> {
+    pub fn info(&self, host: &mut impl StorageV1) -> Result<AccountInfo, EvmDbError> {
         let path = concat(&self.path, &INFO_PATH)?;
         match host.store_read(&path, 0, AccountInfoInternal::RLP_SIZE) {
             Ok(bytes) => {
@@ -255,7 +263,7 @@ impl StorageAccount {
                         )?;
                     }
                     Err(RuntimeError::PathNotFound) => (),
-                    Err(err) => return Err(Error::Runtime(err)),
+                    Err(err) => return Err(EvmDbError::Runtime(err)),
                 };
                 host.store_write(&path, &info.rlp_bytes(), 0)?;
 
@@ -263,20 +271,20 @@ impl StorageAccount {
                 for path in &[balance_path, nonce_path, code_hash_path, code_path] {
                     match host.store_delete(path) {
                         Ok(()) | Err(RuntimeError::PathNotFound) => (),
-                        Err(err) => return Err(Error::Runtime(err)),
+                        Err(err) => return Err(EvmDbError::Runtime(err)),
                     };
                 }
 
                 Ok(info.into())
             }
-            Err(err) => Err(Error::Runtime(err)),
+            Err(err) => Err(EvmDbError::Runtime(err)),
         }
     }
 
     pub fn info_without_migration(
         &self,
-        host: &impl Runtime,
-    ) -> Result<Option<AccountInfo>, Error> {
+        host: &impl StorageV1,
+    ) -> Result<Option<AccountInfo>, EvmDbError> {
         let path = concat(&self.path, &INFO_PATH)?;
         match host.store_read(&path, 0, AccountInfoInternal::RLP_SIZE) {
             Ok(bytes) => {
@@ -285,15 +293,15 @@ impl StorageAccount {
                 Ok(Some(account_info.into()))
             }
             Err(RuntimeError::PathNotFound) => Ok(None),
-            Err(err) => Err(Error::Runtime(err)),
+            Err(err) => Err(EvmDbError::Runtime(err)),
         }
     }
 
     pub fn set_info(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         mut new_infos: AccountInfo,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmDbError> {
         let path = concat(&self.path, &INFO_PATH)?;
         if let Some(code) = new_infos.code.take() {
             CodeStorage::add(
@@ -310,9 +318,9 @@ impl StorageAccount {
 
     pub fn set_info_without_code(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         new_infos: AccountInfo,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmDbError> {
         let path = concat(&self.path, &INFO_PATH)?;
         let value = AccountInfoInternal::from(new_infos).rlp_bytes();
 
@@ -320,76 +328,119 @@ impl StorageAccount {
         Ok(())
     }
 
-    pub fn delete_info(&mut self, host: &mut impl Runtime) -> Result<(), Error> {
+    pub fn delete_info(&mut self, host: &mut impl StorageV1) -> Result<(), EvmDbError> {
         let path = concat(&self.path, &INFO_PATH)?;
         match host.store_delete(&path) {
             Ok(()) | Err(RuntimeError::PathNotFound) => (),
-            Err(err) => return Err(Error::Runtime(err)),
+            Err(err) => return Err(EvmDbError::Runtime(err)),
         };
+        Ok(())
+    }
+
+    /// Read the classification record for this account.
+    /// Returns None when the path is absent.
+    pub fn get_origin(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Option<Origin>, OriginStorageError> {
+        let path = concat(&self.path, &ORIGIN_PATH)?;
+        match host.store_read_all(&path) {
+            Ok(bytes) => {
+                let (rest, origin) = Origin::nom_read(&bytes)
+                    .map_err(|e| OriginStorageError::Decode(e.to_string()))?;
+                if !rest.is_empty() {
+                    return Err(OriginStorageError::DecodeTrailing);
+                }
+                Ok(Some(origin))
+            }
+            Err(RuntimeError::PathNotFound) => Ok(None),
+            Err(err) => Err(OriginStorageError::Runtime(err)),
+        }
+    }
+
+    /// Write the classification record for this account.
+    pub fn set_origin(
+        &mut self,
+        host: &mut impl StorageV1,
+        origin: &Origin,
+    ) -> Result<(), OriginStorageError> {
+        let path = concat(&self.path, &ORIGIN_PATH)?;
+        let mut buf = Vec::new();
+        origin
+            .bin_write(&mut buf)
+            .map_err(|e| OriginStorageError::Encode(e.to_string()))?;
+        host.store_write(&path, &buf, 0)?;
         Ok(())
     }
 
     // In the future we might want to optimize reading to not use `info`.
     pub fn add_balance(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         amount: U256,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmDbError> {
         let mut info = self.info(host)?;
-        info.balance = info
-            .balance
+        let current = info.balance;
+        info.balance = current
             .checked_add(amount)
-            .ok_or(Error::Custom("Balance overflow".to_string()))?;
+            .ok_or(EvmDbError::BalanceOverflow { current, amount })?;
         self.set_info(host, info)
     }
 
     // In the future we might want to optimize reading to not use `info`.
     pub fn sub_balance(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         amount: U256,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmDbError> {
         let mut info = self.info(host)?;
-        info.balance = info
-            .balance
+        let current = info.balance;
+        info.balance = current
             .checked_sub(amount)
-            .ok_or(Error::Custom("Balance underflow".to_string()))?;
+            .ok_or(EvmDbError::BalanceUnderflow { current, amount })?;
         self.set_info(host, info)
     }
 
-    pub fn storage_path(&self, index: &U256) -> Result<OwnedPath, Error> {
+    pub fn storage_path(&self, index: &U256) -> Result<OwnedPath, PathError> {
         let storage_path = concat(&self.path, &STORAGE_ROOT_PATH)?;
         let index_path = path_from_u256(index)?;
         concat(&storage_path, &index_path)
     }
 
-    pub fn get_storage(&self, host: &impl Runtime, index: &U256) -> Result<U256, Error> {
+    pub fn get_storage(
+        &self,
+        host: &impl StorageV1,
+        index: &U256,
+    ) -> Result<U256, EvmDbError> {
         let path = self.storage_path(index)?;
         Ok(read_u256_be_default(host, &path, STORAGE_DEFAULT_VALUE)?)
     }
 
     pub fn set_storage(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         index: &U256,
         value: &U256,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmDbError> {
         let path = self.storage_path(index)?;
         let value_bytes = value.to_be_bytes::<{ U256::BYTES }>();
 
         Ok(host.store_write(&path, &value_bytes, 0)?)
     }
 
-    pub(crate) fn read_global_counter(&self, host: &impl Runtime) -> Result<U256, Error> {
+    pub(crate) fn read_global_counter(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<U256, PrecompileStateError> {
         let path = concat(&self.path, &GLOBAL_COUNTER_PATH)?;
         Ok(read_u256_le_default(host, &path, U256::ZERO)?)
     }
 
     pub(crate) fn write_global_counter(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         value: U256,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmDbError> {
         let path = concat(&self.path, &GLOBAL_COUNTER_PATH)?;
         Ok(write_u256_le(host, &path, value)?)
     }
@@ -398,7 +449,7 @@ impl StorageAccount {
         &self,
         ticket_hash: &U256,
         owner: &Address,
-    ) -> Result<OwnedPath, Error> {
+    ) -> Result<OwnedPath, PathError> {
         concat(
             &self.path,
             &concat(
@@ -410,27 +461,27 @@ impl StorageAccount {
 
     pub fn read_ticket_balance(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
         ticket_hash: &U256,
         owner: &Address,
-    ) -> Result<U256, Error> {
+    ) -> Result<U256, PrecompileStateError> {
         let path = self.ticket_path(ticket_hash, owner)?;
         Ok(read_u256_le_default(host, &path, U256::ZERO)?)
     }
 
     pub fn write_ticket_balance(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         ticket_hash: &U256,
         owner: &Address,
         amount: U256,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmDbError> {
         let path = self.ticket_path(ticket_hash, owner)?;
         write_u256_le(host, &path, amount)?;
         Ok(())
     }
 
-    fn deposit_path(&self, withdrawal_id: &U256) -> Result<OwnedPath, Error> {
+    fn deposit_path(&self, withdrawal_id: &U256) -> Result<OwnedPath, PathError> {
         concat(
             &concat(&self.path, &DEPOSIT_QUEUE_TABLE)?,
             &RefPath::assert_from(format!("/{withdrawal_id}").as_bytes()),
@@ -439,29 +490,29 @@ impl StorageAccount {
 
     pub(crate) fn write_deposit(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         deposit_id: &U256,
         deposit: &FaDepositWithProxy,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmDbError> {
         let deposit_path = self.deposit_path(deposit_id)?;
         Ok(host.store_write_all(&deposit_path, &deposit.rlp_bytes())?)
     }
 
     pub(crate) fn read_deposit_from_queue(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
         deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, Error> {
+    ) -> Result<FaDepositWithProxy, PrecompileStateError> {
         let deposit_path = self.deposit_path(deposit_id)?;
         let bytes = host.store_read_all(&deposit_path)?;
-        FaDepositWithProxy::from_raw(bytes)
+        Ok(FaDepositWithProxy::from_raw(bytes)?)
     }
 
     pub(crate) fn remove_deposit_from_queue(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         deposit_id: &U256,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmDbError> {
         let deposit_path = self.deposit_path(deposit_id)?;
         Ok(host.store_delete(&deposit_path)?)
     }
@@ -475,32 +526,29 @@ impl From<OwnedPath> for StorageAccount {
 
 #[cfg(test)]
 mod test {
+    use crate::error::EvmDbError;
     use crate::{
-        custom,
         precompiles::constants::{
-            FA_BRIDGE_SOL_CODE_HASH, FA_BRIDGE_SOL_CONTRACT,
-            INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
-            WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
+            FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
+            XTZ_BRIDGE_SOL_CONTRACT,
         },
         storage::code::CodeStorage,
-        Error,
     };
 
     use revm::{
-        primitives::{hex::FromHex, Bytes, FixedBytes, KECCAK_EMPTY},
+        primitives::{Bytes, FixedBytes, KECCAK_EMPTY},
         state::Bytecode,
     };
     use rlp::Encodable;
-    use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::storage::StorageV1;
 
-    fn bytecode_from_hex_str(hex_str: &str) -> Result<Bytecode, Error> {
-        Ok(Bytecode::new_legacy(
-            Bytes::from_hex(hex_str).map_err(custom)?,
-        ))
+    fn bytecode_from_static(bytes: &'static [u8]) -> Result<Bytecode, EvmDbError> {
+        Ok(Bytecode::new_legacy(Bytes::from_static(bytes)))
     }
 
     fn check_account_code_info_fetching(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         code_voucher: Bytecode,
         code_hash_voucher: FixedBytes<32>,
     ) {
@@ -516,24 +564,24 @@ mod test {
     #[test]
     fn check_withdrawal_code_info_fetching() {
         let mut host = MockKernelHost::default();
-        let code_voucher = bytecode_from_hex_str(WITHDRAWAL_SOL_CONTRACT).unwrap();
+        let code_voucher = bytecode_from_static(XTZ_BRIDGE_SOL_CONTRACT.code).unwrap();
 
         check_account_code_info_fetching(
             &mut host,
             code_voucher,
-            WITHDRAWAL_SOL_CODE_HASH,
+            XTZ_BRIDGE_SOL_CONTRACT.code_hash,
         );
     }
 
     #[test]
     fn check_fa_withdrawal_code_info_fetching() {
         let mut host = MockKernelHost::default();
-        let code_voucher = bytecode_from_hex_str(FA_BRIDGE_SOL_CONTRACT).unwrap();
+        let code_voucher = bytecode_from_static(FA_BRIDGE_SOL_CONTRACT.code).unwrap();
 
         check_account_code_info_fetching(
             &mut host,
             code_voucher,
-            FA_BRIDGE_SOL_CODE_HASH,
+            FA_BRIDGE_SOL_CONTRACT.code_hash,
         );
     }
 
@@ -541,12 +589,12 @@ mod test {
     fn check_internal_forwarder_code_info_fetching() {
         let mut host = MockKernelHost::default();
         let code_voucher =
-            bytecode_from_hex_str(INTERNAL_FORWARDER_SOL_CONTRACT).unwrap();
+            bytecode_from_static(INTERNAL_FORWARDER_SOL_CONTRACT.code).unwrap();
 
         check_account_code_info_fetching(
             &mut host,
             code_voucher,
-            INTERNAL_FORWARDER_SOL_CODE_HASH,
+            INTERNAL_FORWARDER_SOL_CONTRACT.code_hash,
         );
     }
 
@@ -565,5 +613,49 @@ mod test {
         let rlp_size = AccountInfoInternal::default().rlp_bytes().len();
         assert_eq!(rlp_size, AccountInfoInternal::RLP_SIZE);
         assert_eq!(rlp_size, 77);
+    }
+
+    #[test]
+    fn origin_storage_unrecorded_returns_none() {
+        use crate::storage::world_state_handler::StorageAccount;
+        use revm::primitives::Address;
+
+        let host = MockKernelHost::default();
+        let addr = Address::from_slice(&[0x42; 20]);
+        let account = StorageAccount::from_address(&addr).unwrap();
+        assert!(account.get_origin(&host).unwrap().is_none());
+        // A read of the info path must not affect the origin path.
+        let _ = account.info_without_migration(&host);
+        assert!(account.get_origin(&host).unwrap().is_none());
+    }
+
+    #[test]
+    fn origin_storage_native_roundtrip() {
+        use crate::storage::world_state_handler::StorageAccount;
+        use revm::primitives::Address;
+        use tezosx_interfaces::Origin;
+
+        let mut host = MockKernelHost::default();
+        let addr = Address::from_slice(&[0x42; 20]);
+        let mut account = StorageAccount::from_address(&addr).unwrap();
+        account.set_origin(&mut host, &Origin::Native).unwrap();
+        assert_eq!(account.get_origin(&host).unwrap(), Some(Origin::Native));
+    }
+
+    #[test]
+    fn origin_storage_alias_roundtrip() {
+        use crate::storage::world_state_handler::StorageAccount;
+        use revm::primitives::Address;
+        use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+        let addr = Address::from_slice(&[0x42; 20]);
+        let mut account = StorageAccount::from_address(&addr).unwrap();
+        let origin = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: b"tz1abcdef".to_vec(),
+        });
+        account.set_origin(&mut host, &origin).unwrap();
+        assert_eq!(account.get_origin(&host).unwrap(), Some(origin));
     }
 }

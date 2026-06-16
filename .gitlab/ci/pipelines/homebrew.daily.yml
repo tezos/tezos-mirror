@@ -6,7 +6,7 @@ stages:
 - build
 
 datadog_pipeline_trace:
-  image: datadog/ci:v4.1.0
+  image: datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2
   stage: start
   tags:
   - gcp
@@ -28,7 +28,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-v24-release-2642faac
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-be43e621
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -43,16 +43,19 @@ oc.build-homebrew-formula:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - cp images/ci/.cargo/config.toml .cargo/
   - ./scripts/packaging/test_homebrew_install.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     DUNE_BUILD_JOBS: -j 12
+    HOMEBREW_KISSCACHE: http://kisscache.kisscache.svc.cluster.local
+    HOMEBREW_OPAMFETCH: scripts/kiss-fetch.sh
     CARGO_NET_OFFLINE: "false"
 
 oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-v24-release-2642faac
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-be43e621
   stage: build
   tags:
   - gcp
@@ -71,7 +74,7 @@ oc.create-homebrew-formula:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build-homebrew-formula-macosx:
-  image: macos-15-xcode-16
+  image: $MACOS_IMAGE
   stage: build
   tags:
   - $TAGS
@@ -94,3 +97,8 @@ oc.build-homebrew-formula-macosx:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     TAGS: saas-macos-large-m2pro
+  parallel:
+    matrix:
+    - MACOS_IMAGE:
+      - macos-15-xcode-16
+      - macos-26-xcode-26

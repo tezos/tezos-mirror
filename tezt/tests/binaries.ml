@@ -33,7 +33,8 @@
 (* Executables which use the version of octez-evm-node instead of octez-node.
    If one day one adds script-inputs/octez-etherlink-executables or something,
    it would be better to read this list from this file. *)
-let evm_executables = ["octez-evm-node"; "etherlink-governance-observer"]
+let evm_executables =
+  ["octez-evm-node"; "etherlink-governance-observer"; "fa-bridge-watchtower"]
 
 (* TODO: tezos/tezos#4769
 

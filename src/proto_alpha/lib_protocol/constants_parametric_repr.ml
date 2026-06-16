@@ -48,8 +48,10 @@ let between_zero_and_excluding_one_q_encoding =
 type dal = {
   feature_enable : bool;
   incentives_enable : bool;
+  dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
+  attestation_lags : int list;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
   minimal_participation_ratio : Q.t;
@@ -82,8 +84,10 @@ let dal_encoding =
     (fun {
            feature_enable;
            incentives_enable;
+           dynamic_lag_enable;
            number_of_slots;
            attestation_lag;
+           attestation_lags;
            attestation_threshold;
            cryptobox_parameters;
            minimal_participation_ratio;
@@ -93,8 +97,10 @@ let dal_encoding =
        ->
       ( ( feature_enable,
           incentives_enable,
+          dynamic_lag_enable,
           number_of_slots,
           attestation_lag,
+          attestation_lags,
           attestation_threshold,
           minimal_participation_ratio,
           rewards_ratio,
@@ -102,8 +108,10 @@ let dal_encoding =
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              incentives_enable,
+             dynamic_lag_enable,
              number_of_slots,
              attestation_lag,
+             attestation_lags,
              attestation_threshold,
              minimal_participation_ratio,
              rewards_ratio,
@@ -113,8 +121,10 @@ let dal_encoding =
       {
         feature_enable;
         incentives_enable;
+        dynamic_lag_enable;
         number_of_slots;
         attestation_lag;
+        attestation_lags;
         attestation_threshold;
         cryptobox_parameters;
         minimal_participation_ratio;
@@ -122,11 +132,13 @@ let dal_encoding =
         traps_fraction;
       })
     (merge_objs
-       (obj8
+       (obj10
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
+          (req "dynamic_lag_enable" bool)
           (req "number_of_slots" uint16)
           (req "attestation_lag" uint8)
+          (req "attestation_lags" (list uint8))
           (req "attestation_threshold" uint8)
           (req
              "minimal_participation_ratio"
@@ -234,6 +246,7 @@ type sc_rollup = {
   reveal_activation_level : sc_rollup_reveal_activation_level;
   private_enable : bool;
   riscv_pvm_enable : bool;
+  canonical_rollup_address : Smart_rollup.Address.t option;
 }
 
 type zk_rollup = {
@@ -313,16 +326,17 @@ type t = {
   cache_script_size : int;
   cache_stake_distribution_cycles : int;
   cache_sampler_state_cycles : int;
+  cache_stake_info_cycles : int;
+  cache_swrr_selected_distribution_cycles : int;
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
   direct_ticket_spending_enable : bool;
-  aggregate_attestation : bool;
-  allow_tz4_delegate_enable : bool;
   all_bakers_attest_activation_threshold : Ratio_repr.t;
   native_contracts_enable : bool;
   swrr_new_baker_lottery_enable : bool;
+  tz5_account_enable : bool;
 }
 
 let sc_rollup_encoding =
@@ -343,7 +357,8 @@ let sc_rollup_encoding =
           c.max_number_of_parallel_games,
           c.reveal_activation_level,
           c.private_enable,
-          c.riscv_pvm_enable ) ))
+          c.riscv_pvm_enable,
+          c.canonical_rollup_address ) ))
     (fun ( ( sc_rollup_arith_pvm_enable,
              sc_rollup_origination_size,
              sc_rollup_challenge_window_in_blocks,
@@ -358,7 +373,8 @@ let sc_rollup_encoding =
              sc_rollup_max_number_of_parallel_games,
              sc_rollup_reveal_activation_level,
              sc_rollup_private_enable,
-             sc_rollup_riscv_pvm_enable ) )
+             sc_rollup_riscv_pvm_enable,
+             sc_rollup_canonical_rollup_address ) )
        ->
       {
         arith_pvm_enable = sc_rollup_arith_pvm_enable;
@@ -378,6 +394,7 @@ let sc_rollup_encoding =
         reveal_activation_level = sc_rollup_reveal_activation_level;
         private_enable = sc_rollup_private_enable;
         riscv_pvm_enable = sc_rollup_riscv_pvm_enable;
+        canonical_rollup_address = sc_rollup_canonical_rollup_address;
       })
     (merge_objs
        (obj8
@@ -389,7 +406,7 @@ let sc_rollup_encoding =
           (req "smart_rollup_max_lookahead_in_blocks" int32)
           (req "smart_rollup_max_active_outbox_levels" int32)
           (req "smart_rollup_max_outbox_messages_per_level" int31))
-       (obj7
+       (obj8
           (req "smart_rollup_number_of_sections_in_dissection" uint8)
           (req "smart_rollup_timeout_period_in_blocks" int31)
           (req "smart_rollup_max_number_of_cemented_commitments" int31)
@@ -398,7 +415,10 @@ let sc_rollup_encoding =
              "smart_rollup_reveal_activation_level"
              sc_rollup_reveal_activation_level_encoding)
           (req "smart_rollup_private_enable" bool)
-          (req "smart_rollup_riscv_pvm_enable" bool)))
+          (req "smart_rollup_riscv_pvm_enable" bool)
+          (opt
+             "smart_rollup_canonical_rollup_address"
+             Smart_rollup.Address.encoding)))
 
 let zk_rollup_encoding =
   let open Data_encoding in
@@ -620,16 +640,17 @@ let encoding =
                 c.initial_seed ),
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
-                  c.cache_sampler_state_cycles ),
+                  c.cache_sampler_state_cycles,
+                  c.cache_stake_info_cycles,
+                  c.cache_swrr_selected_distribution_cycles ),
                 ( c.dal,
                   ( (c.sc_rollup, c.zk_rollup),
                     ( c.adaptive_issuance,
                       ( c.direct_ticket_spending_enable,
-                        c.aggregate_attestation,
-                        c.allow_tz4_delegate_enable,
                         c.all_bakers_attest_activation_threshold,
                         c.native_contracts_enable,
-                        c.swrr_new_baker_lottery_enable ) ) ) ) ) ) ) ) ))
+                        c.swrr_new_baker_lottery_enable,
+                        c.tz5_account_enable ) ) ) ) ) ) ) ) ))
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
                delegate_parameters_activation_delay,
@@ -667,16 +688,17 @@ let encoding =
                    initial_seed ),
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
-                     cache_sampler_state_cycles ),
+                     cache_sampler_state_cycles,
+                     cache_stake_info_cycles,
+                     cache_swrr_selected_distribution_cycles ),
                    ( dal,
                      ( (sc_rollup, zk_rollup),
                        ( adaptive_issuance,
                          ( direct_ticket_spending_enable,
-                           aggregate_attestation,
-                           allow_tz4_delegate_enable,
                            all_bakers_attest_activation_threshold,
                            native_contracts_enable,
-                           swrr_new_baker_lottery_enable ) ) ) ) ) ) ) ) )
+                           swrr_new_baker_lottery_enable,
+                           tz5_account_enable ) ) ) ) ) ) ) ) )
        ->
       {
         consensus_rights_delay;
@@ -717,16 +739,17 @@ let encoding =
         cache_script_size;
         cache_stake_distribution_cycles;
         cache_sampler_state_cycles;
+        cache_stake_info_cycles;
+        cache_swrr_selected_distribution_cycles;
         dal;
         sc_rollup;
         zk_rollup;
         adaptive_issuance;
         direct_ticket_spending_enable;
-        aggregate_attestation;
-        allow_tz4_delegate_enable;
         all_bakers_attest_activation_threshold;
         native_contracts_enable;
         swrr_new_baker_lottery_enable;
+        tz5_account_enable;
       })
     (merge_objs
        (merge_objs
@@ -780,25 +803,26 @@ let encoding =
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
-                   (obj3
+                   (obj5
                       (req "cache_script_size" int31)
                       (req "cache_stake_distribution_cycles" int8)
-                      (req "cache_sampler_state_cycles" int8))
+                      (req "cache_sampler_state_cycles" int8)
+                      (req "cache_stake_info_cycles" int8)
+                      (req "cache_swrr_selected_distribution_cycles" int8))
                    (merge_objs
                       (obj1 (req "dal_parametric" dal_encoding))
                       (merge_objs
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
                          (merge_objs
                             adaptive_issuance_encoding
-                            (obj6
+                            (obj5
                                (req "direct_ticket_spending_enable" bool)
-                               (req "aggregate_attestation" bool)
-                               (req "allow_tz4_delegate_enable" bool)
                                (req
                                   "all_bakers_attest_activation_threshold"
                                   Ratio_repr.encoding)
                                (req "native_contracts_enable" bool)
-                               (req "swrr_new_baker_lottery_enable" bool))))))))))
+                               (req "swrr_new_baker_lottery_enable" bool)
+                               (req "tz5_account_enable" bool))))))))))
 
 let update_sc_rollup_parameter ratio_i32 c =
   (* Constants remain small enough to fit in [int32] after update (as a
@@ -823,6 +847,7 @@ let update_sc_rollup_parameter ratio_i32 c =
     reveal_activation_level = c.reveal_activation_level;
     private_enable = c.private_enable;
     riscv_pvm_enable = c.riscv_pvm_enable;
+    canonical_rollup_address = c.canonical_rollup_address;
   }
 
 let update_sc_rollup_parameter_with_block_time block_time c =
@@ -865,6 +890,7 @@ let update_sc_rollup_parameter_with_block_time block_time c =
     reveal_activation_level = c.reveal_activation_level;
     private_enable = c.private_enable;
     riscv_pvm_enable = c.riscv_pvm_enable;
+    canonical_rollup_address = c.canonical_rollup_address;
   }
 
 module Internal_for_tests = struct

@@ -9,7 +9,7 @@
 open Evm_node_lib_dev_encoding
 
 (** A list of network officially supported by the EVM node. *)
-type supported_network = Mainnet | Testnet | Shadownet
+type supported_network = Mainnet | Testnet | Shadownet | Previewnet
 
 val pp_supported_network : Format.formatter -> supported_network -> unit
 
@@ -76,6 +76,10 @@ type history_mode =
   | Full of garbage_collector_parameters
       (** Keep all blocks and transactions. Keep operations and states for a period defined by
               {!type-garbage_collector_parameters}. *)
+  | Seed of garbage_collector_parameters
+      (** Keep all blueprints. Prune blocks, transactions, and states for a period
+          defined by {!type-garbage_collector_parameters}. Intended for nodes
+          that only need to serve blueprints with events to consumers. *)
 
 (** Compare history modes and ignore [garbage_collector_parameters] *)
 val history_mode_partial_eq : history_mode -> history_mode -> bool
@@ -130,6 +134,7 @@ type experimental_features = {
   l2_chains : l2_chain list option;
   periodic_snapshot_path : string option;
   preconfirmation_stream_enabled : bool;
+  compact_receipt_encoding : bool;
 }
 
 type gcp_key = {
@@ -152,16 +157,10 @@ type sequencer = {
   sunset_sec : int64;
 }
 
-type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
-
-type proxy = {
-  finalized_view : bool option;
-      (** Provide a view on the latest final state of the rollup, not its
-          current HEAD. *)
-  evm_node_endpoint : Uri.t option;
-      (** If provided, the EVM node will inject transactions to this endpoint
-          instead of to its companian rollup node. *)
-  ignore_block_param : bool;
+type observer = {
+  evm_node_endpoint : Uri.t;
+  rollup_node_tracking : bool;
+  fail_on_divergence : bool;
 }
 
 type fee_history_max_count = Unlimited | Limit of int
@@ -221,7 +220,6 @@ type t = {
   kernel_execution : kernel_execution_config;
   sequencer : sequencer;
   observer : observer option;
-  proxy : proxy;
   gcp_kms : gcp_kms;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
@@ -288,7 +286,11 @@ val observer_config_exn : t -> observer tzresult
 (** [observer_config_dft ()] returns the default observer config
     populated with given value. *)
 val observer_config_dft :
-  evm_node_endpoint:Uri.t -> ?rollup_node_tracking:bool -> unit -> observer
+  evm_node_endpoint:Uri.t ->
+  ?rollup_node_tracking:bool ->
+  ?fail_on_divergence:bool ->
+  unit ->
+  observer
 
 val make_pattern_restricted_rpcs : string -> restricted_rpcs
 
@@ -347,12 +349,12 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
-    ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
     ?sunset_sec:int64 ->
     ?rpc_timeout:float ->
+    ?fail_on_divergence:bool ->
     unit ->
     t
 
@@ -389,11 +391,11 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
-    ?proxy_ignore_block_param:bool ->
     ?history_mode:history_mode ->
     ?dal_slots:int list ->
     ?sunset_sec:int64 ->
     ?rpc_timeout:float ->
+    ?fail_on_divergence:bool ->
     t ->
     t
 
@@ -430,12 +432,12 @@ module Cli : sig
     ?log_filter_chunk_size:int ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
-    ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
     ?sunset_sec:int64 ->
     ?rpc_timeout:float ->
+    ?fail_on_divergence:bool ->
     string ->
     t tzresult Lwt.t
 end

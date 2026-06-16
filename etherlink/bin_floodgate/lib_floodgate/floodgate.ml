@@ -6,6 +6,99 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let forever () = fst (Lwt.task ())
+
+type preconfirmed_data = {
+  timestamp : Ptime.t;
+  block_number : Ethereum_types.quantity;
+}
+
+type ic_bench = {
+  sent : (Ethereum_types.hash, Ptime.t) Stdlib.Hashtbl.t;
+  included : (Ethereum_types.hash, Ptime.t) Stdlib.Hashtbl.t;
+  preconfirmed : (Ethereum_types.hash, preconfirmed_data) Stdlib.Hashtbl.t;
+}
+
+type ic_data = {ic_bench : ic_bench; oc : out_channel}
+
+let ic_bench_size = 100
+
+let raw_transfer ?(callback = fun _ -> Lwt.return_unit) ~raw_tx
+    ~transaction_object ~infos ~from () =
+  let open Lwt_result_syntax in
+  let (Qty gas_limit) = Transaction_object.gas transaction_object in
+  let (Qty value) = Transaction_object.value transaction_object in
+  let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
+  let callback reason =
+    (match reason with
+    | `Confirmed ->
+        Account.debit from Z.(value + fees) ;
+        Account.increment_nonce from
+    | _ -> ()) ;
+    callback reason
+  in
+  let next_nonce = Ethereum_types.quantity_of_z from.nonce in
+  let* add_res =
+    Evm_node_lib_dev.Tx_queue.add
+      ~callback
+      ~next_nonce
+      (Evm_node_lib_dev.Tx_queue_types.Evm transaction_object)
+      ~raw_tx
+  in
+  match add_res with
+  | Ok (_ : Ethereum_types.hash) -> return_unit
+  | Error e ->
+      Lwt.fail_with @@ Format.asprintf "Error adding to the tx_queue: %s" e
+
+let transfer ?callback ?to_ ?(value = Z.zero) ?nonce ?data ~gas_limit ~infos
+    ~from () =
+  let open Lwt_result_syntax in
+  let* raw_tx, transaction_object =
+    Craft.transfer_with_obj_exn
+      ?nonce
+      ~infos
+      ~from
+      ?to_
+      ~gas_limit
+      ~value
+      ?data
+      ()
+  in
+  raw_transfer ?callback ~raw_tx ~transaction_object ~infos ~from ()
+
+let send_raw_transaction ~relay_endpoint txn =
+  let open Lwt_result_syntax in
+  let module Srt = Rpc_encodings.Send_raw_transaction in
+  let uuid_seed = Random.get_state () in
+  let req_id = Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false) in
+  let txn =
+    Rpc_encodings.JSONRPC.
+      {
+        method_ = Srt.method_;
+        parameters = Some (Data_encoding.Json.construct Srt.input_encoding txn);
+        id = Some (Id_string req_id);
+      }
+  in
+
+  let* response =
+    Rollup_services.call_service
+      ~keep_alive:true
+      ~base:relay_endpoint
+      ~timeout:Network_info.timeout
+      (Batch.dispatch_service ~path:Resto.Path.root)
+      ()
+      ()
+      txn
+  in
+
+  match response.value with
+  | Ok res ->
+      let hash = Data_encoding.Json.destruct Srt.output_encoding res in
+      return hash
+  | Error error ->
+      let*! () = Floodgate_events.rpc_error error in
+      failwith "Could not send transaction"
+
 type attempt = Always | Never | Number of int
 
 let one_xtz = Z.(of_int 1_000_000_000 * of_int 1_000_000_000)
@@ -36,12 +129,12 @@ let controller_from_signer ~rpc_endpoint ~min_balance controller =
     wait for it to be confirmed. It will return an error if the transactions
     is not confirmed, either because it was dropped or refused. *)
 let send_transaction_and_wait ~infos ~gas_limit ~from ~to_ ~value =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let result, waker = Lwt.wait () in
   let* () =
-    Tx_queue.transfer
+    transfer
       ~callback:(function
-        | `Accepted _ -> return_unit
+        | `Accepted -> Lwt.return_unit
         | `Confirmed ->
             Lwt.wakeup waker (Ok ()) ;
             Lwt.return_unit
@@ -87,8 +180,114 @@ module State = struct
     report ~elapsed_time
 end
 
-let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
-    ~retry_attempt =
+let retry_transfer ?confirmation_wakener ~start ~infos ~gas_limit ~nonce
+    ~ic_data retry_attempt account data to_ =
+  let open Lwt_syntax in
+  let* tx_data =
+    Craft.transfer_with_obj_exn
+      ~nonce
+      ~infos
+      ~from:account
+      ~to_
+      ~gas_limit
+      ~value:Z.zero
+      ?data
+      ()
+  in
+  let* raw_tx, tx_object =
+    match tx_data with
+    | Ok (raw_tx, tx_object) -> return (raw_tx, tx_object)
+    | Error _ -> Stdlib.failwith "Crafting transaction failed"
+  in
+  let rec maybe_retry ~attempt =
+    match retry_attempt with
+    | Always -> aux ~attempt:(attempt + 1)
+    | Never -> return_unit
+    | Number max_attempt when attempt >= max_attempt ->
+        let* () = Floodgate_events.transaction_retried_failed account attempt in
+        return_unit
+    | Number _ -> aux ~attempt:(attempt + 1)
+  and aux ~attempt =
+    let callback reason =
+      match reason with
+      | `Accepted ->
+          Option.iter
+            (fun {ic_bench; _} ->
+              Stdlib.Hashtbl.add
+                ic_bench.sent
+                (Transaction_object.hash tx_object)
+                (Ptime_clock.now ()))
+            ic_data ;
+          return_unit
+      | `Refused ->
+          let* () = Floodgate_events.transaction_refused account in
+          maybe_retry ~attempt
+      | `Confirmed ->
+          let end_ = Time.System.now () in
+          let* () =
+            Floodgate_events.transaction_confirmed
+              account
+              Ptime.(diff end_ start)
+          in
+          let* () =
+            if attempt > 0 then
+              Floodgate_events.transaction_retried_confirmed
+                account
+                attempt
+                Ptime.(diff end_ start)
+            else return_unit
+          in
+          Option.iter (fun u -> Lwt.wakeup u ()) confirmation_wakener ;
+          return_unit
+      | `Dropped ->
+          let* () = Floodgate_events.transaction_dropped account in
+          maybe_retry ~attempt
+    in
+    Misc.unwrap_error_monad @@ fun () ->
+    raw_transfer
+      ~infos
+      ~raw_tx
+      ~transaction_object:tx_object
+      ~callback
+      ~from:account
+      ()
+  in
+  aux ~attempt:0
+
+let salvo ~txs_per_salvo retry_attempt ~infos ~gas_limit ~ic_data account data
+    to_ =
+  let open Lwt_syntax in
+  let last_confirmation, confirmation_wakener = Lwt.wait () in
+  let rec aux ~start ~nonce ~last_nonce =
+    let is_last_nonce = Compare.Z.(Z.succ nonce >= last_nonce) in
+    let confirmation_wakener =
+      if is_last_nonce then Some confirmation_wakener else None
+    in
+    let* () =
+      retry_transfer
+        ?confirmation_wakener
+        ~nonce
+        ~start
+        ~infos
+        ~gas_limit
+        ~ic_data
+        retry_attempt
+        account
+        data
+        to_
+    in
+    if not is_last_nonce then aux ~start ~last_nonce ~nonce:(Z.succ nonce)
+    else return_unit
+  in
+  let start = Time.System.now () in
+  let start_nonce = account.Account.nonce in
+  let last_nonce = Z.(of_int txs_per_salvo + start_nonce) in
+  let* () = aux ~start ~last_nonce ~nonce:start_nonce in
+  last_confirmation
+
+let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit ~retry_attempt
+    ~ic_data account =
+  let open Lwt_syntax in
   let data, to_ =
     match token with
     | `Native data ->
@@ -102,66 +301,24 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
         in
         (Some data, Efunc_core.Private.a contract)
   in
-  let rec salvo ~start ~nonce_limit ~nonce =
-    let is_last_nonce = Compare.Z.(Z.succ nonce = nonce_limit) in
-    let open Lwt_syntax in
-    let rec retry_transfer attempt =
-      let maybe_retry () =
-        match retry_attempt with
-        | Always -> retry_transfer (attempt + 1)
-        | Never -> return_unit
-        | Number max_attempt when attempt >= max_attempt ->
-            let* () =
-              Floodgate_events.transaction_retried_failed account attempt
-            in
-            return_unit
-        | Number _ -> retry_transfer (attempt + 1)
-      in
-      let callback reason =
-        match reason with
-        | `Accepted _ -> return_unit
-        | `Refused ->
-            let* () = Floodgate_events.transaction_refused account in
-            maybe_retry ()
-        | `Confirmed ->
-            let end_ = Time.System.now () in
-            let* () =
-              Floodgate_events.transaction_confirmed
-                account
-                Ptime.(diff end_ start)
-            in
-            let* () =
-              if attempt > 0 then
-                Floodgate_events.transaction_retried_confirmed
-                  account
-                  attempt
-                  Ptime.(diff end_ start)
-              else return_unit
-            in
-            if is_last_nonce then loop () else return_unit
-        | `Dropped ->
-            let* () = Floodgate_events.transaction_dropped account in
-            maybe_retry ()
-      in
-      Tx_queue.transfer
-        ~nonce
+  let rec loop () =
+    let* () =
+      salvo
+        ~txs_per_salvo
         ~infos
-        ~callback
         ~gas_limit
-        ~from:account
-        ~to_
-        ?data
-        ()
+        ~ic_data
+        retry_attempt
+        account
+        data
+        to_
     in
-    let* () = retry_transfer 0 in
-    if not is_last_nonce then salvo ~start ~nonce_limit ~nonce:(Z.succ nonce)
-    else return_unit
-  and loop () =
-    let start = Time.System.now () in
-    let nonce_limit = Z.(of_int txs_per_salvo + account.nonce) in
-    salvo ~start ~nonce_limit ~nonce:account.nonce
+    loop ()
   in
-  loop ()
+  let Ethereum_types.(Address (Hex hex_address)) = Account.address_et account in
+  let task_name = Format.sprintf "%s spammer" hex_address in
+  let () = Misc.background_task ~name:task_name @@ fun () -> loop () in
+  return_unit
 
 let rec get_transaction_receipt rpc_endpoint txn_hash =
   let open Lwt_result_syntax in
@@ -179,12 +336,26 @@ let rec get_transaction_receipt rpc_endpoint txn_hash =
       let*! () = Lwt_unix.sleep 0.1 in
       get_transaction_receipt rpc_endpoint txn_hash
 
-let wait_for_receipt ~rpc_endpoint ?to_ ?value ?data ?nonce ~gas_limit ~infos
-    ~from () =
-  let open Lwt_syntax in
+let wait_for_receipt ~rpc_endpoint ?to_ ?(value = Z.zero) ?data ?nonce
+    ~gas_limit ~infos ~from () =
+  let open Lwt_result_syntax in
   let res, waiter = Lwt.task () in
-  let txn_hash = ref Ethereum_types.(Hash (Hex "")) in
-  let callback = function
+  let* raw_tx, transaction_object =
+    Craft.transfer_with_obj_exn
+      ?nonce
+      ~infos
+      ~from
+      ?to_
+      ~gas_limit
+      ~value
+      ?data
+      ()
+  in
+  let txn_hash = Transaction_object.hash transaction_object in
+  let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
+  let callback status =
+    let open Lwt_syntax in
+    match status with
     | `Refused ->
         Lwt.wakeup waiter
         @@ Result_syntax.tzfail
@@ -199,25 +370,27 @@ let wait_for_receipt ~rpc_endpoint ?to_ ?value ?data ?nonce ~gas_limit ~infos
                 "Could not get the transaction receipt: transaction was \
                  dropped]") ;
         return_unit
-    | `Accepted hash ->
-        txn_hash := hash ;
-        return_unit
+    | `Accepted -> return_unit
     | `Confirmed ->
-        let* result = get_transaction_receipt rpc_endpoint !txn_hash in
+        Account.debit from Z.(value + fees) ;
+        Account.increment_nonce from ;
+        let* result = get_transaction_receipt rpc_endpoint txn_hash in
         Lwt.wakeup waiter result ;
         return_unit
   in
-  let* () =
-    Tx_queue.transfer
+  let next_nonce = Ethereum_types.quantity_of_z from.nonce in
+  let* add_res =
+    Evm_node_lib_dev.Tx_queue.add
       ~callback
-      ?to_
-      ?value
-      ?data
-      ?nonce
-      ~gas_limit
-      ~infos
-      ~from
-      ()
+      ~next_nonce
+      (Evm_node_lib_dev.Tx_queue_types.Evm transaction_object)
+      ~raw_tx
+  in
+  let* () =
+    match add_res with
+    | Ok (_ : Ethereum_types.hash) -> return_unit
+    | Error e ->
+        Lwt.fail_with @@ Format.asprintf "Error adding to the tx_queue: %s" e
   in
   res
 
@@ -266,8 +439,8 @@ let fund_fresh_account ~infos ~relay_endpoint ~initial_balance ~gas_limit
             ~value:Z.(node.balance - fees - fees)
             ()
         in
-        let* _ = Tx_queue.Misc.send_raw_transaction ~relay_endpoint txn in
-        let* _ = Tx_queue.Misc.send_raw_transaction ~relay_endpoint txn' in
+        let* _ = send_raw_transaction ~relay_endpoint txn in
+        let* _ = send_raw_transaction ~relay_endpoint txn' in
         let*! () = Floodgate_events.reimbursed_controller node in
         return_unit)
   in
@@ -393,11 +566,85 @@ let start_new_head_monitor ~ws_uri =
       match block.Ethereum_types.transactions with
       | TxHash hashes ->
           State.incr_transactions_count (List.length hashes) ;
-          List.iter_es Tx_queue.confirm hashes
+          Evm_node_lib_dev.Tx_queue.confirm_transactions
+            ~clear_pending_queue_after:false
+            ~confirmed_txs:(List.to_seq hashes)
       | TxFull _ -> return_unit)
     heads_subscription.stream
 
-let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
+let start_new_preconfirmed_receipts ~ic_data ~ws_uri =
+  let open Lwt_result_syntax in
+  let ws_client =
+    Websocket_client.create
+      ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
+      ~keep_alive:false
+      Media_type.json
+      ws_uri
+  in
+  let* () = Websocket_client.connect ws_client in
+  let* heads_subscription =
+    Websocket_client.subscribe_newPreconfirmedReceipts ws_client
+  in
+  lwt_stream_iter_es
+    (fun receipt ->
+      let*? Transaction_receipt.{transactionHash; blockNumber; _} = receipt in
+      match ic_data with
+      | Some {ic_bench; _} ->
+          Stdlib.Hashtbl.add
+            ic_bench.preconfirmed
+            transactionHash
+            {timestamp = Ptime_clock.now (); block_number = blockNumber} ;
+          return_unit
+      | None -> return_unit)
+    heads_subscription.stream
+
+let ic_bench_csv ?ic_data () =
+  Option.iter
+    (fun {ic_bench; oc} ->
+      Stdlib.Hashtbl.iter
+        (fun hash sent_t ->
+          match
+            ( Stdlib.Hashtbl.find_opt ic_bench.included hash,
+              Stdlib.Hashtbl.find_opt ic_bench.preconfirmed hash )
+          with
+          | Some included_t, Some {timestamp = preconf_t; block_number} ->
+              let (Qty block_number) = block_number in
+              let diff_sent_included =
+                Ptime.Span.to_float_s (Ptime.diff included_t sent_t)
+              in
+              let diff_sent_preconf =
+                Ptime.Span.to_float_s (Ptime.diff preconf_t sent_t)
+              in
+              let diff_included_preconf =
+                Ptime.Span.to_float_s (Ptime.diff preconf_t included_t)
+              in
+              Printf.fprintf
+                oc
+                "%d|%s|%.6f|%.6f|%.6f\n%!"
+                (Z.to_int block_number)
+                (Ethereum_types.hash_to_string hash)
+                diff_sent_included
+                diff_sent_preconf
+                diff_included_preconf ;
+              Stdlib.Hashtbl.remove ic_bench.sent hash ;
+              Stdlib.Hashtbl.remove ic_bench.included hash ;
+              Stdlib.Hashtbl.remove ic_bench.preconfirmed hash
+          | Some included_t, None ->
+              let diff_sent_included =
+                Ptime.Span.to_float_s (Ptime.diff included_t sent_t)
+              in
+              Printf.fprintf
+                oc
+                "-1|%s|%.6f|0,0|0,0\n%!"
+                (Ethereum_types.hash_to_string hash)
+                diff_sent_included ;
+              Stdlib.Hashtbl.remove ic_bench.sent hash ;
+              Stdlib.Hashtbl.remove ic_bench.included hash
+          | _ -> ())
+        ic_bench.sent)
+    ic_data
+
+let start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data () =
   let open Lwt_result_syntax in
   let* next_blueprint_number =
     Batch.call
@@ -414,36 +661,78 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
       ~timeout:Network_info.timeout
       ()
   in
+  let instant_confirmations = Option.is_some ic_data in
   Blueprints_follower.start
     ~multichain:false
     ~time_between_blocks
     ~evm_node_endpoint:relay_endpoint
     ~rpc_timeout:Network_info.timeout
     ~next_blueprint_number
-    ~on_new_blueprint:(fun number blueprint ->
+    ~instant_confirmations
+    ~on_new_blueprint:(fun number blueprint ~expected_block_hash:_ ->
       let*! () = Floodgate_events.received_blueprint number in
       let* () =
         match Blueprint_decoder.transaction_hashes blueprint with
         | Ok hashes ->
             State.incr_transactions_count (List.length hashes) ;
-            List.iter_es Tx_queue.confirm hashes
+            Evm_node_lib_dev.Tx_queue.confirm_transactions
+              ~clear_pending_queue_after:false
+              ~confirmed_txs:(List.to_seq hashes)
         | Error _ -> return_unit
       in
-      return (`Continue Blueprints_follower.{sbl_callbacks_activated = false}))
+      return
+        (`Continue
+           Blueprints_follower.{sbl_callbacks_activated = instant_confirmations}))
     ~on_finalized_levels:(fun ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ ->
       return_unit)
-    ~on_next_block_info:(fun _ _ -> return_unit)
-    ~on_inclusion:(fun _ _ -> return_unit)
+    ~on_next_block_info:(fun _ _ ->
+      ic_bench_csv ?ic_data () ;
+      return_unit)
+    ~on_inclusion:(fun _ hash ->
+      match ic_data with
+      | Some {ic_bench; _} ->
+          Stdlib.Hashtbl.add ic_bench.included hash (Ptime_clock.now ()) ;
+          return_unit
+      | None -> return_unit)
     ~on_dropped:(fun _ _ -> return_unit)
     ()
 
+let init_ic_data ~ic_bench_csv =
+  let ic_data =
+    {
+      ic_bench =
+        {
+          sent = Stdlib.Hashtbl.create ic_bench_size;
+          included = Stdlib.Hashtbl.create ic_bench_size;
+          preconfirmed = Stdlib.Hashtbl.create ic_bench_size;
+        };
+      oc = open_out ic_bench_csv;
+    }
+  in
+  let _callback =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+        Lwt.return (close_out ic_data.oc))
+  in
+  Printf.fprintf
+    ic_data.oc
+    "block_number|hash|diff_sent_included|diff_sent_preconfirmed|diff_included_preconfirmed\n" ;
+  ic_data
+
 let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
     ~ws_endpoint ~controller ~max_active_eoa ~max_transaction_batch_length
-    ~spawn_interval ~tick_interval ~base_fee_factor ~initial_balance
-    ~txs_per_salvo ~elapsed_time_between_report ~dummy_data_size ~retry_attempt
-    =
+    ~max_lifespan_s ~spawn_interval ~tick_interval ~base_fee_factor
+    ~initial_balance ~txs_per_salvo ~elapsed_time_between_report
+    ~dummy_data_size ~retry_attempt ~benchmark_instant_confirmations =
   State.dummy_data_size := dummy_data_size ;
+  let tx_per_addr_limit = Int64.of_int 999_999 in
+  let max_size = 999_999 in
   let open Lwt_result_syntax in
+  let ic_data =
+    Option.map
+      (fun ic_bench_csv -> init_ic_data ~ic_bench_csv)
+      benchmark_instant_confirmations
+  in
+  let benchmark_instant_confirmations_enabled = Option.is_some ic_data in
   let* controller =
     controller_from_signer
       ~rpc_endpoint
@@ -451,52 +740,75 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
       controller
   in
   let* infos = Network_info.fetch ~rpc_endpoint ~base_fee_factor in
-  let* () = Tx_queue.start ~relay_endpoint ~max_transaction_batch_length () in
-  let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
+  let config : Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
   let* () =
-    match ws_endpoint with
-    | Some ws_uri -> start_new_head_monitor ~ws_uri
-    | None -> start_blueprint_follower ~relay_endpoint ~rpc_endpoint
-  and* () = Tx_queue.beacon ~tick_interval
-  and* () =
-    let* token, gas_limit =
-      prepare_scenario ~rpc_endpoint ~scenario ~dummy_data_size infos controller
-    in
-    let* simple_gas_limit =
-      Network_info.get_gas_limit
-        ~rpc_endpoint
-        ~base_fee_per_gas:infos.Network_info.base_fee_per_gas
-        ~to_:(Account.address_et controller)
-        ()
-    in
-    let* () =
-      Seq.ES.iter
-        (fun _ ->
-          let* () = Lwt_result.ok (Lwt_unix.sleep spawn_interval)
-          and* () =
-            let* node =
-              fund_fresh_account
-                ~infos
-                ~relay_endpoint
-                ~initial_balance
-                ~gas_limit:simple_gas_limit
-                controller
-            in
-            let*! () =
-              Floodgate_events.spam_started (Account.address_et node)
-            in
-            Lwt_result.ok
-              (spam_with_account
-                 ~txs_per_salvo
-                 ~token
-                 ~infos
-                 ~gas_limit
-                 node
-                 ~retry_attempt)
+    Evm_node_lib_dev.Tx_queue.start
+      ~config
+      ~keep_alive:true
+      ~timeout:10.
+      ~start_injector_worker:true
+      ()
+  in
+  let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
+
+  Misc.background_task ~name:"chain_monitor" (fun () ->
+      match ws_endpoint with
+      | Some ws_uri when benchmark_instant_confirmations_enabled ->
+          Lwt.pick
+            [
+              start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data ();
+              start_new_preconfirmed_receipts ~ic_data ~ws_uri;
+            ]
+      | Some ws_uri -> start_new_head_monitor ~ws_uri
+      | None ->
+          start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data ()) ;
+
+  Misc.background_task ~name:"tx_queue_beacon" (fun () ->
+      Evm_node_lib_dev.Tx_queue.tx_queue_beacon
+        ~evm_node_endpoint:(Rpc relay_endpoint)
+        ~tick_interval) ;
+
+  Misc.background_task ~name:"reporter" (fun () ->
+      State.report ~elapsed_time:elapsed_time_between_report) ;
+
+  let* token, gas_limit =
+    prepare_scenario ~rpc_endpoint ~scenario ~dummy_data_size infos controller
+  in
+  let* simple_gas_limit =
+    Network_info.get_gas_limit
+      ~rpc_endpoint
+      ~base_fee_per_gas:infos.Network_info.base_fee_per_gas
+      ~to_:(Account.address_et controller)
+      ()
+  in
+  let* () =
+    Seq.ES.iter
+      (fun _ ->
+        let* () = Lwt_result.ok (Lwt_unix.sleep spawn_interval)
+        and* () =
+          let* node =
+            fund_fresh_account
+              ~infos
+              ~relay_endpoint
+              ~initial_balance
+              ~gas_limit:simple_gas_limit
+              controller
           in
-          return_unit)
-        (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)
-    in
-    Lwt_result.ok (Floodgate_events.setup_completed ())
-  and* () = State.report ~elapsed_time:elapsed_time_between_report in
-  return_unit
+          let*! () = Floodgate_events.spam_started (Account.address_et node) in
+          Lwt_result.ok
+            (spam_with_account
+               ~txs_per_salvo
+               ~token
+               ~infos
+               ~gas_limit
+               ~retry_attempt
+               ~ic_data
+               node)
+        in
+        return_unit)
+      (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)
+  in
+  let*! () = Floodgate_events.setup_completed () in
+  forever ()

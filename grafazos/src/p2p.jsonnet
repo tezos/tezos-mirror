@@ -70,9 +70,9 @@ local mkPeersPanel(h, w, x, y, legendRightSide) =
   exchangedData(h, w, x, y):
     local received = 'Received data (KB)';
     local sent = 'Sent data (KB)';
-    local receivedQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_p2p_io_scheduler_total_recv' + base.node_instance_query + '[1m]) / 1000')
+    local receivedQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_p2p_io_scheduler_total_recv' + base.node_instance_query + '[1m]) / 1000')
                           + query.prometheus.withLegendFormat(received);
-    local sentQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_p2p_io_scheduler_total_sent' + base.node_instance_query + '[1m]) / 1000')
+    local sentQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_p2p_io_scheduler_total_sent' + base.node_instance_query + '[1m]) / 1000')
                       + query.prometheus.withLegendFormat(sent);
     graph.new('Average data exchange per second (over 1min)', [receivedQuery, sentQuery], h, w, x, y)
     + graph.withQueryColor([[received, 'blue'], [sent, 'green']])
@@ -122,8 +122,8 @@ local mkPeersPanel(h, w, x, y, legendRightSide) =
         local received = name + ' received';
         local getReceived = 'get ' + name + ' received';
         local sent = name + ' sent';
-        local queryGet(t) = query.prometheus.new('Prometheus', base.namespace + '_distributed_db_message_get_' + queryNameGet + '_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
-        local query(t) = grafonnet.query.prometheus.new('Prometheus', base.namespace + '_distributed_db_message_' + queryName + '_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
+        local queryGet(t) = query.prometheus.new(base.datasource, base.namespace + '_distributed_db_message_get_' + queryNameGet + '_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
+        local query(t) = grafonnet.query.prometheus.new(base.datasource, base.namespace + '_distributed_db_message_' + queryName + '_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
         local getSentQuery = queryGet('sent')
                              + grafonnet.query.prometheus.withLegendFormat(getSent);
         local receivedQuery = query('received')
@@ -162,8 +162,8 @@ local mkPeersPanel(h, w, x, y, legendRightSide) =
         local getReceived = 'get current head received';
         local sent = 'current head sent';
         local broadcasted = 'current head broadcasted';
-        local queryGet(t) = query.prometheus.new('Prometheus', base.namespace + '_distributed_db_message_get_current_head_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
-        local query(t) = grafonnet.query.prometheus.new('Prometheus', base.namespace + '_distributed_db_message_current_head_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
+        local queryGet(t) = query.prometheus.new(base.datasource, base.namespace + '_distributed_db_message_get_current_head_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
+        local query(t) = grafonnet.query.prometheus.new(base.datasource, base.namespace + '_distributed_db_message_current_head_messages{action="' + t + '",' + base.node_instance + '="$node_instance"}');
         local getBroadcastedQuery = queryGet('broadcasted')
                                     + grafonnet.query.prometheus.withLegendFormat(getBroadcasted);
         local getSentQuery = queryGet('sent')

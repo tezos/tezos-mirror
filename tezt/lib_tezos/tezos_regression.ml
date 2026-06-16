@@ -25,6 +25,11 @@
 
 let replacements =
   [
+    (* Normalize DAL debug print store schemas command for regression (dal-node vs baker). *)
+    ( "\\./octez-baker dal debug print store schemas\\b",
+      "./[octez-dal-executable] debug print store schemas" );
+    ( "\\./octez-dal-node debug print store schemas\\b",
+      "./[octez-dal-executable] debug print store schemas" );
     ("sh\\w{72}\\b", "[DAL_SLOT_HEADER]");
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3752
        Remove this regexp as soon as the WASM PVM stabilizes. *)
@@ -42,6 +47,7 @@ let replacements =
     ("sr1\\w{33}\\b", "[SMART_ROLLUP_HASH]");
     ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
     ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
+    ("parent_hash: 0x\\w{64}\\b", "parent_hash: [EVM_BLOCK_PARENT_HASH]");
     (* Ports are non-deterministic when using -j. *)
     ("/localhost:\\d{4,5}/", "/[HOST]:[PORT]/");
     ("/127.0.0.1:\\d{4,5}/", "/[HOST]:[PORT]/");
@@ -79,7 +85,7 @@ let hooks_custom ?(scrubbed_global_options = scrubbed_global_options)
         arguments
     in
     let message = Log.quote_shell_command command arguments in
-    Regression.capture ("\n" ^ message)
+    Regression.capture ("\n" ^ replace_variables message)
   in
   let on_log output = replace_variables output |> Regression.capture in
   {Process.on_spawn; on_log}

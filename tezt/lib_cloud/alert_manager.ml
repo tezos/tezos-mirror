@@ -84,6 +84,7 @@ type t = {
   mutable routes : (Prometheus.alert * route) list;
   receivers : receiver list;
   default_receiver : receiver;
+  port : int;
 }
 
 let jingoo_receiver_template receiver =
@@ -197,7 +198,8 @@ let write_configuration t =
       Stdlib.seek_out oc 0 ;
       output_string oc content)
 
-let run ?(default_receiver = null_receiver) alerts =
+let run ?(port = 9093) ?(interface = "0.0.0.0")
+    ?(default_receiver = null_receiver) alerts =
   let alert_manager_configuration_directory = Path.tmp_dir // "alert_manager" in
   let* () = Process.run "mkdir" ["-p"; alert_manager_configuration_directory] in
   let configuration_file =
@@ -208,7 +210,7 @@ let run ?(default_receiver = null_receiver) alerts =
   let receivers =
     List.sort_uniq compare (default_receiver :: receivers_of_alerts alerts)
   in
-  let t = {configuration_file; routes; default_receiver; receivers} in
+  let t = {configuration_file; routes; default_receiver; receivers; port} in
   match receivers with
   | [Null] -> Lwt.return_none
   | _ ->
@@ -229,10 +231,11 @@ let run ?(default_receiver = null_receiver) alerts =
                 "--name";
                 "alert-manager";
                 "-p";
-                "9093-9093";
+                sf "%d-%d" port port;
                 "prom/alertmanager:latest";
                 "--config.file";
                 configuration_file;
+                sf "--web.listen-address=%s:%d" interface port;
               ])
           (fun exn ->
             Log.error "Alert_manager:%s" (Printexc.to_string exn) ;
@@ -245,7 +248,9 @@ let reload t =
   write_configuration t ;
   Lwt.catch
     (fun () ->
-      Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"])
+      Process.run
+        "curl"
+        ["-X"; "POST"; sf "http://127.0.0.1:%d/-/reload" t.port])
     (fun exn ->
       Log.error
         "%s: Could not reload alert_manager, curl returned: %s"

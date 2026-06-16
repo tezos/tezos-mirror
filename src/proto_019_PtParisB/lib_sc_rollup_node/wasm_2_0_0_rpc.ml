@@ -24,25 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Rpc_directory_helpers
 open Context_wrapper.Irmin
 
 module Make_RPC
     (Durable_state :
       Wasm_2_0_0_pvm.Durable_state with type state = Irmin_context.tree) =
 struct
-  module Block_directory = Make_sub_directory (struct
-    include Sc_rollup_services.Block
-
-    type context = Node_context.rw
-
-    type subcontext = Node_context.ro * Block_hash.t
-
-    let context_of_prefix node_ctxt (((), block) : prefix) =
-      let open Lwt_result_syntax in
-      let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
-      (Node_context.readonly node_ctxt, block)
-  end)
+  module Block_directory = Rpc_directory.Make_block_directory (struct end)
 
   let get_state (node_ctxt : _ Node_context.t) block_hash =
     let open Lwt_result_syntax in
@@ -57,7 +45,7 @@ struct
     @@ fun (node_ctxt, block) {key} () ->
       let open Lwt_result_syntax in
       let* state = get_state node_ctxt block in
-      let*! value = Durable_state.lookup (of_node_pvmstate state) key in
+      let*! value = Durable_state.lookup !(of_node_pvmstate state) key in
       return value ) ;
 
     ( Block_directory.register0
@@ -65,7 +53,7 @@ struct
     @@ fun (node_ctxt, block) {key} () ->
       let open Lwt_result_syntax in
       let* state = get_state node_ctxt block in
-      let*! leng = Durable_state.value_length (of_node_pvmstate state) key in
+      let*! leng = Durable_state.value_length !(of_node_pvmstate state) key in
       return leng ) ;
 
     ( Block_directory.register0
@@ -73,7 +61,7 @@ struct
     @@ fun (node_ctxt, block) {key} () ->
       let open Lwt_result_syntax in
       let* state = get_state node_ctxt block in
-      let*! subkeys = Durable_state.list (of_node_pvmstate state) key in
+      let*! subkeys = Durable_state.list !(of_node_pvmstate state) key in
       return subkeys ) ;
 
     Block_directory.register0
@@ -81,7 +69,7 @@ struct
     @@ fun (node_ctxt, block) {key} () ->
     let open Lwt_result_syntax in
     let* state = get_state node_ctxt block in
-    let tree = of_node_pvmstate state in
+    let tree = !(of_node_pvmstate state) in
     let*! subkeys = Durable_state.list tree key in
     let*! bindings =
       List.filter_map_s

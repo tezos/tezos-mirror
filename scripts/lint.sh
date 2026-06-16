@@ -40,7 +40,7 @@ declare -a source_directories
 
 # Make sure that the set of source_directories here are also reflected in
 # [changeset_lint_files] in [ci/bin/common.ml].
-source_directories=(src docs/doc_gen tezt devtools contrib etherlink client-libs)
+source_directories=(src docs/doc_gen tezt devtools contrib etherlink)
 # Set of newline-separated basic regular expressions to exclude from --check-licenses-git-new.
 license_check_exclude=$(
   cat << EOF
@@ -48,6 +48,10 @@ license_check_exclude=$(
 src/lib_protocol_environment/sigs/.*
 src/riscv/api/octez_riscv_api.ml
 src/riscv/api/octez_riscv_api.mli
+src/riscv/durable-in-memory/octez_riscv_durable_storage_in_memory_api.ml
+src/riscv/durable-in-memory/octez_riscv_durable_storage_in_memory_api.mli
+src/riscv/durable-on-disk/octez_riscv_durable_storage_on_disk_api.ml
+src/riscv/durable-on-disk/octez_riscv_durable_storage_on_disk_api.mli
 etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.ml
 etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.mli
 src/rust_deps/rust_igd_next/ocaml-api/igd_next_gen.ml
@@ -56,6 +60,8 @@ src/rust_deps/rust_tezos_context/ocaml-api/rust_tezedge_gen.ml
 src/rust_deps/rust_tezos_context/ocaml-api/rust_tezedge_gen.mli
 etherlink/lwt_domain/lwt_domain.ml
 etherlink/lwt_domain/lwt_domain.mli
+src/rust_libcrux/src/octez_libcrux_ml_dsa.ml
+src/rust_libcrux/src/octez_libcrux_ml_dsa.mli
 EOF
 )
 
@@ -199,7 +205,7 @@ check_redirects() {
 }
 
 check_rust_toolchain_files() {
-  authorized_version=("1.66.0" "1.73.0" "1.76.0" "1.78.0" "1.86.0" "1.88.0")
+  authorized_version=("1.88.0")
 
   declare -a rust_toolchain_files
   mapfile -t rust_toolchain_files <<< "$(find src/ -name rust-toolchain)"

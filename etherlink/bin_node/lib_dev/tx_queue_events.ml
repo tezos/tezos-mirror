@@ -103,6 +103,14 @@ let missing_tx_object =
     ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) -> Format.fprintf fmt "%10s" h)
     ("tx_hash", Ethereum_types.hash_encoding)
 
+let transaction_already_present =
+  declare_1
+    ~section
+    ~name:"transaction_already_present"
+    ~msg:"transaction {tx_hash} is already in the tx_queue"
+    ~level:Debug
+    ("tx_hash", Ethereum_types.hash_encoding)
+
 let is_ready () = emit is_ready ()
 
 let shutdown () = emit shutdown ()
@@ -128,3 +136,5 @@ let callback_error__dont_wait__use_with_care (error : tztrace) =
 let callback_error (error : tztrace) = emit callback_error error
 
 let missing_tx_object tx = emit missing_tx_object tx
+
+let transaction_already_present hash = emit transaction_already_present hash

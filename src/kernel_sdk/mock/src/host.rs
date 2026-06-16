@@ -206,18 +206,15 @@ unsafe impl SmartRollupCore for MockHost {
         // only `Reveal_hash` supported for now.
         let hash = from_raw_parts(hash_addr, hash_len)
             .try_into()
-            .unwrap_or_else(|_| panic!("Hash is not {} bytes", PREIMAGE_HASH_SIZE));
+            .unwrap_or_else(|_| panic!("Hash is not {PREIMAGE_HASH_SIZE} bytes"));
 
-        let bytes = self
-            .state
-            .borrow()
-            .handle_reveal_preimage(&hash, max_bytes)
-            .to_vec();
+        let state = self.state.borrow();
+        let bytes = state.handle_reveal_preimage(&hash, max_bytes);
 
         assert!(bytes.len() <= max_bytes);
 
         let slice = from_raw_parts_mut(destination_addr, bytes.len());
-        slice.copy_from_slice(bytes.as_slice());
+        slice.copy_from_slice(bytes);
 
         bytes.len().try_into().unwrap()
     }
@@ -298,6 +295,21 @@ unsafe impl SmartRollupCore for MockHost {
             ),
         }
     }
+
+    unsafe fn __internal_store_get_hash(
+        &self,
+        path: *const u8,
+        path_len: usize,
+        destination_addr: *mut u8,
+        max_size: usize,
+    ) -> i32 {
+        self.state.borrow().store.__internal_store_get_hash(
+            path,
+            path_len,
+            destination_addr,
+            max_size,
+        )
+    }
 }
 
 #[cfg(test)]
@@ -311,9 +323,8 @@ mod tests {
     use tezos_smart_rollup_core::{MAX_FILE_CHUNK_SIZE, MAX_INPUT_MESSAGE_SIZE};
     use tezos_smart_rollup_host::input::Message;
     use tezos_smart_rollup_host::{
-        metadata::RollupMetadata,
-        path::RefPath,
-        runtime::{Runtime, RuntimeError},
+        metadata::RollupMetadata, path::RefPath, reveal::HostReveal,
+        runtime::RuntimeError, storage::StorageV1, wasm::WasmHost,
     };
 
     #[test]
@@ -428,7 +439,7 @@ mod tests {
 
     #[test]
     fn test_store_write() {
-        let mut state = HostState::default();
+        let state = HostState::default();
         let size = 256_i32;
         let data = vec![b'a'; size as usize];
         let path = b"/a/b";
@@ -448,10 +459,10 @@ mod tests {
             .map(|v| (v % 100).try_into().unwrap())
             .collect();
 
-        Runtime::store_write_all(&mut mock, &PATH, &value)
+        StorageV1::store_write_all(&mut mock, &PATH, &value)
             .expect("Could not write value to store");
 
-        let value_in_durable = Runtime::store_read_all(&mock, &PATH)
+        let value_in_durable = StorageV1::store_read_all(&mock, &PATH)
             .expect("Could not read the value from the store");
 
         let size = mock.store_value_size(&PATH);
@@ -470,10 +481,10 @@ mod tests {
             .map(|v| (v % 100).try_into().unwrap())
             .collect();
 
-        Runtime::store_write_all(&mut mock, &PATH, &initial_value)
+        StorageV1::store_write_all(&mut mock, &PATH, &initial_value)
             .expect("Could not write value to store");
         let initial_size = mock.store_value_size(&PATH).expect("Could not read size");
-        let initial_value_in_store = Runtime::store_read_all(&mock, &PATH)
+        let initial_value_in_store = StorageV1::store_read_all(&mock, &PATH)
             .expect("Could not read the value from the store");
 
         // Then write a new value of size ~2.1 KB
@@ -481,10 +492,10 @@ mod tests {
             .map(|v| (v % 50).try_into().unwrap())
             .collect();
 
-        Runtime::store_write_all(&mut mock, &PATH, &smaller_value)
+        StorageV1::store_write_all(&mut mock, &PATH, &smaller_value)
             .expect("Could not write value to store");
         let new_size = mock.store_value_size(&PATH).expect("Could not read size");
-        let new_value_in_store = Runtime::store_read_all(&mock, &PATH)
+        let new_value_in_store = StorageV1::store_read_all(&mock, &PATH)
             .expect("Could not read the value from the store");
 
         // The size of the value in the storage should have been shrinked, and

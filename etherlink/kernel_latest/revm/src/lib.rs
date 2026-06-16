@@ -1,86 +1,86 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    journal::Journal, precompiles::send_outbox_message::Withdrawal,
+    inspectors::EtherlinkInspector, journal::Journal,
     storage::world_state_handler::StorageAccount,
 };
 use database::EtherlinkVMDB;
+pub use error::{EvmDbError, EvmKernelError, EvmRunError};
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
     call_tracer::{CallTracer, CallTracerInput},
-    noop::NoInspector,
     struct_logger::{StructLogger, StructLoggerInput},
-    EtherlinkInspector, EvmInspection, TracerInput,
+    EtherlinkHandler, EvmInspection, TracerInput,
 };
+pub use michelson_types::Withdrawal;
 use precompiles::provider::EtherlinkPrecompiles;
 use revm::{
     context::{
         result::{EVMError, ExecutionResult},
         transaction::{AccessList, SignedAuthorization},
         tx::TxEnvBuilder,
-        BlockEnv, CfgEnv, ContextTr, DBErrorMarker, Evm, TxEnv,
+        BlockEnv, CfgEnv, ContextSetters, ContextTr, Evm, LocalContext, TxEnv,
     },
-    context_interface::block::BlobExcessGasAndPrice,
-    handler::{instructions::EthInstructions, EthFrame},
+    context_interface::{block::BlobExcessGasAndPrice, journaled_state::JournalTr},
+    handler::{instructions::EthInstructions, EthFrame, Handler},
+    inspector::InspectorHandler,
     interpreter::interpreter::EthInterpreter,
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, B256, U256},
-    Context, ExecuteCommitEvm, InspectCommitEvm, MainBuilder,
+    Context, ExecuteCommitEvm, MainBuilder,
 };
 use tezos_ethereum::{block::BlockConstants, transaction::TRANSACTION_HASH_SIZE};
 use tezos_evm_logging::{
     __trace_kernel, __trace_kernel_add_attrs, tracing::instrument, OTelAttrValue,
 };
-use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup_host::runtime::RuntimeError;
-use thiserror::Error;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
+use tezosx_journal::TezosXJournal;
 
+pub mod database;
+mod error;
 pub mod helpers;
 pub mod inspectors;
 pub mod journal;
-pub mod layered_state;
 pub mod precompiles;
 pub mod storage;
 
-mod database;
-
-type EVMInnerContext<'a, Host> = Context<
+type EVMInnerContext<'a, Host, R> = Context<
     &'a BlockEnv,
     &'a TxEnv,
     CfgEnv,
-    EtherlinkVMDB<'a, Host>,
-    Journal<EtherlinkVMDB<'a, Host>>,
+    EtherlinkVMDB<'a, Host, R>,
+    Journal<'a, Host, R>,
 >;
 
-type EvmContext<'a, Host> = Evm<
-    EVMInnerContext<'a, Host>,
+type EvmContext<'a, Host, R> = Evm<
+    EVMInnerContext<'a, Host, R>,
     (),
-    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host>>,
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, R>>,
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
 
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
-pub enum Error {
-    #[error("Runtime error: {0}")]
-    Runtime(#[from] RuntimeError),
-    #[error("Execution error: {0}")]
-    Custom(String),
-    /// Converting non-execution fees to gas overflowed u64::max
-    #[error("Gas for fees overflowed u64::max in conversion")]
-    FeesToGasOverflow,
-    /// Underflow of gas limit when subtracting gas for fees
-    #[error("Insufficient gas to cover the non-execution fees")]
-    GasToFeesUnderflow,
+/// Controls commit behavior and optional balance injection in `run_transaction`.
+pub enum TransactionOrigin {
+    /// Original caller: commit EVM journal to durable storage, return withdrawals.
+    UserInput { access_list: AccessList },
+    /// Cross-runtime call: do NOT commit the journal.
+    /// If `credit` is `Some`, inject a balance credit into the REVM journal
+    /// before executing the transaction.
+    CrossRuntime { credit: Option<(Address, U256)> },
+    /// Read-only cross-runtime call: no balance credit, no journal
+    /// commit, and the top-level frame runs with `is_static = true`
+    /// (routed through [`EtherlinkHandler::new_static`]). REVM then
+    /// enforces the standard `STATICCALL` contract — any
+    /// state-mutating opcode halts with
+    /// `StateChangeDuringStaticCall`, and only writes made *within*
+    /// this call are unwound (outer-frame state in the same
+    /// enclosing transaction is preserved).
+    CrossRuntimeStatic,
 }
-
-pub(crate) fn custom<E: std::fmt::Display>(e: E) -> Error {
-    Error::Custom(e.to_string())
-}
-
-impl DBErrorMarker for Error {}
 
 #[derive(Debug, PartialEq)]
 pub struct ExecutionOutcome {
@@ -112,18 +112,14 @@ impl GasData {
     }
 }
 
-fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
+fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, EvmKernelError> {
     // TODO: Whenever the switch to REVM is completely made, readapt BlockConstants
     // structure to match alloy's type. The current structure is highly dependant
     // on what is needed for Sputnik.
-    let basefee: u64 = match block_constants.base_fee_per_gas().try_into() {
-        Ok(basefee) => basefee,
-        Err(err) => {
-            return Err(Error::Custom(format!(
-                "Invalid base fee per gas conversion: {err:?}"
-            )))
-        }
-    };
+    let basefee: u64 = block_constants
+        .base_fee_per_gas()
+        .try_into()
+        .map_err(|_| EvmKernelError::BaseFeePerGasOverflow)?;
     Ok(BlockEnv {
         number: U256::from_le_slice(&u256_to_le_bytes(block_constants.number)),
         beneficiary: Address::from(block_constants.coinbase.0),
@@ -138,29 +134,53 @@ fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
                 .unwrap_or_default(),
         ),
         blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
+        // The slot number of the block.
+        // Incorporated as part of the Amsterdam upgrade via [EIP-7843].
+        //
+        // Not used for now, so we default to 0 here.
+        slot_num: 0,
     })
 }
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn tx_env<Host: Runtime>(
-    host: &'_ mut Host,
+fn tx_env(
+    host: &'_ mut impl StorageV1,
+    journal: &mut TezosXJournal,
     caller: Address,
     destination: Option<Address>,
     gas_data: &GasData,
     value: U256,
     data: Bytes,
-    access_list: AccessList,
     authorization_list: Option<Vec<SignedAuthorization>>,
     chain_id: u64,
-) -> Result<TxEnv, Error> {
+    origin: &mut TransactionOrigin,
+) -> Result<TxEnv, EvmRunError> {
     let kind = match destination {
         Some(address) => TxKind::Call(address),
         None => TxKind::Create,
     };
 
-    let storage_account = StorageAccount::from_address(&caller)?;
-    let info = storage_account.info(host)?;
+    // Check journal first for uncommitted nonce changes from earlier
+    // CrossRuntime transactions, then fall back to durable storage.
+    let nonce = if let Some(account) = journal.evm.inner.state.get(&caller) {
+        account.info.nonce
+    } else {
+        let storage_account =
+            StorageAccount::from_address(&caller).map_err(EvmDbError::from)?;
+        storage_account.info(host)?.nonce
+    };
+
+    match origin {
+        TransactionOrigin::UserInput { access_list } => {
+            journal
+                .evm
+                .set_access_list(std::mem::take(access_list))
+                .map_err(|_| EvmKernelError::AccessListAlreadySet)?;
+        }
+        TransactionOrigin::CrossRuntime { .. }
+        | TransactionOrigin::CrossRuntimeStatic => (),
+    };
 
     // Using the transaction environment builder helps to
     // derive the transaction type directly from the different
@@ -172,93 +192,106 @@ fn tx_env<Host: Runtime>(
         .kind(kind)
         .value(value)
         .data(data)
-        .nonce(info.nonce)
+        .nonce(nonce)
         .chain_id(Some(chain_id))
-        .access_list(access_list);
+        .access_list(journal.evm.get_access_list_copy());
 
     let tx_env_builder = match authorization_list {
         Some(authorization_list) => {
             if authorization_list.is_empty() {
-                return Err(Error::Custom(
-                    "Authorization list cannot be empty per EIP-7702.".to_string(),
-                ));
+                return Err(EvmKernelError::EmptyAuthorizationList.into());
             }
             tx_env_builder.authorization_list_signed(authorization_list)
         }
         None => tx_env_builder,
     };
 
-    let tx_env = tx_env_builder.build().map_err(|err| {
-        Error::Custom(format!(
-            "Building the transaction environment failed with: {err:?}"
-        ))
-    })?;
+    let tx_env = tx_env_builder.build().map_err(EvmKernelError::from)?;
 
     Ok(tx_env)
 }
 
 #[instrument(skip_all)]
-fn get_inspector_from(
+fn get_inspector_from<'a, Host, R>(
     tracer_input: TracerInput,
     precompiles: EtherlinkPrecompiles,
     spec_id: SpecId,
-) -> EtherlinkInspector {
+) -> Box<dyn EtherlinkInspector<'a, Host, R>>
+where
+    Host: StorageV1 + 'a,
+    R: Registry + 'a,
+{
     match tracer_input {
         TracerInput::CallTracer(CallTracerInput {
             config,
             transaction_hash,
-        }) => EtherlinkInspector::CallTracer(Box::new(CallTracer::new(
+        }) => Box::new(CallTracer::new(
             config,
             precompiles,
             spec_id,
             transaction_hash,
-        ))),
+        )) as Box<dyn EtherlinkInspector<'a, Host, R>>,
         TracerInput::StructLogger(StructLoggerInput {
             config,
             transaction_hash,
-        }) => EtherlinkInspector::StructLogger(Box::new(StructLogger::new(
-            config,
-            transaction_hash,
-        ))),
-        TracerInput::NoOp => EtherlinkInspector::NoOp(NoInspector),
+        }) => Box::new(StructLogger::new(config, transaction_hash))
+            as Box<dyn EtherlinkInspector<'a, Host, R>>,
     }
 }
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn evm_inspect<'a, Host: Runtime>(
-    db: EtherlinkVMDB<'a, Host>,
+fn build_evm_inspector_context<
+    'a,
+    Host,
+    R: Registry,
+    INSP: EtherlinkInspector<'a, Host, R>,
+>(
+    db: EtherlinkVMDB<'a, Host, R>,
+    journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
     maximum_gas_per_transaction: u64,
     precompiles: EtherlinkPrecompiles,
     chain_id: u64,
     spec_id: SpecId,
-    inspector: EtherlinkInspector,
+    inspector: INSP,
     is_simulation: bool,
-) -> EvmInspection<'a, Host> {
-    let mut cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
+) -> EvmInspection<'a, Host, INSP, R>
+where
+    Host: StorageV1,
+{
+    let mut cfg = CfgEnv::new()
+        .with_chain_id(chain_id)
+        .with_spec_and_mainnet_gas_params(spec_id);
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
 
-    Context::<
-        BlockEnv,
-        TxEnv,
-        CfgEnv,
-        EtherlinkVMDB<'a, Host>,
-        Journal<EtherlinkVMDB<'a, Host>>,
-    >::new(db, spec_id)
-    .with_block(block)
-    .with_tx(tx)
-    .with_cfg(cfg)
-    .build_mainnet_with_inspector(inspector)
-    .with_precompiles(precompiles)
+    // IMPORTANT
+    // `Journal::new_with_inner` is the only working constructor of our `Journal` implementation.
+    // `Journal` holds a mutable reference to its inner data that exists before it creation and must outlive it.
+    // `Journal::new` exists only as a requirement for the `revm::context_interface::JournalTr` trait impl.
+    // `Journal::new` is `unimplemented!()` and will panic.
+    let mut journal = Journal::new_with_inner(db, journal);
+    journal.set_spec_id(spec_id);
+    let ctx = Context {
+        tx,
+        block,
+        cfg,
+        journaled_state: journal,
+        chain: (),
+        local: LocalContext::default(),
+        error: Ok(()),
+    };
+    ctx.build_mainnet_with_inspector(inspector)
+        .with_precompiles(precompiles)
 }
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn evm<'a, Host: Runtime>(
-    db: EtherlinkVMDB<'a, Host>,
+fn build_evm_context<'a, Host, R: Registry>(
+    db: EtherlinkVMDB<'a, Host, R>,
+    journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
     maximum_gas_per_transaction: u64,
@@ -266,30 +299,47 @@ fn evm<'a, Host: Runtime>(
     chain_id: u64,
     spec_id: SpecId,
     is_simulation: bool,
-) -> EvmContext<'a, Host> {
-    let mut cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
+) -> EvmContext<'a, Host, R>
+where
+    Host: StorageV1,
+{
+    let mut cfg = CfgEnv::new()
+        .with_chain_id(chain_id)
+        .with_spec_and_mainnet_gas_params(spec_id);
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
 
-    Context::<
-        BlockEnv,
-        TxEnv,
-        CfgEnv,
-        EtherlinkVMDB<'a, Host>,
-        Journal<EtherlinkVMDB<'a, Host>>,
-    >::new(db, spec_id)
-    .with_block(block)
-    .with_tx(tx)
-    .with_cfg(cfg)
-    .build_mainnet()
-    .with_precompiles(precompiles)
+    // IMPORTANT
+    // `Journal::new_with_inner` is the only working constructor of our `Journal` implementation.
+    // `Journal` holds a mutable reference to its inner data that exists before it creation and must outlive it.
+    // `Journal::new` exists only as a requirement for the `revm::context_interface::JournalTr` trait impl.
+    // `Journal::new` is `unimplemented!()` and will panic.
+    let mut journal = Journal::new_with_inner(db, journal);
+    journal.set_spec_id(spec_id);
+    let ctx = Context {
+        tx,
+        block,
+        cfg,
+        journaled_state: journal,
+        chain: (),
+        local: LocalContext::default(),
+        error: Ok(()),
+    };
+    ctx.build_mainnet().with_precompiles(precompiles)
 }
 
-fn execute_transaction<'a, Host: Runtime>(
-    evm: &mut EvmContext<'a, Host>,
+/// Run the EVM transaction. Routes through [`EtherlinkHandler`]
+/// (not REVM's stock `transact_one`) so the `first_frame_input`
+/// override actually fires when `is_static_top_frame` is set.
+fn execute_transaction<'a, Host, R: Registry>(
+    evm_context: &mut EvmContext<'a, Host, R>,
     tx: &'a TxEnv,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
-) -> Result<ExecutionResult, EVMError<Error>> {
+    is_static_top_frame: bool,
+) -> Result<ExecutionResult, EVMError<EvmDbError>>
+where
+    Host: StorageV1,
+{
     let opt_attrs_fun: Box<dyn FnOnce(&mut Host)> =
         if transaction_hash.is_some() && cfg!(feature = "tracing") {
             // The following unwrap is safe, see condition above.
@@ -300,21 +350,31 @@ fn execute_transaction<'a, Host: Runtime>(
                 OTelAttrValue::String(pretty_hash),
             )];
             Box::new(move |__host| {
-                __trace_kernel_add_attrs!(__host, __attrs);
+                let _ = __host;
+                __trace_kernel_add_attrs!(__attrs);
             })
         } else {
             Box::new(|__host| ())
         };
-    __trace_kernel!(evm.db_mut().host, "evm.transact_commit", {
-        opt_attrs_fun(evm.db_mut().host);
-        evm.transact_commit(tx)
+    __trace_kernel!("evm_context.transact_commit", {
+        opt_attrs_fun(evm_context.db_mut().host);
+        evm_context.set_tx(tx);
+        let mut handler: EtherlinkHandler<_, EVMError<EvmDbError>, _> =
+            if is_static_top_frame {
+                EtherlinkHandler::new_static()
+            } else {
+                EtherlinkHandler::default()
+            };
+        handler.run(evm_context)
     })
 }
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn run_transaction<'a, Host: Runtime>(
+pub fn run_transaction<'a, Host, R: Registry>(
     host: &'a mut Host,
+    registry: &'a R,
+    journal: &'a mut TezosXJournal,
     spec_id: SpecId,
     block_constants: &'a BlockConstants,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
@@ -323,63 +383,112 @@ pub fn run_transaction<'a, Host: Runtime>(
     call_data: Bytes,
     gas_data: GasData,
     value: U256,
-    access_list: AccessList,
     authorization_list: Option<Vec<SignedAuthorization>>,
     tracer_input: Option<TracerInput>,
     is_simulation: bool,
-) -> Result<ExecutionOutcome, EVMError<Error>> {
+    mut origin: TransactionOrigin,
+) -> Result<ExecutionOutcome, EvmRunError>
+where
+    Host: StorageV1,
+{
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
         host,
+        journal,
         caller,
         destination,
         &gas_data,
         value,
         call_data,
-        access_list,
         authorization_list,
         block_constants.chain_id.as_u64(),
+        &mut origin,
     )?;
 
-    let db = EtherlinkVMDB::new(host, block_constants)?;
+    let db = EtherlinkVMDB::new(host, registry, block_constants)?;
 
     if let Some(tracer_input) = tracer_input {
-        let inspector =
-            get_inspector_from(tracer_input, EtherlinkPrecompiles::new(), spec_id);
-
-        let mut evm = evm_inspect(
+        let mut evm_context = build_evm_inspector_context(
             db,
+            journal,
             &block_env,
             &tx,
             gas_data.maximum_gas_per_transaction,
             EtherlinkPrecompiles::new(),
             block_constants.chain_id.as_u64(),
             spec_id,
-            inspector,
+            get_inspector_from::<Host, R>(
+                tracer_input,
+                EtherlinkPrecompiles::new(),
+                spec_id,
+            ),
             is_simulation,
         );
 
-        let result = evm.inspect_tx_commit(&tx)?;
+        let credit_checkpoint = match origin {
+            TransactionOrigin::CrossRuntime {
+                credit: Some((addr, amount)),
+            } if amount > U256::ZERO => {
+                let cp = evm_context.ctx.journaled_state.checkpoint();
+                evm_context
+                    .ctx
+                    .journaled_state
+                    .balance_incr(addr, amount)
+                    .map_err(EVMError::Database)?;
+                Some(cp)
+            }
+            _ => None,
+        };
 
-        if evm.inspector.is_struct_logger() {
+        // Use `EtherlinkHandler` so our `first_frame_input` override
+        // fires; stock `inspect_one_tx` would bypass it.
+        let is_static_top_frame = matches!(origin, TransactionOrigin::CrossRuntimeStatic);
+        evm_context.set_tx(&tx);
+        let mut handler: EtherlinkHandler<_, EVMError<EvmDbError>, _> =
+            if is_static_top_frame {
+                EtherlinkHandler::new_static()
+            } else {
+                EtherlinkHandler::default()
+            };
+        let result = handler.inspect_run(&mut evm_context)?;
+
+        if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
+            return Err(EvmKernelError::Runtime(err).into());
+        }
+
+        if let Some(cp) = credit_checkpoint {
+            if result.is_success() {
+                evm_context.ctx.journaled_state.checkpoint_commit();
+            } else {
+                evm_context.ctx.journaled_state.checkpoint_revert(cp);
+            }
+        }
+
+        if evm_context.inspector.is_struct_logger() {
             StructLogger::store_outcome(
-                evm.ctx.db_mut().host,
+                evm_context.ctx.db_mut().host,
                 result.is_success(),
                 result.output(),
                 result.gas_used(),
-                evm.inspector.get_transaction_hash(),
+                evm_context.inspector.get_transaction_hash(),
             )?
         }
 
-        let withdrawals = evm.db_mut().take_withdrawals();
+        let withdrawals = if matches!(origin, TransactionOrigin::UserInput { .. }) {
+            evm_context.commit_inner();
+            evm_context.db_mut().take_withdrawals()
+        } else {
+            Vec::new()
+        };
 
         Ok(ExecutionOutcome {
             result,
             withdrawals,
         })
     } else {
-        let mut evm = evm(
+        let mut evm_context = build_evm_context(
             db,
+            journal,
             &block_env,
             &tx,
             gas_data.maximum_gas_per_transaction,
@@ -389,17 +498,54 @@ pub fn run_transaction<'a, Host: Runtime>(
             is_simulation,
         );
 
-        let result = execute_transaction(&mut evm, &tx, transaction_hash)?;
+        let credit_checkpoint = match origin {
+            TransactionOrigin::CrossRuntime {
+                credit: Some((addr, amount)),
+            } if amount > U256::ZERO => {
+                let cp = evm_context.ctx.journaled_state.checkpoint();
+                evm_context
+                    .ctx
+                    .journaled_state
+                    .balance_incr(addr, amount)
+                    .map_err(EVMError::Database)?;
+                Some(cp)
+            }
+            _ => None,
+        };
 
-        let withdrawals = evm.db_mut().take_withdrawals();
+        let is_static_top_frame = matches!(origin, TransactionOrigin::CrossRuntimeStatic);
+        let result = execute_transaction(
+            &mut evm_context,
+            &tx,
+            transaction_hash,
+            is_static_top_frame,
+        )?;
 
-        if !evm.db_mut().commit_status() {
-            // No need to revert the possible database changes because
-            // we are in a safe storage.
-            return Err(EVMError::Custom(
-                "Comitting ended up in an incorrect state change: reverting.".to_owned(),
-            ));
+        if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
+            return Err(EvmKernelError::Runtime(err).into());
         }
+
+        if let Some(cp) = credit_checkpoint {
+            if result.is_success() {
+                evm_context.ctx.journaled_state.checkpoint_commit();
+            } else {
+                evm_context.ctx.journaled_state.checkpoint_revert(cp);
+            }
+        }
+
+        let withdrawals = if matches!(origin, TransactionOrigin::UserInput { .. }) {
+            evm_context.commit_inner();
+
+            if !evm_context.db_mut().commit_status() {
+                // No need to revert the possible database changes because
+                // we are in a safe storage.
+                return Err(EvmDbError::CommitMismatch.into());
+            }
+
+            evm_context.db_mut().take_withdrawals()
+        } else {
+            Vec::new()
+        };
 
         Ok(ExecutionOutcome {
             result,
@@ -410,13 +556,13 @@ pub fn run_transaction<'a, Host: Runtime>(
 
 #[cfg(test)]
 mod test {
+    use crate::EvmRunError;
     use alloy_sol_types::{
         sol, ContractError, Revert, RevertReason, SolEvent, SolInterface,
     };
     use alloy_sol_types::{SolCall, SolError};
     use nom::AsBytes;
     use primitive_types::H256;
-    use revm::context::result::EVMError;
     use revm::{
         context::{
             result::{ExecutionResult, Output},
@@ -432,14 +578,22 @@ mod test {
     };
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup_host::runtime::Runtime;
-    use utilities::{
-        block_constants_with_fees, block_constants_with_no_fees, DEFAULT_SPEC_ID,
-    };
+    use tezos_smart_rollup_host::storage::StorageV1;
+    use tezosx_interfaces::{AliasInfo, Registry as RegistryTrait};
+    use tezosx_journal::TezosXJournal;
+    use utilities::MOCK_TEZOS_GAS_CONSUMED;
 
-    use super::Error;
+    use tezos_ethereum::block::BlockConstants;
+    use utilities::{test_alias_creation_context, Registry, DEFAULT_SPEC_ID};
+
+    use super::{EvmKernelError, TransactionOrigin};
     use crate::helpers::storage::bytes_hash;
-    use crate::precompiles::constants::FEED_DEPOSIT_ADDR;
+    use crate::precompiles::constants::{
+        FEED_DEPOSIT_ADDR, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+    };
+    use crate::precompiles::runtime_gateway::RuntimeGateway::{
+        transferCall, RuntimeGatewayCalls,
+    };
     use crate::storage::code::CodeStorage;
     use crate::test::utilities::CreateAndRevert::{
         createAndRevertCall, CreateAndRevertCalls,
@@ -455,15 +609,15 @@ mod test {
             },
             constants::{
                 CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, FA_BRIDGE_SOL_ADDR,
-                PRECOMPILE_BURN_ADDRESS, WITHDRAWAL_SOL_ADDR,
+                PRECOMPILE_BURN_ADDRESS, XTZ_BRIDGE_SOL_ADDR,
             },
             initializer::init_precompile_bytecodes,
         },
         storage::{
             sequencer_key_change::SequencerKeyChange,
             world_state_handler::{
-                StorageAccount, SEQUENCER_KEY_CHANGE_PATH, SEQUENCER_KEY_PATH,
-                WITHDRAWALS_TICKETER_PATH,
+                StorageAccount, NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_CHANGE_PATH,
+                SEQUENCER_KEY_PATH,
             },
         },
         test::utilities::CallAndRevert::{self, callAndRevertCall},
@@ -472,46 +626,286 @@ mod test {
 
     mod utilities {
         use alloy_sol_types::sol;
-        use primitive_types::{H160 as PH160, U256 as PU256};
+        use primitive_types::U256 as PU256;
         use revm::primitives::hardfork::SpecId;
-        use tezos_ethereum::block::{BlockConstants, BlockFees};
+        use tezos_smart_rollup_host::{
+            path::{concat, OwnedPath, RefPath},
+            storage::StorageV1,
+        };
+        use tezosx_ethereum_runtime::EthereumRuntime;
+        use tezosx_interfaces::{
+            AliasInfo, CrossRuntimeContext, Registry as RegistryTrait, RuntimeId,
+            RuntimeInterface, TezosXRuntimeError,
+        };
+        use tezosx_journal::TezosXJournal;
 
         use crate::test::GAS_LIMIT;
 
-        pub(crate) const DEFAULT_SPEC_ID: SpecId = SpecId::OSAKA;
-        const ETHERLINK_CHAIN_ID: u64 = 42793;
+        /// Milligas consumed by the mock Tezos runtime for every CRAC call.
+        /// 10_000 milligas = 1_000 EVM gas (Tezos milligas / 10).
+        pub(crate) const MOCK_TEZOS_GAS_CONSUMED: u64 = 10_000;
 
-        pub(crate) fn block_constants_with_fees() -> BlockConstants {
-            BlockConstants::first_block(
-                PU256::from(1),
-                PU256::from(ETHERLINK_CHAIN_ID),
-                BlockFees::new(PU256::from(1), PU256::from(1), PU256::from(1)),
-                GAS_LIMIT,
-                PH160::zero(),
-            )
+        // Test-only Registry struct that implements the Registry trait from tezosx-interfaces.
+        // It contains a MockTezosRuntime for testing cross-runtime functionality,
+        // and an EthereumRuntime for Ethereum alias creation.
+        pub(crate) struct Registry {
+            mock_tezos: MockTezosRuntime,
+            ethereum: EthereumRuntime,
         }
 
-        pub(crate) fn block_constants_with_no_fees() -> BlockConstants {
-            BlockConstants::first_block(
-                PU256::from(1),
-                PU256::from(ETHERLINK_CHAIN_ID),
-                BlockFees::new(PU256::zero(), PU256::zero(), PU256::zero()),
-                GAS_LIMIT,
-                PH160::zero(),
-            )
+        impl Registry {
+            pub(crate) fn new() -> Self {
+                Self {
+                    mock_tezos: MockTezosRuntime,
+                    ethereum: EthereumRuntime::default(),
+                }
+            }
+
+            pub(crate) fn get_balance(
+                &self,
+                host: &mut impl StorageV1,
+                address: &[u8],
+                runtime_id: RuntimeId,
+            ) -> Result<primitive_types::U256, TezosXRuntimeError> {
+                match runtime_id {
+                    RuntimeId::Tezos => self.mock_tezos.get_balance(host, address),
+                    RuntimeId::Ethereum => {
+                        Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+                    }
+                }
+            }
+        }
+
+        impl RegistryTrait for Registry {
+            fn ensure_alias<Host>(
+                &self,
+                host: &mut Host,
+                journal: &mut TezosXJournal,
+                alias_info: AliasInfo,
+                native_public_key: Option<&[u8]>,
+                target_runtime: RuntimeId,
+                context: CrossRuntimeContext,
+                gas_remaining: u64,
+            ) -> Result<(String, u64), TezosXRuntimeError>
+            where
+                Host: StorageV1,
+            {
+                match target_runtime {
+                    RuntimeId::Tezos => self.mock_tezos.ensure_alias(
+                        self,
+                        host,
+                        journal,
+                        alias_info,
+                        native_public_key,
+                        context,
+                        gas_remaining,
+                    ),
+                    RuntimeId::Ethereum => self.ethereum.ensure_alias(
+                        self,
+                        host,
+                        journal,
+                        alias_info,
+                        native_public_key,
+                        context,
+                        gas_remaining,
+                    ),
+                }
+            }
+
+            fn address_from_string(
+                &self,
+                address_str: &str,
+                runtime_id: RuntimeId,
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                match runtime_id {
+                    RuntimeId::Tezos => self.mock_tezos.address_from_string(address_str),
+                    RuntimeId::Ethereum => {
+                        Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+                    }
+                }
+            }
+
+            fn serve<Host>(
+                &self,
+                host: &mut Host,
+                journal: &mut TezosXJournal,
+                request: http::Request<Vec<u8>>,
+            ) -> http::Response<Vec<u8>>
+            where
+                Host: StorageV1,
+            {
+                match request.uri().host() {
+                    Some("tezos") | Some("stub") => {
+                        self.mock_tezos.serve(self, host, journal, request)
+                    }
+                    unknown => http::Response::builder()
+                        .status(http::StatusCode::NOT_FOUND)
+                        .body(
+                            format!(
+                                "No runtime handles host: {}",
+                                unknown.unwrap_or("(none)")
+                            )
+                            .into_bytes(),
+                        )
+                        .unwrap(),
+                }
+            }
+        }
+
+        pub(crate) const DEFAULT_SPEC_ID: SpecId = SpecId::OSAKA;
+
+        // Path where mock Tezos balances are stored for testing
+        const MOCK_TEZOS_BALANCES_PATH: RefPath =
+            RefPath::assert_from(b"/mock_tezos/balances");
+
+        pub(crate) fn test_alias_creation_context() -> CrossRuntimeContext {
+            CrossRuntimeContext {
+                gas_limit: GAS_LIMIT,
+                timestamp: PU256::from(1),
+                block_number: PU256::from(1),
+            }
+        }
+
+        pub(crate) struct MockTezosRuntime;
+
+        impl RuntimeInterface for MockTezosRuntime {
+            fn ensure_alias<Host>(
+                &self,
+                _registry: &impl RegistryTrait,
+                _host: &mut Host,
+                _journal: &mut TezosXJournal,
+                alias_info: AliasInfo,
+                _native_public_key: Option<&[u8]>,
+                _context: CrossRuntimeContext,
+                gas_remaining: u64,
+            ) -> Result<(String, u64), TezosXRuntimeError>
+            where
+                Host: StorageV1,
+            {
+                // Deterministic mock: compute a KT1 from native_address bytes
+                use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
+                let kt1 = ContractKt1Hash::from(blake2b::digest_160(
+                    &alias_info.native_address,
+                ));
+                Ok((kt1.to_base58_check(), gas_remaining))
+            }
+
+            fn serve<Host>(
+                &self,
+                _registry: &impl RegistryTrait,
+                host: &mut Host,
+                _journal: &mut TezosXJournal,
+                request: http::Request<Vec<u8>>,
+            ) -> http::Response<Vec<u8>>
+            where
+                Host: StorageV1,
+            {
+                // Parse the destination address from the URL path
+                let path = request.uri().path();
+                let address_str = path
+                    .strip_prefix('/')
+                    .and_then(|rest| rest.split('/').next())
+                    .expect("Missing address in URL");
+                // Parse the amount from the X-Tezos-Amount header (TEZ decimal → mutez)
+                let amount = request
+                    .headers()
+                    .get(tezosx_interfaces::X_TEZOS_AMOUNT)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| tezosx_interfaces::headers::parse_tez_to_mutez(s).ok())
+                    .unwrap_or(0);
+
+                // Store the balance keyed by the address string from the URL
+                let address_hex = hex::encode(address_str.as_bytes());
+                let path = OwnedPath::try_from(format!("/{address_hex}")).unwrap();
+                let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path).unwrap();
+
+                let current_balance = match host.store_read_all(&full_path) {
+                    Ok(bytes) if bytes.len() == 32 => {
+                        primitive_types::U256::from_little_endian(&bytes)
+                    }
+                    _ => primitive_types::U256::zero(),
+                };
+
+                let new_balance = current_balance
+                    .checked_add(primitive_types::U256::from(amount))
+                    .expect("Balance overflow");
+                let mut balance_bytes = [0u8; 32];
+                new_balance.to_little_endian(&mut balance_bytes);
+                host.store_write_all(&full_path, &balance_bytes).unwrap();
+
+                http::Response::builder()
+                    .status(http::StatusCode::OK)
+                    .header(
+                        tezosx_interfaces::X_TEZOS_GAS_CONSUMED,
+                        MOCK_TEZOS_GAS_CONSUMED.to_string(),
+                    )
+                    .body(Vec::new())
+                    .unwrap()
+            }
+
+            fn host(&self) -> &'static str {
+                "stub"
+            }
+
+            fn address_from_string(
+                &self,
+                address_str: &str,
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                // Parse a b58check Tezos address (KT1/tz1) to binary Contract bytes
+                use tezos_data_encoding::enc::BinWriter;
+                let contract =
+                    tezos_protocol::contract::Contract::from_b58check(address_str)
+                        .map_err(|e| {
+                            TezosXRuntimeError::ConversionError(format!("{e}"))
+                        })?;
+                contract
+                    .to_bytes()
+                    .map_err(|e| TezosXRuntimeError::ConversionError(format!("{e}")))
+            }
+
+            fn string_from_address(
+                &self,
+                address: &[u8],
+            ) -> Result<String, TezosXRuntimeError> {
+                // Simple mock: convert bytes to string
+                String::from_utf8(address.to_vec())
+                    .map_err(|e| TezosXRuntimeError::ConversionError(e.to_string()))
+            }
+
+            fn get_balance(
+                &self,
+                host: &mut impl StorageV1,
+                address: &[u8],
+            ) -> Result<primitive_types::U256, TezosXRuntimeError> {
+                let address_hex = hex::encode(address);
+                let path = OwnedPath::try_from(format!("/{address_hex}"))
+                    .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
+                let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path)?;
+
+                match host.store_read_all(&full_path) {
+                    Ok(bytes) if bytes.len() == 32 => {
+                        Ok(primitive_types::U256::from_little_endian(&bytes))
+                    }
+                    Ok(_) => Ok(primitive_types::U256::zero()),
+                    Err(tezos_smart_rollup_host::runtime::RuntimeError::PathNotFound) => {
+                        Ok(primitive_types::U256::zero())
+                    }
+                    Err(e) => Err(TezosXRuntimeError::Runtime(e)),
+                }
+            }
         }
 
         sol!("contracts/tests/create_and_revert.sol");
         sol!("contracts/tests/call_and_revert.sol");
-        sol!(FABridge, "contracts/abi/fa_bridge.abi");
+        sol!(FABridge, "contracts/predeployed/abi/fa_bridge.abi");
     }
 
-    const GAS_LIMIT: u64 = 30_000_000;
+    const GAS_LIMIT: u64 = tezosx_constants::EVM_MAX_GAS_PER_TRANSACTION;
 
     #[test]
     fn test_simple_transfer() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -524,6 +918,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -541,8 +936,12 @@ mod test {
         assert_eq!(caller_info.balance, U256::MAX);
         assert_eq!(destination_info.balance, U256::ZERO);
 
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let execution_result = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -551,10 +950,12 @@ mod test {
             Bytes::new(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_sent,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         )
         .unwrap();
 
@@ -573,12 +974,194 @@ mod test {
         );
         let destination_info = destination_account.info(&mut host).unwrap();
         assert_eq!(destination_info.balance, value_sent);
+
+        // Caller is marked Native via the nonce bump. The destination
+        // only received funds, so it stays unrecorded.
+        assert_eq!(
+            caller_account.get_origin(&host).unwrap(),
+            Some(tezosx_interfaces::Origin::Native)
+        );
+        assert!(destination_account.get_origin(&host).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_tezosx_simple_transfer_to_mapped_address() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let destination =
+            Address::from_hex("2222222222222222222222222222222222222222").unwrap();
+
+        let value_sent = U256::from(5);
+
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            account_id: None,
+            code: None,
+        };
+
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
+
+        let destination_account = StorageAccount::from_address(&destination).unwrap();
+
+        caller_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
+
+        let caller_info = caller_account.info(&mut host).unwrap();
+        let destination_info = destination_account.info(&mut host).unwrap();
+        // Check balances before executing the transfer
+        assert_eq!(caller_info.balance, U256::MAX);
+        assert_eq!(destination_info.balance, U256::ZERO);
+
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
+        let execution_result = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            caller,
+            Some(destination),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            value_sent,
+            None,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .unwrap();
+
+        // Check the outcome of the transaction
+        match execution_result.result {
+            ExecutionResult::Success { .. } => (),
+            ExecutionResult::Halt { .. } | ExecutionResult::Revert { .. } => {
+                panic!("Simple transfer should have succeeded")
+            }
+        }
+    }
+
+    #[test]
+    fn test_tezosx_transfer_gateway_to_implicit_address() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+
+        let caller = Address::from(&[1; 20]);
+        let destination = Address::from(&[2; 20]);
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
+        let alias = registry
+            .ensure_alias(
+                &mut host,
+                &mut journal,
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Ethereum,
+                    native_address: destination.to_string().into_bytes(),
+                },
+                None,
+                tezosx_interfaces::RuntimeId::Tezos,
+                test_alias_creation_context(),
+                1_000_000,
+            )
+            .unwrap();
+        let value_sent = U256::from(5000000000000u64);
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            account_id: None,
+            code: None,
+        };
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
+        caller_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
+
+        // Create a mock implicit address string for the test (hex-encoded for URL safety)
+        let implicit_address = alias.0.strip_prefix("0x").unwrap_or(&alias.0).to_string();
+
+        let calldata = RuntimeGatewayCalls::transfer(transferCall {
+            implicitAddress: implicit_address.clone(),
+        })
+        .abi_encode();
+
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
+        let execution_result = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            caller,
+            Some(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS),
+            calldata.into(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            value_sent,
+            None,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .unwrap();
+
+        // Check the outcome of the transaction
+        assert!(
+            execution_result.result.is_success(),
+            "Transfer to implicit address should have succeeded"
+        );
+
+        // Verify the CRAC gas was actually charged (mock returns 10_000
+        // milligas = 1_000 EVM gas, plus the precompile base cost).
+        let gas_used = execution_result.result.gas_used();
+        let mock_evm_gas = tezosx_interfaces::gas::convert(
+            tezosx_interfaces::RuntimeId::Tezos,
+            tezosx_interfaces::RuntimeId::Ethereum,
+            MOCK_TEZOS_GAS_CONSUMED,
+        )
+        .unwrap();
+        assert!(
+            gas_used >= mock_evm_gas,
+            "Transaction should have consumed at least {mock_evm_gas} EVM gas \
+             from the CRAC call, but only used {gas_used}"
+        );
+        let balance = registry
+            .get_balance(
+                &mut host,
+                implicit_address.as_bytes(),
+                tezosx_interfaces::RuntimeId::Tezos,
+            )
+            .unwrap();
+        assert_eq!(balance, primitive_types::U256::from(5));
+
+        let precompile_account =
+            StorageAccount::from_address(&RUNTIME_GATEWAY_PRECOMPILE_ADDRESS).unwrap();
+        let precompile_info = precompile_account.info(&mut host).unwrap();
+        assert_eq!(
+            precompile_info.balance,
+            U256::ZERO,
+            "Gateway precompile should have zero balance after bridge"
+        );
     }
 
     #[test]
     fn test_contract_call_sload_sstore() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_fees();
+        let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -591,6 +1174,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -609,6 +1193,7 @@ mod test {
             // Code hash will be automatically computed and inserted when
             // inserting the account info into the db.
             code_hash: bytes_hash(bytecode.original_byte_slice()),
+            account_id: None,
             // PUSH1 0x42      # Value to store
             // PUSH1 0x01      # Storage slot index
             // SSTORE          # Store the value in storage
@@ -621,8 +1206,12 @@ mod test {
 
         contract_account.set_info(&mut host, contract_info).unwrap();
 
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let execution_result = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -631,17 +1220,19 @@ mod test {
             Bytes::new(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             value_sent,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         )
         .unwrap();
 
         // Check the outcome of the transaction
         match execution_result.result {
-            ExecutionResult::Success { gas_used, .. } => {
-                assert!(gas_used > 0);
+            ExecutionResult::Success { gas, .. } => {
+                assert!(gas.spent() > 0);
             }
             ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                 panic!("Simple transfer should have succeeded")
@@ -658,7 +1249,7 @@ mod test {
     #[test]
     fn test_contract_deployment() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_fees();
+        let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -666,6 +1257,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -675,8 +1267,12 @@ mod test {
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
 
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let result = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -696,10 +1292,10 @@ mod test {
             Bytes::from_hex("6080604052600160005534801561001557600080fd5b50610133806100256000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c80633fa4f24514603757806355241077146051575b600080fd5b603d6069565b604051604891906090565b60405180910390f35b606760048036038101906063919060d5565b606f565b005b60005481565b8060008190555050565b6000819050919050565b608a816079565b82525050565b600060208201905060a360008301846083565b92915050565b600080fd5b60b5816079565b811460bf57600080fd5b50565b60008135905060cf8160ae565b92915050565b60006020828403121560e85760e760a9565b5b600060f48482850160c2565b9150509291505056fea26469706673582212202dba9d4631e2c42eb5a90449e79df9c7031f4e73f695987b580809d987c057c864736f6c63430008120033").unwrap(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             U256::ZERO,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput { access_list: AccessList::default() },
         );
 
         match result {
@@ -722,7 +1318,20 @@ mod test {
                         .unwrap()
                         .unwrap()
                         .original_bytes()
-                )
+                );
+
+                // Deployed contract is marked Native via the code
+                // transition; caller is marked Native via the nonce
+                // bump.
+                assert_eq!(
+                    contract_account.get_origin(&host).unwrap(),
+                    Some(tezosx_interfaces::Origin::Native)
+                );
+                let caller_account = StorageAccount::from_address(&caller).unwrap();
+                assert_eq!(
+                    caller_account.get_origin(&host).unwrap(),
+                    Some(tezosx_interfaces::Origin::Native)
+                );
             }
             other => panic!("ERROR: ended up in {other:?}"),
         }
@@ -731,9 +1340,9 @@ mod test {
     #[test]
     fn test_withdrawal_contract() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
-        init_precompile_bytecodes(&mut host).unwrap();
+        init_precompile_bytecodes(&mut host, true).unwrap();
 
         // Insert account information
         let caller =
@@ -742,6 +1351,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -751,7 +1361,7 @@ mod test {
 
         // Store the ticketer address required to build the outbox message
         host.store_write(
-            &WITHDRAWALS_TICKETER_PATH,
+            &NATIVE_TOKEN_TICKETER_PATH,
             "KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4".as_bytes(),
             0,
         )
@@ -763,23 +1373,29 @@ mod test {
         let calldata = "0xcda4fee200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024747a316670356e63446d7159775943353638665245597a3969775154674751754b5a715800000000000000000000000000000000000000000000000000000000";
         let withdrawn_amount = U256::from(1_000_000_000_000u64);
 
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let ExecutionOutcome {
             result,
             withdrawals,
         } = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
-            Some(WITHDRAWAL_SOL_ADDR),
+            Some(XTZ_BRIDGE_SOL_ADDR),
             Bytes::from_hex(calldata).unwrap(),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             withdrawn_amount,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         )
         .unwrap();
 
@@ -791,7 +1407,7 @@ mod test {
         assert!(result.is_success());
         let info = storage_account.info(&mut host).unwrap();
         assert_eq!(info.balance, U256::MAX.saturating_sub(withdrawn_amount));
-        let created_account = StorageAccount::from_address(&WITHDRAWAL_SOL_ADDR).unwrap();
+        let created_account = StorageAccount::from_address(&XTZ_BRIDGE_SOL_ADDR).unwrap();
         let created_account_info = created_account.info(&mut host).unwrap();
         assert_eq!(created_account_info.balance, U256::ZERO);
         let zero_account =
@@ -805,9 +1421,9 @@ mod test {
     #[test]
     fn test_call_update_sequencer_key() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
-        init_precompile_bytecodes(&mut host).unwrap();
+        init_precompile_bytecodes(&mut host, true).unwrap();
         // Insert account information
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -815,6 +1431,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -844,8 +1461,12 @@ mod test {
             })
             .abi_encode();
 
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let ExecutionOutcome { result, .. } = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -854,10 +1475,12 @@ mod test {
             Bytes::copy_from_slice(&calldata),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::MAX,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         )
         .unwrap();
 
@@ -887,7 +1510,7 @@ mod test {
     #[test]
     fn test_call_mint_erc20() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_fees();
+        let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -895,6 +1518,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -904,8 +1528,12 @@ mod test {
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
 
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let result_create = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -915,10 +1543,10 @@ mod test {
             Bytes::from_hex("60806040526040518060400160405280601381526020017f536f6c6964697479206279204578616d706c6500000000000000000000000000815250600390816200004a91906200033c565b506040518060400160405280600781526020017f534f4c4259455800000000000000000000000000000000000000000000000000815250600490816200009191906200033c565b506012600560006101000a81548160ff021916908360ff160217905550348015620000bb57600080fd5b5062000423565b600081519050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b600060028204905060018216806200014457607f821691505b6020821081036200015a5762000159620000fc565b5b50919050565b60008190508160005260206000209050919050565b60006020601f8301049050919050565b600082821b905092915050565b600060088302620001c47fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8262000185565b620001d0868362000185565b95508019841693508086168417925050509392505050565b6000819050919050565b6000819050919050565b60006200021d620002176200021184620001e8565b620001f2565b620001e8565b9050919050565b6000819050919050565b6200023983620001fc565b62000251620002488262000224565b84845462000192565b825550505050565b600090565b6200026862000259565b620002758184846200022e565b505050565b5b818110156200029d57620002916000826200025e565b6001810190506200027b565b5050565b601f821115620002ec57620002b68162000160565b620002c18462000175565b81016020851015620002d1578190505b620002e9620002e08562000175565b8301826200027a565b50505b505050565b600082821c905092915050565b60006200031160001984600802620002f1565b1980831691505092915050565b60006200032c8383620002fe565b9150826002028217905092915050565b6200034782620000c2565b67ffffffffffffffff811115620003635762000362620000cd565b5b6200036f82546200012b565b6200037c828285620002a1565b600060209050601f831160018114620003b457600084156200039f578287015190505b620003ab85826200031e565b8655506200041b565b601f198416620003c48662000160565b60005b82811015620003ee57848901518255600182019150602085019450602081019050620003c7565b868310156200040e57848901516200040a601f891682620002fe565b8355505b6001600288020188555050505b505050505050565b610d6a80620004336000396000f3fe608060405234801561001057600080fd5b50600436106100a95760003560e01c806342966c681161007157806342966c681461016857806370a082311461018457806395d89b41146101b4578063a0712d68146101d2578063a9059cbb146101ee578063dd62ed3e1461021e576100a9565b806306fdde03146100ae578063095ea7b3146100cc57806318160ddd146100fc57806323b872dd1461011a578063313ce5671461014a575b600080fd5b6100b661024e565b6040516100c391906109be565b60405180910390f35b6100e660048036038101906100e19190610a79565b6102dc565b6040516100f39190610ad4565b60405180910390f35b6101046103ce565b6040516101119190610afe565b60405180910390f35b610134600480360381019061012f9190610b19565b6103d4565b6040516101419190610ad4565b60405180910390f35b610152610585565b60405161015f9190610b88565b60405180910390f35b610182600480360381019061017d9190610ba3565b610598565b005b61019e60048036038101906101999190610bd0565b61066f565b6040516101ab9190610afe565b60405180910390f35b6101bc610687565b6040516101c991906109be565b60405180910390f35b6101ec60048036038101906101e79190610ba3565b610715565b005b61020860048036038101906102039190610a79565b6107ec565b6040516102159190610ad4565b60405180910390f35b61023860048036038101906102339190610bfd565b610909565b6040516102459190610afe565b60405180910390f35b6003805461025b90610c6c565b80601f016020809104026020016040519081016040528092919081815260200182805461028790610c6c565b80156102d45780601f106102a9576101008083540402835291602001916102d4565b820191906000526020600020905b8154815290600101906020018083116102b757829003601f168201915b505050505081565b600081600260003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055508273ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925846040516103bc9190610afe565b60405180910390a36001905092915050565b60005481565b600081600260008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546104629190610ccc565b9250508190555081600160008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546104b89190610ccc565b9250508190555081600160008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825461050e9190610d00565b925050819055508273ffffffffffffffffffffffffffffffffffffffff168473ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef846040516105729190610afe565b60405180910390a3600190509392505050565b600560009054906101000a900460ff1681565b80600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546105e79190610ccc565b92505081905550806000808282546105ff9190610ccc565b92505081905550600073ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef836040516106649190610afe565b60405180910390a350565b60016020528060005260406000206000915090505481565b6004805461069490610c6c565b80601f01602080910402602001604051908101604052809291908181526020018280546106c090610c6c565b801561070d5780601f106106e25761010080835404028352916020019161070d565b820191906000526020600020905b8154815290600101906020018083116106f057829003601f168201915b505050505081565b80600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546107649190610d00565b925050819055508060008082825461077c9190610d00565b925050819055503373ffffffffffffffffffffffffffffffffffffffff16600073ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef836040516107e19190610afe565b60405180910390a350565b600081600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825461083d9190610ccc565b9250508190555081600160008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546108939190610d00565b925050819055508273ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef846040516108f79190610afe565b60405180910390a36001905092915050565b6002602052816000526040600020602052806000526040600020600091509150505481565b600081519050919050565b600082825260208201905092915050565b60005b8381101561096857808201518184015260208101905061094d565b60008484015250505050565b6000601f19601f8301169050919050565b60006109908261092e565b61099a8185610939565b93506109aa81856020860161094a565b6109b381610974565b840191505092915050565b600060208201905081810360008301526109d88184610985565b905092915050565b600080fd5b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000610a10826109e5565b9050919050565b610a2081610a05565b8114610a2b57600080fd5b50565b600081359050610a3d81610a17565b92915050565b6000819050919050565b610a5681610a43565b8114610a6157600080fd5b50565b600081359050610a7381610a4d565b92915050565b60008060408385031215610a9057610a8f6109e0565b5b6000610a9e85828601610a2e565b9250506020610aaf85828601610a64565b9150509250929050565b60008115159050919050565b610ace81610ab9565b82525050565b6000602082019050610ae96000830184610ac5565b92915050565b610af881610a43565b82525050565b6000602082019050610b136000830184610aef565b92915050565b600080600060608486031215610b3257610b316109e0565b5b6000610b4086828701610a2e565b9350506020610b5186828701610a2e565b9250506040610b6286828701610a64565b9150509250925092565b600060ff82169050919050565b610b8281610b6c565b82525050565b6000602082019050610b9d6000830184610b79565b92915050565b600060208284031215610bb957610bb86109e0565b5b6000610bc784828501610a64565b91505092915050565b600060208284031215610be657610be56109e0565b5b6000610bf484828501610a2e565b91505092915050565b60008060408385031215610c1457610c136109e0565b5b6000610c2285828601610a2e565b9250506020610c3385828601610a2e565b9150509250929050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b60006002820490506001821680610c8457607f821691505b602082108103610c9757610c96610c3d565b5b50919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000610cd782610a43565b9150610ce283610a43565b9250828203905081811115610cfa57610cf9610c9d565b5b92915050565b6000610d0b82610a43565b9150610d1683610a43565b9250828201905080821115610d2e57610d2d610c9d565b5b9291505056fea264697066735822122066c43ea8566df927073ea47efbfa7f9ed97ebc53ac46b1f05dd52d5af93b50be64736f6c63430008120033").unwrap(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             U256::ZERO,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput { access_list: AccessList::default() },
         );
 
         let contract_address = match result_create {
@@ -933,8 +1561,12 @@ mod test {
             other => panic!("ERROR: ended up in {other:?}"),
         };
 
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let result_call = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -944,10 +1576,10 @@ mod test {
             Bytes::from_hex("a0712d68000000000000000000000000000000000000000000000000000000000000002a").unwrap(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             U256::ZERO,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput { access_list: AccessList::default() },
         );
 
         match result_call {
@@ -967,14 +1599,18 @@ mod test {
     #[test]
     fn test_revert_precompile_state_changes() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
         let deploy_call_and_revert_bytecode = Bytes::from_hex("0x6080604052348015600e575f5ffd5b506103ba8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c8063b1755bc81461002d575b5f5ffd5b610047600480360381019061004291906101f3565b610049565b005b5f5f8473ffffffffffffffffffffffffffffffffffffffff16848460405161007292919061028c565b5f604051808303815f865af19150503d805f81146100ab576040519150601f19603f3d011682016040523d82523d5f602084013e6100b0565b606091505b5091509150816100f5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100ec906102fe565b60405180910390fd5b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161012790610366565b60405180910390fd5b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61016182610138565b9050919050565b61017181610157565b811461017b575f5ffd5b50565b5f8135905061018c81610168565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f8401126101b3576101b2610192565b5b8235905067ffffffffffffffff8111156101d0576101cf610196565b5b6020830191508360018202830111156101ec576101eb61019a565b5b9250929050565b5f5f5f6040848603121561020a57610209610130565b5b5f6102178682870161017e565b935050602084013567ffffffffffffffff81111561023857610237610134565b5b6102448682870161019e565b92509250509250925092565b5f81905092915050565b828183375f83830152505050565b5f6102738385610250565b935061028083858461025a565b82840190509392505050565b5f610298828486610268565b91508190509392505050565b5f82825260208201905092915050565b7f43616c6c206661696c65640000000000000000000000000000000000000000005f82015250565b5f6102e8600b836102a4565b91506102f3826102b4565b602082019050919050565b5f6020820190508181035f830152610315816102dc565b9050919050565b7f526576657274696e6700000000000000000000000000000000000000000000005f82015250565b5f6103506009836102a4565b915061035b8261031c565b602082019050919050565b5f6020820190508181035f83015261037d81610344565b905091905056fea264697066735822122054a37109eed5c973161a962f99e7485f344af2bc66af38eed5ef05d1c30561ea64736f6c634300081e0033").unwrap();
-        init_precompile_bytecodes(&mut host).unwrap();
+        init_precompile_bytecodes(&mut host, true).unwrap();
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CallAndRevert contract
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let result_create = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -983,10 +1619,12 @@ mod test {
             deploy_call_and_revert_bytecode,
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         );
 
         let revert_contract_address = match result_create {
@@ -1042,6 +1680,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -1049,12 +1688,16 @@ mod test {
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
 
+        let registry = Registry::new();
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
+        let mut journal = TezosXJournal::default();
         let ExecutionOutcome {
             result,
             withdrawals: _,
         } = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1063,10 +1706,12 @@ mod test {
             Bytes::from(call_and_revert_call.abi_encode()),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::ZERO,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         )
         .unwrap();
 
@@ -1100,15 +1745,19 @@ mod test {
     #[test]
     fn test_revert_delete_created_bytecode() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
         let deploy_create_and_revert_bytecode = Bytes::from_hex("0x6080604052348015600e575f5ffd5b506102b38061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80634f8c2d0e1461002d575b5f5ffd5b610047600480360381019061004291906101de565b610049565b005b5f815f523660a05ff09050806040517f9f8aa6e50000000000000000000000000000000000000000000000000000000081526004016100889190610264565b60405180910390fd5b5f604051905090565b5f5ffd5b5f5ffd5b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6100f0826100aa565b810181811067ffffffffffffffff8211171561010f5761010e6100ba565b5b80604052505050565b5f610121610091565b905061012d82826100e7565b919050565b5f67ffffffffffffffff82111561014c5761014b6100ba565b5b610155826100aa565b9050602081019050919050565b828183375f83830152505050565b5f61018261017d84610132565b610118565b90508281526020810184848401111561019e5761019d6100a6565b5b6101a9848285610162565b509392505050565b5f82601f8301126101c5576101c46100a2565b5b81356101d5848260208601610170565b91505092915050565b5f602082840312156101f3576101f261009a565b5b5f82013567ffffffffffffffff8111156102105761020f61009e565b5b61021c848285016101b1565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61024e82610225565b9050919050565b61025e81610244565b82525050565b5f6020820190506102775f830184610255565b9291505056fea264697066735822122053059908becc543c4f8d8f401652f4888f3e356e7d1c6567a4f53fcdf0ea6ea364736f6c634300081e0033").unwrap();
-        init_precompile_bytecodes(&mut host).unwrap();
+        init_precompile_bytecodes(&mut host, true).unwrap();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CreateAndRevert contract
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let result_create = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1117,10 +1766,12 @@ mod test {
             deploy_create_and_revert_bytecode,
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         );
 
         let revert_contract_address = match result_create {
@@ -1140,12 +1791,16 @@ mod test {
                 bytecode: Bytes::from_hex("0x6080604052348015600e575f5ffd5b50606a80601a5f395ff3fe6080604052348015600e575f5ffd5b50600436106026575f3560e01c80636b59084d14602a575b5f5ffd5b60306032565b005b56fea2646970667358221220e7c453431baacca104fa0d26c8d9fb06266545148b18a79c3ed740ce52d16a0a64736f6c634300081e0033").unwrap()
             });
 
+        let registry = Registry::new();
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
+        let mut journal = TezosXJournal::default();
         let ExecutionOutcome {
             result,
             withdrawals: _,
         } = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1154,10 +1809,12 @@ mod test {
             Bytes::from(create_and_revert_call.abi_encode()),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::ZERO,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         )
         .unwrap();
 
@@ -1180,9 +1837,9 @@ mod test {
     #[test]
     fn test_store_and_claim_fa_deposit_wrong_id() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
-        init_precompile_bytecodes(&mut host).unwrap();
+        init_precompile_bytecodes(&mut host, true).unwrap();
 
         // Initialize dummy deposit, store it in the deposits table with id 1
 
@@ -1206,6 +1863,7 @@ mod test {
             balance: initial_balance,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -1217,8 +1875,12 @@ mod test {
 
         // Claim deposit with id 2 (wrong id), revert is expected
 
+        let mut journal = TezosXJournal::default();
+        let registry = Registry::new();
         run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1231,10 +1893,12 @@ mod test {
             .into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         )
         .unwrap();
 
@@ -1245,7 +1909,7 @@ mod test {
     #[test]
     fn test_empty_authorization_list_are_prohibited() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -1258,6 +1922,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -1275,8 +1940,12 @@ mod test {
         assert_eq!(caller_info.balance, U256::MAX);
         assert_eq!(destination_info.balance, U256::ZERO);
 
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let result = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1285,30 +1954,30 @@ mod test {
             Bytes::new(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_sent,
-            AccessList(vec![]),
             Some(vec![]),
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         );
 
-        assert_eq!(
+        assert!(matches!(
             result,
-            Err(EVMError::Database(Error::Custom(
-                "Authorization list cannot be empty per EIP-7702.".to_owned()
-            )))
-        );
+            Err(EvmRunError::Kernel(EvmKernelError::EmptyAuthorizationList))
+        ));
     }
 
     #[test]
     fn deposit_and_claim_fa_with_empty_proxy() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
         let proxy = Address::from(&[1u8; 20]);
         let caller = Address::from(&[2u8; 20]);
         let receiver = Address::from(&[3u8; 20]);
 
-        init_precompile_bytecodes(&mut host).unwrap();
+        init_precompile_bytecodes(&mut host, true).unwrap();
 
         let deposit = ITable::FaDepositWithProxy {
             amount: U256::ONE,
@@ -1319,8 +1988,12 @@ mod test {
             ticketHash: Default::default(),
         };
 
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let outcome = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1329,17 +2002,22 @@ mod test {
             FABridge::queueCall { deposit }.abi_encode().into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         )
         .unwrap();
 
         assert!(outcome.result.is_success());
 
+        let mut journal = TezosXJournal::default();
         let outcome = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1352,10 +2030,12 @@ mod test {
             .into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         )
         .unwrap();
 
@@ -1397,6 +2077,7 @@ mod test {
             state::AccountInfo,
         };
         use tezos_crypto_rs::hash::ContractKt1Hash;
+        use tezos_ethereum::block::BlockConstants;
         use tezos_evm_runtime::runtime::MockKernelHost;
         use tezos_protocol::contract::Contract;
         use tezos_smart_rollup_encoding::michelson::{
@@ -1418,16 +2099,16 @@ mod test {
                     MockFaBridgeWrapper::{Burn, Mint},
                 },
                 utilities::{
-                    block_constants_with_no_fees,
                     FABridge::{claimCall, queueCall, withdrawCall, Deposit, Withdrawal},
                     ITable::FaDepositWithProxy,
-                    DEFAULT_SPEC_ID,
+                    Registry, DEFAULT_SPEC_ID,
                 },
                 GAS_LIMIT,
             },
-            ExecutionOutcome, GasData,
+            ExecutionOutcome, GasData, TransactionOrigin,
         };
         use tezos_data_encoding::enc::BinWriter;
+        use tezosx_journal::TezosXJournal;
 
         fn dummy_ticket() -> FA2_1Ticket {
             use tezos_crypto_rs::hash::HashTrait;
@@ -1513,20 +2194,26 @@ mod test {
                     },
                 )
                 .unwrap();
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::default();
             let outcome = run_transaction(
                 host,
+                &registry,
+                &mut journal,
                 DEFAULT_SPEC_ID,
-                &block_constants_with_no_fees(),
+                &BlockConstants::test_block_with_no_fees(),
                 None,
                 FEED_DEPOSIT_ADDR,
                 Some(FA_BRIDGE_SOL_ADDR),
                 queueCall { deposit }.abi_encode().into(),
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                AccessList(vec![]),
                 None,
                 None,
                 false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
             )
             .unwrap();
             if !outcome.result.is_success() {
@@ -1542,10 +2229,14 @@ mod test {
                     },
                 )
                 .unwrap();
+            let mut journal = TezosXJournal::default();
+            let registry = Registry::new();
             run_transaction(
                 host,
+                &registry,
+                &mut journal,
                 DEFAULT_SPEC_ID,
-                &block_constants_with_no_fees(),
+                &BlockConstants::test_block_with_no_fees(),
                 None,
                 caller,
                 Some(FA_BRIDGE_SOL_ADDR),
@@ -1556,10 +2247,12 @@ mod test {
                 .into(),
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                AccessList(vec![]),
                 None,
                 None,
                 false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
             )
             .unwrap()
         }
@@ -1582,20 +2275,26 @@ mod test {
                     },
                 )
                 .unwrap();
+            let mut journal = TezosXJournal::default();
+            let registry = Registry::new();
             run_transaction(
                 host,
+                &registry,
+                &mut journal,
                 DEFAULT_SPEC_ID,
-                &block_constants_with_no_fees(),
+                &BlockConstants::test_block_with_no_fees(),
                 None,
                 caller,
                 Some(destination),
                 call_data,
                 GasData::new(gas_limit, 0, GAS_LIMIT),
                 value,
-                AccessList(vec![]),
                 None,
                 None,
                 false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
             )
             .unwrap()
         }
@@ -1615,20 +2314,26 @@ mod test {
                     },
                 )
                 .unwrap();
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::default();
             let result_create = run_transaction(
                 host,
+                &registry,
+                &mut journal,
                 DEFAULT_SPEC_ID,
-                &block_constants_with_no_fees(),
+                &BlockConstants::test_block_with_no_fees(),
                 None,
                 caller,
                 None,
                 calldata,
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                AccessList(vec![]),
                 None,
                 None,
                 false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
             );
 
             match result_create {
@@ -1654,7 +2359,7 @@ mod test {
                 .unwrap()
         }
 
-        sol!("contracts/interfaces.sol");
+        sol!("contracts/predeployed/interfaces.sol");
         sol!("contracts/tests/static_caller.sol");
         sol!("contracts/tests/delegate_caller.sol");
         sol!("contracts/tests/reentrancy_tester.sol");
@@ -1663,7 +2368,7 @@ mod test {
         #[test]
         fn fa_bridge_precompile_fails_due_to_low_gas_limit() {
             let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host).unwrap();
+            init_precompile_bytecodes(&mut host, true).unwrap();
 
             // Cover basic costs
             let gas_limit = 23460;
@@ -1683,10 +2388,7 @@ mod test {
                 U256::ZERO,
             );
             match res.result {
-                ExecutionResult::Halt {
-                    reason,
-                    gas_used: _,
-                } => {
+                ExecutionResult::Halt { reason, .. } => {
                     assert_eq!(reason, HaltReason::OutOfGas(OutOfGasError::Basic))
                 }
                 _ => panic!("Should fail with OOG"),
@@ -1696,7 +2398,7 @@ mod test {
         #[test]
         fn fa_bridge_precompile_fails_due_to_static_call() {
             let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host).unwrap();
+            init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
             let static_call_bytecode = Bytes::from_hex("6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033").unwrap();
@@ -1736,7 +2438,7 @@ mod test {
         #[test]
         fn fa_bridge_precompile_fails_due_to_delegate_call() {
             let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host).unwrap();
+            init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
             let delegate_call_bytecode = Bytes::from_hex("6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80638771074f1461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855af49150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220065aceddd10343ed6e9faf40c53bcf49432de8e786641789238cf6d0eaf59c7364736f6c634300081e0033").unwrap();
@@ -1776,7 +2478,7 @@ mod test {
         #[test]
         fn fa_bridge_precompile_succeeds_without_l2_proxy_contract() {
             let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host).unwrap();
+            init_precompile_bytecodes(&mut host, true).unwrap();
 
             let ticket_owner = Address::from([1; 20]);
             let amount = U256::from(5);
@@ -1817,7 +2519,7 @@ mod test {
         #[test]
         fn fa_bridge_precompile_cannot_call_itself() {
             let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host).unwrap();
+            init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
             let reentrancy_tester_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b5060405161156d38038061156d83398181016040528101906100319190610323565b61004586868686868661005060201b60201c565b5050505050506106ba565b855f5f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550846001908161009e91906105eb565b50836002819055508260035f6101000a81548175ffffffffffffffffffffffffffffffffffffffffffff021916908360501c021790555081600490816100e491906105eb565b5080600581905550505050505050565b5f604051905090565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61012e82610105565b9050919050565b61013e81610124565b8114610148575f5ffd5b50565b5f8151905061015981610135565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101ad82610167565b810181811067ffffffffffffffff821117156101cc576101cb610177565b5b80604052505050565b5f6101de6100f4565b90506101ea82826101a4565b919050565b5f67ffffffffffffffff82111561020957610208610177565b5b61021282610167565b9050602081019050919050565b8281835e5f83830152505050565b5f61023f61023a846101ef565b6101d5565b90508281526020810184848401111561025b5761025a610163565b5b61026684828561021f565b509392505050565b5f82601f8301126102825761028161015f565b5b815161029284826020860161022d565b91505092915050565b5f819050919050565b6102ad8161029b565b81146102b7575f5ffd5b50565b5f815190506102c8816102a4565b92915050565b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b610302816102ce565b811461030c575f5ffd5b50565b5f8151905061031d816102f9565b92915050565b5f5f5f5f5f5f60c0878903121561033d5761033c6100fd565b5b5f61034a89828a0161014b565b965050602087015167ffffffffffffffff81111561036b5761036a610101565b5b61037789828a0161026e565b955050604061038889828a016102ba565b945050606061039989828a0161030f565b935050608087015167ffffffffffffffff8111156103ba576103b9610101565b5b6103c689828a0161026e565b92505060a06103d789828a016102ba565b9150509295509295509295565b5f81519050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52602260045260245ffd5b5f600282049050600182168061043257607f821691505b602082108103610445576104446103ee565b5b50919050565b5f819050815f5260205f209050919050565b5f6020601f8301049050919050565b5f82821b905092915050565b5f600883026104a77fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8261046c565b6104b1868361046c565b95508019841693508086168417925050509392505050565b5f819050919050565b5f6104ec6104e76104e28461029b565b6104c9565b61029b565b9050919050565b5f819050919050565b610505836104d2565b610519610511826104f3565b848454610478565b825550505050565b5f5f905090565b610530610521565b61053b8184846104fc565b505050565b5b8181101561055e576105535f82610528565b600181019050610541565b5050565b601f8211156105a3576105748161044b565b61057d8461045d565b8101602085101561058c578190505b6105a06105988561045d565b830182610540565b50505b505050565b5f82821c905092915050565b5f6105c35f19846008026105a8565b1980831691505092915050565b5f6105db83836105b4565b9150826002028217905092915050565b6105f4826103e4565b67ffffffffffffffff81111561060d5761060c610177565b5b610617825461041b565b610622828285610562565b5f60209050601f831160018114610653575f8415610641578287015190505b61064b85826105d0565b8655506106b2565b601f1984166106618661044b565b5f5b8281101561068857848901518255600182019150602085019450602081019050610663565b868310156106a557848901516106a1601f8916826105b4565b8355505b6001600288020188555050505b505050505050565b610ea6806106c75f395ff3fe608060405234801561000f575f5ffd5b5060043610610091575f3560e01c806359537d491161006457806359537d491461010b57806373af3851146101275780638a4d5a6714610145578063aa8c217c14610163578063b5c5f6721461018157610091565b8063071c9308146100955780630be69fcd146100b35780630efe6a8b146100d15780633f70f347146100ed575b5f5ffd5b61009d61019d565b6040516100aa91906105a3565b60405180910390f35b6100bb6101c1565b6040516100c891906105d4565b60405180910390f35b6100eb60048036038101906100e69190610652565b6101c7565b005b6100f56101d4565b60405161010291906106dc565b60405180910390f35b6101256004803603810190610120919061085b565b6101e6565b005b61012f61028a565b60405161013c919061097c565b60405180910390f35b61014d610316565b60405161015a919061097c565b60405180910390f35b61016b6103a2565b60405161017891906105d4565b60405180910390f35b61019b60048036038101906101969190610652565b6103a8565b005b5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60055481565b6101cf6103b5565b505050565b60035f9054906101000a900460501b81565b855f5f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555084600190816102349190610b99565b50836002819055508260035f6101000a81548175ffffffffffffffffffffffffffffffffffffffffffff021916908360501c0217905550816004908161027a9190610b99565b5080600581905550505050505050565b60018054610297906109c9565b80601f01602080910402602001604051908101604052809291908181526020018280546102c3906109c9565b801561030e5780601f106102e55761010080835404028352916020019161030e565b820191905f5260205f20905b8154815290600101906020018083116102f157829003601f168201915b505050505081565b60048054610323906109c9565b80601f016020809104026020016040519081016040528092919081815260200182805461034f906109c9565b801561039a5780601f106103715761010080835404028352916020019161039a565b820191905f5260205f20905b81548152906001019060200180831161037d57829003601f168201915b505050505081565b60025481565b6103b06103b5565b505050565b5f30600160025460035f9054906101000a900460501b60046040516024016103e1959493929190610ce9565b6040516020818303038152906040527f80fc1fe3000000000000000000000000000000000000000000000000000000007bffffffffffffffffffffffffffffffffffffffffffffffffffffffff19166020820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff8381831617835250505050905061048e5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff16825f600554610491565b50565b5f600190505b81811161055d575f8573ffffffffffffffffffffffffffffffffffffffff1684866040516104c59190610d82565b5f6040518083038185875af1925050503d805f81146104ff576040519150601f19603f3d011682016040523d82523d5f602084013e610504565b606091505b5050905080610548576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161053f90610df2565b60405180910390fd5b6001826105559190610e3d565b915050610497565b5050505050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61058d82610564565b9050919050565b61059d81610583565b82525050565b5f6020820190506105b65f830184610594565b92915050565b5f819050919050565b6105ce816105bc565b82525050565b5f6020820190506105e75f8301846105c5565b92915050565b5f604051905090565b5f5ffd5b5f5ffd5b61060781610583565b8114610611575f5ffd5b50565b5f81359050610622816105fe565b92915050565b610631816105bc565b811461063b575f5ffd5b50565b5f8135905061064c81610628565b92915050565b5f5f5f60608486031215610669576106686105f6565b5b5f61067686828701610614565b93505060206106878682870161063e565b92505060406106988682870161063e565b9150509250925092565b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b6106d6816106a2565b82525050565b5f6020820190506106ef5f8301846106cd565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b610743826106fd565b810181811067ffffffffffffffff821117156107625761076161070d565b5b80604052505050565b5f6107746105ed565b9050610780828261073a565b919050565b5f67ffffffffffffffff82111561079f5761079e61070d565b5b6107a8826106fd565b9050602081019050919050565b828183375f83830152505050565b5f6107d56107d084610785565b61076b565b9050828152602081018484840111156107f1576107f06106f9565b5b6107fc8482856107b5565b509392505050565b5f82601f830112610818576108176106f5565b5b81356108288482602086016107c3565b91505092915050565b61083a816106a2565b8114610844575f5ffd5b50565b5f8135905061085581610831565b92915050565b5f5f5f5f5f5f60c08789031215610875576108746105f6565b5b5f61088289828a01610614565b965050602087013567ffffffffffffffff8111156108a3576108a26105fa565b5b6108af89828a01610804565b95505060406108c089828a0161063e565b94505060606108d189828a01610847565b935050608087013567ffffffffffffffff8111156108f2576108f16105fa565b5b6108fe89828a01610804565b92505060a061090f89828a0161063e565b9150509295509295509295565b5f81519050919050565b5f82825260208201905092915050565b8281835e5f83830152505050565b5f61094e8261091c565b6109588185610926565b9350610968818560208601610936565b610971816106fd565b840191505092915050565b5f6020820190508181035f8301526109948184610944565b905092915050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52602260045260245ffd5b5f60028204905060018216806109e057607f821691505b6020821081036109f3576109f261099c565b5b50919050565b5f819050815f5260205f209050919050565b5f6020601f8301049050919050565b5f82821b905092915050565b5f60088302610a557fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82610a1a565b610a5f8683610a1a565b95508019841693508086168417925050509392505050565b5f819050919050565b5f610a9a610a95610a90846105bc565b610a77565b6105bc565b9050919050565b5f819050919050565b610ab383610a80565b610ac7610abf82610aa1565b848454610a26565b825550505050565b5f5f905090565b610ade610acf565b610ae9818484610aaa565b505050565b5b81811015610b0c57610b015f82610ad6565b600181019050610aef565b5050565b601f821115610b5157610b22816109f9565b610b2b84610a0b565b81016020851015610b3a578190505b610b4e610b4685610a0b565b830182610aee565b50505b505050565b5f82821c905092915050565b5f610b715f1984600802610b56565b1980831691505092915050565b5f610b898383610b62565b9150826002028217905092915050565b610ba28261091c565b67ffffffffffffffff811115610bbb57610bba61070d565b5b610bc582546109c9565b610bd0828285610b10565b5f60209050601f831160018114610c01575f8415610bef578287015190505b610bf98582610b7e565b865550610c60565b601f198416610c0f866109f9565b5f5b82811015610c3657848901518255600182019150602085019450602081019050610c11565b86831015610c535784890151610c4f601f891682610b62565b8355505b6001600288020188555050505b505050505050565b5f8154610c74816109c9565b610c7e8186610926565b9450600182165f8114610c985760018114610cae57610ce0565b60ff198316865281151560200286019350610ce0565b610cb7856109f9565b5f5b83811015610cd857815481890152600182019150602081019050610cb9565b808801955050505b50505092915050565b5f60a082019050610cfc5f830188610594565b8181036020830152610d0e8187610c68565b9050610d1d60408301866105c5565b610d2a60608301856106cd565b8181036080830152610d3c8184610c68565b90509695505050505050565b5f81905092915050565b5f610d5c8261091c565b610d668185610d48565b9350610d76818560208601610936565b80840191505092915050565b5f610d8d8284610d52565b915081905092915050565b5f82825260208201905092915050565b7f43616c6c20746f2074617267657420636f6e7472616374206661696c656400005f82015250565b5f610ddc601e83610d98565b9150610de782610da8565b602082019050919050565b5f6020820190508181035f830152610e0981610dd0565b9050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f610e47826105bc565b9150610e52836105bc565b9250828201905080821115610e6a57610e69610e10565b5b9291505056fea264697066735822122030849f76b9e4e5acaa2fa563f76431ebe5059d03f496c9d7d864978421d72a6e64736f6c634300081e0033").unwrap();
@@ -1952,7 +2654,7 @@ mod test {
         #[test]
         fn fa_deposit_reached_wrapper_contract() {
             let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host).unwrap();
+            init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
             let mock_wrapper_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b50604051610a58380380610a5883398181016040528101906100319190610330565b610041848461009e60201b60201c565b5f819055508160015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610095816100d260201b60201c565b505050506104a3565b5f82826040516020016100b2929190610414565b604051602081830303815290604052805190602001205f1c905092915050565b5f6040516020016100e29061048f565b6040516020818303038152906040528051906020012090508181555050565b5f604051905090565b5f5ffd5b5f5ffd5b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b61014681610112565b8114610150575f5ffd5b50565b5f815190506101618161013d565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101b58261016f565b810181811067ffffffffffffffff821117156101d4576101d361017f565b5b80604052505050565b5f6101e6610101565b90506101f282826101ac565b919050565b5f67ffffffffffffffff8211156102115761021061017f565b5b61021a8261016f565b9050602081019050919050565b8281835e5f83830152505050565b5f610247610242846101f7565b6101dd565b9050828152602081018484840111156102635761026261016b565b5b61026e848285610227565b509392505050565b5f82601f83011261028a57610289610167565b5b815161029a848260208601610235565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6102cc826102a3565b9050919050565b6102dc816102c2565b81146102e6575f5ffd5b50565b5f815190506102f7816102d3565b92915050565b5f819050919050565b61030f816102fd565b8114610319575f5ffd5b50565b5f8151905061032a81610306565b92915050565b5f5f5f5f608085870312156103485761034761010a565b5b5f61035587828801610153565b945050602085015167ffffffffffffffff8111156103765761037561010e565b5b61038287828801610276565b9350506040610393878288016102e9565b92505060606103a48782880161031c565b91505092959194509250565b5f819050919050565b6103ca6103c582610112565b6103b0565b82525050565b5f81519050919050565b5f81905092915050565b5f6103ee826103d0565b6103f881856103da565b9350610408818560208601610227565b80840191505092915050565b5f61041f82856103b9565b60168201915061042f82846103e4565b91508190509392505050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61047960088361043b565b915061048482610445565b600882019050919050565b5f6104998261046d565b9150819050919050565b6105a8806104b05f395ff3fe608060405234801561000f575f5ffd5b5060043610610034575f3560e01c80630efe6a8b14610038578063b5c5f67214610054575b5f5ffd5b610052600480360381019061004d919061038c565b610070565b005b61006e6004803603810190610069919061038c565b61019e565b005b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16146100ff576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100f69061045c565b60405180910390fd5b805f5414610142576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610139906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d41213968858360405161018891906104f1565b60405180910390a2610199826102cc565b505050565b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461022d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102249061045c565b60405180910390fd5b805f5414610270576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610267906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167fcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5836040516102b691906104f1565b60405180910390a26102c7826102cc565b505050565b5f6040516020016102dc9061055e565b6040516020818303038152906040528051906020012090508181555050565b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610328826102ff565b9050919050565b6103388161031e565b8114610342575f5ffd5b50565b5f813590506103538161032f565b92915050565b5f819050919050565b61036b81610359565b8114610375575f5ffd5b50565b5f8135905061038681610362565b92915050565b5f5f5f606084860312156103a3576103a26102fb565b5b5f6103b086828701610345565b93505060206103c186828701610378565b92505060406103d286828701610378565b9150509250925092565b5f82825260208201905092915050565b7f4d6f636b577261707065723a206f6e6c79206b65726e656c20616c6c6f7765645f8201527f20746f206d696e7420746f6b656e730000000000000000000000000000000000602082015250565b5f610446602f836103dc565b9150610451826103ec565b604082019050919050565b5f6020820190508181035f8301526104738161043a565b9050919050565b7f4d6f636b577261707065723a2077726f6e67207469636b6574206861736800005f82015250565b5f6104ae601e836103dc565b91506104b98261047a565b602082019050919050565b5f6020820190508181035f8301526104db816104a2565b9050919050565b6104eb81610359565b82525050565b5f6020820190506105045f8301846104e2565b92915050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61054860088361050a565b915061055382610514565b600882019050919050565b5f6105688261053c565b915081905091905056fea26469706673582212208a68bac19629ffb15854b8a4320f7ad75da8dceb352e6e89ec31c8eca1cdbb3a64736f6c634300081e0033").unwrap();
@@ -2018,7 +2720,7 @@ mod test {
         #[test]
         fn fa_deposit_proxy_state_reverted_if_ticket_balance_overflows() {
             let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host).unwrap();
+            init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
             let mock_wrapper_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b50604051610a58380380610a5883398181016040528101906100319190610330565b610041848461009e60201b60201c565b5f819055508160015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610095816100d260201b60201c565b505050506104a3565b5f82826040516020016100b2929190610414565b604051602081830303815290604052805190602001205f1c905092915050565b5f6040516020016100e29061048f565b6040516020818303038152906040528051906020012090508181555050565b5f604051905090565b5f5ffd5b5f5ffd5b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b61014681610112565b8114610150575f5ffd5b50565b5f815190506101618161013d565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101b58261016f565b810181811067ffffffffffffffff821117156101d4576101d361017f565b5b80604052505050565b5f6101e6610101565b90506101f282826101ac565b919050565b5f67ffffffffffffffff8211156102115761021061017f565b5b61021a8261016f565b9050602081019050919050565b8281835e5f83830152505050565b5f610247610242846101f7565b6101dd565b9050828152602081018484840111156102635761026261016b565b5b61026e848285610227565b509392505050565b5f82601f83011261028a57610289610167565b5b815161029a848260208601610235565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6102cc826102a3565b9050919050565b6102dc816102c2565b81146102e6575f5ffd5b50565b5f815190506102f7816102d3565b92915050565b5f819050919050565b61030f816102fd565b8114610319575f5ffd5b50565b5f8151905061032a81610306565b92915050565b5f5f5f5f608085870312156103485761034761010a565b5b5f61035587828801610153565b945050602085015167ffffffffffffffff8111156103765761037561010e565b5b61038287828801610276565b9350506040610393878288016102e9565b92505060606103a48782880161031c565b91505092959194509250565b5f819050919050565b6103ca6103c582610112565b6103b0565b82525050565b5f81519050919050565b5f81905092915050565b5f6103ee826103d0565b6103f881856103da565b9350610408818560208601610227565b80840191505092915050565b5f61041f82856103b9565b60168201915061042f82846103e4565b91508190509392505050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61047960088361043b565b915061048482610445565b600882019050919050565b5f6104998261046d565b9150819050919050565b6105a8806104b05f395ff3fe608060405234801561000f575f5ffd5b5060043610610034575f3560e01c80630efe6a8b14610038578063b5c5f67214610054575b5f5ffd5b610052600480360381019061004d919061038c565b610070565b005b61006e6004803603810190610069919061038c565b61019e565b005b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16146100ff576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100f69061045c565b60405180910390fd5b805f5414610142576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610139906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d41213968858360405161018891906104f1565b60405180910390a2610199826102cc565b505050565b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461022d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102249061045c565b60405180910390fd5b805f5414610270576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610267906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167fcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5836040516102b691906104f1565b60405180910390a26102c7826102cc565b505050565b5f6040516020016102dc9061055e565b6040516020818303038152906040528051906020012090508181555050565b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610328826102ff565b9050919050565b6103388161031e565b8114610342575f5ffd5b50565b5f813590506103538161032f565b92915050565b5f819050919050565b61036b81610359565b8114610375575f5ffd5b50565b5f8135905061038681610362565b92915050565b5f5f5f606084860312156103a3576103a26102fb565b5b5f6103b086828701610345565b93505060206103c186828701610378565b92505060406103d286828701610378565b9150509250925092565b5f82825260208201905092915050565b7f4d6f636b577261707065723a206f6e6c79206b65726e656c20616c6c6f7765645f8201527f20746f206d696e7420746f6b656e730000000000000000000000000000000000602082015250565b5f610446602f836103dc565b9150610451826103ec565b604082019050919050565b5f6020820190508181035f8301526104738161043a565b9050919050565b7f4d6f636b577261707065723a2077726f6e67207469636b6574206861736800005f82015250565b5f6104ae601e836103dc565b91506104b98261047a565b602082019050919050565b5f6020820190508181035f8301526104db816104a2565b9050919050565b6104eb81610359565b82525050565b5f6020820190506105045f8301846104e2565b92915050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61054860088361050a565b915061055382610514565b600882019050919050565b5f6105688261053c565b915081905091905056fea26469706673582212208a68bac19629ffb15854b8a4320f7ad75da8dceb352e6e89ec31c8eca1cdbb3a64736f6c634300081e0033").unwrap();
@@ -2063,7 +2765,7 @@ mod test {
         #[test]
         fn fa_deposit_refused_non_compatible_interface() {
             let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host).unwrap();
+            init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
             let proxy = Address::from([2; 20]);
@@ -2103,7 +2805,7 @@ mod test {
         #[test]
         fn fa_withdrawal_executed_via_l2_proxy_contract() {
             let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host).unwrap();
+            init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
             let mock_wrapper_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b50604051610a58380380610a5883398181016040528101906100319190610330565b610041848461009e60201b60201c565b5f819055508160015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610095816100d260201b60201c565b505050506104a3565b5f82826040516020016100b2929190610414565b604051602081830303815290604052805190602001205f1c905092915050565b5f6040516020016100e29061048f565b6040516020818303038152906040528051906020012090508181555050565b5f604051905090565b5f5ffd5b5f5ffd5b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b61014681610112565b8114610150575f5ffd5b50565b5f815190506101618161013d565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101b58261016f565b810181811067ffffffffffffffff821117156101d4576101d361017f565b5b80604052505050565b5f6101e6610101565b90506101f282826101ac565b919050565b5f67ffffffffffffffff8211156102115761021061017f565b5b61021a8261016f565b9050602081019050919050565b8281835e5f83830152505050565b5f610247610242846101f7565b6101dd565b9050828152602081018484840111156102635761026261016b565b5b61026e848285610227565b509392505050565b5f82601f83011261028a57610289610167565b5b815161029a848260208601610235565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6102cc826102a3565b9050919050565b6102dc816102c2565b81146102e6575f5ffd5b50565b5f815190506102f7816102d3565b92915050565b5f819050919050565b61030f816102fd565b8114610319575f5ffd5b50565b5f8151905061032a81610306565b92915050565b5f5f5f5f608085870312156103485761034761010a565b5b5f61035587828801610153565b945050602085015167ffffffffffffffff8111156103765761037561010e565b5b61038287828801610276565b9350506040610393878288016102e9565b92505060606103a48782880161031c565b91505092959194509250565b5f819050919050565b6103ca6103c582610112565b6103b0565b82525050565b5f81519050919050565b5f81905092915050565b5f6103ee826103d0565b6103f881856103da565b9350610408818560208601610227565b80840191505092915050565b5f61041f82856103b9565b60168201915061042f82846103e4565b91508190509392505050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61047960088361043b565b915061048482610445565b600882019050919050565b5f6104998261046d565b9150819050919050565b6105a8806104b05f395ff3fe608060405234801561000f575f5ffd5b5060043610610034575f3560e01c80630efe6a8b14610038578063b5c5f67214610054575b5f5ffd5b610052600480360381019061004d919061038c565b610070565b005b61006e6004803603810190610069919061038c565b61019e565b005b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16146100ff576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100f69061045c565b60405180910390fd5b805f5414610142576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610139906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d41213968858360405161018891906104f1565b60405180910390a2610199826102cc565b505050565b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461022d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102249061045c565b60405180910390fd5b805f5414610270576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610267906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167fcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5836040516102b691906104f1565b60405180910390a26102c7826102cc565b505050565b5f6040516020016102dc9061055e565b6040516020818303038152906040528051906020012090508181555050565b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610328826102ff565b9050919050565b6103388161031e565b8114610342575f5ffd5b50565b5f813590506103538161032f565b92915050565b5f819050919050565b61036b81610359565b8114610375575f5ffd5b50565b5f8135905061038681610362565b92915050565b5f5f5f606084860312156103a3576103a26102fb565b5b5f6103b086828701610345565b93505060206103c186828701610378565b92505060406103d286828701610378565b9150509250925092565b5f82825260208201905092915050565b7f4d6f636b577261707065723a206f6e6c79206b65726e656c20616c6c6f7765645f8201527f20746f206d696e7420746f6b656e730000000000000000000000000000000000602082015250565b5f610446602f836103dc565b9150610451826103ec565b604082019050919050565b5f6020820190508181035f8301526104738161043a565b9050919050565b7f4d6f636b577261707065723a2077726f6e67207469636b6574206861736800005f82015250565b5f6104ae601e836103dc565b91506104b98261047a565b602082019050919050565b5f6020820190508181035f8301526104db816104a2565b9050919050565b6104eb81610359565b82525050565b5f6020820190506105045f8301846104e2565b92915050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61054860088361050a565b915061055382610514565b600882019050919050565b5f6105688261053c565b915081905091905056fea26469706673582212208a68bac19629ffb15854b8a4320f7ad75da8dceb352e6e89ec31c8eca1cdbb3a64736f6c634300081e0033").unwrap();
@@ -2198,18 +2900,18 @@ mod test {
             let global_counter = system_account.read_global_counter(&host).unwrap();
             assert_eq!(balance, U256::ZERO);
 
+            let burn_event =
+                Burn::decode_log_data(&outcome.result.logs()[0].data).unwrap();
+            assert_eq!(burn_event.sender, fa_withdrawal.sender);
+            assert_eq!(burn_event.amount, fa_withdrawal.amount);
+
             let withdrawal_event =
-                Withdrawal::decode_log_data(&outcome.result.logs()[0].data).unwrap();
+                Withdrawal::decode_log_data(&outcome.result.logs()[1].data).unwrap();
             assert_eq!(withdrawal_event.ticketHash, fa_withdrawal.ticketHash);
             assert_eq!(withdrawal_event.ticketOwner, fa_withdrawal.ticketOwner);
             assert_eq!(withdrawal_event.amount, fa_withdrawal.amount);
             assert_eq!(withdrawal_event.receiver, fa_withdrawal.receiver);
             assert_eq!(withdrawal_event.withdrawalId, U256::ZERO);
-
-            let burn_event =
-                Burn::decode_log_data(&outcome.result.logs()[1].data).unwrap();
-            assert_eq!(burn_event.sender, fa_withdrawal.sender);
-            assert_eq!(burn_event.amount, fa_withdrawal.amount);
 
             assert_eq!(global_counter, U256::ONE);
         }
@@ -2217,7 +2919,7 @@ mod test {
         #[test]
         fn fa_withdrawal_fails_due_to_insufficient_balance() {
             let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host).unwrap();
+            init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
             let proxy = Address::from([2; 20]);
@@ -2252,7 +2954,7 @@ mod test {
     #[test]
     fn test_osaka_clz_is_enabled() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_fees();
+        let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -2265,6 +2967,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -2288,13 +2991,18 @@ mod test {
             balance: U256::ZERO,
             nonce: 0,
             code_hash: bytes_hash(bytecode.original_byte_slice()),
+            account_id: None,
             code: Some(bytecode),
         };
 
         contract_account.set_info(&mut host, contract_info).unwrap();
 
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
         let execution_result = run_transaction(
             &mut host,
+            &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -2303,19 +3011,276 @@ mod test {
             Bytes::new(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             value_sent,
-            AccessList(vec![]),
             None,
             None,
             false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
         )
         .unwrap();
 
         match execution_result.result {
-            ExecutionResult::Success { gas_used, .. } => {
-                assert!(gas_used > 0);
+            ExecutionResult::Success { gas, .. } => {
+                assert!(gas.spent() > 0);
             }
             ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                 panic!("Simple transfer should have succeeded")
+            }
+        }
+    }
+
+    /// Test that an Ethereum alias is correctly created with the EIP-1167 proxy bytecode
+    /// and that it points to the AliasForwarder implementation.
+    #[test]
+    fn test_alias_forwarder_proxy_is_correctly_deployed() {
+        let mut host = MockKernelHost::default();
+
+        // Initialize all precompiles (including AliasForwarder)
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        // Native Tezos address
+        let native_address = "tz1TestForwarder123";
+
+        // Create the Ethereum alias for this native address
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
+        let alias_bytes = registry
+            .ensure_alias(
+                &mut host,
+                &mut journal,
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Tezos,
+                    native_address: native_address.as_bytes().to_vec(),
+                },
+                None,
+                tezosx_interfaces::RuntimeId::Ethereum,
+                test_alias_creation_context(),
+                1_000_000,
+            )
+            .expect("Failed to generate alias");
+        let alias_bytes = alias_bytes.0;
+        let alias_hex = alias_bytes.strip_prefix("0x").unwrap_or(&alias_bytes);
+        let alias = Address::from_slice(&hex::decode(alias_hex).unwrap());
+
+        // Verify the alias has code (delegation bytecode)
+        let alias_account = StorageAccount::from_address(&alias).unwrap();
+        let alias_info = alias_account.info(&mut host).unwrap();
+        assert_ne!(
+            alias_info.code_hash,
+            revm::primitives::KECCAK_EMPTY,
+            "Alias should have proxy bytecode"
+        );
+
+        // Verify the alias address is computed deterministically from the native address
+        let expected_alias = {
+            let hash = bytes_hash(native_address.as_bytes());
+            Address::from_slice(&hash.0[0..20])
+        };
+        assert_eq!(
+            alias, expected_alias,
+            "Alias should be at the computed address"
+        );
+
+        // Verify the AliasForwarder precompile has code
+        use crate::precompiles::constants::ALIAS_FORWARDER_PRECOMPILE_ADDRESS;
+        let precompile_account =
+            StorageAccount::from_address(&ALIAS_FORWARDER_PRECOMPILE_ADDRESS).unwrap();
+        let precompile_info = precompile_account.info(&mut host).unwrap();
+        assert_ne!(
+            precompile_info.code_hash,
+            revm::primitives::KECCAK_EMPTY,
+            "AliasForwarder precompile should have code"
+        );
+    }
+
+    /// Test that pre-existing balance at the alias address is forwarded to the
+    /// native Tezos address when the alias is created.
+    #[test]
+    fn test_alias_forwarder_transfers_preexisting_balance() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+
+        // Initialize all precompiles (including AliasForwarder)
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        // Native Tezos address that should receive the funds
+        let native_address = "tz1PreexistingBal";
+
+        // First, we need to compute the alias address to set pre-existing balance
+        // We use the same algorithm as ensure_alias: keccak256(native_address)[0..20]
+        let alias = {
+            let hash = bytes_hash(native_address.as_bytes());
+            Address::from_slice(&hash.0[0..20])
+        };
+
+        // Set pre-existing balance at the alias address BEFORE creating the alias
+        let preexisting_balance = U256::from(5_000_000_000_000_000_000u128); // 5 ETH
+        let mut alias_account = StorageAccount::from_address(&alias).unwrap();
+        let mut alias_info = alias_account.info(&mut host).unwrap();
+        alias_info.balance = preexisting_balance;
+        alias_account
+            .set_info_without_code(&mut host, alias_info)
+            .unwrap();
+
+        // Verify pre-existing balance is set
+        let alias_info_before = alias_account.info(&mut host).unwrap();
+        assert_eq!(
+            alias_info_before.balance, preexisting_balance,
+            "Pre-existing balance should be set"
+        );
+
+        // Create the Ethereum alias - this should forward the pre-existing balance
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
+        let alias_bytes = registry
+            .ensure_alias(
+                &mut host,
+                &mut journal,
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Tezos,
+                    native_address: native_address.as_bytes().to_vec(),
+                },
+                None,
+                tezosx_interfaces::RuntimeId::Ethereum,
+                test_alias_creation_context(),
+                1_000_000,
+            )
+            .expect("Failed to generate alias");
+        let alias_bytes = alias_bytes.0;
+
+        // Verify the alias was created at the expected address
+        // (case-insensitive: ensure_alias returns lowercase, Address::to_string uses EIP-55 checksum)
+        assert_eq!(
+            alias_bytes.to_lowercase(),
+            alias.to_string().to_lowercase(),
+            "Alias should be at the computed address"
+        );
+
+        // Check that the pre-existing balance was forwarded to the Tezos address
+        let native_addr_str = native_address.to_string();
+        let tezos_balance = registry
+            .get_balance(
+                &mut host,
+                native_addr_str.as_bytes(),
+                tezosx_interfaces::RuntimeId::Tezos,
+            )
+            .unwrap_or(primitive_types::U256::zero());
+
+        // The pre-existing balance should have been forwarded
+        assert!(
+            tezos_balance > primitive_types::U256::zero(),
+            "Pre-existing balance should have been forwarded to Tezos. Balance: {tezos_balance:?}"
+        );
+    }
+
+    /// Test that when funds are sent to an existing alias, they are forwarded
+    /// to the associated Tezos account via the AliasForwarder contract.
+    #[test]
+    fn test_alias_forwarder_forwards_funds_after_creation() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+
+        // Initialize all precompiles (including AliasForwarder)
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        // Native Tezos address that should receive the funds
+        let native_address = "tz1TestForwarder123";
+
+        // Create the Ethereum alias for this native address
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::default();
+        let alias_bytes = registry
+            .ensure_alias(
+                &mut host,
+                &mut journal,
+                AliasInfo {
+                    runtime: tezosx_interfaces::RuntimeId::Tezos,
+                    native_address: native_address.as_bytes().to_vec(),
+                },
+                None,
+                tezosx_interfaces::RuntimeId::Ethereum,
+                test_alias_creation_context(),
+                1_000_000,
+            )
+            .expect("Failed to generate alias");
+        let alias_bytes = alias_bytes.0;
+        let alias_hex = alias_bytes.strip_prefix("0x").unwrap_or(&alias_bytes);
+        let alias = Address::from_slice(&hex::decode(alias_hex).unwrap());
+
+        // Verify the alias has code (EIP-7702 delegation bytecode)
+        let alias_account = StorageAccount::from_address(&alias).unwrap();
+        let alias_info = alias_account.info(&mut host).unwrap();
+        assert_ne!(
+            alias_info.code_hash,
+            revm::primitives::KECCAK_EMPTY,
+            "Alias should have delegation bytecode"
+        );
+
+        // Set up a sender with balance
+        let sender = Address::from(&[0xAA; 20]);
+        let sender_info = AccountInfo {
+            balance: U256::from(10_000_000_000_000_000_000u128), // 10 ETH
+            nonce: 0,
+            code_hash: Default::default(),
+            account_id: None,
+            code: None,
+        };
+        let mut sender_account = StorageAccount::from_address(&sender).unwrap();
+        sender_account
+            .set_info_without_code(&mut host, sender_info)
+            .unwrap();
+
+        let value_to_send = U256::from(1_000_000_000_000_000_000u128); // 1 ETH
+
+        // Send funds to the alias address
+        let registry = Registry::new();
+        let execution_result = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(), // empty calldata triggers receive()
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            value_to_send,
+            None,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .expect("Transaction should not fail");
+
+        // Verify the transaction succeeded and funds were forwarded
+        match execution_result.result {
+            ExecutionResult::Success { .. } => {
+                // Check the mock Tezos balance - funds should have been forwarded
+                let native_addr_str = native_address.to_string();
+                let tezos_balance = registry
+                    .get_balance(
+                        &mut host,
+                        native_addr_str.as_bytes(),
+                        tezosx_interfaces::RuntimeId::Tezos,
+                    )
+                    .unwrap_or(primitive_types::U256::zero());
+
+                assert!(
+                    tezos_balance > primitive_types::U256::zero(),
+                    "Funds should have been forwarded to Tezos. Balance: {tezos_balance:?}"
+                );
+            }
+            ExecutionResult::Revert { output, .. } => {
+                panic!("Transaction reverted: {output:?}");
+            }
+            ExecutionResult::Halt { reason, .. } => {
+                panic!("Transaction halted: {reason:?}");
             }
         }
     }

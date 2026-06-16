@@ -13,11 +13,41 @@ let tests =
         ( "PVM advances the expected number of steps",
           `Quick,
           Test_backend.test_advance_dummy_kernel );
-        ( "Proofs produced via the OCaml API match those produced by the \
+        ( "Jstz: Proofs produced via the OCaml API match those produced by the \
            sandboxed RISC-V PVM",
           `Quick,
-          Test_backend.test_jstz_proof_regression );
-        ("Proofs are immutable", `Quick, Test_backend.test_proof_immutability);
+          Test_backend.test_proof_regression Utils.Jstz );
+        ( "Jstz: Proofs are immutable",
+          `Quick,
+          Test_backend.test_proof_immutability Utils.Jstz );
+        ( "Etherlink: Proofs produced via the OCaml API match those produced \
+           by the sandboxed RISC-V PVM",
+          `Quick,
+          Test_backend.test_proof_regression Utils.Etherlink );
+        ( "Etherlink: Proofs are immutable",
+          `Quick,
+          Test_backend.test_proof_immutability Utils.Etherlink );
+        ( "Echo: Output proof serialisation roundtrip",
+          `Quick,
+          Test_outbox.test_output_proof_serialisation_round_trip );
+        ( "Echo: Produce and verify output proofs",
+          `Quick,
+          Test_outbox.test_produce_output_proofs );
+        ( "Echo: Produce proof fails for invalid message index",
+          `Quick,
+          Test_outbox.test_produce_proof_invalid_message_index );
+        ( "Echo: Produce proof fails for invalid outbox level",
+          `Quick,
+          Test_outbox.test_produce_proof_invalid_outbox_level );
+        ( "Echo: Produce proof fails on empty outbox",
+          `Quick,
+          Test_outbox.test_produce_proof_empty_outbox );
+        ( "Echo: Deserialise invalid bytes fails",
+          `Quick,
+          Test_outbox.test_deserialise_invalid_bytes );
+        ( "Echo: Proofs for input steps are produced and verified correctly",
+          `Quick,
+          Test_backend.test_input_request_proof );
       ] );
     ( "Storage",
       [

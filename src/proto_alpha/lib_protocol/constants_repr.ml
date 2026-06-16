@@ -64,7 +64,7 @@ let michelson_maximum_type_size = 2001
 
 (* This constant declares the number of subcaches used by the cache
    mechanism (see {Context.Cache}). *)
-let cache_layout_size = 3
+let cache_layout_size = 5
 
 (* /!\ Several parts of the codebase may assume that
    [denunciation_period = 1] and [slashing_delay = 1] **without being
@@ -356,6 +356,33 @@ let check_constants constants =
   let* () =
     error_unless
       Compare.Int.(
+        List.compare_length_with constants.dal.attestation_lags 1 >= 0)
+      (Invalid_protocol_constants
+         "The attestation_lags must contain at least one element.")
+  in
+  let* () =
+    let last_lag =
+      Option.value ~default:0 @@ List.hd
+      @@ List.rev constants.dal.attestation_lags
+    in
+    error_unless
+      Compare.Int.(last_lag = constants.dal.attestation_lag)
+      (Invalid_protocol_constants
+         "The last element of attestation_lags must equal attestation_lag.")
+  in
+  let* () =
+    let rec is_sorted = function
+      | [] | [_] -> true
+      | h1 :: h2 :: tl -> Compare.Int.(h1 < h2) && is_sorted (h2 :: tl)
+    in
+    error_unless
+      (is_sorted constants.dal.attestation_lags)
+      (Invalid_protocol_constants
+         "The attestation_lags list must be ordered increasingly.")
+  in
+  let* () =
+    error_unless
+      Compare.Int.(
         constants.dal.cryptobox_parameters.number_of_shards
         <= constants.consensus_committee_size)
       (Invalid_protocol_constants
@@ -398,6 +425,30 @@ let check_constants constants =
             "The number cached cycles for the sampler state (%d) and for the \
              stake distribution (%d) should currently be the same."
             constants.cache_sampler_state_cycles
+            constants.cache_stake_distribution_cycles))
+  in
+  let* () =
+    error_unless
+      Compare.Int.(
+        constants.cache_stake_info_cycles
+        = constants.cache_stake_distribution_cycles)
+      (Invalid_protocol_constants
+         (Format.sprintf
+            "The number cached cycles for the stake info (%d) and for the \
+             stake distribution (%d) should currently be the same."
+            constants.cache_stake_info_cycles
+            constants.cache_stake_distribution_cycles))
+  in
+  let* () =
+    error_unless
+      Compare.Int.(
+        constants.cache_swrr_selected_distribution_cycles
+        = constants.cache_stake_distribution_cycles)
+      (Invalid_protocol_constants
+         (Format.sprintf
+            "The number cached cycles for the SWRR selection (%d) and for the \
+             stake distribution (%d) should currently be the same."
+            constants.cache_swrr_selected_distribution_cycles
             constants.cache_stake_distribution_cycles))
   in
   Result.return_unit
@@ -581,4 +632,6 @@ let cache_layout p =
       p.cache_script_size;
       p.cache_stake_distribution_cycles;
       p.cache_sampler_state_cycles;
+      p.cache_stake_info_cycles;
+      p.cache_swrr_selected_distribution_cycles;
     ]

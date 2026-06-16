@@ -8,7 +8,10 @@
 
 let () =
   Stdlib.exit
-    (Tezos_base_unix.Event_loop.main_run ~process_name:"baker" (fun () ->
+    (Tezos_base_unix.Event_loop.main_run
+       ~eio:true
+       ~process_name:"baker"
+       (fun () ->
          let open Lwt_syntax in
          let* retcode =
            Lwt_exit.wrap_and_exit

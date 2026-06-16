@@ -113,21 +113,32 @@ let agent_jingo_template agent =
     @
     match disk_size_gb with None -> [] | Some s -> [("disk_size_gb", Tint s)])
 
-let monitoring_jingo_template agents agent =
+let monitoring_jingo_template ~auth_netdata_base_port agents idx agent =
   let open Jingoo.Jg_types in
-  let host =
-    if Env.mode = `Local_orchestrator_local_agents then "localhost"
-    else
-      match Agent.point agent with
-      | Some (host, _port) -> host
-      | None -> domain agents
+  let uri =
+    match auth_netdata_base_port with
+    | Some base_port ->
+        (* Auth enabled: Netdata is accessed through the nginx proxy on
+           the orchestrator, using remapped ports starting at
+           [Env.netdata_proxy_base_port] = 20001. *)
+        let host = domain agents in
+        sf "http://%s:%d" host (base_port + idx)
+    | None ->
+        let host =
+          if Env.mode = `Local_orchestrator_local_agents then "localhost"
+          else
+            match Agent.point agent with
+            | Some (host, _port) -> host
+            | None -> domain agents
+        in
+        sf "http://%s:19999" host
   in
   let vm_name = Option.value ~default:"None" (Agent.vm_name agent) in
   Tobj
     [
       ("name", Tstr (Agent.name agent));
       ("vm_name", Tstr vm_name);
-      ("uri", Tstr (sf "http://%s:19999" host));
+      ("uri", Tstr uri);
     ]
 
 let service_jingo_template {name; url} =
@@ -157,7 +168,16 @@ let jingoo_template t agents =
     ( "monitoring",
       Tlist
         (if Env.monitoring then
-           List.map (monitoring_jingo_template agents) agents
+           let auth_netdata_base_port =
+             if
+               Option.is_some Env.auth_enabled
+               && Env.mode <> `Local_orchestrator_local_agents
+             then Some Env.netdata_proxy_base_port
+             else None
+           in
+           List.mapi
+             (monitoring_jingo_template ~auth_netdata_base_port agents)
+             agents
          else []) );
     ( "opentelemetry",
       Tobj
@@ -190,13 +210,12 @@ let add_service t ~agents service =
   t.services <- service :: t.services ;
   write t ~agents
 
-let run () =
+let run ~interface ~port () =
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
   let dir = Path.tmp_dir // "website" in
   let* () = Process.run "mkdir" ["-p"; dir] in
   let index = index dir in
-  let port = Env.website_port in
   let prometheus = Env.prometheus in
   let monitoring = Env.monitoring in
   let opentelemetry = Env.open_telemetry in
@@ -226,7 +245,7 @@ let run () =
     next_handler request
   in
   let process =
-    Dream.serve ~stop ~port ~tls:false ~interface:"0.0.0.0"
+    Dream.serve ~stop ~port ~tls:false ~interface
     (* @@ Dream.logger *)
     @@ logger
     @@ Dream.router
@@ -262,8 +281,8 @@ let run () =
       services = [];
     }
 
-let start ~agents =
-  let* t = run () in
+let start ?(interface = "0.0.0.0") ?(port = Env.website_port) ~agents () =
+  let* t = run ~interface ~port () in
   let* () = write t ~agents in
   Lwt.return t
 

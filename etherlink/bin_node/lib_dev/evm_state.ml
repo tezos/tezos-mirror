@@ -164,11 +164,7 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
   in
   return evm_state
 
-let modify ?edit_readonly ~key ~value evm_state =
-  Pvm.Kernel.set_durable_value ?edit_readonly evm_state key value
-
-let flag_local_exec evm_state =
-  modify evm_state ~key:Durable_storage_path.evm_node_flag ~value:""
+let flag_local_exec evm_state = Durable_storage.write Evm_node_flag () evm_state
 
 let init_reboot_counter evm_state =
   let initial_reboot_counter =
@@ -178,60 +174,27 @@ let init_reboot_counter evm_state =
         Z.(
           to_int32 @@ succ Tezos_scoru_wasm.Constants.maximum_reboots_per_input))
   in
-  modify
+  Pvm.Kernel.set_durable_value
     ~edit_readonly:true
-    ~key:Durable_storage_path.reboot_counter
-    ~value:initial_reboot_counter
     evm_state
+    Durable_storage_path.reboot_counter
+    initial_reboot_counter
 
 let init ~kernel =
   let open Lwt_result_syntax in
-  let evm_state = Pvm.State.empty (module Irmin_context) () in
+  let evm_state = Pvm.State.empty (module Pvm.Irmin_context) () in
   let* evm_state =
     Pvm.Kernel.start ~tree:evm_state Tezos_scoru_wasm.Wasm_pvm_state.V3 kernel
   in
   (* The WASM Runtime completely ignores the reboot counter, but some versions
      of the Etherlink kernel will need it to exist. *)
   let*! evm_state = init_reboot_counter evm_state in
-  let*! evm_state = flag_local_exec evm_state in
   return evm_state
 
-let inspect evm_state key =
-  let open Lwt_syntax in
-  let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let* value = Pvm.Kernel.find_key_in_durable evm_state key in
-  Option.map_s Tezos_lazy_containers.Chunked_byte_vector.to_bytes value
-
-let subkeys evm_state key =
-  let open Lwt_syntax in
-  let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let* durable = Pvm.Kernel.wrap_as_durable_storage evm_state in
-  let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
-  Tezos_scoru_wasm.Durable.list durable key
-
-let exists evm_state key =
-  let open Lwt_syntax in
-  let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let* durable = Pvm.Kernel.wrap_as_durable_storage evm_state in
-  let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
-  Tezos_scoru_wasm.Durable.exists durable key
-
-let read state key =
+let current_block_height ~chain_family evm_state =
   let open Lwt_result_syntax in
-  let*! res = inspect state key in
-  return res
-
-let storage_version state = Durable_storage.storage_version (read state)
-
-let kernel_version evm_state =
-  let open Lwt_syntax in
-  let+ version = inspect evm_state Durable_storage_path.kernel_version in
-  match version with Some v -> Bytes.unsafe_to_string v | None -> "(unknown)"
-
-let current_block_height ~root evm_state =
-  let open Lwt_syntax in
   let* current_block_number =
-    inspect evm_state (Durable_storage_path.Block.current_number ~root)
+    Durable_storage.read_opt (Current_block_number chain_family) evm_state
   in
   match current_block_number with
   | None ->
@@ -240,18 +203,15 @@ let current_block_height ~root evm_state =
          [apply_unsigned_chunks] is to verify the block height has been
          incremented once, we default to [-1]. *)
       return (Qty Z.(pred zero))
-  | Some current_block_number ->
-      let (Qty current_block_number) = decode_number_le current_block_number in
-      return (Qty current_block_number)
+  | Some qty -> return qty
 
 let current_block_hash ~chain_family evm_state =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let*! current_hash =
-    inspect evm_state (Durable_storage_path.Block.current_hash ~root)
+  let* current_hash =
+    Durable_storage.read_opt (Current_block_hash chain_family) evm_state
   in
   match current_hash with
-  | Some h -> return (decode_block_hash h)
+  | Some h -> return h
   | None -> return (L2_types.genesis_parent_hash ~chain_family)
 
 let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
@@ -288,54 +248,56 @@ let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
       ctxt
       (`Inbox messages)
   in
-  let*! values = List.map_p (fun key -> inspect evm_state key) keys in
+  let* values =
+    List.map_es
+      (fun key -> Durable_storage.read_opt (Raw_path key) evm_state)
+      keys
+  in
   return values
-
-let store_blueprint_chunk evm_state (chunk : Sequencer_blueprint.unsigned_chunk)
-    =
-  let open Lwt_result_syntax in
-  let (Qty number) = chunk.number in
-  let key =
-    Durable_storage_path.Blueprint.chunk
-      ~blueprint_number:number
-      ~chunk_index:chunk.chunk_index
-  in
-  let value =
-    (* We want to encode a [StoreBlueprint] (see blueprint_storage.rs in
-       kernel_latest/kernel). The [StoreBlueprint] has two variants, and we
-       want to store a [SequencerChunk] whose tag is 0. [Value ""] is the
-       RLP-encoded for 0. *)
-    Rlp.List [Rlp.Value (Bytes.of_string ""); Value chunk.value]
-    |> Rlp.encode |> Bytes.to_string
-  in
-  let*! evm_state = modify ~key ~value evm_state in
-  return evm_state
 
 let store_blueprint_chunks ~blueprint_number evm_state
     (chunks : Sequencer_blueprint.unsigned_chunked_blueprint) =
   let open Lwt_result_syntax in
   let chunks = (chunks :> Sequencer_blueprint.unsigned_chunk list) in
   let nb_chunks = List.length chunks in
-  let* evm_state = List.fold_left_es store_blueprint_chunk evm_state chunks in
-  let*! evm_state =
-    modify
-      ~key:(Durable_storage_path.Blueprint.nb_chunks ~blueprint_number)
-      ~value:(Z.to_bits (Z.of_int nb_chunks))
+  let* version = Durable_storage.storage_version evm_state in
+  let chunk_writes =
+    List.map
+      (fun (chunk : Sequencer_blueprint.unsigned_chunk) ->
+        let (Qty number) = chunk.number in
+        let value =
+          (* We want to encode a [StoreBlueprint] (see blueprint_storage.rs
+             in kernel_latest/kernel). The [StoreBlueprint] has two variants,
+             and we want to store a [SequencerChunk] whose tag is 0. [Value ""]
+             is the RLP-encoded for 0. *)
+          Rlp.List [Rlp.Value (Bytes.of_string ""); Value chunk.value]
+          |> Rlp.encode
+        in
+        ( Durable_storage.Blueprint_chunk
+            {blueprint_number = number; chunk_index = chunk.chunk_index},
+          value ))
+      chunks
+  in
+  let* evm_state = Durable_storage.write_all chunk_writes evm_state in
+  let* evm_state =
+    Durable_storage.write
+      (Blueprint_nb_chunks blueprint_number)
+      nb_chunks
       evm_state
   in
-  let* version = storage_version evm_state in
   if version >= 39 then
     let* current_generation =
       Durable_storage.inspect_durable_and_decode_default
         ~default:Qty.zero
-        (read evm_state)
-        Durable_storage_path.Blueprint.current_generation
+        evm_state
+        (Durable_storage_path.Blueprint.current_generation
+           ~storage_version:version)
         Ethereum_types.decode_number_le
     in
-    let*! evm_state =
-      modify
-        ~key:(Durable_storage_path.Blueprint.generation ~blueprint_number)
-        ~value:(encode_u256_le current_generation |> Bytes.to_string)
+    let* evm_state =
+      Durable_storage.write
+        (Blueprint_generation blueprint_number)
+        current_generation
         evm_state
     in
     return evm_state
@@ -345,15 +307,199 @@ type apply_result =
   | Apply_success of {
       evm_state : t;
       block : Ethereum_types.legacy_transaction_object L2_types.block;
+      tezos_block : L2_types.Tezos_block.t option;
     }
   | Apply_failure
+
+type block_in_progress = {
+  timestamp : Time.Protocol.t;
+  number : Ethereum_types.quantity;
+  transactions_count : int32;
+}
+
+let encode ~tezos_x_tag inner =
+  (Rlp.(List [Value (Rlp.encode_int tezos_x_tag); inner]), tezos_x_tag = 1)
+
+let encode_inner ~inner_tag hash raw =
+  let hash = Ethereum_types.hex_to_real_bytes hash in
+  let bytes = String.to_bytes raw in
+  Rlp.(List [Value hash; List [Value (Rlp.encode_int inner_tag); Value bytes]])
+
+let execute_single_transaction ~storage_version ~data_dir ~pool
+    ~native_execution ~config evm_state block_in_progress (Hash hash)
+    (tx : Broadcast.transaction) =
+  let open Lwt_result_syntax in
+  Octez_telemetry.Trace.add_attrs (fun () ->
+      Telemetry.Attributes.
+        [Transaction.hash (Hash hash); Block.number block_in_progress.number]) ;
+  let tezosx = Storage_version.tezosx_single_tx ~storage_version in
+  let tx, read_receipt =
+    match tx with
+    | Broadcast.Delayed tx ->
+        if tezosx then
+          encode ~tezos_x_tag:1 (Evm_events.Delayed_transaction.to_rlp tx)
+        else (Evm_events.Delayed_transaction.to_rlp tx, true)
+    | Broadcast.Common (Evm tx) ->
+        let inner = encode_inner ~inner_tag:1 hash tx in
+        if tezosx then encode ~tezos_x_tag:1 inner else (inner, true)
+    | Broadcast.Common (Michelson op) ->
+        let inner = encode_inner ~inner_tag:1 hash op in
+        if tezosx then encode ~tezos_x_tag:0 inner else (inner, false)
+  in
+  let rlp =
+    Rlp.List
+      [
+        tx;
+        Value (Ethereum_types.timestamp_to_bytes block_in_progress.timestamp);
+        Value (Ethereum_types.encode_u256_le block_in_progress.number);
+      ]
+  in
+  let* evm_state = Durable_storage.write Single_tx_input rlp evm_state in
+  let* evm_state =
+    execute
+      ~pool
+      ~native_execution
+      ~data_dir
+      ~config
+      ~wasm_entrypoint:"single_tx_execution"
+      evm_state
+      (`Inbox [])
+  in
+  if read_receipt then
+    let* receipt = Durable_storage.read Current_receipts evm_state in
+    return (L2_types.Ethereum receipt, evm_state)
+  else return (L2_types.Tezos, evm_state)
+
+let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config
+    evm_state ~input_path ~input ~output_path ~entrypoint =
+  let open Lwt_result_syntax in
+  let* evm_state =
+    Durable_storage.write (Raw_path input_path) input evm_state
+  in
+  let output_path_parts =
+    String.split_on_char '/' output_path |> List.filter (fun s -> s <> "")
+  in
+  let execution_input =
+    Simulation.Encodings.
+      {
+        messages = [];
+        reveal_pages = None;
+        insight_requests = [Durable_storage_key output_path_parts];
+        log_kernel_debug_file = None;
+      }
+  in
+  let* bytes_opt_l =
+    execute_and_inspect
+      ~pool
+      ~native_execution_policy
+      ~data_dir
+      ~config
+      ~wasm_entrypoint:entrypoint
+      ~input:execution_input
+      evm_state
+  in
+  match bytes_opt_l with
+  | [Some bytes] -> return bytes
+  | _ -> failwith "No value found at the entrypoint output path %s" output_path
+
+let retrieve_block_at_root ~chain_family evm_state =
+  let open Lwt_result_syntax in
+  let* storage_version = Durable_storage.storage_version evm_state in
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
+    Durable_storage.read_opt (Current_block chain_family) evm_state
+  else
+    let* current_block_hash = current_block_hash ~chain_family evm_state in
+    Durable_storage.read_opt
+      (Block_by_hash (chain_family, current_block_hash))
+      evm_state
+
+(** [retrieve_block ~chain_family evm_state] returns 0, 1, or 2 blocks
+    as a (first_block * second_block option) option as follows:
+
+    - The first block's kind and the path at which it is read depends
+      on the [chain_family] argument; if the chain family is Michelson,
+      the block is read at the Tezlink root path and expected to be a
+      Tezos block, if the chain family is EVM, the block is read at the
+      Etherlink root path and expected to be an Ethereum block.
+
+    - The second block is attempted to be read at the Tezos X Michelson
+      runtime's path, if something is found at that path, it is always
+      expected to be a Tezos block.
+
+    - If the fist block cannot be read or deserialized, the second read
+      is ignored and this function returns [None].
+
+*)
+let retrieve_block ~chain_family evm_state =
+  let open Lwt_result_syntax in
+  let* block_opt = retrieve_block_at_root ~chain_family evm_state in
+  let* tezos_block_opt =
+    Durable_storage.read_opt Tezosx_tezos_current_block evm_state
+  in
+  let tezos_block =
+    match tezos_block_opt with
+    | Some (L2_types.Tez block) -> Some block
+    | Some (L2_types.Eth _) -> None
+    | None -> None
+  in
+  return (Option.map (fun block -> (block, tezos_block)) block_opt)
+
+let assemble_block (type f) ~pool ~data_dir
+    ~(chain_family : f L2_types.chain_family) ~config ~timestamp ~number
+    ~native_execution evm_state =
+  let open Lwt_result_syntax in
+  let* () =
+    match chain_family with
+    | EVM -> return_unit
+    | Michelson ->
+        failwith "Assemble block is not supported for Michelson chain family"
+  in
+  let rlp =
+    Rlp.List
+      [
+        Value (Ethereum_types.timestamp_to_bytes timestamp);
+        Value (Ethereum_types.encode_u256_le number);
+      ]
+  in
+  let* evm_state = Durable_storage.write Assemble_block_input rlp evm_state in
+  let* evm_state =
+    execute
+      ~pool
+      ~native_execution
+      ~data_dir
+      ~config
+      ~wasm_entrypoint:"assemble_block"
+      evm_state
+      (`Inbox [])
+  in
+  let (Qty height) = number in
+  let before_height = Z.pred height in
+  let* block = retrieve_block ~chain_family evm_state in
+  match block with
+  | Some (block, tezos_block) ->
+      let (Qty after_height) = L2_types.block_number block in
+      if Z.(equal (succ before_height) after_height) then
+        return (Apply_success {evm_state; block; tezos_block})
+      else return Apply_failure
+  | None -> return Apply_failure
+
+let export_gas_used ~log_file ~data_dir
+    (block : legacy_transaction_object L2_types.block) =
+  let (Qty gas) =
+    match block with Eth {gasUsed; _} -> gasUsed | _ -> Qty.zero
+  in
+  let filename =
+    Filename.concat (kernel_logs_directory ~data_dir) (log_file ^ "_profile.csv")
+  in
+  let flags = Unix.[O_WRONLY; O_CREAT; O_APPEND] in
+  Lwt_io.with_file ~mode:Lwt_io.Output ~flags filename @@ fun oc ->
+  Lwt_io.fprintf oc "gas_used\n%Ld\n" (Z.to_int64 gas)
 
 let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
     ~chain_family ~config ~native_execution_policy evm_state
     (chunks : Sequencer_blueprint.unsigned_chunked_blueprint) =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let*! (Qty before_height) = current_block_height ~root evm_state in
+  let* (Qty before_height) = current_block_height ~chain_family evm_state in
   let* evm_state =
     store_blueprint_chunks
       ~blueprint_number:(Z.succ before_height)
@@ -373,58 +519,23 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
       evm_state
       `Skip_stage_one
   in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let* storage_version = storage_version evm_state in
-  let* block =
-    if not (Storage_version.legacy_storage_compatible ~storage_version) then
-      let*! bytes =
-        inspect evm_state (Durable_storage_path.Block.current_block ~root)
-      in
-      return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
-    else
-      let* current_block_hash = current_block_hash ~chain_family evm_state in
-      let*! bytes =
-        inspect
-          evm_state
-          (Durable_storage_path.Block.by_hash ~root current_block_hash)
-      in
-      return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
-  in
-
-  let export_gas_used (Qty gas) =
-    match (profile, log_file) with
-    | Some Configuration.Minimal, Some log_file ->
-        let filename =
-          Filename.concat
-            (kernel_logs_directory ~data_dir)
-            (log_file ^ "_profile.csv")
-        in
-        let flags = Unix.[O_WRONLY; O_CREAT; O_APPEND] in
-        Lwt_io.with_file ~mode:Lwt_io.Output ~flags filename @@ fun oc ->
-        Lwt_io.fprintf oc "gas_used\n%Ld\n" (Z.to_int64 gas)
-    | _ -> Lwt.return_unit
-  in
+  let* block = retrieve_block ~chain_family evm_state in
   match block with
-  | Some block ->
+  | Some (block, tezos_block) ->
       let (Qty after_height) = L2_types.block_number block in
-      let gas =
-        match block with Eth {gasUsed; _} -> gasUsed | _ -> Qty.zero
+      let*! () =
+        match (profile, log_file) with
+        | Some Configuration.Minimal, Some log_file ->
+            export_gas_used ~log_file ~data_dir block
+        | _ -> Lwt_syntax.return_unit
       in
-      let*! () = export_gas_used gas in
       if Z.(equal (succ before_height) after_height) then
-        return (Apply_success {evm_state; block})
+        return (Apply_success {evm_state; block; tezos_block})
       else return Apply_failure
   | _ -> return Apply_failure
 
-let delete ~kind evm_state path =
-  let open Lwt_syntax in
-  let key = Tezos_scoru_wasm.Durable.key_of_string_exn path in
-  let* pvm_state = Pvm.Kernel.decode evm_state in
-  let* durable = Tezos_scoru_wasm.Durable.delete ~kind pvm_state.durable key in
-  Pvm.Kernel.encode {pvm_state with durable} evm_state
-
 let clear_delayed_inbox evm_state =
-  delete ~kind:Directory evm_state Durable_storage_path.delayed_inbox
+  Durable_storage.delete_dir Delayed_inbox evm_state
 
 let wasm_pvm_version state = Pvm.Kernel.get_wasm_version state
 
@@ -436,16 +547,23 @@ let preload_kernel ~pool evm_state =
     Wasm_runtime.preload_kernel ~pool (Pvm.Wasm_internal.to_irmin_exn evm_state)
   in
   if loaded then
-    let* version = kernel_version evm_state in
+    let* version_result = Durable_storage.read Kernel_version evm_state in
+    let version =
+      match version_result with Ok v -> v | Error _ -> "(unknown)"
+    in
     Events.preload_kernel version
   else return_unit
 
 let get_delayed_inbox_item evm_state hash =
   let open Lwt_result_syntax in
-  let*! bytes =
-    inspect
+  let* storage_version = Durable_storage.storage_version evm_state in
+  let* bytes =
+    Durable_storage.read_opt
+      (Raw_path
+         (Durable_storage_path.Delayed_transaction.transaction
+            ~storage_version
+            hash))
       evm_state
-      (Durable_storage_path.Delayed_transaction.transaction hash)
   in
   let*? bytes =
     Option.to_result ~none:[error_of_fmt "missing delayed inbox item"] bytes
@@ -458,18 +576,18 @@ let get_delayed_inbox_item evm_state hash =
         @@ Evm_events.Delayed_transaction.of_rlp_content
              ~transaction_tag:"\x01"
              ~fa_deposit_tag:"\x03"
+             ~operation_tag:"\x04"
              hash
              rlp_item
       in
       return res
   | _ -> failwith "invalid delayed inbox item"
 
-let clear_events evm_state =
-  delete ~kind:Directory evm_state Durable_storage_path.Evm_events.events
+let clear_events evm_state = Durable_storage.delete_dir Evm_events evm_state
 
 let clear_block_storage chain_family block evm_state =
-  let open Lwt_syntax in
-  let* storage_version = Lwt_result.get_exn (storage_version evm_state) in
+  let open Lwt_result_syntax in
+  let* storage_version = Durable_storage.storage_version evm_state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     return evm_state
   else
@@ -481,17 +599,15 @@ let clear_block_storage chain_family block evm_state =
      necessary to produce the next block. Block production starts by reading
      the head to retrieve information such as parent block hash.
   *)
-    let root = Durable_storage_path.root_of_chain_family chain_family in
     let block_parent = L2_types.block_parent block in
     let block_number = L2_types.block_number block in
     let (Qty number) = block_number in
     (* Handles case (1.). *)
     let* evm_state =
       if number > Z.zero then
-        let pred_block_path =
-          Durable_storage_path.Block.by_hash ~root block_parent
-        in
-        delete ~kind:Value evm_state pred_block_path
+        Durable_storage.delete
+          (Block_by_hash (chain_family, block_parent))
+          evm_state
       else return evm_state
     in
     (* Handles case (2.). *)
@@ -502,35 +618,22 @@ let clear_block_storage chain_family block evm_state =
        so we garbage collect only what's possible. *)
       let to_keep = Z.of_int 256 in
       if number >= to_keep then
-        let index_path =
-          Durable_storage_path.Indexes.block_by_number
-            ~root
-            (Nth (Z.sub number to_keep))
-        in
-        delete ~kind:Value evm_state index_path
+        Durable_storage.delete
+          (Block_index (chain_family, Nth (Z.sub number to_keep)))
+          evm_state
       else return evm_state
     in
     (* Receipts are not necessary for the kernel, we can just remove
      the directories. *)
     let* evm_state =
-      delete
-        ~kind:Directory
-        evm_state
-        Durable_storage_path.Transaction_receipt.receipts
+      Durable_storage.delete_dir Transaction_receipts evm_state
     in
-    let* evm_state =
-      delete
-        ~kind:Directory
-        evm_state
-        Durable_storage_path.Transaction_object.objects
-    in
+    let* evm_state = Durable_storage.delete_dir Transaction_objects evm_state in
     return evm_state
 
 let delayed_inbox_hashes evm_state =
-  let open Lwt_syntax in
-  let* keys =
-    subkeys evm_state Durable_storage_path.Delayed_transaction.hashes
-  in
+  let open Lwt_result_syntax in
+  let* keys = Durable_storage.subkeys Delayed_transactions evm_state in
   let hashes =
     (* Remove the empty, meta keys *)
     List.filter_map

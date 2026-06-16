@@ -13,11 +13,13 @@
   octez-libs.base-test-helpers
   octez-libs.test-helpers
   octez-libs.scoru-wasm
+  octez-libs.smart-rollup-wasm-in-memory
   qcheck-alcotest
   octez-alcotezt
   octez-l2-libs.scoru-wasm-helpers
   octez-l2-libs.scoru_wasm_test_helpers
-  octez-l2-libs.webassembly-interpreter-extra)
+  octez-l2-libs.webassembly-interpreter-extra
+  octez-riscv-nds.memory)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
  (flags
@@ -40,6 +42,7 @@
   test_get_set
   test_hash_consistency
   test_host_functions_ticks
+  test_nds_host_func_crash
   test_init
   test_input
   test_output
@@ -47,10 +50,11 @@
   test_protocol_migration
   test_reveal
   test_wasm_encoding
+  test_wasm_pvm_config
   test_wasm_pvm_encodings
   test_wasm_pvm
   test_wasm_vm
-  test_crypto))
+  test_nds_host_functions))
 
 (executable
  (name main)

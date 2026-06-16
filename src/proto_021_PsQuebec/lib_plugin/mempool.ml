@@ -562,6 +562,21 @@ let pre_filter info config
 
 let syntactic_check _ = Lwt.return `Well_formed
 
+let equal_modulo_dummy_values
+    ({contents = contents1; _} : Block_header.protocol_data)
+    ({contents = contents2; _} : Block_header.protocol_data) =
+  (* proof_of_work_nonce are not compared since the preapply function uses a fake
+     protocol_data created with an empty proof_of_work_nonce *)
+
+  (* payload_hash are not compared since the preapply function uses a dummy
+     payload hash (see [forge_faked_protocol_data]) *)
+  Round.equal contents1.payload_round contents2.payload_round
+  && Option.equal
+       Nonce_hash.equal
+       contents1.seed_nonce_hash
+       contents2.seed_nonce_hash
+  && contents1.per_block_votes = contents2.per_block_votes
+
 let is_manager_operation op =
   match Operation.acceptable_pass op with
   | Some pass -> Compare.Int.equal pass Operation_repr.manager_pass

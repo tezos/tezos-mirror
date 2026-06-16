@@ -14,9 +14,6 @@ depends: [
   "bls12-381"
   "octez-libs"
   "octez-version"
-  "caqti-lwt" { >= "2.0.1" }
-  "crunch" { >= "3.3.0" }
-  "re" { >= "1.10.0" }
   "octez-l2-libs"
   "efunc_core"
   "dream" { >= "1.0.0~alpha8-octez" }
@@ -28,4 +25,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "A binary to claim FA deposits sent by the bridge"
+synopsis: "A binary to claim deposits sent by the bridge"

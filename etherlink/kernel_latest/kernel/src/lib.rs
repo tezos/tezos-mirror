@@ -29,16 +29,19 @@ use storage::{
     STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_evm_logging::{log, Level::*, Verbosity};
-use tezos_evm_runtime::internal_runtime::InternalRuntime;
-use tezos_evm_runtime::runtime::{KernelHost, Runtime};
+use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::extensions::WithGas;
+use tezos_evm_runtime::runtime::{IsEvmNode, KernelHost};
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
     OutboxMessage, OutboxMessageWhitelistUpdate, OUTBOX_QUEUE,
 };
 use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::runtime::ValueType;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_tracing::trace_kernel;
 
 mod apply;
@@ -64,10 +67,12 @@ mod l2block;
 mod linked_list;
 mod migration;
 mod parsing;
+pub mod registry_impl;
 mod reveal_storage;
 mod sequencer_blueprint;
 mod simulation;
 mod stage_one;
+mod state_hash;
 mod storage;
 mod sub_block;
 mod tick_model;
@@ -76,15 +81,15 @@ mod upgrade;
 
 extern crate alloc;
 
+// This needs to be set to the frozen commit on snapshot time
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
-fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+fn switch_to_public_rollup<Host>(host: &mut Host) -> Result<(), Error>
+where
+    Host: StorageV1 + WasmHost,
+{
     if let Some(ValueType::Value) = host.store_has(&PRIVATE_FLAG_PATH)? {
-        log!(
-            host,
-            Info,
-            "Submitting outbox message to make the rollup public."
-        );
+        log!(Info, "Submitting outbox message to make the rollup public.");
         let whitelist_update: OutboxMessage<_> =
             OutboxMessage::<MichelsonUnit>::WhitelistUpdate(
                 OutboxMessageWhitelistUpdate { whitelist: None },
@@ -99,8 +104,11 @@ fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
 }
 
 #[trace_kernel]
-pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
-    log!(host, Debug, "Entering stage zero.");
+pub fn stage_zero<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
+where
+    Host: StorageV1 + WasmHost + IsEvmNode,
+{
+    log!(Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
     switch_to_public_rollup(host)?;
     storage_migration(host)
@@ -111,20 +119,23 @@ pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Err
 // function is visible in the profiling results.
 #[trace_kernel]
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn stage_one<Host: Runtime>(
+pub fn stage_one<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     chain_config: &chains::ChainConfig,
     configuration: &mut Configuration,
-) -> Result<StageOneStatus, anyhow::Error> {
-    log!(host, Debug, "Entering stage one.");
-    log!(host, Debug, "Chain Configuration: {}", chain_config);
-    log!(host, Debug, "Configuration: {}", configuration);
+) -> Result<StageOneStatus, anyhow::Error>
+where
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+{
+    log!(Debug, "Entering stage one.");
+    log!(Debug, "Chain Configuration: {}", chain_config);
+    log!(Debug, "Configuration: {}", configuration);
 
     fetch_blueprints(host, smart_rollup_address, chain_config, configuration)
 }
 
-fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+fn set_kernel_version(host: &mut impl StorageV1) -> Result<(), Error> {
     match read_kernel_version(host) {
         Ok(kernel_version) => {
             if kernel_version != KERNEL_VERSION {
@@ -136,14 +147,21 @@ fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     }
 }
 
-fn init_storage_versioning<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+fn init_storage_versioning(host: &mut impl StorageV1) -> Result<(), Error> {
+    // Check both the new /base/ path and the legacy /evm/ path.
+    // If either exists, storage versioning is already initialised and the
+    // migration framework will take it from here.
+    use crate::storage::LEGACY_STORAGE_VERSION_PATH;
     match host.store_read(&STORAGE_VERSION_PATH, 0, 0) {
         Ok(_) => Ok(()),
-        Err(_) => store_storage_version(host, STORAGE_VERSION),
+        Err(_) => match host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, 0) {
+            Ok(_) => Ok(()),
+            Err(_) => store_storage_version(host, STORAGE_VERSION),
+        },
     }
 }
 
-fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+fn retrieve_chain_id(host: &mut impl StorageV1) -> Result<U256, Error> {
     match read_chain_id(host) {
         Ok(chain_id) => Ok(chain_id),
         Err(_) => {
@@ -154,7 +172,10 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 
-fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> U256 {
+fn retrieve_minimum_base_fee_per_gas<Host>(host: &mut Host) -> U256
+where
+    Host: StorageV1,
+{
     match read_minimum_base_fee_per_gas(host) {
         Ok(minimum_base_fee_per_gas) => minimum_base_fee_per_gas,
         Err(_) => {
@@ -162,12 +183,7 @@ fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> U256 {
             if let Err(err) =
                 store_minimum_base_fee_per_gas(host, minimum_base_fee_per_gas)
             {
-                log!(
-                    host,
-                    Error,
-                    "Can't store the default minimum_base_fee: {:?}",
-                    err
-                );
+                log!(Error, "Can't store the default minimum_base_fee: {:?}", err);
             }
             minimum_base_fee_per_gas
         }
@@ -175,20 +191,13 @@ fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> U256 {
 }
 
 #[cfg(test)]
-fn retrieve_base_fee_per_gas<Host: Runtime>(
-    host: &mut Host,
+fn retrieve_base_fee_per_gas(
+    host: &mut impl StorageV1,
     minimum_base_fee_per_gas: U256,
 ) -> U256 {
-    use chains::{ChainConfigTrait, EvmChainConfig};
-
-    let chain_config = EvmChainConfig::default();
-    match block_storage::read_current(
-        host,
-        &chain_config.storage_root_path(),
-        &chain_config.get_chain_family(),
-    ) {
+    match block_storage::read_current_etherlink_block(host) {
         Ok(current_block) => {
-            let current_base_fee_per_gas = current_block.base_fee_per_gas();
+            let current_base_fee_per_gas = current_block.base_fee_per_gas;
             if current_base_fee_per_gas < minimum_base_fee_per_gas {
                 minimum_base_fee_per_gas
             } else {
@@ -199,7 +208,7 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(
     }
 }
 
-fn retrieve_da_fee<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+fn retrieve_da_fee(host: &mut impl StorageV1) -> Result<U256, Error> {
     match read_da_fee(host) {
         Ok(da_fee) => Ok(da_fee),
         Err(_) => {
@@ -211,9 +220,12 @@ fn retrieve_da_fee<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
 }
 
 #[cfg(test)]
-fn retrieve_block_fees<Host: Runtime>(
+fn retrieve_block_fees<Host>(
     host: &mut Host,
-) -> Result<tezos_ethereum::block::BlockFees, Error> {
+) -> Result<tezos_ethereum::block::BlockFees, Error>
+where
+    Host: StorageV1,
+{
     let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host);
     let base_fee_per_gas = retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas);
     let da_fee = retrieve_da_fee(host)?;
@@ -226,7 +238,10 @@ fn retrieve_block_fees<Host: Runtime>(
     Ok(block_fees)
 }
 
-pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+pub fn run<Host>(host: &mut Host) -> Result<(), anyhow::Error>
+where
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+{
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
     // We always start by doing the migration if needed.
@@ -251,12 +266,7 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             set_kernel_version(host)?;
             host.mark_for_reboot()?;
             let configuration = fetch_configuration(host);
-            log!(
-                host,
-                Info,
-                "Configuration after migration: {}",
-                configuration
-            );
+            log!(Info, "Configuration after migration: {}", configuration);
             return Ok(());
         }
         Err(Error::UpgradeError(Fallback)) => {
@@ -289,7 +299,12 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Initialize custom precompile
-    init_precompile_bytecodes(host).map_err(|_| Error::RevmPrecompileInitError)?;
+    let tezosx_enabled = match &chain_configuration {
+        chains::ChainConfig::Evm(config) => config.tezos_runtime_feature_flag(),
+        chains::ChainConfig::Michelson(_) => false,
+    };
+    init_precompile_bytecodes(host, tezosx_enabled)
+        .map_err(|_| Error::RevmPrecompileInitError)?;
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
@@ -313,7 +328,7 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     // Start processing blueprints
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
-        log!(host, Debug, "Entering stage two.");
+        log!(Debug, "Entering stage two.");
         if let block::ComputationResult::RebootNeeded = match chain_configuration {
             chains::ChainConfig::Evm(chain_configuration) => block::produce(
                 host,
@@ -338,12 +353,12 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "benchmark-bypass-stage2")]
     {
-        log!(host, Benchmarking, "Shortcircuiting computation");
+        log!(Benchmarking, "Shortcircuiting computation");
         #[cfg(not(target_arch = "riscv64"))]
         return Ok(());
     }
 
-    log!(host, Debug, "End of kernel run.");
+    log!(Debug, "End of kernel run.");
     Ok(())
 }
 
@@ -351,18 +366,14 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
 // internal runtime. Use `kernel` instead.
 #[entrypoint::main]
 pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut Host) {
-    kernel(
-        host,
-        tezos_evm_runtime::internal_runtime::WasmInternalHost(),
-    )
+    kernel(host)
 }
 
-pub fn kernel<Host, I>(host: &mut Host, internal: I)
+pub fn kernel<Host>(host: &mut Host)
 where
     Host: tezos_smart_rollup_host::runtime::Runtime,
-    I: InternalRuntime,
 {
-    let mut host: KernelHost<Host, &mut Host, I> = KernelHost::init(host, internal);
+    let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
 
     let reboot_counter = host
         .host
@@ -370,7 +381,6 @@ where
         .expect("The kernel failed to get the number of reboot left");
     if reboot_counter == 1000 {
         tezos_smart_rollup_debug::debug_msg!(
-            host,
             "------------------ Kernel Invocation ------------------\n"
         )
     }
@@ -393,15 +403,30 @@ where
             .unwrap();
     }
 
-    let tezlink_subkeys = host
+    let tez_world_state_subkeys = host
         .host
-        .store_count_subkeys(&chains::TEZLINK_SAFE_STORAGE_ROOT_PATH)
-        .expect("The kernel failed to read the number of /tezlink subkeys");
+        .store_count_subkeys(&chains::TEZ_SAFE_STORAGE_ROOT_PATH)
+        .expect("The kernel failed to read the number of /tez/world_state subkeys");
 
-    if tezlink_subkeys == 0 {
+    if tez_world_state_subkeys == 0 {
         host.host
             .store_write(
-                &chains::TEZLINK_SAFE_STORAGE_ROOT_PATH,
+                &chains::TEZ_SAFE_STORAGE_ROOT_PATH,
+                b"Une sarabande de monades",
+                0,
+            )
+            .unwrap();
+    }
+
+    let tez_tez_accounts_subkeys = host
+        .host
+        .store_count_subkeys(&chains::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+        .expect("The kernel failed to read the number of /tez/tez_accounts subkeys");
+
+    if tez_tez_accounts_subkeys == 0 {
+        host.host
+            .store_write(
+                &chains::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
                 b"Un carnaval de foncteur",
                 0,
             )
@@ -423,7 +448,7 @@ where
     match run(&mut host) {
         Ok(()) => (),
         Err(err) => {
-            log!(&host, Fatal, "The kernel produced an error: {:?}", err);
+            log!(Fatal, "The kernel produced an error: {:?}", err);
         }
     }
 }
@@ -447,8 +472,9 @@ mod tests {
     };
     use revm_etherlink::precompiles::constants::{FA_BRIDGE_SOL_ADDR, SYSTEM_SOL_ADDR};
     use revm_etherlink::precompiles::send_outbox_message::RouterInterface;
-    use revm_etherlink::storage::world_state_handler::StorageAccount;
-    use revm_etherlink::storage::NATIVE_TOKEN_TICKETER_PATH;
+    use revm_etherlink::storage::world_state_handler::{
+        StorageAccount, NATIVE_TOKEN_TICKETER_PATH,
+    };
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::nom::NomReader;
@@ -460,7 +486,6 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use alloy_sol_types::SolCall;
-    use tezos_evm_runtime::runtime::Runtime;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
@@ -471,12 +496,12 @@ mod tests {
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_host::path::RefPath;
-    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_mock::TransferMetadata;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
 
-    fn set_balance<Host: Runtime>(host: &mut Host, address: &H160, balance: U256) {
+    fn set_balance(host: &mut impl StorageV1, address: &H160, balance: U256) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
         let mut info = account.info(host).unwrap();
         info.balance = u256_to_alloy(&balance);
@@ -506,7 +531,10 @@ mod tests {
 
         (ticketer.try_into().unwrap(), content)
     }
-    sol!(kernel_wrapper, "../revm/contracts/abi/fa_bridge.abi");
+    sol!(
+        kernel_wrapper,
+        "../revm/contracts/predeployed/abi/fa_bridge.abi"
+    );
 
     #[test]
     fn load_block_fees_new() {

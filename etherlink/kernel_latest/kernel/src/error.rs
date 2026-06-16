@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Trilitech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
@@ -16,6 +16,7 @@ use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_storage::error::Error as GenStorageError;
+use tezos_tezlink::enc_wrappers::BlockNumberOverflowError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -106,10 +107,10 @@ pub enum Error {
     NomReadError(String),
     #[error("Invalid parsing")]
     InvalidParsing,
-    #[error(transparent)]
-    InvalidRunTransaction(revm_etherlink::Error),
+    #[error("Invalid run transaction: {0}")]
+    InvalidRunTransaction(revm_etherlink::EvmRunError),
     #[error("Simulation failed: {0}")]
-    Simulation(revm_etherlink::Error),
+    Simulation(revm_etherlink::EvmRunError),
     #[error("Tezlink simulation failed: {0}")]
     TezlinkSimulation(TezlinkSimulationError),
     #[error(transparent)]
@@ -134,10 +135,26 @@ pub enum Error {
     TcError(String),
     #[error("BigInt conversion error: {0}")]
     TryFromBigIntError(TryFromBigIntError<BigUint>),
+    #[error("Unexpected error from native bridge: {0}")]
+    BridgeError(String),
+    #[error(transparent)]
+    BlockNumberOverflowError(BlockNumberOverflowError),
 }
 
-impl From<revm_etherlink::Error> for Error {
-    fn from(err: revm_etherlink::Error) -> Self {
+impl From<revm_etherlink::EvmKernelError> for Error {
+    fn from(err: revm_etherlink::EvmKernelError) -> Self {
+        Error::Simulation(err.into())
+    }
+}
+
+impl From<revm_etherlink::EvmDbError> for Error {
+    fn from(err: revm_etherlink::EvmDbError) -> Self {
+        Error::Simulation(err.into())
+    }
+}
+
+impl From<revm_etherlink::EvmRunError> for Error {
+    fn from(err: revm_etherlink::EvmRunError) -> Self {
         Error::Simulation(err)
     }
 }
@@ -258,5 +275,11 @@ impl From<GenStorageError> for Error {
             GenStorageError::TcError(msg) => Error::TcError(msg),
             GenStorageError::TryFromBigIntError(msg) => Error::TryFromBigIntError(msg),
         }
+    }
+}
+
+impl From<BlockNumberOverflowError> for Error {
+    fn from(e: BlockNumberOverflowError) -> Self {
+        Self::BlockNumberOverflowError(e)
     }
 }

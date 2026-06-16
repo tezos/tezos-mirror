@@ -26,6 +26,18 @@ let cannot_start =
     ~level:Warning
     ()
 
+let failed_da_fee_read =
+  declare_0
+    ~section
+    ~name:"prevalidator_failed_da_fee_read"
+    ~msg:
+      "failed to read DA fee from durable storage, falling back to zero \
+       (expected at genesis)"
+    ~level:Warning
+    ()
+
 let is_ready = emit is_ready
 
 let cannot_start = emit cannot_start
+
+let failed_da_fee_read = emit failed_da_fee_read

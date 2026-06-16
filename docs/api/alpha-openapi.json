@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol alpha RPC",
     "description": "The RPC API for protocol alpha served by the Octez node.",
-    "version": "Octez 2223.0~rc1+dev (00bee1ae)"
+    "version": "Octez 24.0~rc1+dev (build: 0) (991d8266)"
   },
   "paths": {
     "/": {
@@ -793,6 +793,16 @@
                       "minimum": -128,
                       "maximum": 127
                     },
+                    "cache_stake_info_cycles": {
+                      "type": "integer",
+                      "minimum": -128,
+                      "maximum": 127
+                    },
+                    "cache_swrr_selected_distribution_cycles": {
+                      "type": "integer",
+                      "minimum": -128,
+                      "maximum": 127
+                    },
                     "dal_parametric": {
                       "type": "object",
                       "properties": {
@@ -800,6 +810,9 @@
                           "type": "boolean"
                         },
                         "incentives_enable": {
+                          "type": "boolean"
+                        },
+                        "dynamic_lag_enable": {
                           "type": "boolean"
                         },
                         "number_of_slots": {
@@ -811,6 +824,14 @@
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 255
+                        },
+                        "attestation_lags": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          }
                         },
                         "attestation_threshold": {
                           "type": "integer",
@@ -886,8 +907,10 @@
                       "required": [
                         "feature_enable",
                         "incentives_enable",
+                        "dynamic_lag_enable",
                         "number_of_slots",
                         "attestation_lag",
+                        "attestation_lags",
                         "attestation_threshold",
                         "minimal_participation_ratio",
                         "rewards_ratio",
@@ -1004,6 +1027,9 @@
                     },
                     "smart_rollup_riscv_pvm_enable": {
                       "type": "boolean"
+                    },
+                    "smart_rollup_canonical_rollup_address": {
+                      "$ref": "#/components/schemas/smart_rollup_address"
                     },
                     "zk_rollup_enable": {
                       "type": "boolean"
@@ -1199,6 +1225,12 @@
                     "native_contracts_enable": {
                       "type": "boolean"
                     },
+                    "swrr_new_baker_lottery_enable": {
+                      "type": "boolean"
+                    },
+                    "tz5_account_enable": {
+                      "type": "boolean"
+                    },
                     "issuance_modification_delay": {
                       "type": "integer",
                       "minimum": 0,
@@ -1267,6 +1299,8 @@
                     "cache_script_size",
                     "cache_stake_distribution_cycles",
                     "cache_sampler_state_cycles",
+                    "cache_stake_info_cycles",
+                    "cache_swrr_selected_distribution_cycles",
                     "dal_parametric",
                     "smart_rollup_arith_pvm_enable",
                     "smart_rollup_origination_size",
@@ -1295,6 +1329,8 @@
                     "allow_tz4_delegate_enable",
                     "all_bakers_attest_activation_threshold",
                     "native_contracts_enable",
+                    "swrr_new_baker_lottery_enable",
+                    "tz5_account_enable",
                     "issuance_modification_delay",
                     "consensus_key_activation_delay",
                     "unstake_finalization_delay"
@@ -1586,6 +1622,16 @@
                       "minimum": -128,
                       "maximum": 127
                     },
+                    "cache_stake_info_cycles": {
+                      "type": "integer",
+                      "minimum": -128,
+                      "maximum": 127
+                    },
+                    "cache_swrr_selected_distribution_cycles": {
+                      "type": "integer",
+                      "minimum": -128,
+                      "maximum": 127
+                    },
                     "dal_parametric": {
                       "type": "object",
                       "properties": {
@@ -1593,6 +1639,9 @@
                           "type": "boolean"
                         },
                         "incentives_enable": {
+                          "type": "boolean"
+                        },
+                        "dynamic_lag_enable": {
                           "type": "boolean"
                         },
                         "number_of_slots": {
@@ -1604,6 +1653,14 @@
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 255
+                        },
+                        "attestation_lags": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          }
                         },
                         "attestation_threshold": {
                           "type": "integer",
@@ -1679,8 +1736,10 @@
                       "required": [
                         "feature_enable",
                         "incentives_enable",
+                        "dynamic_lag_enable",
                         "number_of_slots",
                         "attestation_lag",
+                        "attestation_lags",
                         "attestation_threshold",
                         "minimal_participation_ratio",
                         "rewards_ratio",
@@ -1797,6 +1856,9 @@
                     },
                     "smart_rollup_riscv_pvm_enable": {
                       "type": "boolean"
+                    },
+                    "smart_rollup_canonical_rollup_address": {
+                      "$ref": "#/components/schemas/smart_rollup_address"
                     },
                     "zk_rollup_enable": {
                       "type": "boolean"
@@ -1991,6 +2053,12 @@
                     },
                     "native_contracts_enable": {
                       "type": "boolean"
+                    },
+                    "swrr_new_baker_lottery_enable": {
+                      "type": "boolean"
+                    },
+                    "tz5_account_enable": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -2030,6 +2098,8 @@
                     "cache_script_size",
                     "cache_stake_distribution_cycles",
                     "cache_sampler_state_cycles",
+                    "cache_stake_info_cycles",
+                    "cache_swrr_selected_distribution_cycles",
                     "dal_parametric",
                     "smart_rollup_arith_pvm_enable",
                     "smart_rollup_origination_size",
@@ -2057,7 +2127,9 @@
                     "aggregate_attestation",
                     "allow_tz4_delegate_enable",
                     "all_bakers_attest_activation_threshold",
-                    "native_contracts_enable"
+                    "native_contracts_enable",
+                    "swrr_new_baker_lottery_enable",
+                    "tz5_account_enable"
                   ]
                 }
               }
@@ -2461,7 +2533,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded)",
+                  "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash (Base58Check-encoded)",
                   "oneOf": [
                     {
                       "$ref": "#/components/schemas/unistring"
@@ -3147,6 +3219,180 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/positive_bignum"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/contracts/{contract_id}/stez_balance": {
+      "get": {
+        "description": "Returns the sTEZ token balance of the contract. Returns 0 if the contract is originated or does not hold any sTEZ tokens.",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "A contract identifier encoded in b58check.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/positive_bignum"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/contracts/{contract_id}/stez_redeemed_finalizable_balance": {
+      "get": {
+        "description": "Returns the balance (in mutez) of funds that were requested for a redeem operation and are no longer frozen. These can be transferred to the contract's spendable balance with any deposit, redeem, or finalize_redeem operation. Returns null if the contract is originated.",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "A contract identifier encoded in b58check.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/alpha.mutez"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/contracts/{contract_id}/stez_redeemed_frozen_balance": {
+      "get": {
+        "description": "Returns the balance (in mutez) of funds that were requested for a redeem operation but are still frozen for the standard unstake finalization delay. Returns null if the contract is originated.",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "A contract identifier encoded in b58check.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/alpha.mutez"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/contracts/{contract_id}/stez_ticket_balance": {
+      "get": {
+        "description": "Returns the sTEZ ticket balance of the contract (for tokens exported as tickets). Returns 0 if the contract does not hold any sTEZ tickets.",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "description": "A contract identifier encoded in b58check.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Positive big number",
+                  "description": "Decimal representation of a positive big number",
+                  "type": "string"
                 }
               }
             }
@@ -3955,6 +4201,9 @@
                     "incentives_enable": {
                       "type": "boolean"
                     },
+                    "dynamic_lag_enable": {
+                      "type": "boolean"
+                    },
                     "number_of_slots": {
                       "type": "integer",
                       "minimum": 0,
@@ -3964,6 +4213,14 @@
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 255
+                    },
+                    "attestation_lags": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
                     },
                     "attestation_threshold": {
                       "type": "integer",
@@ -4039,8 +4296,10 @@
                   "required": [
                     "feature_enable",
                     "incentives_enable",
+                    "dynamic_lag_enable",
                     "number_of_slots",
                     "attestation_lag",
+                    "attestation_lags",
                     "attestation_threshold",
                     "minimal_participation_ratio",
                     "rewards_ratio",
@@ -5101,6 +5360,66 @@
                   "required": [
                     "limit_of_staking_over_baking_millionth",
                     "edge_of_baking_over_staking_billionth"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/delegates/{pkh}/active_stez_parameters": {
+      "get": {
+        "description": "Returns the currently active delegate's parameters for the sTEZ contract.",
+        "parameters": [
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "type": "object",
+                      "properties": {
+                        "edge_of_stez_staking_over_baking_millionth": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        },
+                        "ratio_of_stez_staking_over_direct_staking_billionth": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "edge_of_stez_staking_over_baking_millionth",
+                        "ratio_of_stez_staking_over_direct_staking_billionth"
+                      ]
+                    }
                   ]
                 }
               }
@@ -6422,6 +6741,112 @@
         }
       }
     },
+    "/context/delegates/{pkh}/pending_stez_parameters": {
+      "get": {
+        "description": "Returns the currently pending delegate's parameters for the sTEZ contract.",
+        "parameters": [
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "cycle": {
+                        "type": "integer",
+                        "minimum": -2147483648,
+                        "maximum": 2147483647
+                      },
+                      "parameters": {
+                        "oneOf": [
+                          {
+                            "title": "update",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "update"
+                                ]
+                              },
+                              "parameters": {
+                                "type": "object",
+                                "properties": {
+                                  "edge_of_stez_staking_over_baking_millionth": {
+                                    "type": "integer",
+                                    "minimum": -2147483648,
+                                    "maximum": 2147483647
+                                  },
+                                  "ratio_of_stez_staking_over_direct_staking_billionth": {
+                                    "type": "integer",
+                                    "minimum": -2147483648,
+                                    "maximum": 2147483647
+                                  }
+                                },
+                                "required": [
+                                  "edge_of_stez_staking_over_baking_millionth",
+                                  "ratio_of_stez_staking_over_direct_staking_billionth"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "parameters"
+                            ]
+                          },
+                          {
+                            "title": "unregister",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "unregister"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "cycle",
+                      "parameters"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/context/delegates/{pkh}/stakers": {
       "get": {
         "description": "Returns the list of accounts that stake to a given delegate together with their share of the frozen deposits.",
@@ -6516,6 +6941,82 @@
     "/context/delegates/{pkh}/staking_denominator": {
       "get": {
         "description": "Returns an abstract representation of the total delegated stake.",
+        "parameters": [
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/positive_bignum"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/delegates/{pkh}/stez_registered": {
+      "get": {
+        "description": "Returns true if the delegate is registered with the sTEZ contract. Otherwise, returns false.",
+        "parameters": [
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/delegates/{pkh}/stez_staking_power": {
+      "get": {
+        "description": "Returns the current staking power from sTEZ allocated to this delegate.",
         "parameters": [
           {
             "name": "pkh",
@@ -9417,6 +9918,239 @@
         }
       }
     },
+    "/context/stez/bakers": {
+      "get": {
+        "description": "List of delegates registered with sTEZ together with their fee and capacity.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "pkh": {
+                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "properties": {
+                          "edge_of_stez_staking_over_baking_millionth": {
+                            "type": "integer",
+                            "minimum": -2147483648,
+                            "maximum": 2147483647
+                          },
+                          "ratio_of_stez_staking_over_direct_staking_billionth": {
+                            "type": "integer",
+                            "minimum": -2147483648,
+                            "maximum": 2147483647
+                          }
+                        },
+                        "required": [
+                          "edge_of_stez_staking_over_baking_millionth",
+                          "ratio_of_stez_staking_over_direct_staking_billionth"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "pkh",
+                      "parameters"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/stez/contract_hash": {
+      "get": {
+        "description": "Returns the sTEZ contract hash.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "A contract ID (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/stez/exchange_rate": {
+      "get": {
+        "description": "Returns the exchange rate between sTEZ token and tez calculated as the ratio of total_amount_of_tez to total_supply. Returns {1, 1} if total_supply is 0.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "numerator": {
+                      "$ref": "#/components/schemas/positive_bignum"
+                    },
+                    "denominator": {
+                      "$ref": "#/components/schemas/positive_bignum"
+                    }
+                  },
+                  "required": [
+                    "numerator",
+                    "denominator"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/stez/staking_power": {
+      "get": {
+        "description": "List of delegates with their staking power from sTEZ for the current cycle.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/alpha.mutez"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                              },
+                              {
+                                "$ref": "#/components/schemas/alpha.mutez"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/stez/total_amount_of_tez": {
+      "get": {
+        "description": "Returns the total amount of tez in the sTEZ staking ledger (in mutez).",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/positive_bignum"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/stez/total_supply": {
+      "get": {
+        "description": "Returns the total supply of sTEZ tokens.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/positive_bignum"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/context/total_currently_staked": {
       "get": {
         "description": "Returns the amount of staked tez by delegates, delegators or overstaked.",
@@ -10433,6 +11167,126 @@
         }
       }
     },
+    "/helpers/decode_dal_attestation/{dal_attestation_bitset}": {
+      "get": {
+        "description": "Decodes a DAL attestation bitset into an explicit representation of attested slots per lag, using the current protocol parameters (number_of_slots and number_of_lags).",
+        "parameters": [
+          {
+            "name": "dal_attestation_bitset",
+            "in": "path",
+            "description": "A DAL attestation bitset as a decimal integer",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "lag_index": {
+                        "type": "integer",
+                        "minimum": -1073741824,
+                        "maximum": 1073741823
+                      },
+                      "slot_indices": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
+                        }
+                      }
+                    },
+                    "required": [
+                      "lag_index",
+                      "slot_indices"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/helpers/encode_dal_attestation": {
+      "post": {
+        "description": "Encodes an explicit representation of attested slots per lag into a DAL attestation bitset, using the current protocol parameters (number_of_slots and number_of_lags).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "lag_index": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "slot_indices": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": -1073741824,
+                        "maximum": 1073741823
+                      }
+                    }
+                  },
+                  "required": [
+                    "lag_index",
+                    "slot_indices"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Big number",
+                  "description": "Decimal representation of a big number",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/helpers/forge/bls_consensus_operations": {
       "post": {
         "description": "Forge a consensus operation in BLS mode",
@@ -10641,7 +11495,7 @@
                     }
                   },
                   "signature": {
-                    "$ref": "#/components/schemas/Signature.V2"
+                    "$ref": "#/components/schemas/Signature.V3"
                   }
                 },
                 "required": [
@@ -10912,7 +11766,7 @@
                       "$ref": "#/components/schemas/alpha.liquidity_baking_vote"
                     },
                     "signature": {
-                      "$ref": "#/components/schemas/Signature.V2"
+                      "$ref": "#/components/schemas/Signature.V3"
                     }
                   },
                   "required": [
@@ -10997,7 +11851,7 @@
                         }
                       },
                       "signature": {
-                        "$ref": "#/components/schemas/Signature.V2"
+                        "$ref": "#/components/schemas/Signature.V3"
                       }
                     },
                     "required": [
@@ -11078,7 +11932,7 @@
                         "$ref": "#/components/schemas/alpha.liquidity_baking_vote"
                       },
                       "signature": {
-                        "$ref": "#/components/schemas/Signature.V2"
+                        "$ref": "#/components/schemas/Signature.V3"
                       }
                     },
                     "required": [
@@ -11504,7 +12358,7 @@
     },
     "/helpers/scripts/normalize_data": {
       "post": {
-        "description": "Normalizes some data expression using the requested unparsing mode",
+        "description": "Normalizes some data expression using the requested unparsing mode, input data does not need to be well-typed.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -11711,7 +12565,7 @@
     },
     "/helpers/scripts/normalize_stack": {
       "post": {
-        "description": "Normalize a Michelson stack using the requested unparsing mode",
+        "description": "Normalize a Michelson stack using the requested unparsing mode, input stack does not need to be well-typed.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -11998,7 +12852,7 @@
     },
     "/helpers/scripts/run_code": {
       "post": {
-        "description": "Run a Michelson script in the current context",
+        "description": "Run a Michelson script in the current context. The gas used is bounded by the protocol's hard gas limit per operation.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -12411,7 +13265,7 @@
                         }
                       },
                       "signature": {
-                        "$ref": "#/components/schemas/Signature.V2"
+                        "$ref": "#/components/schemas/Signature.V3"
                       }
                     },
                     "required": [
@@ -12449,7 +13303,7 @@
                           }
                         },
                         "signature": {
-                          "$ref": "#/components/schemas/Signature.V2"
+                          "$ref": "#/components/schemas/Signature.V3"
                         }
                       },
                       "required": [
@@ -12467,7 +13321,7 @@
                           }
                         },
                         "signature": {
-                          "$ref": "#/components/schemas/Signature.V2"
+                          "$ref": "#/components/schemas/Signature.V3"
                         }
                       },
                       "required": [
@@ -12905,7 +13759,7 @@
                         }
                       },
                       "signature": {
-                        "$ref": "#/components/schemas/Signature.V2"
+                        "$ref": "#/components/schemas/Signature.V3"
                       }
                     },
                     "required": [
@@ -12948,7 +13802,7 @@
                           }
                         },
                         "signature": {
-                          "$ref": "#/components/schemas/Signature.V2"
+                          "$ref": "#/components/schemas/Signature.V3"
                         }
                       },
                       "required": [
@@ -12966,7 +13820,7 @@
                           }
                         },
                         "signature": {
-                          "$ref": "#/components/schemas/Signature.V2"
+                          "$ref": "#/components/schemas/Signature.V3"
                         }
                       },
                       "required": [
@@ -13332,6 +14186,109 @@
                   },
                   "required": [
                     "gas"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/helpers/swrr_credits": {
+      "get": {
+        "description": "Returns the current SWRR state which contains the remaining credits for all the active delegates. Delegates whose credits have not been initialized yet are returned with a credit of zero. Fails with a 'non_activated_feature' error if the 'swrr_new_baker_lottery_enable' feature flag is not enabled.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "delegate": {
+                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      },
+                      "credit": {
+                        "$ref": "#/components/schemas/bignum"
+                      }
+                    },
+                    "required": [
+                      "delegate",
+                      "credit"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/helpers/swrr_selected_bakers": {
+      "get": {
+        "description": "Returns the selected bakers for the round 0 of the cycle, selected via the SWRR algorithm. If the 'cycle' parameter is not provided, defaults to the current cycle. Returns 'null' if the baking rights for this cycle have not been computed yet or have already been cleaned from the context. Fails with a 'non_activated_feature' error if the 'swrr_new_baker_lottery_enable' feature flag is not enabled.",
+        "parameters": [
+          {
+            "name": "cycle",
+            "in": "query",
+            "description": "A cycle integer",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "consensus_pk": {
+                            "$ref": "#/components/schemas/Signature.Public_key"
+                          },
+                          "delegate": {
+                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                          },
+                          "companion_pk": {
+                            "$ref": "#/components/schemas/Bls12_381.Public_key"
+                          }
+                        },
+                        "required": [
+                          "consensus_pk"
+                        ]
+                      }
+                    }
                   ]
                 }
               }
@@ -14853,7 +15810,7 @@
         ]
       },
       "Signature.Public_key": {
-        "title": "A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded)",
+        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded)",
         "oneOf": [
           {
             "$ref": "#/components/schemas/unistring"
@@ -14861,7 +15818,7 @@
         ]
       },
       "Signature.Public_key_hash": {
-        "title": "A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded)",
+        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash (Base58Check-encoded)",
         "oneOf": [
           {
             "$ref": "#/components/schemas/unistring"
@@ -14876,8 +15833,8 @@
           }
         ]
       },
-      "Signature.V2": {
-        "title": "A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded)",
+      "Signature.V3": {
+        "title": "A Ed25519, Secp256k1, P256, BLS or Mldsa44 signature (Base58Check-encoded)",
         "oneOf": [
           {
             "$ref": "#/components/schemas/unistring"
@@ -15120,7 +16077,7 @@
             "$ref": "#/components/schemas/alpha.liquidity_baking_vote"
           },
           "signature": {
-            "$ref": "#/components/schemas/Signature.V2"
+            "$ref": "#/components/schemas/Signature.V3"
           }
         },
         "required": [
@@ -15333,7 +16290,7 @@
             "$ref": "#/components/schemas/alpha.inlined.consensus_operation.contents"
           },
           "signature": {
-            "$ref": "#/components/schemas/Signature.V2"
+            "$ref": "#/components/schemas/Signature.V3"
           }
         },
         "required": [
@@ -16472,6 +17429,11 @@
                 "maximum": 65535
               },
               "slot_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "lag_index": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 255
@@ -19497,6 +20459,11 @@
                 "maximum": 65535
               },
               "slot_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "lag_index": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 255
@@ -24817,7 +25784,7 @@
                 }
               },
               "signature": {
-                "$ref": "#/components/schemas/Signature.V2"
+                "$ref": "#/components/schemas/Signature.V3"
               }
             },
             "required": [
@@ -24835,7 +25802,7 @@
                 }
               },
               "signature": {
-                "$ref": "#/components/schemas/Signature.V2"
+                "$ref": "#/components/schemas/Signature.V3"
               }
             },
             "required": [
@@ -25719,6 +26686,82 @@
                 "change",
                 "origin"
               ]
+            },
+            {
+              "title": "STEZ_deposits",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "freezer"
+                  ]
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "stez_deposits"
+                  ]
+                },
+                "change": {
+                  "$ref": "#/components/schemas/int64"
+                },
+                "origin": {
+                  "type": "string",
+                  "enum": [
+                    "block"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "category",
+                "change",
+                "origin"
+              ]
+            },
+            {
+              "title": "STEZ_redeemed_deposits",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "freezer"
+                  ]
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "stez_redeemed_deposits"
+                  ]
+                },
+                "staker": {
+                  "$ref": "#/components/schemas/alpha.contract_id"
+                },
+                "cycle": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "change": {
+                  "$ref": "#/components/schemas/int64"
+                },
+                "origin": {
+                  "type": "string",
+                  "enum": [
+                    "block"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "category",
+                "staker",
+                "cycle",
+                "change",
+                "origin"
+              ]
             }
           ]
         }
@@ -26324,7 +27367,7 @@
             }
           },
           "signature": {
-            "$ref": "#/components/schemas/Signature.V2"
+            "$ref": "#/components/schemas/Signature.V3"
           }
         },
         "required": [

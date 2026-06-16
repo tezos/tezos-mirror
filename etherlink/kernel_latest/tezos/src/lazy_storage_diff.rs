@@ -5,26 +5,26 @@
 
 //! Tezos operations
 
-use crate::enc_wrappers::ScriptExprHash;
+use tezos_crypto_rs::hash::ScriptExprHash;
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::Zarith;
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 pub struct Update {
     pub key_hash: ScriptExprHash,
     pub key: Vec<u8>,
     pub value: Option<Vec<u8>>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 pub struct Copy {
     pub source: Zarith,
     #[encoding(dynamic, list)]
     pub updates: Vec<Update>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 pub struct Alloc {
     #[encoding(dynamic, list)]
     pub updates: Vec<Update>,
@@ -32,7 +32,7 @@ pub struct Alloc {
     pub value_type: Vec<u8>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 #[encoding(tags = "u8")]
 pub enum StorageDiff {
     #[encoding(dynamic, list)]
@@ -42,19 +42,19 @@ pub enum StorageDiff {
     Alloc(Alloc),
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 pub struct BigMapDiff {
     pub id: Zarith,
     pub storage_diff: StorageDiff,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 #[encoding(tags = "u8")]
 pub enum LazyStorageDiff {
     BigMap(BigMapDiff),
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 pub struct LazyStorageDiffList {
     #[encoding(dynamic, list)]
     pub diff: Vec<LazyStorageDiff>,
@@ -84,20 +84,24 @@ mod tests {
     use std::str::FromStr;
 
     use crate::{
-        enc_wrappers::ScriptExprHash,
         encoding_test_data_helper::test_helpers::fetch_generated_data,
         lazy_storage_diff::{
             Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff,
             Update,
         },
+        protocol::TARGET_TEZOS_PROTOCOL,
     };
     use mir::ast::BinWriter;
-    use primitive_types::H256;
+    use tezos_crypto_rs::hash::ScriptExprHash;
 
     #[test]
     pub fn big_map_alloc_compatibility() {
-        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat).encode();
-        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit).encode();
+        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat)
+            .encode()
+            .unwrap();
+        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit)
+            .encode()
+            .unwrap();
         let diff: LazyStorageDiffList = LazyStorageDiff::BigMap(BigMapDiff {
             id: 0u64.into(),
             storage_diff: StorageDiff::Alloc(Alloc {
@@ -107,8 +111,11 @@ mod tests {
             }),
         })
         .into();
-        let expected =
-            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-alloc");
+        let expected = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "lazy_storage_diff",
+            "big_map_diff-alloc",
+        );
         assert_eq!(
             diff.to_bytes()
                 .expect("Lazy storage diff encoding should have succeed"),
@@ -127,8 +134,11 @@ mod tests {
             }),
         })
         .into();
-        let expected =
-            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-copy");
+        let expected = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "lazy_storage_diff",
+            "big_map_diff-copy",
+        );
         assert_eq!(
             diff.to_bytes()
                 .expect("Lazy storage diff encoding should have succeed"),
@@ -144,8 +154,11 @@ mod tests {
             storage_diff: StorageDiff::Remove,
         })
         .into();
-        let expected =
-            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-remove");
+        let expected = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "lazy_storage_diff",
+            "big_map_diff-remove",
+        );
         assert_eq!(
             diff.to_bytes()
                 .expect("Lazy storage diff encoding should have succeed"),
@@ -156,19 +169,29 @@ mod tests {
 
     #[test]
     pub fn big_map_update_compatibility() {
-        let key = mir::ast::Micheline::Int(1u64.into()).encode();
-        let value = Some(mir::ast::Micheline::prim0(mir::lexer::Prim::UNIT).encode());
+        let key = mir::ast::Micheline::Int(1u64.into()).encode().unwrap();
+        let value = Some(
+            mir::ast::Micheline::prim0(mir::lexer::Prim::UNIT)
+                .encode()
+                .unwrap(),
+        );
         let diff: LazyStorageDiffList = LazyStorageDiff::BigMap(BigMapDiff {
             id: 0u64.into(),
             storage_diff: StorageDiff::Update(vec![Update {
-                key_hash: ScriptExprHash(H256::from_str("cffedbaf00cb581448a5683abdefe0d5cd4d4ba4923f1a489791810c3fec3325").unwrap()),
+                key_hash: ScriptExprHash::from_str(
+                    "exprv6UsC1sN3Fk2XfgcJCL8NCerP5rCGy1PRESZAqr7L2JdzX55EN",
+                )
+                .unwrap(),
                 key,
                 value,
             }]),
         })
         .into();
-        let expected =
-            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-update");
+        let expected = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "lazy_storage_diff",
+            "big_map_diff-update",
+        );
         assert_eq!(
             diff.to_bytes()
                 .expect("Lazy storage diff encoding should have succeed"),

@@ -182,7 +182,9 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
   (* We want to give the extra bootstraps as little as possible, just enough
      to do their job. *)
   let default_accounts_balance =
-    (max_single_transaction_fee + Constants.gas_safety_margin) * blocks_total
+    Int64.of_int
+    @@ (max_single_transaction_fee + Constants.gas_safety_margin)
+       * blocks_total
   in
   let* node, client =
     Client.init_with_protocol

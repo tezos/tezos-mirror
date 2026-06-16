@@ -23,4 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make = Tezos_scoru_wasm.Wasm_pvm.Make_pvm (Vm)
+module Make_machine (S : Tezos_scoru_wasm.Wasm_pvm_sig.STATE) =
+  Tezos_scoru_wasm.Wasm_pvm.Make_machine (Vm) (S)
+module Make_pvm = Tezos_scoru_wasm.Wasm_pvm.Make_pvm (Vm)

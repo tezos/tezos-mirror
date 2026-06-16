@@ -34,14 +34,14 @@ val init :
   identity:P2p_identity.t ->
   network_name:Distributed_db_version.Name.t ->
   Profile_manager.t ->
-  Cryptobox.t ->
-  Cryptobox.shards_proofs_precomputation option ->
+  Proto_cryptoboxes.t ->
   Proto_plugins.t ->
   Store.t ->
   Gossipsub.Worker.t ->
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
   last_finalized_level:int32 ->
+  l1_current_level:int32 ->
   ?disable_shard_validation:bool ->
   ignore_pkhs:Signature.Public_key_hash.Set.t ->
   unit ->
@@ -69,29 +69,40 @@ val get_plugin_and_parameters_for_level :
     {!get_plugin_and_parameters_for_level}. *)
 val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
 
+(** Returns the proto_level of the plugin registered for the given level. *)
+val get_proto_level_for_level : t -> level:int32 -> int tzresult
+
 (** Tries to add a new plugin for the protocol with level [proto_level] to be used
     starting with the given [block_level].
+    Returns [true] if a plugin is added. [false] otherwise.
 
     It returns an error if the node is not ready, if the
     [Chain_services.Blocks.protocols] RPC fails, or if the plugin is not
     registered. *)
-val may_add_plugin :
+val may_add_plugin_and_cryptobox :
   t ->
   Rpc_context.t ->
   block_level:int32 ->
   proto_level:int ->
-  unit tzresult Lwt.t
+  bool tzresult Lwt.t
 
 (** Set the protocol plugins to the given value. *)
 val set_proto_plugins : t -> Proto_plugins.t -> unit
 
 (** [get_proto_parameters ~level ctxt] returns the DAL node's protocol
-    parameters. When [level] is [`Last_proto], it returns the last known
-    parameters. If [level] is [`Level level], then the protocol parameters for
-    that level are returned. The parameters returned are obtained via
-    {!get_plugin_and_parameters_for_level}. *)
+    parameters. When [level] is [`Head], it returns the protocol parameters
+    associated to L1's current head. If [level] is [`Level level], then the
+    protocol parameters for that level are returned. The parameters returned are
+    obtained via {!get_plugin_and_parameters_for_level}. *)
 val get_proto_parameters :
-  level:[`Last_proto | `Level of int32] -> t -> Types.proto_parameters tzresult
+  level:[`Head | `Level of int32] -> t -> Types.proto_parameters tzresult
+
+(** [get_traps_fraction ctxt ~published_level ~default] returns the
+    [traps_fraction] from the protocol parameters at [~published_level].
+    Falls back to [~default] if the lookup fails. The published level is
+    used because trap detection depends on the shard content, which is
+    fixed at publication time. *)
+val get_traps_fraction : t -> published_level:int32 -> default:Q.t -> Q.t
 
 (** Reconstruct the given slot id by calling the [reconstruct]
     function unless a reconstruction for the given slot id is alredy
@@ -137,7 +148,10 @@ val set_profile_ctxt : t -> ?save:bool -> Profile_manager.t -> unit Lwt.t
 val get_config : t -> Configuration_file.t
 
 (** [get_cryptobox ctxt] returns the DAL node's cryptobox *)
-val get_cryptobox : t -> Cryptobox.t
+val get_cryptobox_and_precomputations :
+  level:Int32.t ->
+  t ->
+  (Cryptobox.t * Cryptobox.shards_proofs_precomputation option) tzresult
 
 (** Update the node's last finalized level. *)
 val set_last_finalized_level : t -> int32 -> unit
@@ -146,21 +160,26 @@ val set_last_finalized_level : t -> int32 -> unit
     the node's last processed level. *)
 val get_last_finalized_level : t -> int32
 
+(** Update the node's L1 current head level. *)
+val set_l1_current_head_level : t -> int32 -> unit
+
+(** Get the node's L1 current head level. *)
+val get_l1_current_head_level : t -> int32
+
 (** Returns true if and only if the node's profile is bootstrap. *)
 val is_bootstrap_node : t -> bool
 
 (** Returns true if and only if the node's profile supports refutation games. *)
 val supports_refutations : t -> bool
 
-(** [get_shards_proofs_precomputation ctxt] returns the shards proof's precomputation. *)
-val get_shards_proofs_precomputation :
-  t -> Cryptobox.shards_proofs_precomputation option
-
 (** [get_store ctxt] returns the dal node store. *)
 val get_store : t -> Store.t
 
 (** [get_gs_worker ctxt] returns the Gossipsub worker state. *)
 val get_gs_worker : t -> Gossipsub.Worker.t
+
+(** [get_attestation_ops_cache ctxt] returns the attestation operations cache. *)
+val get_attestation_ops_cache : t -> Attestation_ops_cache.t
 
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
 val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic
@@ -242,6 +261,39 @@ val get_attestable_slots_watcher_table : t -> Attestable_slots_watcher_table.t
 (** [get_attestation_lag ctxt ~level] returns the attestation lag found at [~level]
     using protocol parameters obtained using [ctxt]. *)
 val get_attestation_lag : t -> level:int32 -> int32 tzresult
+
+(** [get_attestation_lags ctxt ~level] returns the list of attestation lags found
+    at [~level] using protocol parameters using [ctxt]. *)
+val get_attestation_lags : t -> level:int32 -> int32 list tzresult
+
+(** [get_next_migration_level ctxt] returns the level of the next known pending
+    migration, or [None] if no known migration is pending. *)
+val get_next_migration_level : t -> int32 option tzresult Lwt.t
+
+(** [get_cached_or_fetch_attestation_ops cctxt node_ctxt parameters ~attested_level]
+    returns the attestation operations for [attested_level] from the cache if
+    available. Otherwise, fetches them from L1 using the appropriate plugin,
+    converts them to cache format, stores them, and returns the result. *)
+val get_cached_or_fetch_attestation_ops :
+  Rpc_context.t ->
+  t ->
+  Types.proto_parameters ->
+  attested_level:int32 ->
+  Attestation_ops_cache.cached_ops tzresult Lwt.t
+
+(** [store_attestations_in_cache plugin ctxt parameters attestations ~block_level]
+    converts raw [attestations] obtained from the plugin into cache format and
+    stores them in the attestation operations cache for [block_level] and
+    returns them. *)
+val store_attestations_in_cache :
+  (module Dal_plugin.T
+     with type tb_slot = 'tb_slot
+      and type dal_attestations = 'dal_attestations) ->
+  t ->
+  Types.proto_parameters ->
+  ('tb_slot * 'attestation_operation * 'dal_attestations option) list ->
+  block_level:int32 ->
+  Attestation_ops_cache.cached_ops tzresult Lwt.t
 
 (** Module for P2P-related accessors.  *)
 module P2P : sig

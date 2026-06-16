@@ -7,7 +7,7 @@
 
 open Gitlab_ci.Base
 
-type stage = Build | Test | Publish
+type stage = Build | Test | Publish | Test_publication
 
 (* Should actually be equivalent to [Stdlib.compare]
    if stages are defined in the right order.
@@ -19,56 +19,175 @@ type stage = Build | Test | Publish
 let compare_stages a b =
   match (a, b) with
   | Build, Build -> 0
-  | Build, (Test | Publish) -> -1
+  | Build, (Test | Publish | Test_publication) -> -1
   | Test, Build -> 1
   | Test, Test -> 0
-  | Test, Publish -> -1
+  | Test, (Publish | Test_publication) -> -1
   | Publish, (Build | Test) -> 1
   | Publish, Publish -> 0
+  | Publish, Test_publication -> -1
+  | Test_publication, (Build | Test | Publish) -> 1
+  | Test_publication, Test_publication -> 0
 
 let show_stage = function
   | Build -> "build"
   | Test -> "test"
   | Publish -> "publish"
+  | Test_publication -> "publishing_tests"
 
 type need = Job | Artifacts
 
 type sccache_config = {
-  key : string option;
   error_log : string option;
-  idle_timeout : string option;
   log : string option;
-  path : string option;
-  cache_size : string option;
-}
-
-let sccache ?key ?error_log ?idle_timeout ?log ?path ?cache_size () =
-  {key; error_log; idle_timeout; log; path; cache_size}
-
-type dune_cache_config = {
-  key : string option;
-  path : string option;
-  cache_size : string option;
-  copy_mode : bool option;
   policy : Gitlab_ci.Types.cache_policy option;
 }
 
-let dune_cache ?key ?path ?cache_size ?copy_mode ?policy () =
-  {key; path; cache_size; copy_mode; policy}
+let sccache ?error_log ?log ?policy () = {error_log; log; policy}
 
-(* Conditions are disjunctions: the job is included in the pipeline if
-   ANY file in [changed] changed, or if the merge request has ANY of the [label]s. *)
-type condition = {changed : Tezos_ci.Changeset.t; label : String_set.t}
+(* The [Condition] module provides an interface that makes it look like Cacio
+   supports generic predicates for job rules,
+   because predicates are easier to reason with than GitLab's rules.
+   This module can then encode those predicates into GitLab rules.
 
-let empty_condition =
-  {changed = Tezos_ci.Changeset.make []; label = String_set.empty}
+   This module does not support conjunctions because GitLab rules are not general enough.
+   To convince yourself, try to encode [(changes a.ml or b.ml) and (changes c.ml or d.ml)]
+   into GitLab rules.
 
-let merge_conditions {changed = changed1; label = label1}
-    {changed = changed2; label = label2} =
-  {
-    changed = Tezos_ci.Changeset.union changed1 changed2;
-    label = String_set.union label1 label2;
-  }
+   And since the negation of a disjunction is a conjunction,
+   this module does not support negations
+   for the same reason it does not support disjunctions. *)
+module Condition : sig
+  (** Conditions for a job to be included.
+
+      Conditions are ignored for pipelines which are not merge request pipelines:
+      jobs are included unconditionally for those pipelines. *)
+  type t
+
+  (** Condition that never holds (never include the job). *)
+  val false_ : t
+
+  (** Condition that always holds (always include the job). *)
+  val true_ : t
+
+  (** Include the job if the merge request modifies
+      at least one of the files in a given changeset. *)
+  val changes : Tezos_ci.Changeset.t -> t
+
+  (** Include the job if the merge request labels include any of the given labels. *)
+  val label : string list -> t
+
+  (** Disjunction: include the job if at least one condition holds. *)
+  val or_ : t -> t -> t
+
+  (** Convert a condition to a set of GitLab [rules].
+
+      [when_] should be positive ([Always], [On_success] or [Manual]).
+      It is the [when_] clause for rules when the condition holds. *)
+  val encode :
+    ?when_:Gitlab_ci.Types.when_ ->
+    ?allow_failure:Gitlab_ci.Types.allow_failure_rule ->
+    t ->
+    Gitlab_ci.Types.job_rule list option
+end = struct
+  type base_predicate =
+    | False
+    | True
+    | Changes of Tezos_ci.Changeset.t
+    | Label of string list
+
+  (* Conditions are disjunctions of base predicates.
+     Following the usual conventions, the empty disjunction is equivalent to [True]. *)
+  type t = base_predicate list
+
+  let false_ = [False]
+
+  let true_ = [True]
+
+  let changes set = [Changes set]
+
+  let label label = [Label label]
+
+  let or_ = ( @ )
+
+  let empty_changeset = Tezos_ci.Changeset.make []
+
+  let encode ?when_ ?allow_failure condition =
+    if List.mem True condition then
+      (* If any of the base predicate is [True],
+         the whole condition is equivalent to [True]. *)
+      match when_ with
+      | None -> None
+      | Some when_ -> Some [Gitlab_ci.Util.job_rule ~when_ ?allow_failure ()]
+    else
+      (* Else, the condition can be rewritten to have the form
+         [changes or labels] where [changes] is a disjunction of [Changes] predicates
+         and labels is a disjunction of [Label] predicates.
+         We ignore [False] while doing so because [False] has no effect on disjunctions. *)
+      let changes =
+        Fun.flip List.concat_map condition @@ function
+        | False -> []
+        | True ->
+            (* Impossible due to the check above. *)
+            assert false
+        | Changes set -> [set]
+        | Label _ -> []
+      in
+      let labels =
+        Fun.flip List.concat_map condition @@ function
+        | False -> []
+        | True ->
+            (* Impossible due to the check above. *)
+            assert false
+        | Changes _ -> []
+        | Label label -> label
+      in
+      (* The condition is [changes or labels].
+         We encode it into the following GitLab rules:
+         - if changes => include the job (named [rules_from_changes] below)
+         - else if labels => include the job (named [rules_from_labels] below)
+         - (implicitly) else => do not include the job *)
+      let rules_from_changes =
+        (* Changesets are disjunctions themselves.
+           So the big disjunction of changesets, [changes],
+           can simply be merged into one big changeset. *)
+        let changes =
+          changes
+          |> List.fold_left Tezos_ci.Changeset.union empty_changeset
+          |> Tezos_ci.Changeset.encode
+        in
+        match changes with
+        | [] ->
+            (* The [changes] part of the disjunction is equivalent to [False].
+                 Don't add a rule. *)
+            []
+        | _ :: _ -> [Gitlab_ci.Util.job_rule ~changes ?when_ ?allow_failure ()]
+      in
+      let rules_from_labels =
+        (* Simplify the disjunction by observing that [a or b] is equivalent to [a]
+           when [b = a]. In our case, this means when labels are equal. *)
+        let labels = labels |> String_set.of_list |> String_set.elements in
+        match labels with
+        | [] ->
+            (* The [labels] part of the disjunction is equivalent to [False].
+                 Don't add a rule. *)
+            []
+        | first_label :: other_labels ->
+            [
+              Gitlab_ci.Util.job_rule
+                ~if_:
+                  (List.fold_left
+                     (fun acc label ->
+                       Gitlab_ci.If.(acc || Tezos_ci.Rules.has_mr_label label))
+                     (Tezos_ci.Rules.has_mr_label first_label)
+                     other_labels)
+                ?when_
+                ?allow_failure
+                ();
+            ]
+      in
+      Some (rules_from_labels @ rules_from_changes)
+end
 
 type job = {
   uid : int;
@@ -80,23 +199,26 @@ type job = {
   arch : Tezos_ci.Runner.Arch.t option;
   cpu : Tezos_ci.Runner.CPU.t option;
   storage : Tezos_ci.Runner.Storage.t option;
-  image : Tezos_ci.Image.t;
+  tag : Tezos_ci.Runner.Tag.t option;
+  image : Tezos_ci.Image.t option;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
   parallel : Gitlab_ci.Types.parallel option;
-  only_if : condition;
+  only_if : Condition.t;
   variables : Gitlab_ci.Types.variables option;
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
+  cache : Gitlab_ci.Types.cache list option;
   cargo_cache : bool;
   sccache : sccache_config option;
-  dune_cache : dune_cache_config option;
-  test_coverage : bool;
+  dune_cache : bool;
+  disable_datadog : bool;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
   timeout : Gitlab_ci.Types.time_interval option;
   image_dependencies : Tezos_ci.Image.t list;
   services : Gitlab_ci.Types.service list option;
+  id_tokens : Gitlab_ci.Types.id_tokens option;
 }
 
 type trigger = Auto | Immediate | Manual
@@ -138,7 +260,10 @@ module UID_map = Map.Make (Int)
    and corrected it to something that actually makes sense.
    In particular this prevents some cases of invalid pipelines.
 
-   Step 4: the [convert_graph] function converts the [fixed_job_graph]
+   Step 4 (optional): the [trigger] job is added as a dependency to all jobs
+   that should have this dependency.
+
+   Step 5: the [convert_graph] function converts the [fixed_job_graph]
    into a [tezos_job_graph]. This just converts all jobs to [Tezos_ci.tezos_job],
    that can be used by CIAO.
 
@@ -251,7 +376,7 @@ let make_graph (jobs : (trigger * job) list) : job_graph =
 type fixed_job_graph_node = {
   job : job;
   trigger : trigger;
-  only_if : condition;
+  only_if : Condition.t;
   explicit : bool;
 }
 
@@ -285,28 +410,49 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
               let rev_deps = rev_deps |> UID_set.elements |> List.map fix_uid in
               (* Fix [trigger]. *)
               let trigger =
-                let merge_triggers a b =
-                  match (a, b) with
-                  | Manual, Manual -> Manual
-                  | Immediate, (Auto | Immediate | Manual)
-                  | (Auto | Manual), Immediate ->
-                      Immediate
-                  | Auto, (Auto | Manual) | Manual, Auto ->
-                      (* If a job is supposed to run automatically,
-                         its dependencies must run automatically as well. *)
-                      Auto
-                in
-                let initial_trigger =
-                  match trigger with
-                  | None ->
-                      (* We don't know yet.
-                         [Manual] will be upgraded to [Auto] if necessary. *)
-                      Manual
-                  | Some trigger -> trigger
-                in
-                rev_deps
-                |> List.map (fun node -> node.trigger)
-                |> List.fold_left merge_triggers initial_trigger
+                match trigger with
+                | Some Immediate -> Immediate
+                | Some ((Auto | Manual) as trigger) ->
+                    (* If a job A that was requested to be [Immediate] depends
+                       on a job B that was requested to be non-[Immediate],
+                       the job A will not actually be [Immediate].
+                       So this is probably a mistake.
+                       Here we check that this is not the case (with B = [job]). *)
+                    ( Fun.flip List.iter rev_deps @@ fun rev_dep ->
+                      match rev_dep.trigger with
+                      | Auto | Manual -> ()
+                      | Immediate ->
+                          failwith
+                          @@ sf
+                               "Job %s, which is Immediate, depends on job %s, \
+                                which is non-Immediate; this is probably a \
+                                mistake."
+                               rev_dep.job.name
+                               job.name ) ;
+                    trigger
+                | None ->
+                    (* Job was added automatically because of reverse dependencies.
+                       - If all explicit reverse dependencies are [Manual],
+                         we don't want to trigger this job automatically;
+                         it must also be [Manual].
+                       - If there is an explicit reverse dependency that is [Immediate],
+                         the job must be [Immediate].
+                       - Else it should be [Auto]. *)
+                    let auto_rev_deps = ref false in
+                    let immediate_rev_deps = ref false in
+                    let manual_rev_deps = ref false in
+                    ( Fun.flip List.iter rev_deps @@ fun rev_dep ->
+                      match rev_dep.trigger with
+                      | Auto -> auto_rev_deps := true
+                      | Immediate -> immediate_rev_deps := true
+                      | Manual -> manual_rev_deps := true ) ;
+                    if !immediate_rev_deps then Immediate
+                    else if !auto_rev_deps then Auto
+                    else if !manual_rev_deps then Manual
+                    else
+                      (* No reverse dependency, yet the job was added automatically?
+                         This does not make sense. *)
+                      assert false
               in
               (* Fix the job's conditions so that it becomes the disjunction
                  of the conditions of its transitive dependencies (including itself)
@@ -318,11 +464,11 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
                     (* This job is only present because it is a dependency of another job.
                        So its trigger conditions are irrelevant: we only want this job
                        to be present if one of its reverse dependencies is present. *)
-                    empty_condition
+                    Condition.false_
                 in
                 rev_deps
                 |> List.map (fun node -> node.only_if)
-                |> List.fold_left merge_conditions initial_only_if
+                |> List.fold_left Condition.or_ initial_only_if
               in
               {job; trigger; only_if; explicit}
         in
@@ -337,6 +483,25 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
     graph ;
   !result
 
+(* Add a dependency on [job_trigger] in all jobs that are not [Immediate] or [Manual].
+   See GRAPH TRANSFORMATIONS above (step 4). *)
+let add_dependency_on_job_trigger (job_trigger : Tezos_ci.tezos_job)
+    (graph : fixed_job_graph) : fixed_job_graph =
+  (* The actual [trigger] job is defined deep inside [code_verification.ml]
+     (look for [job_start]). CIAO only really cares about the name of the job,
+     so we hackishly redefine it here. *)
+  Fun.flip UID_map.map graph @@ fun node ->
+  match node.trigger with
+  | Immediate | Manual -> node
+  | Auto ->
+      let job =
+        {
+          node.job with
+          needs_legacy = (Job, job_trigger) :: node.job.needs_legacy;
+        }
+      in
+      {node with job}
+
 let convert_stage (trigger : trigger) (stage : stage) : Tezos_ci.Stage.t =
   match (stage, trigger) with
   | Build, _ -> Tezos_ci.Stages.build
@@ -347,24 +512,28 @@ let convert_stage (trigger : trigger) (stage : stage) : Tezos_ci.Stage.t =
       Tezos_ci.Stages.sanity
   | Test, _ -> Tezos_ci.Stages.test
   | Publish, _ -> Tezos_ci.Stages.publish
+  | Test_publication, _ -> Tezos_ci.Stages.publishing_tests
 
 type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
 
 (* Convert jobs to [Tezos_ci] jobs.
-   See GRAPH TRANSFORMATIONS above (step 4).
+   See GRAPH TRANSFORMATIONS above (step 5).
 
    By default, [Publish] jobs are non-interruptible and other jobs are interruptible.
    Setting [interruptible_pipeline] to [false] makes all jobs non-interruptible.
+   Setting [interruptible_publish] to [true] makes publish jobs interruptible.
 
-   [Publish] jobs use non-interruptible runners.
+   Non-interruptible [Publish] jobs use non-interruptible runners.
    Other jobs may use any runner (interruptible or not).
    [interruptible_pipeline] has no impact on the choice of runners.
+   Setting [interruptible_publish] to [true] allows publish jobs to use interruptible runners.
 
    If [with_condition] is [true], the job [rules] will include its conditions.
    If it is [false], its conditions are ignored.
    Conditions are typically only used in merge request pipelines such as [before_merging]. *)
-let convert_graph ?(interruptible_pipeline = true) ~with_condition
-    (graph : fixed_job_graph) : tezos_job_graph =
+let convert_graph ?(interruptible_pipeline = true)
+    ?(interruptible_publish = false) ~with_condition (graph : fixed_job_graph) :
+    tezos_job_graph =
   (* To build the graph, we take all jobs from [graph], convert them,
      and add them to [result].
      But before we convert a job, we need the converted version of its dependencies.
@@ -396,6 +565,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     arch;
                     cpu;
                     storage;
+                    tag;
                     image;
                     needs;
                     needs_legacy;
@@ -404,15 +574,17 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     variables;
                     script;
                     artifacts;
+                    cache;
                     cargo_cache;
                     sccache;
                     dune_cache;
-                    test_coverage;
+                    disable_datadog;
                     allow_failure;
                     retry;
                     timeout;
                     image_dependencies;
                     services;
+                    id_tokens;
                   };
                 trigger;
                 only_if;
@@ -435,52 +607,57 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                  whether we actually want the condition ([with_condition]),
                  and the [trigger]. *)
               let rules =
-                if with_condition then
-                  let when_ : Gitlab_ci.Types.when_ =
-                    match trigger with
-                    | Auto | Immediate -> On_success
-                    | Manual -> Manual
-                  in
-                  let labels =
-                    match String_set.elements only_if.label with
-                    | [] -> []
-                    | first_label :: other_labels ->
-                        [
-                          Gitlab_ci.Util.job_rule
-                            ~if_:
-                              (List.fold_left
-                                 (fun acc label ->
-                                   Gitlab_ci.If.(
-                                     acc || Tezos_ci.Rules.has_mr_label label))
-                                 (Tezos_ci.Rules.has_mr_label first_label)
-                                 other_labels)
-                            ~when_
-                            ();
-                        ]
-                  in
-                  let changes =
-                    [
-                      Gitlab_ci.Util.job_rule
-                        ~changes:(Tezos_ci.Changeset.encode only_if.changed)
-                        ~when_
-                        ();
-                    ]
-                  in
-                  Some (labels @ changes)
-                else
+                let (when_, allow_failure) :
+                    Gitlab_ci.Types.when_ option
+                    * Gitlab_ci.Types.allow_failure_rule option =
                   match trigger with
-                  | Auto | Immediate -> None
-                  | Manual -> Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
+                  | Auto | Immediate -> (None, None)
+                  | Manual ->
+                      ( Some Manual,
+                        match allow_failure with
+                        | Some No ->
+                            (* Make sure that one can disable the [allow_failure: true]
+                               that is added by default (by [Gitlab_ci.Util.job_rule])
+                               by specifying [~allow_failure: No]. *)
+                            Some No
+                        | None | Some (Yes | With_exit_codes _) -> None )
+                in
+                let condition =
+                  if with_condition then only_if else Condition.true_
+                in
+                Condition.encode ?when_ ?allow_failure condition
               in
-              let interruptible_stage =
-                match stage with Build | Test -> true | Publish -> false
+              let interruptible, interruptible_runner =
+                match stage with
+                | Build | Test ->
+                    (* Build and test jobs are canceled if another pipeline starts.
+                         This can be overridden by [interruptible_pipeline].
+                         The runner itself can always be preempted, to reduce costs. *)
+                    if interruptible_pipeline then (true, None)
+                    else (false, None)
+                | Publish ->
+                    (* Publish jobs are not canceled if another pipeline starts.
+                         This is to avoid partial publications.
+                         This can be overridden by [interruptible_publish].
+                         The runner can be preempted only if the job is interruptible,
+                         for the same reason (avoiding partial publications). *)
+                    if interruptible_publish then (true, None)
+                    else (false, Some false)
+                | Test_publication ->
+                    (* Tests that are performed after publish jobs are not canceled
+                         if another pipeline starts, because we do want to check
+                         that published artifacts are working.
+                         However, this is not a strong enough requirement for us
+                         to justify the increased costs,
+                         so the runners can still be preempted. *)
+                    if interruptible_publish then (true, None) else (false, None)
               in
               let retry : Gitlab_ci.Types.retry option =
                 match retry with
                 | Some _ -> retry
                 | None -> (
                     match stage with
-                    | Build | Test -> None
+                    | Build | Test | Test_publication -> None
                     | Publish -> Some {max = 0; when_ = []})
               in
               let dev_infra =
@@ -495,33 +672,11 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
               let maybe_enable_sccache job =
                 match sccache with
                 | None -> job
-                | Some {key; error_log; idle_timeout; log; path; cache_size} ->
-                    Tezos_ci.Cache.enable_sccache
-                      ?key
-                      ?error_log
-                      ?idle_timeout
-                      ?log
-                      ?path
-                      ?cache_size
-                      job
+                | Some {error_log; log; policy} ->
+                    Tezos_ci.Cache.enable_sccache ?error_log ?log ?policy job
               in
               let maybe_enable_dune_cache job =
-                match dune_cache with
-                | None -> job
-                | Some {key; path; cache_size; copy_mode; policy} ->
-                    Tezos_ci.Cache.enable_dune_cache
-                      ?key
-                      ?path
-                      ?cache_size
-                      ?copy_mode
-                      ?policy
-                      job
-              in
-              let maybe_enable_test_coverage job =
-                if test_coverage then
-                  job |> Tezos_ci.Coverage.enable_instrumentation
-                  |> Tezos_ci.Coverage.enable_output_artifact
-                else job
+                if dune_cache then Tezos_ci.Cache.enable_dune_cache job else job
               in
               Tezos_ci.job
                 ~__POS__:source_location
@@ -532,27 +687,26 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 ?arch
                 ?cpu
                 ?storage
-                ~image
+                ?tag
+                ?image
                 ~image_dependencies
                 ~dependencies:(Dependent dependencies)
                 ?parallel
                 ?rules
                 ?services
-                ~interruptible:(interruptible_stage && interruptible_pipeline)
-                ?interruptible_runner:
-                  (if interruptible_stage then
-                     (* Can be interruptible, or not. *)
-                     None
-                   else (* Cannot be interruptible. *)
-                     Some false)
+                ?id_tokens
+                ~interruptible
+                ?interruptible_runner
                 ?retry
                 ?timeout
                 ?variables
                 ?artifacts
+                ~datadog:(not disable_datadog)
                 ?allow_failure
+                ?cache
                 script
               |> maybe_enable_cargo_cache |> maybe_enable_sccache
-              |> maybe_enable_dune_cache |> maybe_enable_test_coverage
+              |> maybe_enable_dune_cache
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -567,10 +721,17 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
 
 (* Convert user-specified jobs into [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS. *)
-let convert_jobs ?interruptible_pipeline ~with_condition
-    (jobs : (trigger * job) list) : Tezos_ci.tezos_job list =
+let convert_jobs ?interruptible_pipeline ?interruptible_publish
+    ?with_job_trigger ~with_condition (jobs : (trigger * job) list) :
+    Tezos_ci.tezos_job list =
   jobs |> make_graph |> fix_graph
-  |> convert_graph ?interruptible_pipeline ~with_condition
+  |> (match with_job_trigger with
+     | None -> Fun.id
+     | Some job_trigger -> add_dependency_on_job_trigger job_trigger)
+  |> convert_graph
+       ?interruptible_pipeline
+       ?interruptible_publish
+       ~with_condition
   |> UID_map.bindings |> List.map snd
 
 let parameterize make =
@@ -598,25 +759,29 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
-    image:Tezos_ci.Image.t ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
+    ?image:Tezos_ci.Image.t ->
     ?only_if_changed:string list ->
+    ?force:bool ->
     ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
+    ?cache:Gitlab_ci.Types.cache list ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
-    ?dune_cache:dune_cache_config ->
-    ?test_coverage:bool ->
+    ?dune_cache:bool ->
+    ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?timeout:Gitlab_ci.Types.time_interval ->
     ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
+    ?id_tokens:Gitlab_ci.Types.id_tokens ->
+    ?script:string list ->
     string ->
-    string list ->
     job
 
   type tezt_timeout = No_timeout | Minutes of int
@@ -629,10 +794,11 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
-    ?test_coverage:bool ->
+    ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?tezt_exe:string ->
     ?global_timeout:tezt_timeout ->
@@ -643,16 +809,9 @@ module type COMPONENT_API = sig
     ?retry_tests:int ->
     ?test_selection:Tezt_core.TSL_AST.t ->
     ?before_script:string list ->
+    ?select_tezts:bool ->
     string ->
     job
-
-  val register_before_merging_jobs : (trigger * job) list -> unit
-
-  val register_schedule_extended_test_jobs : (trigger * job) list -> unit
-
-  val register_custom_extended_test_jobs : (trigger * job) list -> unit
-
-  val register_master_jobs : (trigger * job) list -> unit
 
   val register_scheduled_pipeline :
     description:string ->
@@ -661,84 +820,98 @@ module type COMPONENT_API = sig
     (trigger * job) list ->
     unit
 
-  val register_global_release_jobs : (trigger * job) list -> unit
-
-  val register_global_test_release_jobs : (trigger * job) list -> unit
-
-  val register_global_scheduled_test_release_jobs : (trigger * job) list -> unit
-
-  val register_global_publish_release_page_jobs : (trigger * job) list -> unit
-
-  val register_global_test_publish_release_page_jobs :
-    (trigger * job) list -> unit
-
   val register_dedicated_release_pipeline :
-    ?tag_rex:string -> (trigger * job) list -> unit
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 
   val register_dedicated_test_release_pipeline :
-    ?tag_rex:string -> (trigger * job) list -> unit
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 end
 
-(* Some jobs are to be added to shared pipelines.
-   We must only call [convert_jobs] once we know all of them,
-   otherwise some jobs (such as [select_tezts]) could be added twice. *)
-let before_merging_jobs = ref []
+type global_pipeline =
+  | Before_merging
+  | Merge_train
+  | Schedule_extended_test
+  | Custom_extended_test
+  | Master
+  | Scheduled_docker_build
+  | Scheduled_docker_master_snapshot
+  | Scheduled_test_release
+  | Publish_release_page
+  | Test_publish_release_page
+  (* Release tag pipelines *)
+  | Major_release_tag
+  | Major_release_tag_test
+  | Minor_release_tag
+  | Minor_release_tag_test
+  | Beta_release_tag
+  | Beta_release_tag_test
+  | Non_release_tag
+  | Non_release_tag_test
+  | Packaging_revision
+  | Packaging_revision_test
+  | Octez_latest_release
+  | Octez_latest_release_test
+  (* Debian packaging pipelines *)
+  | Debian_partial
+  | Debian_daily
 
-let get_before_merging_jobs () =
-  convert_jobs ~with_condition:true !before_merging_jobs
+let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
+  Hashtbl.create 128
 
-let schedule_extended_test_jobs = ref []
+let register_jobs pipeline jobs =
+  List.iter (Hashtbl.add global_jobs pipeline) jobs
 
-let get_schedule_extended_test_jobs () =
-  convert_jobs
-    ~interruptible_pipeline:false
-    ~with_condition:false
-    !schedule_extended_test_jobs
+let register_merge_request_jobs jobs =
+  register_jobs Before_merging jobs ;
+  register_jobs Merge_train jobs
 
-let custom_extended_test_jobs = ref []
+let register_release_jobs jobs =
+  register_jobs Major_release_tag jobs ;
+  register_jobs Beta_release_tag jobs
 
-let get_custom_extended_test_jobs () =
-  convert_jobs ~with_condition:false !custom_extended_test_jobs
+let register_test_release_jobs jobs =
+  register_jobs Major_release_tag_test jobs ;
+  register_jobs Beta_release_tag_test jobs
 
-let master_jobs = ref []
+let get_jobs pipeline =
+  let jobs = Hashtbl.find_all global_jobs pipeline |> List.rev in
+  match pipeline with
+  | Before_merging ->
+      (* Add [trigger] as a dependency of all [jobs]. *)
+      (* The actual [trigger] job is defined deep inside [code_verification.ml]
+           (look for [job_start]). CIAO only really cares about the name of the job,
+           so we hackishly redefine it here. *)
+      let job_trigger =
+        Tezos_ci.job ~__POS__ ~stage:Tezos_ci.Stages.start ~name:"trigger" []
+      in
+      convert_jobs ~with_job_trigger:job_trigger ~with_condition:true jobs
+  | Merge_train -> convert_jobs ~with_condition:true jobs
+  | Schedule_extended_test ->
+      convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
+  | Master ->
+      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
+  | Packaging_revision_test ->
+      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
+  | Debian_partial ->
+      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
+  | _ -> convert_jobs ~with_condition:false jobs
 
-let get_master_jobs () = convert_jobs ~with_condition:false !master_jobs
+let release_tag_rexes = ref String_set.empty
 
-let global_release_jobs = ref []
-
-let get_global_release_jobs () =
-  convert_jobs ~with_condition:false !global_release_jobs
-
-let global_test_release_jobs = ref []
-
-let get_global_test_release_jobs () =
-  convert_jobs ~with_condition:false !global_test_release_jobs
-
-let global_scheduled_test_release_jobs = ref []
-
-let get_global_scheduled_test_release_jobs () =
-  convert_jobs ~with_condition:false !global_scheduled_test_release_jobs
-
-let global_publish_release_page_jobs = ref []
-
-let get_global_publish_release_page_jobs () =
-  convert_jobs ~with_condition:false !global_publish_release_page_jobs
-
-let global_test_publish_release_page_jobs = ref []
-
-let get_global_test_publish_release_page_jobs () =
-  convert_jobs ~with_condition:false !global_test_publish_release_page_jobs
-
-let release_tag_rexes = ref []
-
-let get_release_tag_rexes () = !release_tag_rexes
+let get_release_tag_rexes () = String_set.elements !release_tag_rexes
 
 (* [job_select_tezts] will be initialized further down. *)
 let job_select_tezts = ref None
 
-let number_of_declared_jobs = ref 0
+let declared_jobs = ref String_map.empty
 
-let get_number_of_declared_jobs () = !number_of_declared_jobs
+let get_declared_jobs () = !declared_jobs
 
 (* Data to be written using [output_tezt_job_list]. *)
 type tezt_job_info = {
@@ -812,13 +985,14 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     | Some component -> component ^ "." ^ name
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
-      ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
-      ?(needs_legacy = []) ?parallel ?variables ?artifacts
-      ?(cargo_cache = false) ?sccache ?dune_cache ?(test_coverage = false)
-      ?allow_failure ?retry ?timeout ?(image_dependencies = []) ?services name
-      script =
-    incr number_of_declared_jobs ;
+      ?storage ?tag ?image ?only_if_changed ?(force = false)
+      ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
+      ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
+      ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
+      ?timeout ?(image_dependencies = []) ?services ?id_tokens ?(script = [])
+      name =
     let name = make_name name in
+    declared_jobs := String_map.add name source_location !declared_jobs ;
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
       if compare_stages dep.stage stage > 0 then
@@ -840,30 +1014,34 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       arch;
       cpu;
       storage;
+      tag;
       image;
       needs;
       needs_legacy;
       parallel;
       only_if =
-        {
-          changed =
-            (match only_if_changed with
-            | None -> default_only_if_changed
-            | Some list -> Tezos_ci.Changeset.make list);
-          label = String_set.of_list force_if_label;
-        };
+        (if force then Condition.true_
+         else
+           Condition.or_
+             (Condition.changes
+                (match only_if_changed with
+                | None -> default_only_if_changed
+                | Some list -> Tezos_ci.Changeset.make list))
+             (Condition.label force_if_label));
       variables;
       script;
       artifacts;
+      cache;
       cargo_cache;
       sccache;
       dune_cache;
-      test_coverage;
+      disable_datadog;
       allow_failure;
       retry;
       timeout;
       image_dependencies;
       services;
+      id_tokens;
     }
 
   module SH = struct
@@ -891,15 +1069,17 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   type tezt_timeout = No_timeout | Minutes of int
 
   let tezt_job ~__POS__:source_location ~pipeline ~description ?provider ?arch
-      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?only_if_changed ?(needs = [])
-      ?needs_legacy ?test_coverage ?allow_failure ?tezt_exe
+      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?tag ?only_if_changed
+      ?(needs = []) ?needs_legacy ?disable_datadog ?allow_failure ?tezt_exe
       ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
       ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
-      ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = []) variant =
+      ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = [])
+      ?(select_tezts = true) variant =
     if not (is_a_valid_name variant) then
       failwith @@ sf "Cacio.tezt_job: invalid variant name: %S" variant ;
     let select_tezts =
-      match pipeline with `merge_request -> true | `scheduled -> false
+      select_tezts
+      && match pipeline with `merge_request -> true | `scheduled -> false
     in
     let record_dir =
       let dir =
@@ -1080,6 +1260,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?arch
       ~cpu
       ?storage
+      ?tag
       ~image:Tezos_ci.Images.CI.e2etest
       ?only_if_changed
       ~needs
@@ -1099,7 +1280,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
            ]
            ~expire_in:(Duration (Days 7))
            ~when_:Always)
-      ?test_coverage
+      ?disable_datadog
       ?allow_failure
       ?retry:
         (match retry_jobs with
@@ -1109,55 +1290,14 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         (match global_timeout with
         | No_timeout -> None
         | Minutes m -> Some (Minutes (m + 10)))
-      (before_script
-      @ [
-          ". ./scripts/version.sh";
-          cmd_echo_variables;
-          cmd_store_list_of_selected_tests;
-          wrap_with_exit_code (wrap_with_timeout cmd_run_tests);
-        ])
-
-  let register_before_merging_jobs jobs =
-    (* Add [trigger] as a dependency of all [jobs]. *)
-    let jobs =
-      (* The actual [trigger] job is defined deep inside [code_verification.ml]
-         (look for [job_start]). CIAO only really cares about the name of the job,
-         so we hackishly redefine it here. *)
-      let job_trigger =
-        Tezos_ci.job ~__POS__ ~stage:Tezos_ci.Stages.start ~name:"trigger" []
-      in
-      (* Here we re-allocate the jobs with the same UID to override [needs_legacy].
-         But only these re-allocated jobs will be in the pipeline,
-         so there is no risk of actually duplicating them. *)
-      Fun.flip List.map jobs @@ fun (trigger, job) ->
-      match trigger with
-      | Immediate -> (trigger, job)
-      | Auto | Manual ->
-          let job =
-            {job with needs_legacy = (Job, job_trigger) :: job.needs_legacy}
-          in
-          (trigger, job)
-    in
-    before_merging_jobs := jobs @ !before_merging_jobs
-
-  let register_schedule_extended_test_jobs jobs =
-    match Component.name with
-    | Some _ ->
-        failwith
-          "register_schedule_extended_test_jobs can only be used from the \
-           Shared component; regular components should define their own \
-           schedule pipelines with register_scheduled_pipeline"
-    | None -> schedule_extended_test_jobs := jobs @ !schedule_extended_test_jobs
-
-  let register_custom_extended_test_jobs jobs =
-    match Component.name with
-    | Some _ ->
-        failwith
-          "register_custom_extended_test_jobs can only be used from the Shared \
-           component to migrate old custom extended test jobs"
-    | None -> custom_extended_test_jobs := jobs @ !custom_extended_test_jobs
-
-  let register_master_jobs jobs = master_jobs := jobs @ !master_jobs
+      ~script:
+        (before_script
+        @ [
+            ". ./scripts/version.sh";
+            cmd_echo_variables;
+            cmd_store_list_of_selected_tests;
+            wrap_with_exit_code (wrap_with_timeout cmd_run_tests);
+          ])
 
   (* Helper for other functions below, that is not exposed to users of this module.
      It is responsible for:
@@ -1186,37 +1326,17 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         Gitlab_ci.If.(
           scheduled && var "TZ_SCHEDULE_KIND" == str (make_name name)))
 
-  let register_global_release_jobs jobs =
-    global_release_jobs := jobs @ !global_release_jobs
-
-  let register_global_test_release_jobs jobs =
-    global_test_release_jobs := jobs @ !global_test_release_jobs
-
-  let register_global_scheduled_test_release_jobs jobs =
-    global_scheduled_test_release_jobs :=
-      jobs @ !global_scheduled_test_release_jobs
-
-  let register_global_publish_release_page_jobs jobs =
-    global_publish_release_page_jobs := jobs @ !global_publish_release_page_jobs
-
-  let register_global_test_publish_release_page_jobs jobs =
-    global_test_publish_release_page_jobs :=
-      jobs @ !global_test_publish_release_page_jobs
-
   (* Use this function to get the release tag regular expression,
      as it makes sure that it is registered only once. *)
-  let get_release_tag_rex =
-    let tag = ref None in
-    fun component_name ->
-      match !tag with
-      | Some tag -> tag
-      | None ->
-          let result =
-            "/^" ^ String.lowercase_ascii component_name ^ "-v\\d+\\.\\d+$/"
-          in
-          tag := Some result ;
-          release_tag_rexes := result :: !release_tag_rexes ;
-          result
+  let get_release_tag_rex component_name requested_tag_rex =
+    let result =
+      match requested_tag_rex with
+      | None -> "/^" ^ String.lowercase_ascii component_name ^ "-v\\d+\\.\\d+$/"
+      | Some tag_rex -> tag_rex
+    in
+    if not (String_set.mem result !release_tag_rexes) then
+      release_tag_rexes := String_set.add result !release_tag_rexes ;
+    result
 
   (* Wrap a function with this function to make sure
      the component is an actual component, not [Shared]. *)
@@ -1238,32 +1358,28 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       already_called := true ;
       f x
 
-  let register_dedicated_release_pipeline ?tag_rex =
+  let register_dedicated_release_pipeline ?tag_rex ?(legacy_jobs = []) =
     only_once "register_dedicated_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
-    let release_tag_rex =
-      Option.value ~default:(get_release_tag_rex component_name) tag_rex
-    in
+    let release_tag_rex = get_release_tag_rex component_name tag_rex in
     register_pipeline
       "release"
       ~description:(sf "Release %s." component_name)
-      ~jobs:(convert_jobs ~with_condition:false jobs)
+      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
 
-  let register_dedicated_test_release_pipeline ?tag_rex =
+  let register_dedicated_test_release_pipeline ?tag_rex ?(legacy_jobs = []) =
     only_once "register_dedicated_test_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
-    let release_tag_rex =
-      Option.value ~default:(get_release_tag_rex component_name) tag_rex
-    in
+    let release_tag_rex = get_release_tag_rex component_name tag_rex in
     register_pipeline
       "test_release"
       ~description:(sf "Release %s (test)." component_name)
-      ~jobs:(convert_jobs ~with_condition:false jobs)
+      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
@@ -1295,8 +1411,9 @@ let () =
               ~when_:Always
               ["selected_tezts.tsl"])
          ~allow_failure:(With_exit_codes [17])
-         [
-           "./scripts/ci/take_ownership.sh";
-           "eval $(opam env)";
-           "scripts/ci/select_tezts.sh || exit $?";
-         ])
+         ~script:
+           [
+             "./scripts/ci/take_ownership.sh";
+             "eval $(opam env)";
+             "scripts/ci/select_tezts.sh || exit $?";
+           ])

@@ -1551,11 +1551,9 @@ let test_registered_self_delegate_key_init_delegation () =
   let* () = Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh in
   return_unit
 
-let test_bls_account_self_delegate ~allow_tz4_delegate_enable () =
+let test_bls_account_self_delegate () =
   let open Lwt_result_syntax in
-  let* b, bootstrap =
-    Context.init1 ~consensus_threshold_size:0 ~allow_tz4_delegate_enable ()
-  in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let {Account.pkh = tz4_pkh; pk = tz4_pk; _} =
     Account.new_account ~algo:Bls ()
   in
@@ -1573,30 +1571,51 @@ let test_bls_account_self_delegate ~allow_tz4_delegate_enable () =
   let* b = Block.bake ~operation b in
   let* operation = Op.delegation (B b) tz4_contract (Some tz4_pkh) in
   let* inc = Incremental.begin_construction b in
-  let tz4_pkh = match tz4_pkh with Bls pkh -> pkh | _ -> assert false in
-  if allow_tz4_delegate_enable then
-    let* (_i : Incremental.t) = Incremental.validate_operation inc operation in
-    return_unit
-  else
-    let expect_failure = function
-      | [
-          Environment.Ecoproto_error
-            (Contract_delegate_storage.Forbidden_tz4_delegate pkh);
-        ]
-        when Signature.Bls.Public_key_hash.(pkh = tz4_pkh) ->
-          return_unit
-      | err ->
-          failwith
-            "Error trace:@,\
-             %a does not match the \
-             [Contract_delegate_storage.Forbidden_tz4_delegate] error"
-            Error_monad.pp_print_trace
-            err
-    in
-    let* (_i : Incremental.t) =
-      Incremental.validate_operation ~expect_failure inc operation
-    in
-    return_unit
+  let* (_i : Incremental.t) = Incremental.validate_operation inc operation in
+  return_unit
+
+let test_mldsa44_account_self_delegate () =
+  let open Lwt_result_syntax in
+  let* b, bootstrap =
+    Context.init1 ~tz5_account_enable:true ~consensus_threshold_size:0 ()
+  in
+  let {Account.pkh = tz5_pkh; pk = tz5_pk; _} =
+    Account.new_account ~algo:Mldsa44 ()
+  in
+  let tz5_contract = Alpha_context.Contract.Implicit tz5_pkh in
+  let* operation =
+    Op.transaction
+      ~force_reveal:true
+      (B b)
+      bootstrap
+      tz5_contract
+      (of_int 200_000)
+  in
+  let* b = Block.bake ~operation b in
+  let* operation = Op.revelation (B b) tz5_pk in
+  let* b = Block.bake ~operation b in
+  let* operation = Op.delegation (B b) tz5_contract (Some tz5_pkh) in
+  let* inc = Incremental.begin_construction b in
+  let tz5_pkh = match tz5_pkh with Mldsa44 pkh -> pkh | _ -> assert false in
+  let expect_failure = function
+    | [
+        Environment.Ecoproto_error
+          (Delegate_storage.Contract.Tz5_cannot_be_a_delegate pkh);
+      ]
+      when Signature.Mldsa44.Public_key_hash.(pkh = tz5_pkh) ->
+        return_unit
+    | err ->
+        failwith
+          "Error trace:@,\
+           %a does not match the \
+           [Contract_delegate_storage.Forbidden_tz5_delegate] error"
+          Error_monad.pp_print_trace
+          err
+  in
+  let* (_i : Incremental.t) =
+    Incremental.validate_operation ~expect_failure inc operation
+  in
+  return_unit
 
 let tests_delegate_registration =
   [
@@ -1765,9 +1784,9 @@ let tests_delegate_registration =
       `Quick
       (test_emptying_delegated_implicit_contract_fails Tez.one_mutez);
     Tztest.tztest
-      "failed BLS self delegation (allow_tz4_delegate_enable:false)"
+      "failed ML-DSA-44 self delegation"
       `Quick
-      (test_bls_account_self_delegate ~allow_tz4_delegate_enable:false);
+      test_mldsa44_account_self_delegate;
     (*** valid registration ***)
     (* valid registration: credit 1 μꜩ, self delegation *)
     Tztest.tztest
@@ -1804,9 +1823,9 @@ let tests_delegate_registration =
       `Quick
       test_double_registration_when_recredited;
     Tztest.tztest
-      "valid BLS self delegation (allow_tz4_delegate_enable:true)"
+      "valid BLS self delegation"
       `Quick
-      (test_bls_account_self_delegate ~allow_tz4_delegate_enable:true);
+      test_bls_account_self_delegate;
   ]
 
 (******************************************************************************)

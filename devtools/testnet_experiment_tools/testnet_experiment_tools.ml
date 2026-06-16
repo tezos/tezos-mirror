@@ -105,6 +105,11 @@ let network_activation_parameters_templates protocol_hash =
         (Filename.concat
            network_parameters_templates_dir
            "proto_024_PtTALLiN_mainnet.json")
+  | Tezt_tezos.Protocol.U025 ->
+      Some
+        (Filename.concat
+           network_parameters_templates_dir
+           "proto_025_PsUshuai_mainnet.json")
   | Tezt_tezos.Protocol.Alpha ->
       (* Fetching the network parameters from the src/proto_alpha directory,
          to be sure that we are in synch with current protocl parameters. *)
@@ -300,7 +305,7 @@ module Local = struct
       |> List.filter (String.starts_with ~prefix:baker_prefix)
     in
     let* () = Lwt_io.printf "Fetching client accounts from %s\n" output_dir in
-    let bootstrap_amount_mutez = Some 4_000_000_000_000 in
+    let bootstrap_amount_mutez = Some 4_000_000_000_000L in
     let* bootstrap_accounts =
       baker_accounts
       |> Lwt_list.map_s (fun alias ->

@@ -17,7 +17,7 @@ use crate::{
         annotations::{Annotations, NO_ANNS},
         Annotation, Micheline,
     },
-    lexer::{try_ann_from_str, Prim},
+    lexer::{ann_from_str, Prim},
 };
 
 /// Errors that can happen during deserialization.
@@ -73,6 +73,20 @@ impl<'a> Micheline<'a> {
             return Err(DecodeError::TrailingBytes);
         }
         Ok(res)
+    }
+
+    /// Decode exactly one Micheline expression from the start of `bytes`,
+    /// returning it together with the number of bytes consumed.
+    ///
+    /// Unlike [`decode_raw`], this does NOT error on trailing bytes.
+    pub fn decode_raw_prefix(
+        arena: &'a Arena<Micheline<'a>>,
+        bytes: &[u8],
+    ) -> Result<(Micheline<'a>, usize), DecodeError> {
+        let mut it: BytesIt = bytes.into();
+        let res = decode_micheline(arena, &mut it)?;
+        let consumed = bytes.len() - it.0.len();
+        Ok((res, consumed))
     }
 
     /// Decode data that was previously `PACK`ed. Checks for `0x05` tag as the
@@ -261,8 +275,9 @@ fn validate_ann(bytes: &[u8]) -> Result<Annotation<'static>, DecodeError> {
     }
     // SAFETY: we just checked all bytes are ASCII
     let str = unsafe { std::str::from_utf8_unchecked(bytes) };
-    // unwrap is fine, we effectively validated against a regex
-    Ok(try_ann_from_str(str).unwrap().into_owned())
+    ann_from_str(str)
+        .map(Annotation::into_owned)
+        .map_err(|_| DecodeError::BadAnnotation)
 }
 
 fn decode_app<'a>(

@@ -36,8 +36,8 @@ type error +=
       (Cycle_repr.t * Operation_repr.consensus_key_kind)
   | Invalid_consensus_key_update_active of
       (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
-  | Invalid_consensus_key_update_tz4 of
-      (Bls.Public_key.t * Operation_repr.consensus_key_kind)
+  | Invalid_consensus_key_update_tz5 of
+      (Mldsa44.Public_key.t * Operation_repr.consensus_key_kind)
   | Invalid_consensus_key_update_another_delegate of
       (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
 
@@ -54,7 +54,6 @@ type pk = Raw_context.consensus_pk = {
 type power = Raw_context.consensus_power = {
   consensus_key : pk;
   attesting_power : Attesting_power_repr.t;
-  dal_power : int;
 }
 
 (** The public key hash of a consensus key and the associated delegate. *)
@@ -71,8 +70,8 @@ val pp : Format.formatter -> t -> unit
 
 val pkh : pk -> t
 
-(** [check_not_tz4 pk] checks that [pk] is not a BLS address. *)
-val check_not_tz4 :
+(** [check_not_tz5 pk] checks that [pk] is not a ML-DSA-44 address. *)
+val check_not_tz5 :
   Operation_repr.consensus_key_kind -> Signature.public_key -> unit tzresult
 
 (** Initialize the consensus key when registering a delegate. *)

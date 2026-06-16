@@ -4,7 +4,7 @@
 set -e
 
 # Patch the protocol sources:
-# - add profiling to the latest protocols (currently alpha and quebec)
+# - add profiling to the latest protocols (currently alpha and tallinn)
 
 for arg in "$@"; do
   case $arg in
@@ -15,7 +15,7 @@ for arg in "$@"; do
 done
 
 #shellcheck disable=SC2086
-patch $dry_run -p 1 < scripts/profile_seoul.patch
+patch $dry_run -p 1 < scripts/profile_tallinn.patch
 
 #shellcheck disable=SC2086
 patch $dry_run -p 1 -t < scripts/profile_alpha.patch

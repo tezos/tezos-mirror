@@ -1,0 +1,27 @@
+{	"branch": "BMRseqrUA4RmcWfXiZFUF25LexWbAL85fydodyvQp5smQUpVjiJ",
+	"contents":
+  	[ { "kind": "double_consensus_operation_evidence", "slot": 13,
+      	"op1":
+        	{ "branch": "BLE9LASpwxzBoEk2uR5mW35FWh8g7Qxui9rkEKR65PEqsM4XozB",
+          	"operations":
+            	{ "kind": "attestations_aggregate",
+              	"consensus_content":
+                	{ "level": 152463, "round": 0,
+                  	"block_payload_hash":
+                    	"vh3VKo8UcTK1ZtuGzgGpyVYXivH1nDV9GsrHUnXgdcLLQmTtWqFC" },
+              	"committee":
+                	[ { "slot": 13 }, { "slot": 0 },
+                  	{ "slot": 1, "dal_attestation": "0" }, { "slot": 2 },
+                  	{ "slot": 4 }, { "slot": 9, "dal_attestation": "0" } ] },
+          	"signature":
+            	"BLsigBjEmpFPDQTwjpirWAheQU2G7Tqns2EK9x2xnzpyQEQ1n1P8wVW3KcJTFwzYMBNZLgP8j6ZLqjwhGMwghXi3s2D45wGGvL6Zd4wJuXFqe4DAGgVwiPGoARvJhnaUe5j5x2kVdZP2Vu" },
+      	"op2":
+        	{ "branch": "BLE9LASpwxzBoEk2uR5mW35FWh8g7Qxui9rkEKR65PEqsM4XozB",
+          	"operations":
+            	{ "kind": "attestation", "slot": 13, "level": 152463,
+              	"round": 0,
+              	"block_payload_hash":
+                	"vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" },
+          	"signature":
+            	"BLsigBa4qoRRPCACeLyRja5Avha5c3YjuJmrPzGyKLPJtKVijc94oj9baq95rGwKAQcdK6sBoQEJ7AqHCJRGv8aep7cCGvUhWcKFTFYrKpiHaoSgFEqqtTT4YoevvPHeNQaiDXo1xn7xE6" }
+} ] }

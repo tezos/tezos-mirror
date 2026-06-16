@@ -30,7 +30,9 @@ type repo
 (** The type of trees stored in the context, i.e. the actual data. *)
 type tree
 
-type mut_state = tree ref
+type state = tree
+
+type mut_state = state ref
 
 type 'a raw_index = ('a, repo) Context_sigs.raw_index
 
@@ -45,7 +47,7 @@ type rw_index = [`Read | `Write] index
 type ro_index = [`Read] index
 
 (** The type of context with its content. *)
-type 'a t = ('a, repo, tree) Context_sigs.t
+type 'a t = ('a, repo, mut_state) Context_sigs.t
 
 (** Read/write context {!t}. *)
 type rw = [`Read | `Write] t
@@ -55,10 +57,10 @@ type ro = [`Read] t
 
 module Tree :
   Tezos_context_sigs.Context.TREE
-    with type t := rw
-     and type key := string list
-     and type value := bytes
-     and type tree := tree
+    with type t := unit
+     and type key = string list
+     and type value = bytes
+     and type tree = tree
 
 (** A context hash is the hash produced when the data of the context is
     committed to disk, i.e. the {!type:commit} hash. *)
@@ -69,11 +71,11 @@ type commit
 
 val impl_name : string
 
-val equality_witness : (repo, tree) Context_sigs.equality_witness
+val equality_witness : (repo, state, mut_state) Context_sigs.equality_witness
 
-val from_imm : tree -> mut_state
+val from_imm : state -> mut_state
 
-val to_imm : mut_state -> tree
+val to_imm : mut_state -> state
 
 (** [load cache_size path] initializes from disk a context from [path].
     [cache_size] allows to change the LRU cache size of Irmin
@@ -215,7 +217,7 @@ end
 (** State of the PVM that this rollup node deals with *)
 module PVMState : sig
   (** The value of a PVM state *)
-  type value = tree
+  type value = mut_state
 
   (** [empty ()] is the empty PVM state. *)
   val empty : unit -> value
@@ -229,10 +231,27 @@ module PVMState : sig
       state [state].  *)
   val lookup : value -> string list -> bytes option Lwt.t
 
-  (** [set context state] saves the PVM state [state] in the context and returns
-      the updated context. Note: [set] does not perform any write on disk, this
-      information must be committed using {!val:commit}. *)
-  val set : 'a t -> value -> 'a t Lwt.t
+  (** [set context state] saves the PVM state [state] in the context. Note:
+      [set] does not perform any write on disk, this information must be
+      committed using {!val:commit}. *)
+  val set : 'a t -> value -> unit Lwt.t
+
+  val cache_preference : Context_sigs.cache_preference
+
+  (** [commit index state] commits just the raw PVM state tree to disk and
+      returns the commit hash. This is used for on-disk caching of PVM states
+      during refutation game dissections. Unlike {!Irmin_context.commit}, this
+      commits the raw PVM state tree directly, not a full context tree with the
+      [/pvm_state] subtree prefix.
+
+      Note: for the Irmin backend, in-memory caching via immutable copies is
+      preferred (see {!cache_preference}). These functions are provided for
+      interface completeness but are not used in practice. *)
+  val commit : [> `Write] index -> value -> hash Lwt.t
+
+  (** [checkout index hash] restores a PVM state from the commit [hash].
+      Returns [None] if the commit is not found. See {!commit} for details. *)
+  val checkout : _ index -> hash -> value option Lwt.t
 end
 
 module Internal_for_tests : sig

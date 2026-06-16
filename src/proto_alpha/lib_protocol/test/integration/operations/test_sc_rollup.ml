@@ -200,6 +200,19 @@ let context_init ?commitment_period_in_blocks
         };
     }
 
+let bake_until_refutation_game_can_start block =
+  (* A refutation game must not start too early: the protocol requires waiting
+     for one commitment period to ensure sufficient time has passed since the
+     commitment being challenged was published. This allows for potential
+     successor commitments to be observed and provides a more stable foundation
+     for dispute resolution. *)
+  let open Lwt_result_syntax in
+  let* constants = Context.get_constants (B block) in
+  let commitment_period_in_blocks =
+    constants.parametric.sc_rollup.commitment_period_in_blocks
+  in
+  Block.bake_n (commitment_period_in_blocks - 1) block
+
 (** [test_disable_arith_pvm_feature_flag ()] tries to originate a Arith smart
     rollup when the Arith PVM feature flag is deactivated and checks that it
     fails. *)
@@ -1910,6 +1923,7 @@ let test_number_of_parallel_games_bounded () =
           "It should have failed with \
            [Sc_rollup_max_number_of_parallel_games_reached]"
   in
+  let* block = bake_until_refutation_game_can_start block in
   let* incr = Incremental.begin_construction block in
   let* _block, _counter =
     List.fold_left2_es
@@ -1976,6 +1990,7 @@ let test_timeout () =
 
   let* block = add_publish ~rollup block account1 commitment1 in
   let* block = add_publish ~rollup block account2 commitment2 in
+  let* block = bake_until_refutation_game_can_start block in
   let refutation =
     Sc_rollup.Game.Start
       {
@@ -2048,6 +2063,7 @@ let test_timeout () =
 
 let start_game block rollup (first_player, commitment1) (pkh2, commitment2) =
   let open Lwt_result_syntax in
+  let* block = bake_until_refutation_game_can_start block in
   let refutation =
     Sc_rollup.Game.Start
       {
@@ -2502,6 +2518,7 @@ let test_refute_set_input
      1 -> state just before the [set_input]
      2 -> tick in conflict with different evaluations of [set_input]
   *)
+  let* block = bake_until_refutation_game_can_start block in
   let* start_game_op =
     let refutation =
       Sc_rollup.Game.Start
@@ -3139,6 +3156,7 @@ let test_winner_by_forfeit () =
   let* block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (pD, pD_pkh) =
     init_with_4_conflicts ()
   in
+  let* block = bake_until_refutation_game_can_start block in
 
   (* Refutation game starts: A against B, C and D. *)
   (* A starts against B and D so it can be timeouted. *)
@@ -3196,6 +3214,7 @@ let test_winner_by_forfeit_with_draw () =
   let Constants.Parametric.{timeout_period_in_blocks; stake_amount; _} =
     constants.parametric.sc_rollup
   in
+  let* block = bake_until_refutation_game_can_start block in
 
   (* A and B starts a refutation game against C. *)
   let* pA_against_pC_op =
@@ -3330,6 +3349,7 @@ let test_agreeing_stakers_cannot_play () =
   let commitments, _ = List.split commitments_and_hashes in
   let* block = publish_commitments block pA rollup commitments in
   let* block = publish_commitments block pB rollup commitments in
+  let* block = bake_until_refutation_game_can_start block in
   let _, agreed_commitment_hash =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.last_opt commitments_and_hashes
@@ -3374,6 +3394,7 @@ let test_start_game_on_cemented_commitment () =
       hashes
   in
 
+  let* block = bake_until_refutation_game_can_start block in
   (* We now check that pA and pB cannot start a refutation against on
      cemented commitments. *)
   List.iter_es
@@ -3646,6 +3667,151 @@ let test_whitelist_update_make_rollup_public () =
   in
   return_unit
 
+(** Sets the canonical rollup address in the protocol constants. *)
+let set_canonical_rollup_address block rollup =
+  let open Lwt_result_syntax in
+  let* incr = Incremental.begin_construction block in
+  let*! alpha_ctxt =
+    Alpha_context.Internal_for_tests.patch_constants
+      (Incremental.alpha_ctxt incr)
+      (fun c ->
+        {
+          c with
+          sc_rollup = {c.sc_rollup with canonical_rollup_address = Some rollup};
+        })
+  in
+  let incr = Incremental.set_alpha_ctxt incr alpha_ctxt in
+  Incremental.finalize_block incr
+
+let make_canonical_rollup_signal_output ~outbox_level ~message_index signal =
+  make_output ~outbox_level ~message_index
+  @@ Sc_rollup.Outbox.Message.Canonical_rollup_signal signal
+
+(** Test that the canonical rollup can toggle the new durable storage flag
+    by sending a [Canonical_rollup_signal] outbox message. *)
+let test_canonical_rollup_signal_enables_signal () =
+  let open Lwt_result_wrap_syntax in
+  let signal = "FOOBAR" in
+  let* block, account = context_init Context.T1 in
+  let* block, rollup = sc_originate block account in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  (* Set this rollup as the canonical rollup. *)
+  let* block = set_canonical_rollup_address block rollup in
+  (* Verify the flag is initially disabled. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ initially_enabled =
+    Sc_rollup.Internal_for_tests.is_signal_enable
+      (Incremental.alpha_ctxt incr)
+      signal
+  in
+  assert (not initially_enabled) ;
+  (* Send the signal from the canonical rollup. *)
+  let output =
+    make_canonical_rollup_signal_output
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
+      ~message_index:1
+      signal
+  in
+  let* _res, block =
+    execute_outbox_message_without_proof_validation
+      block
+      rollup
+      ~cemented_commitment:genesis_info.commitment_hash
+      output
+  in
+  (* Verify the flag is now enabled. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ enabled =
+    Sc_rollup.Internal_for_tests.is_signal_enable
+      (Incremental.alpha_ctxt incr)
+      signal
+  in
+  assert enabled ;
+  return_unit
+
+(** Test that a non-canonical rollup sending a [Canonical_rollup_signal]
+    does not toggle the flag. *)
+let test_non_canonical_rollup_signal_is_ignored () =
+  let open Lwt_result_wrap_syntax in
+  let signal = "FOOBAR" in
+  let* block, account = context_init Context.T1 in
+  let* block, rollup = sc_originate block account in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  (* Do NOT set this rollup as canonical — the constant stays [None]. *)
+  let output =
+    make_canonical_rollup_signal_output
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
+      ~message_index:1
+      signal
+  in
+  let* _res, block =
+    execute_outbox_message_without_proof_validation
+      block
+      rollup
+      ~cemented_commitment:genesis_info.commitment_hash
+      output
+  in
+  (* Verify the flag is still disabled. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ enabled =
+    Sc_rollup.Internal_for_tests.is_signal_enable
+      (Incremental.alpha_ctxt incr)
+      signal
+  in
+  assert (not enabled) ;
+  return_unit
+
+(** Test that sending the same signal twice does not update the activation
+    level recorded in storage. *)
+let test_duplicate_signal_preserves_activation_level () =
+  let open Lwt_result_wrap_syntax in
+  let signal = "FOOBAR" in
+  let* block, account = context_init Context.T1 in
+  let* block, rollup = sc_originate block account in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  (* Set this rollup as the canonical rollup. *)
+  let* block = set_canonical_rollup_address block rollup in
+  (* Send the signal a first time. *)
+  let output =
+    make_canonical_rollup_signal_output
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
+      ~message_index:1
+      signal
+  in
+  let* _res, block =
+    execute_outbox_message_without_proof_validation
+      block
+      rollup
+      ~cemented_commitment:genesis_info.commitment_hash
+      output
+  in
+  (* Record the signals after the first execution. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ signals_after_first =
+    Sc_rollup.Internal_for_tests.signals (Incremental.alpha_ctxt incr)
+  in
+  (* Send the same signal a second time, in a new block. *)
+  let output =
+    make_canonical_rollup_signal_output
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
+      ~message_index:2
+      signal
+  in
+  let* _res, block =
+    execute_outbox_message_without_proof_validation
+      block
+      rollup
+      ~cemented_commitment:genesis_info.commitment_hash
+      output
+  in
+  (* Verify the signals are unchanged. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ signals_after_second =
+    Sc_rollup.Internal_for_tests.signals (Incremental.alpha_ctxt incr)
+  in
+  assert (signals_after_first = signals_after_second) ;
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -3824,6 +3990,18 @@ let tests =
       "Update the whitelist to make the rollup public"
       `Quick
       test_whitelist_update_make_rollup_public;
+    Tztest.tztest
+      "Canonical rollup signal enables new durable storage"
+      `Quick
+      test_canonical_rollup_signal_enables_signal;
+    Tztest.tztest
+      "Non-canonical rollup signal is ignored"
+      `Quick
+      test_non_canonical_rollup_signal_is_ignored;
+    Tztest.tztest
+      "Duplicate signal preserves activation level"
+      `Quick
+      test_duplicate_signal_preserves_activation_level;
   ]
 
 let () =

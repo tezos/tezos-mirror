@@ -147,12 +147,15 @@ impl ByteReprTrait for AddressHash {
         use AddressHash::*;
 
         check_size(bytes, Self::BYTE_SIZE, "bytes")?;
-        let validate_padding_byte = || match bytes.last().unwrap() {
-            0 => Ok(()),
-            b => Err(ByteReprError::WrongFormat(format!(
+        let validate_padding_byte = || match bytes.last() {
+            Some(0) => Ok(()),
+            Some(b) => Err(ByteReprError::WrongFormat(format!(
                 "address must be padded with byte 0x00, but it was padded with 0x{}",
                 hex::encode([*b])
             ))),
+            None => Err(ByteReprError::WrongFormat(
+                "address bytes unexpectedly empty".to_owned(),
+            )),
         };
         Ok(match bytes[0] {
             // implicit addresses
@@ -192,6 +195,7 @@ impl ByteReprTrait for AddressHash {
         match self {
             Implicit(hash) => {
                 out.push(TAG_IMPLICIT);
+                // bin_write to Vec<u8> is infallible (no I/O errors).
                 hash.bin_write(out).unwrap();
             }
             Kt1(hash) => originated_account(out, TAG_KT1, hash),

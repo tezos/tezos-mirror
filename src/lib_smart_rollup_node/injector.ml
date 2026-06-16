@@ -30,6 +30,7 @@ type state = {
   fee_parameters : Configuration.fee_parameters;
   minimal_block_delay : int64;
   delay_increment_per_round : int64;
+  max_batch_length : int option;
 }
 
 let registry = Prometheus.CollectorRegistry.create ()
@@ -110,6 +111,8 @@ module Parameters :
     | Add_messages _ | Cement _ | Recover_bond _ | Execute_outbox_message _ ->
         None
     | Publish_dal_commitment _ -> None
+
+  let max_batch_length state = state.max_batch_length
 
   let persist_operation (op : Operation.t) =
     match op with

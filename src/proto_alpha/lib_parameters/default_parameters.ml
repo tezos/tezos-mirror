@@ -42,7 +42,7 @@ let seconds_in_a_day = 60 * 60 * 24
 
 let seconds_in_a_week = seconds_in_a_day * 7
 
-let make_sc_rollup_parameter ~dal_activation_level
+let make_sc_rollup_parameter ?canonical_rollup ~dal_activation_level
     ~dal_attested_slots_validity_lag block_time =
   (* Maximum number of outbox messages per level.
 
@@ -139,17 +139,15 @@ let make_sc_rollup_parameter ~dal_activation_level
         };
       private_enable = true;
       riscv_pvm_enable = false;
+      canonical_rollup_address = canonical_rollup;
     }
 
 let default_cryptobox_parameters =
   {
-    Dal.page_size = 3967;
-    slot_size = 126_944;
+    Dal.Parameters.page_size = 3967;
+    slot_size = 380_832;
     redundancy_factor = 8;
     number_of_shards = 512;
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
-       Changing these values will be tricky. (The issue suggests a way to deal
-       with such changes.) *)
   }
 
 let default_dal =
@@ -157,8 +155,29 @@ let default_dal =
     {
       feature_enable = true;
       incentives_enable = true;
-      number_of_slots = 32;
+      dynamic_lag_enable = true;
+      number_of_slots = 160;
       attestation_lag = 5;
+      attestation_lags = [1; 2; 3; 4; 5];
+      (* The list of attestation lags at which an attester can attest a DAL
+         slot. A lag represents the offset of the attested level with respect
+         to the slot's published level.
+
+         There is a trade-off concerning the number of supported lags: more lags
+         can increase the size of the DAL payload in an attestation operation
+         (which is in the worst case proportional to the number of lags and the
+         number of slots). However, more lags provide greater flexibility for
+         attestation timing, enabling better latency optimization.
+
+         Enforced constraints: the list should be increasing and
+         [attestation_lag] should be its last element.
+
+         Note that a DAL specific terminology is used for various levels related
+         to the publication and attestation of a DAL slot (like published,
+         attestation, attested, and committee levels), see
+         {!Dal_slot_repr.Header}'s documentation.
+
+         Introduced in protocol U. *)
       attestation_threshold = 66;
       cryptobox_parameters = default_cryptobox_parameters;
       minimal_participation_ratio = Q.(64 // 100);
@@ -179,9 +198,6 @@ let default_dal =
          rewards, [dal_rewards_weight] is ignored when [incentives_enable =
          false]. *)
       traps_fraction = Q.(5 // 10000);
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
-         Further changes (both in the protocol and in the DAL node) need to be
-         made if this value changes. *)
     }
 
 let constants_mainnet : Constants.Parametric.t =
@@ -226,6 +242,9 @@ let constants_mainnet : Constants.Parametric.t =
   in
   let sc_rollup =
     make_sc_rollup_parameter
+      ~canonical_rollup:
+        (Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_exn
+           "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf")
       ~dal_activation_level
       ~dal_attested_slots_validity_lag
       block_time
@@ -386,6 +405,10 @@ let constants_mainnet : Constants.Parametric.t =
     cache_stake_distribution_cycles = 5;
     (* One for the sampler state for all cycles stored at any moment (as above). *)
     cache_sampler_state_cycles = 5;
+    (* One for the stake info for all cycles stored at any moment (as above). *)
+    cache_stake_info_cycles = 5;
+    (* One for the SWRR selected distribution for all cycles stored at any moment (as above). *)
+    cache_swrr_selected_distribution_cycles = 5;
     dal = default_dal;
     sc_rollup;
     zk_rollup =
@@ -423,15 +446,13 @@ let constants_mainnet : Constants.Parametric.t =
        - Split [allow_forged] into [allow_tickets] and [allow_lazy_storage_id]: #2964
        - Introduce a new Ticket constructor in Michelson: #6643 *)
     direct_ticket_spending_enable = false;
-    (* attestation aggregation feature flag *)
-    aggregate_attestation = true;
-    allow_tz4_delegate_enable = true;
     (* Portion of tz4 bakers required to activate all bakers attest (50%) *)
     all_bakers_attest_activation_threshold =
       Ratio.{numerator = 1; denominator = 2};
     (* Native contracts feature flag *)
     native_contracts_enable = false;
     swrr_new_baker_lottery_enable = false;
+    tz5_account_enable = false;
   }
 
 let constants_sandbox =
@@ -468,8 +489,10 @@ let constants_sandbox =
     consensus_threshold_size = 0;
     limit_of_delegation_over_baking = 19;
     max_operations_time_to_live = 8;
-    allow_tz4_delegate_enable = true;
     native_contracts_enable = true;
+    tz5_account_enable = true;
+    sc_rollup =
+      {constants_mainnet.sc_rollup with canonical_rollup_address = None};
   }
 
 let constants_test =
@@ -512,6 +535,9 @@ let constants_test =
          divisions by a limit do not easily get intermingled. *);
     max_operations_time_to_live = 8;
     native_contracts_enable = true;
+    tz5_account_enable = true;
+    sc_rollup =
+      {constants_mainnet.sc_rollup with canonical_rollup_address = None};
   }
 
 let test_commitments =

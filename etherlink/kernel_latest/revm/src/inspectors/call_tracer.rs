@@ -2,13 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::storage::store_call_trace;
+use super::storage::flush_call_traces;
 use crate::{
     database::EtherlinkVMDB,
     helpers::rlp::{
         append_address, append_option_address, append_option_canonical,
         append_option_u64_le, append_u16_le, append_u256_le, append_u64_le,
     },
+    inspectors::EtherlinkInspector,
     precompiles::provider::EtherlinkPrecompiles,
 };
 
@@ -30,7 +31,8 @@ use tezos_ethereum::{
     Log as RlpLog,
 };
 use tezos_evm_logging::{log, Level::Debug};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
 
 const CALL_TRACER_CONFIG_SIZE: usize = 3;
 
@@ -70,7 +72,7 @@ impl Decodable for CallTracerInput {
 pub struct CallTrace {
     type_: Vec<u8>,
     from: Address,
-    /// `to` will be [None] if type is CREATE / CREATE2.
+    /// `to` will be the created contract address if type is CREATE / CREATE2.
     to: Option<Address>,
     value: U256,
     /// `gas` will be [None] if no gas limit was provided.
@@ -115,6 +117,20 @@ impl Encodable for CallTrace {
         });
         append_option_canonical(stream, &logs, |s, logs| s.append_list(logs));
         append_u16_le(stream, &self.depth);
+    }
+}
+
+impl<'a, Host, R> EtherlinkInspector<'a, Host, R> for CallTracer
+where
+    Host: StorageV1 + 'a,
+    R: Registry + 'a,
+{
+    fn is_struct_logger(&self) -> bool {
+        false
+    }
+
+    fn get_transaction_hash(&self) -> Option<B256> {
+        self.transaction_hash
     }
 }
 
@@ -186,20 +202,16 @@ impl CallTrace {
     pub fn add_logs(&mut self, logs: Option<Vec<Log>>) {
         self.logs = logs;
     }
-
-    pub fn store(&self, host: &mut impl Runtime, transaction_hash: &Option<B256>) {
-        store_call_trace(host, self, transaction_hash)
-            .inspect_err(|err| {
-                log!(host, Debug, "Storing call trace failed with: {err:?}")
-            })
-            .ok();
-    }
 }
 
 pub struct CallTracer {
     config: CallTracerConfig,
     precompiles: EtherlinkPrecompiles,
     call_trace: HashMap<u16, CallTrace>,
+    /// Traces buffered in memory, flushed to storage once at the end of
+    /// each transaction (depth == 0).  RLP encoding is deferred to flush
+    /// time so the buffer remains readable.
+    pending_traces: Vec<CallTrace>,
     pub transaction_hash: Option<B256>,
     initial_gas: u64,
     spec_id: SpecId,
@@ -216,6 +228,7 @@ impl CallTracer {
             config,
             precompiles,
             call_trace: HashMap::with_capacity(1),
+            pending_traces: Vec::new(),
             transaction_hash,
             initial_gas: 0,
             spec_id,
@@ -239,46 +252,52 @@ impl CallTracer {
         self.initial_gas = initial_gas;
     }
 
-    #[inline]
-    fn clear(&mut self, depth: &u16) {
-        self.call_trace.remove(depth);
-    }
-
-    fn end_transaction_layer<
-        'a,
-        Host: Runtime + 'a,
-        CTX: ContextTr<Db = EtherlinkVMDB<'a, Host>>,
-    >(
+    fn end_transaction_layer<'a, Host, R, CTX>(
         &mut self,
         context: &mut CTX,
         gas_spent: u64,
         output: &Bytes,
         instruction_result: &InstructionResult,
-    ) {
+    ) where
+        Host: StorageV1 + 'a,
+        R: Registry + 'a,
+        CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
+    {
         let depth = context.journal().depth() as u16;
 
         if self.config.only_top_call && depth > 0 {
             return;
         }
 
-        if let Some(call_trace) = self.call_trace.get_mut(&depth) {
+        if let Some(mut call_trace) = self.call_trace.remove(&depth) {
             if self.config.with_logs {
                 call_trace.add_logs(Some(context.journal_mut().take_logs()));
             }
             call_trace.add_gas_used(gas_spent + self.initial_gas);
             call_trace.add_output(Some(output.to_vec()));
             call_trace.add_error_from_instruction_result(instruction_result);
-            call_trace.store(context.db_mut().host, &self.transaction_hash);
 
-            self.clear(&depth);
+            self.pending_traces.push(call_trace);
+        }
+
+        // At depth 0 (end of top-level transaction), flush all buffered
+        // traces to storage in a single batch operation.
+        if depth == 0 && !self.pending_traces.is_empty() {
+            let traces = std::mem::take(&mut self.pending_traces);
+            flush_call_traces(context.db_mut().host, &traces, &self.transaction_hash)
+                .inspect_err(|err| {
+                    log!(Debug, "Flushing call traces failed with: {err:?}");
+                })
+                .ok();
         }
     }
 }
 
-impl<'a, Host, CTX, INTR> Inspector<CTX, INTR> for CallTracer
+impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for CallTracer
 where
-    Host: Runtime + 'a,
-    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host>>,
+    Host: StorageV1 + 'a,
+    R: Registry + 'a,
+    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     INTR: InterpreterTypes<Stack: StackTr, ReturnData = ReturnDataImpl>,
 {
     fn call(
@@ -387,22 +406,22 @@ where
 
         self.set_initial_gas(context.tx());
 
-        let (type_, from) = match inputs.scheme {
-            CreateScheme::Create => ("CREATE", inputs.caller),
-            CreateScheme::Create2 { .. } => ("CREATE2", inputs.caller),
+        let (type_, from) = match inputs.scheme() {
+            CreateScheme::Create => ("CREATE", inputs.caller()),
+            CreateScheme::Create2 { .. } => ("CREATE2", inputs.caller()),
             // Impossible case on Etherlink:
-            CreateScheme::Custom { .. } => ("CUSTOM", inputs.caller),
+            CreateScheme::Custom { .. } => ("CUSTOM", inputs.caller()),
         };
 
         let mut call_trace = CallTrace::new_minimal_trace(
             type_.into(),
             from,
-            inputs.value,
-            inputs.init_code.to_vec(),
+            inputs.value(),
+            inputs.init_code().to_vec(),
             depth,
         );
 
-        call_trace.add_gas(Some(inputs.gas_limit + self.initial_gas));
+        call_trace.add_gas(Some(inputs.gas_limit() + self.initial_gas));
 
         self.set_call_trace(depth, call_trace);
 
@@ -416,6 +435,10 @@ where
         _: &CreateInputs,
         outcome: &mut CreateOutcome,
     ) {
+        let depth = context.journal().depth() as u16;
+        if let Some(call_trace) = self.call_trace.get_mut(&depth) {
+            call_trace.add_to(outcome.address);
+        }
         self.end_transaction_layer(
             context,
             outcome.gas().spent(),

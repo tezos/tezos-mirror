@@ -89,13 +89,9 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
     ~timeout:config.rpc_timeout
     ctxt.store ;
 
-  let (module Rpc_backend) =
-    Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint
-  in
-
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ctxt in
   let* l2_chain_id, Ex_chain_family chain_family =
-    Rpc_backend.single_chain_id_and_family ~config ~enable_multichain
+    Evm_ro_context.single_chain_id_and_family ctxt ~config ~enable_multichain
   in
 
   let* () = set_metrics_level ctxt in
@@ -112,7 +108,7 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
     }
   in
 
-  let* () = Prevalidator.start ~chain_family Minimal (module Rpc_backend) in
+  let* () = Prevalidator.start ~chain_family Minimal ctxt in
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let ws_client =
     match rpc_config.websockets with
@@ -146,7 +142,7 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
       ~rpc_server_family
       ~tick:(fun () -> Lwt_result_syntax.return_unit)
       rpc_config
-      ((module Rpc_backend), ctxt.smart_rollup_address)
+      ctxt
   in
 
   let (_ : Lwt_exit.clean_up_callback_id) =
@@ -159,50 +155,46 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
   in
 
   let* next_blueprint_number = Evm_ro_context.next_blueprint_number ctxt in
-  let* () =
-    Blueprints_follower.start
-      ~multichain:enable_multichain
-      ~time_between_blocks
-      ~evm_node_endpoint
-      ~rpc_timeout:config.rpc_timeout
-      ~next_blueprint_number
-      ~on_new_blueprint:(fun (Qty number) blueprint ->
-        let (Qty level) = blueprint.blueprint.number in
-        if Z.Compare.(number = level) then (
-          let* () =
-            when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
-            Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
-          in
-          let* () = Prevalidator.refresh_state () in
-          Broadcast.notify_blueprint blueprint ;
-          Metrics.set_level ~level:number ;
-          let* () = set_metrics_confirmed_levels ctxt in
-          return
-            (`Continue Blueprints_follower.{sbl_callbacks_activated = true}))
-        else
-          let*! () =
-            Blueprint_events.unexpected_blueprint_from_remote_node
-              ~received:blueprint.blueprint.number
-              ~expected:next_blueprint_number
-          in
-          return (`Restart_from (Ethereum_types.Qty number)))
-      ~on_finalized_levels:(fun ~l1_level ~start_l2_level ~end_l2_level ->
-        Broadcast.notify_finalized_levels
-          ~l1_level
-          ~start_l2_level
-          ~end_l2_level ;
-        return_unit)
-      ~on_next_block_info:(fun timestamp number ->
-        Broadcast.notify_next_block_info timestamp number ;
-        let*! () = Events.next_block_timestamp timestamp in
-        return_unit)
-      ~on_inclusion:(fun tx hash ->
-        Broadcast.notify_inclusion tx hash ;
-        let*! () = Events.inclusion hash in
-        return_unit)
-      ~on_dropped:(fun hash reason ->
-        Broadcast.notify_dropped ~hash ~reason ;
-        return_unit)
-      ()
-  in
-  return_unit
+  Blueprints_follower.start
+    ~multichain:enable_multichain
+    ~time_between_blocks
+    ~evm_node_endpoint
+    ~rpc_timeout:config.rpc_timeout
+    ~next_blueprint_number
+    ~instant_confirmations:
+      config.experimental_features.preconfirmation_stream_enabled
+    ~on_new_blueprint:(fun (Qty number) blueprint ~expected_block_hash ->
+      let (Qty level) = blueprint.blueprint.number in
+      if Z.Compare.(number = level) then (
+        let* () =
+          when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
+          Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
+        in
+        let* () = Prevalidator.refresh_state () in
+        Option.iter Broadcast.notify_block_hash expected_block_hash ;
+        Broadcast.notify_blueprint blueprint ;
+        Metrics.set_level ~level:number ;
+        let* () = set_metrics_confirmed_levels ctxt in
+        return (`Continue Blueprints_follower.{sbl_callbacks_activated = true}))
+      else
+        let*! () =
+          Blueprint_events.unexpected_blueprint_from_remote_node
+            ~received:blueprint.blueprint.number
+            ~expected:next_blueprint_number
+        in
+        return (`Restart_from (Ethereum_types.Qty number)))
+    ~on_finalized_levels:(fun ~l1_level ~start_l2_level ~end_l2_level ->
+      Broadcast.notify_finalized_levels ~l1_level ~start_l2_level ~end_l2_level ;
+      return_unit)
+    ~on_next_block_info:(fun timestamp number ->
+      Broadcast.notify_next_block_info timestamp number ;
+      let*! () = Events.next_block_info timestamp number in
+      return_unit)
+    ~on_inclusion:(fun tx hash ->
+      Broadcast.notify_inclusion tx hash ;
+      let*! () = Events.inclusion hash in
+      return_unit)
+    ~on_dropped:(fun hash reason ->
+      Broadcast.notify_dropped ~hash ~reason ;
+      return_unit)
+    ()

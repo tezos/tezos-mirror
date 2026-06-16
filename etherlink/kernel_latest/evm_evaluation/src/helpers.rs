@@ -76,11 +76,7 @@ macro_rules! write_host {
         {
             if cfg!(not(feature = "disable-file-logs")) {
                 extern crate alloc;
-                writeln!(
-                    $host.buffer.borrow_mut(),
-                    "{}",
-                    { &alloc::format!($($args), *) },
-                ).unwrap()
+                $host.writeln({ &alloc::format!($($args), *) });
             }
         }
     };

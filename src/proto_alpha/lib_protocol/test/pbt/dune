@@ -22,7 +22,8 @@
   octez-protocol-alpha-libs.smart-rollup
   octez-libs.crypto-dal
   octez-libs.base-test-helpers
-  tezos-protocol-alpha.parameters)
+  tezos-protocol-alpha.parameters
+  octez-protocol-alpha-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -40,7 +41,8 @@
   -open Tezos_smart_rollup_alpha
   -open Tezos_crypto_dal
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_alpha_parameters)
+  -open Tezos_protocol_alpha_parameters
+  -open Tezos_protocol_plugin_alpha)
  (modules
   liquidity_baking_pbt
   saturation_fuzzing
@@ -48,6 +50,7 @@
   test_sampler
   test_script_comparison
   test_script_roundtrip
+  test_script_normalization
   test_tez_repr
   test_sc_rollup_tick_repr
   test_sc_rollup_encoding

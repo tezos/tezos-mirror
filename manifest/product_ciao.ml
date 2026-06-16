@@ -52,7 +52,8 @@ let ci_sdk_bindings =
     ~path:"contrib/sdk-bindings/ci"
     ~bisect_ppx:No
     ~modules:["sdk_bindings_ci"]
-    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
+    ~deps:
+      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
     ~release_status:Unreleased
 
 let ci_lib_tezos_ci_jobs =
@@ -75,7 +76,7 @@ let _release_page_base_lib =
   private_lib
     "base_lib"
     ~opam:""
-    ~path:"ci/bin_release_page"
+    ~path:"ci/bin_release_page/src"
     ~release_status:Unreleased
     ~modules:["base"]
     ~profile:"release-tools-deps"
@@ -85,7 +86,7 @@ let _release_page =
   private_exe
     "release_page"
     ~opam:""
-    ~path:"ci/bin_release_page"
+    ~path:"ci/bin_release_page/src"
     ~release_status:Unreleased
     ~modules:["release_page"]
     ~profile:"release-tools-deps"
@@ -95,11 +96,33 @@ let _version_manager =
   private_exe
     "version_manager"
     ~opam:""
-    ~path:"ci/bin_release_page"
+    ~path:"ci/bin_release_page/src"
     ~release_status:Unreleased
     ~modules:["version_manager"]
     ~profile:"release-tools-deps"
     ~deps:[unix; clap; tezt_json_lib; rss; _release_page_base_lib |> open_]
+
+let _release_page_tests =
+  private_exe
+    "main"
+    ~path:"ci/bin_release_page/tezt"
+    ~opam:""
+    ~synopsis:"Tests for the release page tools"
+    ~release_status:Unreleased
+    ~modules:["main"; "test_version_manager"; "test_generate_release_page"]
+    ~profile:"release-tools-deps"
+    ~deps:
+      [tezt_lib |> open_ |> open_ ~m:"Base"; _release_page_base_lib |> open_]
+
+let ci_release_page =
+  private_lib
+    "release_page_ci"
+    ~opam:""
+    ~path:"ci/bin_release_page/ci"
+    ~bisect_ppx:No
+    ~deps:
+      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
+    ~release_status:Unreleased
 
 let ci_grafazos =
   private_lib
@@ -160,16 +183,6 @@ let ci_documentation =
       ]
     ~release_status:Unreleased
 
-let ci_client_libs =
-  private_lib
-    "client_libs_ci"
-    ~opam:""
-    ~path:"client-libs/ci"
-    ~bisect_ppx:No
-    ~deps:
-      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
-    ~release_status:Unreleased
-
 let _ci_bin_main =
   private_exe
     "main"
@@ -181,13 +194,13 @@ let _ci_bin_main =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_lib_tezos_ci_jobs |> open_;
+        ci_release_page;
         ci_grafazos;
         ci_teztale;
         ci_rollup_node;
         ci_sdk_bindings;
         ci_etherlink;
         ci_documentation;
-        ci_client_libs;
       ]
     ~release_status:Unreleased
 

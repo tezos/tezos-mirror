@@ -21,11 +21,19 @@ let () =
     exit 1)
 
 let () =
-  match Tezos_profiler_unix.Profiler_instance.selected_backends () with
+  match
+    Tezos_profiler_unix.Profiler_instance.selected_backends
+      ~profiling_config:Tezos_profiler.Profiler.default_profiling_config
+  with
   | Some backends ->
       List.iter
         (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
-          let profiler_maker = instance_maker ~directory:"/tmp" ~name:"main" in
+          let profiler_maker =
+            instance_maker
+              ~directory:"/tmp"
+              ~profiling_config:Tezos_profiler.Profiler.default_profiling_config
+              ~name:"main"
+          in
           match profiler_maker with
           | Some instance -> Tezos_profiler.Profiler.(plug main) instance
           | None -> ())

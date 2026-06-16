@@ -224,6 +224,10 @@ let sc_rollup_riscv_pvm_enable c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.riscv_pvm_enable
 
+let canonical_rollup c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.canonical_rollup_address
+
 let dal_number_of_slots c =
   let constants = Raw_context.constants c in
   constants.dal.number_of_slots
@@ -235,6 +239,14 @@ let dal_attestation_lag c =
 let dal_number_of_shards c =
   let constants = Raw_context.constants c in
   constants.dal.cryptobox_parameters.number_of_shards
+
+let dal_attestation_lags c =
+  let constants = Raw_context.constants c in
+  constants.dal.attestation_lags
+
+let dal_number_of_lags c =
+  let constants = Raw_context.constants c in
+  List.length constants.dal.attestation_lags
 
 let dal_enable c =
   let constants = Raw_context.constants c in
@@ -274,10 +286,7 @@ let max_slashing_per_block c = (Raw_context.constants c).max_slashing_per_block
 let direct_ticket_spending_enable c =
   (Raw_context.constants c).direct_ticket_spending_enable
 
-let aggregate_attestation c = (Raw_context.constants c).aggregate_attestation
-
-let allow_tz4_delegate_enable c =
-  (Raw_context.constants c).allow_tz4_delegate_enable
+let tz5_account_enable c = (Raw_context.constants c).tz5_account_enable
 
 let all_bakers_attest_activation_threshold c =
   (Raw_context.constants c).all_bakers_attest_activation_threshold
@@ -289,6 +298,9 @@ let round_durations ctxt = Raw_context.round_durations ctxt
 
 let native_contracts_enable c =
   (Raw_context.constants c).native_contracts_enable
+
+let swrr_new_baker_lottery_enable c =
+  (Raw_context.constants c).swrr_new_baker_lottery_enable
 
 let all ctxt = Constants_repr.all_of_parametric (parametric ctxt)
 

@@ -166,7 +166,14 @@ let constants_of_parametric
           max_active_outbox_levels = Int32.to_int max_active_outbox_levels;
         };
       dal =
-        {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
+        {
+          feature_enable;
+          attestation_lag;
+          attestation_lags = [];
+          dynamic_lag_enable = false;
+          number_of_slots;
+          cryptobox_parameters;
+        };
     }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2901
@@ -269,12 +276,12 @@ let find_last_whitelist_update cctxt rollup_address =
     last_whitelist_update
   |> return
 
-let get_commitment cctxt rollup_address commitment_hash =
+let get_commitment cctxt ?(block = `Head 0) rollup_address commitment_hash =
   let open Lwt_result_syntax in
   let+ commitment =
     Plugin.RPC.Sc_rollup.commitment
       (new Protocol_client_context.wrap_full (cctxt :> Client_context.full))
-      (cctxt#chain, `Head 0)
+      (cctxt#chain, block)
       rollup_address
       commitment_hash
   in

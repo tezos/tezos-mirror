@@ -2,32 +2,138 @@
 //
 // SPDX-License-Identifier: MIT
 
-use mir::ast::big_map::BigMapId;
+use mir::ast::{big_map::BigMapId, AddressHash, PublicKeyHash};
+use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Origin;
+
+use crate::account_storage::{
+    TezlinkImplicitAccount, TezlinkOriginatedAccount, TezosImplicitAccount,
+    TezosOriginatedAccount,
+};
 
 // TODO: https://gitlab.com/tezos/tezos/-/issues/7867: add the missing paths
 
 // Instead of using directly the paths, we construct a Context object that holds the
 // path to the context and does the concatenations.
-// This will prevent '/tezlink/context' to appear at multiple place like '/evm/world_state'
-pub struct Context {
+// This prevents the root path (e.g. '/tez/tez_accounts') from
+// appearing at multiple places in the codebase.
+pub struct TezlinkContext {
     path: OwnedPath,
 }
 
-impl Context {
-    pub fn from(root: &impl Path) -> Result<Self, PathError> {
-        let context = RefPath::assert_from(b"/context");
-        let path = concat(root, &context)?;
-        Ok(Self { path })
+pub trait Context {
+    type ImplicitAccountType: TezosImplicitAccount;
+
+    type OriginatedAccountType: TezosOriginatedAccount;
+
+    fn implicit_from_contract(
+        &self,
+        contract: &Contract,
+    ) -> Result<Self::ImplicitAccountType, tezos_storage::error::Error> {
+        match contract {
+            Contract::Implicit(pkh) => self.implicit_from_public_key_hash(pkh),
+            _ => Err(tezos_storage::error::Error::OriginatedToImplicit),
+        }
     }
 
-    pub fn path(&self) -> OwnedPath {
+    fn implicit_from_public_key_hash(
+        &self,
+        pkh: &PublicKeyHash,
+    ) -> Result<Self::ImplicitAccountType, tezos_storage::error::Error>;
+
+    fn originated_from_contract(
+        &self,
+        contract: &Contract,
+    ) -> Result<Self::OriginatedAccountType, tezos_storage::error::Error> {
+        match contract {
+            Contract::Originated(kt1) => self.originated_from_kt1(kt1),
+            _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
+        }
+    }
+
+    fn originated_from_kt1(
+        &self,
+        kt1: &ContractKt1Hash,
+    ) -> Result<Self::OriginatedAccountType, tezos_storage::error::Error>;
+
+    /// Record that an originated account is recognized as native.
+    /// Default is a no-op for runtimes without classification storage.
+    /// TezosX overrides this to write Native at the origin storage path.
+    fn record_native_origin(
+        &self,
+        _host: &mut impl StorageV1,
+        _kt1: &ContractKt1Hash,
+    ) -> Result<(), tezos_storage::error::Error> {
+        Ok(())
+    }
+
+    /// Read the origin classification (native / alias) for the given address.
+    /// Default returns None for runtimes without classification storage.
+    /// TezosX overrides this to read the origin path.
+    fn read_origin_for_address(
+        &self,
+        _host: &impl StorageV1,
+        _address: &AddressHash,
+    ) -> Result<Option<Origin>, tezos_storage::error::Error> {
+        Ok(None)
+    }
+
+    fn path(&self) -> OwnedPath;
+
+    fn from_root(root: &impl Path) -> Result<Self, PathError>
+    where
+        Self: Sized;
+}
+
+impl Context for TezlinkContext {
+    type ImplicitAccountType = TezlinkImplicitAccount;
+
+    fn implicit_from_public_key_hash(
+        &self,
+        pkh: &PublicKeyHash,
+    ) -> Result<Self::ImplicitAccountType, tezos_storage::error::Error> {
+        let index = contracts::index(self)?;
+        let contract = Contract::Implicit(pkh.clone());
+        let path = concat(&index, &account::account_path(&contract)?)?;
+        Ok(TezlinkImplicitAccount {
+            path,
+            pkh: pkh.clone(),
+        })
+    }
+
+    type OriginatedAccountType = TezlinkOriginatedAccount;
+
+    fn originated_from_kt1(
+        &self,
+        kt1: &ContractKt1Hash,
+    ) -> Result<Self::OriginatedAccountType, tezos_storage::error::Error> {
+        let index = contracts::index(self)?;
+        let contract = Contract::Originated(kt1.clone());
+        let path = concat(&index, &account::account_path(&contract)?)?;
+        Ok(TezlinkOriginatedAccount {
+            path,
+            kt1: kt1.clone(),
+        })
+    }
+
+    fn from_root(root: &impl Path) -> Result<Self, PathError> {
+        Ok(Self {
+            path: OwnedPath::from(root),
+        })
+    }
+
+    fn path(&self) -> OwnedPath {
         self.path.clone()
     }
+}
 
+impl TezlinkContext {
     #[cfg(test)]
     pub fn init_context() -> Self {
-        let path = RefPath::assert_from(b"/tezlink/context");
+        let path = RefPath::assert_from(b"/tez/tez_accounts");
         Self {
             path: OwnedPath::from(path),
         }
@@ -43,20 +149,22 @@ pub mod contracts {
 
     const GLOBAL_COUNTER: RefPath = RefPath::assert_from(b"/global_counter");
 
-    pub fn root(context: &Context) -> Result<OwnedPath, PathError> {
-        concat(&context.path, &ROOT)
+    pub fn root<C: Context>(context: &C) -> Result<OwnedPath, PathError> {
+        concat(&context.path(), &ROOT)
     }
 
-    pub fn index(context: &Context) -> Result<OwnedPath, PathError> {
+    pub fn index<C: Context>(context: &C) -> Result<OwnedPath, PathError> {
         concat(&root(context)?, &INDEX)
     }
 
-    pub fn global_counter(context: &Context) -> Result<OwnedPath, PathError> {
+    pub fn global_counter<C: Context>(context: &C) -> Result<OwnedPath, PathError> {
         concat(&root(context)?, &GLOBAL_COUNTER)
     }
 }
 
 pub mod big_maps {
+    use tezos_crypto_rs::hash::ScriptExprHash;
+
     use super::*;
 
     const BIG_MAP_PATH: RefPath = RefPath::assert_from(b"/big_map");
@@ -69,46 +177,46 @@ pub mod big_maps {
 
     const KEYS: RefPath = RefPath::assert_from(b"/keys");
 
-    fn root(context: &Context) -> Result<OwnedPath, PathError> {
-        concat(&context.path, &BIG_MAP_PATH)
+    fn root<C: Context>(context: &C) -> Result<OwnedPath, PathError> {
+        concat(&context.path(), &BIG_MAP_PATH)
     }
 
-    pub fn next_id_path(context: &Context) -> Result<OwnedPath, PathError> {
+    pub fn next_id_path<C: Context>(context: &C) -> Result<OwnedPath, PathError> {
         concat(&root(context)?, &NEXT_ID_PATH)
     }
 
-    pub fn big_map_path(
-        context: &Context,
+    pub fn big_map_path<C: Context>(
+        context: &C,
         id: &BigMapId,
     ) -> Result<OwnedPath, PathError> {
         concat(&root(context)?, &OwnedPath::try_from(format!("/{id}"))?)
     }
 
-    pub fn key_type_path(
-        context: &Context,
+    pub fn key_type_path<C: Context>(
+        context: &C,
         id: &BigMapId,
     ) -> Result<OwnedPath, PathError> {
         concat(&big_map_path(context, id)?, &KEY_TYPE_PATH)
     }
 
-    pub fn keys_of_big_map(
-        context: &Context,
+    pub fn keys_of_big_map<C: Context>(
+        context: &C,
         id: &BigMapId,
     ) -> Result<OwnedPath, PathError> {
         concat(&big_map_path(context, id)?, &KEYS)
     }
 
-    pub fn value_type_path(
-        context: &Context,
+    pub fn value_type_path<C: Context>(
+        context: &C,
         id: &BigMapId,
     ) -> Result<OwnedPath, PathError> {
         concat(&big_map_path(context, id)?, &VALUE_TYPE_PATH)
     }
 
-    pub fn value_path(
-        context: &Context,
+    pub fn value_path<C: Context>(
+        context: &C,
         id: &BigMapId,
-        key_hashed: &[u8],
+        key_hashed: &ScriptExprHash,
     ) -> Result<OwnedPath, PathError> {
         let key_hex = hex::encode(key_hashed);
         concat(
@@ -119,7 +227,7 @@ pub mod big_maps {
 }
 
 pub mod code {
-    use crate::account_storage::{TezlinkAccount, TezlinkOriginatedAccount};
+    use crate::account_storage::TezosOriginatedAccount;
 
     use super::*;
 
@@ -135,42 +243,46 @@ pub mod code {
 
     const USED_BYTES_PATH: RefPath = RefPath::assert_from(b"/used_bytes");
 
-    pub fn code_path(account: &TezlinkOriginatedAccount) -> Result<OwnedPath, PathError> {
+    pub fn code_path<A: TezosOriginatedAccount>(
+        account: &A,
+    ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &CODE_PATH)
     }
 
-    pub fn storage_path(
-        account: &TezlinkOriginatedAccount,
+    pub fn storage_path<A: TezosOriginatedAccount>(
+        account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &STORAGE_PATH)
     }
 
-    pub fn code_size_path(
-        account: &TezlinkOriginatedAccount,
+    pub fn code_size_path<A: TezosOriginatedAccount>(
+        account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &CODE_SIZE_PATH)
     }
 
-    pub fn storage_size_path(
-        account: &TezlinkOriginatedAccount,
+    pub fn storage_size_path<A: TezosOriginatedAccount>(
+        account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &STORAGE_SIZE_PATH)
     }
 
-    pub fn paid_bytes_path(
-        account: &TezlinkOriginatedAccount,
+    pub fn paid_bytes_path<A: TezosOriginatedAccount>(
+        account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &PAID_BYTES_PATH)
     }
 
-    pub fn used_bytes_path(
-        account: &TezlinkOriginatedAccount,
+    pub fn used_bytes_path<A: TezosOriginatedAccount>(
+        account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &USED_BYTES_PATH)
     }
 }
 
 pub mod account {
+    use mir::ast::BinWriter;
+
     use crate::account_storage::TezlinkAccount;
 
     use super::*;
@@ -180,6 +292,20 @@ pub mod account {
     const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
 
     const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
+
+    pub fn account_path(
+        contract: &Contract,
+    ) -> Result<OwnedPath, tezos_storage::error::Error> {
+        // uses the same encoding as in the octez node's representation of the context
+        // see `octez-codec describe alpha.contract binary schema`
+        let mut contract_encoded = Vec::new();
+        contract
+            .bin_write(&mut contract_encoded)
+            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
+
+        let path_string = alloc::format!("/{}", hex::encode(&contract_encoded));
+        Ok(OwnedPath::try_from(path_string)?)
+    }
 
     pub fn balance_path<A: TezlinkAccount + ?Sized>(
         account: &A,

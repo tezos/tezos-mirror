@@ -11,6 +11,9 @@ type t
 (** See [Daemon.Make.name] *)
 val name : t -> string
 
+(** See [Daemon.Make.pid] *)
+val pid : t -> int option
+
 (** Send SIGTERM and wait for the process to terminate.
 
     Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
@@ -29,7 +32,13 @@ val continue : t -> unit Lwt.t
 val log_events : ?max_length:int -> t -> unit
 
 (** See [Daemon.Make.wait_for]. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** Wait until the agnostic baker is ready.
 
@@ -37,6 +46,29 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
     If this event alreay happened, return immediately.
  *)
 val wait_for_ready : t -> unit Lwt.t
+
+(** [wait_for_supervisor_automaton_start baker] resolves once [baker] emits a
+    [supervisor_starting_automaton] event. If [endpoint] is provided, only
+    events for that endpoint are considered. *)
+val wait_for_supervisor_automaton_start :
+  ?timeout:float -> ?endpoint:Endpoint.t -> t -> unit Lwt.t
+
+(** [wait_for_supervisor_automaton_crash baker] resolves once [baker] emits a
+    [supervisor_automaton_crashed] event. If [endpoint] is provided, only
+    events for that endpoint are considered. *)
+val wait_for_supervisor_automaton_crash :
+  ?timeout:float -> ?endpoint:Endpoint.t -> t -> unit Lwt.t
+
+(** [wait_for_supervisor_automaton_retr baker] resolves once [baker] emits a
+    [supervisor_automaton_retry] event. If [endpoint] is provided, only
+    events for that endpoint are considered. *)
+val wait_for_supervisor_automaton_retry :
+  ?timeout:float -> ?endpoint:Endpoint.t -> t -> unit Lwt.t
+
+(** [wait_for_supervisor_all_automatons_down baker] resolves once [baker] emits
+    a [supervisor_all_automatons_down] event, which fires just before the baker
+    shuts down because all supervised nodes are simultaneously unreachable. *)
+val wait_for_supervisor_all_automatons_down : ?timeout:float -> t -> unit Lwt.t
 
 (* Wait for agnostic baker termination. *)
 val wait_for_termination : t -> unit Lwt.t
@@ -136,7 +168,10 @@ val extra_levels_for_old_baker : int
 
     If a [dal_node_rpc_endpoint] is specified, then the baker queries it in
     order to determine the DAL content of the attestations it sends to the L1
-    node.  *)
+    node.
+
+    If [extra_nodes] is specified, the baker will connect to multiple nodes for
+    improved fault resilience (EXPERIMENTAL). *)
 val create :
   ?runner:Runner.t ->
   ?path:string ->
@@ -149,6 +184,7 @@ val create :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
+  ?extra_nodes:Endpoint.t list ->
   ?dal_node_rpc_endpoint:Endpoint.t ->
   ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
@@ -175,7 +211,10 @@ val create :
 
     If a [dal_node_rpc_endpoint] is specified, then the baker queries it in
     order to determine the DAL content of the attestations it sends to the L1
-    node. *)
+    node.
+
+    If [extra_nodes] is specified, the baker will connect to multiple nodes for
+    improved fault resilience (EXPERIMENTAL). *)
 val create_from_uris :
   ?runner:Runner.t ->
   ?path:string ->
@@ -188,6 +227,7 @@ val create_from_uris :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
+  ?extra_nodes:Endpoint.t list ->
   ?dal_node_rpc_endpoint:Endpoint.t ->
   ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
@@ -237,7 +277,10 @@ val create_from_uris :
     "every known account".
 
     If [remote_mode] is specified, the agnostic baker will run in
-    RPC-only mode. *)
+    RPC-only mode.
+
+    If [extra_nodes] is specified, the baker will connect to multiple nodes for
+    improved fault resilience (EXPERIMENTAL). *)
 val init :
   ?env:string String_map.t ->
   ?runner:Runner.t ->
@@ -253,6 +296,7 @@ val init :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
+  ?extra_nodes:Endpoint.t list ->
   ?dal_node_rpc_endpoint:Endpoint.t ->
   ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->

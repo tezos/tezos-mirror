@@ -32,7 +32,6 @@ module Internals = Internals
 module Data_encoding = Product_data_encoding
 module Octez = Product_octez
 open Octez
-module Client_libs = Product_client_libs
 module Tooling = Product_tooling
 module Etherlink = Product_etherlink
 module CIAO = Product_ciao
@@ -78,6 +77,7 @@ let exclude filename =
   (* We need to tell Dune about excluding directories without defining targets
      in those directories. Therefore we hand write some Dune in these. *)
   | "src" :: "riscv" :: _ -> true
+  | ["src"; "rust_libcrux"; "dune"] -> true
   (* [src/dune] is either absent or copied from [script-inputs/slim-mode-dune]. *)
   | "src" :: "dune" :: _ -> true
   (* [manifest/dune] serves for ocaml-lsp to handle the manifest. *)
@@ -248,7 +248,10 @@ let () =
     | Frozen | Overridden ->
         (* Protocol 000 is always needed,
            if only to be able to bootstrap Mainnet. *)
+        (* Seoul (023) test_helpers is kept for Etherlink's tezlink.
+           Remove this exception when Etherlink migrates to TALLiN. *)
         Octez.Protocol.number protocol <> V 000
+        && Octez.Protocol.number protocol <> V 023
     | Not_mainnet ->
         (* Demo protocols are useful for tests,
            and slim mode is intended for developers

@@ -1,0 +1,49 @@
+# Deposits a bytes payload via %collect_result on the current CRAC
+# frame, then calls an EVM contract via %call_evm.  Used to test that
+# nested CRAC frames are independent: the outer caller receives the
+# bytes deposited here, while the inner EVM call can independently
+# receive bytes from a second %collect_result call inside the nested
+# frame.
+#
+# Storage: pair address (pair string bytes)
+#   address = gateway KT1
+#   string  = EVM target address (e.g. "0x1234...") called via %call_evm
+#   bytes   = outer payload for %collect_result
+parameter unit;
+storage (pair address (pair string bytes));
+code {
+       CDR;
+       DUP;
+       CAR;
+       CONTRACT %collect_result bytes;
+       ASSERT_SOME;
+       DUP 2;
+       CDR;
+       CDR;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       DUP 2;
+       CAR;
+       CONTRACT %call_evm (pair string (pair string (pair bytes (option (contract bytes)))));
+       ASSERT_SOME;
+       DUP 3;
+       CDR;
+       CAR;
+       NONE (contract bytes);
+       PUSH bytes 0x;
+       PAIR;
+       PUSH string "run()";
+       PAIR;
+       SWAP;
+       PAIR;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       NIL operation;
+       SWAP;
+       CONS;
+       SWAP;
+       CONS;
+       PAIR
+     };

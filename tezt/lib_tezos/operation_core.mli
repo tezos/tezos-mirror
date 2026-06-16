@@ -272,7 +272,7 @@ module Consensus : sig
     level:int ->
     round:int ->
     block_payload_hash:string ->
-    ?dal_attestation:bool array ->
+    ?dal_attestation:string ->
     unit ->
     t
 
@@ -372,7 +372,7 @@ module Consensus : sig
     round:int ->
     block_payload_hash:string ->
     ?branch:string ->
-    ?dal_attestation:bool array ->
+    ?dal_attestation:string ->
     ?companion_key:Account.key ->
     Account.key ->
     Client.t ->
@@ -418,6 +418,7 @@ module Anonymous : sig
     protocol:Protocol.t ->
     attestation:operation * Tezos_crypto.Signature.t ->
     slot_index:int ->
+    ?lag_index:int ->
     Tezos_crypto_dal.Cryptobox.shard ->
     Tezos_crypto_dal.Cryptobox.shard_proof ->
     t
@@ -768,7 +769,7 @@ val rejected_by_full_mempool_no_possible_fee : rex
     from [src/proto_alpha/lib_protocol/dal_errors_repr].
 
     Captures [attester], [level], and [slot]. *)
-val dal_data_availibility_attester_not_in_committee : rex
+val dal_data_availibility_attester_not_in_committee : Protocol.t -> rex
 
 (** Calls {!inject_and_capture2_stderr} and checks that the second
     captured group is [expected_fee].
@@ -819,7 +820,24 @@ val injection_error_unknown_branch : rex
 val dal_entrapment_wrong_commitment : rex
 
 (** Matches the message
-    [Invalid accusation for delegate %a, level %d, and DAL slot index %d: the DAL slot was not published.]
-    from [src/proto_alpha/lib_protocol/validate_errors.ml]
+    [Invalid accusation for delegate %a, level %d, lag_index %d and DAL slot index %d: the DAL slot was not published.]
+    or
+    [Invalid accusation for delegate %a, level %d, and DAL slot index %d: the DAL slot was not published.],
+    depending on the protocol version, from
+    [src/proto_<proto>/lib_protocol/validate_errors.ml]
 *)
-val dal_entrapment_of_not_published_commitment : rex
+val dal_entrapment_of_not_published_commitment : Protocol.t -> rex
+
+(** Matches the message [The given lag index <lag_index> is out of range of
+    representable lag indices [0, <max_bound>]], from
+    [src/proto_<proto>/lib_protocol/validate_errors.ml]
+*)
+val dal_entrapment_invalid_lag_index : lag_index:int -> max_bound:int -> rex
+
+(** Matches accusation errors where the attester did not attest the targeted
+    DAL slot. *)
+val dal_entrapment_slot_not_attested : rex
+
+(** Matches accusation errors where the provided shard is not assigned to the
+    accused attester. *)
+val dal_entrapment_wrong_shard_owner : rex

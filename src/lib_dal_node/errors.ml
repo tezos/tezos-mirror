@@ -37,6 +37,17 @@ type error +=
       current_chain_id : Chain_id.t;
       stored_chain_id : Chain_id.t;
     }
+  | Unexpected_slot_status of {
+      published_level : int32;
+      slot_id : Types.Slot_id.t;
+      status : Types.header_status;
+    }
+  | Unexpected_slot_status_transition of {
+      slot_id : Types.Slot_id.t;
+      from_status_opt : Types.header_status option;
+      to_status : Types.header_status;
+    }
+  | Missing_configuration_file of {file : string}
 
 let () =
   register_error_kind
@@ -168,7 +179,71 @@ let () =
           Some (current_chain_id, stored_chain_id)
       | _ -> None)
     (fun (current_chain_id, stored_chain_id) ->
-      Wrong_chain_id {current_chain_id; stored_chain_id})
+      Wrong_chain_id {current_chain_id; stored_chain_id}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.unexpected_slot_status"
+    ~title:"Unexpected slot status"
+    ~description:"A slot has an unexpected status"
+    ~pp:(fun ppf (published_level, slot_id, status) ->
+      Format.fprintf
+        ppf
+        "Unexpected status %a for slot %a at published level %ld"
+        Types.pp_header_status
+        status
+        Types.Slot_id.pp
+        slot_id
+        published_level)
+    Data_encoding.(
+      obj3
+        (req "published_level" int32)
+        (req "slot_id" Types.slot_id_encoding)
+        (req "status" Types.header_status_encoding))
+    (function
+      | Unexpected_slot_status {published_level; slot_id; status} ->
+          Some (published_level, slot_id, status)
+      | _ -> None)
+    (fun (published_level, slot_id, status) ->
+      Unexpected_slot_status {published_level; slot_id; status}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.unexpected_slot_status_transition"
+    ~title:"Unexpected slot status transition"
+    ~description:"A slot status transition is not allowed"
+    ~pp:(fun ppf (slot_id, from_status_opt, to_status) ->
+      Format.fprintf
+        ppf
+        "Unexpected slot status transition for slot %a%s to %a"
+        Types.Slot_id.pp
+        slot_id
+        (match from_status_opt with
+        | None -> ""
+        | Some status ->
+            Format.asprintf " from %a" Types.pp_header_status status)
+        Types.pp_header_status
+        to_status)
+    Data_encoding.(
+      obj3
+        (req "slot_id" Types.slot_id_encoding)
+        (opt "from_status" Types.header_status_encoding)
+        (req "to_status" Types.header_status_encoding))
+    (function
+      | Unexpected_slot_status_transition {slot_id; from_status_opt; to_status}
+        ->
+          Some (slot_id, from_status_opt, to_status)
+      | _ -> None)
+    (fun (slot_id, from_status_opt, to_status) ->
+      Unexpected_slot_status_transition {slot_id; from_status_opt; to_status}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.configuration_file_missing"
+    ~title:"missing configuration file"
+    ~description:"missing configuration file"
+    ~pp:(fun ppf file ->
+      Format.fprintf ppf "Configuration file %s is missing" file)
+    Data_encoding.(obj1 (req "file" Data_encoding.string))
+    (function Missing_configuration_file {file} -> Some file | _ -> None)
+    (fun file -> Missing_configuration_file {file})
 
 (** This part defines and handles more elaborate errors for the DAL node. *)
 
@@ -213,3 +288,24 @@ let to_tzresult r =
   let open Lwt_result_syntax in
   let*! r in
   match r with Ok s -> return s | Error e -> error_to_tzresult e
+
+module Exit_codes = struct
+  include Cmdliner.Cmd.Exit
+
+  let invalid_configuration_file =
+    Cmdliner.Cmd.Exit.info 1 ~doc:"$(status): configuration file invalid"
+
+  let invalid_configuration_file_code =
+    Cmdliner.Cmd.Exit.info_code invalid_configuration_file
+
+  let trapped_attester =
+    Cmdliner.Cmd.Exit.info
+      2
+      ~doc:
+        "$(status): a registered attester attested a slot containing traps; \
+         the node halts to prevent further reward loss"
+
+  let trapped_attester_code = Cmdliner.Cmd.Exit.info_code trapped_attester
+
+  let all = defaults @ [invalid_configuration_file; trapped_attester]
+end

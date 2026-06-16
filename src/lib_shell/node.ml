@@ -365,7 +365,7 @@ let http_cache_header_tools node =
   let chain_store = Store.main_chain_store store in
   Http_cache_headers.make_tools (fun () -> Some chain_store)
 
-let build_rpc_directory ~node_version node =
+let build_rpc_directory ~node_version ~profiling_config node =
   let dir : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty in
   let merge d = dir := Tezos_rpc.Directory.merge !dir d in
   let register0 s f =
@@ -393,7 +393,9 @@ let build_rpc_directory ~node_version node =
        node.store) ;
   merge (Version_directory.rpc_directory node_version) ;
   merge (Health_directory.build_rpc_directory ()) ;
-  merge (Tezos_profiler_unix.Profiler_directory.build_rpc_directory ()) ;
+  merge
+    (Tezos_profiler_unix.Profiler_directory.build_rpc_directory
+       ~profiling_config) ;
   register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   merge (Bls_directory.build_rpc_directory ()) ;

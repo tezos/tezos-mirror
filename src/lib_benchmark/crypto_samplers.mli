@@ -100,6 +100,19 @@ module V2 : sig
     Finite_key_pool_S
 end
 
+module V3 : sig
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash := Tezos_crypto.Signature.V3.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V3.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V3.Secret_key.t
+
+  (** Create a finite key pool. *)
+  module Make_finite_key_pool
+      (Arg : Param_S with type algo := Tezos_crypto.Signature.V3.algo) :
+    Finite_key_pool_S
+end
+
 module V_latest : sig
   module type Finite_key_pool_S =
     P_Finite_key_pool_S

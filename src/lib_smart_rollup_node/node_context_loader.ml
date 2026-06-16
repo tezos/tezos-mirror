@@ -63,6 +63,23 @@ let create_sync_info () =
     sync_level_input = Lwt_watcher.create_input ();
   }
 
+let maybe_reset_to_last_committed_context ~data_dir =
+  let open Lwt_result_syntax in
+  let* store = Store.init Read_write ~data_dir in
+  Lwt.finalize
+    (fun () ->
+      let* head = Store.State.L2_head.get store in
+      let* last_committed =
+        Store.L2_blocks.find_last_committed_hash_level store
+      in
+      match (head, last_committed) with
+      | None, _ | _, None -> return_unit
+      | Some (head, _), Some (last_committed, _)
+        when Block_hash.equal last_committed head ->
+          return_unit
+      | Some _, Some _ -> Store.reset_to_last_committed store)
+    (fun () -> Store.close store)
+
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     ?last_whitelist_update ~(store_access : 'store Access_mode.t)
     ~(context_access : 'context Access_mode.t) l1_ctxt genesis_info ~(lcc : lcc)
@@ -85,6 +102,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     }
   in
   let* () = update_metadata metadata ~data_dir in
+  let* () = maybe_reset_to_last_committed_context ~data_dir in
   let* store = Node_context.Node_store.init store_access ~data_dir in
   let dal_cctxt =
     Option.map
@@ -197,7 +215,7 @@ let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
 
 module For_snapshots = struct
   let create_node_context cctxt current_protocol store context ~data_dir
-      ~apply_unsafe_patches =
+      ~apply_unsafe_patches ?dal_node_endpoint () =
     let open Lwt_result_syntax in
     let loser_mode = Loser_mode.no_failures in
     let l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size in
@@ -238,7 +256,7 @@ module For_snapshots = struct
           unsafe_disable_wasm_kernel_checks = false;
           execute_outbox_messages_filter =
             Configuration.default_execute_outbox_filter;
-          dal_node_endpoint = None;
+          dal_node_endpoint;
           batcher = Configuration.default_batcher;
           injector = Configuration.default_injector;
           l1_blocks_cache_size;
@@ -257,6 +275,8 @@ module For_snapshots = struct
           loop_retry_delay = 10.;
           pre_images_endpoint = None;
           bail_on_disagree = false;
+          slow_vm_fallback = false;
+          commit_on = Configuration.default_commit_on_strategy;
           opentelemetry = Octez_telemetry.Opentelemetry_config.default;
           dal_slot_status_max_fetch_attempts =
             Configuration.default_dal_slot_status_max_fetch_attempts;
@@ -292,12 +312,17 @@ module For_snapshots = struct
         metadata.rollup_address
         config.unsafe_pvm_patches
     in
+    let dal_cctxt =
+      Option.map
+        Tezos_dal_node_lib.Dal_node_client.make_unix_cctxt
+        dal_node_endpoint
+    in
     return
       {
         config;
         cctxt :> Client_context.full;
         degraded = Reference.new_ false;
-        dal_cctxt = None;
+        dal_cctxt;
         data_dir;
         l1_ctxt;
         genesis_info = metadata.genesis_info;
@@ -377,6 +402,8 @@ module Internal_for_tests = struct
           history_mode = None;
           cors = Resto_cohttp.Cors.default;
           bail_on_disagree = false;
+          slow_vm_fallback = false;
+          commit_on = Configuration.default_commit_on_strategy;
           opentelemetry = Octez_telemetry.Opentelemetry_config.default;
           dal_slot_status_max_fetch_attempts =
             Configuration.default_dal_slot_status_max_fetch_attempts;
@@ -472,6 +499,8 @@ module Internal_for_tests = struct
                 {
                   feature_enable = false;
                   attestation_lag = 0;
+                  attestation_lags = [];
+                  dynamic_lag_enable = false;
                   number_of_slots = 0;
                   cryptobox_parameters =
                     {

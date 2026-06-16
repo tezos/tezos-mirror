@@ -131,7 +131,7 @@ let test_reveal_preimage_gen ~version preimage max_bytes =
       preimage_addr
       max_bytes
   in
-  let*! state = initial_tree ~version modl in
+  let*! state = initial_state ~version modl in
   let*! state_snapshotted = eval_until_input_or_reveal_requested state in
   let*! state_with_dummy_input = set_empty_inbox_step 0l state_snapshotted in
   (* Let’s go *)
@@ -214,7 +214,7 @@ let test_reveal_metadata ~version () =
   let open Lwt_result_syntax in
   let metadata_addr = 200l in
   let modl = reveal_metadata_module metadata_addr in
-  let*! state = initial_tree ~version modl in
+  let*! state = initial_state ~version modl in
   let*! state_snapshotted = eval_until_input_or_reveal_requested state in
   let*! state_with_dummy_input = set_empty_inbox_step 0l state_snapshotted in
   (* Let’s go *)
@@ -353,7 +353,7 @@ let test_fast_exec_reveal ~version () =
       example_hash
   in
 
-  let* tree = initial_tree ~version kernel in
+  let* tree = initial_state ~version kernel in
   let* tree = eval_until_input_or_reveal_requested tree in
   let* tree = set_empty_inbox_step 0l tree in
   let* tree = apply_fast ~images tree in

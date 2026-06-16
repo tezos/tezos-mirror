@@ -29,8 +29,7 @@ open Baking_state
 open Baking_state_types
 open Baking_actions
 module Events = Baking_events.State_transitions
-
-module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
+module Profiler = Baking_profiler.Baker_profiler
 
 let do_nothing state = Lwt.return (state, Do_nothing)
 
@@ -533,7 +532,7 @@ let prepare_block_to_bake ~attestations ?last_proposal
     let current_mempool =
       let pool =
         Operation_worker.get_current_operations
-          state.global_state.operation_worker
+          state.automaton_state.operation_worker
       in
       (* Considered the operations in the previous proposal as well *)
       match last_proposal with
@@ -561,11 +560,7 @@ let prepare_block_to_bake ~attestations ?last_proposal
           branch = predecessor.grandparent;
         }
       in
-      let aggregate_attestation_feature_flag =
-        state.global_state.constants.parametric.aggregate_attestation
-      in
       (Operation_pool.filter_with_relevant_consensus_ops
-         ~aggregate_attestation_feature_flag
          ~attestation_filter
          ~preattestation_filter:None
          current_mempool.consensus
@@ -645,7 +640,7 @@ let propose_block_action state delegate round ~last_proposal =
            into [packed_operation trace]. *)
         let mempool_consensus_operations =
           (Operation_worker.get_current_operations
-             state.global_state.operation_worker)
+             state.automaton_state.operation_worker)
             .consensus
         in
         let all_consensus_operations =
@@ -673,12 +668,8 @@ let propose_block_action state delegate round ~last_proposal =
               branch = proposal.predecessor.shell.predecessor;
             }
         in
-        let aggregate_attestation_feature_flag =
-          state.global_state.constants.parametric.aggregate_attestation
-        in
         Operation_pool.(
           filter_with_relevant_consensus_ops
-            ~aggregate_attestation_feature_flag
             ~attestation_filter
             ~preattestation_filter
             all_consensus_operations

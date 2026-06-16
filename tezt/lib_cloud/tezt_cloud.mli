@@ -279,6 +279,10 @@ module Tezt_cloud_cli : sig
 
   val binaries_path : string
 
+  val machine_type : string
+
+  val disk_type : string option
+
   val teztale_artifacts : bool
 
   val faketime : string option
@@ -296,6 +300,15 @@ module Tezt_cloud_cli : sig
 
   (** Equivalent to [Cli.dns_domains] *)
   val dns_domains : string list
+
+  (** The tezt-cloud workspace name *)
+  val tezt_cloud : string
+
+  (** Equivalent to [Cli.website_port] *)
+  val website_port : int
+
+  (** Equivalent to [Cli.prometheus_port] *)
+  val prometheus_port : int
 end
 
 module Artifact_helpers : sig
@@ -317,10 +330,16 @@ end
    registered jobs. *)
 val register : tags:string list -> unit
 
+module Nginx : module type of Nginx
+
 module Gcloud : sig
   module DNS : sig
     (** [add_subdomain ~zone ~name ~value] adds a dns entry for the domain name
     [~name], associated to the value [~value]. The value being an ip *)
     val add_subdomain : zone:string -> name:string -> value:string -> unit Lwt.t
   end
+end
+
+module Netdata : sig
+  val proxy_base_port : int
 end

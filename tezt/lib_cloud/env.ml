@@ -71,6 +71,8 @@ let keep_alive = Cli.keep_alive
 
 let vms = Cli.vms
 
+let netdata_proxy_base_port = 20001
+
 let vm_base_port = Cli.vm_base_port
 
 let ports_per_vm = Cli.ports_per_vm
@@ -121,11 +123,43 @@ let artifacts_dir = Cli.artifacts_dir
 
 let teztale_artifacts = Cli.teztale_artifacts
 
+type auth_infos = {username : string; password : string}
+
+let auth_enabled =
+  let auth_username =
+    match Cli.auth_username with
+    | Some _ as v -> v
+    | None -> Sys.getenv_opt "TEZT_CLOUD_AUTH_USERNAME"
+  in
+  let auth_password =
+    match Cli.auth_password with
+    | Some _ as v -> v
+    | None -> Sys.getenv_opt "TEZT_CLOUD_AUTH_PASSWORD"
+  in
+  match (auth_username, auth_password) with
+  | Some _, None ->
+      Test.fail
+        "Both --auth-username and --auth-password must be set (or \
+         TEZT_CLOUD_AUTH_USERNAME and TEZT_CLOUD_AUTH_PASSWORD). Only \
+         --auth-username is provided."
+  | None, Some _ ->
+      Test.fail
+        "Both --auth-username and --auth-password must be set (or \
+         TEZT_CLOUD_AUTH_USERNAME and TEZT_CLOUD_AUTH_PASSWORD). Only \
+         --auth-password is provided."
+  | None, None -> None
+  | Some username, Some password -> Some {username; password}
+
 let init () =
   if tezt_cloud = "" then
     Test.fail
       "The tezt-cloud value should be set. Either via the CLI or via the \
        environment variable 'TEZT_CLOUD'" ;
+  if Option.is_some auth_enabled && macosx then
+    Test.fail
+      "Auth mode (--auth-username / --auth-password) is not supported on \
+       macOS. Docker on macOS does not support --network host, which is \
+       required for the nginx reverse proxy. Use SSH tunneling instead." ;
   (* If using logfile, installs a signal handler to close and reopen the logfile.
      This allows logrotate to use a better strategy than copytruncate
      https://incoherency.co.uk/blog/stories/logrotate-copytruncate-race-condition.html
@@ -247,9 +281,9 @@ let rec wait_process ?(sleep = 4) ~is_ready ~run ?(propagate_error = false) () =
       if propagate_error then Lwt.fail (Process_failed e)
       else wait_process ~sleep ~is_ready ~run ()
 
-let run_command ?cmd_wrapper cmd args =
+let run_command ?runner ?cmd_wrapper cmd args =
   match cmd_wrapper with
-  | None -> Process.spawn cmd args
+  | None -> Process.spawn ?runner cmd args
   | Some cmd_wrapper ->
       Process.spawn cmd_wrapper.Gcloud.cmd (cmd_wrapper.args @ [cmd] @ args)
 

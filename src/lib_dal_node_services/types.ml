@@ -223,7 +223,7 @@ module Peer = struct
   let pp fmt {peer_id; maybe_reachable_point} =
     Format.fprintf
       fmt
-      "{peer_id=%a;@,maybe_reachable_point=%a}"
+      "{ peer_id=%a;@,maybe_reachable_point=%a }"
       P2p_peer.Id.pp
       peer_id
       P2p_point.Id.pp
@@ -331,6 +331,9 @@ module Slot_id = struct
 
   let hash = Stdlib.Hashtbl.hash
 
+  let pp fmt {slot_level; slot_index} =
+    Format.fprintf fmt "{ level=%ld; index=%d }" slot_level slot_index
+
   module Comparable = struct
     type nonrec t = t
 
@@ -368,8 +371,10 @@ type with_proof = {with_proof : bool}
 type proto_parameters = {
   feature_enable : bool;
   incentives_enable : bool;
+  dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
+  attestation_lags : int list;
   attestation_threshold : int;
   traps_fraction : Q.t;
   cryptobox_parameters : Cryptobox.Verifier.parameters;
@@ -525,8 +530,10 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
     (fun {
            feature_enable;
            incentives_enable;
+           dynamic_lag_enable;
            number_of_slots;
            attestation_lag;
+           attestation_lags;
            attestation_threshold;
            traps_fraction;
            cryptobox_parameters;
@@ -539,8 +546,10 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
        ->
       ( ( feature_enable,
           incentives_enable,
+          dynamic_lag_enable,
           number_of_slots,
           attestation_lag,
+          attestation_lags,
           attestation_threshold,
           traps_fraction ),
         ( cryptobox_parameters,
@@ -551,8 +560,10 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
           minimal_block_delay ) ))
     (fun ( ( feature_enable,
              incentives_enable,
+             dynamic_lag_enable,
              number_of_slots,
              attestation_lag,
+             attestation_lags,
              attestation_threshold,
              traps_fraction ),
            ( cryptobox_parameters,
@@ -565,8 +576,10 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
       {
         feature_enable;
         incentives_enable;
+        dynamic_lag_enable;
         number_of_slots;
         attestation_lag;
+        attestation_lags;
         attestation_threshold;
         traps_fraction;
         cryptobox_parameters;
@@ -577,11 +590,13 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
         minimal_block_delay;
       })
     (merge_objs
-       (obj6
+       (obj8
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
+          (req "dynamic_lag_enable" bool)
           (req "number_of_slots" int31)
           (req "attestation_lag" int31)
+          (req "attestation_lags" (list int31))
           (req "attestation_threshold" int31)
           (req "traps_fraction" q_encoding))
        (obj6
@@ -792,26 +807,26 @@ module Attestable_event = struct
   type backfill_payload = {
     slot_ids : slot_id list;
     trap_slot_ids : slot_id list;
-    no_shards_attestation_levels : level list;
+    no_shards_committee_levels : level list;
   }
 
   type t =
     | Attestable_slot of {slot_id : slot_id}
-    | No_shards_assigned of {attestation_level : level}
+    | No_shards_assigned of {committee_level : level}
     | Slot_has_trap of {slot_id : slot_id}
     | Backfill of {backfill_payload : backfill_payload}
 
   let backfill_payload_encoding =
     let open Data_encoding in
     conv
-      (fun {slot_ids; trap_slot_ids; no_shards_attestation_levels} ->
-        (slot_ids, trap_slot_ids, no_shards_attestation_levels))
-      (fun (slot_ids, trap_slot_ids, no_shards_attestation_levels) ->
-        {slot_ids; trap_slot_ids; no_shards_attestation_levels})
+      (fun {slot_ids; trap_slot_ids; no_shards_committee_levels} ->
+        (slot_ids, trap_slot_ids, no_shards_committee_levels))
+      (fun (slot_ids, trap_slot_ids, no_shards_committee_levels) ->
+        {slot_ids; trap_slot_ids; no_shards_committee_levels})
       (obj3
          (req "slot_ids" (list slot_id_encoding))
          (req "trap_slot_ids" (list slot_id_encoding))
-         (req "no_shards_attestation_levels" (list int32)))
+         (req "no_shards_committee_levels" (list int32)))
 
   let encoding =
     let open Data_encoding in
@@ -831,13 +846,11 @@ module Attestable_event = struct
           (Tag 1)
           (obj2
              (req "kind" (constant "no_shards_assigned"))
-             (req "attestation_level" int32))
+             (req "committee_level" int32))
           (function
-            | No_shards_assigned {attestation_level} ->
-                Some ((), attestation_level)
+            | No_shards_assigned {committee_level} -> Some ((), committee_level)
             | _ -> None)
-          (fun ((), attestation_level) ->
-            No_shards_assigned {attestation_level});
+          (fun ((), committee_level) -> No_shards_assigned {committee_level});
         case
           ~title:"slot_has_trap"
           (Tag 2)

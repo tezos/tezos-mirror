@@ -5,13 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let build_rpc_directory () =
+let build_rpc_directory ~profiling_config =
   let module Registered = (val Profiler_services.registered_module ()) in
   let dir = Tezos_rpc.Directory.empty in
   let dir =
     Tezos_rpc.Directory.register0 dir Registered.S.registered (fun () () ->
         let registered_backends =
-          match Profiler_instance.selected_backends () with
+          match Profiler_instance.selected_backends ~profiling_config with
           | Some backends ->
               List.map
                 (fun backend_info -> backend_info.Profiler_instance.view)

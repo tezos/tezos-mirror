@@ -16,6 +16,9 @@ type error +=
   | Not_supported
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
+  | Block_hash_not_found of Ethereum_types.block_hash
+        (** Emitted by tracers that look up a block by hash (e.g.
+            [http_traceBlockByHash]) when the hash is unknown to the node. *)
   | Trace_not_found
   | Tracer_not_activated  (** Tracer only activated after a certain level *)
   | Tracer_not_implemented of string

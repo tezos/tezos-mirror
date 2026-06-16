@@ -8,6 +8,11 @@ packages() {
   # Build tezos as usual
   # shellcheck disable=SC1091
   . "$HOME/.cargo/env"
+  # Adding [make build-deps] to handle MRs that update dependencies.
+  # Without it, packages would be built with stale packages.
+  # Apart from these cases, [make build-deps] should be a non-op
+  # as dependencies are already up-to-date.
+  make build-deps
   eval "$(opam env)"
   make release
 

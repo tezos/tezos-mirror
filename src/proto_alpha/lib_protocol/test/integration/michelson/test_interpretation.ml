@@ -33,7 +33,7 @@
 
 open Protocol
 open Alpha_context
-open Script_interpreter
+open Script_interpreter_errors
 
 let test_context () =
   let open Lwt_result_syntax in

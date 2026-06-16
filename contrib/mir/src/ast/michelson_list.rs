@@ -106,6 +106,14 @@ impl<T> From<Vec<T>> for MichelsonList<T> {
     }
 }
 
+/// Construct a `MichelsonList<Rc<T>>` from `Vec<T>`. O(n).
+impl<T> From<Vec<T>> for MichelsonList<std::rc::Rc<T>> {
+    fn from(mut value: Vec<T>) -> Self {
+        value.reverse();
+        MichelsonList(value.into_iter().map(std::rc::Rc::new).collect())
+    }
+}
+
 /// Extract a `Vec<T>` from `MichelsonList<T>`. O(n).
 impl<T> From<MichelsonList<T>> for Vec<T> {
     fn from(MichelsonList(mut vec): MichelsonList<T>) -> Self {
@@ -116,6 +124,13 @@ impl<T> From<MichelsonList<T>> for Vec<T> {
 
 /// Construct a `MichelsonList<T>` from an iterator. O(n).
 impl<T> FromIterator<T> for MichelsonList<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        MichelsonList::from(Vec::from_iter(iter))
+    }
+}
+
+/// Construct a `MichelsonList<Rc<T>>` from an iterator. O(n).
+impl<T> FromIterator<T> for MichelsonList<std::rc::Rc<T>> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         MichelsonList::from(Vec::from_iter(iter))
     }
@@ -137,12 +152,12 @@ mod tests {
 
     #[test]
     fn len() {
-        assert_eq!(MichelsonList::from_iter(1..=42).len(), 42);
+        assert_eq!(MichelsonList::<i32>::from_iter(1..=42).len(), 42);
     }
 
     #[test]
     fn uncons() {
-        let mut lst = MichelsonList::from(vec![1, 2, 3]);
+        let mut lst = MichelsonList::<i32>::from(vec![1, 2, 3]);
         assert_eq!(lst.uncons(), Some(1));
         assert_eq!(lst.uncons(), Some(2));
         assert_eq!(lst.uncons(), Some(3));
@@ -151,18 +166,24 @@ mod tests {
 
     #[test]
     fn into_iter() {
-        let lst = MichelsonList::from(vec![1, 2, 3]);
+        let lst = MichelsonList::<i32>::from(vec![1, 2, 3]);
         assert_eq!(lst.into_iter().collect::<Vec<_>>(), vec![1, 2, 3]);
     }
 
     #[test]
     fn from_iter() {
-        assert_eq!(MichelsonList::from_iter(1..=3), vec![1, 2, 3].into());
+        assert_eq!(
+            MichelsonList::<i32>::from_iter(1..=3),
+            MichelsonList::<i32>::from(vec![1, 2, 3])
+        );
     }
 
     #[test]
     fn to_vec() {
-        assert_eq!(Vec::from(MichelsonList::from(vec![1, 2, 3])), vec![1, 2, 3]);
+        assert_eq!(
+            Vec::from(MichelsonList::<i32>::from(vec![1, 2, 3])),
+            vec![1, 2, 3]
+        );
     }
 
     #[test]

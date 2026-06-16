@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type evm_version = Shanghai | Cancun
+type evm_version = Shanghai | Cancun | Prague | Osaka
 
 let make_path = function [] -> "" | l -> "/" ^ String.concat "/" l ^ "/"
 
@@ -17,9 +17,10 @@ let make_instr ?(path_prefix = ["evm"]) ?(convert = Fun.id) arg_opt =
          Installer_config.make ~key:(path_prefix ^ key) ~value:(convert value))
   |> Option.to_list
 
-let make_l2_config_instr ?(convert = Fun.id) ~l2_chain_id config =
+let make_l2_config_instr ?(convert = Fun.id) ?(root = "evm") ~l2_chain_id config
+    =
   make_instr
-    ~path_prefix:["evm"; "chain_configurations"; l2_chain_id]
+    ~path_prefix:[root; "chain_configurations"; l2_chain_id]
     ~convert
     config
 
@@ -82,11 +83,26 @@ let clean_path path =
     []
     (List.rev path)
 
-let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
-    ?eth_bootstrap_accounts ?tez_bootstrap_accounts ?tez_bootstrap_contracts
-    ?minimum_base_fee_per_gas ?da_fee_per_byte ?sequencer_pool_address
+let make_l2 ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
+    ~tez_bootstrap_balance ?eth_bootstrap_accounts ?tez_bootstrap_accounts
+    ?tez_bootstrap_contracts ?minimum_base_fee_per_gas
+    ?michelson_to_evm_gas_multiplier ?da_fee_per_byte ?sequencer_pool_address
     ?maximum_gas_per_transaction ?set_account_code ?world_state_path
     ~l2_chain_id ~l2_chain_family ~output () =
+  (* Phase 2 of the durable storage reorganization (storage version V53)
+     moves /evm/chain_configurations/<id>/* to /base/chain_configurations/<id>/*.
+     Match the same gate used by [make] for governance/config keys. *)
+  let chain_configurations_root =
+    if Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat) then "base"
+    else "evm"
+  in
+  let make_l2_config_instr ?convert ~l2_chain_id config =
+    make_l2_config_instr
+      ?convert
+      ~root:chain_configurations_root
+      ~l2_chain_id
+      config
+  in
   let world_state_prefix =
     match world_state_path with
     | None -> ["evm"; "world_state"; l2_chain_id]
@@ -114,7 +130,7 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
           (fun manager ->
             let make_account_field key value converter =
               let path_prefix =
-                manager |> Signature.Public_key.hash
+                manager |> Signature.V2.Public_key.hash
                 |> Tezos_types.Contract.of_implicit
                 |> Tezlink_durable_storage.Path.account
                 |> String.split_on_char '/' |> clean_path
@@ -201,27 +217,6 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
         |> List.flatten
   in
 
-  (* We initialize the big map id counter to 4 because Liquidity Baking bootstrap contracts use 4 big maps. *)
-  let first_big_map_id = Z.of_int 4 in
-  let set_first_big_map_id =
-    let path_prefix =
-      Tezlink_durable_storage.Path.big_map |> String.split_on_char '/'
-      |> clean_path
-    in
-    let set : type f. f L2_types.chain_family -> _ = function
-      | L2_types.Michelson ->
-          make_instr
-            ~path_prefix
-            (Some
-               ( "next_id",
-                 Data_encoding.Binary.to_string_exn
-                   Data_encoding.z
-                   first_big_map_id ))
-      | L2_types.EVM -> []
-    in
-    set l2_chain_family
-  in
-
   let config_instrs =
     (* These configuration parameter will not be stored in the world_state of an l2 chain but are parameter for an l2 chain *)
     (* To do so we put them into another path /evm/config/<l2_chain_id> *)
@@ -229,6 +224,10 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
       ~l2_chain_id
       ~convert:parse_z_to_padded_32_le_int_bytes
       minimum_base_fee_per_gas
+    @ make_l2_config_instr
+        ~l2_chain_id
+        ~convert:le_int64_bytes
+        michelson_to_evm_gas_multiplier
     @ make_l2_config_instr
         ~l2_chain_id
         ~convert:parse_z_to_padded_32_le_int_bytes
@@ -252,55 +251,104 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
       ~path_prefix:world_state_prefix
       sequencer_pool_address
     @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ tez_bootstrap_contracts
-    @ set_account_code @ set_first_big_map_id
+    @ set_account_code
   in
   Installer_config.to_file (config_instrs @ world_state_instrs) ~output
 
-let make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts =
-  let balance =
-    Tezos_types.Tez.to_mutez_z tez_bootstrap_balance |> Rlp.encode_z
-  in
-  let nonce = Rlp.encode_int 0 in
+let make_tezos_bootstrap_instr tez_bootstrap_balance
+    (tez_bootstrap_accounts : Signature.V2.public_key list) =
   List.map
     (fun manager ->
-      let address =
-        Signature.Public_key.hash manager
-        |> Signature.Public_key_hash.to_b58check
+      let tezos_account_info =
+        Tezosx.Tezos_runtime.
+          {
+            balance = tez_bootstrap_balance;
+            nonce = 0L;
+            public_key = Some manager;
+          }
       in
-      let public_key =
-        Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding manager
-      in
-      let (`Hex alias) =
-        let address = Bytes.of_string address in
-        let alias = Tezos_crypto.Hacl.Hash.Keccak_256.digest address in
-        Bytes.sub alias 0 20 |> Hex.of_bytes
+      let address = Signature.V2.Public_key.hash manager in
+      let (Address (Hex alias)) =
+        Tezosx.Ethereum_runtime.generate_alias
+          (Signature.V2.Public_key_hash.to_b58check address)
       in
       let payload =
-        Rlp.(
-          List [Value balance; Value nonce; Value public_key]
-          |> encode |> Bytes.to_string)
+        Tezosx.Tezos_runtime.encode_account_info tezos_account_info
+      in
+      let rlp_address =
+        Bytes.to_string (Tezosx.Foreign_address.encode (`Tezos address))
       in
       make_instr
-        ~path_prefix:["evm"; "world_state"; "eth_accounts"; "tezos"; address]
-        (Some ("info", payload))
+        ~path_prefix:
+          [
+            "tez";
+            "tez_accounts";
+            "tezosx";
+            Signature.V2.Public_key_hash.to_b58check address;
+          ]
+        (Some ("info", Bytes.to_string payload))
       @ make_instr
-          ~path_prefix:
-            ["evm"; "world_state"; "eth_accounts"; "tezos"; "names"; "ethereum"]
-          (Some (alias, address)))
+          ~path_prefix:["tez"; "tez_accounts"; "tezosx"; "native"; "ethereum"]
+          (Some ("0x" ^ alias, rlp_address)))
     tez_bootstrap_accounts
   |> List.flatten
 
-let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
-    ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id ?sequencer
-    ?delayed_bridge ?ticketer ?admin ?sequencer_governance ?kernel_governance
-    ?kernel_security_governance ?minimum_base_fee_per_gas ?da_fee_per_byte
+let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
+  contracts
+  |> List.map (fun (address, script, storage) ->
+         let encode_len (s : string) =
+           s |> String.length |> Z.of_int
+           |> Data_encoding.Binary.to_string_exn Data_encoding.n
+         in
+
+         let encode_hexa_with_len x =
+           let encoded = encode_hexa x in
+           let encoded_len = encode_len encoded in
+           (encoded, encoded_len)
+         in
+
+         let path_prefix =
+           Tezlink_durable_storage.Path.account address
+           |> String.split_on_char '/' |> clean_path
+         in
+
+         let encoded_balance =
+           Data_encoding.Binary.to_string_exn
+             Tezos_types.Tez.encoding
+             tez_bootstrap_balance
+         in
+
+         let encoded_script, encoded_script_len = encode_hexa_with_len script in
+         let encoded_storage, encoded_storage_len =
+           encode_hexa_with_len storage
+         in
+
+         let instr key value = make_instr ~path_prefix (Some (key, value)) in
+
+         [
+           ("balance", encoded_balance);
+           ("data/code", encoded_script);
+           ("len/code", encoded_script_len);
+           ("data/storage", encoded_storage);
+           ("len/storage", encoded_storage_len);
+         ]
+         |> List.concat_map (fun (k, v) -> instr k v))
+  |> List.flatten
+
+let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
+    ?l2_chain_ids ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id
+    ?michelson_runtime_chain_id ?sequencer ?delayed_bridge ?ticketer ?admin
+    ?sequencer_governance ?kernel_governance ?kernel_security_governance
+    ?minimum_base_fee_per_gas ?michelson_to_evm_gas_multiplier ?da_fee_per_byte
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
-    ?enable_revm ?enable_dal ?dal_slots ?enable_fast_withdrawal
-    ?enable_fast_fa_withdrawal ?enable_multichain ?set_account_code
-    ?max_delayed_inbox_blueprint_length ?evm_version ?(with_runtimes = [])
-    ?tez_bootstrap_accounts ~tez_bootstrap_balance ~output () =
+    ?enable_revm ?enable_dal ?dal_slots ?dal_publishers_whitelist
+    ?disable_legacy_dal_signals ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?enable_multichain ?enable_michelson_gas_refund
+    ?set_account_code ?max_delayed_inbox_blueprint_length ?evm_version
+    ?(with_runtimes = []) ?tez_bootstrap_accounts ~tez_bootstrap_balance
+    ?tez_bootstrap_contracts ~output () =
   let eth_bootstrap_accounts =
     let open Ethereum_types in
     match eth_bootstrap_accounts with
@@ -320,6 +368,14 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     | None -> []
     | Some tez_bootstrap_accounts ->
         make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts
+  in
+  let tez_bootstrap_contracts =
+    match tez_bootstrap_contracts with
+    | None -> []
+    | Some tez_bootstrap_contracts ->
+        make_tezos_bootstrap_contracts_instr
+          tez_bootstrap_balance
+          tez_bootstrap_contracts
   in
 
   let set_account_code =
@@ -365,28 +421,90 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
       (fun evm_version ->
         ( "evm_version",
           padded_32_le_int_bytes
-          @@ match evm_version with Shanghai -> Z.zero | Cancun -> Z.one ))
+          @@
+          match evm_version with
+          | Shanghai -> Z.zero
+          | Cancun -> Z.one
+          | Prague -> Z.of_int 2
+          | Osaka -> Z.of_int 3 ))
       evm_version
   in
+  (* Phase 2 of the durable storage reorganization (storage version V53)
+     moves governance / sequencing / config installer-set paths from
+     /evm/ to /base/. Phase 3 (storage version V54) moves all feature
+     flags to /base/feature_flags/. Both ship on the same dev kernel, so
+     a single gate against [FarfadetR2] selects the new paths. *)
+  let newer_than_farfadet_r2 =
+    Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat)
+  in
+  let governance_in_base = newer_than_farfadet_r2 in
+  let feature_flags_in_base = newer_than_farfadet_r2 in
+  let base_or_evm_prefix = if governance_in_base then ["base"] else ["evm"] in
+  let make_governance_instr ?convert arg =
+    make_instr ?convert ~path_prefix:base_or_evm_prefix arg
+  in
+  (* Path prefix for feature flags according to the target kernel's version. *)
+  let feature_flag_prefix_base = ["base"; "feature_flags"] in
+  let feature_flag_prefix_evm = ["evm"; "feature_flags"] in
+  let feature_flag_prefix_world_state =
+    ["evm"; "world_state"; "feature_flags"]
+  in
+  let feature_flag_prefix_tezlink = ["tezlink"; "feature_flags"] in
+  let make_feature_flag_instr ?convert ~legacy_prefix arg =
+    let path_prefix =
+      if feature_flags_in_base then feature_flag_prefix_base else legacy_prefix
+    in
+    make_instr ?convert ~path_prefix arg
+  in
   let with_runtimes =
-    List.map
-      (fun runtime ->
-        Installer_config.make ~key:(Tezosx.feature_flag runtime) ~value:"")
+    List.concat_map
+      (fun (runtime, target_sunrise_level) ->
+        let flag_path =
+          let prefix =
+            if feature_flags_in_base then feature_flag_prefix_base
+            else feature_flag_prefix_evm
+          in
+          match runtime with
+          | Tezosx.Tezos ->
+              String.concat "/" (("" :: prefix) @ ["enable_tezos_runtime"])
+        in
+        Installer_config.make ~key:flag_path ~value:""
+        ::
+        (match target_sunrise_level with
+        | None -> []
+        | Some level ->
+            [
+              Installer_config.make
+                ~key:(Tezosx.target_sunrise_level_path runtime)
+                ~value:(Tezosx.encode_target_sunrise_level level);
+            ]))
       with_runtimes
   in
   let instrs =
-    (if mainnet_compat then make_instr ticketer
-     else
-       (* For compatibility reason for Mainnet and Ghostnet *)
-       make_instr ~path_prefix:["evm"; "world_state"] ticketer)
-    @ make_instr
+    (if Constants.(kernel_is_newer ~than:Mainnet_beta kernel_compat) then
+       make_instr ~path_prefix:["evm"; "world_state"] ticketer
+     else make_instr ticketer)
+    @ (if Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat) then
+         make_instr ~path_prefix:["evm"; "world_state"] sequencer
+       else make_instr sequencer)
+    @ make_governance_instr
         ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
         kernel_root_hash
     @ make_instr ~convert:parse_z_to_padded_32_le_int_bytes chain_id
-    @ make_instr sequencer @ make_instr delayed_bridge @ make_instr admin
+    @ make_instr
+        ~path_prefix:["tez"; "world_state"]
+        (Option.map
+           (fun chain_id ->
+             chain_id
+             |> Data_encoding.Binary.to_bytes_exn Chain_id.encoding
+             |> Bytes.to_string
+             |> fun s -> ("chain_id", s))
+           michelson_runtime_chain_id)
+    @ make_governance_instr delayed_bridge
+    @ make_governance_instr admin
     @ make_instr sequencer_governance
-    @ make_instr kernel_governance
-    @ make_instr kernel_security_governance
+    @ make_governance_instr kernel_governance
+    @ make_governance_instr kernel_security_governance
     @ make_instr evm_version
     @ make_instr
         ~path_prefix:["evm"; "world_state"; "fees"]
@@ -394,35 +512,89 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
         minimum_base_fee_per_gas
     @ make_instr
         ~path_prefix:["evm"; "world_state"; "fees"]
+        ~convert:le_int64_bytes
+        michelson_to_evm_gas_multiplier
+    @ make_instr
+        ~path_prefix:["evm"; "world_state"; "fees"]
         ~convert:parse_z_to_padded_32_le_int_bytes
         da_fee_per_byte
-    @ make_instr ~convert:le_int64_bytes delayed_inbox_timeout
-    @ make_instr ~convert:le_int64_bytes delayed_inbox_min_levels
+    @ make_governance_instr ~convert:le_int64_bytes delayed_inbox_timeout
+    @ make_governance_instr ~convert:le_int64_bytes delayed_inbox_min_levels
     @ make_instr
         ~convert:(fun addr ->
           match Misc.normalize_hex addr with
           | Ok hex -> Hex.to_bytes_exn hex |> String.of_bytes
           | Error _ -> raise (Invalid_argument "sequencer_pool_address"))
         sequencer_pool_address
-    @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
+    @ make_governance_instr ~convert:le_int64_bytes maximum_allowed_ticks
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
-    @ make_instr ~convert:le_int64_bytes max_blueprint_lookahead_in_seconds
-    @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ set_account_code
-    @ make_instr remove_whitelist
-    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
+    @ make_governance_instr
+        ~convert:le_int64_bytes
+        max_blueprint_lookahead_in_seconds
+    @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ tez_bootstrap_contracts
+    @ set_account_code
+    @ make_governance_instr remove_whitelist
+    @ make_feature_flag_instr
+        ~legacy_prefix:feature_flag_prefix_evm
+        enable_fa_bridge
+    (* enable_revm is only consumed by pre-V54 kernels — V54+ kernels
+       unconditionally enable revm and ignore the flag. *)
+    @ (if feature_flags_in_base then []
+       else make_instr ~path_prefix:feature_flag_prefix_world_state enable_revm)
+    @ make_feature_flag_instr ~legacy_prefix:feature_flag_prefix_evm enable_dal
+    @ make_feature_flag_instr
+        ~legacy_prefix:feature_flag_prefix_evm
+        disable_legacy_dal_signals
+    (* enable_fast_withdrawal and enable_fast_fa_withdrawal are only
+       consumed by pre-Farfadet kernels — Farfadet+ kernels run the
+       corresponding code paths unconditionally and ignore these flags. *)
+    @ (if feature_flags_in_base then []
+       else
+         make_instr
+           ~path_prefix:feature_flag_prefix_world_state
+           enable_fast_withdrawal)
+    @ (if feature_flags_in_base then []
+       else
+         make_instr
+           ~path_prefix:feature_flag_prefix_world_state
+           enable_fast_fa_withdrawal)
+    @ make_governance_instr ~convert:decimal_list_to_bytes dal_slots
     @ make_instr
-        ~path_prefix:["evm"; "world_state"; "feature_flags"]
-        enable_revm
-    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_dal
-    @ make_instr
-        ~path_prefix:["evm"; "world_state"; "feature_flags"]
-        enable_fast_withdrawal
-    @ make_instr
-        ~path_prefix:["evm"; "world_state"; "feature_flags"]
-        enable_fast_fa_withdrawal
-    @ make_instr ~convert:decimal_list_to_bytes dal_slots
-    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_multichain
-    @ make_instr
+        ~convert:(fun s ->
+          let open Evm_node_lib_dev_encoding.Rlp in
+          let pkh_list =
+            if String.trim s = "" then [] else String.split_on_char ',' s
+          in
+          let encoded_list =
+            List.map
+              (fun pkh_str ->
+                let pkh_str = String.trim pkh_str in
+                (* Decode base58check to get the PublicKeyHash *)
+                let pkh =
+                  Tezos_crypto.Signature.Public_key_hash.of_b58check_exn pkh_str
+                in
+                (* Encode to binary using Data_encoding *)
+                let binary =
+                  Data_encoding.Binary.to_bytes_exn
+                    Tezos_crypto.Signature.Public_key_hash.encoding
+                    pkh
+                in
+                (* Store as binary bytes in RLP *)
+                Value binary)
+              pkh_list
+          in
+          (* RLP-encode the list *)
+          let rlp_item = List encoded_list in
+          Bytes.to_string (encode rlp_item))
+        ~path_prefix:base_or_evm_prefix
+        dal_publishers_whitelist
+    @ make_feature_flag_instr
+        ~legacy_prefix:feature_flag_prefix_evm
+        enable_multichain
+    @ make_feature_flag_instr
+        ~legacy_prefix:feature_flag_prefix_tezlink
+        enable_michelson_gas_refund
+    @ make_governance_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))
         max_delayed_inbox_blueprint_length
     @ chain_ids_instr @ with_runtimes

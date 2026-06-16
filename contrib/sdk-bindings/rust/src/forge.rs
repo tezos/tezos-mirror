@@ -136,8 +136,7 @@ pub mod operation {
                         ),
                         // octez-client convert data "Unit" from Michelson to binary
                         value: value.unwrap_or(vec![0x03, 0x0b]).clone(),
-                    }
-                    .into(),
+                    },
                 },
             }))
         }

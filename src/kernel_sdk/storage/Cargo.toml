@@ -17,11 +17,6 @@ categories = ["database", "wasm"]
 [dependencies]
 thiserror = "1.0"
 
-[dependencies.tezos-smart-rollup-core]
-path = "../core"
-version = "0.2.2"
-default-features = false
-
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
 version = "0.2.2"
@@ -30,17 +25,6 @@ default-features = false
 [dependencies.tezos-smart-rollup-debug]
 path = "../debug"
 version = "0.2.2"
-
-[dependencies.tezos-smart-rollup-encoding]
-path = "../encoding"
-version = "0.2.2"
-default-features = false
-features = ["alloc", "tezos-encoding", "crypto"]
-
-[dev-dependencies.tezos-smart-rollup-core]
-path = "../core"
-version = "0.2.2"
-features = ["mock-core-trait"]
 
 [dev-dependencies.tezos-smart-rollup-mock]
 path = "../mock"

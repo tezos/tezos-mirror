@@ -1,0 +1,43 @@
+# Generates 4 MiB of zero bytes at runtime via 22 CONCAT doublings
+# (1-byte seed), then deposits them via %collect_result.  Used to
+# verify that a large response body triggers EVM OOG when the
+# precompile return value is copied into memory.
+# Storage: address (gateway KT1)
+parameter unit;
+storage address;
+code {
+       CDR;
+       DUP;
+       CONTRACT %collect_result bytes;
+       ASSERT_SOME;
+       PUSH bytes 0x00;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       DUP; CONCAT;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       NIL operation;
+       SWAP;
+       CONS;
+       PAIR
+     };

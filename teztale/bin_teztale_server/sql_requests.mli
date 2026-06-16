@@ -32,6 +32,8 @@ module Mutex : sig
 
   val operations : Lwt_mutex.t
 
+  val aggregated_operations : Lwt_mutex.t
+
   val operations_reception : Lwt_mutex.t
 
   val operations_inclusion : Lwt_mutex.t
@@ -41,6 +43,8 @@ module Mutex : sig
   val cycles : Lwt_mutex.t
 
   val missing_blocks : Lwt_mutex.t
+
+  val dal_shard_assignments : Lwt_mutex.t
 end
 
 val create_tables : string list
@@ -61,6 +65,19 @@ val maybe_insert_attesting_right :
 val maybe_insert_operation :
   ( (int32 * Tezos_crypto.Hashed.Operation_hash.t * bool * int32 option)
     * Tezos_crypto.Signature.public_key_hash,
+    unit,
+    [`Zero] )
+  Caqti_request.t
+
+val maybe_insert_aggregated_operation :
+  ( (int32 * Tezos_crypto.Hashed.Operation_hash.t * bool * int32 option)
+    * Tezos_crypto.Signature.public_key_hash,
+    unit,
+    [`Zero] )
+  Caqti_request.t
+
+val insert_aggregated_operation_delegate :
+  ( Tezos_crypto.Hashed.Operation_hash.t * Tezos_crypto.Signature.public_key_hash,
     unit,
     [`Zero] )
   Caqti_request.t
@@ -116,6 +133,12 @@ val insert_included_operation :
 
 val insert_received_block :
   ( Ptime.t option * Ptime.t option * Tezos_crypto.Hashed.Block_hash.t * string,
+    unit,
+    [`Zero] )
+  Caqti_request.t
+
+val insert_dal_shard_assignment :
+  ( int32 * Tezos_crypto.Signature.public_key_hash * int,
     unit,
     [`Zero] )
   Caqti_request.t

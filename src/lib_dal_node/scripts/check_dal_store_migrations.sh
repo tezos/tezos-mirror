@@ -9,7 +9,7 @@ CURRENT="$(mktemp)"
 
 COMMAND="${1}"
 
-find src/lib_dal_node/migrations/ -name "*.sql" -print |
+find src/lib_dal_node/migrations/ \( -name "*.sql" -o -name "m[0-9][0-9][0-9]_*.ml" \) -print |
   sort |
   xargs sha256sum \
     >> "${CURRENT}"

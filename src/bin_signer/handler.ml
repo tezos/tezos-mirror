@@ -48,24 +48,47 @@ module High_watermark = struct
          (req "hash" raw_hash)
          (opt "signature" (dynamic_size Tezos_crypto.Signature.encoding))
 
-  let get_level_and_round_for_tenderbake_block bytes =
-    (* <watermark(1)><chain_id(4)><level(4)><proto_level(1)><predecessor(32)><timestamp(8)><validation_passes(1)><oph(32)><FITNESS>... *)
-    (* FITNESS=<len(4)><version(1)><len(4)><level(4)><len(4)><locked_round(0 OR 4)><len(4)><predecessor_round(4)><len(4)><round(4)> *)
-    let open Lwt_result_syntax in
-    try
-      let level = Bytes.get_int32_be bytes (1 + 4) in
-      let fitness_offset = 1 + 4 + 4 + 1 + 32 + 8 + 1 + 32 in
-      let fitness_length =
-        Bytes.get_int32_be bytes fitness_offset |> Int32.to_int
-      in
-      let round =
-        Bytes.get_int32_be bytes (fitness_offset + fitness_length + 4 - 4)
-      in
-      return (level, Some round)
-    with exn ->
-      failwith
-        "Failed to retrieve level and round of a Tenderbake block: %s"
-        (Printexc.to_string exn)
+  let get_level_and_round_for_tenderbake_block =
+    (* Lengths of the different encoding parts in a tenderbake block *)
+    let watermark_len = 1 in
+    let chain_id_len = 4 in
+    let level_len = 4 in
+    let proto_level_len = 1 in
+    let predecessor_len = 32 in
+    let timestamp_len = 8 in
+    let validation_passes_len = 1 in
+    let oph_len = 32 in
+    let fitness_offset =
+      watermark_len + chain_id_len + level_len + proto_level_len
+      + predecessor_len + timestamp_len + validation_passes_len + oph_len
+    in
+    fun bytes ->
+      (* <watermark(1)><chain_id(4)><level(4)><proto_level(1)><predecessor(32)><timestamp(8)><validation_passes(1)><oph(32)><FITNESS>... *)
+      (* Fitness is encoded as a list of bytes:
+       - each byte is encoded as <length of encoded bytes><bytes>
+       - a list is encoded as <length of list><encoding of each element>
+
+       The resulting encoding is the following:
+       FITNESS=<fitness_len(4)>
+               <version_len(4)><version(1)>
+               <level_len(4)><level(4)>
+               <locked_round_len(4)><locked_round(0 OR 4)>
+               <predecessor_round_len(4)><predecessor_round(4)>
+               <round_len(4)><round(4)> *)
+      let open Lwt_result_syntax in
+      try
+        let level = Bytes.get_int32_be bytes (watermark_len + chain_id_len) in
+        let fitness_length =
+          Bytes.get_int32_be bytes fitness_offset |> Int32.to_int
+        in
+        let round =
+          Bytes.get_int32_be bytes (fitness_offset + fitness_length)
+        in
+        return (level, Some round)
+      with exn ->
+        failwith
+          "Failed to retrieve level and round of a Tenderbake block: %s"
+          (Printexc.to_string exn)
 
   let get_level_and_round_for_tenderbake_attestation
       (pkh : Signature.public_key_hash) bytes =
@@ -78,7 +101,7 @@ module High_watermark = struct
             (* Slot is not part of the signed payload when
                signing with a tz4 address *)
             1 + 4 + 32 + 1
-        | Ed25519 _ | Secp256k1 _ | P256 _ -> 1 + 4 + 32 + 1 + 2
+        | Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _ -> 1 + 4 + 32 + 1 + 2
       in
       let level = Bytes.get_int32_be bytes level_offset in
       let round = Bytes.get_int32_be bytes (level_offset + 4) in
@@ -301,7 +324,10 @@ let sign ?signing_version ?magic_bytes ~check_high_watermark ~require_auth
     | Some Version_1 ->
         let* s = Client_keys.V1.sign cctxt sk_uri bytes in
         return (Signature.V_latest.Of_V1.signature s)
-    | Some Version_2 -> Client_keys.V2.sign cctxt sk_uri bytes
+    | Some Version_2 ->
+        let* s = Client_keys.V2.sign cctxt sk_uri bytes in
+        return (Signature.V_latest.Of_V2.signature s)
+    | Some Version_3 -> Client_keys.V3.sign cctxt sk_uri bytes
     | None -> Client_keys.V_latest.sign cctxt sk_uri bytes
   in
   if check_high_watermark then

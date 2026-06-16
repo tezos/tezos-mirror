@@ -86,6 +86,8 @@ let get_total_supply {infos; rpc_node; accounts; _} contract =
             Some
               ((Efunc_core.Evm.encode ~name:"totalSupply" [] [] :> string)
               |> Ethereum_types.hash_of_string);
+          access_list = [];
+          authorization_list = [];
         },
         Block_parameter Latest,
         Ethereum_types.AddressMap.empty )
@@ -132,14 +134,14 @@ let transfer_gas_limit {accounts; infos; rpc_node; _} contract =
   in
   return gas_limit
 
-let account_step infos rpc_node ?gas_limit contract ~nonce (sender : Account.t)
-    value (dest : Account.t) =
+let account_step {infos; rpc_node; gas_limit; _} contract ~nonce
+    (sender : Account.t) value (dest : Account.t) =
   let* _ =
     call
       infos
       rpc_node
       contract
-      ?gas_limit
+      ~gas_limit
       sender
       ~nonce
       ~name:"transfer"
@@ -148,8 +150,8 @@ let account_step infos rpc_node ?gas_limit contract ~nonce (sender : Account.t)
   in
   unit
 
-let sender_step {infos; rpc_node; gas_limit; accounts; _} erc20s iteration
-    sender_index =
+let sender_step env erc20s iteration sender_index =
+  let accounts = env.accounts in
   let sender = accounts.(sender_index mod Array.length accounts) in
   let dest_index =
     (sender_index + (7 * (iteration + 1))) mod Array.length accounts
@@ -160,9 +162,7 @@ let sender_step {infos; rpc_node; gas_limit; accounts; _} erc20s iteration
     (fun i contract ->
       let nonce = Z.add nonce (Z.of_int i) in
       account_step
-        infos
-        rpc_node
-        ~gas_limit
+        env
         contract
         ~nonce
         sender
@@ -192,7 +192,6 @@ let test_erc20_capacity () =
     ~time_between_blocks:Nothing
     ~eth_bootstrap_accounts
     ~websockets:true
-    ~use_multichain:Register_without_feature
     ~use_dal:Register_without_feature
     ~da_fee:Wei.zero
     ~minimum_base_fee_per_gas:Wei.one
@@ -214,19 +213,34 @@ let test_erc20_capacity () =
       nb_contracts;
     }
   in
+
+  let max_size = 999_999 in
+  let tx_per_addr_limit = Int64.of_int 999_999 in
+  let max_transaction_batch_length = Some 300 in
+  let max_lifespan_s = int_of_float parameters.timeout in
+  let config : Evm_node_config.Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
   let*? () =
-    Tx_queue.start
-      ~relay_endpoint:endpoint
-      ~max_transaction_batch_length:(Some 300)
-      ~inclusion_timeout:parameters.timeout
+    Evm_node_lib_dev.Tx_queue.start
+      ~config
+      ~keep_alive:true
+      ~timeout:parameters.timeout
+      ~start_injector_worker:true
       ()
   in
+  let* () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let follower =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
+      ()
   in
-  let tx_queue = Tx_queue.beacon ~tick_interval:0.1 in
+  let tx_queue =
+    Evm_node_lib_dev.Tx_queue.tx_queue_beacon
+      ~evm_node_endpoint:(Rpc endpoint)
+      ~tick_interval:0.1
+  in
   Log.report "Deploying %d ERC20 contracts" nb_contracts ;
   let* erc20s =
     deploy_contracts
@@ -244,17 +258,22 @@ let test_erc20_capacity () =
   let* gas_limit = transfer_gas_limit env (List.hd erc20s) in
   Log.debug "Transfer gas limit: %a@." Z.pp_print gas_limit ;
   let env = {env with gas_limit} in
-  monitor_gasometer sequencer @@ fun () ->
-  let* stop_profile =
-    if parameters.profiling then profile sequencer else return (fun () -> unit)
+  let* _ =
+    monitor_gasometer sequencer @@ fun () ->
+    let* stop_profile =
+      if parameters.profiling then profile sequencer
+      else return (fun () -> unit)
+    in
+    let* () =
+      with_collect_host_function_metrics env.rpc_node @@ fun () ->
+      Lwt_list.iter_s (step env erc20s) (List.init parameters.iterations succ)
+    in
+    Lwt.cancel follower ;
+    Lwt.cancel tx_queue ;
+    let*? () = Evm_node_lib_dev.Tx_queue.shutdown () in
+    let* () = Evm_node.terminate sequencer in
+    stop_profile ()
   in
-  let* () =
-    Lwt_list.iter_s (step env erc20s) (List.init parameters.iterations succ)
-  in
-  Lwt.cancel follower ;
-  Lwt.cancel tx_queue ;
-  let* () = Tx_queue.shutdown () in
-  let* () = Evm_node.terminate sequencer in
-  stop_profile ()
+  unit
 
 let register () = test_erc20_capacity () [Protocol.Alpha]

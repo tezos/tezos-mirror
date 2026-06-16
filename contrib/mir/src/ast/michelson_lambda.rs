@@ -138,7 +138,7 @@ mod tests {
         gas::Gas,
         irrefutable_match::irrefutable_match,
         parser::Parser,
-        stk,
+        stack::Stack,
     };
 
     #[test]
@@ -149,10 +149,13 @@ mod tests {
         let code = code
             .typecheck_instruction(&mut Gas::default(), None, &[])
             .unwrap();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
             .unwrap();
-        let closure = irrefutable_match!(stack.pop().unwrap(); TypedValue::Lambda);
+        let closure = irrefutable_match!(
+            TypedValue::unwrap_rc(stack.pop().unwrap());
+            TypedValue::Lambda
+        );
         let arena = Arena::new();
         assert_eq!(
             closure.into_micheline_optimized_legacy(&arena),
@@ -181,10 +184,13 @@ mod tests {
         let code = code
             .typecheck_instruction(&mut Gas::default(), None, &[])
             .unwrap();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
             .unwrap();
-        let closure = irrefutable_match!(stack.pop().unwrap(); TypedValue::Lambda);
+        let closure = irrefutable_match!(
+            TypedValue::unwrap_rc(stack.pop().unwrap());
+            TypedValue::Lambda
+        );
         let arena = Arena::new();
         assert_eq!(
             closure.into_micheline_optimized_legacy(&arena),
@@ -234,10 +240,13 @@ mod tests {
         let code = code
             .typecheck_instruction(&mut Gas::default(), None, &[])
             .unwrap();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
             .unwrap();
-        let closure = irrefutable_match!(stack.pop().unwrap(); TypedValue::Lambda);
+        let closure = irrefutable_match!(
+            TypedValue::unwrap_rc(stack.pop().unwrap());
+            TypedValue::Lambda
+        );
         let arena = Arena::new();
         assert_eq!(
             closure.into_micheline_optimized_legacy(&arena),

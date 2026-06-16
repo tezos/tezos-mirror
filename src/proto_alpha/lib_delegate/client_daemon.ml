@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Events = Baking_events.Client_daemon
+
 let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
   let open Lwt_result_syntax in
   let*! result = f () in
@@ -37,7 +39,7 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
       let* () =
         Client_confirmations.really_wait_for_bootstrapped
           ~retry:
-            (Baking_scheduling.retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5)
+            (Baking_automaton.retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5)
           cctxt
       in
       retry_on_disconnection cctxt f
@@ -52,13 +54,19 @@ let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
   Node_rpc.await_protocol_activation cctxt ~chain ()
 
 let[@warning "-32"] may_start_profiler baking_dir =
-  match Tezos_profiler_unix.Profiler_instance.selected_backends () with
+  let profiling_config =
+    Tezos_profiler_unix.Profiler_instance.read_profiling_config_from_base_dir
+      baking_dir
+  in
+  match
+    Tezos_profiler_unix.Profiler_instance.selected_backends ~profiling_config
+  with
   | Some backends ->
       List.iter
         (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
           let profiler_maker = instance_maker ~directory:baking_dir in
-          Baking_profiler.activate_all ~profiler_maker ;
-          RPC_profiler.init profiler_maker)
+          Baking_profiler.activate_all ~profiling_config ~profiler_maker ;
+          RPC_profiler.init ~profiling_config profiler_maker)
         backends
   | None -> ()
 
@@ -67,7 +75,7 @@ module Baker = struct
       ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
       ?votes ?extra_operations ?pre_emptive_forge_time ?force_apply_from_round
       ?remote_calls_timeout ?data_dir ?state_recorder ~chain ~keep_alive
-      delegates =
+      ~extra_nodes delegates =
     let open Lwt_result_syntax in
     let process () =
       let* user_activated_upgrades = Node_rpc.user_activated_upgrades cctxt in
@@ -118,7 +126,18 @@ module Baker = struct
           ?data_dir
           ~user_activated_upgrades
           ?state_recorder
+          ~multi_node:(extra_nodes <> [])
           ()
+      in
+      let* () =
+        if Option.is_some data_dir && not (List.is_empty extra_nodes) then
+          (* Multiple nodes work only when all the nodes are remote for now. *)
+          failwith
+            "Incompatible configuration: `--extra-node` cannot be used with \
+             local node."
+        else
+          let*! () = Events.(emit extra_node_warning ()) in
+          return_unit
       in
       let*! () =
         cctxt#message
@@ -141,6 +160,7 @@ module Baker = struct
       Lifted_protocol.set_log_message_consumer consumer ;
       Baking_scheduling.run
         cctxt
+        ~extra_nodes
         ?dal_node_rpc_ctxt
         ~canceler
         ~chain
@@ -151,7 +171,7 @@ module Baker = struct
     let* () =
       Client_confirmations.really_wait_for_bootstrapped
         ~retry:
-          (Baking_scheduling.retry
+          (Baking_automaton.retry
              cctxt
              ~delay:1.
              ~factor:1.5
@@ -199,7 +219,7 @@ module Accuser = struct
     let* () =
       Client_confirmations.really_wait_for_bootstrapped
         ~retry:
-          (Baking_scheduling.retry
+          (Baking_automaton.retry
              cctxt
              ~delay:1.
              ~factor:1.5
@@ -239,7 +259,7 @@ module VDF = struct
     let* () =
       Client_confirmations.really_wait_for_bootstrapped
         ~retry:
-          (Baking_scheduling.retry
+          (Baking_automaton.retry
              cctxt
              ~delay:1.
              ~factor:1.5

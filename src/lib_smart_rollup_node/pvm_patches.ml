@@ -8,6 +8,7 @@
 type unsafe_patch =
   | Increase_max_nb_ticks of int64
   | Patch_durable_storage of {key : string; value : string}
+  | Patch_PVM_version of {version : string}
 
 type kind = Hardcoded | User_provided
 
@@ -16,6 +17,7 @@ type t = (unsafe_patch * kind) list
 let patch_kinds = function
   | Increase_max_nb_ticks _ -> [Kind.Wasm_2_0_0]
   | Patch_durable_storage _ -> [Kind.Wasm_2_0_0]
+  | Patch_PVM_version _ -> [Kind.Wasm_2_0_0]
 
 (* Patches for Etherlink PVM. *)
 let etherlink_patches = [(Increase_max_nb_ticks 50_000_000_000_000L, Hardcoded)]
@@ -60,6 +62,8 @@ let pp_unsafe_patch fmt = function
         "Rewrites value at %s with %s"
         key
         Hex.(of_string value |> show)
+  | Patch_PVM_version {version} ->
+      Format.fprintf fmt "Set PVM version to %s" version
 
 let make kind rollup_address user_provided_patches =
   let open Result_syntax in

@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type publish_slots_regularly = {
+  frequency : int;
+  slot_index : int;
+  secret_key : Account.secret_key;
+}
+
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
@@ -35,6 +41,7 @@ module Parameters = struct
     l1_node_endpoint : Endpoint.t;
     disable_shard_validation : bool;
     disable_amplification : bool;
+    publish_slots_regularly : publish_slots_regularly option;
     ignore_pkhs : string list option;
     mutable pending_ready : unit option Lwt.u list;
     runner : Runner.t option;
@@ -58,6 +65,9 @@ let disable_shard_validation_environment_variable =
 let ignore_topics_environment_variable =
   "TEZOS_IGNORE_TOPICS_I_KNOW_WHAT_I_AM_DOING"
 
+let allow_regular_publication_environment_variable =
+  "TEZOS_DAL_PUBLISH_REGULARLY_I_KNOW_WHAT_I_AM_DOING"
+
 let check_error ?exit_code ?msg dal_node =
   match dal_node.status with
   | Not_running ->
@@ -66,9 +76,8 @@ let check_error ?exit_code ?msg dal_node =
 
 let use_baker_to_start_dal_node =
   match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
-  | Some "EXTENDED_DAL_USE_BAKER" -> Some true
-  | Some _ -> Some false
-  | _ -> None
+  | Some "EXTENDED_DAL_USE_BAKER" -> true
+  | _ -> false
 
 let wait dal_node =
   match dal_node.status with
@@ -124,15 +133,15 @@ let mk_backup_uris_args sources =
 let mk_trust_slots_backup_uris flag =
   if flag then ["--trust-slots-backup-uris"] else []
 
-let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
+let spawn_config_init_or_reset ~subcommand ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
     ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
     ?batching_time_interval dal_node =
-  spawn_command dal_node @@ ["config"]
-  @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+  spawn_command dal_node
+  @@ (if use_baker_to_start_dal_node then ["dal"; "config"] else ["config"])
   @ [
-      "init";
+      subcommand;
       "--data-dir";
       data_dir dal_node;
       "--rpc-addr";
@@ -176,13 +185,24 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
   | Some Auto -> ["--history-mode"; "auto"]
   | Some (Custom i) -> ["--history-mode"; string_of_int i]
 
+let spawn_config_init = spawn_config_init_or_reset ~subcommand:"init"
+
+let spawn_config_reset = spawn_config_init_or_reset ~subcommand:"reset"
+
 let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
     ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
     ?batching_time_interval dal_node =
   spawn_command dal_node
-  @@ ["config"; "update"; "--expected-pow"; string_of_float expected_pow]
+  @@ (if use_baker_to_start_dal_node then ["dal"; "config"; "update"]
+      else ["config"; "update"])
+  @ [
+      "--data-dir";
+      data_dir dal_node;
+      "--expected-pow";
+      string_of_float expected_pow;
+    ]
   @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
   @ (if attester_profiles = [] then []
      else ["--attester-profiles"; String.concat "," attester_profiles])
@@ -227,6 +247,25 @@ let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
     ?trust_slots_backup_uris ?batching_time_interval dal_node =
   let process =
     spawn_config_init
+      ?expected_pow
+      ?peers
+      ?attester_profiles
+      ?operator_profiles
+      ?observer_profiles
+      ?bootstrap_profile
+      ?history_mode
+      ?slots_backup_uris
+      ?trust_slots_backup_uris
+      ?batching_time_interval
+      dal_node
+  in
+  Process.check process
+
+let reset_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
+    ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
+    ?trust_slots_backup_uris ?batching_time_interval dal_node =
+  let process =
+    spawn_config_reset
       ?expected_pow
       ?peers
       ?attester_profiles
@@ -335,7 +374,8 @@ let handle_event dal_node {name; value = _; timestamp = _} =
 let create_from_endpoint ?runner ?path ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr ?public_addr
     ?metrics_addr ?(disable_shard_validation = false)
-    ?(disable_amplification = false) ?ignore_pkhs ~l1_node_endpoint () =
+    ?(disable_amplification = false) ?ignore_pkhs ?publish_slots_regularly
+    ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -357,7 +397,7 @@ let create_from_endpoint ?runner ?path ?name ?color ?data_dir ?event_pipe
     Option.value
       path
       ~default:
-        (if use_baker_to_start_dal_node = Some true then
+        (if use_baker_to_start_dal_node then
            Uses.path Constant.octez_agnostic_baker
          else Uses.path Constant.octez_dal_node)
   in
@@ -381,6 +421,7 @@ let create_from_endpoint ?runner ?path ?name ?color ?data_dir ?event_pipe
         ignore_pkhs;
         l1_node_endpoint;
         runner;
+        publish_slots_regularly;
       }
   in
   on_event dal_node (handle_event dal_node) ;
@@ -390,7 +431,7 @@ let create_from_endpoint ?runner ?path ?name ?color ?data_dir ?event_pipe
 let create ?runner ?path ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr ?public_addr
     ?metrics_addr ?disable_shard_validation ?disable_amplification ?ignore_pkhs
-    ~node () =
+    ?publish_slots_regularly ~node () =
   let l1_node_endpoint =
     Node.as_rpc_endpoint ~local:(Node.runner node = runner) node
   in
@@ -409,6 +450,7 @@ let create ?runner ?path ?name ?color ?data_dir ?event_pipe
     ?disable_shard_validation
     ?disable_amplification
     ?ignore_pkhs
+    ?publish_slots_regularly
     ~l1_node_endpoint
     ()
 
@@ -441,6 +483,19 @@ let make_arguments node =
       ~none:[]
       ~some:(fun pkhs -> "--ignore-topics" :: [String.concat "," pkhs])
       node.persistent_state.ignore_pkhs
+  @ Option.fold
+      ~none:[]
+      ~some:(fun {frequency; slot_index; secret_key} ->
+        match secret_key with
+        | Unencrypted secret_key ->
+            [
+              "--publish-slots-regularly";
+              Format.sprintf "%d-%d-%s" frequency slot_index secret_key;
+            ]
+        | _ ->
+            failwith
+              "Cannot publish slots regularly without unencrypted secret key")
+      node.persistent_state.publish_slots_regularly
 
 let do_runlike_command ?env ?(event_level = `Info) node arguments =
   if node.status <> Not_running then
@@ -464,17 +519,17 @@ let do_runlike_command ?env ?(event_level = `Info) node arguments =
     arguments
     ~on_terminate
 
-let run ?env ?event_level node =
+let run ?env ?event_level ?(ignore_l1_history_check = false) node =
   do_runlike_command
     ?env
     ?event_level
     node
-    (["run"]
-    @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
-    @ ["--verbose"; "--data-dir"; node.persistent_state.data_dir])
+    ((if use_baker_to_start_dal_node then ["dal"; "run"] else ["run"])
+    @ ["--verbose"; "--data-dir"; node.persistent_state.data_dir]
+    @ if ignore_l1_history_check then ["--ignore-l1-history-check"] else [])
 
-let run ?(wait_ready = true) ?env ?event_level node =
-  let* () = run ?env ?event_level node in
+let run ?(wait_ready = true) ?env ?event_level ?ignore_l1_history_check node =
+  let* () = run ?env ?event_level ?ignore_l1_history_check node in
   let* () = if wait_ready then wait_for_ready node else Lwt.return_unit in
   return ()
 
@@ -526,20 +581,95 @@ let load_last_finalized_processed_level dal_node =
 
 let debug_print_store_schemas ?path ?hooks () =
   let args =
-    ["debug"]
-    @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
-    @ ["print"; "store"; "schemas"]
+    (if use_baker_to_start_dal_node then ["dal"] else [])
+    @ ["debug"; "print"; "store"; "schemas"]
   in
   let path =
     Option.value
       path
       ~default:
-        (if use_baker_to_start_dal_node = Some true then
+        (if use_baker_to_start_dal_node then
            Uses.path Constant.octez_agnostic_baker
          else Uses.path Constant.octez_dal_node)
   in
   let process = Process.spawn ?hooks path @@ args in
   Process.check process
+
+let spawn_snapshot_aux cmd dal_node ?(extra = []) ?endpoint ?min_published_level
+    ?max_published_level ?slots output_file =
+  let data_dir = data_dir dal_node in
+  let endpoint_args =
+    match endpoint with
+    | None -> []
+    | Some ep -> ["--endpoint"; Endpoint.as_string ep]
+  in
+  let min_level_args =
+    match min_published_level with
+    | None -> []
+    | Some level -> ["--min-published-level"; Int32.to_string level]
+  in
+  let max_level_args =
+    match max_published_level with
+    | None -> []
+    | Some level -> ["--max-published-level"; Int32.to_string level]
+  in
+  let slot_args =
+    match slots with
+    | None -> []
+    | Some indices ->
+        ["--slots"; String.concat "," (List.map string_of_int indices)]
+  in
+  let args =
+    (if use_baker_to_start_dal_node then ["dal"] else [])
+    @ ["snapshot"; cmd] @ ["--data-dir"; data_dir] @ endpoint_args
+    @ min_level_args @ max_level_args @ slot_args @ extra @ [output_file]
+  in
+  let path =
+    if use_baker_to_start_dal_node then Uses.path Constant.octez_agnostic_baker
+    else Uses.path Constant.octez_dal_node
+  in
+  Process.spawn path args
+
+let snapshot_aux cmd dal_node ?extra ?endpoint ?min_published_level
+    ?max_published_level ?slots output_file =
+  Process.check
+    (spawn_snapshot_aux
+       cmd
+       dal_node
+       ?extra
+       ?endpoint
+       ?min_published_level
+       ?max_published_level
+       ?slots
+       output_file)
+
+let spawn_snapshot_export t ?(compress = false) ?(skip_shards = false) =
+  let extra =
+    (if compress then ["--compress"] else [])
+    @ if skip_shards then ["--skip-shards"] else []
+  in
+  spawn_snapshot_aux "export" t ~extra
+
+let snapshot_export t ?(compress = false) ?(skip_shards = false) =
+  let extra =
+    (if compress then ["--compress"] else [])
+    @ if skip_shards then ["--skip-shards"] else []
+  in
+  snapshot_aux "export" t ~extra
+
+let spawn_snapshot_import t ?(no_check = false) ?(skip_shards = false) =
+  let extra =
+    (if no_check then ["--no-check"] else [])
+    @ if skip_shards then ["--skip-shards"] else []
+  in
+  spawn_snapshot_aux ~extra "import" t
+
+let snapshot_import t ?(no_check = false) ?(skip_shards = false) =
+  let extra =
+    (if no_check then ["--no-check"] else [])
+    @ if skip_shards then ["--skip-shards"] else []
+  in
+  snapshot_aux ~extra "import" t
 
 module Proxy = struct
   type answer = [`Response of string | `Stream of Cohttp_lwt.Body.t]
@@ -644,7 +774,7 @@ module Proxy = struct
               [
                 ("slot_ids", list slot_id_to_json slot_ids);
                 ("trap_slot_ids", list slot_id_to_json []);
-                ("no_shards_attestation_levels", list int []);
+                ("no_shards_committee_levels", list int []);
               ] );
         ]
     in
@@ -906,7 +1036,7 @@ module Mockup_for_baker = struct
                [
                  ("slot_ids", list slot_id_to_json slot_ids);
                  ("trap_slot_ids", list slot_id_to_json []);
-                 ("no_shards_attestation_levels", list int []);
+                 ("no_shards_committee_levels", list int []);
                ] );
          ])
 

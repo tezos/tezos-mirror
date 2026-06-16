@@ -120,8 +120,13 @@ let get_network_peer peer_id = make GET ["network"; "peers"; peer_id] Fun.id
 let get_network_peer_banned peer_id =
   make GET ["network"; "peers"; peer_id; "banned"] Fun.id
 
-let get_chain_blocks ?(chain = "main") () =
-  make GET ["chains"; chain; "blocks"] Fun.id
+let get_chain_blocks ?(chain = "main") ?heads ?length ?min_date () =
+  let query_string =
+    Query_arg.opt_list "head" (fun name head -> (name, head)) heads
+    @ Query_arg.opt "length" string_of_int length
+    @ Query_arg.opt "min_date" string_of_int min_date
+  in
+  make ~query_string GET ["chains"; chain; "blocks"] Fun.id
 
 let get_chain_invalid_blocks ?(chain = "main") () =
   make GET ["chains"; chain; "invalid_blocks"] Fun.id
@@ -269,6 +274,24 @@ let post_chain_block_helpers_scripts_run_operation ?(chain = "main")
     ~data
     Fun.id
 
+let post_chain_block_helpers_scripts_pack_data ?(chain = "main")
+    ?(block = "head") ~data ~ty ?gas () =
+  let body =
+    `O
+      (List.filter_map
+         Fun.id
+         [
+           Some ("data", data);
+           Some ("type", ty);
+           Option.map (fun g -> ("gas", `String (string_of_int g))) gas;
+         ])
+  in
+  make
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "pack_data"]
+    ~data:(Data body)
+    Fun.id
+
 let get_chain_chain_id ?(chain = "main") () =
   make GET ["chains"; chain; "chain_id"] JSON.as_string
 
@@ -295,7 +318,7 @@ type block_metadata = {
   next_protocol : string;
   proposer : string;
   max_operations_ttl : int;
-  dal_attestation : bool Array.t option;
+  dal_attestation : string option;
   balance_updates : balance_update list;
 }
 
@@ -303,18 +326,7 @@ let get_chain_block_metadata ?(chain = "main") ?(block = "head") ?version () =
   let query_string = Query_arg.opt "version" Fun.id version in
   make ~query_string GET ["chains"; chain; "blocks"; block; "metadata"]
   @@ fun json ->
-  let dal_attestation =
-    match JSON.(json |-> "dal_attestation" |> as_string_opt) with
-    | None -> None
-    | Some slots ->
-        let attestation = Z.of_string slots in
-        let length = Z.numbits attestation in
-        let array = Array.make length false in
-        List.iter
-          (fun i -> if Z.testbit attestation i then array.(i) <- true)
-          (range 0 (length - 1)) ;
-        Some array
-  in
+  let dal_attestation = JSON.(json |-> "dal_attestation" |> as_string_opt) in
   let protocol = JSON.(json |-> "protocol" |> as_string) in
   let next_protocol = JSON.(json |-> "next_protocol" |> as_string) in
   let proposer =
@@ -888,12 +900,17 @@ let get_chain_block_helper_validators ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "helpers"; "validators"]
     Fun.id
 
+type cycle_levels = {first : int; last : int}
+
 let get_chain_block_helper_levels_in_current_cycle ?(chain = "main")
     ?(block = "head") () =
   make
     GET
     ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
-    Fun.id
+  @@ fun json ->
+  let first = JSON.(json |-> "first" |> as_int) in
+  let last = JSON.(json |-> "last" |> as_int) in
+  {first; last}
 
 let get_chain_block_helper_total_baking_power ?(chain = "main")
     ?(block = "head") () =
@@ -973,6 +990,24 @@ let get_chain_block_context_big_maps ?(chain = "main") ?(block = "head") ~id
     ["chains"; chain; "blocks"; block; "context"; "big_maps"; id]
     Fun.id
 
+let get_chain_block_context_raw_json_big_maps_index ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "raw";
+      "json";
+      "big_maps";
+      "index";
+      id;
+    ]
+    Fun.id
+
 let get_chain_block_context_contracts ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "contracts"] Fun.id
 
@@ -1044,9 +1079,11 @@ let get_chain_block_context_contract_delegate ?(chain = "main")
     Fun.id
 
 let get_chain_block_context_contract_entrypoints ?(chain = "main")
-    ?(block = "head") ~id () =
+    ?(block = "head") ?normalize_types ~id () =
+  let query_string = Query_arg.opt_bool "normalize_types" normalize_types in
   make
     GET
+    ~query_string
     [
       "chains"; chain; "blocks"; block; "context"; "contracts"; id; "entrypoints";
     ]
@@ -1066,6 +1103,24 @@ let get_chain_block_context_contract_script ?(chain = "main") ?(block = "head")
   make
     GET
     ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "script"]
+    Fun.id
+
+let post_chain_block_context_contract_script_normalized ?(chain = "main")
+    ?(block = "head") ~id ~data () =
+  make
+    POST
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      id;
+      "script";
+      "normalized";
+    ]
+    ~data
     Fun.id
 
 let get_chain_block_context_contract_storage ?(chain = "main") ?(block = "head")
@@ -1995,13 +2050,19 @@ let get_monitor_heads_chain ?(chain = "main") () =
 let get_monitor_validated_blocks =
   make GET ["monitor"; "validated_blocks"] Fun.id
 
+let get_monitor_bootstrapped = make GET ["monitor"; "bootstrapped"] Fun.id
+
 let nonexistent_path = make GET ["nonexistent"; "path"] Fun.id
 
 let get_chain_block_context_denunciations ?(chain = "main") ?(block = "head") ()
     =
   make GET ["chains"; chain; "blocks"; block; "context"; "denunciations"] Fun.id
 
-type baker_with_power = {delegate : string; baking_power : int}
+type baker_with_power = {
+  delegate : string;
+  staked : int;
+  weighted_delegated : int;
+}
 
 let get_stake_distribution ?(chain = "main") ?(block = "head") ~cycle () =
   make
@@ -2024,11 +2085,10 @@ let get_stake_distribution ?(chain = "main") ?(block = "head") ~cycle () =
     JSON.(
       fun baker_with_pow ->
         let active_stake = baker_with_pow |-> "active_stake" in
-        let frozen_stake = active_stake |-> "frozen" |> as_int in
-        let delegated_stake = active_stake |-> "delegated" |> as_int in
         {
           delegate = baker_with_pow |-> "baker" |> as_string;
-          baking_power = frozen_stake + delegated_stake;
+          staked = active_stake |-> "frozen" |> as_int;
+          weighted_delegated = active_stake |-> "delegated" |> as_int;
         })
     bakers_with_pow
 
@@ -2082,3 +2142,141 @@ let get_chain_block_context_destination_index ?(chain = "main")
       "index";
     ]
   @@ JSON.as_int_opt
+
+let get_chain_block_context_stez_contract_hash ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "stez"; "contract_hash"]
+    JSON.as_string
+
+let get_chain_block_context_stez_total_supply ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "stez"; "total_supply"]
+    Fun.id
+
+let get_chain_block_context_stez_total_amount_of_tez ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "stez"; "total_amount_of_tez"]
+    Fun.id
+
+let get_chain_block_context_stez_exchange_rate ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "stez"; "exchange_rate"]
+    Fun.id
+
+let get_chain_block_context_contract_stez_balance ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      id;
+      "stez_balance";
+    ]
+    Fun.id
+
+let get_chain_block_context_contract_stez_ticket_balance ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      id;
+      "stez_ticket_balance";
+    ]
+    Fun.id
+
+let get_chain_block_context_address_registry ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "raw";
+      "json";
+      "contracts";
+      "address_registry";
+      "next";
+    ]
+  @@ fun json -> JSON.as_string json |> int_of_string
+
+let get_chain_block_helpers_swrr_credits ?(chain = "main") ?(block = "head") ()
+    =
+  make GET ["chains"; chain; "blocks"; block; "helpers"; "swrr_credits"] Fun.id
+
+let get_chain_block_helpers_swrr_selected_bakers ?(chain = "main")
+    ?(block = "head") ?cycle () =
+  let query_string = Option.map (fun c -> [("cycle", Int.to_string c)]) cycle in
+  make
+    ?query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "swrr_selected_bakers"]
+    Fun.id
+
+type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
+
+let get_chain_block_helpers_decode_dal_attestation ?(chain = "main")
+    ?(block = "head") bitset =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "helpers";
+      "decode_dal_attestation";
+      bitset;
+    ]
+  @@ fun json ->
+  JSON.as_list json
+  |> List.map (fun entry ->
+         let lag_index = JSON.(entry |-> "lag_index" |> as_int) in
+         let slot_indices =
+           JSON.(entry |-> "slot_indices" |> as_list |> List.map as_int)
+         in
+         {lag_index; slot_indices})
+
+let post_chain_block_helpers_encode_dal_attestation ?(chain = "main")
+    ?(block = "head") attestations =
+  let data =
+    RPC_core.Data
+      (`A
+         (List.map
+            (fun {lag_index; slot_indices} ->
+              `O
+                [
+                  ("lag_index", `Float (Float.of_int lag_index));
+                  ( "slot_indices",
+                    `A
+                      (List.map (fun i -> `Float (Float.of_int i)) slot_indices)
+                  );
+                ])
+            attestations))
+  in
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "encode_dal_attestation"]
+    JSON.as_string

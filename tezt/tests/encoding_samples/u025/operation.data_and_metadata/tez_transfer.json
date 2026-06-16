@@ -1,0 +1,35 @@
+{
+  "contents": [
+    {
+      "kind": "transaction",
+      "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+      "fee": "468",
+      "counter": "1",
+      "gas_limit": "2169",
+      "storage_limit": "0",
+      "amount": "42000000",
+      "destination": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+      "metadata": {
+        "operation_result": {
+          "status": "applied",
+          "balance_updates": [
+            {
+              "kind": "contract",
+              "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+              "change": "-42000000",
+              "origin": "block"
+            },
+            {
+              "kind": "contract",
+              "contract": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+              "change": "42000000",
+              "origin": "block"
+            }
+          ],
+          "consumed_milligas": "2169000"
+        }
+      }
+    }
+  ],
+  "signature": "sigPc9gwEse2o5nsicnNeWLjLgoMbEGumXw7PErAkMMa1asXVKRq43RPd7TnUKYwuHmejxEu15XTyV1iKGiaa8akFHK7CCEF"
+}

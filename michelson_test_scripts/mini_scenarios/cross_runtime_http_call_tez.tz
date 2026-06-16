@@ -1,0 +1,82 @@
+parameter (or (unit %run) (unit %_incrementWitness)) ;
+storage (pair (nat %count) (string %destination)) ;
+# Michelson-to-Michelson bridge using the gateway's %call (HTTP) entrypoint.
+#
+# Functionally analogous to cross_runtime_http_call_evm.tz, but the URL
+# host is http://tezos/<destination>/run, exercising the same-runtime
+# CRAC path: the gateway dispatches the HTTP request back to the
+# Michelson runtime instead of crossing to the EVM runtime.
+#
+# %run builds:
+#   url     = "http://tezos/" ++ destination ++ "/run"
+#   headers = {} (empty)
+#   body    = 0x030b (packed Unit, parameter for the target's %run)
+#   method  = 1 (POST)
+#   callback = None
+# and calls gateway.%call.
+#
+# %call type:
+#   pair string
+#        (pair (list (pair string string))
+#              (pair bytes
+#                    (pair nat
+#                          (option (contract bytes)))))
+#
+# The gateway address (KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw) is the
+# enshrined CRAC contract with a deterministic address.
+code
+  { UNPAIR ;
+    IF_LEFT
+      { # run()
+        DROP ;
+        DUP ; CDR ;
+        # destination : storage
+        # Build URL: "http://tezos/" ++ destination ++ "/run"
+        PUSH string "http://tezos/" ;
+        CONCAT ;
+        PUSH string "/run" ;
+        SWAP ;
+        CONCAT ;
+        # url : storage
+        DIP { PUSH @gateway address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
+              CONTRACT %call (pair string (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes)))))) ;
+              ASSERT_SOME } ;
+        # url : (contract %call ...) : storage
+        NONE (contract bytes) ;
+        PUSH nat 1 ;  # method: 1 = POST (gateway convention)
+        PAIR ;
+        # (pair 1 None) : url : (contract ...) : storage
+        PUSH bytes 0x030b ;  # packed Unit (target's %run parameter)
+        PAIR ;
+        # (pair 0x030b (pair 1 None)) : url : (contract ...) : storage
+        NIL (pair string string) ;
+        PAIR ;
+        # (pair {} (pair 0x030b (pair 1 None))) : url : (contract ...) : storage
+        SWAP ;
+        PAIR ;
+        # Pair url (Pair {} (Pair 0x030b (Pair 1 None))) : (contract ...) : storage
+        AMOUNT ; SWAP ;
+        # param : amount : (contract ...) : storage
+        TRANSFER_TOKENS ;
+        # gateway_op : storage
+        # Build post-increment operation
+        SELF %_incrementWitness ;
+        PUSH mutez 0 ; UNIT ; TRANSFER_TOKENS ;
+        # post_incr : gateway_op : storage
+        # Build ops list: [gateway_op, post_incr]
+        NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
+        # [gateway_op, post_incr] : storage
+        # Build pre-increment operation
+        SELF %_incrementWitness ;
+        PUSH mutez 0 ; UNIT ; TRANSFER_TOKENS ;
+        # pre_incr : [gateway_op, post_incr] : storage
+        CONS ;
+        # [pre_incr, gateway_op, post_incr] : storage
+        PAIR
+      }
+      { # _incrementWitness()
+        DROP ;
+        UNPAIR ; PUSH nat 1 ; ADD ; PAIR ;
+        NIL operation ; PAIR
+      }
+  } ;

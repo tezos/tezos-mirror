@@ -10,7 +10,9 @@ type error += RISCV_proof_production_failed
 
 type error += RISCV_proof_verification_failed
 
-type error += RISCV_output_proof_verification_failed
+type error += RISCV_output_proof_production_failed of string
+
+type error += RISCV_output_proof_verification_failed of string
 
 let () =
   let open Data_encoding in
@@ -34,16 +36,28 @@ let () =
     unit
     (function RISCV_proof_verification_failed -> Some () | _ -> None)
     (fun () -> RISCV_proof_verification_failed) ;
+  let msg = "Output proof production failed" in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_riscv_output_proof_production_failed"
+    ~title:msg
+    ~description:msg
+    ~pp:(fun ppf err -> Format.fprintf ppf "%s with error: %s" msg err)
+    Data_encoding.(obj1 (req "err" (string Plain)))
+    (function
+      | RISCV_output_proof_production_failed err -> Some err | _ -> None)
+    (fun err -> RISCV_output_proof_production_failed err) ;
   let msg = "Output proof verification failed" in
   register_error_kind
     `Permanent
     ~id:"smart_rollup_riscv_output_proof_verification_failed"
     ~title:msg
-    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg
-    unit
-    (function RISCV_output_proof_verification_failed -> Some () | _ -> None)
-    (fun () -> RISCV_output_proof_verification_failed)
+    ~pp:(fun ppf err -> Format.fprintf ppf "%s with error: %s" msg err)
+    Data_encoding.(obj1 (req "err" (string Plain)))
+    (function
+      | RISCV_output_proof_verification_failed err -> Some err | _ -> None)
+    (fun err -> RISCV_output_proof_verification_failed err)
 
 module PS = Sc_rollup_PVM_sig
 
@@ -173,14 +187,15 @@ module Protocol_implementation :
 
   let verify_output_proof output_proof =
     let open Lwt_result_syntax in
-    let output =
-      let open Option_syntax in
-      let* output = Riscv.verify_output_proof output_proof in
-      from_riscv_output output
-    in
-    match output with
-    | None -> tzfail RISCV_output_proof_verification_failed
-    | Some output -> return output
+    match Riscv.verify_output_proof output_proof with
+    | Error err -> tzfail (RISCV_output_proof_verification_failed err)
+    | Ok output -> (
+        match from_riscv_output output with
+        | None ->
+            tzfail
+              (RISCV_output_proof_verification_failed
+                 "Failed to convert output from PVM representation")
+        | Some output -> return output)
 
   let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
       dissection =

@@ -41,11 +41,11 @@ local p2p_y = gossipsub_y + 24;
 
 dashboard.new('Octez DAL Node Dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('dal-basic' + uid_ext) else {})
-+ dashboard.withDescription('A dashboard for Octez DAL node')
-+ dashboard.withTags(['tezos', 'octez', 'dal'])
++ dashboard.withDescription('A dashboard for Octez DAL node' + base.build_options)
++ dashboard.withTags(['tezos', 'octez', 'dal', 'grafazos'])
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')
-+ dashboard.withVariables([base.nodeInstanceDal, base.slotIndex, base.pkh, base.peer])
++ dashboard.withVariables(base.standardVariablesDAL)
 
 + dashboard.withPanels(
 
@@ -61,6 +61,9 @@ dashboard.new('Octez DAL Node Dashboard' + if !uid && uid_ext != '' then ' (' + 
     dalNode.slotsAttesatationSummary(h=8, w=8, x=0, y=node_y + 8),
     dalNode.slotsWaitingAttestations(h=8, w=8, x=8, y=node_y + 8),
     dalNode.slotsAttested(h=8, w=8, x=16, y=node_y + 8),
+
+    dalNode.slotsUnattested(h=8, w=24, x=0, y=node_y + 16),
+
 
     // ## Third line of pannels
     dalNode.L1BlockProcessingTime(h=8, w=8, x=0, y=node_y + 16),

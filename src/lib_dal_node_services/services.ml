@@ -178,7 +178,7 @@ let post_slot :
   Tezos_rpc.Service.post_service
     ~description:
       "Post a slot to the DAL node, computes its commitment and commitment \
-       proof, then computes the correspoding shards with their proof. The \
+       proof, then computes the corresponding shards with their proof. The \
        result of this RPC can be directly used to publish a slot header. If \
        the sent data is smaller than the size of a DAL slot, it is padded with \
        the character provided as padding query parameter (defaults to \\000). \
@@ -186,7 +186,10 @@ let post_slot :
        its profile allows to publish data on the given slot index. However, \
        slot_index is optional and has NO SEMANTIC EFFECT on the produced \
        commitment. It exists solely to help reverse proxies route POST /slots \
-       requests to a DAL node subscribed to the corresponding topics."
+       requests to a DAL node subscribed to the corresponding topics. The RPC \
+       will fail if publishing at the current level would cross the T to U \
+       protocol migration boundary (when the attestation lag changes between \
+       protocols), as such slots may not be properly attested."
     ~query:slot_query
       (* With [Data_encoding.string], the body of the HTTP request contains
          two length prefixes: one for the full body, and one for the string.
@@ -198,21 +201,6 @@ let post_slot :
           (req "commitment" Cryptobox.Commitment.encoding)
           (req "commitment_proof" Cryptobox.Commitment_proof.encoding))
     Tezos_rpc.Path.(open_root / "slots")
-
-let patch_commitment :
-    < meth : [`PATCH]
-    ; input : slot_id
-    ; output : unit
-    ; prefix : unit
-    ; params : unit * Cryptobox.commitment
-    ; query : unit >
-    service =
-  Tezos_rpc.Service.patch_service
-    ~description:"Associate a commitment to a level and a slot index."
-    ~query:Tezos_rpc.Query.empty
-    ~input:slot_id_encoding
-    ~output:Data_encoding.unit
-    Tezos_rpc.Path.(open_root / "commitments" /: Cryptobox.Commitment.rpc_arg)
 
 let get_slot_content :
     < meth : [`GET]

@@ -78,7 +78,7 @@ Operations
 ----------
 
 - Added new operation kinds :ref:`Preattestations_aggregate and
-  Attestations_aggregate<consensus_operations_aggregate_seoul>`. (MRs
+  Attestations_aggregate<consensus_operations_aggregate>`. (MRs
   :gl:`!15244`, :gl:`!17485`)
 
 - The ``Reveal`` operation has a new optional ``proof`` field, which

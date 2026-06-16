@@ -42,9 +42,9 @@ let blueprint_application =
     ("level", Data_encoding.n)
     ("timestamp", Time.Protocol.rfc_encoding)
     ("txs_nb", Data_encoding.int31)
-    ("gas_used", Data_encoding.n)
+    ("gas_used", Data_encoding.z)
     ("block_hash", Ethereum_types.block_hash_encoding)
-    ("execution_gas", Data_encoding.n)
+    ("execution_gas", Data_encoding.z)
     ("process_time", Time.System.Span.encoding)
 
 let blueprint_replayed =

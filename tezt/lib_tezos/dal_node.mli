@@ -38,6 +38,14 @@ val disable_shard_validation_environment_variable : string
 
 val ignore_topics_environment_variable : string
 
+val allow_regular_publication_environment_variable : string
+
+type publish_slots_regularly = {
+  frequency : int;
+  slot_index : int;
+  secret_key : Account.secret_key;
+}
+
 (** Creates a DAL node *)
 val create :
   ?runner:Runner.t ->
@@ -54,6 +62,7 @@ val create :
   ?disable_shard_validation:bool ->
   ?disable_amplification:bool ->
   ?ignore_pkhs:string list ->
+  ?publish_slots_regularly:publish_slots_regularly ->
   node:Node.t ->
   unit ->
   t
@@ -73,6 +82,7 @@ val create_from_endpoint :
   ?disable_shard_validation:bool ->
   ?disable_amplification:bool ->
   ?ignore_pkhs:string list ->
+  ?publish_slots_regularly:publish_slots_regularly ->
   l1_node_endpoint:Endpoint.t ->
   unit ->
   t
@@ -106,18 +116,22 @@ val data_dir : t -> string
 (** Get the identity file of a dal node. *)
 val identity_file : t -> string
 
-(** [run ?wait_ready ?env ?event_level node] launches the given dal
-    node where env is a map of environment variable.
+(** [run ?wait_ready ?env ?event_level ?ignore_l1_history_check node] launches
+    the given dal node where env is a map of environment variable.
 
     If [wait_ready] is [true], the promise waits for the dal node to be ready.
     [true] by default.
 
     [event_level] allows to determine the printed levels. By default,
-    it is set to [`Info]. *)
+    it is set to [`Info].
+
+    If [ignore_l1_history_check] is [true], the node is started with the
+    [--ignore-l1-history-check] flag. [false] by default. *)
 val run :
   ?wait_ready:bool ->
   ?env:string String_map.t ->
   ?event_level:Daemon.Level.default_level ->
+  ?ignore_l1_history_check:bool ->
   t ->
   unit Lwt.t
 
@@ -126,6 +140,10 @@ val pid : t -> int option
 
 (** Return the path of the daemon. *)
 val path : t -> string
+
+(** Whether the baker should be used to start the DAL node, as determined by the
+    [TZ_SCHEDULE_KIND] environment variable, evaluated at compile time. *)
+val use_baker_to_start_dal_node : bool
 
 (** Send SIGTERM and wait for the process to terminate.
 
@@ -142,7 +160,13 @@ val stop : t -> unit Lwt.t
 val log_events : ?max_length:int -> t -> unit
 
 (** See [Daemon.Make.wait_for]. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** [is_running_not_ready dal_node] returns true if the given node is
     running but its status is not ready *)
@@ -157,6 +181,20 @@ val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 (** Wait until a node terminates and return its status. If the node is not
     running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
+
+val spawn_config_init :
+  ?expected_pow:float ->
+  ?peers:string list ->
+  ?attester_profiles:string list ->
+  ?operator_profiles:int list ->
+  ?observer_profiles:int list ->
+  ?bootstrap_profile:bool ->
+  ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
+  ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
+  t ->
+  Process.t
 
 (** Run [octez-dal-node config init].
 
@@ -176,6 +214,52 @@ val init_config :
   t ->
   unit Lwt.t
 
+val spawn_config_reset :
+  ?expected_pow:float ->
+  ?peers:string list ->
+  ?attester_profiles:string list ->
+  ?operator_profiles:int list ->
+  ?observer_profiles:int list ->
+  ?bootstrap_profile:bool ->
+  ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
+  ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
+  t ->
+  Process.t
+
+(** Run [octez-dal-node config init].
+
+    [expected_pow] allows to change the PoW difficulty. Default value is 0.
+*)
+val reset_config :
+  ?expected_pow:float ->
+  ?peers:string list ->
+  ?attester_profiles:string list ->
+  ?operator_profiles:int list ->
+  ?observer_profiles:int list ->
+  ?bootstrap_profile:bool ->
+  ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
+  ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
+  t ->
+  unit Lwt.t
+
+val spawn_config_update :
+  ?expected_pow:float ->
+  ?peers:string list ->
+  ?attester_profiles:string list ->
+  ?operator_profiles:int list ->
+  ?observer_profiles:int list ->
+  ?bootstrap_profile:bool ->
+  ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
+  ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
+  t ->
+  Process.t
+
 val update_config :
   ?expected_pow:float ->
   ?peers:string list ->
@@ -192,6 +276,9 @@ val update_config :
 
 module Config_file : sig
   (** DAL node configuration files. *)
+
+  (**   *)
+  val filename : t -> string
 
   (** Read the configuration file ([config.json]) of a DAL node. *)
   val read : t -> JSON.t
@@ -247,6 +334,70 @@ val load_last_finalized_processed_level : t -> int option Lwt.t
     - [hooks] are attached to the process (defaults to [None]). *)
 val debug_print_store_schemas :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
+
+(** [snapshot_export dal_node ?compress ?skip_shards ?endpoint
+    ?min_published_level ?max_published_level ?slots output_file] exports a
+    snapshot of the DAL node's store to [output_file].
+    If [compress] is [true], the snapshot is exported as a compressed tar
+    archive instead of a plain data directory (default: [false]).
+    If [skip_shards] is [true], shard data is not included in the snapshot
+    (default: [false]).
+    If [endpoint] is provided, it overrides the endpoint in the config file.
+    [min_published_level] and [max_published_level] are optional level ranges
+    to export, and [slots] the optional list of slots to export. *)
+val snapshot_export :
+  t ->
+  ?compress:bool ->
+  ?skip_shards:bool ->
+  ?endpoint:Endpoint.t ->
+  ?min_published_level:int32 ->
+  ?max_published_level:int32 ->
+  ?slots:int list ->
+  string ->
+  unit Lwt.t
+
+(** Same as [snapshot_export] but returns the process without waiting for it. *)
+val spawn_snapshot_export :
+  t ->
+  ?compress:bool ->
+  ?skip_shards:bool ->
+  ?endpoint:Endpoint.t ->
+  ?min_published_level:int32 ->
+  ?max_published_level:int32 ->
+  ?slots:int list ->
+  string ->
+  Process.t
+
+(** Same as [snapshot_import] but returns the process without waiting for it. *)
+val spawn_snapshot_import :
+  t ->
+  ?no_check:bool ->
+  ?skip_shards:bool ->
+  ?endpoint:Endpoint.t ->
+  ?min_published_level:int32 ->
+  ?max_published_level:int32 ->
+  ?slots:int list ->
+  string ->
+  Process.t
+
+(** [snapshot_import dal_node ?no_check ?skip_shards ?endpoint
+    ?min_published_level ?max_published_level ?slots input_file] imports a
+    snapshot into the DAL node's store from [input_file].
+    If [skip_shards] is [true], shard entries are not imported (default:
+    [false]).
+    If [endpoint] is provided, it overrides the endpoint in the config file.
+    [min_published_level] and [max_published_level] are optional level ranges
+    to import, and [slots] the optional list of slots to import. *)
+val snapshot_import :
+  t ->
+  ?no_check:bool ->
+  ?skip_shards:bool ->
+  ?endpoint:Endpoint.t ->
+  ?min_published_level:int32 ->
+  ?max_published_level:int32 ->
+  ?slots:int list ->
+  string ->
+  unit Lwt.t
 
 (** The Proxy module provides functionality to create a proxy server
     that can intercept and mock responses for DAL node requests. *)

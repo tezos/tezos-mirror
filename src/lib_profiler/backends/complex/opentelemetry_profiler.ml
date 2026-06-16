@@ -5,13 +5,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let initialize ?unique_identifier service_name =
+let initialize ?unique_identifier ?env service_name =
   let service_name =
     match unique_identifier with
     | None -> service_name
     | Some id -> Format.sprintf "%s-%s" service_name id
   in
   Opentelemetry.Globals.service_name := service_name ;
+  (match env with
+  | None -> ()
+  | Some env ->
+      Opentelemetry.Globals.add_global_attribute
+        "deployment.environment"
+        (`String env)) ;
   Opentelemetry.GC_metrics.basic_setup () ;
   Ambient_context.set_storage_provider (Ambient_context_lwt.storage ()) ;
   Opentelemetry_client_cohttp_lwt.setup ()
@@ -117,7 +123,7 @@ end
 let opentelemetry : config Profiler.driver =
   (module Driver : Profiler.DRIVER with type config = config)
 
-let instance_maker driver ~verbosity ~directory:_ ~name =
+let instance_maker driver ~verbosity ~directory:_ ~profiling_config:_ ~name =
   Profiler.instance driver {verbosity; service_name = name}
 
 let () =

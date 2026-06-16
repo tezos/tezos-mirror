@@ -204,7 +204,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
         Process.check ~expect_failure:true process)
       [
         RPC.get_chain_block_context_contract_delegate;
-        RPC.get_chain_block_context_contract_entrypoints;
+        RPC.get_chain_block_context_contract_entrypoints ?normalize_types:None;
         RPC.get_chain_block_context_contract_script;
         RPC.get_chain_block_context_contract_storage;
       ]
@@ -247,7 +247,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
         in
         Process.check ~expect_failure:true process)
       [
-        RPC.get_chain_block_context_contract_entrypoints;
+        RPC.get_chain_block_context_contract_entrypoints ?normalize_types:None;
         RPC.get_chain_block_context_contract_script;
         RPC.get_chain_block_context_contract_storage;
       ]
@@ -463,6 +463,35 @@ let test_adaptive_issuance ~contracts ?endpoint client =
   in
   unit
 
+let test_stez ~contracts ?endpoint client =
+  Log.info "Test STEZ parameters retrieval" ;
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_stez_contract_hash ()
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_stez_total_supply ()
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_stez_total_amount_of_tez ()
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_stez_exchange_rate ()
+  in
+  let bootstrap = List.hd contracts in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract_stez_balance ~id:bootstrap ()
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract_stez_ticket_balance ~id:bootstrap ()
+  in
+  unit
+
 let test_delegates_on_registered_hangzhou ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
 
@@ -661,6 +690,11 @@ let test_adaptive_issuance _test_mode_tag (_ : Protocol.t) ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
   test_adaptive_issuance ~contracts ?endpoint client
 
+(* Test the sTEZ RPC. *)
+let test_stez _test_mode_tag (_ : Protocol.t) ?endpoint client =
+  let* contracts = get_contracts ?endpoint client in
+  test_stez ~contracts ?endpoint client
+
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =
   (* initialize data *)
@@ -758,6 +792,32 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
       in
       unit
     else unit
+  in
+  let* () =
+    if Protocol.(number protocol >= 025) then
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helpers_swrr_credits ()
+      in
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helpers_swrr_selected_bakers ()
+      in
+      unit
+    else unit
+  in
+  unit
+
+(* Test that SWRR RPCs fail with a proper error when the feature flag is
+   disabled. *)
+let test_swrr_disabled _test_mode_tag _protocol ?endpoint client =
+  let check_failure rpc =
+    let*? process = Client.RPC.spawn ?endpoint ~hooks client @@ rpc in
+    Process.check ~expect_failure:true process
+  in
+  let* () = check_failure @@ RPC.get_chain_block_helpers_swrr_credits () in
+  let* () =
+    check_failure @@ RPC.get_chain_block_helpers_swrr_selected_bakers ()
   in
   unit
 
@@ -1680,6 +1740,11 @@ let register protocols =
           `Int 0 );
       ]
     in
+    let swrr_flag protocol =
+      if Protocol.(number protocol >= 025) then
+        [(["swrr_new_baker_lottery_enable"], `Bool true)]
+      else []
+    in
     check_rpc_regression
       "contracts"
       ~test_function:test_contracts
@@ -1691,6 +1756,10 @@ let register protocols =
     check_rpc_regression
       "adaptive_issuance"
       ~test_function:test_adaptive_issuance ;
+    check_rpc_regression
+      ~supports:Protocol.(From_protocol 25)
+      "stez"
+      ~test_function:test_stez ;
     check_rpc_regression
       "votes"
       ~test_function:test_votes
@@ -1707,7 +1776,8 @@ let register protocols =
     check_rpc_regression
       "misc_protocol"
       ~test_function:test_misc_protocol
-      ~parameter_overrides:consensus_threshold ;
+      ~parameter_overrides:(fun protocol ->
+        consensus_threshold protocol @ swrr_flag protocol) ;
     check_rpc_regression
       "misc_protocol_abaab"
       ~test_function:test_misc_protocol
@@ -1718,7 +1788,15 @@ let register protocols =
           ( ["all_bakers_attest_activation_threshold"],
             `O [("numerator", `Float 0.); ("denominator", `Float 1.)] );
         ]
-        @ consensus_threshold protocol) ;
+        @ consensus_threshold protocol
+        @ swrr_flag protocol) ;
+    check_rpc_regression
+      "swrr_disabled"
+      ~supports:Protocol.(From_protocol 025)
+      ~test_function:test_swrr_disabled
+      ~parameter_overrides:(fun protocol ->
+        consensus_threshold protocol
+        @ [(["swrr_new_baker_lottery_enable"], `Bool false)]) ;
     (match test_mode_tag with
     | `Light -> ()
     | _ ->

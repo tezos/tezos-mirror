@@ -4,6 +4,8 @@
 
 ### SDK
 
+- Add support for the `DalAttestedSlots` inbox message behind the `proto-alpha` flag.
+- Add support for the `ProtocolMigration` inbox message.
 - Add experimental support for compiling kernels to a RISC-V image behind the `proto-alpha` flag.
 - Add an experimental rollup host for RISC-V with an in-memory store behind the `experimental-host-in-memory-store` flag.
 - Add an `OutboxQueue` that can be used when more than 100 outbox messages are produced at a given level.
@@ -37,6 +39,25 @@
 - Add `Hash` implementation for `OwnedPath`.
 - Remove `tezos-smart-rollup-encoding::contract::Contract`. One may continue to use `tezos-smart-rollup::types::Contract`, which is exported
   from `tezos-protocol::contract::Contract`. This is a drop-in replacement that is fully backwards compatible.
+- Add `tezos-smart-rollup-keyspace` crate which defines the `KeySpace` high-level durable storage API
+- Add irmin path validation to `tezos-smart-rollup-keyspace` behind the `irmin-compat` feature flag (enabled by default).
+  `Key` and `Name` now validate that their content is a valid irmin path (starts with `/`, no trailing `/`, valid step bytes).
+- Move functionality from `Runtime` into new supertraits. This allows kernels to restrict capabilities certain parts of their
+  codebase are able to use.
+  - Move `store_` functions to new `StorageV1` supertrait.
+  - Move `reveal_` functions from `Runtime` to new `HostReveal` supertrait.
+  - Move all other functions (input/ouput, reboots, runtime version) to new `WasmHost` supertrait. Experimental support
+    for using `WasmHost` on RISC-V still exists.
+- Remove `write_debug` from the `Runtime` trait. `debug_msg!` and `debug_str!` no longer require a host implementing
+  any trait — on WASM they call the host's `write_debug` import directly; on all other targets they write to `stderr`
+  via `eprintln!`. The `host` argument to both macros is retained for backward compatibility but is ignored.
+- Expose `store_get_hash` on `StorageV1` trait - wrapping WASM pvm's `__internal_store_get_hash` host function.
+- Storage, DAC and Outbox utilities have been restricted to only use relevant required traits, rather than `Runtime` directly.
+  For the most part, this will be backwards compatible - though the specific traits _may_ have to be brought into scope rather than
+  just relying on a `Runtime` import.
+- StorageV1 `store_read` / `store_read_slice` now support reading more than `MAX_FILE_CHUNK_SIZE` in one go.
+- fixed InMemoryStore `store_read` to match out-of-bounds check of
+  irmin durable storage.
 
 ### Installer client/kernel
 

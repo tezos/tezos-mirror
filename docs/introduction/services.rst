@@ -1,6 +1,12 @@
 Setting up Octez Services
 =========================
 
+.. warning::
+
+   **Experimental Tool Available**
+
+   An experimental tool called `octez-manager <https://github.com/trilitech/octez-manager>`_ is available to simplify the setup and management of Octez services. This tool is currently in beta and provides an alternative way to configure and run Octez daemons. While it may streamline the setup process, please be aware that it is still under active development and may have limitations or bugs. For production environments, we recommend carefully evaluating your requirements before using beta software.
+
 The Octez suite consists of :ref:`several executables <tezos_binaries>`, some to be run interactively, while others are to be run as daemons.
 
 Previous tutorials in this section showed how to :doc:`get started with the different executables <./howtouse>`, and different :doc:`options for participating to Tezos <./howtorun>` such as delegating, staking, and baking.
@@ -63,6 +69,7 @@ Once the node is configured, we can use ``systemd`` to start the daemon:
 
 .. code:: shell
 
+   sudo systemctl enable octez-node
    sudo systemctl start octez-node
 
 If configured to do so during package installation, this will automatically download a snapshot
@@ -91,7 +98,7 @@ If you intend to bake on a testnet, you can simply create a key as follows, fund
    Hash: tz1Ti8WHvfp3XKsTCKWLFv4TrER2HDofXG39
    Public Key: edpkuGRKH8oZDP2PH2EULw9PGzJHdf5g2zCiHnaYG7tapeePUNAWeC
 
-   $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+   $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.currentnet.teztnets.com
    $ sudo su tezos -c "octez-client register key mybaker as delegate"
    $ sudo su tezos -c "octez-client stake 6000 for mybaker"
    $ sudo su tezos -c "octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles=tz1Ti8WHvfp3XKsTCKWLFv4TrER2HDofXG39"
@@ -173,7 +180,7 @@ the configuration commands below:
    # Configure the baker to use the remote signer
    $ sudo su tezos -c "octez-client -R tcp://localhost:7732 \
       import secret key mybaker remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
-   $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+   $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.currentnet.teztnets.com
    $ sudo su tezos -c "octez-client -R tcp://localhost:7732 register key mybaker as delegate"
    $ sudo su tezos -c "octez-client -R tcp://localhost:7732 stake 6000 for mybaker"
    $ sudo su tezos -c "octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles=tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"

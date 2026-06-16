@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `SecretKeySecp256k1` and `SecretKeyP256` hashes
 - Add `EncryptedSecretKeyEd25519`, `EncryptedSecretKeySecp256k1`, `EncryptedSecretKeyP256` and `EncryptedSecretKeyBls` hashes
 - Add `ScriptExprHash` hash
+- Add `SmartRollupCommitment` and state hash definitions.
+- Add `SmartRollupOperation` cement and publish types to the `operation` module.
 - Allow the unit type `()` as field in derived implementations of `NomReader` and `BinWriter`.
 - Add a new package `tezos-protocol`, holding the Tezos protocol structures.
 - Add `Contract` defining contract address.
@@ -17,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `OperationContent`, `ManagerOperationContent`, `RevealContent`, `TransactionContent` defining operations contents for reveal and transaction.
 - Add `DelegationContent` defining operation content for delegation.
 - Add `OriginationContent` defining operation content for origination.
+- Implement trait `BinWriter` for `&T` whenever `T` implements `BinWriter`.
+- `HashType::b58check_to_sized_hash` method has been added to `HashType`. Conversion chains like `.as_ref().try_into().unwrap()` can be replaced by `.into()`.
 
 ### Changed
 
@@ -25,14 +29,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   *NB* The internally wrapped type is changed from `BigInt` to `BigUint` as a result.
 - Add `#[encoding]` attribute support for enum fields, in addition to struct fields.
 - `tezos_data_encoding_derive`: derivations of `NomReader` and `BinWriter` require those same constraints on their fields. If such a field doesn't meet the constraint, the implementation will not be available for use, however compilation will still succeed.
+- `nom::optional_field` no longer requires inner type to be `Clone`.
+- Hash types now use fixed-size arrays (`[u8; N]`) instead of `Vec<u8>`, providing compile-time size guarantees.
+- `HashTrait` is now generic over size (`HashTrait<const N: usize>`).
+- `hash::Hash` type alias has been removed, in favour of byte arrays.
+- `serde::Deserialize` and `serde::Serialize` impls for hashes now go via `Vec<u8>` directly, instead of a newtype struct, for binary encodings.
+  This may be backwards compatible, depending on the format being serialised to/from. The `serde` docs encourage this to be the case - see
+  [Serializer::serialize_newtype_struct](https://docs.rs/serde/latest/serde/trait.Serializer.html#tymethod.serialize_newtype_struct).
+- Refactor `blake2b` digest methods to return fixed-size arrays for improved consistency and type safety
+- Refactor `Hasher` trait to use fixed-size arrays for hash outputs and update `TezosHasher` implementation
 
 ### Fixed
 
 - Fix `short_dynamic` function in `encoding` - was incorrectly using `dynamic` internally.
+- Fix `n_bignum` encoder - would silently drop all parts of a value above `2^56`.
 
 ### Security
 
-- Nothing.
+- `PublicKeySecp256k1::verify_signature` now rejects high-S signatures, aligning the Rust SDK with the
+  verification behaviour of Octez's `src/lib_crypto`.
 
 ### Performance
 

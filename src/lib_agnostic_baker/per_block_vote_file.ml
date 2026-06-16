@@ -30,24 +30,18 @@ let default_vote_json_filename = "per_block_votes.json"
 
 type per_block_votes = {
   liquidity_baking_toggle_vote : Per_block_votes.per_block_vote;
-  adaptive_issuance_vote_opt : Per_block_votes.per_block_vote option;
 }
 
 let vote_file_content_encoding =
   let open Data_encoding in
   def "vote_file_content"
   @@ conv
-       (fun {liquidity_baking_toggle_vote; adaptive_issuance_vote_opt} ->
-         (liquidity_baking_toggle_vote, adaptive_issuance_vote_opt))
-       (fun (liquidity_baking_toggle_vote, adaptive_issuance_vote_opt) ->
-         {liquidity_baking_toggle_vote; adaptive_issuance_vote_opt})
-       (obj2
+       (fun {liquidity_baking_toggle_vote} -> liquidity_baking_toggle_vote)
+       (fun liquidity_baking_toggle_vote -> {liquidity_baking_toggle_vote})
+       (obj1
           (req
              "liquidity_baking_toggle_vote"
-             Per_block_votes.liquidity_baking_vote_encoding)
-          (opt
-             "adaptive_issuance_vote"
-             Per_block_votes.adaptive_issuance_vote_encoding))
+             Per_block_votes.liquidity_baking_vote_encoding))
 
 let check_file_exists file =
   let open Lwt_result_syntax in
@@ -81,12 +75,7 @@ let read_per_block_votes_no_fail ~default ~per_block_vote_file =
   | Error errs ->
       let* () = Events.(emit per_block_vote_file_fail) errs in
       return default
-  | Ok {liquidity_baking_toggle_vote; adaptive_issuance_vote_opt} ->
-      let* () =
-        if Option.is_some adaptive_issuance_vote_opt then
-          Events.(emit deprecated_adaptive_issuance_vote_field ())
-        else Lwt.return_unit
-      in
+  | Ok {liquidity_baking_toggle_vote} ->
       return
         Per_block_votes.{liquidity_baking_vote = liquidity_baking_toggle_vote}
 
@@ -103,16 +92,7 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
     | Some per_block_vote_file, _ -> (
         let*! (res : _ tzresult) = read_per_block_votes ~per_block_vote_file in
         match res with
-        | Ok
-            {
-              liquidity_baking_toggle_vote = liquidity_baking_vote;
-              adaptive_issuance_vote_opt;
-            } ->
-            let*! () =
-              if Option.is_some adaptive_issuance_vote_opt then
-                Events.(emit deprecated_adaptive_issuance_vote_field ())
-              else Lwt.return_unit
-            in
+        | Ok {liquidity_baking_toggle_vote = liquidity_baking_vote} ->
             return
               {
                 Configuration.vote_file = Some per_block_vote_file;

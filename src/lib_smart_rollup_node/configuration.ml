@@ -42,7 +42,12 @@ type batcher = {
   max_batch_size : int option;
 }
 
-type injector = {retention_period : int; attempts : int; injection_ttl : int}
+type injector = {
+  retention_period : int;
+  attempts : int;
+  injection_ttl : int;
+  max_batch_length : int option;
+}
 
 type fee_parameters = Injector_common.fee_parameter Operation_kind.Map.t
 
@@ -66,6 +71,8 @@ type outbox_message_filter =
       destination : outbox_destination_filter;
       entrypoint : outbox_entrypoint_filter;
     }
+
+type commit_on_strategy = Block | Commitment
 
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
@@ -101,10 +108,12 @@ type t = {
   log_kernel_debug_file : string option;
   unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
+  slow_vm_fallback : bool;
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
   bail_on_disagree : bool;
+  commit_on : commit_on_strategy;
   opentelemetry : Octez_telemetry.Opentelemetry_config.t;
 }
 
@@ -238,7 +247,12 @@ let default_batcher =
   }
 
 let default_injector =
-  {retention_period = 2048; attempts = 10; injection_ttl = 120}
+  {
+    retention_period = 2048;
+    attempts = 10;
+    injection_ttl = 120;
+    max_batch_length = None;
+  }
 
 let max_injector_retention_period =
   5 * 8192 (* Preserved cycles (5) for mainnet *)
@@ -261,6 +275,8 @@ let default_gc_parameters =
 let default_history_mode = Full
 
 let default_execute_outbox_filter = []
+
+let default_commit_on_strategy = Block
 
 let string_of_history_mode = function Archive -> "archive" | Full -> "full"
 
@@ -395,9 +411,9 @@ let batcher_encoding =
 let injector_encoding : injector Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {retention_period; attempts; injection_ttl} ->
-      (retention_period, attempts, injection_ttl))
-    (fun (retention_period, attempts, injection_ttl) ->
+    (fun {retention_period; attempts; injection_ttl; max_batch_length} ->
+      (retention_period, attempts, injection_ttl, max_batch_length))
+    (fun (retention_period, attempts, injection_ttl, max_batch_length) ->
       if retention_period > max_injector_retention_period then
         Format.ksprintf
           Stdlib.failwith
@@ -405,11 +421,19 @@ let injector_encoding : injector Data_encoding.t =
           max_injector_retention_period ;
       if injection_ttl < 1 then
         Stdlib.failwith "injector.injection_ttl should be at least 1" ;
-      {retention_period; attempts; injection_ttl})
-  @@ obj3
+      {retention_period; attempts; injection_ttl; max_batch_length})
+  @@ obj4
        (dft "retention_period" uint16 default_injector.retention_period)
        (dft "attempts" uint16 default_injector.attempts)
        (dft "injection_ttl" uint16 default_injector.injection_ttl)
+       (dft
+          "max_batch_length"
+          ~description:
+            "Maximum number of operations to include in a single L1 batch. If \
+             not specified, batches are limited only by the operation size \
+             limit."
+          (option int31)
+          default_injector.max_batch_length)
 
 let fee_parameters_encoding =
   Operation_kind.map_encoding (fun operation_kind ->
@@ -506,6 +530,39 @@ let outbox_messages_filter_encoding =
 let execute_outbox_messages_filter_encoding =
   Data_encoding.list outbox_messages_filter_encoding
 
+let string_of_commit_on_strategy = function
+  | Block -> "block"
+  | Commitment -> "commitment"
+
+let commit_on_strategy_of_string = function
+  | "block" -> Ok Block
+  | "commitment" -> Ok Commitment
+  | _ -> error_with "Invalid value for commit-on, should be block or commitment"
+
+let commit_on_strategy_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"block"
+        (def
+           "commit_every_block"
+           ~description:"Commit to disk every block"
+           (constant "block"))
+        (function Block -> Some () | _ -> None)
+        (function () -> Block);
+      case
+        (Tag 1)
+        ~title:"commitment"
+        (def
+           "commit_every_commitment"
+           ~description:"Commit to disk every time a commitment is computed"
+           (constant "commitment"))
+        (function Commitment -> Some () | _ -> None)
+        (function () -> Commitment);
+    ]
+
 let encoding default_display : t Data_encoding.t =
   let open Data_encoding in
   let dft =
@@ -549,10 +606,12 @@ let encoding default_display : t Data_encoding.t =
            log_kernel_debug_file;
            unsafe_disable_wasm_kernel_checks;
            no_degraded;
+           slow_vm_fallback;
            gc_parameters;
            history_mode;
            cors;
            bail_on_disagree;
+           commit_on;
            opentelemetry;
            dal_slot_status_max_fetch_attempts;
          }
@@ -589,10 +648,12 @@ let encoding default_display : t Data_encoding.t =
               log_kernel_debug_file,
               unsafe_disable_wasm_kernel_checks ),
             ( no_degraded,
+              slow_vm_fallback,
               gc_parameters,
               history_mode,
               cors,
               bail_on_disagree,
+              commit_on,
               opentelemetry,
               dal_slot_status_max_fetch_attempts ) ) ) ))
     (fun ( ( ( sc_rollup_address,
@@ -627,10 +688,12 @@ let encoding default_display : t Data_encoding.t =
                  log_kernel_debug_file,
                  unsafe_disable_wasm_kernel_checks ),
                ( no_degraded,
+                 slow_vm_fallback,
                  gc_parameters,
                  history_mode,
                  cors,
                  bail_on_disagree,
+                 commit_on,
                  opentelemetry,
                  dal_slot_status_max_fetch_attempts ) ) ) )
        ->
@@ -670,10 +733,12 @@ let encoding default_display : t Data_encoding.t =
         log_kernel_debug_file;
         unsafe_disable_wasm_kernel_checks;
         no_degraded;
+        slow_vm_fallback;
         gc_parameters;
         history_mode;
         cors;
         bail_on_disagree;
+        commit_on;
         opentelemetry;
         dal_slot_status_max_fetch_attempts;
       })
@@ -763,7 +828,14 @@ let encoding default_display : t Data_encoding.t =
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31)
-             (dft "l1_monitor_finalized" bool default_l1_monitor_finalized))
+             (dft
+                "l1_monitor_finalized"
+                bool
+                default_l1_monitor_finalized
+                ~description:
+                  "When set to true, the rollup node only monitors L1 head \
+                   which are finalized. This option has no effect for RISC-V \
+                   rollups."))
           (merge_objs
              (obj7
                 (dft
@@ -782,8 +854,16 @@ let encoding default_display : t Data_encoding.t =
                    "unsafe-disable-wasm-kernel-checks"
                    Data_encoding.bool
                    false))
-             (obj7
+             (obj9
                 (dft "no-degraded" Data_encoding.bool false)
+                (dft
+                   "slow-vm-fallback"
+                   ~description:
+                     "When set to true, the rollup node will fall back to the \
+                      slow VM interpreter when the fast execution engine fails \
+                      instead of exiting."
+                   Data_encoding.bool
+                   false)
                 (dft
                    "gc-parameters"
                    gc_parameters_encoding
@@ -791,6 +871,10 @@ let encoding default_display : t Data_encoding.t =
                 (opt "history-mode" history_mode_encoding)
                 (dft "cors" cors_encoding Resto_cohttp.Cors.default)
                 (dft "bail-on-disagree" bool false)
+                (dft
+                   "commit-on"
+                   commit_on_strategy_encoding
+                   default_commit_on_strategy)
                 (dft
                    "opentelemetry"
                    ~description:"Enable or disable opentelemetry profiling"
@@ -915,8 +999,8 @@ module Cli = struct
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
-      ~force_etherlink ~l1_monitor_finalized =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~slow_vm_fallback
+      ~commit_on ~profiling ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
@@ -963,6 +1047,7 @@ module Cli = struct
               Option.value ~default:default_injector.attempts injector_attempts;
             injection_ttl =
               Option.value ~default:default_injector.injection_ttl injection_ttl;
+            max_batch_length = None;
           };
         l1_blocks_cache_size = default_l1_blocks_cache_size;
         l2_blocks_cache_size = default_l2_blocks_cache_size;
@@ -979,6 +1064,7 @@ module Cli = struct
         log_kernel_debug_file;
         unsafe_disable_wasm_kernel_checks;
         no_degraded;
+        slow_vm_fallback;
         gc_parameters =
           {frequency_in_blocks = gc_frequency; context_splitting_period = None};
         history_mode;
@@ -991,6 +1077,7 @@ module Cli = struct
                 Option.value ~default:default.allowed_origins allowed_origins;
             };
         bail_on_disagree;
+        commit_on = Option.value commit_on ~default:default_commit_on_strategy;
         opentelemetry =
           (match profiling with
           | None -> Octez_telemetry.Opentelemetry_config.default
@@ -1008,7 +1095,8 @@ module Cli = struct
       ~irmin_cache_size ~log_kernel_debug ~log_kernel_debug_file ~no_degraded
       ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
       ~apply_unsafe_patches ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree
-      ~profiling ~force_etherlink ~l1_monitor_finalized =
+      ~slow_vm_fallback ~commit_on ~profiling ~force_etherlink
+      ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -1069,6 +1157,7 @@ module Cli = struct
               Option.value
                 ~default:configuration.injector.injection_ttl
                 injection_ttl;
+            max_batch_length = configuration.injector.max_batch_length;
           };
         loser_mode = Option.value ~default:configuration.loser_mode loser_mode;
         apply_unsafe_patches;
@@ -1088,6 +1177,7 @@ module Cli = struct
           unsafe_disable_wasm_kernel_checks
           || configuration.unsafe_disable_wasm_kernel_checks;
         no_degraded = no_degraded || configuration.no_degraded;
+        slow_vm_fallback = slow_vm_fallback || configuration.slow_vm_fallback;
         gc_parameters =
           {
             frequency_in_blocks =
@@ -1111,6 +1201,7 @@ module Cli = struct
                   allowed_origins;
             };
         bail_on_disagree = bail_on_disagree || configuration.bail_on_disagree;
+        commit_on = Option.value commit_on ~default:configuration.commit_on;
         opentelemetry =
           (match profiling with
           | None -> configuration.opentelemetry
@@ -1128,8 +1219,8 @@ module Cli = struct
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
-      ~force_etherlink ~l1_monitor_finalized =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~slow_vm_fallback
+      ~commit_on ~profiling ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let*! exists_config = Lwt_unix.file_exists config_file in
     if exists_config then
@@ -1167,6 +1258,8 @@ module Cli = struct
           ~apply_unsafe_patches
           ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
+          ~slow_vm_fallback
+          ~commit_on
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -1222,6 +1315,8 @@ module Cli = struct
           ~apply_unsafe_patches
           ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
+          ~slow_vm_fallback
+          ~commit_on
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized

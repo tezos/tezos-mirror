@@ -1,6 +1,39 @@
 # Changelog
 
-## Version NEXT
+## Version 6 (Farfadet)
+
+### 6.2 (4d6762e)
+
+This version brings quality of life improvements to Etherlink Mainnet.
+
+- **Breaking change:** The deposit event is now called via the XTZ Bridge
+  `0xff00000000000000000000000000000000000001` and not the "system" address
+  which was `0x0000000000000000000000000000000000000000`. (!20352)
+- EIP-7702 accounts and smart contracts will now have their code executed
+  automatically when XTZ deposits are received via the L1 bridge. (!20352)
+- Update the Layer 1 governance contracts to take into account protocol T L1
+  block time that is reduced from 8s to 6s. (!20574)
+    - [`KT1NM6cpM5BPTmYPszjv6LRDAMRZXPET9DmH`](https://better-call.dev/mainnet/KT1NM6cpM5BPTmYPszjv6LRDAMRZXPET9DmH) for the slow upgrade governance
+    - [`KT1JGCdHEyvE3RkmzR7hRYK7vC42QF6zK34H`](https://better-call.dev/mainnet/KT1JGCdHEyvE3RkmzR7hRYK7vC42QF6zK34H) for the fast upgrade governance
+    - [`KT1CSqkafD5ZCHFvmsozrCBeSy2XJQzutJRn`](https://better-call.dev/mainnet/KT1CSqkafD5ZCHFvmsozrCBeSy2XJQzutJRn) for the sequencer governance
+- Cleanup remaining leftover block indexes from V41 migration. (!20187)
+
+Its storage version is 47.
+
+### 6.1 (d748ae50)
+
+This versions fixes two issues introduced in version 6.0 of Farfadet.
+
+- Fix predeployed contract initialization to allow overwriting existing
+  bytecode after kernel upgrade. (!20279)
+- Re-inject a locked FA deposit (0x82f507bc5aba0f3f6088c087c2fcd87fc7b7f33c9445e331ec3d1fdf45e4be38)
+  which was affected by the previous incorrect initialization. (!20280)
+
+This kernel requires the Octez EVM node version 0.48 or higher.
+
+Its storage version is 45.
+
+### 6.0 (d2842ae4)
 
 Important information: Rollup nodes configured to use the full history mode will require
 up to twice the disk space they are currently using in the two weeks following

@@ -79,6 +79,7 @@ type t = {
   version : int;  (** The version of the configuration. *)
   service_name : string;  (** Name of the service provided by this node. *)
   service_namespace : string;  (** Namespace for the service. *)
+  telemetry_env : string option; (* Running environment name for telemetry *)
   experimental_features : experimental_features;  (** Experimental features.  *)
   fetch_trusted_setup : bool;
       (** Should the trusted setup be downloaded if not found or has invalid hash. *)
@@ -88,10 +89,18 @@ type t = {
   ignore_l1_config_peers : bool;
       (** Ignore the boot(strap) peers provided by L1. *)
   disable_amplification : bool;  (** Disable amplification. *)
+  banned_addrs : P2p_addr.t list;
+      (** List of IP addresses to ban at startup. Connections from/to these
+          addresses will be rejected by the P2P layer. *)
   batching_configuration : batching_configuration;
       (** The configuration of the batching of the shards.
           The default is [Enabled{time_interval=100}]. *)
   publish_slots_regularly : publish_slots_regularly option;
+  profiling : Tezos_profiler.Profiler.profiling_config option;
+  rpc_acl_policy : Tezos_rpc_http_server.RPC_server.Acl.policy;
+      (** Per-bind-address ACL overrides for the RPC server. When a configured
+          entry matches the bind address, its ACL replaces the default
+          [dal_secure] (public) / [allow_all] (loopback) policy. *)
 }
 
 (** [default] is the default configuration. *)
@@ -107,10 +116,28 @@ val store_path : t -> string
     from a data dir. *)
 val default_config_file : string -> string
 
-(** [save config] writes config file in [config.data_dir] *)
-val save : config_file:string -> t -> unit tzresult Lwt.t
+(** [save ~allow_overwrite ~config_file] writes config file in [config.data_dir] if it doesn't exists or allow_overwrite is true.
 
-val load : config_file:string -> t tzresult Lwt.t
+    If the file exists and allow_overwrite is false, the function returns an error.
+*)
+val save :
+  allow_overwrite:bool -> config_file:string -> t -> unit tzresult Lwt.t
+
+(** [load ~on_file_not_found ~config_file ()] load config file from
+    [config.data_dir] if it exists. If not it calls the provided on_file_not_found function.
+    If no such function is provided, an error is returned.
+*)
+val load :
+  ?on_file_not_found:(unit -> t tzresult Lwt.t) ->
+  config_file:string ->
+  unit ->
+  t tzresult Lwt.t
+
+(* Helper to exit with a proper code when a configuration error occurs *)
+val exit_on_configuration_error :
+  emit:(error_trace:tztrace -> experimental_features Lwt.t) ->
+  'a tzresult Lwt.t ->
+  'a tzresult Lwt.t
 
 (** [identity_file config] returns the absolute path to the
     "identity.json" file of the DAL node, based on the configuration

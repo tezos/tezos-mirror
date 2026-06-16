@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::block_in_progress::EthBlockInProgress;
+use crate::block_in_progress::BlockInProgress;
 use crate::chains::ChainFamily;
 use crate::event::Event;
 use crate::simulation::SimulationResult;
@@ -16,19 +16,23 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use revm_etherlink::inspectors::call_tracer::CallTracerInput;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
 use revm_etherlink::inspectors::{TracerInput, CALL_TRACER_CONFIG_PREFIX};
+use tezos_crypto_rs::hash::ChainId;
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_data_encoding::nom::NomReader;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::ValueType;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{
-    read_b58_kt1, read_u256_le, read_u64_le, store_read_slice, write_u256_le,
-    write_u64_le,
+    read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le, store_bin,
+    store_read_slice, write_u256_le, write_u64_le,
 };
 
 use crate::error::{Error, StorageError};
@@ -77,6 +81,18 @@ pub enum StorageVersion {
     V42,
     V43,
     V44,
+    V45,
+    V46,
+    V47,
+    V48,
+    V49,
+    V50,
+    V51,
+    V52,
+    V53,
+    V54,
+    V55,
+    V56,
 }
 
 impl From<StorageVersion> for u64 {
@@ -91,24 +107,26 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V44;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V56;
 
-pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
+pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/base/remove_whitelist");
 
-pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/storage_version");
+pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/storage_version");
+pub const LEGACY_STORAGE_VERSION_PATH: RefPath =
+    RefPath::assert_from(b"/evm/storage_version");
 
-const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version");
+const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/kernel_version");
 
-pub const ADMIN: RefPath = RefPath::assert_from(b"/evm/admin");
+pub const ADMIN: RefPath = RefPath::assert_from(b"/base/admin");
 pub const SEQUENCER_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/sequencer_governance");
-pub const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/evm/kernel_governance");
+pub const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/base/kernel_governance");
 pub const KERNEL_SECURITY_GOVERNANCE: RefPath =
-    RefPath::assert_from(b"/evm/kernel_security_governance");
-pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
+    RefPath::assert_from(b"/base/kernel_security_governance");
+pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/base/delayed_bridge");
 
 pub const MAXIMUM_ALLOWED_TICKS: RefPath =
-    RefPath::assert_from(b"/evm/maximum_allowed_ticks");
+    RefPath::assert_from(b"/base/maximum_allowed_ticks");
 
 pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
     RefPath::assert_from(b"/evm/maximum_gas_per_transaction");
@@ -117,7 +135,7 @@ pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
 const EVM_BLOCK_IN_PROGRESS: RefPath =
     RefPath::assert_from(b"/evm/world_state/blocks/in_progress");
 
-const EVENTS: RefPath = RefPath::assert_from(b"/evm/events");
+const EVENTS: RefPath = RefPath::assert_from(b"/base/rollup_events");
 
 pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
     RefPath::assert_from(b"/evm/world_state/transactions_receipts");
@@ -127,21 +145,39 @@ pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
 
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
 
+const MICHELSON_RUNTIME_CHAIN_ID: RefPath =
+    RefPath::assert_from(b"/tez/world_state/chain_id");
+
 // Path to the Multichain feature flag. If there is nothing at this path,
 // a single chain is used.
 #[allow(dead_code)]
 pub const ENABLE_MULTICHAIN: RefPath =
-    RefPath::assert_from(b"/evm/feature_flags/enable_multichain");
+    RefPath::assert_from(b"/base/feature_flags/enable_multichain");
 
 pub const ENABLE_TEZOS_RUNTIME: RefPath =
-    RefPath::assert_from(b"/evm/feature_flags/enable_tezos_runtime");
+    RefPath::assert_from(b"/base/feature_flags/enable_tezos_runtime");
+
+// Target EVM block number for the Michelson runtime sunrise. Written by the
+// installer when scheduling a future activation.
+const MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL: RefPath =
+    RefPath::assert_from(b"/evm/michelson_runtime/target_sunrise_level");
+
+// EVM block number where the Michelson runtime first started producing
+// Tezos blocks. Written once by the kernel at the sunrise block.
+const MICHELSON_RUNTIME_SUNRISE_LEVEL: RefPath =
+    RefPath::assert_from(b"/evm/michelson_runtime/sunrise_level");
+
+pub const ENABLE_MICHELSON_GAS_REFUND: RefPath =
+    RefPath::assert_from(b"/base/feature_flags/enable_michelson_gas_refund");
 
 // Root for chain configurations. Informations about a chain are available by appending its chain ID.
 pub const CHAIN_CONFIGURATIONS: RefPath =
-    RefPath::assert_from(b"/evm/chain_configurations");
+    RefPath::assert_from(b"/base/chain_configurations");
 
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
+const EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER: RefPath =
+    RefPath::assert_from(b"/evm/world_state/fees/michelson_to_evm_gas_multiplier");
 const EVM_DA_FEE: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/da_fee_per_byte");
 const BACKLOG_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/fees/backlog");
@@ -156,45 +192,86 @@ pub const SEQUENCER_POOL_PATH: RefPath =
     RefPath::assert_from(b"/evm/sequencer_pool_address");
 
 /// Path to the last L1 level seen.
-const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/evm/l1_level");
+const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/base/l1_level");
 
 const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/evm/world_state/fees/burned");
 
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
-    RefPath::assert_from(b"/evm/info_per_level/timestamp");
+    RefPath::assert_from(b"/base/info_per_level/timestamp");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_result");
+pub const SIMULATION_HTTP_TRACES: RefPath =
+    RefPath::assert_from(b"/evm/simulation_http_traces");
+
+/// Flag path enabling per-transaction HTTP trace capture during block
+/// replay. The `__` prefix follows the existing convention for node-driven
+/// control keys — cf. `/base/__evm_node`, `/base/__simulation/...`,
+/// `/base/__delayed_input`: the node writes the key via `alter_evm_state`
+/// just before the replay and the kernel reads it exactly once at the top
+/// of `block::produce` (outside the `SafeStorage` wrapper), then threads
+/// the resulting boolean through `compute_bip` → `compute` →
+/// `ChainConfigTrait::apply_transaction` → the three apply sites. The
+/// flag therefore has no lifetime beyond a single replay and nothing
+/// else in the kernel touches this path.
+pub const HTTP_TRACE_ENABLED: RefPath =
+    RefPath::assert_from(b"/base/__http_trace_enabled");
+
+/// Storage root under which traces are persisted per transaction.
+///
+/// This subtree *does* need to live under `/evm/world_state/` because the
+/// writes happen through the `SafeStorage`-wrapped host (the apply sites
+/// have no direct access to the underlying host): a path outside
+/// `storage_root_paths` would land in `/tmp/` and be discarded at promote
+/// instead of moved back to the real subtree. See
+/// `tezos_evm_runtime::safe_storage` for the mirror/promote mechanism.
+const HTTP_TRACES_ROOT: RefPath =
+    RefPath::assert_from(b"/evm/world_state/__http_trace/traces");
 
 // Path to the number of seconds until delayed txs are timed out.
 const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
-    RefPath::assert_from(b"/evm/delayed_inbox_timeout");
+    RefPath::assert_from(b"/base/delayed_inbox_timeout");
 
 // Path to the number of l1 levels that need to pass for a
 // delayed tx to be timed out.
 const EVM_DELAYED_INBOX_MIN_LEVELS: RefPath =
-    RefPath::assert_from(b"/evm/delayed_inbox_min_levels");
+    RefPath::assert_from(b"/base/delayed_inbox_min_levels");
 
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
-pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
+use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_PATH;
+
+pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/base/keep_rollup_events");
 
 // Path to the DAL feature flag. If there is nothing at this path, DAL
 // is not used.
-pub const ENABLE_DAL: RefPath = RefPath::assert_from(b"/evm/feature_flags/enable_dal");
+pub const ENABLE_DAL: RefPath = RefPath::assert_from(b"/base/feature_flags/enable_dal");
+
+// Path to the flag that disables legacy DAL slot import signals.
+// If there is something at this path, the kernel ignores DalSlotImportSignals
+// external messages and instead relies on DalAttestedSlots internal messages
+// from the protocol.
+pub const DISABLE_LEGACY_DAL_SIGNALS: RefPath =
+    RefPath::assert_from(b"/base/feature_flags/disable_legacy_dal_signals");
 
 // Path to the DAL slot indices to use.
-pub const DAL_SLOTS: RefPath = RefPath::assert_from(b"/evm/dal_slots");
+pub const DAL_SLOTS: RefPath = RefPath::assert_from(b"/base/dal_slots");
+
+// Path to the whitelist of authorized DAL publishers (public key hashes).
+// These are the keys authorized to publish DAL slots that the kernel will accept.
+// NOTE: Empty whitelist means reject all publishers (therefore all slots).
+pub const DAL_PUBLISHERS_WHITELIST: RefPath =
+    RefPath::assert_from(b"/base/dal_publishers_whitelist");
 
 // Path where the input for the tracer is stored by the sequencer.
 const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
 
 // If this path contains a value, the fa bridge is enabled in the kernel.
 pub const ENABLE_FA_BRIDGE: RefPath =
-    RefPath::assert_from(b"/evm/feature_flags/enable_fa_bridge");
+    RefPath::assert_from(b"/base/feature_flags/enable_fa_bridge");
 
 const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: RefPath =
-    RefPath::assert_from(b"/evm/max_blueprint_lookahead_in_seconds");
+    RefPath::assert_from(b"/base/max_blueprint_lookahead_in_seconds");
 
 pub fn chain_config_path(chain_id: &U256) -> Result<OwnedPath, Error> {
     let raw_chain_id_path: Vec<u8> = format!("/{chain_id}").into();
@@ -202,13 +279,104 @@ pub fn chain_config_path(chain_id: &U256) -> Result<OwnedPath, Error> {
     concat(&CHAIN_CONFIGURATIONS, &chain_id_path).map_err(Error::from)
 }
 
-pub fn store_simulation_result<Host: Runtime, T: Decodable + Encodable>(
-    host: &mut Host,
+pub fn store_simulation_result<T>(
+    host: &mut impl StorageV1,
     result: SimulationResult<T, String>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), anyhow::Error>
+where
+    T: Decodable + Encodable,
+{
     let encoded = result.to_bytes();
     host.store_write(&SIMULATION_RESULT, &encoded, 0)
         .context("Failed to write the simulation result.")
+}
+
+pub fn store_simulation_http_traces(
+    host: &mut impl StorageV1,
+    traces: &[tezosx_journal::HttpTrace],
+) -> Result<(), anyhow::Error> {
+    let mut stream = rlp::RlpStream::new_list(traces.len());
+    for trace in traces {
+        stream.append(trace);
+    }
+    let encoded = stream.out();
+    host.store_write(&SIMULATION_HTTP_TRACES, &encoded, 0)
+        .context("Failed to write the simulation HTTP traces.")
+}
+
+/// Returns whether per-transaction HTTP trace capture is enabled for the
+/// current kernel run. Called exactly once per block, at the top of
+/// `block::produce` (and of `sub_block::handle_run_transaction`) before
+/// any `SafeStorage` wrapping, so the lookup is a single host call per
+/// block and the result is passed down through the apply chain as a
+/// plain boolean. A missing key (the common case) returns `false`; an
+/// error is treated as "flag absent" so a transient storage failure
+/// cannot crash the replay.
+pub fn is_http_trace_enabled(host: &impl StorageV1) -> bool {
+    matches!(host.store_has(&HTTP_TRACE_ENABLED), Ok(Some(_)))
+}
+
+/// Returns the durable storage path under which the HTTP traces for the
+/// transaction `tx_hash` are written when HTTP trace capture is enabled.
+pub fn http_traces_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
+    let raw_suffix: Vec<u8> = format!("/{}", hex::encode(tx_hash)).into();
+    let suffix = OwnedPath::try_from(raw_suffix)?;
+    concat(&HTTP_TRACES_ROOT, &suffix).map_err(Error::from)
+}
+
+/// Store the HTTP traces collected for a single transaction during a replay
+/// driven by the `http_trace*` RPCs. The traces are RLP-encoded as a list,
+/// using the same shape as [`store_simulation_http_traces`] so both outputs
+/// share the EVM-node-side decoder.
+pub fn store_http_traces_for_tx(
+    host: &mut impl StorageV1,
+    tx_hash: &TransactionHash,
+    traces: &[tezosx_journal::HttpTrace],
+) -> Result<(), anyhow::Error> {
+    let path = http_traces_path(tx_hash)?;
+    let mut stream = rlp::RlpStream::new_list(traces.len());
+    for trace in traces {
+        stream.append(trace);
+    }
+    let encoded = stream.out();
+    host.store_write_all(&path, &encoded)
+        .context("Failed to write the per-transaction HTTP traces.")
+}
+
+/// When `enabled` is set and the journal captured at least one HTTP
+/// exchange, persist the traces for `tx_hash`. `enabled` comes from a
+/// single read of [`HTTP_TRACE_ENABLED`] done once per block outside the
+/// `SafeStorage` wrap (see `block::produce`), so the apply sites do not
+/// re-read the flag per transaction and the flag itself does not need
+/// to live inside the world-state subtree.
+///
+/// Transactions that performed no cross-runtime HTTP call write nothing
+/// — the EVM node side treats a missing key as the empty list, so there
+/// is no observable difference and we avoid filling the trace subtree
+/// with empty-list entries on blocks where only a minority of
+/// transactions perform CRACs. Failures are logged but never
+/// propagated, so instrumentation cannot break the replay itself.
+pub fn maybe_store_http_traces_for_tx(
+    host: &mut impl StorageV1,
+    enabled: bool,
+    tx_hash: &TransactionHash,
+    journal: &tezosx_journal::TezosXJournal,
+) {
+    if !enabled {
+        return;
+    }
+    let traces = journal.http_traces();
+    if traces.is_empty() {
+        return;
+    }
+    if let Err(err) = store_http_traces_for_tx(host, tx_hash, traces) {
+        log!(
+            Error,
+            "Failed to store HTTP traces for tx {}: {:?}",
+            hex::encode(tx_hash),
+            err
+        );
+    }
 }
 
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");
@@ -234,8 +402,8 @@ pub fn chunked_hashes_transaction_path(
     concat(chunked_transaction_path, &CHUNKED_HASHES).map_err(Error::from)
 }
 
-pub fn chunked_transaction_hash_exists<Host: Runtime>(
-    host: &mut Host,
+pub fn chunked_transaction_hash_exists(
+    host: &mut impl StorageV1,
     chunked_transaction_path: &OwnedPath,
     hash: &TransactionHash,
 ) -> Result<bool, Error> {
@@ -261,8 +429,8 @@ pub fn transaction_chunk_path(
     concat(chunked_transaction_path, &i_path).map_err(Error::from)
 }
 
-fn is_transaction_complete<Host: Runtime>(
-    host: &mut Host,
+fn is_transaction_complete(
+    host: &mut impl StorageV1,
     chunked_transaction_path: &OwnedPath,
     num_chunks: u16,
 ) -> Result<bool, Error> {
@@ -275,8 +443,8 @@ fn is_transaction_complete<Host: Runtime>(
     Ok(true)
 }
 
-fn chunked_transaction_num_chunks_by_path<Host: Runtime>(
-    host: &mut Host,
+fn chunked_transaction_num_chunks_by_path(
+    host: &mut impl StorageV1,
     chunked_transaction_path: &OwnedPath,
 ) -> Result<u16, Error> {
     let chunked_transaction_num_chunks_path =
@@ -286,16 +454,16 @@ fn chunked_transaction_num_chunks_by_path<Host: Runtime>(
     Ok(u16::from_le_bytes(buffer))
 }
 
-pub fn chunked_transaction_num_chunks<Host: Runtime>(
-    host: &mut Host,
+pub fn chunked_transaction_num_chunks(
+    host: &mut impl StorageV1,
     tx_hash: &TransactionHash,
 ) -> Result<u16, Error> {
     let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
     chunked_transaction_num_chunks_by_path(host, &chunked_transaction_path)
 }
 
-fn store_transaction_chunk_data<Host: Runtime>(
-    host: &mut Host,
+fn store_transaction_chunk_data(
+    host: &mut impl StorageV1,
     transaction_chunk_path: &OwnedPath,
     data: Vec<u8>,
 ) -> Result<(), Error> {
@@ -315,8 +483,8 @@ fn store_transaction_chunk_data<Host: Runtime>(
     }
 }
 
-pub fn read_transaction_chunk_data<Host: Runtime>(
-    host: &mut Host,
+pub fn read_transaction_chunk_data(
+    host: &mut impl StorageV1,
     transaction_chunk_path: &OwnedPath,
 ) -> Result<Vec<u8>, Error> {
     let data_size = host.store_value_size(transaction_chunk_path)?;
@@ -336,8 +504,8 @@ pub fn read_transaction_chunk_data<Host: Runtime>(
     }
 }
 
-fn get_full_transaction<Host: Runtime>(
-    host: &mut Host,
+fn get_full_transaction(
+    host: &mut impl StorageV1,
     chunked_transaction_path: &OwnedPath,
     num_chunks: u16,
 ) -> Result<Vec<u8>, Error> {
@@ -350,8 +518,8 @@ fn get_full_transaction<Host: Runtime>(
     Ok(buffer)
 }
 
-pub fn remove_chunked_transaction<Host: Runtime>(
-    host: &mut Host,
+pub fn remove_chunked_transaction(
+    host: &mut impl StorageV1,
     tx_hash: &TransactionHash,
 ) -> Result<(), Error> {
     let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
@@ -377,8 +545,8 @@ pub fn remove_chunked_transaction<Host: Runtime>(
 
 /// Store the transaction chunk in the storage. Returns the full transaction
 /// if the last chunk to store is the last missing chunk.
-pub fn store_transaction_chunk<Host: Runtime>(
-    host: &mut Host,
+pub fn store_transaction_chunk(
+    host: &mut impl StorageV1,
     tx_hash: &TransactionHash,
     i: u16,
     data: Vec<u8>,
@@ -402,12 +570,15 @@ pub fn store_transaction_chunk<Host: Runtime>(
     }
 }
 
-pub fn create_chunked_transaction<Host: Runtime>(
+pub fn create_chunked_transaction<Host>(
     host: &mut Host,
     tx_hash: &TransactionHash,
     num_chunks: u16,
     chunk_hashes: Vec<TransactionHash>,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
     let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
 
     // A new chunked transaction creates the `../<tx_hash>/num_chunks`, if there
@@ -417,7 +588,6 @@ pub fn create_chunked_transaction<Host: Runtime>(
         > 0
     {
         log!(
-            host,
             Info,
             "The chunked transaction {} already exist, ignoring the message.\n",
             hex::encode(tx_hash)
@@ -445,58 +615,82 @@ pub fn create_chunked_transaction<Host: Runtime>(
     Ok(())
 }
 
-pub fn store_chain_id<Host: Runtime>(
-    host: &mut Host,
-    chain_id: U256,
-) -> Result<(), Error> {
+pub fn store_chain_id(host: &mut impl StorageV1, chain_id: U256) -> Result<(), Error> {
     write_u256_le(host, &EVM_CHAIN_ID, chain_id).map_err(Error::from)
 }
 
-pub fn read_chain_id<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+pub fn read_chain_id(host: &impl StorageV1) -> Result<U256, Error> {
     read_u256_le(host, &EVM_CHAIN_ID).map_err(Error::from)
 }
 
-pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+pub fn store_michelson_runtime_chain_id(
+    host: &mut impl StorageV1,
+    chain_id: &ChainId,
+) -> Result<(), Error> {
+    store_bin(chain_id, host, &MICHELSON_RUNTIME_CHAIN_ID).map_err(Error::from)
+}
+
+pub fn read_michelson_runtime_chain_id(
+    host: &impl StorageV1,
+) -> Result<Option<ChainId>, Error> {
+    read_optional_nom_value(host, &MICHELSON_RUNTIME_CHAIN_ID).map_err(Error::from)
+}
+
+pub fn read_minimum_base_fee_per_gas(host: &impl StorageV1) -> Result<U256, Error> {
     read_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS).map_err(Error::from)
 }
 
-pub fn read_backlog(host: &impl Runtime) -> Result<u64, Error> {
+pub fn read_backlog(host: &impl StorageV1) -> Result<u64, Error> {
     read_u64_le(host, &BACKLOG_PATH).map_err(Error::from)
 }
 
-pub fn store_backlog(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
+pub fn store_backlog(host: &mut impl StorageV1, value: u64) -> Result<(), Error> {
     write_u64_le(host, &BACKLOG_PATH, value).map_err(Error::from)
 }
 
-pub fn read_backlog_timestamp(host: &impl Runtime) -> Result<u64, Error> {
+pub fn read_backlog_timestamp(host: &impl StorageV1) -> Result<u64, Error> {
     read_u64_le(host, &BACKLOG_TIMESTAMP_PATH).map_err(Error::from)
 }
 
-pub fn store_backlog_timestamp(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
+pub fn store_backlog_timestamp(
+    host: &mut impl StorageV1,
+    value: u64,
+) -> Result<(), Error> {
     write_u64_le(host, &BACKLOG_TIMESTAMP_PATH, value)?;
     Ok(())
 }
 
-pub fn store_minimum_base_fee_per_gas<Host: Runtime>(
-    host: &mut Host,
+pub fn store_minimum_base_fee_per_gas(
+    host: &mut impl StorageV1,
     price: U256,
 ) -> Result<(), Error> {
     write_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS, price).map_err(Error::from)
 }
 
+pub fn read_michelson_to_evm_gas_multiplier(host: &impl StorageV1) -> Result<u64, Error> {
+    read_u64_le(host, &EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER).map_err(Error::from)
+}
+
+pub fn store_michelson_to_evm_gas_multiplier(
+    host: &mut impl StorageV1,
+    value: u64,
+) -> Result<(), Error> {
+    write_u64_le(host, &EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER, value).map_err(Error::from)
+}
+
 pub fn store_da_fee(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     base_fee_per_gas: U256,
 ) -> Result<(), Error> {
     write_u256_le(host, &EVM_DA_FEE, base_fee_per_gas).map_err(Error::from)
 }
 
-pub fn read_da_fee(host: &impl Runtime) -> Result<U256, Error> {
+pub fn read_da_fee(host: &impl StorageV1) -> Result<U256, Error> {
     read_u256_le(host, &EVM_DA_FEE).map_err(Error::from)
 }
 
 pub fn update_burned_fees(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     burned_fee: U256,
 ) -> Result<(), Error> {
     let path = &EVM_BURNED_FEES;
@@ -506,23 +700,26 @@ pub fn update_burned_fees(
 }
 
 #[cfg(test)]
-pub fn read_burned_fees(host: &mut impl Runtime) -> U256 {
+pub fn read_burned_fees(host: &mut impl StorageV1) -> U256 {
     let path = &EVM_BURNED_FEES;
     read_u256_le(host, path).unwrap_or_else(|_| U256::zero())
 }
 
-pub fn read_sequencer_pool_address(host: &impl Runtime) -> Option<H160> {
+pub fn read_sequencer_pool_address<Host>(host: &Host) -> Option<H160>
+where
+    Host: StorageV1,
+{
     let mut bytes = [0; std::mem::size_of::<H160>()];
     let Ok(20) = host.store_read_slice(&SEQUENCER_POOL_PATH, 0, bytes.as_mut_slice())
     else {
-        log!(host, Debug, "No sequencer pool address set");
+        log!(Debug, "No sequencer pool address set");
         return None;
     };
     Some(bytes.into())
 }
 
 pub fn store_sequencer_pool_address(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     address: H160,
 ) -> Result<(), Error> {
     let bytes = address.to_fixed_bytes();
@@ -530,8 +727,8 @@ pub fn store_sequencer_pool_address(
     Ok(())
 }
 
-pub fn store_timestamp_path<Host: Runtime>(
-    host: &mut Host,
+pub fn store_timestamp_path(
+    host: &mut impl StorageV1,
     path: &OwnedPath,
     timestamp: &Timestamp,
 ) -> Result<(), Error> {
@@ -540,27 +737,27 @@ pub fn store_timestamp_path<Host: Runtime>(
 }
 
 #[allow(dead_code)]
-pub fn read_l1_level<Host: Runtime>(host: &mut Host) -> Result<u32, Error> {
+pub fn read_l1_level(host: &mut impl StorageV1) -> Result<u32, Error> {
     let mut buffer = [0u8; 4];
     store_read_slice(host, &EVM_L1_LEVEL, &mut buffer, 4)?;
     let level = u32::from_le_bytes(buffer);
     Ok(level)
 }
 
-pub fn store_l1_level<Host: Runtime>(host: &mut Host, level: u32) -> Result<(), Error> {
+pub fn store_l1_level(host: &mut impl StorageV1, level: u32) -> Result<(), Error> {
     host.store_write(&EVM_L1_LEVEL, &level.to_le_bytes(), 0)?;
     Ok(())
 }
 
-pub fn store_last_info_per_level_timestamp<Host: Runtime>(
-    host: &mut Host,
+pub fn store_last_info_per_level_timestamp(
+    host: &mut impl StorageV1,
     timestamp: Timestamp,
 ) -> Result<(), Error> {
     store_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into(), &timestamp)
 }
 
-pub fn read_timestamp_path<Host: Runtime>(
-    host: &Host,
+pub fn read_timestamp_path(
+    host: &impl StorageV1,
     path: &OwnedPath,
 ) -> Result<Timestamp, Error> {
     let mut buffer = [0u8; 8];
@@ -569,41 +766,39 @@ pub fn read_timestamp_path<Host: Runtime>(
     Ok(timestamp_as_i64.into())
 }
 
-pub fn read_last_info_per_level_timestamp<Host: Runtime>(
-    host: &Host,
+pub fn read_last_info_per_level_timestamp(
+    host: &impl StorageV1,
 ) -> Result<Timestamp, Error> {
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
 }
 
-pub fn read_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+pub fn read_admin(host: &mut impl StorageV1) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &ADMIN)
 }
 
-pub fn read_sequencer_governance<Host: Runtime>(
-    host: &mut Host,
-) -> Option<ContractKt1Hash> {
+pub fn read_sequencer_governance(host: &mut impl StorageV1) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &SEQUENCER_GOVERNANCE)
 }
 
-pub fn read_kernel_governance<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+pub fn read_kernel_governance(host: &mut impl StorageV1) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &KERNEL_GOVERNANCE)
 }
 
-pub fn read_kernel_security_governance<Host: Runtime>(
-    host: &mut Host,
+pub fn read_kernel_security_governance(
+    host: &mut impl StorageV1,
 ) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &KERNEL_SECURITY_GOVERNANCE)
 }
 
-pub fn read_maximum_allowed_ticks<Host: Runtime>(host: &mut Host) -> Option<u64> {
+pub fn read_maximum_allowed_ticks(host: &mut impl StorageV1) -> Option<u64> {
     read_u64_le(host, &MAXIMUM_ALLOWED_TICKS).ok()
 }
 
 /// Reads the maximum gas per transaction. If the value cannot found in the storage,
 /// we write the kernel default value in the storage. The value becomes accessible
 /// from outside the kernel.
-pub fn read_or_set_maximum_gas_per_transaction<Host: Runtime>(
-    host: &mut Host,
+pub fn read_or_set_maximum_gas_per_transaction(
+    host: &mut impl StorageV1,
 ) -> anyhow::Result<u64> {
     match read_u64_le(host, &MAXIMUM_GAS_PER_TRANSACTION) {
         Ok(gas_limit) => Ok(gas_limit),
@@ -614,33 +809,41 @@ pub fn read_or_set_maximum_gas_per_transaction<Host: Runtime>(
     }
 }
 
-pub fn store_storage_version<Host: Runtime>(
-    host: &mut Host,
+pub fn store_storage_version(
+    host: &mut impl StorageV1,
     storage_version: StorageVersion,
 ) -> Result<(), Error> {
     let storage_version = u64::from(storage_version);
     host.store_write(&STORAGE_VERSION_PATH, &storage_version.to_le_bytes(), 0)
-        .map_err(Error::from)
+        .map_err(Error::from)?;
+    // Clean up legacy path so only /base/storage_version remains.
+    let _ = host.store_delete(&LEGACY_STORAGE_VERSION_PATH);
+    Ok(())
 }
 
-pub fn read_storage_version<Host: Runtime>(
-    host: &mut Host,
-) -> Result<StorageVersion, Error> {
-    match host.store_read(&STORAGE_VERSION_PATH, 0, std::mem::size_of::<u64>()) {
-        Ok(bytes) => {
-            let slice_of_bytes: [u8; 8] =
-                bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
-            let version_u64 = u64::from_le_bytes(slice_of_bytes);
-            let version =
-                FromPrimitive::from_u64(version_u64).ok_or(Error::InvalidConversion)?;
-            log!(host, Debug, "Current storage version: {:?}", version);
-            Ok(version)
+pub fn read_storage_version<Host>(host: &mut Host) -> Result<StorageVersion, Error>
+where
+    Host: StorageV1,
+{
+    // Try the new /base/ path first, fall back to legacy /evm/ path
+    // only when the new path does not exist yet.
+    let size = std::mem::size_of::<u64>();
+    let bytes = match host.store_read(&STORAGE_VERSION_PATH, 0, size) {
+        Ok(bytes) => bytes,
+        Err(RuntimeError::PathNotFound) => {
+            host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, size)?
         }
-        Err(e) => Err(e.into()),
-    }
+        Err(e) => return Err(e.into()),
+    };
+    let slice_of_bytes: [u8; 8] =
+        bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
+    let version_u64 = u64::from_le_bytes(slice_of_bytes);
+    let version = FromPrimitive::from_u64(version_u64).ok_or(Error::InvalidConversion)?;
+    log!(Debug, "Current storage version: {:?}", version);
+    Ok(version)
 }
 
-pub fn read_kernel_version<Host: Runtime>(host: &mut Host) -> Result<String, Error> {
+pub fn read_kernel_version(host: &mut impl StorageV1) -> Result<String, Error> {
     match host.store_read_all(&KERNEL_VERSION_PATH) {
         Ok(bytes) => {
             let kernel_version =
@@ -651,8 +854,8 @@ pub fn read_kernel_version<Host: Runtime>(host: &mut Host) -> Result<String, Err
     }
 }
 
-pub fn store_kernel_version<Host: Runtime>(
-    host: &mut Host,
+pub fn store_kernel_version(
+    host: &mut impl StorageV1,
     kernel_version: &str,
 ) -> Result<(), Error> {
     let kernel_version = kernel_version.as_bytes();
@@ -664,14 +867,16 @@ pub fn store_kernel_version<Host: Runtime>(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn store_block_in_progress<Host: Runtime>(
+pub fn store_block_in_progress<Host>(
     host: &mut Host,
-    bip: &EthBlockInProgress,
-) -> anyhow::Result<()> {
+    bip: &BlockInProgress,
+) -> anyhow::Result<()>
+where
+    Host: StorageV1,
+{
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     let bytes = &bip.rlp_bytes();
     log!(
-        host,
         Benchmarking,
         "Storing Block In Progress of size {}",
         bytes.len()
@@ -684,22 +889,24 @@ pub fn store_block_in_progress<Host: Runtime>(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn read_block_in_progress<Host: Runtime>(
+pub fn read_block_in_progress<Host>(
     host: &Host,
-) -> anyhow::Result<Option<EthBlockInProgress>> {
+) -> anyhow::Result<Option<BlockInProgress>>
+where
+    Host: StorageV1,
+{
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     if let Some(ValueType::Value) = host.store_has(&path)? {
         let bytes = host
             .store_read_all(&path)
             .context("Failed to read current block in progress")?;
         log!(
-            host,
             Benchmarking,
             "Reading Block In Progress of size {}",
             bytes.len()
         );
         let decoder = Rlp::new(bytes.as_slice());
-        let bip = EthBlockInProgress::decode(&decoder)
+        let bip = BlockInProgress::decode(&decoder)
             .context("Failed to decode current block in progress")?;
         Ok(Some(bip))
     } else {
@@ -707,14 +914,14 @@ pub fn read_block_in_progress<Host: Runtime>(
     }
 }
 
-pub fn delete_block_in_progress<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+pub fn delete_block_in_progress(host: &mut impl StorageV1) -> anyhow::Result<()> {
     host.store_delete(&EVM_BLOCK_IN_PROGRESS)
         .context("Failed to delete block in progress")
 }
 
-pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>> {
-    if host.store_has(&SEQUENCER)?.is_some() {
-        let bytes = host.store_read_all(&SEQUENCER)?;
+pub fn sequencer(host: &impl StorageV1) -> anyhow::Result<Option<PublicKey>> {
+    if host.store_has(&SEQUENCER_KEY_PATH)?.is_some() {
+        let bytes = host.store_read_all(&SEQUENCER_KEY_PATH)?;
         let Ok(tz1_b58) = String::from_utf8(bytes) else {
             return Ok(None);
         };
@@ -727,7 +934,10 @@ pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>
     }
 }
 
-pub fn enable_dal<Host: Runtime>(host: &Host) -> anyhow::Result<bool> {
+pub fn enable_dal<Host>(host: &Host) -> anyhow::Result<bool>
+where
+    Host: StorageV1 + IsEvmNode,
+{
     if let Some(ValueType::Value) = host.store_has(&ENABLE_DAL)? {
         // When run from the EVM node, the DAL feature is always
         // considered as disabled.
@@ -738,12 +948,33 @@ pub fn enable_dal<Host: Runtime>(host: &Host) -> anyhow::Result<bool> {
     }
 }
 
-pub fn enable_tezos_runtime<Host: Runtime>(host: &Host) -> bool {
+pub fn enable_tezos_runtime(host: &impl StorageV1) -> bool {
     Some(ValueType::Value) == host.store_has(&ENABLE_TEZOS_RUNTIME).unwrap_or(None)
 }
 
-pub fn tweak_dal_activation<Host: Runtime>(
-    host: &mut Host,
+pub fn read_michelson_runtime_target_sunrise_level(
+    host: &impl StorageV1,
+) -> Option<U256> {
+    read_u256_le(host, &MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL).ok()
+}
+
+pub fn store_michelson_runtime_sunrise_level(
+    host: &mut impl StorageV1,
+    level: U256,
+) -> Result<(), Error> {
+    write_u256_le(host, &MICHELSON_RUNTIME_SUNRISE_LEVEL, level).map_err(Error::from)
+}
+
+pub fn read_michelson_runtime_sunrise_level(host: &impl StorageV1) -> Option<U256> {
+    read_u256_le(host, &MICHELSON_RUNTIME_SUNRISE_LEVEL).ok()
+}
+
+pub fn enable_michelson_gas_refund(host: &impl StorageV1) -> bool {
+    Ok(Some(ValueType::Value)) == host.store_has(&ENABLE_MICHELSON_GAS_REFUND)
+}
+
+pub fn tweak_dal_activation(
+    host: &mut impl StorageV1,
     activate_dal: bool,
 ) -> anyhow::Result<()> {
     if activate_dal {
@@ -754,14 +985,18 @@ pub fn tweak_dal_activation<Host: Runtime>(
     Ok(())
 }
 
-pub fn store_dal_slots<Host: Runtime>(
-    host: &mut Host,
-    slots: &[u8],
-) -> anyhow::Result<()> {
+pub fn store_dal_slots(host: &mut impl StorageV1, slots: &[u8]) -> anyhow::Result<()> {
     Ok(host.store_write_all(&DAL_SLOTS, slots)?)
 }
 
-pub fn dal_slots<Host: Runtime>(host: &Host) -> anyhow::Result<Option<Vec<u8>>> {
+/// Returns true if legacy DAL slot import signals are disabled.
+/// When disabled, the kernel ignores `DalSlotImportSignals` external messages
+/// and instead relies on `DalAttestedSlots` internal messages.
+pub fn is_legacy_dal_signals_disabled(host: &impl StorageV1) -> anyhow::Result<bool> {
+    Ok(host.store_has(&DISABLE_LEGACY_DAL_SIGNALS)?.is_some())
+}
+
+pub fn dal_slots(host: &impl StorageV1) -> anyhow::Result<Option<Vec<u8>>> {
     if host.store_has(&DAL_SLOTS)?.is_some() {
         let bytes = host.store_read_all(&DAL_SLOTS)?;
         Ok(Some(bytes))
@@ -770,32 +1005,76 @@ pub fn dal_slots<Host: Runtime>(host: &Host) -> anyhow::Result<Option<Vec<u8>>> 
     }
 }
 
-pub fn remove_sequencer<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
-    host.store_delete(&SEQUENCER).map_err(Into::into)
+/// Read the whitelist of authorized DAL publishers from storage.
+/// Returns an empty vector if no whitelist is configured.
+/// The whitelist is stored as an RLP-encoded list of binary-encoded public key hashes.
+///
+/// NOTE: An empty whitelist means NO publishers are authorized
+/// The kernel will reject all DAL slots if the whitelist is empty.
+pub fn read_dal_publishers_whitelist(
+    host: &impl StorageV1,
+) -> anyhow::Result<Vec<tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash>> {
+    if host.store_has(&DAL_PUBLISHERS_WHITELIST)?.is_some() {
+        let rlp_bytes = host.store_read_all(&DAL_PUBLISHERS_WHITELIST)?;
+        let rlp = rlp::Rlp::new(&rlp_bytes);
+
+        let mut whitelist = Vec::new();
+        for item in rlp.iter() {
+            let pkh_bytes = item.as_val::<Vec<u8>>()?;
+            let (remaining, pkh) = PublicKeyHash::nom_read(&pkh_bytes).map_err(|e| {
+                anyhow::anyhow!("Failed to decode public key hash: {:?}", e)
+            })?;
+            if !remaining.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Unexpected trailing bytes after public key hash"
+                ));
+            }
+            whitelist.push(pkh);
+        }
+        Ok(whitelist)
+    } else {
+        Ok(Vec::new())
+    }
 }
 
-pub fn store_sequencer<Host: Runtime>(
-    host: &mut Host,
+pub fn remove_sequencer(host: &mut impl StorageV1) -> anyhow::Result<()> {
+    host.store_delete(&SEQUENCER_KEY_PATH).map_err(Into::into)
+}
+
+pub fn store_sequencer(
+    host: &mut impl StorageV1,
     public_key: &PublicKey,
 ) -> anyhow::Result<()> {
     let pk_b58 = PublicKey::to_b58check(public_key);
     let bytes = String::as_bytes(&pk_b58);
-    host.store_write(&SEQUENCER, bytes, 0).map_err(Into::into)
+    host.store_write(&SEQUENCER_KEY_PATH, bytes, 0)
+        .map_err(Into::into)
 }
 
-pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
-    let index = IndexableStorage::new(&EVENTS)?;
-    index.clear(host).map_err(Into::into)
+pub fn clear_events<Host>(host: &mut Host) -> anyhow::Result<()>
+where
+    Host: StorageV1,
+{
+    if host.store_has(&KEEP_EVENTS)?.is_some() {
+        host.store_delete(&KEEP_EVENTS)?;
+        Ok(())
+    } else {
+        let index = IndexableStorage::new(&EVENTS)?;
+        index.clear(host).map_err(Into::into)
+    }
 }
 
-pub fn store_event<Host: Runtime>(host: &mut Host, event: &Event) -> anyhow::Result<()> {
+pub fn store_event(host: &mut impl StorageV1, event: &Event) -> anyhow::Result<()> {
     let index = IndexableStorage::new(&EVENTS)?;
     index
         .push_value(host, &event.rlp_bytes())
         .map_err(Into::into)
 }
 
-pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> {
+pub fn delayed_inbox_timeout<Host>(host: &Host) -> anyhow::Result<u64>
+where
+    Host: StorageV1,
+{
     // The default timeout is 12 hours
     let default_timeout = 43200;
     if host.store_has(&EVM_DELAYED_INBOX_TIMEOUT)?.is_some() {
@@ -803,7 +1082,6 @@ pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> 
         store_read_slice(host, &EVM_DELAYED_INBOX_TIMEOUT, &mut buffer, 8)?;
         let timeout = u64::from_le_bytes(buffer);
         log!(
-            host,
             Debug,
             "Using delayed inbox timeout of {} seconds ({} hours)",
             timeout,
@@ -812,7 +1090,6 @@ pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> 
         Ok(timeout)
     } else {
         log!(
-            host,
             Debug,
             "Using default delayed inbox timeout of {} seconds ({} hours)",
             default_timeout,
@@ -822,22 +1099,19 @@ pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> 
     }
 }
 
-pub fn delayed_inbox_min_levels<Host: Runtime>(host: &Host) -> anyhow::Result<u32> {
+pub fn delayed_inbox_min_levels<Host>(host: &Host) -> anyhow::Result<u32>
+where
+    Host: StorageV1,
+{
     let default_min_levels = 720;
     if host.store_has(&EVM_DELAYED_INBOX_MIN_LEVELS)?.is_some() {
         let mut buffer = [0u8; 4];
         store_read_slice(host, &EVM_DELAYED_INBOX_MIN_LEVELS, &mut buffer, 4)?;
         let min_levels = u32::from_le_bytes(buffer);
-        log!(
-            host,
-            Debug,
-            "Using delayed inbox minimum levels: {}",
-            min_levels
-        );
+        log!(Debug, "Using delayed inbox minimum levels: {}", min_levels);
         Ok(min_levels)
     } else {
         log!(
-            host,
             Debug,
             "Using default delayed inbox minimum levels: {}",
             default_min_levels
@@ -846,9 +1120,10 @@ pub fn delayed_inbox_min_levels<Host: Runtime>(host: &Host) -> anyhow::Result<u3
     }
 }
 
-pub fn read_tracer_input<Host: Runtime>(
-    host: &mut Host,
-) -> anyhow::Result<Option<TracerInput>> {
+pub fn read_tracer_input<Host>(host: &mut Host) -> anyhow::Result<Option<TracerInput>>
+where
+    Host: StorageV1,
+{
     if let Some(ValueType::Value) = host.store_has(&TRACER_INPUT).map_err(Error::from)? {
         let bytes = host
             .store_read_all(&TRACER_INPUT)
@@ -863,7 +1138,7 @@ pub fn read_tracer_input<Host: Runtime>(
                 FromRlpBytes::from_rlp_bytes(&bytes)?;
             TracerInput::StructLogger(struct_logger_input)
         };
-        log!(host, Debug, "Tracer input found: {:?}", tracer);
+        log!(Debug, "Tracer input found: {:?}", tracer);
 
         Ok(Some(tracer))
     } else {
@@ -871,7 +1146,7 @@ pub fn read_tracer_input<Host: Runtime>(
     }
 }
 
-pub fn is_enable_fa_bridge(host: &impl Runtime) -> anyhow::Result<bool> {
+pub fn is_enable_fa_bridge(host: &impl StorageV1) -> anyhow::Result<bool> {
     if let Some(ValueType::Value) = host.store_has(&ENABLE_FA_BRIDGE)? {
         Ok(true)
     } else {
@@ -879,7 +1154,7 @@ pub fn is_enable_fa_bridge(host: &impl Runtime) -> anyhow::Result<bool> {
     }
 }
 
-pub fn max_blueprint_lookahead_in_seconds(host: &impl Runtime) -> anyhow::Result<i64> {
+pub fn max_blueprint_lookahead_in_seconds(host: &impl StorageV1) -> anyhow::Result<i64> {
     let bytes = host.store_read(&MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS, 0, 8)?;
     let bytes: [u8; 8] = bytes.as_slice().try_into()?;
     Ok(i64::from_le_bytes(bytes))
@@ -888,7 +1163,7 @@ pub fn max_blueprint_lookahead_in_seconds(host: &impl Runtime) -> anyhow::Result
 // Storage functions related to a chain configuration
 
 pub fn read_chain_family(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     chain_id: U256,
 ) -> anyhow::Result<ChainFamily> {
     let chain_configurations_path = chain_config_path(&chain_id)?;
@@ -905,15 +1180,15 @@ pub fn read_chain_family(
 ///
 /// This smart contract is used to submit transactions to the rollup
 /// when in sequencer mode
-pub fn read_delayed_transaction_bridge<Host: Runtime>(
-    host: &Host,
-) -> Option<ContractKt1Hash> {
+pub fn read_delayed_transaction_bridge(host: &impl StorageV1) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &DELAYED_BRIDGE)
 }
 
 #[cfg(test)]
 mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::storage::StorageV1;
+    use tezosx_journal::{CracId, TezosXJournal};
 
     #[test]
     fn update_burned_fees() {
@@ -933,5 +1208,150 @@ mod tests {
 
         let burned = super::read_burned_fees(&mut host);
         assert_eq!(fst + snd, burned);
+    }
+
+    #[test]
+    fn http_trace_flag_default_off() {
+        let host = MockKernelHost::default();
+        assert!(!super::is_http_trace_enabled(&host));
+    }
+
+    #[test]
+    fn http_trace_flag_on_once_written() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&super::HTTP_TRACE_ENABLED, &[1u8])
+            .unwrap();
+        assert!(super::is_http_trace_enabled(&host));
+    }
+
+    #[test]
+    fn maybe_store_http_traces_is_noop_when_disabled() {
+        let mut host = MockKernelHost::default();
+        let tx_hash = [7u8; 32];
+        let journal = TezosXJournal::new(CracId::new(0, 0));
+        super::maybe_store_http_traces_for_tx(&mut host, false, &tx_hash, &journal);
+        let path = super::http_traces_path(&tx_hash).unwrap();
+        assert!(matches!(host.store_has(&path), Ok(None)));
+    }
+
+    #[test]
+    fn maybe_store_http_traces_is_noop_when_journal_empty() {
+        // When the flag is on but the journal captured no HTTP exchange,
+        // we write nothing — a missing key is equivalent to the empty list
+        // on the reader side, and skipping avoids writing one RLP-encoded
+        // empty list per non-CRAC transaction on every replayed block.
+        let mut host = MockKernelHost::default();
+        let tx_hash = [42u8; 32];
+        let journal = TezosXJournal::new(CracId::new(0, 0));
+        super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
+        let path = super::http_traces_path(&tx_hash).unwrap();
+        assert!(matches!(host.store_has(&path), Ok(None)));
+    }
+
+    #[test]
+    fn maybe_store_http_traces_persists_rlp_when_journal_has_trace() {
+        // Happy path: enabled, journal captured one HTTP exchange.
+        // [maybe_store_http_traces_for_tx] writes an RLP-encoded
+        // one-element list under [http_traces_path(tx_hash)], which is what
+        // the EVM node expects to decode through [Simulation.decode_http_traces].
+        let mut host = MockKernelHost::default();
+
+        let mut journal = TezosXJournal::new(CracId::new(0, 0));
+        let request = http::Request::builder()
+            .method("GET")
+            .uri("http://tezos/KT1abc/default")
+            .header("X-Tezos-Sender", "KT1sender")
+            .body(b"hello".to_vec())
+            .unwrap();
+        journal.record_request(&request);
+        let response = http::Response::builder()
+            .status(200)
+            .header("X-Tezos-Gas-Consumed", "42")
+            .body(b"world".to_vec())
+            .unwrap();
+        journal.record_response(response);
+        assert_eq!(journal.http_traces().len(), 1);
+
+        let tx_hash = [0xABu8; 32];
+        super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
+
+        let path = super::http_traces_path(&tx_hash).unwrap();
+        let bytes = host.store_read_all(&path).unwrap();
+        // Non-empty: the empty-list RLP encoding is a single 0xc0 byte.
+        assert!(
+            bytes.len() > 1,
+            "expected a non-trivial RLP payload, got {bytes:?}"
+        );
+
+        // Decoding the payload as an RLP list of [HttpTrace] yields the one
+        // exchange we recorded.
+        let rlp = rlp::Rlp::new(&bytes);
+        assert!(rlp.is_list());
+        let decoded: Vec<tezosx_journal::HttpTrace> = rlp.as_list().unwrap();
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(decoded[0].method, "GET");
+        assert_eq!(decoded[0].url, "http://tezos/KT1abc/default");
+        assert_eq!(decoded[0].response_status, 200);
+        assert_eq!(decoded[0].response_body, b"world".to_vec());
+    }
+
+    #[test]
+    fn maybe_store_http_traces_preserves_order_on_multi_trace_journal() {
+        // A realistic CRAC-heavy transaction performs several sequential
+        // HTTP calls in the same journal. Exercise the
+        // [RlpStream::new_list(traces.len())] path with two top-level
+        // exchanges and confirm the persisted list round-trips through RLP
+        // while preserving the order in which the journal recorded them
+        // (first call first).
+        let mut host = MockKernelHost::default();
+
+        let mut journal = TezosXJournal::new(CracId::new(0, 0));
+
+        // First exchange: GET /first.
+        let req1 = http::Request::builder()
+            .method("GET")
+            .uri("http://tezos/KT1abc/first")
+            .body(b"".to_vec())
+            .unwrap();
+        journal.record_request(&req1);
+        let resp1 = http::Response::builder()
+            .status(200)
+            .body(b"r1".to_vec())
+            .unwrap();
+        journal.record_response(resp1);
+
+        // Second exchange: POST /second.
+        let req2 = http::Request::builder()
+            .method("POST")
+            .uri("http://tezos/KT1abc/second")
+            .body(b"payload".to_vec())
+            .unwrap();
+        journal.record_request(&req2);
+        let resp2 = http::Response::builder()
+            .status(204)
+            .body(b"r2".to_vec())
+            .unwrap();
+        journal.record_response(resp2);
+
+        assert_eq!(journal.http_traces().len(), 2);
+
+        let tx_hash = [0xCDu8; 32];
+        super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
+
+        let path = super::http_traces_path(&tx_hash).unwrap();
+        let bytes = host.store_read_all(&path).unwrap();
+        let rlp = rlp::Rlp::new(&bytes);
+        let decoded: Vec<tezosx_journal::HttpTrace> = rlp.as_list().unwrap();
+
+        assert_eq!(decoded.len(), 2);
+        assert_eq!(decoded[0].method, "GET");
+        assert_eq!(decoded[0].url, "http://tezos/KT1abc/first");
+        assert_eq!(decoded[0].response_status, 200);
+        assert_eq!(decoded[0].response_body, b"r1".to_vec());
+        assert_eq!(decoded[1].method, "POST");
+        assert_eq!(decoded[1].url, "http://tezos/KT1abc/second");
+        assert_eq!(decoded[1].response_status, 204);
+        assert_eq!(decoded[1].request_body, b"payload".to_vec());
+        assert_eq!(decoded[1].response_body, b"r2".to_vec());
     }
 }

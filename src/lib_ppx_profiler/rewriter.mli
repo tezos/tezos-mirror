@@ -34,15 +34,24 @@ type t = {key : Key.t; action : action; location : Ppxlib.location}
 
 val to_constant : t -> Constants.t
 
-(** [to_fully_qualified_lident_expr t _] transforms a [t] in a
-    [Parsetree.expression] that contains a
-    {{: https://ocaml-ppx.github.io/ppxlib/ppxlib/Ppxlib/index.html#val-lident}Lident}
+(** Describes how to call a profiler method *)
+type profiler_method_call =
+  | Direct of Ppxlib.expression
+      (** Call the method directly: [Profiler.record_s] *)
+  | Unpack of {
+      module_expr : Ppxlib.expression;  (** The first-class module expression *)
+      method_name : string;  (** The method name, e.g., "record_s" *)
+    }
+      (** Unpack First Class Module then call:
+          [let (module Profiler__) = expr in Profiler__.record_s] *)
 
-    Example:
+(** [to_profiler_method_call t loc] returns how to call the profiler method
+    for the given rewriter action.
 
-    [Aggregate_s] will be transformed in [Lident "Profiler.aggregate_s"] *)
-val to_fully_qualified_lident_expr :
-  t -> Warnings.loc -> Ppxlib.Parsetree.expression
+    Examples:
+    - With static module [Profiler]: [Direct (Profiler.record_s)]
+    - With First Class Module [state.profiler]: [Unpack {module_expr; method_name = "record_s"}] *)
+val to_profiler_method_call : t -> Warnings.loc -> profiler_method_call
 
 val get_location : t -> Ppxlib.location
 

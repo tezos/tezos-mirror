@@ -2,11 +2,11 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>      *)
-(* SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>              *)
+(* SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>         *)
 (*                                                                           *)
 (*****************************************************************************)
 open Tezlink_imports
-open Tezlink_imports.Alpha_context
+open Imported_context
 open Validation_types
 
 let ( let** ) v f =
@@ -28,7 +28,8 @@ type error +=
   | Not_a_manager_operation of clue
   | Unsupported_manager_operation of clue
   | Oversized_operation of clue * int * int
-  | Bls_is_not_allowed of clue * public_key_hash
+  | Bls_is_not_allowed of clue * Signature.V2.public_key_hash
+  | Insufficient_fees of string * string
 
 let () =
   register_error_kind
@@ -44,12 +45,12 @@ let () =
         "Failed to validate operation %a: tz4 keys are forbidden %a"
         pp_clue
         clue
-        Signature.Public_key_hash.pp
+        Signature.V2.Public_key_hash.pp
         key)
     Data_encoding.(
       obj2
         (req "operation" clue_encoding)
-        (req "key" Signature.Public_key_hash.encoding))
+        (req "key" Signature.V2.Public_key_hash.encoding))
     (function Bls_is_not_allowed (clue, err) -> Some (clue, err) | _ -> None)
     (fun (clue, err) -> Bls_is_not_allowed (clue, err)) ;
   register_error_kind
@@ -125,27 +126,48 @@ let () =
     (function
       | Oversized_operation (clue, size, max) -> Some (clue, size, max)
       | _ -> None)
-    (fun (clue, size, max) -> Oversized_operation (clue, size, max))
+    (fun (clue, size, max) -> Oversized_operation (clue, size, max)) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.insufficient_fees"
+    ~title:"Fees are insufficient"
+    ~description:
+      "Fees are insufficient to cover for the cost of the transaction"
+    ~pp:(fun ppf (current, required) ->
+      Format.fprintf
+        ppf
+        "Fees are insufficient to cover for the cost of the transaction, \
+         current fees are %s but %s is required"
+        current
+        required)
+    Data_encoding.(obj2 (req "current" string) (req "required" string))
+    (function
+      | Insufficient_fees (current, required) -> Some (current, required)
+      | _ -> None)
+    (fun (current, required) -> Insufficient_fees (current, required))
 
 (** Search for the manager info (public key, counter), and checks that it is
     valid: the public key must be already revealed, or be the reveal must be
     the first operation of the batch. *)
-let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
+let validate_manager_info ~state ~data_model ~error_clue
+    (Contents op : packed_contents) =
   let open Lwt_result_syntax in
   match op with
   | Manager_operation {source; operation; counter; _} -> (
       let contract = Tezos_types.Contract.of_implicit source in
-      let* manager = Tezlink_durable_storage.manager read contract in
+      let* manager =
+        Tezlink_durable_storage.manager state ~data_model contract
+      in
       match (manager, operation) with
       | Some (Public_key _), Reveal _ ->
           tzfail_p
           @@ Imported_protocol.Contract_manager_storage.Previously_revealed_key
                (Implicit source)
       | Some (Public_key pk), _op -> return (Ok (pk, source, counter))
-      | Some (Hash _), Reveal {public_key; _} ->
+      | (None | Some (Hash _)), Reveal {public_key; _} ->
           (* The operation might be the reveal of the public key we're
              searching for. *)
-          let open Signature in
+          let open Signature.V2 in
           let pkh_revealed = Public_key.hash public_key in
           if Public_key_hash.equal source pkh_revealed then
             return @@ Ok (public_key, source, counter)
@@ -159,15 +181,10 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
                      expected_hash = source;
                      provided_hash = pkh_revealed;
                    })
-      | Some (Hash _), _op ->
+      | (None | Some (Hash _)), _op ->
           tzfail_p
           @@ Imported_protocol.Contract_manager_storage.Unrevealed_manager_key
-               (Implicit source)
-      | None, _ ->
-          (* If an address is not known, it doesn't hold any tez and can't send
-             operations. *)
-          tzfail_p
-          @@ Imported_protocol.Contract_storage.Empty_implicit_contract source)
+               (Implicit source))
   | _ -> tzfail @@ Not_a_manager_operation error_clue
 
 (** Information required to validate a batch of operations. Some will change
@@ -216,7 +233,7 @@ let validate_reveal ctxt (Reveal {public_key; _}) =
   | Bls _ ->
       tzfail
       @@ Bls_is_not_allowed
-           (ctxt.error_clue, Signature.Public_key.hash public_key)
+           (ctxt.error_clue, Signature.V2.Public_key.hash public_key)
   | _ -> return (Ok ())
 
 let validate_transaction ctxt (Transaction {destination; _}) =
@@ -238,7 +255,7 @@ let validate_supported_operation (type kind) ~ctxt
 
 let validate_source ~ctxt second_source =
   let open Lwt_result_syntax in
-  if Signature.Public_key_hash.equal ctxt.source second_source then
+  if Signature.V2.Public_key_hash.equal ctxt.source second_source then
     return (Ok ())
   else
     tzfail_p
@@ -403,12 +420,13 @@ let rec validate_batch ~(ctxt : batch_validation_context)
       let** ctxt = validate_operation_in_batch ~ctxt c in
       (validate_batch [@ocaml.tailcall]) ~ctxt rest
 
-let validate_first_counter ~read ~source ~first_counter =
+let validate_first_counter ~state ~data_model ~source ~first_counter =
   let open Lwt_result_syntax in
   let* counter =
-    Tezlink_durable_storage.counter read
+    Tezlink_durable_storage.counter state ~data_model
     @@ Tezos_types.Contract.of_implicit source
   in
+  let counter = Option.value ~default:Z.zero counter in
   let*? first_counter = Tezos_types.Operation.counter_to_z first_counter in
   if Z.gt first_counter counter then
     (* we allow the first counter to be in the future *) return (Ok ())
@@ -425,14 +443,13 @@ let validate_first_counter ~read ~source ~first_counter =
     @@ Imported_protocol.Contract_storage.(
          Counter_in_the_past {contract = Implicit source; expected; found})
 
-let validate_size ~raw ~error_clue =
+let validate_size ~op_raw_size ~error_clue =
   let open Lwt_result_syntax in
-  let length = Bytes.length raw in
-  if length <= Constants.max_operation_data_length then return (Ok ())
+  if op_raw_size <= Constants.max_operation_data_length then return (Ok ())
   else
     tzfail
     @@ Oversized_operation
-         (error_clue, length, Constants.max_operation_data_length)
+         (error_clue, op_raw_size, Constants.max_operation_data_length)
 
 let get_signature signature =
   let open Lwt_result_syntax in
@@ -469,7 +486,7 @@ let validate_signature ~check_signature shell contents pk signature =
     if
       (* That watermark ({!Generic_operation}) is used for all operations
          except endorsement, which we don't support. *)
-      Signature.check
+      Signature.V2.check
         ~watermark:Generic_operation
         pk
         signature
@@ -485,11 +502,29 @@ let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
        pk)
     {shell; protocol_data}
 
-let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
+let compute_minimal_fees ~(op_raw_size : int) ~(op_gas_limit : Z.t)
+    ~(da_fee_per_byte : Tezos_types.Tez.t)
+    ~(nanotez_per_michelson_gas : Tezos_types.Tez.nanotez) =
+  let open Tezos_types.Tez in
+  let open Result_syntax in
+  let open Imported_env in
+  let* da_fees =
+    wrap_tzresult @@ (da_fee_per_byte *? Int64.of_int op_raw_size)
+  in
+  let execution_fees =
+    let (Nanotez per_michelson_gas) = nanotez_per_michelson_gas in
+    Nanotez Q.(mul per_michelson_gas (of_bigint op_gas_limit))
+  in
+  let* execution_fees = of_nanotez_ceil execution_fees in
+  Imported_env.wrap_tzresult @@ Tezos_types.Tez.(da_fees +? execution_fees)
+
+let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
+    ~state ~data_model raw =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
+  let op_raw_size = Bytes.length raw in
   let error_clue = Operation_hash.hash_bytes [raw] in
-  let** () = validate_size ~raw ~error_clue in
+  let** () = validate_size ~op_raw_size ~error_clue in
   let* op =
     match Data_encoding.Binary.of_bytes Operation.encoding raw with
     | Error e -> tzfail @@ Parsing_failure (error_clue, e)
@@ -502,16 +537,24 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
     | Cons (first_operation, rest) ->
         (Contents first_operation, Operation.to_list (Contents_list rest))
   in
+  (* During operation simulation, fees are not yet estimated and the
+     operation is not properly signed yet. For this reason, the
+     simulator bypasses the corresponding checks during validation. *)
+  let check_signature, check_minimal_fees =
+    match simulator_mode with
+    | Tezlink_backend_sig.Simulation -> (false, false)
+    | Preapplication -> (true, true)
+  in
   let** () = signature_exists ~check_signature signature in
   let** pk, source, first_counter =
-    validate_manager_info ~read ~error_clue first
+    validate_manager_info ~state ~data_model ~error_clue first
   in
   let signature_check_cost = signature_cost pk op in
   let* balance_left =
-    Tezlink_durable_storage.balance read
+    Tezlink_durable_storage.balance state ~data_model
     @@ Tezos_types.Contract.of_implicit source
   in
-  let** () = validate_first_counter ~read ~source ~first_counter in
+  let** () = validate_first_counter ~state ~data_model ~source ~first_counter in
   let initial_context =
     {
       source;
@@ -527,32 +570,46 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
     }
   in
   let** ctxt = validate_batch ~ctxt:initial_context (first :: rest) in
-  let** () =
-    validate_signature
-      ~check_signature
-      shell
-      (Contents_list contents)
-      pk
-      signature
+  let* da_fee_per_byte = Tezlink_durable_storage.da_fee_per_byte_mutez state in
+  let*? minimal_fees =
+    compute_minimal_fees
+      ~op_raw_size
+      ~op_gas_limit:ctxt.gas_limit_sum
+      ~da_fee_per_byte
+      ~nanotez_per_michelson_gas
   in
-  let*? first_counter = Tezos_types.Operation.counter_to_z ctxt.first_counter in
-  let operation : Tezos_types.Operation.t =
-    Tezos_types.Operation.
-      {
-        length = ctxt.length;
-        source = ctxt.source;
-        raw;
-        op;
-        first_counter;
-        fee = ctxt.fee_sum;
-        gas_limit = ctxt.gas_limit_sum;
-      }
-  in
-  return (Ok operation)
+  if check_minimal_fees && ctxt.fee_sum < minimal_fees then
+    tzfail
+    @@ Insufficient_fees (Tez.to_string ctxt.fee_sum, Tez.to_string minimal_fees)
+  else
+    let** () =
+      validate_signature
+        ~check_signature
+        shell
+        (Contents_list contents)
+        pk
+        signature
+    in
+    let*? first_counter =
+      Tezos_types.Operation.counter_to_z ctxt.first_counter
+    in
+    let operation : Tezos_types.Operation.t =
+      Tezos_types.Operation.
+        {
+          length = ctxt.length;
+          source = ctxt.source;
+          raw;
+          op;
+          first_counter;
+          fee = ctxt.fee_sum;
+          gas_limit = ctxt.gas_limit_sum;
+        }
+    in
+    return (Ok operation)
 
-let init_blueprint_validation read () =
-  let get_counter = Tezlink_durable_storage.counter read in
-  let get_balance = Tezlink_durable_storage.balance_z read in
+let init_blueprint_validation state ~data_model () =
+  let get_counter = Tezlink_durable_storage.counter state ~data_model in
+  let get_balance = Tezlink_durable_storage.balance_z state ~data_model in
   let michelson_config = {get_balance; get_counter} in
   empty_validation_state
     ~michelson_config
@@ -566,20 +623,27 @@ let gas_limit_could_fit state (operation : Tezos_types.Operation.t) =
   Z.(state.gas + operation.gas_limit <= maximum_gas_per_block)
 
 let add_ source cache =
-  String.Map.add (Signature.Public_key_hash.to_b58check source) cache
+  String.Map.add (Signature.V2.Public_key_hash.to_b58check source) cache
 
 let get_ read cache source =
   let open Lwt_result_syntax in
   match
-    String.Map.find (Signature.Public_key_hash.to_b58check source) cache
+    String.Map.find (Signature.V2.Public_key_hash.to_b58check source) cache
   with
   | Some v -> return v
-  | None -> read (Tezlink_imports.Alpha_context.Contract.Implicit source)
+  | None -> read (Tezlink_imports.Imported_context.Contract.Implicit source)
 
 let validate_for_blueprint state (operation : Tezos_types.Operation.t) =
   let open Lwt_result_syntax in
   let* counter =
-    get_ state.michelson_config.get_counter state.addr_nonce operation.source
+    get_
+      (fun c ->
+        let* counter_opt = state.michelson_config.get_counter c in
+        (* FIXME: #7960
+           This default should be the global counter *)
+        return (Option.value ~default:Z.one counter_opt))
+      state.addr_nonce
+      operation.source
   in
   let** new_counter =
     if not Z.(equal (succ counter) operation.first_counter) then

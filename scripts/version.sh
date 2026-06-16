@@ -24,7 +24,7 @@ export recommended_node_version=18.18.2
 
 ## opam_repository is a commit hash of the public opam repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export opam_repository_tag=8a528d6bb48e4be260fb670a1754df39a1192147
+export opam_repository_tag=9d61e8a449aa2436cbd9b390c4afa6b47e8ed0ba
 
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.
@@ -100,5 +100,3 @@ export ci_image_name="${GCP_REGISTRY}/tezos/tezos/ci"
 export ci_image_name_protected="${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci"
 
 export rust_toolchain_image_name="${GCP_REGISTRY}/tezos/tezos/rust-toolchain"
-
-export jsonnet_image_name="${GCP_REGISTRY}/tezos/tezos/jsonnet"

@@ -2,6 +2,9 @@
 
 ## This NGINX configuration template allows you to serve the content of the
 ## `store/slot_store` directory of a DAL node as static files over HTTP.
+## You can also expose **shards** from `store/shard_store` under:
+##
+##   <URI>/v0/shards/by_published_level/<published_level>_<slot_index>
 ##
 ## DAL nodes can be configured to fetch missing slots via fallback HTTP servers
 ## using the following URI layout:
@@ -9,6 +12,9 @@
 ##   <URI>/v0/slots/by_published_level/<published_level>_<slot_index>_<slot_size>
 ##
 ## This layout is expected by the `--slots-backup-uri` option of the DAL node.
+## To fetch **shards** instead of slots, pass a URI with the `#shards` fragment:
+##   --slots-backup-uri "<URI>#shards"
+## (Use `#slots` or no fragment to fetch slots: `--slots-backup-uri "<URI>#slots"`)
 
 # How to deploy?
 
@@ -23,6 +29,7 @@
 ##   chmod o+x /absolute/path/to/tezos-dal-node
 ##   chmod o+x /absolute/path/to/tezos-dal-node/store
 ##   chmod o+rx /absolute/path/to/tezos-dal-node/store/slot_store
+##   chmod o+rx /absolute/path/to/tezos-dal-node/store/shard_store
 
 # How to test via command-line?
 
@@ -40,6 +47,20 @@
 #     --reject "index.html*" \
 #     <URI>/v0/slots/by_published_level/
 
+## Fetch a single shard file:
+#   wget <URI>/v0/shards/by_published_level/<published_level>_<slot_index>
+
+## Mirror the remote shard store locally:
+#   wget \
+#     --mirror \
+#     --no-parent \
+#     --no-host-directories \
+#     --cut-dirs=3 \
+#     --directory-prefix=store/shard_store \
+#     --accept-regex '[0-9]+_[0-9]+' \
+#     --reject "index.html*" \
+#     <URI>/v0/shards/by_published_level/
+
 # NGINX configuration
 # Replace "/absolute/path/to/tezos-dal-node" with the actual path to your DAL node's data directory
 
@@ -49,6 +70,11 @@ server {
 
     location /v0/slots/by_published_level/ {
         alias /absolute/path/to/tezos-dal-node/store/slot_store/;
+        autoindex on;
+    }
+
+    location /v0/shards/by_published_level/ {
+        alias /absolute/path/to/tezos-dal-node/store/shard_store/;
         autoindex on;
     }
 }

@@ -12,8 +12,7 @@ where
         tezos_data_encoding::encoding::Encoding::Obj(
             "StructWithDuplicatedConstraint",
             <[_]>::into_vec(
-                #[rustc_box]
-                ::alloc::boxed::Box::new([
+                ::alloc::boxed::box_new([
                     tezos_data_encoding::encoding::Field::new(
                         "a1",
                         #[allow(clippy::redundant_clone)]

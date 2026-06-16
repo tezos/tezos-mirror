@@ -33,9 +33,6 @@ type endpoint =
   | Node of Node.t  (** A full-fledged node *)
   | Foreign_endpoint of Endpoint.t  (** A service not managed by Tezt *)
 
-(** Values that can be passed to the client's [--adaptive-issuance-vote] argument *)
-type ai_vote = On | Off | Pass
-
 (** A string representation of an endpoint suitable to be used as a CLI
     argument (e.g., [http://127.0.0.1:5893]). *)
 val string_of_endpoint : ?hostname:bool -> endpoint -> string
@@ -90,6 +87,8 @@ type mockup_sync_mode = Asynchronous | Synchronous
 
 (** The mode argument of the client's 'normalize data' command *)
 type normalize_mode = Readable | Optimized | Optimized_legacy
+
+val normalize_mode_to_string : normalize_mode -> string
 
 (** Tezos client states. *)
 type t
@@ -601,7 +600,6 @@ val bake_for :
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
-  ?ai_vote:ai_vote ->
   ?state_recorder:bool ->
   ?expect_failure:bool ->
   t ->
@@ -635,7 +633,6 @@ val bake_for_and_wait :
   ?level_before:int ->
   ?node:Node.t ->
   ?dal_node_endpoint:string ->
-  ?ai_vote:ai_vote ->
   t ->
   unit Lwt.t
 
@@ -657,7 +654,6 @@ val bake_for_and_wait_level :
   ?level_before:int ->
   ?node:Node.t ->
   ?dal_node_endpoint:string ->
-  ?ai_vote:ai_vote ->
   ?state_recorder:bool ->
   t ->
   int Lwt.t
@@ -678,7 +674,6 @@ val spawn_bake_for :
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
-  ?ai_vote:ai_vote ->
   ?state_recorder:bool ->
   t ->
   Process.t
@@ -901,6 +896,7 @@ val transfer :
   ?simulation:bool ->
   ?force:bool ->
   ?expect_failure:bool ->
+  ?minimal_nanotez_per_byte:int ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->
@@ -926,6 +922,7 @@ val spawn_transfer :
   ?arg:string ->
   ?simulation:bool ->
   ?force:bool ->
+  ?minimal_nanotez_per_byte:int ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->
@@ -2629,6 +2626,7 @@ val init_with_node :
   ?base_dir:string ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?media_type:media_type ->
   ?nodes_args:Node.argument list ->
   ?keys:Account.key list ->
   ?rpc_external:bool ->
@@ -2661,10 +2659,11 @@ val init_with_protocol :
   ?base_dir:string ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?media_type:media_type ->
   ?nodes_args:Node.argument list ->
   ?additional_bootstrap_account_count:int ->
   ?additional_revealed_bootstrap_account_count:int ->
-  ?default_accounts_balance:int ->
+  ?default_accounts_balance:int64 ->
   ?parameter_file:string ->
   ?timestamp:timestamp ->
   ?keys:Account.key list ->
@@ -3464,3 +3463,19 @@ val threshold_bls_signatures :
 val signing_delay_env_var : string
 
 val fixed_seed_env_var : string
+
+(** Run [octez-client stez deposit <amount> for <source>]. *)
+val stez_deposit :
+  ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> unit Lwt.t
+
+(** Same as [stez_deposit], but do not wait for the process to exit. *)
+val spawn_stez_deposit :
+  ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> Process.t
+
+(** Run [octez-client stez redeem <amount> for <source>]. *)
+val stez_redeem :
+  ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> unit Lwt.t
+
+(** Same as [stez_redeem], but do not wait for the process to exit. *)
+val spawn_stez_redeem :
+  ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> Process.t

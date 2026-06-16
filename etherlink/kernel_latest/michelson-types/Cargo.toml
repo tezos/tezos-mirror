@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "michelson-types"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+tezos-smart-rollup-encoding.workspace = true

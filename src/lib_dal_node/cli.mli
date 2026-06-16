@@ -106,6 +106,9 @@ module Term : sig
   (** Disable amplification. Default value is false. *)
   val disable_amplification_switch : switch
 
+  (** A list of IP addresses to ban at startup. *)
+  val banned_addrs_arg : P2p_addr.t list arg
+
   (** Emit events related to connections. Default value is false. *)
   val verbose_switch : switch
 
@@ -144,14 +147,17 @@ module Action : sig
     ?history_mode:Configuration_file.history_mode ->
     ?service_name:string ->
     ?service_namespace:string ->
+    ?telemetry_env:string ->
     ?fetch_trusted_setup:bool ->
     ?disable_shard_validation:bool ->
     ?verbose:bool ->
     ?ignore_l1_config_peers:bool ->
     ?disable_amplification:bool ->
+    ?banned_addrs:P2p_addr.t list ->
     ?ignore_topics:Signature.public_key_hash list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
     ?publish_slots_regularly:Configuration_file.publish_slots_regularly ->
+    ?ignore_l1_history_check:bool ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t
 
@@ -178,6 +184,35 @@ module Action : sig
     ?verbose:bool ->
     ?ignore_l1_config_peers:bool ->
     ?disable_amplification:bool ->
+    ?banned_addrs:P2p_addr.t list ->
+    ?batching_configuration:Configuration_file.batching_configuration ->
+    unit ->
+    (unit, Error_monad.tztrace) result Lwt.t
+
+  val config_reset :
+    ?data_dir:string ->
+    ?config_file:string ->
+    ?rpc_addr:P2p_point.Id.t ->
+    ?expected_pow:float ->
+    ?listen_addr:P2p_point.Id.t ->
+    ?public_addr:P2p_point.Id.t ->
+    ?endpoint:Uri.t ->
+    ?slots_backup_uris:Uri.t list ->
+    ?trust_slots_backup_uris:bool ->
+    ?metrics_addr:P2p_point.Id.t ->
+    ?attesters:Signature.public_key_hash list ->
+    ?operators:int list ->
+    ?observers:int list ->
+    ?bootstrap:bool ->
+    ?peers:string list ->
+    ?history_mode:Configuration_file.history_mode ->
+    ?service_name:string ->
+    ?service_namespace:string ->
+    ?fetch_trusted_setup:bool ->
+    ?verbose:bool ->
+    ?ignore_l1_config_peers:bool ->
+    ?disable_amplification:bool ->
+    ?banned_addrs:P2p_addr.t list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t
@@ -205,6 +240,7 @@ module Action : sig
     ?verbose:bool ->
     ?ignore_l1_config_peers:bool ->
     ?disable_amplification:bool ->
+    ?banned_addrs:P2p_addr.t list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t

@@ -1,24 +1,19 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 use crate::{
     fixture::{Account, Env, Fixtures, NamedFixture, PostEntry, TestCase},
-    helpers::{
-        extract_brackets, prepare_host, prepare_host_with_buffer, pretty, u256_to_u128,
-    },
+    helpers::{extract_brackets, prepare_host, pretty, u256_to_u128},
 };
 use revm::{
-    context::{
-        result::{EVMError, ExecutionResult},
-        transaction::AccessList,
-    },
+    context::{result::ExecutionResult, transaction::AccessList},
     primitives::{Address, HashMap, U256},
     state::AccountInfo,
 };
 use revm_etherlink::{
     run_transaction, storage::world_state_handler::StorageAccount, ExecutionOutcome,
-    GasData,
+    GasData, TransactionOrigin,
 };
 use std::{
     ffi::OsStr,
@@ -28,7 +23,8 @@ use std::{
 };
 use structopt::StructOpt;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_journal::TezosXJournal;
 
 mod deserializer;
 mod evalhost;
@@ -174,6 +170,10 @@ fn find_fixture(path: &Path, acc: &mut Fixtures, report: &mut Report) {
             if entry_path.is_dir() {
                 find_fixture(&entry_path, acc, report);
             } else if entry_path.is_file()
+                && entry_path
+                    .extension()
+                    .map(|ext| ext == "json")
+                    .unwrap_or(false)
                 && !entry_path
                     .file_name()
                     .map(|file_name| {
@@ -199,7 +199,7 @@ fn read_all_fixtures<P: AsRef<Path>>(fixtures_dir: P, report: &mut Report) -> Fi
     fixtures
 }
 
-fn fill_state(host: &mut impl Runtime, state: HashMap<Address, Account>) {
+fn fill_state(host: &mut impl StorageV1, state: HashMap<Address, Account>) {
     for (address, info) in state {
         let mut storage_account = StorageAccount::from_address(&address).unwrap();
         for (index, value) in &info.storage {
@@ -210,7 +210,7 @@ fn fill_state(host: &mut impl Runtime, state: HashMap<Address, Account>) {
 }
 
 fn check_result(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     state: HashMap<Address, Account>,
     output_file: &mut Option<File>,
     total_gas_refunded: U256,
@@ -244,12 +244,14 @@ fn check_result(
                 nonce: expected_nonce,
                 code_hash: expected_code_hash,
                 code: expected_code,
+                ..
             } = expected_info;
             let AccountInfo {
                 balance: commited_balance,
                 nonce: commited_nonce,
                 code_hash: commited_code_hash,
                 code: commited_code,
+                ..
             } = commited_info;
 
             success = false;
@@ -304,6 +306,7 @@ fn get_block_constants(env: &Env, chain_id: primitive_types::U256) -> BlockConst
             primitive_types::U256::zero(),
         ),
         chain_id,
+        tezos_experimental_features: false,
         prevrandao: Some(primitive_types::H256::from(
             env.current_difficulty.to_le_bytes(),
         )),
@@ -311,13 +314,13 @@ fn get_block_constants(env: &Env, chain_id: primitive_types::U256) -> BlockConst
 }
 
 fn extract_gas_refunded(
-    execution_result: &Result<ExecutionOutcome, EVMError<revm_etherlink::Error>>,
+    execution_result: &Result<ExecutionOutcome, revm_etherlink::EvmRunError>,
 ) -> u64 {
     match execution_result {
         Ok(ExecutionOutcome {
-            result: ExecutionResult::Success { gas_refunded, .. },
+            result: ExecutionResult::Success { gas, .. },
             ..
-        }) => *gas_refunded,
+        }) => gas.final_refunded(),
         _ => 0,
     }
 }
@@ -349,7 +352,8 @@ pub fn main() {
         )
     };
 
-    let mut host = prepare_host();
+    let mut host;
+    let registry = kernel::registry_impl::RegistryImpl::default();
 
     for NamedFixture { path, fixtures } in fixtures {
         write_out!(output_file, "---------- Test file: {:?} ----------", path);
@@ -381,7 +385,7 @@ pub fn main() {
 
             for (spec_name, post_entrys) in post {
                 for PostEntry { state, indexes, .. } in post_entrys {
-                    host = prepare_host_with_buffer(host.buffer.take());
+                    host = prepare_host();
                     fill_state(&mut host, pre.clone());
                     let spec_id = spec_name.clone().into();
                     write_out!(output_file, "EVM spec: {spec_name:?}");
@@ -400,8 +404,11 @@ pub fn main() {
                             .collect(),
                     );
 
+                    let mut journal = TezosXJournal::default();
                     let execution_result = run_transaction(
                         &mut host,
+                        &registry,
+                        &mut journal,
                         spec_id,
                         &block_constants,
                         None,
@@ -414,10 +421,12 @@ pub fn main() {
                             transaction.gas_limit[indexes.gas],
                         ),
                         transaction.value[indexes.value],
-                        access_lists,
                         transaction.authorization_list.clone(),
                         None,
                         false,
+                        TransactionOrigin::UserInput {
+                            access_list: access_lists,
+                        },
                     );
 
                     let total_gas_refunded =

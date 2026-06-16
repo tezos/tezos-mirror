@@ -51,6 +51,14 @@ let abaab_threshold ~abaab ~protocol =
   else if abaab then pair_to_ratio (0, 1)
   else pair_to_ratio (2, 1)
 
+let alpha_new_cache ~protocol ~consensus_rights_delay =
+  if Protocol.number protocol >= 025 then
+    [
+      ( ["cache_swrr_selected_distribution_cycles"],
+        `Int (consensus_rights_delay + 3) );
+    ]
+  else []
+
 let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
   Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
 
@@ -251,7 +259,7 @@ let bls_baker_test =
     Protocol.write_parameter_file
       ~overwrite_bootstrap_accounts:(Some (List.map (fun k -> (k, None)) keys))
       ~base:(Right (protocol, None))
-      [(["allow_tz4_delegate_enable"], `Bool true)]
+      []
   in
   let* _node, client =
     Client.init_with_node ~keys:(Constant.activator :: keys) `Client ()
@@ -554,7 +562,7 @@ let check_dal ~expected ~attestations_aggregates ~attestations =
                 match committee_json |-> "dal_attestation" |> as_string_opt with
                 | Some dal_attestation_as_string ->
                     let delegate = metadata_json |-> "delegate" |> as_string in
-                    (delegate, Z.of_string dal_attestation_as_string) :: acc
+                    (delegate, dal_attestation_as_string) :: acc
                 | None -> acc)
               []
               (contents |-> "committee" |> as_list)
@@ -570,7 +578,7 @@ let check_dal ~expected ~attestations_aggregates ~attestations =
                 let delegate =
                   contents |-> "metadata" |-> "delegate" |> as_string
                 in
-                Some (delegate, Z.of_string dal_attestation_as_string)
+                Some (delegate, dal_attestation_as_string)
             | None -> None)
           attestations
       in
@@ -585,10 +593,10 @@ let check_dal ~expected ~attestations_aggregates ~attestations =
           expected
         |> List.sort cmp
       in
-      let eq (d, dal) (d', dal') = String.equal d d' && Z.equal dal dal' in
+      let eq (d, dal) (d', dal') = String.equal d d' && String.equal dal dal' in
       if not (List.equal eq sorted_found sorted_expected) then
         let pp_tuple fmt (delegate, dal_attestation) =
-          Format.fprintf fmt "(%s, %a)" delegate Z.pp_print dal_attestation
+          Format.fprintf fmt "(%s, %s)" delegate dal_attestation
         in
         let pp = Format.(pp_print_list ~pp_sep:pp_print_cut pp_tuple) in
         Test.fail
@@ -693,16 +701,14 @@ let simple_attestation_aggregation ~abaab ~remote_mode protocol =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       ([
-         (["allow_tz4_delegate_enable"], `Bool true);
-         (["aggregate_attestation"], `Bool true);
          (* Diminish some constants to activate consensus keys faster *)
-         (["blocks_per_cycle"], `Int 2);
+         (["blocks_per_cycle"], `Int 4);
          (["nonce_revelation_threshold"], `Int 1);
-         (["consensus_rights_delay"], `Int consensus_rights_delay);
-         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
        ]
-      @ abaab_threshold ~abaab ~protocol)
+       @ abaab_threshold ~abaab ~protocol
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol
@@ -728,9 +734,9 @@ let simple_attestation_aggregation ~abaab ~remote_mode protocol =
   (* Expected attestations that should be found non-aggregated *)
   let expected_attestations = [bootstrap4; bootstrap5] in
   (* Testing the "bake for" command *)
-  log_step 4 "Bake for until level 8" ;
-  (* Baking until level 8 ensures that the BLS consensus keys are activated *)
-  let* () = Client.bake_for_and_wait ~count:7 ~keys:delegates client in
+  log_step 4 "Bake for until level 10" ;
+  (* Baking until level 10 ensures that the BLS consensus keys are activated *)
+  let* () = Client.bake_for_and_wait ~count:9 ~keys:delegates client in
   log_step 5 "Check consensus operations" ;
   let* () =
     check_consensus_operations
@@ -739,7 +745,7 @@ let simple_attestation_aggregation ~abaab ~remote_mode protocol =
       client
   in
   (* Testing the "bake for" command with minimal timestamp *)
-  log_step 6 "Bake for with minimal timestamp until level 10" ;
+  log_step 6 "Bake for with minimal timestamp until level 12" ;
   let* () =
     Client.bake_for_and_wait
       ~minimal_timestamp:true
@@ -755,9 +761,9 @@ let simple_attestation_aggregation ~abaab ~remote_mode protocol =
       client
   in
   (* Testing the baker automaton *)
-  log_step 8 "Start a baker and wait until level 12" ;
+  log_step 8 "Start a baker and wait until level 14" ;
   let* _baker = Agnostic_baker.init ~remote_mode ~delegates node client in
-  let* _ = Node.wait_for_level node 12 in
+  let* _ = Node.wait_for_level node 14 in
   log_step 9 "Check consensus operations" ;
   let* () =
     check_consensus_operations
@@ -920,8 +926,6 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       ([
-         (["allow_tz4_delegate_enable"], `Bool true);
-         (["aggregate_attestation"], `Bool true);
          (* Using custom consensus constants to be able to trigger reproposals *)
          (["consensus_committee_size"], `Int consensus_committee_size);
          (["consensus_threshold_size"], `Int 70);
@@ -929,13 +933,13 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
            and make round durations as small as possible *)
          (["minimal_block_delay"], `String "4");
          (["delay_increment_per_round"], `String "0");
-         (["blocks_per_cycle"], `Int 2);
+         (["blocks_per_cycle"], `Int 4);
          (["nonce_revelation_threshold"], `Int 1);
-         (["consensus_rights_delay"], `Int consensus_rights_delay);
-         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
        ]
-      @ abaab_threshold ~abaab ~protocol)
+       @ abaab_threshold ~abaab ~protocol
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol
@@ -983,7 +987,7 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
     Client.update_fresh_companion_key ~algo:"bls" bootstrap3 client
   in
   Log.info "Bake until BLS consensus keys are activated" ;
-  let* _ = Client.bake_for_and_wait ~keys ~count:6 client in
+  let* _ = Client.bake_for_and_wait ~keys ~count:8 client in
   (* Bootstrap5 does not have enough voting power to progress independently. We
      manually inject consensus operations to control the progression of
      consensus. *)
@@ -996,7 +1000,7 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
       client
   in
   let* _ = Client.bake_for_and_wait ~keys client in
-  let base_level = 9 in
+  let base_level = 11 in
   (* BLS consensus keys are now activated. We feed the node with just enough
      consensus operations for the baker to bake a block at [base_level + 1]. *)
   let* round = fetch_round client in
@@ -1012,7 +1016,14 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
     "Injecting consensus for bootstrap1 at level %d round %d@."
     base_level
     round ;
-  let dal_attestation = Array.init 16 (fun _ -> true) in
+  let* dal_parameters = Dal_common.Parameters.from_client client in
+  let* dal_attestation =
+    Dal_common.Attestations.encode_for_one_lag
+      protocol
+      (Node.as_rpc_endpoint node)
+      dal_parameters
+    @@ Array.init 16 (fun _ -> true)
+  in
   let* () =
     Operation.Consensus.(
       let* slot =
@@ -1176,7 +1187,6 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
       [(consensus_key3, Some companion_key3); (bootstrap6, None)]
   in
   let* _ = Node.wait_for_branch_switch ~level:(base_level + 1) node in
-  let dal_attestation_as_int = z_of_bool_vector dal_attestation in
   let* () =
     check_consensus_operations
       ~expected_attestations_committee:[bootstrap1; bootstrap2; bootstrap3]
@@ -1185,11 +1195,11 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
       ~expected_preattestations:[bootstrap4; bootstrap5]
       ~expected_dal_attestations:
         [
-          (bootstrap1, dal_attestation_as_int);
-          (bootstrap2, dal_attestation_as_int);
-          (bootstrap3, dal_attestation_as_int);
-          (bootstrap4, dal_attestation_as_int);
-          (bootstrap6, dal_attestation_as_int);
+          (bootstrap1, dal_attestation);
+          (bootstrap2, dal_attestation);
+          (bootstrap3, dal_attestation);
+          (bootstrap4, dal_attestation);
+          (bootstrap6, dal_attestation);
         ]
       client
   in
@@ -1236,16 +1246,14 @@ let aggregated_operations_retrival_from_block_content ~abaab =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       ([
-         (["allow_tz4_delegate_enable"], `Bool true);
-         (["aggregate_attestation"], `Bool true);
          (* Diminish some constants to activate consensus keys faster *)
-         (["blocks_per_cycle"], `Int 2);
+         (["blocks_per_cycle"], `Int 4);
          (["nonce_revelation_threshold"], `Int 1);
-         (["consensus_rights_delay"], `Int consensus_rights_delay);
-         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
        ]
-      @ abaab_threshold ~abaab ~protocol)
+       @ abaab_threshold ~abaab ~protocol
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol `Client ~protocol ~parameter_file ()
@@ -1265,9 +1273,9 @@ let aggregated_operations_retrival_from_block_content ~abaab =
   let expected_aggregated_committee = [bootstrap1; bootstrap2; bootstrap3] in
   (* Expected delegates that should be found non-aggregated *)
   let expected_non_aggregated = [bootstrap4; bootstrap5] in
-  log_step 4 "Bake for until level 8" ;
-  (* Baking until level 8 ensures that the BLS consensus keys are activated *)
-  let* () = Client.bake_for_and_wait ~count:7 ~keys:delegates client in
+  log_step 4 "Bake for until level 10" ;
+  (* Baking until level 10 ensures that the BLS consensus keys are activated *)
+  let* () = Client.bake_for_and_wait ~count:9 ~keys:delegates client in
   log_step 5 "Check consensus operations" ;
   let* () =
     check_consensus_operations
@@ -1318,6 +1326,11 @@ let aggregated_operations_retrival_from_block_content ~abaab =
   in
   unit
 
+let with_timeout ~timeout ~on_timeout f =
+  Lwt.catch
+    (fun () -> Lwt_unix.with_timeout timeout f)
+    (function Lwt_unix.Timeout -> on_timeout () | e -> Lwt.reraise e)
+
 let unable_to_reach_node_mempool =
   Protocol.register_test
     ~__FILE__
@@ -1338,23 +1351,15 @@ let unable_to_reach_node_mempool =
   log_step 2 "Run a baker" ;
   let* baker = Agnostic_baker.init node client in
   log_step 3 "Wait for baker termination" ;
-  let* outcome =
-    Lwt.choose
-      [
-        (let* () = Agnostic_baker.wait_for_termination baker in
-         return `Terminated);
-        (* Saves some CI time by failing after 2 minutes if the baker fails to
-           shut down as expected.*)
-        (let* () = Lwt_unix.sleep 120. in
-         return `Timeout);
-      ]
-  in
-  match outcome with
-  | `Terminated -> unit
-  | `Timeout ->
+  (* Saves some CI time by failing after 2 minutes if the baker fails to
+     shutdown as expected.*)
+  with_timeout
+    ~timeout:120.
+    ~on_timeout:(fun () ->
       Test.fail
         "The baker failed to shut down after being unable to reach the node \
-         mempool for 2 minutes"
+         mempool for 2 minutes.")
+    (fun () -> Agnostic_baker.wait_for_termination baker)
 
 let stream_is_refreshed_on_timeout =
   Protocol.register_test
@@ -1431,7 +1436,6 @@ let test_reproposal_at_abaab_activation_level =
         "remote";
         "abaab";
       ]
-    ~supports:Protocol.(From_protocol 024)
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let consensus_rights_delay = 1 in
@@ -1469,29 +1473,27 @@ let test_reproposal_at_abaab_activation_level =
     Protocol.write_parameter_file
       ~overwrite_bootstrap_accounts
       ~base:(Right (protocol, None))
-      [
-        (["allow_tz4_delegate_enable"], `Bool true);
-        (["aggregate_attestation"], `Bool true);
-        (* Using custom consensus constants to be able to trigger reproposals *)
-        (["consensus_committee_size"], `Int consensus_committee_size);
-        (["consensus_threshold_size"], `Int 70);
-        (* Diminish some constants to activate consensus keys faster,
+      ([
+         (* Using custom consensus constants to be able to trigger reproposals *)
+         (["consensus_committee_size"], `Int consensus_committee_size);
+         (["consensus_threshold_size"], `Int 70);
+         (* Diminish some constants to activate consensus keys faster,
            and make round durations as small as possible *)
-        (["minimal_block_delay"], `String "4");
-        (["delay_increment_per_round"], `String "0");
-        (["blocks_per_cycle"], `Int 2);
-        (* [blocks_per_cycle] is too short in this testing scenario,
+         (["minimal_block_delay"], `String "4");
+         (["delay_increment_per_round"], `String "0");
+         (["blocks_per_cycle"], `Int 4);
+         (* [blocks_per_cycle] is too short in this testing scenario,
            so we increase [tolerated_inactivity_period] *)
-        (["tolerated_inactivity_period"], `Int 99);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-        (* We start with 6 bootstrap accounts, 3 with a tz4 consensus key,
+         (["tolerated_inactivity_period"], `Int 99);
+         (["nonce_revelation_threshold"], `Int 1);
+         (* We start with 6 bootstrap accounts, 3 with a tz4 consensus key,
            a 4th one will activate his later, triggering abaab. *)
-        (["all_bakers_attest_activation_threshold"; "numerator"], `Int 4);
-        (["all_bakers_attest_activation_threshold"; "denominator"], `Int 6);
-      ]
+         (["all_bakers_attest_activation_threshold"; "numerator"], `Int 4);
+         (["all_bakers_attest_activation_threshold"; "denominator"], `Int 6);
+       ]
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol
@@ -1542,16 +1544,16 @@ let test_reproposal_at_abaab_activation_level =
         bootstrap4;
       ]
   in
-  let* () = Client.bake_for_and_wait ~keys client in
+  let* () = Client.bake_for_and_wait ~keys ~count:5 client in
   (* Check abaab activation_level
-     Activation of last tz4 at beginning of cycle 2: level 5  *)
+     Activation of last tz4 at beginning of cycle 2: level 9 *)
   let* ctxt =
     Client.RPC.call client @@ RPC.get_chain_block_context_raw ~value_path:[] ()
   in
   let activation_level =
     JSON.(ctxt |-> "all_bakers_attest_first_level" |-> "level" |> as_int)
   in
-  assert (activation_level = 5) ;
+  assert (activation_level = 9) ;
   (* Bootstrap5 does not have enough voting power to progress independently. We
      manually inject consensus operations to control the progression of
      consensus. *)
@@ -1755,6 +1757,489 @@ let test_reproposal_at_abaab_activation_level =
   assert (String.equal (JSON.as_string ratio) "66.66%") ;
   unit
 
+let baker_shutdown_on_node_shutdown =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker shutdown on node shutdown"
+    ~tags:[team; "baker"; "shutdown"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol ~timestamp:Now ()
+  in
+  Log.info "Wait for level 1" ;
+  let* _ = Node.wait_for_level node 1 in
+  Log.info "Starts an agnostic baker" ;
+  let* baker = Agnostic_baker.init ~delegates:[] node client in
+  Log.info "Wait 5 levels" ;
+  let* _ = Node.wait_for_level node 5 in
+  Log.info "Kill the node and wait for baker termination" ;
+  let* () = Node.kill node in
+  let timeout = (* arbitrary value *) 1. in
+  with_timeout
+    ~timeout
+    ~on_timeout:(fun () ->
+      Test.fail
+        "The baker failed to shutdown after being disconnected from the node \
+         for over %f seconds."
+        timeout)
+    (fun () -> Agnostic_baker.wait_for_termination baker)
+
+let test_abaab_with_small_baker =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"All bakers attest with a small baker"
+    ~tags:[team; "baker"; "attestation"; "abaab"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  let consensus_rights_delay = 1 in
+  let consensus_committee_size = 256 in
+  let consensus_key1 =
+    Account.generate_new_key
+      ~algo:Tezos_crypto.Signature.Bls
+      ~alias:"consensus_key1"
+  in
+  let consensus_key2 =
+    Account.generate_new_key
+      ~algo:Tezos_crypto.Signature.Bls
+      ~alias:"consensus_key2"
+  in
+  let overwrite_bootstrap_accounts =
+    Some
+      [
+        (* Initial big baker with BLS *)
+        ( bootstrap1,
+          Some
+            {
+              Protocol.default_bootstrap_parameters with
+              balance = Some 800_000_000_000_000L;
+              consensus_key = Some consensus_key1;
+            } );
+        (* Initial small baker. Its BLS key will be activated later. *)
+        ( bootstrap2,
+          Some
+            {
+              Protocol.default_bootstrap_parameters with
+              balance = Some 12_000_000_000L;
+            } );
+      ]
+  in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~overwrite_bootstrap_accounts
+      ~base:(Right (protocol, None))
+      ([
+         (* We ask for all bakers to actually include their attestations *)
+         (["consensus_committee_size"], `Int consensus_committee_size);
+         (["consensus_threshold_size"], `Int consensus_committee_size);
+         (* Diminish some constants to activate consensus keys faster,
+           and make round durations as small as possible *)
+         (["minimal_block_delay"], `String "4");
+         (["delay_increment_per_round"], `String "0");
+         (["blocks_per_cycle"], `Int 4);
+         (* [blocks_per_cycle] is too short in this testing scenario,
+           so we increase [tolerated_inactivity_period] *)
+         (["tolerated_inactivity_period"], `Int 99);
+         (["nonce_revelation_threshold"], `Int 2);
+         (* We start with 2 bootstrap accounts, one with a tz4 consensus key,
+           the other baker will register its BLS key later, triggering abaab. *)
+         (["all_bakers_attest_activation_threshold"; "numerator"], `Int 2);
+         (["all_bakers_attest_activation_threshold"; "denominator"], `Int 3);
+       ]
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
+  in
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ~timestamp:Now
+      ()
+  in
+  let* _ = Node.wait_for_level node 1 in
+  (* Register the consensus keys in the client *)
+  let* () =
+    Client.import_secret_key
+      client
+      consensus_key1.secret_key
+      ~alias:consensus_key1.alias
+  in
+  let* () =
+    Client.import_secret_key
+      client
+      consensus_key2.secret_key
+      ~alias:consensus_key2.alias
+  in
+  (* Check tz4 ratio *)
+  let* ratio = Client.RPC.call client @@ RPC.get_tz4_baker_number_ratio () in
+  assert (String.equal (JSON.as_string ratio) "50.00%") ;
+  Log.info
+    "Launch an agnostic  baker with both bootstraps and their consensus keys" ;
+  let* _baker =
+    Agnostic_baker.init
+      ~delegates:
+        [
+          Constant.bootstrap1.public_key_hash;
+          consensus_key1.public_key_hash;
+          Constant.bootstrap2.public_key_hash;
+          consensus_key2.public_key_hash;
+        ]
+      node
+      client
+  in
+  let* base_level = Node.get_level node in
+  let* base_level = Node.wait_for_level node (base_level + 1) in
+  Log.info "Check attestations before abaab" ;
+  (* We bake for 10 blocks. Assuming constant stake, the probability that bootstrap2 includes an
+     attestation in all of them is
+     Pb1 = power_bootstrap1 = 800Mtz * (1/10 + (1/2 * 9/10)) = 11/20 * 800M
+     Pb2 = power_bootstrap2 = 11/20 * 12Ktz
+     p(b2 has at least an attestation for a block) = 1 - (Pb1/(Pb1 + Pb2)) ^ num_slot
+                                                   =~ 3.8 * 10^-3
+     p(b2 has at least one block with no attestation within 10 given blocks)
+        = 1 - p(b2 has an attestation for a block) ^ 10
+        =~ 1 - 6.4 * 10^-25
+        =~ 1
+   *)
+  let rec check_bootstrap2_absent previous_level =
+    let* current_level = Node.wait_for_level node (previous_level + 1) in
+    if current_level > base_level + 10 then
+      Test.fail
+        "Unexpected outcome: bootstrap2 (small baker) has been observed \
+         attesting for 10 consecutive levels while abaab was not active" ;
+    let* b2_in_block =
+      Operation_core.Consensus.get_attestation_slot_opt
+        ~level:current_level
+        ~protocol
+        ~delegate:bootstrap2
+        client
+      |> Lwt.map Option.is_some
+    in
+    (* bootstrap1 is the only BLS attestation, and it is expected to attest every block.
+          p(b1 has no attestation in a block) = (Pb2/(Pb1 + Pb2)) ^ num_slot =~ 1.19 * 10^-1235
+          p(b1 has at least one block with no attestation within 10 given blocks) =~ 10^-1234
+    *)
+    let* () =
+      check_consensus_operations
+        ~block:(string_of_int current_level)
+        ~expected_attestations_committee:[bootstrap1]
+        ~expected_attestations:(if b2_in_block then [bootstrap2] else [])
+        client
+    in
+    if b2_in_block then check_bootstrap2_absent current_level else return ()
+  in
+  let* () = check_bootstrap2_absent base_level in
+  let* _ = Node.wait_for_level node (base_level + 10) in
+  (* Check that bootstrap2 is still active despite rarely attesting *)
+  let* deactivated =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_deactivated
+         bootstrap2.public_key_hash
+  in
+  assert (not (JSON.as_bool deactivated)) ;
+  (* Set bootstrap2's consensus key to BLS, triggering abaab *)
+  let* () =
+    Client.update_consensus_key
+      ~src:bootstrap2.alias
+      ~pk:consensus_key2.alias
+      client
+  in
+  (* Wait for the abaab activation level to be set.
+     The consensus key update takes effect after [consensus_rights_delay]
+     cycles, so we poll at each new block until the activation is scheduled. *)
+  let rec wait_for_abaab_activation previous_level =
+    let* current_level = Node.wait_for_level node (previous_level + 1) in
+    let* activation_level_json =
+      Client.RPC.call client @@ RPC.get_abaab_activation_level ()
+    in
+    if JSON.is_null activation_level_json then
+      wait_for_abaab_activation current_level
+    else
+      let activation_level =
+        JSON.(activation_level_json |-> "level" |> as_int)
+      in
+      return activation_level
+  in
+  let* current_level = Node.get_level node in
+  let* activation_level = wait_for_abaab_activation current_level in
+  (* Verify that all bakers now use tz4 keys *)
+  let* ratio = Client.RPC.call client @@ RPC.get_tz4_baker_number_ratio () in
+  Log.info "tz4 ratio at abaab scheduling: %s" (JSON.as_string ratio) ;
+  assert (String.equal (JSON.as_string ratio) "50.00%") ;
+  Log.info "Waiting for abaab activation at level %d" activation_level ;
+  (* Wait for activation_level + 1: the block at level L contains attestations
+     for level L-1, so the first post-abaab attestations appear at L+1. *)
+  let* _ = Node.wait_for_level node (activation_level + 1) in
+  let* ratio = Client.RPC.call client @@ RPC.get_tz4_baker_number_ratio () in
+  Log.info "tz4 ratio at abaab activation: %s" (JSON.as_string ratio) ;
+  assert (String.equal (JSON.as_string ratio) "100.00%") ;
+  (* Check attestations at activation level *)
+  Log.info "Check attestations after abaab" ;
+  let* () =
+    check_consensus_operations
+      ~expected_attestations_committee:[bootstrap1; bootstrap2]
+      ~expected_attestations:[]
+      client
+  in
+  (* Check attestations for 10 more blocks *)
+  let rec check_bootstrap2_present previous_level remaining =
+    if remaining <= 0 then return ()
+    else
+      let* current_level = Node.wait_for_level node (previous_level + 1) in
+      let* () =
+        check_consensus_operations
+          ~expected_attestations_committee:[bootstrap1; bootstrap2]
+          ~expected_attestations:[]
+          client
+      in
+      check_bootstrap2_present current_level (remaining - 1)
+  in
+  check_bootstrap2_present (activation_level + 1) 10
+
+let multi_node_inconsistent_chain_id =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Multi node inconsistent chain id"
+    ~tags:[team; "baker"; "extra_nodes"; "sanity_check"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Start node1 with sandbox protocol" ;
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:[Synchronisation_threshold 0]
+      ()
+  in
+  Log.info
+    "Start node2 on a different chain (ghostnet genesis, not connected to \
+     node1)" ;
+  let node2 = Node.create [Synchronisation_threshold 0; No_bootstrap_peers] in
+  let* () = Node.config_init node2 [] in
+  let* () =
+    Node.Config_file.update
+      node2
+      (Node.Config_file.set_ghostnet_sandbox_network ())
+  in
+  let* () = Node.run node2 [] in
+  let* () = Node.wait_for_ready node2 in
+  Log.info
+    "Start baker with node1 as primary and node2 (different chain) as extra" ;
+  let* baker =
+    Agnostic_baker.init
+      ~delegates:[]
+      ~remote_mode:true
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      node1
+      client1
+  in
+  Log.info "Baker should terminate due to chain_id mismatch" ;
+  let timeout = 10. in
+  with_timeout
+    ~timeout
+    ~on_timeout:(fun () ->
+      Test.fail
+        "Baker did not shut down within %f seconds despite chain_id mismatch"
+        timeout)
+    (fun () -> Agnostic_baker.wait_for_termination baker)
+
+let multi_node_staggered_crash =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Multi node staggered crash"
+    ~tags:[team; "baker"; "extra_nodes"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      `Client
+      ()
+  in
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* _ = Node.wait_for_level node2 1 in
+  Log.info "Start agnostic baker with node1 as primary and node2 as extra" ;
+  let node1_endpoint = Node.as_rpc_endpoint node1 in
+  let node2_endpoint = Node.as_rpc_endpoint node2 in
+  let baker =
+    Agnostic_baker.create
+      ~delegates:[]
+      ~remote_mode:true
+      ~extra_nodes:[node2_endpoint]
+      node1
+      client1
+  in
+  let node1_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node1_endpoint
+      baker
+  in
+  let node2_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node2_endpoint
+      baker
+  in
+  let* () = Agnostic_baker.run baker
+  and* () = Agnostic_baker.wait_for_ready baker
+  and* () = node1_start_waiter
+  and* () = node2_start_waiter in
+  Log.info "Wait 5 levels" ;
+  let* _ = Node.wait_for_level node1 5 in
+  let crash_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_crash
+      ~endpoint:node1_endpoint
+      baker
+  in
+  let retry_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_retry
+      ~timeout:60.
+      ~endpoint:node1_endpoint
+      baker
+  in
+  Log.info "Wait for supervisor to crash and retry connecting to node1" ;
+  let* () = crash_waiter and* () = retry_waiter and* () = Node.kill node1 in
+
+  let termination_waiter = Agnostic_baker.wait_for_termination baker in
+  Log.info "Wait for baker to shut down" ;
+  let* () = Node.kill node2
+  and* () =
+    let timeout = 30. in
+    with_timeout
+      ~timeout
+      ~on_timeout:(fun () ->
+        Test.fail
+          "The baker failed to shutdown after being disconnected from all \
+           nodes for over %f seconds."
+          timeout)
+      (fun () -> termination_waiter)
+  in
+  unit
+
+let multi_node_crash_resilience =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Multi node crash resilience"
+    ~tags:[team; "baker"; "extra_nodes"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      `Client
+      ()
+  in
+  (* Connect nodes together *)
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* _ = Node.wait_for_level node2 1 in
+  Log.info "Start agnostic baker with node1 as primary and node2 as extra" ;
+  let node1_endpoint = Node.as_rpc_endpoint node1 in
+  let node2_endpoint = Node.as_rpc_endpoint node2 in
+  let baker =
+    Agnostic_baker.create
+      ~delegates:[]
+      ~remote_mode:true
+      ~extra_nodes:[node2_endpoint]
+      node1
+      client1
+  in
+  let node1_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node1_endpoint
+      baker
+  in
+  let node2_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node2_endpoint
+      baker
+  in
+  let* () = Agnostic_baker.run baker
+  and* () = Agnostic_baker.wait_for_ready baker
+  and* () = node1_start_waiter
+  and* () = node2_start_waiter in
+  Log.info "Wait 5 levels" ;
+  let* _ = Node.wait_for_level node1 5 in
+  (* Kill node1: baker should fall back to node2 *)
+  Log.info "Kill node1" ;
+  let* () = Node.kill node1 in
+  Log.info "Wait for node2 to progress for 5 levels while node1 is down" ;
+  let* level = Node.get_level node2 in
+  let* _ = Node.wait_for_level node2 (level + 5) in
+  (* Restart node1 and reconnect: baker should resume using node1 too *)
+  Log.info "Restart node1 and wait for baker to reconnect its automaton" ;
+  let* () = Node.run node1 [Synchronisation_threshold 0; Connections 1] in
+  let* () = Node.wait_for_ready node1 in
+  let node1_automaton_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node1_endpoint
+      baker
+  in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  (* The supervisor restarts crashed automatons *)
+  let* () = node1_automaton_start_waiter in
+  Log.info "Kill node2: baker should fall back to node1" ;
+  let* () = Node.kill node2 in
+  Log.info "Wait for node1 to progress for 5 levels while node2 is down" ;
+  let* level = Node.get_level node1 in
+  let* _ = Node.wait_for_level node1 (level + 5) in
+  (* Restart node2 and reconnect *)
+  Log.info "Restart node2 and wait for baker to reconnect its automaton" ;
+  let* () = Node.run node2 [Synchronisation_threshold 0; Connections 1] in
+  let* () = Node.wait_for_ready node2 in
+  let node2_automaton_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node2_endpoint
+      baker
+  in
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* () = node2_automaton_start_waiter in
+  (* Kill both nodes: baker must shut down *)
+  Log.info "Kill both nodes and wait for baker to shut down" ;
+  let supervisor_shutdown_waiter =
+    Agnostic_baker.wait_for_supervisor_all_automatons_down baker
+  in
+  let termination_waiter = Agnostic_baker.wait_for_termination baker in
+  let* () = Node.kill node1 in
+  let* () = Node.kill node2 in
+  let timeout =
+    (* The supervisor waits delay_between_restarts=20s before giving up *) 30.
+  in
+  with_timeout
+    ~timeout
+    ~on_timeout:(fun () ->
+      Test.fail
+        "The baker failed to shutdown after being disconnected from all nodes \
+         for over %f seconds."
+        timeout)
+    (fun () ->
+      let* () = supervisor_shutdown_waiter in
+      termination_waiter)
+
 let register_with_abaab ~abaab ~protocols =
   baker_check_consensus_branch ~abaab protocols ;
   force_apply_from_round ~abaab protocols ;
@@ -1778,5 +2263,10 @@ let register ~protocols =
   unable_to_reach_node_mempool protocols ;
   stream_is_refreshed_on_timeout protocols ;
   test_reproposal_at_abaab_activation_level protocols ;
+  test_abaab_with_small_baker protocols ;
   register_with_abaab ~abaab:false ~protocols ;
-  register_with_abaab ~abaab:true ~protocols
+  register_with_abaab ~abaab:true ~protocols ;
+  baker_shutdown_on_node_shutdown protocols ;
+  multi_node_inconsistent_chain_id protocols ;
+  multi_node_staggered_crash protocols ;
+  multi_node_crash_resilience protocols

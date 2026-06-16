@@ -154,32 +154,36 @@ let get_action_maker loc attribute =
         | _ -> None
       else None
 
-(** Transforms a rewriter in an OCaml function call:
-    - [@profiler.aggregate_s ...] will create a proper
-        Parsetree Lident representing Profiler.aggregate_s *)
-let to_fully_qualified_lident_expr t loc =
-  let lident =
-    Ppxlib.Ldot
-      ( Key.get_profiler_module t.key,
-        match t.action with
-        | Aggregate -> "aggregate"
-        | Aggregate_f -> "aggregate_f"
-        | Aggregate_s -> "aggregate_s"
-        | Mark -> "mark"
-        | Record -> "record"
-        | Record_f -> "record_f"
-        | Record_s -> "record_s"
-        | Span -> "span"
-        | Span_f -> "span_f"
-        | Span_s -> "span_s"
-        | Stamp -> "stamp"
-        | Stop -> "stop"
-        | Overwrite | Wrap_f | Wrap_s ->
-            Stdlib.failwith
-              "An overwrite or wrap section shouldn't be called with a leading \
-               module" )
+type profiler_method_call =
+  | Direct of Ppxlib.expression
+  | Unpack of {module_expr : Ppxlib.expression; method_name : string}
+
+let to_profiler_method_call t loc =
+  let action_name =
+    match t.action with
+    | Aggregate -> "aggregate"
+    | Aggregate_f -> "aggregate_f"
+    | Aggregate_s -> "aggregate_s"
+    | Mark -> "mark"
+    | Record -> "record"
+    | Record_f -> "record_f"
+    | Record_s -> "record_s"
+    | Span -> "span"
+    | Span_f -> "span_f"
+    | Span_s -> "span_s"
+    | Stamp -> "stamp"
+    | Stop -> "stop"
+    | Overwrite | Wrap_f | Wrap_s ->
+        Stdlib.failwith
+          "An overwrite or wrap section shouldn't be called with a leading \
+           module"
   in
-  Ppxlib.Ast_helper.Exp.ident {txt = lident; loc}
+  match Key.get_profiler_module t.key with
+  | Key.Static lident ->
+      Direct
+        (Ppxlib.Ast_helper.Exp.ident {txt = Ldot (lident, action_name); loc})
+  | Key.First_class module_expr ->
+      Unpack {module_expr; method_name = action_name}
 
 (** [extract_list e] destruct [e] as [Some list] or returns [None] *)
 let rec extract_list = function
@@ -239,6 +243,35 @@ let extract_enum_from_record loc record string =
       Some ident
   | field -> Error.error loc Error.(Improper_field field)
 
+(** Checks if a string starts with an uppercase letter *)
+let is_capitalized s = String.length s > 0 && Char.uppercase_ascii s.[0] = s.[0]
+
+(** [extract_module_from_record _ record field] checks that [field] exists and
+    that the associated value is a module or an expression evaluating to a
+    module. If [field] is not present, returns [None].
+
+    Returns [Key.Static lident] for static module paths (capitalized identifiers
+    or qualified paths), and [Key.First_class expr] for expressions that
+    evaluate to first-class modules. *)
+let extract_module_from_record _loc record string =
+  extract_field_from_record record string
+  |> Option.map (fun (_, expr) ->
+         match expr.Ppxlib.pexp_desc with
+         (* Capitalized simple identifier: Profiler *)
+         | Pexp_construct ({txt = Lident name; _}, None)
+           when is_capitalized name ->
+             Key.Static (Lident name)
+         (* Qualified module path: Foo.Bar, Foo.Bar.Baz *)
+         | Pexp_construct ({txt = Ldot _ as lident; _}, None) ->
+             Key.Static lident
+         | _ ->
+             (* Everything else is a first-class module expression:
+             - lowercase identifier: profiler
+             - module value access: Foo.bar
+             - record field access: state.profiler
+             - function call: get_profiler () *)
+             Key.First_class expr)
+
 (** [extract_bool_from_record _ record field] checks that [field] exists
       and that the associated value is a boolean.
       If [field] is not present, returns [None] *)
@@ -255,7 +288,9 @@ let extract_bool_from_record loc record string =
 let extract_from_record loc record =
   let verbosity = extract_enum_from_record loc record "verbosity" in
   let cpu_profiling = extract_bool_from_record loc record "cpu_profiling" in
-  let profiler_module = extract_enum_from_record loc record "profiler_module" in
+  let profiler_module =
+    extract_module_from_record loc record "profiler_module"
+  in
   let metadata =
     (* Metadata can be any valid expression so we return the
        expression associated to it as is *)
