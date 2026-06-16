@@ -245,6 +245,9 @@ teztale.release_page:
     URL: octez.tezos.com
     BUCKET_PATH: /releases
     DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+  environment:
+    name: release-page
+    action: access
   artifacts:
     expire_in: 1 day
     paths:

@@ -84,6 +84,9 @@ publish:release-page:
     DISTRIBUTION_ID: E19JF46UG3Z747
     AWS_ACCESS_KEY_ID: ${AWS_KEY_RELEASE_PUBLISH}
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_RELEASE_PUBLISH}
+  environment:
+    name: release-page
+    action: access
   artifacts:
     expire_in: 1 day
     paths:
@@ -122,6 +125,9 @@ grafazos.release_page:
     DISTRIBUTION_ID: E19JF46UG3Z747
     AWS_ACCESS_KEY_ID: ${AWS_KEY_RELEASE_PUBLISH}
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_RELEASE_PUBLISH}
+  environment:
+    name: release-page
+    action: access
   artifacts:
     expire_in: 1 day
     paths:
@@ -158,6 +164,9 @@ teztale.release_page:
     DISTRIBUTION_ID: E19JF46UG3Z747
     AWS_ACCESS_KEY_ID: ${AWS_KEY_RELEASE_PUBLISH}
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_RELEASE_PUBLISH}
+  environment:
+    name: release-page
+    action: access
   artifacts:
     expire_in: 1 day
     paths:
