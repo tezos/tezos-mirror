@@ -96,6 +96,11 @@
 
 ### Michelson Runtime
 
+- The Michelson storage-fees burn is now rendered on the CRAC-triggering
+  operation: an Applied content that delegates storage cost to its
+  callee carries the dual `(payer −V, storage fees +V)` balance-updates
+  pair, where V aggregates every cost the operation delegated through
+  CRAC. (!22166)
 - Removed the legacy `%default` (simple transfer, `string`) entrypoint
   from the gateway contract. Use the generic `%call` entrypoint instead:
   a POST to `http://ethereum/<address>` with an empty body and the
