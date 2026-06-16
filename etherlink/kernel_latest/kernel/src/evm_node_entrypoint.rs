@@ -20,7 +20,6 @@ use crate::{
     },
     configuration::fetch_tezosx_configuration,
     delayed_inbox::DelayedInbox,
-    storage::read_evm_chain_id,
     sub_block,
     transaction::Transaction,
 };
@@ -215,18 +214,6 @@ where
         transaction_bytes.len()
     );
 
-    // Build context: chain config, block constants, outbox queue.
-    let evm_chain_id = match read_evm_chain_id(&host) {
-        Ok(id) => id,
-        Err(err) => {
-            log!(
-                Error,
-                "Tezos X simulation: failed to read chain id: {:?}",
-                err
-            );
-            return;
-        }
-    };
     let chain_config = fetch_tezosx_configuration(&mut host);
     let blueprint_header = match read_current_blueprint_header(&host) {
         Ok(h) => h,
@@ -314,7 +301,7 @@ where
     // keeps the two nonce universes disjoint.
     let trace_operation_hash = tezosx_journal::TezosXJournal::synthetic_operation_hash(
         &trace_crac_id,
-        evm_chain_id.low_u64(),
+        chain_config.get_evm_chain_id().low_u64(),
         block_in_progress.number.low_u64(),
     );
     // Seed the journal with the live simulation block (built above from
