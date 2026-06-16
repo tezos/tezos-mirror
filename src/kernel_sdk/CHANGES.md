@@ -58,6 +58,8 @@
 - StorageV1 `store_read` / `store_read_slice` now support reading more than `MAX_FILE_CHUNK_SIZE` in one go.
 - fixed InMemoryStore `store_read` to match out-of-bounds check of
   irmin durable storage.
+- `store_read_all` skips the `store_value_size` call when the value fits in
+  a single chunk, saving one host call per read.
 
 ### Installer client/kernel
 
