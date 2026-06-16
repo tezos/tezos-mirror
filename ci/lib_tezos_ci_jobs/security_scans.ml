@@ -10,7 +10,6 @@
 
 open Gitlab_ci.Util
 module Images = Tezos_ci.Images
-module Pipeline = Tezos_ci.Pipeline
 module CI = Cacio.Shared
 
 let build_images =
@@ -174,21 +173,9 @@ let slack_jobs = List.map job_container_scanning_slack_notification build_images
    Cacio pulls in the scan jobs automatically via the transitive closure
    of the dependency graph. This reflects the intent: the scans are an
    implementation detail of producing the reports. *)
-let () =
+let register () =
   Cacio.register_jobs
     Schedule_security_scans
     (List.map
        (fun j -> (Cacio.Auto, j))
        (job_container_scanning_merge_reports :: slack_jobs))
-
-let child_pipeline =
-  Pipeline.register_child
-    "security-scans-master"
-    ~description:
-      "A child pipeline of 'before_merging' to launch the security scans for \
-       the images on the master branch"
-    ~jobs:
-      (if Tezos_ci.container_scanning_flag then
-         Tezos_ci.job_datadog_pipeline_trace
-         :: Cacio.get_jobs Schedule_security_scans
-       else [Tezos_ci.job_datadog_pipeline_trace])

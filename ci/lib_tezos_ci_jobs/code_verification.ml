@@ -245,15 +245,6 @@ let jobs pipeline_type =
         ~dependencies:(Dependent [])
         Base_images.child_pipeline
     in
-    let security_scan_trigger =
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:Yes ())
-        ~stage:Stages.manual
-        ~dependencies:(Dependent [])
-        Security_scans.child_pipeline
-    in
-
     match pipeline_type with
     | Before_merging ->
         (* Note: manual jobs in stage [manual] (which is the final
@@ -269,8 +260,6 @@ let jobs pipeline_type =
           job_debian_repository_trigger_partial;
           job_base_images_trigger;
         ]
-        @
-        if Tezos_ci.container_scanning_flag then [security_scan_trigger] else []
     (* No manual jobs on the scheduled pipeline *)
     | Merge_train | Schedule_extended_test -> []
   in

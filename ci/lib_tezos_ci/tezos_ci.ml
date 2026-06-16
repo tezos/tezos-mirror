@@ -1881,8 +1881,6 @@ let job_datadog_pipeline_trace : tezos_job =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
-let container_scanning_flag = false
-
 let enable_kernels =
   append_variables
     [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]

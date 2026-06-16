@@ -81,19 +81,6 @@ let schedule_test_release =
 let schedule_security_scans =
   scheduled && var "TZ_SCHEDULE_KIND" == str "SECURITY_SCANS"
 
-let schedule_container_scanning_master =
-  scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_MASTER"
-
-let schedule_container_scanning_octez_releases =
-  scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_OCTEZ_RELEASES"
-
-let schedule_container_scanning_octez_rc =
-  scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_OCTEZ_RC"
-
-let schedule_container_scanning_evm_node_releases =
-  scheduled
-  && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_EVM_NODE_RELEASES"
-
 let schedule_documentation =
   scheduled && var "TZ_SCHEDULE_KIND" == str "DOCUMENTATION"
 
