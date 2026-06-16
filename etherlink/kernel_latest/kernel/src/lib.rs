@@ -27,7 +27,6 @@ use storage::{
     enter_stage_one, leave_stage_one, read_da_fee, read_kernel_version,
     read_minimum_base_fee_per_gas, read_tracer_input, store_da_fee, store_kernel_version,
     store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
-    STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -138,7 +137,7 @@ where
     res
 }
 
-fn set_kernel_version(host: &mut impl StorageV1) -> Result<(), Error> {
+fn set_kernel_version(host: &mut (impl StorageV1 + KeySpaceLoader)) -> Result<(), Error> {
     match read_kernel_version(host) {
         Ok(kernel_version) => {
             if kernel_version != KERNEL_VERSION {
@@ -150,17 +149,24 @@ fn set_kernel_version(host: &mut impl StorageV1) -> Result<(), Error> {
     }
 }
 
-fn init_storage_versioning(host: &mut impl StorageV1) -> Result<(), Error> {
-    // Check both the new /base/ path and the legacy /evm/ path.
+fn init_storage_versioning(
+    host: &mut (impl StorageV1 + KeySpaceLoader),
+) -> Result<(), Error> {
+    // Check both the `/base` keyspace and the legacy /evm/ path.
     // If either exists, storage versioning is already initialised and the
     // migration framework will take it from here.
-    use crate::storage::LEGACY_STORAGE_VERSION_PATH;
-    match host.store_read(&STORAGE_VERSION_PATH, 0, 0) {
-        Ok(_) => Ok(()),
-        Err(_) => match host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, 0) {
+    use crate::storage::{is_storage_version_initialised, LEGACY_STORAGE_VERSION_PATH};
+    let initialised = {
+        let base = load_base_keyspace(host)?;
+        is_storage_version_initialised(&base)
+    };
+    if initialised {
+        Ok(())
+    } else {
+        match host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, 0) {
             Ok(_) => Ok(()),
             Err(_) => store_storage_version(host, STORAGE_VERSION),
-        },
+        }
     }
 }
 
