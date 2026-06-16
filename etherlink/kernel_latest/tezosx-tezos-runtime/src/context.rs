@@ -13,7 +13,7 @@ use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Origin;
 
-use crate::account::{
+use tezos_execution::account_storage::{
     get_origin_at, path_to_tezos_account, set_origin_at, TezosImplicitAccount,
 };
 
@@ -104,10 +104,10 @@ impl Context for TezosRuntimeContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::account::get_origin_at;
     use tezos_crypto_rs::blake2b;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
+    use tezos_execution::account_storage::get_origin_at;
     use tezosx_interfaces::{AliasInfo, RuntimeId};
 
     #[test]

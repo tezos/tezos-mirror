@@ -500,8 +500,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// Read the classification record (`Origin`) at the account's `/origin`
     /// path. `None` when the account carries no classification.
     ///
-    /// This is the same decode as
-    /// [`tezosx_tezos_runtime::account::get_origin_at`] /
+    /// This is the same decode as [`get_origin_at`] /
     /// `Context::read_origin_for_address`, kept here because `tezos_execution`
     /// sits below those: if the on-disk `Origin` encoding ever changes, all of
     /// them move together. `read_optional_nom_value` already maps a missing

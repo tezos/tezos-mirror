@@ -72,17 +72,14 @@ pub(crate) const TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
 /// `tezos_execution::enshrined_contracts` match against the same constant.
 pub(crate) use tezos_execution::NULL_PKH;
 
-use crate::{
-    account::{
-        get_origin_at, get_tezos_account_info_or_init, narith_to_u256, set_origin_at,
-        set_tezos_account_info,
-    },
-    context::TezosRuntimeContext,
+use crate::context::TezosRuntimeContext;
+use tezos_execution::account_storage::{
+    get_origin_at, get_tezos_account_info_or_init, narith_to_u256, set_origin_at,
+    set_tezos_account_info,
 };
 
 pub struct TezosRuntime(pub ChainId);
 
-pub mod account;
 pub mod alias_forwarder;
 pub mod context;
 pub mod headers;
@@ -2215,7 +2212,7 @@ mod tests {
         // The kernel must never reach an alias address that has been
         // classified as Native. If it does, the call returns an error
         // rather than overwriting the classification.
-        use crate::account::set_origin_at;
+        use tezos_execution::account_storage::set_origin_at;
 
         let mut host = MockKernelHost::default();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -3541,7 +3538,8 @@ mod tests {
             Classification, Origin, RuntimeInterface, ALIAS_LOOKUP_MILLIGAS,
         };
 
-        use crate::{account::set_origin_at, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH};
+        use crate::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH;
+        use tezos_execution::account_storage::set_origin_at;
 
         fn test_runtime() -> TezosRuntime {
             TezosRuntime::new(ChainId::default())
