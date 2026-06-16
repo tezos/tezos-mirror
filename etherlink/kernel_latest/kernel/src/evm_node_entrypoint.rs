@@ -18,7 +18,7 @@ use crate::{
         self, ChainConfigTrait, TezosXChainConfig,
         TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
     },
-    configuration::fetch_chain_configuration,
+    configuration::fetch_tezosx_configuration,
     delayed_inbox::DelayedInbox,
     storage::read_chain_id,
     sub_block,
@@ -227,7 +227,7 @@ where
             return;
         }
     };
-    let chain_config = fetch_chain_configuration(&mut host, chain_id);
+    let chain_config = fetch_tezosx_configuration(&mut host);
     let blueprint_header = match read_current_blueprint_header(&host) {
         Ok(h) => h,
         Err(err) => {

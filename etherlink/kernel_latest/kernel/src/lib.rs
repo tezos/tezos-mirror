@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::configuration::{
-    fetch_chain_configuration, fetch_configuration, Configuration, CHAIN_ID,
+    fetch_configuration, fetch_tezosx_configuration, Configuration, CHAIN_ID,
 };
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
@@ -242,8 +242,6 @@ pub fn run<Host>(host: &mut Host) -> Result<(), anyhow::Error>
 where
     Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
 {
-    let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
-
     // We always start by doing the migration if needed.
     match stage_zero(host) {
         Ok(MigrationStatus::None) => {
@@ -294,7 +292,7 @@ where
     let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let chain_configuration = fetch_chain_configuration(host, chain_id);
+    let chain_configuration = fetch_tezosx_configuration(host);
     let mut configuration = fetch_configuration(host);
     let sequencer_pool_address = read_sequencer_pool_address(host);
 

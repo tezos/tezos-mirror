@@ -10,10 +10,11 @@ use crate::{
     retrieve_minimum_base_fee_per_gas,
     storage::{
         dal_slots, enable_dal, is_enable_fa_bridge, max_blueprint_lookahead_in_seconds,
-        read_admin, read_delayed_transaction_bridge, read_kernel_governance,
-        read_kernel_security_governance, read_maximum_allowed_ticks,
-        read_michelson_runtime_chain_id, read_or_set_maximum_gas_per_transaction,
-        read_sequencer_governance, sequencer, store_michelson_runtime_chain_id,
+        read_admin, read_chain_id, read_delayed_transaction_bridge,
+        read_kernel_governance, read_kernel_security_governance,
+        read_maximum_allowed_ticks, read_michelson_runtime_chain_id,
+        read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
+        store_chain_id, store_michelson_runtime_chain_id,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
@@ -224,23 +225,28 @@ fn fetch_michelson_runtime_chain_id(
     }
 }
 
-pub fn fetch_chain_configuration<Host>(
-    host: &mut Host,
-    chain_id: U256,
-) -> TezosXChainConfig
+pub fn fetch_tezosx_configuration<Host>(host: &mut Host) -> TezosXChainConfig
 where
     Host: StorageV1,
 {
+    // Read both runtime chain ids from storage. The EVM chain id falls back to
+    // the default and is persisted on first use; the Michelson runtime chain id
+    // is derived from it and persisted if absent.
+    let evm_chain_id = read_chain_id(host).unwrap_or_else(|_| {
+        let chain_id = U256::from(CHAIN_ID);
+        let _ = store_chain_id(host, chain_id);
+        chain_id
+    });
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    let michelson_runtime_chain_id = fetch_michelson_runtime_chain_id(host, chain_id);
+    let michelson_chain_id = fetch_michelson_runtime_chain_id(host, evm_chain_id);
     TezosXChainConfig::create_config(
-        chain_id,
+        evm_chain_id,
         limits,
         spec_id,
         experimental_features,
-        michelson_runtime_chain_id,
+        michelson_chain_id,
     )
 }
 
