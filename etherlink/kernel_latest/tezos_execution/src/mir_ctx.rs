@@ -1332,6 +1332,14 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                 if self.host.store_has(&value_path)?.is_some() {
                     let previous_value_size: BigInt =
                         self.host.store_value_size(&value_path)?.into();
+                    // Read total_bytes BEFORE mutating /keys. For a pre-counter
+                    // big_map the counter is absent and total_bytes() rebuilds it
+                    // by summing /keys (init_total_bytes_from_existing); reading
+                    // after remove_key would sum a /keys already missing this
+                    // entry, so the `-(65 + prev)` subtraction below would drop it
+                    // twice. (Once the counter exists this is a plain read, so the
+                    // order only matters on the lazy-migration path.)
+                    let current = total_bytes(self.host, self.context, id)?;
                     // The entry value is L1's carbonated `Big_map.Contents`;
                     // charge its removal. The keys-list and total_bytes updated
                     // below are L1's non-carbonated auxiliary structures.
@@ -1339,7 +1347,6 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                     self.host.store_delete(&value_path)?;
                     BigMapKeys::remove_key(self.host, self.context, id, &key_hashed)?;
 
-                    let current = total_bytes(self.host, self.context, id)?;
                     let lazy_storage_size_diff = Zarith(
                         -(BigInt::from(BYTES_SIZE_FOR_BIG_MAP_KEY) + previous_value_size),
                     );
