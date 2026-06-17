@@ -3545,6 +3545,11 @@ fn typecheck_instruction_step<'a, 'b>(
             // if no entrypoint is specified, default is assumed
             let entrypoint = entrypoint.unwrap_or_default();
             let t = parse_ty(gas, t)?;
+            // The argument of contract only needs to be passable; this mirrors
+            // the written `contract t` parser, which also enforces Passable.
+            // Without this check, MIR would accept e.g. `CONTRACT operation`,
+            // which L1 rejects ("operation type forbidden in parameter, ...").
+            t.ensure_prop(gas, TypeProperty::Passable)?;
             stack.push(T::new_option(T::new_contract(t.clone())));
             I::Contract(t, entrypoint)
         }
@@ -10923,6 +10928,20 @@ mod typecheck_tests {
                 stack: stk![Type::Unit],
                 reason: None
             })
+        );
+
+        // `CONTRACT operation` is rejected because `operation` is not passable.
+        let stk = &mut tc_stk![Type::Address];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("CONTRACT operation").unwrap(),
+                &mut Gas::default(),
+                stk
+            ),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Passable,
+                Type::Operation
+            ))
         );
     }
 

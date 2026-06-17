@@ -133,6 +133,7 @@
   "contract_03.tzt": true,
   "contract_04.tzt": true,
   "contract_05.tzt": true,
+  "contract_06.tc.tzt": true,
   "createcontract_00.tzt": false,
   "createcontract_01.tzt": false,
   "dig_00.tzt": true,

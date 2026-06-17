@@ -1,0 +1,3 @@
+code { CONTRACT operation } ;
+input { Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" } ;
+output (StaticError _) ;
