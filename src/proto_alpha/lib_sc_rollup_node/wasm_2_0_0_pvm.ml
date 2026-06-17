@@ -141,12 +141,18 @@ type unsafe_patch =
   | Patch_durable_storage of {key : string; value : string}
   | Patch_PVM_version of {version : Tezos_scoru_wasm.Wasm_pvm_state.version}
 
+(* FIXME: https://linear.app/tezos/issue/L2-1427
+   Inert placeholder keeping this protocol single-storage: the empty
+   config leaves the [Nds_host_functions] gate closed, so NDS never
+   activates. *)
+module Fast_pvm_params = Tezos_scoru_wasm_fast.Pvm.Default_params
+
 module Wasm_fast_pvm_machine :
   Tezos_scoru_wasm.Wasm_pvm_sig.S
     with type context = Wasm_2_0_0_proof_format.context
      and type state = Wasm_2_0_0_proof_format.state
      and type proof = Wasm_2_0_0_proof_format.proof =
-  Tezos_scoru_wasm_fast.Pvm.Make_pvm (Wasm_2_0_0_proof_format)
+  Tezos_scoru_wasm_fast.Pvm.Make_pvm (Fast_pvm_params) (Wasm_2_0_0_proof_format)
 
 module Wasm_pvm_on_disk :
   Sc_rollup.Wasm_2_0_0PVM.S

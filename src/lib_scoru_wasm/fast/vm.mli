@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,4 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_scoru_wasm.Wasm_vm_sig.S
+(** Fast WASM VM specialised to a given [Params].  There is no implicit
+    default: every caller supplies its own [config] and [make_empty_nds]. *)
+module Make_vm (P : Tezos_scoru_wasm.Wasm_vm.Params) :
+  Tezos_scoru_wasm.Wasm_vm_sig.S

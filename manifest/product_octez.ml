@@ -3325,6 +3325,7 @@ let octez_scoru_wasm_fast =
         octez_webassembly_interpreter;
         lazy_containers;
         octez_scoru_wasm;
+        octez_riscv_nds_common;
         octez_wasmer;
       ]
 
