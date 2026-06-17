@@ -187,7 +187,7 @@ impl<'a> BigMap<'a> {
                     // always used, even if it is `None` (and `get` returned
                     // `Some(None)`) which means removal.
                     Some(change) => change.clone(),
-                    None => storage.big_map_get(arena, id, key)?,
+                    None => storage.big_map_get(arena, id, key, &self.value_type)?,
                 }
             }
         })
@@ -308,6 +308,7 @@ pub trait LazyStorage<'a> {
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key: &TypedValue,
+        value_type: &Type,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError>;
 
     /// Check whether a value is present under the given key of the given big
@@ -487,6 +488,7 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         _arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key: &TypedValue,
+        _value_type: &Type,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
         let info = self.access_big_map(id)?;
         Ok(info.map.get(key).cloned())

@@ -13,7 +13,7 @@ use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
 use crate::{consume_storage_read_milligas, consume_storage_write_milligas};
 use mir::parser::Parser;
-use mir::typechecker::{MichelineContractScript, MichelineView};
+use mir::typechecker::{typecheck_value, MichelineContractScript, MichelineView};
 use mir::{
     ast::{
         big_map::{BigMapId, LazyStorage, LazyStorageError},
@@ -1290,32 +1290,22 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key: &TypedValue,
+        value_type: &Type,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
         let value_path =
             value_path(self.context, id, &hash_key(key.clone(), self.gas())?)?;
-        // The entry value is L1's carbonated `Big_map.Contents`; charge its
-        // read. The value_type below is L1's non-carbonated `Value_type`, read
-        // without charging.
         let Some(encoded_value) =
             read_big_map_value_metered(self.operation_gas, self.host, &value_path)?
         else {
             return Ok(None);
         };
 
-        let value_type_path = value_type_path(self.context, id)?;
-        let encoded_value_type = self.host.store_read_all(&value_type_path)?;
-        let value_type = Micheline::decode_raw(
-            arena,
-            &encoded_value_type,
-            &mut self.operation_gas.remaining,
-        )??;
-
         let value = Micheline::decode_raw(
             arena,
             &encoded_value,
             &mut self.operation_gas.remaining,
         )??;
-        Ok(Some(value.typecheck_value(self, &value_type)?))
+        Ok(Some(typecheck_value(&value, self, value_type)?))
     }
 
     fn big_map_mem(
@@ -1566,7 +1556,7 @@ pub mod tests {
 
         for (key, value) in &content {
             let stored_value = ctx
-                .big_map_get(arena, id, key)
+                .big_map_get(arena, id, key, &value_type)
                 .expect("Failed to read value from storage")
                 .expect("Key should be present in storage");
             assert_eq!(&stored_value, value);
