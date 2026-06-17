@@ -1346,6 +1346,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let value_path = value_path(self.context, id, &key_hashed)?;
         match value {
             None => {
+                consume_storage_write_milligas(self.operation_gas, 1, 0)?;
                 if self.host.store_has(&value_path)?.is_some() {
                     let previous_value_size: BigInt =
                         self.host.store_value_size(&value_path)?.into();
@@ -1357,10 +1358,6 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                     // twice. (Once the counter exists this is a plain read, so the
                     // order only matters on the lazy-migration path.)
                     let current = total_bytes(self.host, self.context, id)?;
-                    // The entry value is L1's carbonated `Big_map.Contents`;
-                    // charge its removal. The keys-list and total_bytes updated
-                    // below are L1's non-carbonated auxiliary structures.
-                    consume_storage_write_milligas(self.operation_gas, 1, 0)?;
                     self.host.store_delete(&value_path)?;
                     BigMapKeys::remove_key(self.host, self.context, id, &key_hashed)?;
 
