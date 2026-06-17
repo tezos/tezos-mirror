@@ -146,9 +146,11 @@ pub mod contracts {
         Ok(OwnedPath::try_from(path_string)?)
     }
 
-    /// Path of an account's mutez balance.
-    pub fn balance_path<A: TezosAccount + ?Sized>(
-        account: &A,
+    /// Path of an originated account's mutez balance. (Implicit accounts keep
+    /// their balance in the RLP `/info` record, so only originated accounts
+    /// use this path.)
+    pub fn balance_path(
+        account: &TezosOriginatedAccount,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &BALANCE_PATH)
     }
