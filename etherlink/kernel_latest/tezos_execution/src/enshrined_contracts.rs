@@ -37,7 +37,7 @@ use tezosx_interfaces::{
 };
 use tezosx_journal::TezosXJournal;
 
-use crate::account_storage::TezlinkAccount;
+use crate::account_storage::TezosAccount;
 use crate::mir_ctx::{
     HasContractAccount, HasCracChainDepth, HasCrossRuntime, HasDelegatedStorageCost,
     HasHost, HasOperationGas, HasOriginLookup, HasSourcePublicKey,

@@ -89,7 +89,7 @@ pub enum Manager {
     Revealed(PublicKey),
 }
 
-pub trait TezlinkAccount {
+pub trait TezosAccount {
     fn path(&self) -> &OwnedPath;
     fn contract(&self) -> Contract;
 
@@ -135,7 +135,7 @@ pub trait TezlinkAccount {
     }
 }
 
-pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
+pub trait TezosImplicitAccountTrait: TezosAccount + Sized {
     fn pkh(&self) -> &PublicKeyHash;
 
     /// Get the **counter** for the Tezlink account.
@@ -269,7 +269,7 @@ pub struct TezlinkOriginatedAccount {
     pub(crate) kt1: ContractKt1Hash,
 }
 
-impl TezlinkAccount for TezlinkOriginatedAccount {
+impl TezosAccount for TezlinkOriginatedAccount {
     #[inline]
     fn path(&self) -> &OwnedPath {
         &self.path
@@ -446,7 +446,7 @@ impl OriginatedContractInfo {
     }
 }
 
-pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
+pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     fn kt1(&self) -> &ContractKt1Hash;
 
     fn code(&self, host: &impl StorageV1) -> Result<Code, tezos_storage::error::Error> {
@@ -981,7 +981,7 @@ pub struct TezosImplicitAccount {
     pub(crate) path: OwnedPath,
 }
 
-impl TezlinkAccount for TezosImplicitAccount {
+impl TezosAccount for TezosImplicitAccount {
     fn path(&self) -> &OwnedPath {
         &self.path
     }

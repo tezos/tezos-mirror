@@ -7,8 +7,8 @@
 //! Account addressing, construction, and origin classification helpers.
 
 use crate::account_storage::{
-    get_origin_at, path_to_tezos_account, set_origin_at, TezlinkAccount,
-    TezlinkOriginatedAccount, TezosImplicitAccount, TezosOriginatedAccount,
+    get_origin_at, path_to_tezos_account, set_origin_at, TezlinkOriginatedAccount,
+    TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
 use mir::ast::{big_map::BigMapId, AddressHash};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -255,19 +255,19 @@ pub mod account {
         Ok(OwnedPath::try_from(path_string)?)
     }
 
-    pub fn balance_path<A: TezlinkAccount + ?Sized>(
+    pub fn balance_path<A: TezosAccount + ?Sized>(
         account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &BALANCE_PATH)
     }
 
-    pub fn counter_path<A: TezlinkAccount + ?Sized>(
+    pub fn counter_path<A: TezosAccount + ?Sized>(
         account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &COUNTER_PATH)
     }
 
-    pub fn manager_path<A: TezlinkAccount + ?Sized>(
+    pub fn manager_path<A: TezosAccount + ?Sized>(
         account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &MANAGER_PATH)

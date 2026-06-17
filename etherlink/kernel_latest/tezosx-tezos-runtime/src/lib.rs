@@ -19,7 +19,7 @@ use tezos_data_encoding::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_execution::{
-    account_storage::{TezlinkAccount, TezosOriginatedAccount},
+    account_storage::{TezosAccount, TezosOriginatedAccount},
     context, cross_runtime_transfer,
     enshrined_contracts::CracError,
     mir_ctx::{clear_temporary_big_maps, InterpretContext, OperationCtx, TcCtx},

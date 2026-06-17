@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::account_storage::{
-    Code, TezlinkAccount, TezlinkOriginatedAccount, TezosImplicitAccountTrait,
+    Code, TezlinkOriginatedAccount, TezosAccount, TezosImplicitAccountTrait,
     TezosOriginatedAccount,
 };
 use crate::address::OriginationNonce;
@@ -186,7 +186,7 @@ fn address_from_contract(contract: Contract) -> AddressHash {
 impl ExecCtx {
     pub fn create(
         host: &mut impl StorageV1,
-        sender_account: &impl TezlinkAccount,
+        sender_account: &impl TezosAccount,
         dest_account: &impl TezosOriginatedAccount,
         amount: &Narith,
     ) -> Result<Self, TransferError> {

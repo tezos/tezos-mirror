@@ -21,7 +21,7 @@ use tezos_tezlink::{
 
 use crate::{
     account_storage::{
-        Manager, TezlinkAccount, TezosImplicitAccount, TezosImplicitAccountTrait,
+        Manager, TezosAccount, TezosImplicitAccount, TezosImplicitAccountTrait,
     },
     context,
     gas::TezlinkOperationGas,

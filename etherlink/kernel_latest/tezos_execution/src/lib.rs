@@ -3,7 +3,7 @@
 
 use account_storage::Code;
 use account_storage::Manager;
-use account_storage::TezlinkAccount;
+use account_storage::TezosAccount;
 use enshrined_contracts::charge_internal_receipt_bodies;
 use enshrined_contracts::charge_persisted_error;
 use enshrined_contracts::get_enshrined_contract_entrypoint;
@@ -274,7 +274,7 @@ fn burn_pass<Host, M, A>(
 where
     Host: StorageV1,
     M: storage_fees::OperationStorageFees,
-    A: TezlinkAccount,
+    A: TezosAccount,
 {
     let parent_outcome = storage_fees::burn_content_storage_fees::<_, M>(
         host,
@@ -340,7 +340,7 @@ fn finalize_and_burn<Host, M, A>(
 where
     Host: StorageV1,
     M: storage_fees::OperationStorageFees,
-    A: TezlinkAccount,
+    A: TezosAccount,
 {
     let mut content = finalize_statuses::<M>(result, &mut internal_operation_results);
     let mut storage_limit_remaining: BigUint = storage_limit.0.clone();
@@ -480,9 +480,9 @@ fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError
 
 fn transfer_tez<Host>(
     host: &mut Host,
-    giver_account: &impl TezlinkAccount,
+    giver_account: &impl TezosAccount,
     amount: &Narith,
-    receiver_account: &impl TezlinkAccount,
+    receiver_account: &impl TezosAccount,
 ) -> Result<TransferSuccess, TransferError>
 where
     Host: StorageV1,
@@ -515,7 +515,7 @@ where
 fn credit_destination_without_debiting_sender(
     host: &mut impl StorageV1,
     amount: &Narith,
-    receiver_account: &impl TezlinkAccount,
+    receiver_account: &impl TezosAccount,
 ) -> Result<TransferSuccess, TransferError> {
     if amount.eq(&0_u64.into()) {
         return Ok(TransferSuccess {
@@ -565,7 +565,7 @@ fn credit_destination_without_debiting_sender(
 
 fn burn_tez(
     host: &mut impl StorageV1,
-    account: &impl TezlinkAccount,
+    account: &impl TezosAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
     let balance = account
@@ -937,7 +937,7 @@ fn transfer<'a, Host>(
     operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    sender_account: &impl TezlinkAccount,
+    sender_account: &impl TezosAccount,
     amount: &Narith,
     dest_contract: &Contract,
     entrypoint: &Entrypoint,
@@ -1504,7 +1504,7 @@ pub fn cross_runtime_transfer<'a, Host>(
     operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    sender: &impl TezlinkAccount,
+    sender: &impl TezosAccount,
     amount: &Narith,
     dest: &Contract,
     parameters: &Parameters,
@@ -1761,7 +1761,7 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1>(
 pub fn originate_contract<'a, Host>(
     ctx: &mut TcCtx<'a, Host>,
     contract: ContractKt1Hash,
-    sender_account: &impl TezlinkAccount,
+    sender_account: &impl TezosAccount,
     initial_balance: &Narith,
     script_code: Option<&[u8]>,
     script_storage: TypedValue<'a>,
@@ -1878,8 +1878,8 @@ where
 
 /// Prepares balance updates in the format expected by the Tezos operation.
 fn compute_balance_updates(
-    giver: &impl TezlinkAccount,
-    receiver: &impl TezlinkAccount,
+    giver: &impl TezosAccount,
+    receiver: &impl TezosAccount,
     amount: &Narith,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     if amount.eq(&0_u64.into()) {
@@ -1907,8 +1907,8 @@ fn compute_balance_updates(
 /// Applies balance changes by updating both source and destination accounts.
 fn apply_balance_changes<Host>(
     host: &mut Host,
-    giver_account: &impl TezlinkAccount,
-    receiver_account: &impl TezlinkAccount,
+    giver_account: &impl TezosAccount,
+    receiver_account: &impl TezosAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<(), TransferError>
 where
@@ -2525,7 +2525,7 @@ mod tests {
     use crate::storage_fees::{COST_PER_BYTES, ORIGINATION_SIZE};
     use crate::storage_read_cost_milligas;
     use crate::{
-        account_storage::{Manager, TezlinkAccount},
+        account_storage::{Manager, TezosAccount},
         burn_pass, cross_runtime_transfer, validate_and_apply_operation,
         CracTransferError, FeeRefundConfig, OperationError, ProcessedOperation,
         TaggedInternalOp,
