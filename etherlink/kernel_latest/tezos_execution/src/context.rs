@@ -7,8 +7,7 @@
 //! Account addressing, construction, and origin classification helpers.
 
 use crate::account_storage::{
-    get_origin_at, path_to_tezos_account, set_origin_at, TezosAccount,
-    TezosImplicitAccount, TezosOriginatedAccount,
+    path_to_tezos_account, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
 use mir::ast::{big_map::BigMapId, AddressHash};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -80,9 +79,7 @@ pub fn record_origin(
     origin: &Origin,
 ) -> Result<(), tezos_storage::error::Error> {
     let originated = originated_from_kt1(kt1)?;
-    let path = originated.path().clone();
-    set_origin_at(host, &path, origin)
-        .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
+    originated.set_origin(host, origin)
 }
 
 /// Read the origin classification (native / alias) for the given address.
@@ -98,9 +95,7 @@ pub fn read_origin_for_address(
         AddressHash::Implicit(_) => Ok(Some(Origin::Native)),
         AddressHash::Kt1(kt1) => {
             let originated = originated_from_kt1(kt1)?;
-            let path = originated.path().clone();
-            get_origin_at(host, &path)
-                .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
+            originated.origin(host)
         }
         AddressHash::Sr1(_) => Ok(None),
     }
@@ -222,9 +217,9 @@ pub mod code {
 
     /// Classification record (`Origin`) of an originated account, read here to
     /// resolve a code-less alias to the shared implementation. This is the
-    /// canonical `/origin` segment: the `get_origin_at` / `set_origin_at`
-    /// helpers in [`crate::account_storage`] build on it, so the reader and the
-    /// writer of the record share a single source of truth.
+    /// canonical `/origin` segment: the `TezosOriginatedAccount::origin` /
+    /// `set_origin` methods build on it, so the reader and the writer of the
+    /// record share a single source of truth.
     pub const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
 
     /// Aggregated storage-accounting record: holds [code_size],
@@ -265,15 +260,14 @@ mod tests {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"some-test-seed"));
 
         let originated = originated_from_kt1(&kt1).unwrap();
-        let path = originated.path().clone();
 
         // Before origination, no classification.
-        assert!(get_origin_at(&host, &path).unwrap().is_none());
+        assert!(originated.origin(&host).unwrap().is_none());
 
         record_origin(&mut host, &kt1, &Origin::Native).unwrap();
 
         // After origination, Native.
-        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(Origin::Native));
+        assert_eq!(originated.origin(&host).unwrap(), Some(Origin::Native));
 
         // record_origin with Alias overwrites with Alias.
         let alias = Origin::Alias(AliasInfo {
@@ -281,7 +275,7 @@ mod tests {
             native_address: b"0xfeedface".to_vec(),
         });
         record_origin(&mut host, &kt1, &alias).unwrap();
-        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(alias));
+        assert_eq!(originated.origin(&host).unwrap(), Some(alias));
     }
 
     #[test]

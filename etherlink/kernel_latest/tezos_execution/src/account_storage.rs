@@ -33,14 +33,6 @@ use tezos_storage::{
 };
 use tezosx_interfaces::{Origin, TezosXRuntimeError};
 
-/// Sibling path that holds the classification record of an originated KT1
-/// account: the segment is appended to the account prefix and the resulting
-/// path lives next to the rest of the account state. Implicit accounts carry
-/// no `/origin` record: a tz1/2/3 is Tezos-native by construction (see
-/// [`crate::context::read_origin_for_address`]), so only KT1 accounts
-/// (which may be `Native` or an `Alias` forwarder) store a classification.
-use crate::context::code::ORIGIN_PATH;
-
 // Path where all the infos of a Tezos contract are stored under the same key.
 // This path must contains balance, nonce and optionally a revealed public key.
 const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
@@ -373,17 +365,23 @@ impl TezosOriginatedAccount {
 
     /// Read the classification record (`Origin`) at the account's `/origin`
     /// path. `None` when the account carries no classification.
-    ///
-    /// This is the same decode as [`get_origin_at`] /
-    /// [`crate::context::read_origin_for_address`]: if the on-disk `Origin`
-    /// encoding ever changes, all of them move together.
-    /// `read_optional_nom_value` already maps a missing path to `None` and
-    /// rejects incomplete / trailing bytes.
+    /// `read_optional_nom_value` maps a missing path to `None` and rejects
+    /// incomplete / trailing bytes.
     pub fn origin(
         &self,
         host: &impl StorageV1,
     ) -> Result<Option<Origin>, tezos_storage::error::Error> {
         read_optional_nom_value(host, &code::origin_path(self)?)
+    }
+
+    /// Write the classification record (`Origin`) at the account's `/origin`
+    /// path.
+    pub fn set_origin(
+        &self,
+        host: &mut impl StorageV1,
+        origin: &Origin,
+    ) -> Result<(), tezos_storage::error::Error> {
+        store_bin(origin, host, &code::origin_path(self)?)
     }
 
     /// Whether this originated account is a Tezos X alias (classified
@@ -819,46 +817,6 @@ pub fn set_tezos_account_info(
     Ok(host.store_write(&path, value, 0)?)
 }
 
-/// Read the classification record stored at the origin path under the
-/// given KT1 account path. Only originated accounts store a classification:
-/// the record sits next to the rest of the contract's state. Implicit
-/// accounts are `Native` by construction and keep no `/origin` record.
-pub fn get_origin_at(
-    host: &impl StorageV1,
-    account_path: &OwnedPath,
-) -> Result<Option<Origin>, TezosXRuntimeError> {
-    let path = concat(account_path, &ORIGIN_PATH)?;
-    match host.store_read_all(&path) {
-        Ok(bytes) => {
-            let (rest, origin) = Origin::nom_read(&bytes).map_err(|_| {
-                TezosXRuntimeError::ConversionError("Invalid origin encoding".to_string())
-            })?;
-            if !rest.is_empty() {
-                return Err(TezosXRuntimeError::ConversionError(
-                    "Trailing bytes after origin encoding".to_string(),
-                ));
-            }
-            Ok(Some(origin))
-        }
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(TezosXRuntimeError::Runtime(err)),
-    }
-}
-
-/// Write the classification record at the origin path under the given account path.
-pub fn set_origin_at(
-    host: &mut impl StorageV1,
-    account_path: &OwnedPath,
-    origin: &Origin,
-) -> Result<(), TezosXRuntimeError> {
-    let path = concat(account_path, &ORIGIN_PATH)?;
-    let mut buf = Vec::new();
-    origin.bin_write(&mut buf).map_err(|e| {
-        TezosXRuntimeError::ConversionError(format!("encoding Origin failed: {e}"))
-    })?;
-    Ok(host.store_write(&path, &buf, 0)?)
-}
-
 pub struct TezosImplicitAccount {
     pub(crate) pkh: PublicKeyHash,
     pub(crate) path: OwnedPath,
@@ -1057,33 +1015,6 @@ mod tests {
         let narith_value = super::u256_to_narith(&u256_value);
         let narith_value = Narith(narith_value.0 + num_bigint::BigUint::from(1u64));
         let _ = narith_to_u256(&narith_value).expect_err("Should error on overflow");
-    }
-
-    #[test]
-    fn origin_at_path_roundtrip() {
-        use super::{get_origin_at, set_origin_at};
-        use tezos_evm_runtime::runtime::MockKernelHost;
-        use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
-        use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
-
-        let mut host = MockKernelHost::default();
-        let path: OwnedPath =
-            RefPath::assert_from(b"/test/some/originated/account").into();
-
-        // An absent path returns no value.
-        assert!(get_origin_at(&host, &path).unwrap().is_none());
-
-        // The native variant round-trips.
-        set_origin_at(&mut host, &path, &Origin::Native).unwrap();
-        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(Origin::Native));
-
-        // The alias variant round-trips.
-        let alias = Origin::Alias(AliasInfo {
-            runtime: RuntimeId::Tezos,
-            native_address: b"tz1...".to_vec(),
-        });
-        set_origin_at(&mut host, &path, &alias).unwrap();
-        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(alias));
     }
 
     #[test]
@@ -1798,10 +1729,34 @@ mod test {
             runtime: RuntimeId::Ethereum,
             native_address: b"0xabc".to_vec(),
         });
-        let mut buf = vec![];
-        origin.bin_write(&mut buf).unwrap();
-        host.store_write_all(&code::origin_path(account).unwrap(), &buf)
-            .unwrap();
+        account.set_origin(host, &origin).unwrap();
+    }
+
+    /// The `Origin` classification round-trips through `set_origin` / `origin`:
+    /// an account with no record reads as `None`, and both variants survive a
+    /// write/read cycle.
+    #[test]
+    fn origin_roundtrip() {
+        use tezosx_interfaces::{AliasInfo, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = originated(&contract);
+
+        // An account with no `/origin` record carries no classification.
+        assert!(account.origin(&host).unwrap().is_none());
+
+        // The native variant round-trips.
+        account.set_origin(&mut host, &Origin::Native).unwrap();
+        assert_eq!(account.origin(&host).unwrap(), Some(Origin::Native));
+
+        // The alias variant round-trips.
+        let alias = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: b"tz1...".to_vec(),
+        });
+        account.set_origin(&mut host, &alias).unwrap();
+        assert_eq!(account.origin(&host).unwrap(), Some(alias));
     }
 
     /// A KT1 classified `Origin::Alias` and carrying no `/data/code` resolves to
@@ -1870,10 +1825,7 @@ mod test {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        let mut buf = vec![];
-        Origin::Native.bin_write(&mut buf).unwrap();
-        host.store_write_all(&code::origin_path(&account).unwrap(), &buf)
-            .unwrap();
+        account.set_origin(&mut host, &Origin::Native).unwrap();
 
         assert!(matches!(
             account.code(&host),
