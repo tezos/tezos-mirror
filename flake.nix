@@ -164,6 +164,7 @@
               shfmt
               taplo
               wabt
+              websocat
               xxd
               # For RISC-V kernel cross-compilation — use symlinkJoin to
               # strip nix-support setup hooks so the cross-compiler's CC
