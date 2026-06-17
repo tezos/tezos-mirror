@@ -724,6 +724,11 @@ where
         source: &source_account,
         origination_nonce: &mut nonce,
         counter: &mut counter,
+        // Fresh per inbound CRAC servicing, scoped exactly like
+        // `counter`: an internal-operation replay (a DUP'd `operation`
+        // emitted twice) within this sub-execution is rejected here
+        // just as on the native path (L2-1637).
+        applied_counters: std::collections::BTreeSet::new(),
         level: &hdrs.block_number,
         now: &hdrs.timestamp,
         chain_id,

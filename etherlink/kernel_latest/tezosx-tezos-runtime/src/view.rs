@@ -244,6 +244,9 @@ where
         source: &source_account,
         origination_nonce: &mut nonce,
         counter: &mut counter,
+        // Views cannot emit operations, so no internal-operation
+        // replay can occur; the set is left empty.
+        applied_counters: std::collections::BTreeSet::new(),
         level: &hdrs.block_number,
         now: &hdrs.timestamp,
         chain_id,

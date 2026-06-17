@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::account_storage::{
     Code, TezlinkAccount, TezlinkOriginatedAccount, TezosImplicitAccount,
@@ -88,6 +88,14 @@ pub struct OperationCtx<'operation, A: TezosImplicitAccount> {
     pub source: &'operation A,
     pub origination_nonce: &'operation mut OriginationNonce,
     pub counter: &'operation mut u128,
+    /// MIR operation counters of the internal operations already
+    /// applied within this top-level operation. `counter` is the
+    /// replay identity L1 enforces: `operation` is `Duplicable`, so a
+    /// contract may `DUP` an `operation` value and emit both copies
+    /// (same counter). They must not both apply — the second is
+    /// rejected as an internal-operation replay (L2-1637). Scoped to
+    /// the top-level operation, exactly like `counter`.
+    pub applied_counters: BTreeSet<u128>,
     // 'level', 'now' and 'chain_id' should outlive operation in reality
     // So having them downcast to 'operation is not a problem
     pub level: &'operation BlockNumber,
@@ -2114,6 +2122,7 @@ pub mod tests {
             source: &source,
             origination_nonce: &mut origination_nonce,
             counter: &mut counter,
+            applied_counters: std::collections::BTreeSet::new(),
             level: &level,
             now: &now,
             chain_id: &chain_id,
@@ -2672,6 +2681,7 @@ pub mod tests {
             source: &source,
             origination_nonce: &mut origination_nonce,
             counter: &mut counter,
+            applied_counters: std::collections::BTreeSet::new(),
             level: &level,
             now: &now,
             chain_id: &chain_id,

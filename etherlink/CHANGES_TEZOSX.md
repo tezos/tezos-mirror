@@ -113,14 +113,14 @@
   size-dependent `unpack_failed` gas penalty before pushing `None`, like L1.
   Previously the failure paths (binary decode or typechecking) returned
   `None` without the penalty, undercharging large failing payloads.
-  (L2-1656)
+  (!22263)
 - The `VIEW` instruction now gates execution on two type-equality checks,
   matching L1: the callee view's declared output type must equal the
   caller-requested return type, and the caller's argument type must equal
   the callee's declared input type. On mismatch `VIEW` pushes `None`
   instead of executing the view (which previously could return `Some` with
   a value of the wrong type). The checks are gas-metered like L1's `ty_eq`.
-  (L2-1659)
+  (!22234)
 - `CREATE_CONTRACT` now validates the embedded child script's view
   declarations like L1, both at origination and when typechecking a
   parameter value that carries an embedded `CREATE_CONTRACT`: a child view
@@ -128,7 +128,7 @@
   `sapling_state`), an ill-typed body, or a forbidden-in-view instruction is
   now rejected instead of being silently originated. Re-typechecking an
   already-stored contract (entrypoint extraction, execution) is unchanged,
-  so already-originated contracts keep executing. (L2-1635)
+  so already-originated contracts keep executing. (!22235)
 - The `TICKET` instruction now rejects a non-comparable ticket content
   (e.g. `ticket (ticket string)`) during typechecking, matching L1,
   which requires ticket content to be comparable. Previously the
@@ -153,6 +153,15 @@
   big map during the returned-storage pass and then fail copying it during
   the operation-list pass; removal of no-longer-referenced big maps is now
   deferred until after the operation list has been dumped. (!22220)
+- Duplicated internal operations are now rejected as replays. The
+  `operation` type is `Duplicable`, so a contract can `DUP` an
+  `operation` value and emit both copies; the runtime previously
+  assigned each copy a fresh nonce and applied both, letting a
+  transfer, ticket transfer, or origination run twice while L1
+  backtracks. Two internal operations sharing the same operation
+  counter within a single top-level operation are now rejected
+  (matching L1 `Internal_operation_replay`) and the whole operation
+  backtracks. (!22219)
 - The Michelson storage-fees burn is now rendered on the CRAC-triggering
   operation: an Applied content that delegates storage cost to its
   callee carries the dual `(payer −V, storage fees +V)` balance-updates
