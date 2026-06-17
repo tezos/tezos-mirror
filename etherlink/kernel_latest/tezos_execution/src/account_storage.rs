@@ -1005,6 +1005,127 @@ pub fn set_origin_at(
     Ok(host.store_write(&path, &buf, 0)?)
 }
 
+pub struct TezosImplicitAccount {
+    pub pkh: PublicKeyHash,
+    pub path: OwnedPath,
+}
+
+impl TezlinkAccount for TezosImplicitAccount {
+    fn path(&self) -> &OwnedPath {
+        &self.path
+    }
+
+    fn contract(&self) -> Contract {
+        Contract::Implicit(self.pkh.clone())
+    }
+
+    fn balance(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Narith, tezos_storage::error::Error> {
+        match get_tezos_account_info(host, &self.pkh) {
+            Ok(Some(info)) => Ok(u256_to_narith(&info.balance)),
+            Ok(None) => Ok(Narith::from(0u64)),
+            Err(e) => Err(tezos_storage::error::Error::TcError(format!("{e}"))),
+        }
+    }
+
+    fn set_balance(
+        &self,
+        host: &mut impl StorageV1,
+        balance: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let mut info = get_tezos_account_info_or_init(host, &self.pkh)
+            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
+        info.balance = narith_to_u256(balance)
+            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
+        set_tezos_account_info(host, &self.pkh, info)
+            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
+    }
+}
+
+impl TezosImplicitAccountTrait for TezosImplicitAccount {
+    fn pkh(&self) -> &PublicKeyHash {
+        &self.pkh
+    }
+
+    fn counter(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Narith, tezos_storage::error::Error> {
+        match get_tezos_account_info(host, &self.pkh) {
+            Ok(Some(info)) => Ok(Narith::from(info.nonce)),
+            Ok(None) => Ok(Narith::from(0u64)),
+            Err(e) => Err(tezos_storage::error::Error::NomReadError(format!("{e}"))),
+        }
+    }
+
+    fn set_counter(
+        &self,
+        host: &mut impl StorageV1,
+        counter: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let mut info = get_tezos_account_info_or_init(host, &self.pkh)
+            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
+        info.nonce = counter
+            .0
+            .clone()
+            .try_into()
+            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
+        set_tezos_account_info(host, &self.pkh, info)
+            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))
+    }
+
+    fn manager(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Manager, tezos_storage::error::Error> {
+        let info = get_tezos_account_info(host, &self.pkh)
+            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
+        match info {
+            Some(info) => match info.pub_key {
+                Some(pk) => Ok(Manager::Revealed(pk)),
+                None => Ok(Manager::NotRevealed(self.pkh.clone())),
+            },
+            None => Ok(Manager::NotRevealed(self.pkh.clone())),
+        }
+    }
+
+    fn set_manager_pk_hash_internal(
+        &self,
+        _host: &mut impl StorageV1,
+        _public_key_hash: &PublicKeyHash,
+    ) -> Result<(), tezos_storage::error::Error> {
+        // In TezosX, we do not need this function which is used in Tezlink
+        // only for backward compatibility.
+        Ok(())
+    }
+
+    fn set_manager_public_key(
+        &self,
+        host: &mut impl StorageV1,
+        public_key: &tezos_smart_rollup::types::PublicKey,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let mut info = get_tezos_account_info_or_init(host, &self.pkh)
+            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
+        info.pub_key = Some(public_key.clone());
+        set_tezos_account_info(host, &self.pkh, info)
+            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
+        Ok(())
+    }
+
+    fn allocated(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<bool, tezos_storage::error::Error> {
+        match get_tezos_account_info(host, &self.pkh) {
+            Ok(Some(_)) => Ok(true),
+            Ok(None) => Ok(false),
+            Err(e) => Err(tezos_storage::error::Error::NomReadError(format!("{e}"))),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -1063,6 +1184,36 @@ mod tests {
         });
         set_origin_at(&mut host, &path, &alias).unwrap();
         assert_eq!(get_origin_at(&host, &path).unwrap(), Some(alias));
+    }
+
+    #[test]
+    fn set_manager_public_key_reveals_manager() {
+        use super::{Manager, TezosImplicitAccount, TezosImplicitAccountTrait};
+        use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
+        use tezos_evm_runtime::runtime::MockKernelHost;
+
+        let mut host = MockKernelHost::default();
+        let pkh =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let public_key = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .unwrap();
+        let path = super::path_to_tezos_account(&pkh).unwrap();
+        let account = TezosImplicitAccount {
+            pkh: pkh.clone(),
+            path,
+        };
+
+        // Reveal records the public key as the account's manager. It writes no
+        // `/origin` record — an implicit account is Native by construction.
+        account
+            .set_manager_public_key(&mut host, &public_key)
+            .unwrap();
+        assert_eq!(
+            account.manager(&host).unwrap(),
+            Manager::Revealed(public_key)
+        );
     }
 }
 
