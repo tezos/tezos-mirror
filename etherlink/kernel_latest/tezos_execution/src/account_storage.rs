@@ -88,32 +88,26 @@ pub trait TezosAccount {
     fn contract(&self) -> Contract;
 
     /// Get the **balance** of an account in Mutez held by the account.
+    /// Each account kind reads it from its own storage layout (RLP `/info`
+    /// for implicit accounts, the `/balance` path for originated ones), so
+    /// there is no shared default.
     fn balance(
         &self,
         host: &impl StorageV1,
-    ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = account::balance_path(self)?;
-        Ok(
-            read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
-                .unwrap_or(0_u64.into()),
-        )
-    }
+    ) -> Result<Narith, tezos_storage::error::Error>;
 
     /// Set the **balance** of an account in Mutez held by the account.
     fn set_balance(
         &self,
         host: &mut impl StorageV1,
         balance: &Narith,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = account::balance_path(self)?;
-        store_bin(balance, host, &path)
-    }
+    ) -> Result<(), tezos_storage::error::Error>;
 
     /// Add amount (in Mutez) to the **balance** held by the account.
     ///
-    /// Delegates to `self.balance()` and `self.set_balance()` so that
-    /// implementations overriding those methods (e.g. TezosX RLP storage)
-    /// get correct behavior without needing to override `add_balance` too.
+    /// Delegates to `self.balance()` and `self.set_balance()`, so each account
+    /// kind's own implementation of those (e.g. the implicit account's RLP
+    /// `/info` storage) is used without needing to provide `add_balance` too.
     ///
     /// TODO: In TezosX, this causes two storage reads + two RLP decodes
     /// (one in balance(), one in set_balance()). If add_balance becomes
@@ -142,6 +136,26 @@ impl TezosAccount for TezosOriginatedAccount {
     }
     fn contract(&self) -> Contract {
         Contract::Originated(self.kt1.clone())
+    }
+
+    fn balance(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Narith, tezos_storage::error::Error> {
+        let path = account::balance_path(self)?;
+        Ok(
+            read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
+                .unwrap_or(0_u64.into()),
+        )
+    }
+
+    fn set_balance(
+        &self,
+        host: &mut impl StorageV1,
+        balance: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = account::balance_path(self)?;
+        store_bin(balance, host, &path)
     }
 }
 #[derive(Debug, PartialEq)]
