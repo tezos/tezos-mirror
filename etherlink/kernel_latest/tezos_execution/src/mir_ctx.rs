@@ -1074,26 +1074,19 @@ fn storage_error_to_lazy(e: tezos_storage::error::Error) -> LazyStorageError {
     ))
 }
 
-/// Charge for and read a big_map entry value, returning `None` (and charging
-/// the base lookup) when absent. Mirrors L1's carbonated
-/// `Big_map.Contents.find` (read_access: base on a miss, base + bytes when
-/// present). The key_type / value_type / total_bytes / keys-list auxiliary
-/// structures are L1's non-carbonated `Indexed_context.Make_map` and stay
-/// uncharged.
+/// Charge for and read a big_map entry value, returning `None` when absent.
 fn read_big_map_value_metered(
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     host: &impl StorageV1,
     path: &impl tezos_smart_rollup_host::path::Path,
 ) -> Result<Option<Vec<u8>>, LazyStorageError> {
+    consume_storage_read_milligas(operation_gas, 1, 0)?; // mem
     match host.store_value_size(path) {
         Ok(size) => {
-            consume_storage_read_milligas(operation_gas, 1, size as u64)?;
+            consume_storage_read_milligas(operation_gas, 1, size as u64)?; // get
             Ok(Some(host.store_read_all(path)?))
         }
-        Err(RuntimeError::PathNotFound) => {
-            consume_storage_read_milligas(operation_gas, 1, 0)?;
-            Ok(None)
-        }
+        Err(RuntimeError::PathNotFound) => Ok(None),
         Err(e) => Err(e.into()),
     }
 }
