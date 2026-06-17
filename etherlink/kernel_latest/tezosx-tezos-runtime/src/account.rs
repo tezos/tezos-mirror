@@ -3,23 +3,18 @@
 // SPDX-License-Identifier: MIT
 
 use tezos_crypto_rs::public_key_hash::PublicKeyHash;
-use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
+use tezos_data_encoding::types::Narith;
 use tezos_execution::account_storage::{
     Manager, TezlinkAccount, TezosImplicitAccountTrait,
 };
 use tezos_protocol::contract::Contract;
+use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_host::{
-    path::{concat, OwnedPath},
-    runtime::RuntimeError,
-};
-use tezosx_interfaces::{Origin, TezosXRuntimeError};
+use tezosx_interfaces::TezosXRuntimeError;
 
 pub use tezos_execution::account_storage::{narith_to_u256, u256_to_narith};
 
 pub use tezos_execution::account_storage::TezosAccountInfo;
-
-pub(crate) use tezos_execution::account_storage::ORIGIN_PATH;
 
 pub use tezos_execution::account_storage::{
     path_to_implicit_account_prefix, path_to_tezos_account,
@@ -29,45 +24,7 @@ pub use tezos_execution::account_storage::{
     get_tezos_account_info, get_tezos_account_info_or_init, set_tezos_account_info,
 };
 
-/// Read the classification record stored at the origin path under the
-/// given KT1 account path. Only originated accounts store a classification:
-/// the record sits next to the rest of the contract's state. Implicit
-/// accounts are `Native` by construction and keep no `/origin` record.
-pub fn get_origin_at(
-    host: &impl StorageV1,
-    account_path: &OwnedPath,
-) -> Result<Option<Origin>, TezosXRuntimeError> {
-    let path = concat(account_path, &ORIGIN_PATH)?;
-    match host.store_read_all(&path) {
-        Ok(bytes) => {
-            let (rest, origin) = Origin::nom_read(&bytes).map_err(|_| {
-                TezosXRuntimeError::ConversionError("Invalid origin encoding".to_string())
-            })?;
-            if !rest.is_empty() {
-                return Err(TezosXRuntimeError::ConversionError(
-                    "Trailing bytes after origin encoding".to_string(),
-                ));
-            }
-            Ok(Some(origin))
-        }
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(TezosXRuntimeError::Runtime(err)),
-    }
-}
-
-/// Write the classification record at the origin path under the given account path.
-pub fn set_origin_at(
-    host: &mut impl StorageV1,
-    account_path: &OwnedPath,
-    origin: &Origin,
-) -> Result<(), TezosXRuntimeError> {
-    let path = concat(account_path, &ORIGIN_PATH)?;
-    let mut buf = Vec::new();
-    origin.bin_write(&mut buf).map_err(|e| {
-        TezosXRuntimeError::ConversionError(format!("encoding Origin failed: {e}"))
-    })?;
-    Ok(host.store_write(&path, &buf, 0)?)
-}
+pub use tezos_execution::account_storage::{get_origin_at, set_origin_at};
 
 /// Seed the shared alias implementation with the canonical forwarder code if
 /// the slot is empty, leaving an already-populated slot untouched.
@@ -225,33 +182,6 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn origin_at_path_roundtrip() {
-        use crate::account::{get_origin_at, set_origin_at};
-        use tezos_evm_runtime::runtime::MockKernelHost;
-        use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
-        use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
-
-        let mut host = MockKernelHost::default();
-        let path: OwnedPath =
-            RefPath::assert_from(b"/test/some/originated/account").into();
-
-        // An absent path returns no value.
-        assert!(get_origin_at(&host, &path).unwrap().is_none());
-
-        // The native variant round-trips.
-        set_origin_at(&mut host, &path, &Origin::Native).unwrap();
-        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(Origin::Native));
-
-        // The alias variant round-trips.
-        let alias = Origin::Alias(AliasInfo {
-            runtime: RuntimeId::Tezos,
-            native_address: b"tz1...".to_vec(),
-        });
-        set_origin_at(&mut host, &path, &alias).unwrap();
-        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(alias));
-    }
-
     #[test]
     fn alias_implementation_seed_and_roundtrip() {
         use crate::account::init_alias_implementation;

@@ -2155,7 +2155,7 @@ mod tests {
         // ensure_alias once, then deleting the origin path, then
         // running it again. The second call should restore the
         // classification without redeploying.
-        use crate::account::{get_origin_at, ORIGIN_PATH};
+        use tezos_execution::account_storage::{get_origin_at, ORIGIN_PATH};
         use tezos_smart_rollup_host::path::concat;
 
         let mut host = test_host();
