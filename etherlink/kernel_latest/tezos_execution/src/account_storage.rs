@@ -6,7 +6,7 @@
 
 //! Tezos account state and storage
 
-use crate::context::{self, account, code};
+use crate::context::{self, code, contracts};
 use crate::enshrined_contracts::{self, EnshrinedContracts};
 use num_bigint::BigInt;
 use primitive_types::U256;
@@ -142,7 +142,7 @@ impl TezosAccount for TezosOriginatedAccount {
         &self,
         host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = account::balance_path(self)?;
+        let path = contracts::balance_path(self)?;
         Ok(
             read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
                 .unwrap_or(0_u64.into()),
@@ -154,7 +154,7 @@ impl TezosAccount for TezosOriginatedAccount {
         host: &mut impl StorageV1,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = account::balance_path(self)?;
+        let path = contracts::balance_path(self)?;
         store_bin(balance, host, &path)
     }
 }

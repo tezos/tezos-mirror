@@ -4059,7 +4059,7 @@ mod tests {
         // never-originated KT1 must remain absent from durable storage.
         let dest_account = context::originated_from_kt1(&desthash)
             .expect("originated_from_kt1 should have succeeded");
-        let balance_path = context::account::balance_path(&dest_account)
+        let balance_path = context::contracts::balance_path(&dest_account)
             .expect("balance_path should have succeeded");
         assert_eq!(
             host.store_has(&balance_path).unwrap(),

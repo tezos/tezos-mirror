@@ -53,7 +53,7 @@ pub fn originated_from_kt1(
 ) -> Result<TezosOriginatedAccount, tezos_storage::error::Error> {
     let index = contracts::index()?;
     let contract = Contract::Originated(kt1.clone());
-    let path = concat(&index, &account::account_path(&contract)?)?;
+    let path = concat(&index, &contracts::account_path(&contract)?)?;
     Ok(TezosOriginatedAccount {
         path,
         kt1: kt1.clone(),
@@ -107,6 +107,8 @@ pub fn read_origin_for_address(
 }
 
 pub mod contracts {
+    use mir::ast::BinWriter;
+
     use super::*;
 
     const ROOT: RefPath = RefPath::assert_from(b"/contracts");
@@ -114,6 +116,8 @@ pub mod contracts {
     const INDEX: RefPath = RefPath::assert_from(b"/index");
 
     const GLOBAL_COUNTER: RefPath = RefPath::assert_from(b"/global_counter");
+
+    const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
 
     pub fn root() -> Result<OwnedPath, PathError> {
         concat(&TEZOS_ACCOUNTS_ROOT, &ROOT)
@@ -125,6 +129,28 @@ pub mod contracts {
 
     pub fn global_counter() -> Result<OwnedPath, PathError> {
         concat(&root()?, &GLOBAL_COUNTER)
+    }
+
+    /// Path segment identifying a contract under [`index`], using the same
+    /// encoding as the octez node's context (see
+    /// `octez-codec describe alpha.contract binary schema`).
+    pub fn account_path(
+        contract: &Contract,
+    ) -> Result<OwnedPath, tezos_storage::error::Error> {
+        let mut contract_encoded = Vec::new();
+        contract
+            .bin_write(&mut contract_encoded)
+            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
+
+        let path_string = alloc::format!("/{}", hex::encode(&contract_encoded));
+        Ok(OwnedPath::try_from(path_string)?)
+    }
+
+    /// Path of an account's mutez balance.
+    pub fn balance_path<A: TezosAccount + ?Sized>(
+        account: &A,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &BALANCE_PATH)
     }
 }
 
@@ -221,34 +247,6 @@ pub mod code {
 
     pub fn origin_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
         concat(account.path(), &ORIGIN_PATH)
-    }
-}
-
-pub mod account {
-    use mir::ast::BinWriter;
-
-    use super::*;
-
-    const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
-
-    pub fn account_path(
-        contract: &Contract,
-    ) -> Result<OwnedPath, tezos_storage::error::Error> {
-        // uses the same encoding as in the octez node's representation of the context
-        // see `octez-codec describe alpha.contract binary schema`
-        let mut contract_encoded = Vec::new();
-        contract
-            .bin_write(&mut contract_encoded)
-            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
-
-        let path_string = alloc::format!("/{}", hex::encode(&contract_encoded));
-        Ok(OwnedPath::try_from(path_string)?)
-    }
-
-    pub fn balance_path<A: TezosAccount + ?Sized>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &BALANCE_PATH)
     }
 }
 
