@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use rlp::{Decodable, Encodable, Rlp};
 use tezos_crypto_rs::public_key_hash::PublicKeyHash;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_execution::account_storage::{
@@ -26,43 +25,9 @@ pub use tezos_execution::account_storage::{
     path_to_implicit_account_prefix, path_to_tezos_account,
 };
 
-pub fn get_tezos_account_info(
-    host: &impl StorageV1,
-    pub_key_hash: &PublicKeyHash,
-) -> Result<Option<TezosAccountInfo>, TezosXRuntimeError> {
-    let path =
-        path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
-    match host.store_read_all(&path) {
-        Ok(bytes) => {
-            let account_info = TezosAccountInfo::decode(&Rlp::new(&bytes))
-                .map_err(|_| RuntimeError::DecodingError)?;
-            Ok(Some(account_info))
-        }
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(TezosXRuntimeError::Runtime(err)),
-    }
-}
-
-pub fn get_tezos_account_info_or_init(
-    host: &mut impl StorageV1,
-    pub_key_hash: &PublicKeyHash,
-) -> Result<TezosAccountInfo, TezosXRuntimeError> {
-    match get_tezos_account_info(host, pub_key_hash)? {
-        Some(info) => Ok(info),
-        None => Ok(TezosAccountInfo::default()),
-    }
-}
-
-pub fn set_tezos_account_info(
-    host: &mut impl StorageV1,
-    pub_key_hash: &PublicKeyHash,
-    info: TezosAccountInfo,
-) -> Result<(), TezosXRuntimeError> {
-    let path =
-        path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
-    let value = &info.rlp_bytes();
-    Ok(host.store_write(&path, value, 0)?)
-}
+pub use tezos_execution::account_storage::{
+    get_tezos_account_info, get_tezos_account_info_or_init, set_tezos_account_info,
+};
 
 /// Read the classification record stored at the origin path under the
 /// given KT1 account path. Only originated accounts store a classification:

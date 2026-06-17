@@ -927,6 +927,44 @@ pub fn path_to_tezos_account(
     Ok(concat(&prefix, &INFO_PATH)?)
 }
 
+pub fn get_tezos_account_info(
+    host: &impl StorageV1,
+    pub_key_hash: &PublicKeyHash,
+) -> Result<Option<TezosAccountInfo>, TezosXRuntimeError> {
+    let path =
+        path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
+    match host.store_read_all(&path) {
+        Ok(bytes) => {
+            let account_info = TezosAccountInfo::decode(&Rlp::new(&bytes))
+                .map_err(|_| RuntimeError::DecodingError)?;
+            Ok(Some(account_info))
+        }
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(TezosXRuntimeError::Runtime(err)),
+    }
+}
+
+pub fn get_tezos_account_info_or_init(
+    host: &mut impl StorageV1,
+    pub_key_hash: &PublicKeyHash,
+) -> Result<TezosAccountInfo, TezosXRuntimeError> {
+    match get_tezos_account_info(host, pub_key_hash)? {
+        Some(info) => Ok(info),
+        None => Ok(TezosAccountInfo::default()),
+    }
+}
+
+pub fn set_tezos_account_info(
+    host: &mut impl StorageV1,
+    pub_key_hash: &PublicKeyHash,
+    info: TezosAccountInfo,
+) -> Result<(), TezosXRuntimeError> {
+    let path =
+        path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
+    let value = &info.rlp_bytes();
+    Ok(host.store_write(&path, value, 0)?)
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
