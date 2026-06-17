@@ -2606,6 +2606,38 @@ let octez_riscv_nds_common =
     ~path:"src/lib_riscv_nds/common"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"]
 
+let octez_riscv_durable_storage_in_memory_api =
+  public_lib
+    "octez-riscv-nds-memory-api"
+    ~path:"src/lib_riscv_nds/memory/api"
+    ~synopsis:
+      "OCaml API of the RISC-V durable storage in-memory Rust components"
+    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
+    ~dep_globs_rec:["../../../riscv/*"]
+    ~link_deps:lib_wasmer_riscv
+    ~modules:["octez_riscv_durable_storage_in_memory_api"]
+    ~dune:
+      Dune.
+        [
+          [
+            S "copy_files";
+            S
+              "../../../riscv/durable-in-memory/octez_riscv_durable_storage_in_memory_api.*";
+          ];
+        ]
+
+let octez_riscv_nds_memory =
+  octez_lib
+    "riscv-nds-memory"
+    ~internal_name:"octez_riscv_nds_memory"
+    ~path:"src/lib_riscv_nds/memory"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_riscv_nds_common |> open_;
+        octez_riscv_durable_storage_in_memory_api;
+      ]
+
 let lazy_containers =
   octez_lib
     "lazy-containers"
@@ -3227,6 +3259,59 @@ let octez_smart_rollup_wasm_in_memory =
         octez_merkle_proof_encoding;
       ]
 
+let octez_smart_rollup_wasm_dual_state =
+  octez_lib
+    "smart-rollup-wasm-dual-state"
+    ~internal_name:"tezos_smart_rollup_wasm_dual_state"
+    ~path:"src/lib_smart_rollup_wasm_dual_state"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_scoru_wasm;
+        octez_riscv_nds_common;
+        lazy_containers;
+      ]
+
+(* In-memory NDS instantiation of [octez_smart_rollup_wasm_dual_state].
+   Kept in a separate library so the RISC-V in-memory NDS FFI
+   ([octez_riscv_nds_memory]) is linked only by binaries that exercise
+   NDS activation — not transitively by [octez_protocol_environment]
+   (and hence every node binary, including octez-evm-node). *)
+let octez_smart_rollup_wasm_in_memory_dual =
+  octez_lib
+    "smart-rollup-wasm-in-memory-dual"
+    ~internal_name:"tezos_smart_rollup_wasm_in_memory_dual"
+    ~path:"src/lib_smart_rollup_wasm_in_memory_dual"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_scoru_wasm;
+        octez_smart_rollup_wasm_in_memory;
+        octez_smart_rollup_wasm_dual_state;
+        octez_riscv_nds_common;
+        octez_riscv_nds_memory;
+      ]
+
+let _octez_smart_rollup_wasm_in_memory_tests =
+  tezt
+    ["test_dual_state"]
+    ~path:"src/lib_smart_rollup_wasm_in_memory/test"
+    ~opam:"octez-libs"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_test_helpers |> open_;
+        octez_test_helpers |> open_;
+        octez_scoru_wasm;
+        octez_smart_rollup_wasm_in_memory;
+        octez_smart_rollup_wasm_dual_state;
+        octez_smart_rollup_wasm_in_memory_dual;
+        octez_riscv_nds_memory;
+        octez_webassembly_interpreter;
+        qcheck_alcotest;
+        alcotezt;
+      ]
+
 let octez_scoru_wasm_fast =
   octez_l2_lib
     "scoru-wasm-fast"
@@ -3819,38 +3904,6 @@ let octez_riscv_api =
     ~link_deps:lib_wasmer_riscv
     ~modules:["octez_riscv_api"]
     ~dune:Dune.[[S "copy_files"; S "../../riscv/api/octez_riscv_api.*"]]
-
-let octez_riscv_durable_storage_in_memory_api =
-  public_lib
-    "octez-riscv-nds-memory-api"
-    ~path:"src/lib_riscv_nds/memory/api"
-    ~synopsis:
-      "OCaml API of the RISC-V durable storage in-memory Rust components"
-    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
-    ~dep_globs_rec:["../../../riscv/*"]
-    ~link_deps:lib_wasmer_riscv
-    ~modules:["octez_riscv_durable_storage_in_memory_api"]
-    ~dune:
-      Dune.
-        [
-          [
-            S "copy_files";
-            S
-              "../../../riscv/durable-in-memory/octez_riscv_durable_storage_in_memory_api.*";
-          ];
-        ]
-
-let octez_riscv_nds_memory =
-  public_lib
-    "octez-riscv-nds.memory"
-    ~path:"src/lib_riscv_nds/memory"
-    ~synopsis:"RISC-V new durable storage"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_riscv_nds_common |> open_;
-        octez_riscv_durable_storage_in_memory_api;
-      ]
 
 (* Rustzcash is not used by the rollup node directly but
    octez_client_base depends on octez_sapling which declares

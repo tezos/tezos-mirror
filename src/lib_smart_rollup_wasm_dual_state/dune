@@ -2,14 +2,14 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name octez_riscv_nds_memory)
- (public_name octez-libs.riscv-nds-memory)
+ (name tezos_smart_rollup_wasm_dual_state)
+ (public_name octez-libs.smart-rollup-wasm-dual-state)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
+  octez-libs.scoru-wasm
   octez-libs.riscv-nds-common
-  octez-riscv-nds-memory-api)
+  octez-libs.lazy-containers)
  (flags
   (:standard)
-  -open Tezos_base.TzPervasives
-  -open Octez_riscv_nds_common))
+  -open Tezos_base.TzPervasives))

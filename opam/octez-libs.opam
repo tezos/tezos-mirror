@@ -79,6 +79,7 @@ depends: [
   "lru" { >= "0.3.0" }
   "semaphore-compat" { >= "1.0.1" }
   "checkseum" { != "0.5.0" }
+  "octez-riscv-nds-memory-api" { = version }
   "saturn" { >= "0.5.0" }
   "ringo" { >= "1.1.0" }
   "octez-internal-libs" { = version }
@@ -89,6 +90,7 @@ depends: [
   "octez-rust-tezos-context" { = version }
   "opentelemetry-lwt"
   "octez-rustzcash-deps" { with-test & = version }
+  "octez-rust-deps" { with-test & = version }
   "bigstring" {with-test}
   "tezt-bam" { with-test & >= "0.3" }
 ]

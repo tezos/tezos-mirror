@@ -2,39 +2,45 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_lib_riscv_nds_test_tezt_lib)
+ (name src_lib_smart_rollup_wasm_in_memory_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   bls12-381.archive
   octez-libs.base
-  octez-libs.riscv-nds-common
-  octez-libs.riscv-nds-memory
-  octez-riscv-nds.disk
+  octez-libs.base-test-helpers
   octez-libs.test-helpers
-  octez-libs.qcheck-tezt
-  tezt)
+  octez-libs.scoru-wasm
+  octez-libs.smart-rollup-wasm-in-memory
+  octez-libs.smart-rollup-wasm-dual-state
+  octez-libs.smart-rollup-wasm-in-memory-dual
+  octez-libs.riscv-nds-memory
+  octez-libs.webassembly-interpreter
+  qcheck-alcotest
+  octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
-  -open Octez_riscv_nds_common)
- (modules test_nds_pbt helpers model))
+  -open Tezos_base_test_helpers
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules test_dual_state))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  octez-rollup-node-rust-deps
-  src_lib_riscv_nds_test_tezt_lib
+  octez-rust-deps
+  src_lib_smart_rollup_wasm_in_memory_test_tezt_lib
   tezt)
  (modules main))
 
 (rule
  (alias runtest)
- (package octez-riscv-nds)
+ (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
