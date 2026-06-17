@@ -27,7 +27,7 @@ use tezos_smart_rollup::{
     host::{RuntimeError, ValueType},
     types::{PublicKey, PublicKeyHash},
 };
-use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{
     read_nom_value_bounded, read_optional_nom_value, read_optional_nom_value_bounded,
@@ -890,6 +890,41 @@ impl Decodable for TezosAccountInfo {
             pub_key,
         })
     }
+}
+
+// Path where Tezos accounts are stored.
+pub(crate) const TEZOS_ACCOUNTS_PATH: RefPath =
+    RefPath::assert_from(b"/tez/tez_accounts/tezosx");
+
+// Path where all the infos of a Tezos contract are stored under the same key.
+// This path must contains balance, nonce and optionally a revealed public key.
+const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
+
+/// Sibling path that holds the classification record of an originated KT1
+/// account: the segment is appended to the account prefix and the resulting
+/// path lives next to the rest of the account state. Implicit accounts carry
+/// no `/origin` record: a tz1/2/3 is Tezos-native by construction (see
+/// [`crate::context`]), so only KT1 accounts (which may be `Native` or an
+/// `Alias` forwarder) store a classification.
+pub use crate::context::code::ORIGIN_PATH;
+
+/// Path of the durable storage subtree for an implicit account. The
+/// info RLP record sits under this prefix at the info segment; the
+/// classification record sits at the origin segment.
+pub fn path_to_implicit_account_prefix(
+    pub_key_hash: &PublicKeyHash,
+) -> Result<OwnedPath, TezosXRuntimeError> {
+    let address_path: Vec<u8> = format!("/{pub_key_hash}").into();
+    let address_path = OwnedPath::try_from(address_path)
+        .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
+    Ok(concat(&TEZOS_ACCOUNTS_PATH, &address_path)?)
+}
+
+pub fn path_to_tezos_account(
+    pub_key_hash: &PublicKeyHash,
+) -> Result<OwnedPath, TezosXRuntimeError> {
+    let prefix = path_to_implicit_account_prefix(pub_key_hash)?;
+    Ok(concat(&prefix, &INFO_PATH)?)
 }
 
 #[cfg(test)]
