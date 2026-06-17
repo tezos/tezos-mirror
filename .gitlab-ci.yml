@@ -182,10 +182,6 @@ workflow:
     variables:
       PIPELINE_TYPE: debian.daily
     when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "rpm.daily"
-    variables:
-      PIPELINE_TYPE: rpm.daily
-    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "homebrew.daily"
     variables:
       PIPELINE_TYPE: homebrew.daily
@@ -447,10 +443,6 @@ include:
 - local: .gitlab/ci/pipelines/debian.daily.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "debian.daily"
-    when: always
-- local: .gitlab/ci/pipelines/rpm.daily.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "rpm.daily"
     when: always
 - local: .gitlab/ci/pipelines/homebrew.daily.yml
   rules:
