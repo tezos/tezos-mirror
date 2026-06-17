@@ -179,7 +179,7 @@ There are 3 types of assets that can be represented in the release page:
 
 The `changelog` will simply be represented by a section with a link to the changelog of the version.
 
-The `packages` will be described by a section for each architecture containing a link to the instruction to install or update the packages (Debian, RPM, …).
+The `packages` will be described by a section for each architecture containing a link to the instruction to install or update the packages (Debian, …).
 
 The `binaries` will be represented as a list of links to download each binary, along with its associated checksum.
 The binaries are those listed in `BUCKET/PATH/COMPONENT/COMPONENT-vX.Y/binaries/ARCH/`.
