@@ -29,7 +29,7 @@ cd contrib/sdk-bindings
 nix-shell
 ```
 
-Alternatively, you may use the Dockerfile located [here](../../images/rust-sdk-bindings/Dockerfile), or ensure you have all
+Alternatively, you may use the Dockerfile located [here](../../images/base-images/Dockerfile.rust-sdk-bindings), or ensure you have all
 such dependencies installed otherwise on your system.
 
 ### Building

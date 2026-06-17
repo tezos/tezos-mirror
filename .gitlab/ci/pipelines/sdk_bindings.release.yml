@@ -3,37 +3,9 @@
 
 stages:
 - start
-- images
 - build
 - test
 - publish
-
-oc.docker:rust-sdk-bindings:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_rust_sdk_bindings_build.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
-  artifacts:
-    reports:
-      dotenv: rust_sdk_bindings_image_tag.env
 
 datadog_pipeline_trace:
   image: datadog/ci:v5.18.0@sha256:07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2
@@ -79,14 +51,12 @@ sdk_bindings.check_version:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 sdk_bindings.build_python_linux:
-  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-a8af426e
   stage: build
   tags:
   - gcp
-  needs:
-  - oc.docker:rust-sdk-bindings:amd64
-  dependencies:
-  - oc.docker:rust-sdk-bindings:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -199,18 +169,16 @@ sdk_bindings.build_python_windows:
     - contrib/sdk-bindings/rust/target/wheels/*
 
 sdk_bindings.publish:
-  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-a8af426e
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.docker:rust-sdk-bindings:amd64
   - sdk_bindings.check_version
   - sdk_bindings.build_python_linux
   - sdk_bindings.build_python_macos
   - sdk_bindings.build_python_windows
   dependencies:
-  - oc.docker:rust-sdk-bindings:amd64
   - sdk_bindings.build_python_linux
   - sdk_bindings.build_python_macos
   - sdk_bindings.build_python_windows
