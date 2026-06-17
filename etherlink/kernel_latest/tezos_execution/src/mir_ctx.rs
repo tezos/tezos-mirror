@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::account_storage::{
-    Code, TezlinkOriginatedAccount, TezosAccount, TezosImplicitAccountTrait,
+    Code, TezosAccount, TezosImplicitAccountTrait, TezosOriginatedAccount,
 };
 use crate::address::OriginationNonce;
 use crate::context::big_maps::*;
@@ -146,7 +146,7 @@ pub struct ExecCtx {
     pub amount: i64,
     pub self_address: AddressHash,
     pub balance: i64,
-    pub contract_account: TezlinkOriginatedAccount,
+    pub contract_account: TezosOriginatedAccount,
 }
 
 pub struct Ctx<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> {
@@ -186,7 +186,7 @@ impl ExecCtx {
     pub fn create(
         host: &mut impl StorageV1,
         sender_account: &impl TezosAccount,
-        dest_account: &TezlinkOriginatedAccount,
+        dest_account: &TezosOriginatedAccount,
         amount: &Narith,
     ) -> Result<Self, TransferError> {
         let sender = address_from_contract(sender_account.contract());
@@ -204,7 +204,7 @@ impl ExecCtx {
                 TransferError::MirAmountToNarithError(err.to_string())
             },
         )?;
-        let contract_account = TezlinkOriginatedAccount {
+        let contract_account = TezosOriginatedAccount {
             path: dest_account.path().clone(),
             kt1: dest_account.kt1().clone(),
         };
@@ -767,7 +767,7 @@ pub trait HasHost<Host> {
 }
 
 pub trait HasContractAccount {
-    fn contract_account(&self) -> &TezlinkOriginatedAccount;
+    fn contract_account(&self) -> &TezosOriginatedAccount;
 }
 
 pub trait HasOperationGas {
@@ -839,7 +839,7 @@ pub trait HasCrossRuntime<Host: StorageV1>: HasJournal + HasRegistry {
 impl<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> HasContractAccount
     for Ctx<'a, 'operation, Host, R>
 {
-    fn contract_account(&self) -> &TezlinkOriginatedAccount {
+    fn contract_account(&self) -> &TezosOriginatedAccount {
         &self.exec_ctx.contract_account
     }
 }
@@ -2407,8 +2407,8 @@ pub mod tests {
     /// missing-`code` durable read as a `LookupViewError::HostError`.
     #[test]
     fn lookup_view_storage_balance_returns_none_for_unoriginated_kt1() {
-        use crate::account_storage::TezlinkOriginatedAccount;
         use crate::account_storage::TezosImplicitAccount;
+        use crate::account_storage::TezosOriginatedAccount;
         use crate::address::OriginationNonce;
         use mir::ast::michelson_address::AddressHash;
         use tezos_smart_rollup_host::path::RefPath;
@@ -2452,7 +2452,7 @@ pub mod tests {
             amount: 0,
             self_address: AddressHash::Kt1(placeholder_kt1.clone()),
             balance: 0,
-            contract_account: TezlinkOriginatedAccount {
+            contract_account: TezosOriginatedAccount {
                 path: RefPath::assert_from(b"/mock_self").into(),
                 kt1: placeholder_kt1,
             },
@@ -2992,8 +2992,8 @@ pub mod tests {
     /// into a hard test failure.
     #[test]
     fn enshrined_synthetic_views_dispatch_in_sync() {
-        use crate::account_storage::TezlinkOriginatedAccount;
         use crate::account_storage::TezosImplicitAccount;
+        use crate::account_storage::TezosOriginatedAccount;
         use crate::address::OriginationNonce;
         use crate::enshrined_contracts::EnshrinedContracts;
         use mir::ast::michelson_address::AddressHash;
@@ -3039,7 +3039,7 @@ pub mod tests {
             amount: 0,
             self_address: AddressHash::Kt1(placeholder_kt1.clone()),
             balance: 0,
-            contract_account: TezlinkOriginatedAccount {
+            contract_account: TezosOriginatedAccount {
                 path: RefPath::assert_from(b"/mock_self").into(),
                 kt1: placeholder_kt1,
             },
@@ -3335,7 +3335,7 @@ pub(crate) mod mock {
         pub now: BigInt,
         pub operation_group_hash: OperationHash,
         pub operation_gas: crate::gas::TezlinkOperationGas,
-        pub contract_account: TezlinkOriginatedAccount,
+        pub contract_account: TezosOriginatedAccount,
         pub operation_counter: u128,
         pub crac_chain_depth: u32,
         pub crac_origin: Option<Contract>,
@@ -3363,7 +3363,7 @@ pub(crate) mod mock {
                 operation_group_hash: OperationHash::from([0u8; 32]),
                 operation_gas: crate::gas::TezlinkOperationGas::default(),
                 operation_counter: 0,
-                contract_account: TezlinkOriginatedAccount {
+                contract_account: TezosOriginatedAccount {
                     path: RefPath::assert_from(b"/mock").into(),
                     kt1: ContractKt1Hash::from([0u8; 20]),
                 },
@@ -3448,7 +3448,7 @@ pub(crate) mod mock {
     impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> HasContractAccount
         for MockCtx<'h, 'j, 'r, Host, R>
     {
-        fn contract_account(&self) -> &TezlinkOriginatedAccount {
+        fn contract_account(&self) -> &TezosOriginatedAccount {
             &self.contract_account
         }
     }

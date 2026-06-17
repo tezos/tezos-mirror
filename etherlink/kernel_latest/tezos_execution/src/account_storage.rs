@@ -264,12 +264,12 @@ pub trait TezosImplicitAccountTrait: TezosAccount + Sized {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TezlinkOriginatedAccount {
+pub struct TezosOriginatedAccount {
     pub(crate) path: OwnedPath,
     pub(crate) kt1: ContractKt1Hash,
 }
 
-impl TezosAccount for TezlinkOriginatedAccount {
+impl TezosAccount for TezosOriginatedAccount {
     #[inline]
     fn path(&self) -> &OwnedPath {
         &self.path
@@ -287,7 +287,7 @@ pub enum Code {
 /// Durable-storage path of the single shared Michelson implementation that
 /// backs every Tezos X alias. An alias `KT1` carries no script of its own;
 /// when its `/data/code` is absent and it is classified [`Origin::Alias`], its
-/// code resolves to the bytes stored here (see [`TezlinkOriginatedAccount::code`]).
+/// code resolves to the bytes stored here (see [`TezosOriginatedAccount::code`]).
 ///
 /// The slot lives in a `__system__` subtree of the `tezosx/` account namespace
 /// (`__system__` is not a valid base58 account address, so it cannot collide
@@ -370,7 +370,7 @@ impl OriginatedContractInfo {
     /// The aggregated record of a freshly originated contract: its
     /// `used_bytes` is the code, storage and initial lazy-storage bytes it
     /// occupies, and `paid_bytes` starts at that same value. Single source of
-    /// truth for both [`TezlinkOriginatedAccount::init`] (which persists it) and
+    /// truth for both [`TezosOriginatedAccount::init`] (which persists it) and
     /// the origination gas charge (which sizes it before the write).
     pub(crate) fn for_new_contract(
         code_size: u64,
@@ -433,7 +433,7 @@ impl OriginatedContractInfo {
     /// than a fixed bound — the encoding is self-delimiting, so the length
     /// depends on the counter magnitudes. The read side does not call this:
     /// it sizes the read from the length the store returned (see
-    /// [TezlinkOriginatedAccount::read_info_with_len]), so this only runs once
+    /// [TezosOriginatedAccount::read_info_with_len]), so this only runs once
     /// per write, on the post-update record that has not been persisted yet.
     pub(crate) fn encoded_len(&self) -> Result<u64, tezos_storage::error::Error> {
         // `BinWriter` has no length-only path, so we serialise into a
@@ -446,7 +446,7 @@ impl OriginatedContractInfo {
     }
 }
 
-impl TezlinkOriginatedAccount {
+impl TezosOriginatedAccount {
     pub fn kt1(&self) -> &ContractKt1Hash {
         &self.kt1
     }
@@ -690,7 +690,7 @@ impl TezlinkOriginatedAccount {
     ///
     /// `code` is `Some` for an ordinary origination. It is `None` for a
     /// Tezos X alias, which carries no script of its own: no `/data/code` is
-    /// written, so [`TezlinkOriginatedAccount::code`] resolves the account to the
+    /// written, so [`TezosOriginatedAccount::code`] resolves the account to the
     /// single shared alias implementation. A zero code size is still recorded
     /// in the aggregated `/info` record so storage-space accounting reads a
     /// definite code size of `0` — the shared code is not charged per alias.
@@ -1216,7 +1216,7 @@ mod test {
     }
 
     /// Build the originated account for `contract` under the test root.
-    fn originated(contract: &Contract) -> TezlinkOriginatedAccount {
+    fn originated(contract: &Contract) -> TezosOriginatedAccount {
         originated_from_contract(contract).expect("originated account resolution")
     }
 
@@ -1691,7 +1691,7 @@ mod test {
     fn init_with_storage(
         host: &mut MockKernelHost,
         storage_len: usize,
-    ) -> TezlinkOriginatedAccount {
+    ) -> TezosOriginatedAccount {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
         let code = vec![0xab_u8; 30];
@@ -1866,7 +1866,7 @@ mod test {
             .starts_with(b"/tez/tez_accounts"));
     }
 
-    fn classify_as_alias(host: &mut impl StorageV1, account: &TezlinkOriginatedAccount) {
+    fn classify_as_alias(host: &mut impl StorageV1, account: &TezosOriginatedAccount) {
         use tezosx_interfaces::{AliasInfo, RuntimeId};
         let origin = Origin::Alias(AliasInfo {
             runtime: RuntimeId::Ethereum,

@@ -1307,7 +1307,7 @@ impl RuntimeInterface for TezosRuntime {
                 })?;
             // L2-1529: materialize the alias *code-less*. Passing `None` writes
             // no `/data/code`, so the alias resolves to the single shared
-            // implementation (see `TezlinkOriginatedAccount::code`). The
+            // implementation (see `TezosOriginatedAccount::code`). The
             // per-alias `/data/storage` (the native address) is still written.
             // The internal operation built below keeps the full forwarder
             // script, preserving the receipt indexers saw before the switch.

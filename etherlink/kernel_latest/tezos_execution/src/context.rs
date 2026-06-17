@@ -7,8 +7,8 @@
 //! Account addressing, construction, and origin classification helpers.
 
 use crate::account_storage::{
-    get_origin_at, path_to_tezos_account, set_origin_at, TezlinkOriginatedAccount,
-    TezosAccount, TezosImplicitAccount,
+    get_origin_at, path_to_tezos_account, set_origin_at, TezosAccount,
+    TezosImplicitAccount, TezosOriginatedAccount,
 };
 use mir::ast::{big_map::BigMapId, AddressHash};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -50,11 +50,11 @@ pub fn implicit_from_contract(
 /// Resolve the originated (`KT1`) account under the Tezos accounts root.
 pub fn originated_from_kt1(
     kt1: &ContractKt1Hash,
-) -> Result<TezlinkOriginatedAccount, tezos_storage::error::Error> {
+) -> Result<TezosOriginatedAccount, tezos_storage::error::Error> {
     let index = contracts::index()?;
     let contract = Contract::Originated(kt1.clone());
     let path = concat(&index, &account::account_path(&contract)?)?;
-    Ok(TezlinkOriginatedAccount {
+    Ok(TezosOriginatedAccount {
         path,
         kt1: kt1.clone(),
     })
@@ -64,7 +64,7 @@ pub fn originated_from_kt1(
 /// accounts root. Errors on an implicit contract.
 pub fn originated_from_contract(
     contract: &Contract,
-) -> Result<TezlinkOriginatedAccount, tezos_storage::error::Error> {
+) -> Result<TezosOriginatedAccount, tezos_storage::error::Error> {
     match contract {
         Contract::Originated(kt1) => originated_from_kt1(kt1),
         _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
@@ -205,23 +205,21 @@ pub mod code {
     /// *blobs* (`/data/code`, `/data/storage`) stay separate.
     const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
-    pub fn info_path(account: &TezlinkOriginatedAccount) -> Result<OwnedPath, PathError> {
+    pub fn info_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
         concat(account.path(), &INFO_PATH)
     }
 
-    pub fn code_path(account: &TezlinkOriginatedAccount) -> Result<OwnedPath, PathError> {
+    pub fn code_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
         concat(account.path(), &CODE_PATH)
     }
 
     pub fn storage_path(
-        account: &TezlinkOriginatedAccount,
+        account: &TezosOriginatedAccount,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &STORAGE_PATH)
     }
 
-    pub fn origin_path(
-        account: &TezlinkOriginatedAccount,
-    ) -> Result<OwnedPath, PathError> {
+    pub fn origin_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
         concat(account.path(), &ORIGIN_PATH)
     }
 }

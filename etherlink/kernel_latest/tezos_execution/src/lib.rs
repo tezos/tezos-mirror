@@ -613,7 +613,7 @@ fn execute_internal_operations<'a, Host>(
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
-    sender_account: &crate::account_storage::TezlinkOriginatedAccount,
+    sender_account: &crate::account_storage::TezosOriginatedAccount,
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     nonce_counter: &mut u16,
@@ -2473,7 +2473,7 @@ mod tests {
     use crate::account_storage::{self, Code, TezosImplicitAccountTrait};
     use crate::context;
     use crate::{
-        account_storage::TezlinkOriginatedAccount, address::OriginationNonce,
+        account_storage::TezosOriginatedAccount, address::OriginationNonce,
         mir_ctx::BlockCtx,
     };
     use mir::ast::big_map::BigMapId;
@@ -3091,7 +3091,7 @@ mod tests {
         script: &str,
         storage_micheline: &Micheline,
         balance: &Narith,
-    ) -> TezlinkOriginatedAccount {
+    ) -> TezosOriginatedAccount {
         // Setting the account in TezosImplicitAccount
         let contract = Contract::Originated(src.clone());
 
@@ -8116,8 +8116,8 @@ mod tests {
     }
 
     struct BigMapTransfer {
-        sender: TezlinkOriginatedAccount,
-        receiver: TezlinkOriginatedAccount,
+        sender: TezosOriginatedAccount,
+        receiver: TezosOriginatedAccount,
         receipts: Vec<OperationWithMetadata>,
     }
 
