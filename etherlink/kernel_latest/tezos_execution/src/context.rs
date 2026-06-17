@@ -231,10 +231,6 @@ pub mod account {
 
     const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
 
-    const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
-
-    const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
-
     pub fn account_path(
         contract: &Contract,
     ) -> Result<OwnedPath, tezos_storage::error::Error> {
@@ -253,18 +249,6 @@ pub mod account {
         account: &A,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &BALANCE_PATH)
-    }
-
-    pub fn counter_path<A: TezosAccount + ?Sized>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &COUNTER_PATH)
-    }
-
-    pub fn manager_path<A: TezosAccount + ?Sized>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &MANAGER_PATH)
     }
 }
 
