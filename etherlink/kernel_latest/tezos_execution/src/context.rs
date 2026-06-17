@@ -70,18 +70,6 @@ pub fn originated_from_contract(
     }
 }
 
-/// Record the origin classification of an originated account. Origination is
-/// the only writer of the origin path for a freshly created KT1, so write the
-/// given origin unconditionally.
-pub fn record_origin(
-    host: &mut impl StorageV1,
-    kt1: &ContractKt1Hash,
-    origin: &Origin,
-) -> Result<(), tezos_storage::error::Error> {
-    let originated = originated_from_kt1(kt1)?;
-    originated.set_origin(host, origin)
-}
-
 /// Read the origin classification (native / alias) for the given address.
 pub fn read_origin_for_address(
     host: &impl StorageV1,
@@ -252,31 +240,6 @@ mod tests {
     use super::*;
     use tezos_crypto_rs::blake2b;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezosx_interfaces::{AliasInfo, RuntimeId};
-
-    #[test]
-    fn record_origin_writes_given_origin_for_kt1() {
-        let mut host = MockKernelHost::default();
-        let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"some-test-seed"));
-
-        let originated = originated_from_kt1(&kt1).unwrap();
-
-        // Before origination, no classification.
-        assert!(originated.origin(&host).unwrap().is_none());
-
-        record_origin(&mut host, &kt1, &Origin::Native).unwrap();
-
-        // After origination, Native.
-        assert_eq!(originated.origin(&host).unwrap(), Some(Origin::Native));
-
-        // record_origin with Alias overwrites with Alias.
-        let alias = Origin::Alias(AliasInfo {
-            runtime: RuntimeId::Ethereum,
-            native_address: b"0xfeedface".to_vec(),
-        });
-        record_origin(&mut host, &kt1, &alias).unwrap();
-        assert_eq!(originated.origin(&host).unwrap(), Some(alias));
-    }
 
     #[test]
     fn read_origin_for_address_implicit_is_native_by_construction() {
@@ -303,7 +266,10 @@ mod tests {
         assert!(read_origin_for_address(&host, &address).unwrap().is_none());
 
         // Native: returns Native.
-        record_origin(&mut host, &kt1, &Origin::Native).unwrap();
+        originated_from_kt1(&kt1)
+            .unwrap()
+            .set_origin(&mut host, &Origin::Native)
+            .unwrap();
         assert_eq!(
             read_origin_for_address(&host, &address).unwrap(),
             Some(Origin::Native),

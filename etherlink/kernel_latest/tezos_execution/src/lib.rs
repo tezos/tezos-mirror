@@ -1860,8 +1860,11 @@ where
     )
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
-    // Record the classification of the new contract.
-    context::record_origin(ctx.host, &contract, origin)
+    // Record the classification of the new contract. Origination is the only
+    // writer of the origin path for a freshly created KT1, so write it
+    // unconditionally.
+    smart_contract
+        .set_origin(ctx.host, origin)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     let origination_success = OriginationSuccess {

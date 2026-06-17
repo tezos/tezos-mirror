@@ -185,7 +185,7 @@ mod tests {
         use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
         use tezos_evm_runtime::runtime::MockKernelHost;
         use tezos_execution::account_storage::write_alias_implementation;
-        use tezos_execution::context::record_origin;
+        use tezos_execution::context::originated_from_kt1;
         use tezos_execution::get_contract_entrypoint;
         use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
 
@@ -200,15 +200,16 @@ mod tests {
 
         // A code-less KT1 classified as an alias (no /data/code written).
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"alias-entrypoint-test"));
-        record_origin(
-            &mut host,
-            &kt1,
-            &Origin::Alias(AliasInfo {
-                runtime: RuntimeId::Ethereum,
-                native_address: b"0xabc".to_vec(),
-            }),
-        )
-        .unwrap();
+        originated_from_kt1(&kt1)
+            .unwrap()
+            .set_origin(
+                &mut host,
+                &Origin::Alias(AliasInfo {
+                    runtime: RuntimeId::Ethereum,
+                    native_address: b"0xabc".to_vec(),
+                }),
+            )
+            .unwrap();
 
         // The entrypoints RPC resolves through code() to the shared forwarder.
         let entrypoints =
