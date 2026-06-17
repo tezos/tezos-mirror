@@ -190,11 +190,6 @@ let asset_content ~component ~version = function
                "For installation instructions, refer to the [Octez Debian \
                 Packages \
                 Guide](https://octez.tezos.com/docs/introduction/howtoget.html#ubuntu-and-debian-octez-packages)";
-          section "RPM packages"
-          @@ text_line
-               "For installation instructions, refer to the [Octez RPM \
-                Packages \
-                Guide](https://tezos.gitlab.io/introduction/howtoget.html#fedora-octez-packages)";
         ]
   | Changelog -> (
       match version.announcement with
