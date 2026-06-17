@@ -82,23 +82,6 @@ let changeset_debian_packages =
         "manifest/**/*.ml*";
       ])
 
-let changeset_rpm_packages =
-  Changeset.(
-    make
-      [
-        ".gitlab/ci/pipelines/rpm_repository_partial_auto.yml";
-        "scripts/packaging/build-rpm-local.sh";
-        "scripts/packaging/octez/rpm/*";
-        "scripts/packaging/tests/rpm/*";
-        "rpm-deps-build.Dockerfile";
-        "scripts/ci/build-packages-dependencies.sh";
-        "scripts/ci/build-rpm-packages.sh";
-        "scripts/ci/prepare-apt-rpm-repo.sh";
-        "scripts/ci/create_rpm_repo.sh";
-        "scripts/version.sh";
-        "manifest/**/*.ml*";
-      ])
-
 let changeset_homebrew =
   Changeset.(
     make

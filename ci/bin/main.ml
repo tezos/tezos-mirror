@@ -377,15 +377,6 @@ let () =
     ~description:
       "Daily pipeline containing all Debian jobs (build and extended tests)." ;
   register
-    "rpm.daily"
-    rpm_daily
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace
-       :: Rpm_repository.(jobs ~limit_dune_build_jobs:true Full)
-      |> List.map (with_interruptible false))
-    ~description:
-      "Daily pipeline containing all RPM jobs (build and extended tests)." ;
-  register
     "homebrew.daily"
     homebrew_daily
     ~jobs:(Homebrew.(jobs Full) |> List.map (with_interruptible false))

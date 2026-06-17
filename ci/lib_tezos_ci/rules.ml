@@ -56,8 +56,6 @@ let schedule_extended_tests =
 
 let debian_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "debian.daily"
 
-let rpm_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "rpm.daily"
-
 let homebrew_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "homebrew.daily"
 
 let base_images_daily =
