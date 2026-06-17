@@ -28,7 +28,7 @@ use tezos_smart_rollup::{
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{
-    read_nom_value_bounded, read_optional_nom_value, read_optional_nom_value_bounded,
+    read_optional_nom_value, read_optional_nom_value_bounded,
     read_optional_nom_value_bounded_with_len, store_bin,
 };
 use tezosx_interfaces::{Origin, TezosXRuntimeError};
@@ -55,12 +55,6 @@ const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 /// the `store_value_size` + `store_read` pair that `store_read_all`
 /// performs. See [`read_optional_nom_value_bounded`].
 const NARITH_FIELD_MAX_BYTES: usize = 32;
-
-/// Upper bound, in bytes, on an encoded [`Manager`]. The largest variant
-/// is `Revealed(PublicKey)`: 1 byte for the manager tag plus a public
-/// key whose largest variant is BLS, at 1 (algorithm tag) + 48 bytes.
-/// 64 leaves headroom over that 50-byte maximum.
-const MANAGER_MAX_BYTES: usize = 64;
 
 /// Upper bound, in bytes, on an encoded [`OriginatedContractInfo`]. The
 /// record is `tup4(n, n, z, z)`: `code_size` and `storage_size` as
@@ -132,134 +126,6 @@ pub trait TezosAccount {
     ) -> Result<(), tezos_storage::error::Error> {
         let current = self.balance(host)?;
         self.set_balance(host, &Narith(current.0 + amount))
-    }
-}
-
-pub trait TezosImplicitAccountTrait: TezosAccount + Sized {
-    fn pkh(&self) -> &PublicKeyHash;
-
-    /// Get the **counter** for the Tezlink account.
-    fn counter(
-        &self,
-        host: &impl StorageV1,
-    ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = account::counter_path(self)?;
-        Ok(
-            read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
-                .unwrap_or(0_u64.into()),
-        )
-    }
-
-    /// Set the **counter** for the Tezlink account.
-    fn set_counter(
-        &self,
-        host: &mut impl StorageV1,
-        counter: &Narith,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = account::counter_path(self)?;
-        store_bin(counter, host, &path)
-    }
-
-    /// Set the **counter** for the Tezlink account to the successor of the current value.
-    fn increment_counter(
-        &self,
-        host: &mut impl StorageV1,
-        validated_operations_count: usize,
-    ) -> Result<(), tezos_storage::error::Error> {
-        self.set_counter(
-            host,
-            &Narith(self.counter(host)?.0 + validated_operations_count),
-        )
-    }
-
-    fn manager(
-        &self,
-        host: &impl StorageV1,
-    ) -> Result<Manager, tezos_storage::error::Error> {
-        let path = account::manager_path(self)?;
-        let manager: Manager = read_nom_value_bounded(host, &path, MANAGER_MAX_BYTES)?;
-        Ok(manager)
-    }
-
-    fn set_manager_public_key_hash(
-        &self,
-        host: &mut impl StorageV1,
-    ) -> Result<(), tezos_storage::error::Error> {
-        self.set_manager_pk_hash_internal(host, self.pkh())
-    }
-
-    /// This function updates the manager with a public key hash in parameter.
-    /// Most of the time, we're dealing with references so this function is here to avoid cloning
-    /// the public key hash to build a [Manager] object
-    fn set_manager_pk_hash_internal(
-        &self,
-        host: &mut impl StorageV1,
-        public_key_hash: &PublicKeyHash,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = account::manager_path(self)?;
-        // The tag for public key hash is 0 (see the Manager enum above)
-        let mut buffer = vec![0_u8];
-        public_key_hash
-            .bin_write(&mut buffer)
-            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
-        host.store_write_all(&path, &buffer)?;
-        Ok(())
-    }
-
-    /// This function is used to test a situation in which we have an
-    /// inconsistent manager pkh for an implicit account.
-    #[cfg(test)]
-    fn force_set_manager_public_key_hash(
-        &self,
-        host: &mut impl StorageV1,
-        pkh: &PublicKeyHash,
-    ) -> Result<(), tezos_storage::error::Error> {
-        self.set_manager_pk_hash_internal(host, pkh)
-    }
-
-    /// This function updates the manager with the public key in parameter.
-    /// Most of the time, we're dealing with references so this function is here to avoid cloning
-    /// the public key hash to build a [Manager] object
-    fn set_manager_public_key(
-        &self,
-        host: &mut impl StorageV1,
-        public_key: &PublicKey,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = account::manager_path(self)?;
-        // The tag for public key is 2 (see the Manager enum above)
-        let mut buffer = vec![2_u8];
-        public_key
-            .bin_write(&mut buffer)
-            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
-        host.store_write_all(&path, &buffer)?;
-        Ok(())
-    }
-
-    /// Allocate an account in the durable storage. Does nothing if account was
-    /// already allocated.
-    fn allocate(
-        &self,
-        host: &mut impl StorageV1,
-    ) -> Result<bool, tezos_storage::error::Error> {
-        if self.allocated(host)? {
-            return Ok(true);
-        }
-        self.set_balance(host, &0_u64.into())?;
-        // TODO: use a global counter instead of initializing counter at 0
-        self.set_counter(host, &0u64.into())?;
-        self.set_manager_public_key_hash(host)?;
-        Ok(false)
-    }
-
-    // Below this comment is multiple functions useful for validate an operation
-
-    /// Verify if an account is allocated by attempting to read its balance
-    fn allocated(
-        &self,
-        host: &impl StorageV1,
-    ) -> Result<bool, tezos_storage::error::Error> {
-        let path = account::balance_path(self)?;
-        Ok(Some(ValueType::Value) == host.store_has(&path)?)
     }
 }
 
@@ -1018,12 +884,12 @@ impl TezosAccount for TezosImplicitAccount {
     }
 }
 
-impl TezosImplicitAccountTrait for TezosImplicitAccount {
-    fn pkh(&self) -> &PublicKeyHash {
+impl TezosImplicitAccount {
+    pub fn pkh(&self) -> &PublicKeyHash {
         &self.pkh
     }
 
-    fn counter(
+    pub fn counter(
         &self,
         host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
@@ -1034,7 +900,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
         }
     }
 
-    fn set_counter(
+    pub fn set_counter(
         &self,
         host: &mut impl StorageV1,
         counter: &Narith,
@@ -1050,7 +916,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))
     }
 
-    fn manager(
+    pub fn manager(
         &self,
         host: &impl StorageV1,
     ) -> Result<Manager, tezos_storage::error::Error> {
@@ -1065,7 +931,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
         }
     }
 
-    fn set_manager_pk_hash_internal(
+    pub fn set_manager_pk_hash_internal(
         &self,
         _host: &mut impl StorageV1,
         _public_key_hash: &PublicKeyHash,
@@ -1075,7 +941,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
         Ok(())
     }
 
-    fn set_manager_public_key(
+    pub fn set_manager_public_key(
         &self,
         host: &mut impl StorageV1,
         public_key: &tezos_smart_rollup::types::PublicKey,
@@ -1088,7 +954,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
         Ok(())
     }
 
-    fn allocated(
+    pub fn allocated(
         &self,
         host: &impl StorageV1,
     ) -> Result<bool, tezos_storage::error::Error> {
@@ -1097,6 +963,52 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
             Ok(None) => Ok(false),
             Err(e) => Err(tezos_storage::error::Error::NomReadError(format!("{e}"))),
         }
+    }
+
+    /// Set the **counter** for the Tezos account to the successor of the current value.
+    pub fn increment_counter(
+        &self,
+        host: &mut impl StorageV1,
+        validated_operations_count: usize,
+    ) -> Result<(), tezos_storage::error::Error> {
+        self.set_counter(
+            host,
+            &Narith(self.counter(host)?.0 + validated_operations_count),
+        )
+    }
+
+    pub fn set_manager_public_key_hash(
+        &self,
+        host: &mut impl StorageV1,
+    ) -> Result<(), tezos_storage::error::Error> {
+        self.set_manager_pk_hash_internal(host, self.pkh())
+    }
+
+    /// This function is used to test a situation in which we have an
+    /// inconsistent manager pkh for an implicit account.
+    #[cfg(test)]
+    pub fn force_set_manager_public_key_hash(
+        &self,
+        host: &mut impl StorageV1,
+        pkh: &PublicKeyHash,
+    ) -> Result<(), tezos_storage::error::Error> {
+        self.set_manager_pk_hash_internal(host, pkh)
+    }
+
+    /// Allocate an account in the durable storage. Does nothing if account was
+    /// already allocated.
+    pub fn allocate(
+        &self,
+        host: &mut impl StorageV1,
+    ) -> Result<bool, tezos_storage::error::Error> {
+        if self.allocated(host)? {
+            return Ok(true);
+        }
+        self.set_balance(host, &0_u64.into())?;
+        // TODO: use a global counter instead of initializing counter at 0
+        self.set_counter(host, &0u64.into())?;
+        self.set_manager_public_key_hash(host)?;
+        Ok(false)
     }
 }
 
@@ -1162,7 +1074,7 @@ mod tests {
 
     #[test]
     fn set_manager_public_key_reveals_manager() {
-        use super::{Manager, TezosImplicitAccount, TezosImplicitAccountTrait};
+        use super::{Manager, TezosImplicitAccount};
         use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
         use tezos_evm_runtime::runtime::MockKernelHost;
 

@@ -526,7 +526,6 @@ mod tests {
     };
 
     use crate::account_storage::TezosImplicitAccount;
-    use crate::account_storage::TezosImplicitAccountTrait;
     use crate::context;
 
     const SOURCE_PKH: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";

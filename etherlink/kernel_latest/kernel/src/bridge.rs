@@ -29,7 +29,7 @@ use tezos_ethereum::{
     wei::eth_from_mutez,
 };
 use tezos_evm_logging::{log, Level::Error, Level::Info};
-use tezos_execution::account_storage::{TezosAccount, TezosImplicitAccountTrait};
+use tezos_execution::account_storage::TezosAccount;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 use tezos_smart_rollup_host::storage::StorageV1;

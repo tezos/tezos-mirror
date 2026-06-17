@@ -55,7 +55,7 @@ use tezosx_interfaces::{Origin, Registry};
 use tezosx_journal::TezosXJournal;
 
 use crate::account_storage::{
-    OriginatedContractInfo, StorageSpace, TezosImplicitAccount, TezosImplicitAccountTrait,
+    OriginatedContractInfo, StorageSpace, TezosImplicitAccount,
 };
 pub use crate::address::OriginationNonce;
 use crate::gas::Cost;
@@ -609,7 +609,7 @@ enum Disposition {
 #[allow(clippy::too_many_arguments)]
 fn execute_internal_operations<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
+    operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
@@ -933,7 +933,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn transfer<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
+    operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     sender_account: &impl TezosAccount,
@@ -1396,7 +1396,7 @@ pub fn get_enshrined_contract_views(
 #[allow(clippy::too_many_arguments)]
 fn transfer_external<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
+    operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     amount: &Narith,
@@ -1500,7 +1500,7 @@ impl From<TransferError> for CracTransferError {
 #[allow(clippy::too_many_arguments)]
 pub fn cross_runtime_transfer<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
+    operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     sender: &impl TezosAccount,
@@ -2187,7 +2187,7 @@ fn apply_batch<Host>(
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     origination_nonce: &mut OriginationNonce,
-    validation_info: validate::ValidatedBatch<TezosImplicitAccount>,
+    validation_info: validate::ValidatedBatch,
     block_ctx: &BlockCtx,
     nonce_counter: &mut u16,
 ) -> Result<(Vec<ProcessedOperation>, bool), String>
@@ -2470,7 +2470,7 @@ pub(crate) mod test_utils {
 #[cfg(test)]
 mod tests {
     use crate::account_storage::TezosImplicitAccount;
-    use crate::account_storage::{self, Code, TezosImplicitAccountTrait};
+    use crate::account_storage::{self, Code};
     use crate::context;
     use crate::{
         account_storage::TezosOriginatedAccount, address::OriginationNonce,

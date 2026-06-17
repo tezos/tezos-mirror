@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::account_storage::{
-    Code, TezosAccount, TezosImplicitAccountTrait, TezosOriginatedAccount,
+    Code, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
 use crate::address::OriginationNonce;
 use crate::context::big_maps::*;
@@ -94,12 +94,12 @@ pub struct TcCtx<'operation, Host: StorageV1> {
     pub next_temporary_id: &'operation mut BigMapId,
 }
 
-pub struct OperationCtx<'operation, A: TezosImplicitAccountTrait> {
+pub struct OperationCtx<'operation> {
     // In reality, 'source' and 'origination_nonce' have
     // a 'batch lifetime. Downgrade it to an 'operation
     // lifetime is not a problem for the compiler.
     // However, it could be misleading in terms of comprehension
-    pub source: &'operation A,
+    pub source: &'operation TezosImplicitAccount,
     pub origination_nonce: &'operation mut OriginationNonce,
     /// MIR internal-operation counter — the replay identity L1 enforces
     /// for internal operations. Incremented by `operation_counter()`
@@ -152,8 +152,7 @@ pub struct ExecCtx {
 pub struct Ctx<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> {
     pub tc_ctx: &'a mut TcCtx<'operation, Host>,
     pub exec_ctx: ExecCtx,
-    pub operation_ctx:
-        &'a mut OperationCtx<'operation, crate::account_storage::TezosImplicitAccount>,
+    pub operation_ctx: &'a mut OperationCtx<'operation>,
     pub journal: &'a mut tezosx_journal::TezosXJournal,
     pub registry: &'a R,
 }
