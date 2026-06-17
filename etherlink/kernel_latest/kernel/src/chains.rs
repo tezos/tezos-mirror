@@ -754,6 +754,8 @@ impl ChainConfigTrait for TezosXChainConfig {
                     Some(&block_constants.evm_runtime_block_constants),
                     &mut journal,
                     self.experimental_features.is_michelson_gas_refund_enabled(),
+                    tracer_input.is_some(),
+                    http_trace_enabled,
                 );
                 // Persist HTTP traces regardless of [result] so that partial
                 // traces from an operation that failed mid-execution remain
@@ -1061,6 +1063,10 @@ pub fn apply_tezos_operation<Host>(
     evm_block_constants: Option<&tezos_ethereum::block::BlockConstants>,
     external_journal: &mut TezosXJournal,
     enable_gas_refund: bool,
+    // Forwarded to validate_and_apply_operation to gate per-op trace promotion
+    // (and its store_has probe) on whether each tracer is actually active.
+    tracing_enabled: bool,
+    http_trace_enabled: bool,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1,
@@ -1076,6 +1082,8 @@ where
         internal_operations_base: crate::apply::count_internal_operations(
             &block_in_progress.cumulative_tezos_operation_receipts.list,
         ),
+        tracing_enabled,
+        http_trace_enabled,
     };
 
     match operation.content {

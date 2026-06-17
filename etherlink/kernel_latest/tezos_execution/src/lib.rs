@@ -1977,8 +1977,14 @@ where
     log!(Debug, "Batch is valid!");
 
     safe_host.promote()?;
-    safe_host.promote_trace()?;
-    safe_host.promote_http_trace()?;
+    // Skip trace promotion (and its store_has probe) when the tracer is off:
+    // no trace data was written, so there is nothing to move out of /tmp.
+    if block_ctx.tracing_enabled {
+        safe_host.promote_trace()?;
+    }
+    if block_ctx.http_trace_enabled {
+        safe_host.promote_http_trace()?;
+    }
     safe_host.start()?;
 
     // Each operation uses 0-based nonces; block-sequential nonces are
@@ -2005,8 +2011,12 @@ where
             "Committing the changes because the batch was successfully applied."
         );
         safe_host.promote()?;
-        safe_host.promote_trace()?;
-        safe_host.promote_http_trace()?;
+        if block_ctx.tracing_enabled {
+            safe_host.promote_trace()?;
+        }
+        if block_ctx.http_trace_enabled {
+            safe_host.promote_http_trace()?;
+        }
     } else {
         log!(
             Debug,
@@ -2467,6 +2477,8 @@ mod tests {
                 now: &0i64.into(),
                 chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
                 internal_operations_base: 0,
+                tracing_enabled: false,
+                http_trace_enabled: false,
             }
         };
     }
@@ -6664,6 +6676,8 @@ mod tests {
                     now: &0i64.into(),
                     chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
                     internal_operations_base: base,
+                    tracing_enabled: false,
+                    http_trace_enabled: false,
                 },
                 false,
                 None,

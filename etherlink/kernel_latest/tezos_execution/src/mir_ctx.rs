@@ -156,6 +156,14 @@ pub struct BlockCtx<'block> {
     /// Internal operations already recorded in the block, used as the
     /// cumulative base for L1's per-block internal-operation cap.
     pub internal_operations_base: u128,
+    /// Whether the Debug tracer is active for this block. Gates per-operation
+    /// trace-subtree promotion (and its `store_has` probe) in
+    /// [validate_and_apply_operation]; when off, no trace data is written so
+    /// promotion is skipped entirely.
+    pub tracing_enabled: bool,
+    /// Whether HTTP-trace capture is enabled for this block. Gates per-operation
+    /// HTTP-trace promotion the same way.
+    pub http_trace_enabled: bool,
 }
 
 fn address_from_contract(contract: Contract) -> AddressHash {

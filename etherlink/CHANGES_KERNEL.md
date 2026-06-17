@@ -16,6 +16,9 @@
   the iterative worklist instead of recursing, so an adversarial origination
   chain is rejected with a bounded error (or its gas/recursion cap) rather than
   aborting the kernel (!22282).
+- The Michelson runtime no longer probes durable storage to promote
+  per-operation trace subtrees when no tracer is active, removing the
+  per-operation `store_has` calls on the block-production path. (!22277)
 
 ## Version 6 (Farfadet)
 
