@@ -15,8 +15,6 @@
     - helpers for making jobs;
     - jobs shared between pipelines *)
 
-open Tezos_ci
-
 (** {2 Shared Helpers} *)
 
 module Helpers = struct
@@ -59,28 +57,4 @@ module Helpers = struct
     @ toggle init_python_venv ". $HOME/.venv/bin/activate"
     @ toggle install_js_deps ". ./scripts/install_build_deps.js.sh"
     @ before_script
-end
-
-(** {2 Helpers for Debian/RPM packaging jobs} *)
-
-module Packaging = struct
-  (* types for the repositories pipelines.
-   - Release: we run all the release jobs, but no tests
-   - Partial: we run only a subset of the tests jobs
-   - Full: we run the complete test matrix
-*)
-  type repository_pipeline = Full | Partial | Release
-
-  (** Return a tuple (ARCHITECTURES, <archs>) based on the type
-    of repository pipeline. *)
-  let archs_variables pipeline =
-    let archs : Runner.Arch.t list =
-      match pipeline with
-      | Partial -> [Amd64]
-      | Full | Release -> [Amd64; Arm64]
-    in
-    [
-      ( "ARCHITECTURES",
-        String.concat " " (List.map Runner.Arch.show_uniform archs) );
-    ]
 end
