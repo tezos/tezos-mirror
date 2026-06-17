@@ -39,24 +39,7 @@ const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 /// (writer) and the execution layer (reader) share a single source of truth.
 pub(crate) use tezos_execution::context::code::ORIGIN_PATH;
 
-pub fn narith_to_u256(
-    narith: &Narith,
-) -> Result<primitive_types::U256, TezosXRuntimeError> {
-    let bytes = narith.0.to_bytes_be();
-    if bytes.len() <= 32 {
-        Ok(primitive_types::U256::from_big_endian(&bytes))
-    } else {
-        Err(TezosXRuntimeError::ConversionError(
-            "Narith value too large to fit in U256".to_string(),
-        ))
-    }
-}
-
-pub fn u256_to_narith(value: &primitive_types::U256) -> Narith {
-    let mut bytes = [0u8; 32];
-    value.to_big_endian(&mut bytes);
-    Narith(num_bigint::BigUint::from_bytes_be(&bytes))
-}
+pub use tezos_execution::account_storage::{narith_to_u256, u256_to_narith};
 
 // Used as a value for the durable storage.
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
@@ -366,37 +349,6 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
-    use crate::account::narith_to_u256;
-    use primitive_types::U256;
-    use tezos_data_encoding::types::Narith;
-
-    #[test]
-    fn convert_narith_u256() {
-        let narith = Narith::from(123456789u64);
-        let u256_value = narith_to_u256(&narith).unwrap();
-        assert_eq!(u256_value.low_u64(), 123456789u64);
-    }
-
-    #[test]
-    fn convert_u256_narith() {
-        let big_value = U256::from_dec_str("123456789012345678901234567890").unwrap();
-        let narith_value = super::u256_to_narith(&big_value);
-        let expected_narith = Narith(
-            num_bigint::BigUint::from_str("123456789012345678901234567890").unwrap(),
-        );
-        assert_eq!(narith_value, expected_narith);
-    }
-
-    #[test]
-    fn narith_u256_overflow() {
-        let u256_value = U256::MAX;
-        let narith_value = super::u256_to_narith(&u256_value);
-        let narith_value = Narith(narith_value.0 + num_bigint::BigUint::from(1u64));
-        let _ = narith_to_u256(&narith_value).expect_err("Should error on overflow");
-    }
-
     #[test]
     fn origin_at_path_roundtrip() {
         use crate::account::{get_origin_at, set_origin_at};
