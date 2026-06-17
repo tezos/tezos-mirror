@@ -604,38 +604,11 @@ struct
     let context = make_empty_context () in
     let nds_empty = make_empty_nds () in
     let nds_size_1 = fresh_nds_of_size 1L in
-    (* Give the size-1 registry's database an entry so [step] can read it
-       back: the read records the database-index access that makes the
-       produced NDS proof well-formed (its registry length node present),
-       so [verify_proof] can reach the endpoint cross-check rather than
-       failing to reconstruct the proof. *)
-    let*? () =
-      Octez_riscv_nds_common.Nds.set
-        nds_size_1
-        ~db_index:0L
-        ~key:(Bytes.of_string "key")
-        ~value:(Bytes.of_string "value")
-      |> Result.map_error (fun e ->
-             [Octez_riscv_nds_common.Nds_errors.Invalid_argument e])
-    in
     let make_state_with_nds nds = stamp_nds_marker (Irmin.empty_state ()) nds in
     let*! irmin_empty = make_state_with_nds nds_empty in
     let*! irmin_size_1 = make_state_with_nds nds_size_1 in
-    let step st =
-      (* Read db 0 to record the database-index access (a no-op for the
-         empty registry, whose db 0 does not exist). *)
-      (match st with
-      | _, Dual.Active nds ->
-          ignore
-            (Octez_riscv_nds_common.Nds.read
-               nds
-               ~db_index:0L
-               ~key:(Bytes.of_string "key")
-               ~offset:0L
-               ~len:5L)
-      | _, Dual.Inactive -> ()) ;
-      Lwt.return (st, ())
-    in
+    (* don't touch NDS at all during the proof *)
+    let step st = Lwt.return (st, ()) in
     let*! proof_empty_opt =
       Dual.produce_proof context (irmin_empty, Dual.Active nds_empty) step
     in
@@ -675,10 +648,7 @@ struct
   (** A [Dual] proof with a mismatched Irmin half is rejected: swap the
       Irmin halves of a no-op and a mutating proof — the swapped half
       attests a different post-tree than the step produces, so the Irmin
-      replay's stop_state diverges.
-
-      Not blocked on TZX-114: the Irmin half is checked before the NDS
-      verify path. *)
+      replay's stop_state diverges. *)
   let test_dual_proof_with_swapped_irmin_half_rejected () =
     let open Lwt_result_syntax in
     let context = make_empty_context () in
@@ -782,9 +752,7 @@ struct
     return_unit
 
   (** Same endpoint/[state_hash] agreement on [Dual]: the dispatchers
-      must reach into [dual_proof.irmin_proof].
-
-      Not blocked on TZX-114: no [verify_proof] call is made. *)
+      must reach into [dual_proof.irmin_proof]. *)
   let test_proof_endpoints_match_state_hash_dual () =
     let open Lwt_result_syntax in
     let context = make_empty_context () in
@@ -883,9 +851,7 @@ struct
     return_unit
 
   (** Same [cast_read_only] contract on [Dual]: reach into
-      [dual_proof.irmin_proof] and collapse its stop to its start.
-
-      Not blocked on TZX-114: no [verify_proof] call is made. *)
+      [dual_proof.irmin_proof] and collapse its stop to its start. *)
   let test_cast_read_only_dual () =
     let open Lwt_result_syntax in
     let context = make_empty_context () in
