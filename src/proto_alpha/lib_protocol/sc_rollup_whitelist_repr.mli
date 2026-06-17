@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Signature.Public_key_hash.t list
+type t = Implicit_account_repr.t list
 
 val encoding : t Data_encoding.t
 

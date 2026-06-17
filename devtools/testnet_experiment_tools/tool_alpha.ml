@@ -54,12 +54,12 @@ class wrap_silent_memory_client (t : Client_context.full) :
   end
 
 module Sorted_baker_map = Map.Make (struct
-  type t = Signature.Public_key_hash.t * Tez.t
+  type t = Protocol.Implicit_account_repr.t * Tez.t
 
   let compare (h, x) (h', x') =
     (* Descending order *)
     let v = Tez.compare x' x in
-    if v <> 0 then v else Signature.Public_key_hash.compare h h'
+    if v <> 0 then v else Protocol.Implicit_account_repr.compare h h'
 end)
 
 module Consensus_key_set = Set.Make (struct
@@ -108,7 +108,12 @@ let load_client_context (cctxt : ctxt_kind) =
           acc
     | _ -> assert false
   in
-  let delegates = get_pkhs (fun _ -> assert false) b [] |> List.rev in
+  let delegates =
+    (* FIXME-PA *)
+    List.map
+      Protocol.Implicit_account_repr.Forbidden.of_pkh
+      (get_pkhs (fun _ -> assert false) b [] |> List.rev)
+  in
   let* sorted_bakers =
     List.fold_left_es
       (fun acc delegate ->
@@ -133,8 +138,10 @@ let load_client_context (cctxt : ctxt_kind) =
                   ck_info.pendings
               in
               if
+                (* FIXME-PA: this assumes the delegate's address is its ck *)
                 Signature.Public_key_hash.(
-                  ck_info.active.consensus_key_pkh = delegate)
+                  ck_info.active.consensus_key_pkh
+                  = Protocol.Implicit_account_repr.Forbidden.to_pkh delegate)
               then pendings
               else
                 ( ck_info.active.consensus_key_pk,
@@ -195,13 +202,27 @@ let load_client_context (cctxt : ctxt_kind) =
         let* cks =
           List.mapi_es
             (fun i (ck_pk, ck_pkh) ->
-              make ~pk:ck_pk (Printf.sprintf "%s_ck_%d" alias i) ck_pkh)
+              (* FIXME-PA *)
+              make
+                ~pk:ck_pk
+                (Printf.sprintf "%s_ck_%d" alias i)
+                (Protocol.Implicit_account_repr.Forbidden.of_pkh ck_pkh))
             (Consensus_key_set.elements cks)
         in
         return (baker :: cks))
       (Sorted_baker_map.bindings sorted_bakers)
   in
-  let delegates = List.flatten delegates_l in
+  let delegates =
+    (* FIXME-PA *)
+    List.map
+      (fun (alias, pkh, pk, pk_uri, sk_uri) ->
+        ( alias,
+          Protocol.Implicit_account_repr.Forbidden.to_pkh pkh,
+          pk,
+          pk_uri,
+          sk_uri ))
+      (List.flatten delegates_l)
+  in
   let* () = Client_keys.register_keys cctxt delegates in
   return_unit
 
@@ -532,7 +553,8 @@ let init ~operations_file_path =
         let oph = Operation.hash_packed op in
         let acc =
           ManagerMap.update
-            source
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.to_pkh source)
             (function
               | None ->
                   let q = Queue.create () in

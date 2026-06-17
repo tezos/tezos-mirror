@@ -33,7 +33,7 @@ module For_RPC : sig
     [stez_frozen] field of the delegate's staking balance).
     Returns [Tez_repr.zero] if no sTez stake is allocated to the delegate. *)
   val allocated_rights_of_delegate :
-    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+    Raw_context.t -> Implicit_account_repr.t -> Tez_repr.t tzresult Lwt.t
 
   (** [total_allocated_rights ctxt] returns the total tez allocated across all
     registered delegates from the sTez deposits for baking rights. *)

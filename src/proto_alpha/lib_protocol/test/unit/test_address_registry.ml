@@ -34,7 +34,7 @@ let test_init_context_counter () =
     Alpha_context.Address_registry.Internal_for_tests.get_counter ctxt
   in
   let initial_address =
-    Alpha_context.Destination.Contract (Implicit Signature.Public_key_hash.zero)
+    Alpha_context.Destination.Contract (Implicit Implicit_account_repr.zero)
   in
   let*@ _ctxt, initial_address_counter =
     Alpha_context.Address_registry.find ctxt initial_address
@@ -94,7 +94,9 @@ let generate_address number =
   let seed = Bytes.make 32 '\000' in
   Bytes.iteri (fun i _ -> Bytes.set_int8 seed i number) seed ;
   let pkh, _pk, _sk = Signature.generate_key ~seed () in
-  Alpha_context.Destination.Contract (Implicit pkh)
+  (* FIXME-PA *)
+  Alpha_context.Destination.Contract
+    (Implicit (Implicit_account_repr.Forbidden.of_pkh pkh))
 
 let init_registry ctx number =
   let open Lwt_result_wrap_syntax in
@@ -148,7 +150,7 @@ let test_register_address_twice () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = init_context () in
   let addr =
-    Alpha_context.Destination.Contract (Implicit Signature.Public_key_hash.zero)
+    Alpha_context.Destination.Contract (Implicit Implicit_account_repr.zero)
   in
   let*@ addr_counter, ctxt = Script_address_registry.index ctxt addr in
   let addr_counter = Script_int.to_zint addr_counter in

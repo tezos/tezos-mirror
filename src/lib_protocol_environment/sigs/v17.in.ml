@@ -111,6 +111,8 @@ module type T = sig
 
   module Context_hash : [%sig "v17/context_hash.mli"]
 
+  module Account_hash : [%sig "v17/account_hash.mli"]
+
   module Sapling : [%sig "v17/sapling.mli"]
 
   module Timelock : [%sig "v17/timelock.mli"]

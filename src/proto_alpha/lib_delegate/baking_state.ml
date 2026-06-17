@@ -126,7 +126,7 @@ module Delegate_infos = struct
            non-first-slot operations from the mempool because this check is
            skipped in the mempool to increase its speed; the baker can and
            should ignore such operations. *)
-    slot_to_delegate_pkh : Signature.Public_key_hash.t SlotMap.t;
+    slot_to_delegate_pkh : Implicit_account_repr.t SlotMap.t;
         (* This is a map from attestation slot to the delegate public key hash
            that owns that slot. It contains the first attestation slot for each
            delegate. This map is used by the DAL attestation cache to resolve

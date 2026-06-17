@@ -54,7 +54,7 @@ type level_participation = Participated | Didn't_participate
     with its participation at the current level. *)
 val record_attesting_participation :
   Raw_context.t ->
-  delegate:Signature.Public_key_hash.t ->
+  delegate:Implicit_account_repr.t ->
   participation:level_participation ->
   attesting_slots:int ->
   Raw_context.t tzresult Lwt.t
@@ -67,7 +67,7 @@ val record_attesting_participation :
     shards, so we know the delegate could have attested DAL slots. *)
 val record_dal_participation :
   Raw_context.t ->
-  delegate:Signature.Public_key_hash.t ->
+  delegate:Implicit_account_repr.t ->
   number_of_slots_attested_by_delegate:int ->
   number_of_protocol_attested_slots:int ->
   Raw_context.t tzresult Lwt.t
@@ -87,8 +87,8 @@ val is_dal_participation_sufficient :
    the payload producer (if the reward_bonus is not None).*)
 val record_baking_activity_and_pay_rewards_and_fees :
   Raw_context.t ->
-  payload_producer:Signature.Public_key_hash.t ->
-  block_producer:Signature.Public_key_hash.t ->
+  payload_producer:Implicit_account_repr.t ->
+  block_producer:Implicit_account_repr.t ->
   baking_reward:Tez_repr.t ->
   reward_bonus:Tez_repr.t option ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
@@ -98,14 +98,14 @@ val record_baking_activity_and_pay_rewards_and_fees :
    preparing the next cycle. *)
 val check_and_reset_delegate_participation :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   (Raw_context.t * bool) tzresult Lwt.t
 
 (** Retrieve the DAL participation of a delegate during the last cycle, and then
     reset the participation for preparing the next cycle. *)
 val get_and_reset_delegate_dal_participation :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   (Raw_context.t * Storage.dal_delegate_participation) tzresult Lwt.t
 
 module For_RPC : sig
@@ -139,7 +139,7 @@ module For_RPC : sig
  *)
   val participation_info :
     Raw_context.t ->
-    Signature.Public_key_hash.t ->
+    Implicit_account_repr.t ->
     participation_info tzresult Lwt.t
 
   (** Participation information. We denote by:
@@ -176,6 +176,6 @@ module For_RPC : sig
       "/context/delegates/<pkh>/dal_participation". *)
   val dal_participation_info :
     Raw_context.t ->
-    Signature.Public_key_hash.t ->
+    Implicit_account_repr.t ->
     dal_participation_info tzresult Lwt.t
 end

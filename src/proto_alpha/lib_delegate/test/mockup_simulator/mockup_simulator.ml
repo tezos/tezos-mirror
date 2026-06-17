@@ -1293,7 +1293,9 @@ let make_baking_delegate
     Baking_state_types.Key.t =
   Baking_state_types.Key.make
     ~alias:secret.name
-    ~public_key_hash:account.public_key_hash
+    ~public_key_hash:
+      (* FIXME-PA *)
+      (Protocol.Implicit_account_repr.Forbidden.to_pkh account.public_key_hash)
     ~public_key:(account.public_key |> WithExceptions.Option.get ~loc:__LOC__)
     ~secret_key_uri:secret.sk_uri
 

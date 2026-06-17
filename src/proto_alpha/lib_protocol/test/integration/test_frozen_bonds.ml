@@ -59,13 +59,21 @@ let init_test ~user_is_delegate =
   let open Lwt_result_wrap_syntax in
   let* ctxt, _ = create_context () in
   let delegate, delegate_pk, _ = Signature.generate_key () in
-  let delegate_contract = Contract.Implicit delegate in
-  let delegate_account = `Contract (Contract.Implicit delegate) in
+  (* FIXME-PA *)
+  let delegate_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh delegate)
+  in
+  let delegate_account =
+    (* FIXME-PA *)
+    `Contract
+      (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh delegate))
+  in
   let user_contract =
     if user_is_delegate then delegate_contract
     else
       let user, _, _ = Signature.generate_key () in
-      Contract.Implicit user
+      (* FIXME-PA *)
+      Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh user)
   in
   let user_account = `Contract user_contract in
   (* Allocate contracts for user and delegate. *)
@@ -77,8 +85,20 @@ let init_test ~user_is_delegate =
   in
   (* Configure delegate, as a delegate by self-delegation, for which
      revealing its manager key is a prerequisite. *)
-  let*@ ctxt = Contract.reveal_manager_key ctxt delegate delegate_pk in
-  let*@ ctxt = Contract.Delegate.set ctxt delegate_contract (Some delegate) in
+  (* FIXME-PA *)
+  let*@ ctxt =
+    Contract.reveal_manager_key
+      ctxt
+      (Implicit_account_repr.Forbidden.of_pkh delegate)
+      delegate_pk
+  in
+  (* FIXME-PA *)
+  let*@ ctxt =
+    Contract.Delegate.set
+      ctxt
+      delegate_contract
+      (Some (Implicit_account_repr.Forbidden.of_pkh delegate))
+  in
   return (ctxt, user_contract, user_account, delegate)
 
 (** Tested scenario :
@@ -95,6 +115,8 @@ let test_delegate_then_freeze_deposit () =
   let* ctxt, user_contract, user_account, delegate =
     init_test ~user_is_delegate:false
   in
+  (* FIXME-PA *)
+  let delegate = Implicit_account_repr.Forbidden.of_pkh delegate in
   (* Fetch user's initial balance before freeze. *)
   let*@ ctxt, user_balance =
     Token.Internal_for_tests.balance ctxt user_account
@@ -155,6 +177,8 @@ let test_freeze_deposit_then_delegate () =
   let* ctxt, user_contract, user_account, delegate =
     init_test ~user_is_delegate:false
   in
+  (* FIXME-PA *)
+  let delegate = Implicit_account_repr.Forbidden.of_pkh delegate in
   (* Fetch user's initial balance before freeze. *)
   let*@ ctxt, user_balance =
     Token.Internal_for_tests.balance ctxt user_account
@@ -348,6 +372,8 @@ let test_delegated_balance () =
   let* ctxt, user_contract, user_account, delegate =
     init_test ~user_is_delegate:false
   in
+  (* FIXME-PA *)
+  let delegate = Implicit_account_repr.Forbidden.of_pkh delegate in
   let delegate_contract = Contract.Implicit delegate in
   let delegate_account = `Contract delegate_contract in
   (* Fetch user's initial balance before freeze. *)
@@ -432,7 +458,11 @@ let test_scenario scenario =
   let* ctxt, user_contract, user_account, delegate1 =
     init_test ~user_is_delegate:false
   in
-  let delegate2, delegate_pk2, _ = Signature.generate_key () in
+  (* FIXME-PA *)
+  let delegate1 = Implicit_account_repr.Forbidden.of_pkh delegate1 in
+  let delegate2_sig, delegate_pk2, _ = Signature.generate_key () in
+  (* FIXME-PA *)
+  let delegate2 = Implicit_account_repr.Forbidden.of_pkh delegate2_sig in
   let delegate_contract2 = Contract.Implicit delegate2 in
   let delegate_account2 = `Contract delegate_contract2 in
   let delegate_balance2 = big_random_amount () in
@@ -457,7 +487,7 @@ let test_scenario scenario =
     let*@ user_balance =
       Contract.get_balance_and_frozen_bonds ctxt user_contract
     in
-    (* Let user delegate to "delegate". *)
+    (* Let user delegate to "delegate". delegate is now Implicit_account_repr.t *)
     let*@ ctxt = Contract.Delegate.set ctxt user_contract (Some delegate) in
     (* Fetch staking balance after delegation  *)
     let*@ staking_balance' = Delegate.For_RPC.staking_balance ctxt delegate in

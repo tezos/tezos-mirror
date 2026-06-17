@@ -34,9 +34,7 @@
 val cycle_end :
   Raw_context.t ->
   Cycle_repr.t ->
-  (Raw_context.t
-  * Receipt_repr.balance_updates
-  * Signature.Public_key_hash.t list)
+  (Raw_context.t * Receipt_repr.balance_updates * Implicit_account_repr.t list)
   tzresult
   Lwt.t
 

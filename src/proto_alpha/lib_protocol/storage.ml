@@ -149,7 +149,7 @@ module Tenderbake = struct
       (struct
         let name = ["forbidden_delegates"]
       end)
-      (Signature.Public_key_hash.Set)
+      (Implicit_account_repr.Set)
 end
 
 (** Contracts handling *)
@@ -234,7 +234,7 @@ module Unstake_request = struct
 
   type requests = request list
 
-  type t = {delegate : Signature.Public_key_hash.t; requests : requests}
+  type t = {delegate : Implicit_account_repr.t; requests : requests}
 
   let request_encoding =
     let open Data_encoding in
@@ -363,7 +363,7 @@ module Contract = struct
       (struct
         let name = ["delegate"]
       end)
-      (Signature.Public_key_hash)
+      (Implicit_account_repr)
 
   module Inactive_delegate =
     Indexed_context.Make_set
@@ -1200,7 +1200,7 @@ module Delegates =
        (struct
          let name = ["delegates"]
        end))
-       (Public_key_hash_index)
+       (Make_index (Implicit_account_repr.Index))
 
 module Consensus_keys =
   Make_data_set_storage
@@ -1216,7 +1216,7 @@ module Pending_denunciations =
        (struct
          let name = ["denunciations"]
        end))
-       (Public_key_hash_index)
+       (Make_index (Implicit_account_repr.Index))
     (Denunciations_repr)
 
 module Slashed_deposits =
@@ -1225,7 +1225,7 @@ module Slashed_deposits =
        (struct
          let name = ["slashed_deposits"]
        end))
-       (Public_key_hash_index)
+       (Make_index (Implicit_account_repr.Index))
     (Slashed_deposits_history)
 
 (** Per cycle storage *)
@@ -1263,7 +1263,7 @@ module Cycle = struct
                (Make_index
                   (Raw_level_repr.Index))
                   (Make_index (Round_repr.Index)))
-               (Public_key_hash_index))
+               (Make_index (Implicit_account_repr.Index)))
       (struct
         type t = denounced
 
@@ -1299,7 +1299,7 @@ module Cycle = struct
                (Make_index
                   (Raw_level_repr.Index))
                   (Make_index (Dal_slot_index_repr.Index)))
-               (Public_key_hash_index))
+               (Make_index (Implicit_account_repr.Index)))
       (struct
         type t = unit
 
@@ -1313,13 +1313,13 @@ module Cycle = struct
         let name = ["selected_stake_distribution"]
       end)
       (struct
-        type t = (Signature.Public_key_hash.t * Stake_repr.t) list
+        type t = (Implicit_account_repr.t * Stake_repr.t) list
 
         let encoding =
           Data_encoding.(
             Variable.list
               (obj2
-                 (req "baker" Signature.Public_key_hash.encoding)
+                 (req "baker" Implicit_account_repr.encoding)
                  (req "active_stake" Stake_repr.encoding)))
       end)
 
@@ -1399,7 +1399,7 @@ module Cycle = struct
 
   type unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
-    delegate : Signature.Public_key_hash.t;
+    delegate : Implicit_account_repr.t;
   }
 
   type nonce_status =
@@ -1413,7 +1413,7 @@ module Cycle = struct
         case
           (Tag 0)
           ~title:"Unrevealed"
-          (tup2 Nonce_hash.encoding Signature.Public_key_hash.encoding)
+          (tup2 Nonce_hash.encoding Implicit_account_repr.encoding)
           (function
             | Unrevealed {nonce_hash; delegate} -> Some (nonce_hash, delegate)
             | _ -> None)
@@ -1505,7 +1505,7 @@ module Stake = struct
          (struct
            let name = ["staking_balance"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Implicit_account_repr.Index))
       (Full_staking_balance_repr)
 
   module Active_delegates_with_minimal_stake =
@@ -1514,7 +1514,7 @@ module Stake = struct
          (struct
            let name = ["active_delegates_with_minimal_stake"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Implicit_account_repr.Index))
 
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
   module Total_active_stake = Cycle.Total_active_stake
@@ -1630,7 +1630,7 @@ module Vote = struct
          (struct
            let name = ["listings"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Implicit_account_repr.Index))
       (Encoding.Int64)
 
   module Proposals =
@@ -1642,7 +1642,7 @@ module Vote = struct
          (Pair
             (Make_index
                (Protocol_hash_with_path_encoding))
-               (Public_key_hash_index))
+               (Make_index (Implicit_account_repr.Index)))
 
   module Proposals_count =
     Make_indexed_data_storage
@@ -1650,7 +1650,7 @@ module Vote = struct
          (struct
            let name = ["proposals_count"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Implicit_account_repr.Index))
       (Encoding.UInt16)
 
   module Ballots =
@@ -1659,7 +1659,7 @@ module Vote = struct
          (struct
            let name = ["ballots"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Implicit_account_repr.Index))
       (struct
         type t = Vote_repr.ballot
 
@@ -1705,7 +1705,7 @@ module Seed_status =
 module Seed = struct
   type unrevealed_nonce = Cycle.unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
-    delegate : Signature.Public_key_hash.t;
+    delegate : Implicit_account_repr.t;
   }
 
   type nonce_status = Cycle.nonce_status =
@@ -2165,7 +2165,7 @@ module Sc_rollup = struct
          (struct
            let name = ["staker_index"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Implicit_account_repr.Index))
       (Sc_rollup_staker_index_repr)
 
   module Stakers =
@@ -2272,7 +2272,7 @@ module Sc_rollup = struct
          (struct
            let name = ["game"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Implicit_account_repr.Index))
 
   module Game =
     Make_indexed_carbonated_data_storage
@@ -2280,7 +2280,7 @@ module Sc_rollup = struct
          (struct
            let name = ["opponents"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Implicit_account_repr.Index))
       (struct
         type t = Sc_rollup_game_repr.Index.t
 
@@ -2368,7 +2368,7 @@ module Sc_rollup = struct
          (struct
            let name = ["whitelist"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Implicit_account_repr.Index))
 
   module Whitelist_paid_storage_space =
     Indexed_context.Make_map
@@ -2481,7 +2481,7 @@ module Dal = struct
          (struct
            let name = ["dal_denounced_delegates"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Implicit_account_repr.Index))
       (struct
         type t = unit
 

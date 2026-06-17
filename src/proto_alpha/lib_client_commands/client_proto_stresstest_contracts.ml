@@ -201,8 +201,10 @@ let originate_command =
             ~block:cctxt#block
             ~delegate:None
             ~initial_storage:scontract.initial_storage
-            ~balance:Tez.zero (* initial balance *)
-            ~source
+            ~balance:Tez.zero
+              (* initial balance *)
+              (* FIXME-PA *)
+            ~source:(Implicit_account_repr.Forbidden.of_pkh source)
             ~src_pk
             ~src_sk
             ~code:scontract.code

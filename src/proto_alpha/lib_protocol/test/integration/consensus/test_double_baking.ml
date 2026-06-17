@@ -190,7 +190,8 @@ let test_valid_double_baking_followed_by_double_attesting () =
   in
   let* e1, e2 = Context.get_first_different_attesters (B blk_a) in
   let delegate =
-    if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
+    (* FIXME-PA *)
+    if Implicit_account_repr.(e1.delegate = baker1) then e1.delegate
     else e2.delegate
   in
   let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in
@@ -268,7 +269,8 @@ let test_valid_double_attesting_followed_by_double_baking () =
   in
   let* e1, e2 = Context.get_first_different_attesters (B blk_a) in
   let delegate =
-    if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
+    (* FIXME-PA *)
+    if Implicit_account_repr.(e1.delegate = baker1) then e1.delegate
     else e2.delegate
   in
   let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in

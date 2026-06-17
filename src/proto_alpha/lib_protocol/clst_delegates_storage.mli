@@ -13,14 +13,14 @@
     active parameters. *)
 val get_delegate_parameters :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Clst_delegates_parameters_repr.t option tzresult Lwt.t
 
 (** [get_pending_parameters ctxt delegate] returns the list of cycles at which
     newly registered parameters will be activated. *)
 val get_pending_parameters :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   (Cycle_repr.t * Clst_delegates_parameters_repr.update) list tzresult Lwt.t
 
 (** [register_pending_parameters ctxt delegate parameters] updates [delegate]'s
@@ -29,7 +29,7 @@ val get_pending_parameters :
     parameters are not activated yet, but serve for future baking rights. *)
 val register_pending_parameters :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Clst_delegates_parameters_repr.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -38,7 +38,7 @@ val register_pending_parameters :
     receive baking rights from CLST starting from the cycle the unregistration
     takes effects. *)
 val unregister :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** [activate_parameters ctxt ~new_cycle] activates the clst pending delegate
     parameters at the beginning of cycle [new_cycle]. This function iterates

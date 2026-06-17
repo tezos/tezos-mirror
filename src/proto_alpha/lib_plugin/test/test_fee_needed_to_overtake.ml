@@ -96,7 +96,7 @@ let test_manager_ops (op_to_overtake, fee_o, gas_o) (candidate_op, fee_c, gas_c)
      the operation that will be compared to [op_to_overtake], so that
      if their weights (fee/gas ratio) are equal, then the former is
      smaller (see [Operation_repr.compare_manager_weight]). *)
-  let source = Signature.Public_key_hash.zero in
+  let source = Implicit_account_repr.zero in
   let with_fee fee =
     (fake_oph, Helpers.set_fee_and_source fee ~source (snd candidate_op))
   in

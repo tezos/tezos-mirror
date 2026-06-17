@@ -255,6 +255,13 @@ let cycle_end ctxt last_cycle =
   | None -> return (ctxt, [])
   | Some previous_cycle ->
       (* cycle with revelations *)
-      purge_nonces_and_get_unrevealed ctxt ~cycle:previous_cycle
+      let+ ctxt, unrevealed_list =
+        purge_nonces_and_get_unrevealed ctxt ~cycle:previous_cycle
+      in
+      let convert (u : Storage.Seed.unrevealed_nonce) : Nonce_storage.unrevealed
+          =
+        {nonce_hash = u.nonce_hash; delegate = u.delegate}
+      in
+      (ctxt, List.map convert unrevealed_list)
 
 let remove_for_cycle = Storage.Seed.For_cycle.remove_existing

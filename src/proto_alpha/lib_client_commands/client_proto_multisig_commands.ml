@@ -246,6 +246,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               alias_name
           in
           let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+          (* FIXME-PA *)
+          let source = Implicit_account_repr.Forbidden.of_pkh source in
           let* keys =
             List.map_es (fun (pk_uri, _) -> Client_keys.public_key pk_uri) keys
           in
@@ -261,7 +263,9 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ?safety_guard
               ?storage_limit
               ~verbose_signing
-              ~delegate
+              ~delegate:
+                (* FIXME-PA *)
+                (Option.map Implicit_account_repr.Forbidden.of_pkh delegate)
               ~threshold:(Z.of_int threshold)
               ~keys
               ~balance
@@ -399,8 +403,10 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               cctxt
               ~chain:cctxt#chain
               ~block:cctxt#block
-              ~multisig_contract
-              ~action:(Client_proto_multisig.Change_delegate (Some delegate))
+              ~multisig_contract (* FIXME-PA *)
+              ~action:
+                (Client_proto_multisig.Change_delegate
+                   (Some (Implicit_account_repr.Forbidden.of_pkh delegate)))
               ()
           in
           let* signature = Client_keys.sign cctxt sk prepared_command.bytes in
@@ -525,6 +531,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
             get_parameter_type cctxt ~destination ~entrypoint
           in
           let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+          (* FIXME-PA *)
+          let source = Implicit_account_repr.Forbidden.of_pkh source in
           let*! errors =
             Client_proto_multisig.call_multisig
               cctxt
@@ -591,6 +599,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
            ->
           let open Lwt_result_syntax in
           let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+          (* FIXME-PA *)
+          let source = Implicit_account_repr.Forbidden.of_pkh source in
           let*? {expanded = lambda; _} =
             Micheline_parser.no_parsing_error
             @@ Michelson_v1_parser.parse_expression lambda
@@ -661,6 +671,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
            ->
           let open Lwt_result_syntax in
           let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+          (* FIXME-PA *)
+          let source = Implicit_account_repr.Forbidden.of_pkh source in
           let*! errors =
             Client_proto_multisig.call_multisig
               cctxt
@@ -675,7 +687,10 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ~src_pk
               ~src_sk
               ~multisig_contract
-              ~action:(Client_proto_multisig.Change_delegate (Some delegate))
+              ~action:
+                (* FIXME-PA *)
+                (Client_proto_multisig.Change_delegate
+                   (Some (Implicit_account_repr.Forbidden.of_pkh delegate)))
               ~signatures
               ~amount:Tez.zero
               ?gas_limit
@@ -722,6 +737,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
            ->
           let open Lwt_result_syntax in
           let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+          (* FIXME-PA *)
+          let source = Implicit_account_repr.Forbidden.of_pkh source in
           let*! errors =
             Client_proto_multisig.call_multisig
               cctxt
@@ -787,6 +804,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
            ->
           let open Lwt_result_syntax in
           let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+          (* FIXME-PA *)
+          let source = Implicit_account_repr.Forbidden.of_pkh source in
           let* keys =
             List.map_es
               (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
@@ -866,6 +885,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
            ->
           let open Lwt_result_syntax in
           let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+          (* FIXME-PA *)
+          let source = Implicit_account_repr.Forbidden.of_pkh source in
           let*! errors =
             Client_proto_multisig.call_multisig_on_bytes
               cctxt
@@ -1006,7 +1027,9 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ~block:cctxt#block
               ~multisig_contract
               ~action:
-                (Client_proto_multisig.Change_delegate (Some new_delegate))
+                (* FIXME-PA *)
+                (Client_proto_multisig.Change_delegate
+                   (Some (Implicit_account_repr.Forbidden.of_pkh new_delegate)))
               ()
           in
           return @@ prepare_command_display prepared_command bytes_only);

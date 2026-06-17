@@ -111,7 +111,8 @@ module Account = struct
   let account_to_bootstrap ({pkh; pk; _}, amount, delegate_to) =
     let open Parameters in
     ({
-       public_key_hash = pkh;
+       (* FIXME-PA *)
+       public_key_hash = Implicit_account_repr.Forbidden.of_pkh pkh;
        public_key = Some pk;
        amount;
        delegate_to;
@@ -197,8 +198,8 @@ let make_rpc_context ~chain_id ctxt block =
 (* This type is used only to provide a simpler interface to the exterior. *)
 type baker_policy =
   | By_round of int
-  | By_account of public_key_hash
-  | Excluding of public_key_hash list
+  | By_account of Implicit_account_repr.t
+  | Excluding of Implicit_account_repr.t list
 
 let get_next_baker_by_round rpc_ctxt round block =
   let open Lwt_result_syntax in
@@ -231,7 +232,7 @@ let get_next_baker_excluding rpc_ctxt excludes block =
   let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} =
     List.find
       (fun {Plugin.RPC.Baking_rights.delegate; _} ->
-        not (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
+        not (List.mem ~equal:Implicit_account_repr.equal delegate excludes))
       bakers
     |> WithExceptions.Option.get ~loc:__LOC__
   in
@@ -248,7 +249,7 @@ let get_next_baker chain_store ?(policy = By_round 0) =
 
 module Forge = struct
   type header = {
-    baker : public_key_hash;
+    baker : Implicit_account_repr.t;
     (* the signer of the block *)
     shell : Block_header.shell_header;
     contents : Block_header.contents;
@@ -291,7 +292,10 @@ module Forge = struct
 
   let sign_header ~chain_id {baker; shell; contents} =
     let open Lwt_result_syntax in
-    let* delegate = Account.find baker in
+    (* FIXME-PA *)
+    let* delegate =
+      Account.find (Implicit_account_repr.Forbidden.to_pkh baker)
+    in
     let unsigned_bytes =
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding

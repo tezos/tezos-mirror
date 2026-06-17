@@ -494,78 +494,82 @@ let apply ctxt gas capture_ty capture lam =
   let lam' =
     match lam with
     | LamRec (descr, expr) -> (
-        let (Item_t (full_arg_ty, Item_t (Lambda_t (_, _, _), Bot_t))) =
-          descr.kbef
-        in
-        let (Item_t (ret_ty, Bot_t)) = descr.kaft in
-        let*? arg_ty_expr, ctxt =
-          Script_ir_unparser.unparse_ty ~loc ctxt full_arg_ty
-        in
-        let*? ret_ty_expr, ctxt =
-          Script_ir_unparser.unparse_ty ~loc ctxt ret_ty
-        in
-        match full_arg_ty with
-        | Pair_t (capture_ty, arg_ty, _, _) ->
-            let arg_stack_ty = Item_t (arg_ty, Bot_t) in
-            (* To avoid duplicating the recursive lambda [lam], we
-               return a regular lambda that builds the tuple of
-               parameters and applies it to `lam`. Since `lam` is
-               recursive it will push itself on top of the stack at
-               execution time. *)
-            let full_descr =
-              {
-                kloc = descr.kloc;
-                kbef = arg_stack_ty;
-                kaft = descr.kaft;
-                kinstr =
-                  IPush
-                    ( descr.kloc,
-                      capture_ty,
-                      capture,
-                      ICons_pair
+        match descr.kbef with
+        | Item_t (full_arg_ty, Item_t (Lambda_t (_, _, _), Bot_t)) -> (
+            let (Item_t (ret_ty, Bot_t)) = descr.kaft in
+            let*? arg_ty_expr, ctxt =
+              Script_ir_unparser.unparse_ty ~loc ctxt full_arg_ty
+            in
+            let*? ret_ty_expr, ctxt =
+              Script_ir_unparser.unparse_ty ~loc ctxt ret_ty
+            in
+            match full_arg_ty with
+            | Pair_t (capture_ty, arg_ty, _, _) ->
+                let arg_stack_ty = Item_t (arg_ty, Bot_t) in
+                (* To avoid duplicating the recursive lambda [lam], we
+                   return a regular lambda that builds the tuple of
+                   parameters and applies it to `lam`. Since `lam` is
+                   recursive it will push itself on top of the stack at
+                   execution time. *)
+                let full_descr =
+                  {
+                    kloc = descr.kloc;
+                    kbef = arg_stack_ty;
+                    kaft = descr.kaft;
+                    kinstr =
+                      IPush
                         ( descr.kloc,
-                          ILambda
+                          capture_ty,
+                          capture,
+                          ICons_pair
                             ( descr.kloc,
-                              lam,
-                              ISwap
+                              ILambda
                                 ( descr.kloc,
-                                  IExec
+                                  lam,
+                                  ISwap
                                     ( descr.kloc,
-                                      Some descr.kaft,
-                                      IHalt descr.kloc ) ) ) ) );
-              }
-            in
-            let full_expr =
-              make_expr
-                Micheline.
-                  [
-                    Prim
-                      (loc, I_LAMBDA_REC, [arg_ty_expr; ret_ty_expr; expr], []);
-                    Prim (loc, I_SWAP, [], []);
-                    Prim (loc, I_EXEC, [], []);
-                  ]
-            in
-            return (Lam (full_descr, full_expr), ctxt))
+                                      IExec
+                                        ( descr.kloc,
+                                          Some descr.kaft,
+                                          IHalt descr.kloc ) ) ) ) );
+                  }
+                in
+                let full_expr =
+                  make_expr
+                    Micheline.
+                      [
+                        Prim
+                          ( loc,
+                            I_LAMBDA_REC,
+                            [arg_ty_expr; ret_ty_expr; expr],
+                            [] );
+                        Prim (loc, I_SWAP, [], []);
+                        Prim (loc, I_EXEC, [], []);
+                      ]
+                in
+                return (Lam (full_descr, full_expr), ctxt)))
     | Lam (descr, expr) -> (
-        let (Item_t (full_arg_ty, Bot_t)) = descr.kbef in
-        match full_arg_ty with
-        | Pair_t (capture_ty, arg_ty, _, _) ->
-            let arg_stack_ty = Item_t (arg_ty, Bot_t) in
-            let full_descr =
-              {
-                kloc = descr.kloc;
-                kbef = arg_stack_ty;
-                kaft = descr.kaft;
-                kinstr =
-                  IPush
-                    ( descr.kloc,
-                      capture_ty,
-                      capture,
-                      ICons_pair (descr.kloc, descr.kinstr) );
-              }
-            in
-            let full_expr = make_expr [expr] in
-            return (Lam (full_descr, full_expr), ctxt))
+        match descr.kbef with
+        | Item_t (full_arg_ty, Bot_t) -> (
+            match full_arg_ty with
+            | Pair_t (capture_ty, arg_ty, _, _) ->
+                let arg_stack_ty = Item_t (arg_ty, Bot_t) in
+                let full_descr =
+                  {
+                    kloc = descr.kloc;
+                    kbef = arg_stack_ty;
+                    kaft = descr.kaft;
+                    kinstr =
+                      IPush
+                        ( descr.kloc,
+                          capture_ty,
+                          capture,
+                          ICons_pair (descr.kloc, descr.kinstr) );
+                  }
+                in
+                let full_expr = make_expr [expr] in
+                return (Lam (full_descr, full_expr), ctxt))
+        | _ -> .)
   in
   let* lam', ctxt = lam' in
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in

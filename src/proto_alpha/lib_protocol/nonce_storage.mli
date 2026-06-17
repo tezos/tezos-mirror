@@ -42,9 +42,9 @@ type error +=
 
 val encoding : nonce Data_encoding.t
 
-type unrevealed = Storage.Seed.unrevealed_nonce = {
+type unrevealed = {
   nonce_hash : Nonce_hash.t;
-  delegate : Signature.Public_key_hash.t;
+  delegate : Implicit_account_repr.t;
 }
 
 type status = Unrevealed of unrevealed | Revealed of Seed_repr.nonce

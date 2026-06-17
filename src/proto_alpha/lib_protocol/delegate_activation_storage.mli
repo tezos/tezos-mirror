@@ -32,17 +32,17 @@
     - {!Storage.Contract.Delegate_last_cycle_before_deactivation} *)
 
 val is_inactive :
-  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> bool tzresult Lwt.t
 
 (** [last_cycle_before_deactivation ctxt delegate] is the cycle at which
     the delegate is scheduled to become inactive. *)
 val last_cycle_before_deactivation :
-  Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> Cycle_repr.t tzresult Lwt.t
 
 (** [set_inactive context delegate] adds [delegate] to the set of inactive
     contracts. *)
 val set_inactive :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> Raw_context.t Lwt.t
 
 (** [set_active ctxt delegate] returns a pair [(new_ctxt, is_inactive)] where:
     - [new_ctxt] is a new context, updated from [ctxt], where the [delegate]'s
@@ -51,5 +51,5 @@ val set_inactive :
   *)
 val set_active :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   (Raw_context.t * bool) tzresult Lwt.t

@@ -267,7 +267,8 @@ let test_unparsable_script () =
     Data_encoding.Binary.to_bytes_exn Operation.contents_list_encoding op
     |> Bytes.to_string
   in
-  let* account = Account.find pkh in
+  (* FIXME-PA *)
+  let* account = Account.find (Implicit_account_repr.Forbidden.to_pkh pkh) in
   let* ill_typed_op =
     Data_encoding.Binary.of_string_exn
       Operation.contents_list_encoding

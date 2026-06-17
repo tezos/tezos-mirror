@@ -73,7 +73,7 @@ type 'a state = {
   (* Protocol constants *)
   constants : Constants.t;
   (* Validators rights for the last preserved levels *)
-  validators_rights : public_key_hash Slot.Map.t Validators_cache.t;
+  validators_rights : Signature.Public_key_hash.t Slot.Map.t Validators_cache.t;
   (* Consensus operations seen so far *)
   consensus_operations_table :
     recorded_consensus_operations Delegate_map.t HLevel.t;
@@ -418,13 +418,17 @@ let process_block (cctxt : #Protocol_client_context.full) state
         Option.value ~default:Delegate_map.empty
         @@ HLevel.find state.blocks_table (chain_id, level, round)
       in
-      match Delegate_map.find baker.delegate map with
+      (* FIXME-PA *)
+      let baker_delegate =
+        Implicit_account_repr.Forbidden.to_pkh baker.delegate
+      in
+      match Delegate_map.find baker_delegate map with
       | None ->
           return
           @@ HLevel.add
                state.blocks_table
                (chain_id, level, round)
-               (Delegate_map.add baker.delegate new_hash map)
+               (Delegate_map.add baker_delegate new_hash map)
       | Some existing_hash when Block_hash.(existing_hash = new_hash) ->
           (* This case should never happen *)
           let*! () = Events.(emit double_baking_but_not) () in
@@ -432,7 +436,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           @@ HLevel.replace
                state.blocks_table
                (chain_id, level, round)
-               (Delegate_map.add baker.delegate new_hash map)
+               (Delegate_map.add baker_delegate new_hash map)
       | Some existing_hash ->
           (* If a previous block made by this pkh is found for
              the same (level, round) we inject a double_baking_evidence *)
@@ -463,7 +467,11 @@ let process_block (cctxt : #Protocol_client_context.full) state
           @@ HLevel.replace
                state.blocks_table
                (chain_id, level, round)
-               (Delegate_map.add baker.delegate new_hash map))
+               (* FIXME-PA *)
+               (Delegate_map.add
+                  (Implicit_account_repr.Forbidden.to_pkh baker.delegate)
+                  new_hash
+                  map))
 
 (* Remove levels that are lower than the
    [highest_level_encountered] minus [preserved_levels] *)

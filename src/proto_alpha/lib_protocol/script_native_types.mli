@@ -36,7 +36,8 @@ module CLST_types : sig
 
   type redeem = nat
 
-  type finalize_redeem = Signature.public_key_hash
+  (* FIXME-PA: !IMPORTANT! find a way to use the Implicit_account_repr.t *)
+  type finalize_redeem = Signature.Public_key_hash.t
 
   type staker_entrypoints = ((deposit, redeem) or_, finalize_redeem) or_
 

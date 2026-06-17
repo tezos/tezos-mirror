@@ -243,7 +243,7 @@ module Cost_of : sig
 
     val algo_of_public_key : Signature.public_key -> algo
 
-    val algo_of_public_key_hash : Signature.public_key_hash -> algo
+    val algo_of_public_key_hash : Implicit_account_repr.t -> algo
 
     val check_signature_on_algo : algo -> int -> Gas.cost
 

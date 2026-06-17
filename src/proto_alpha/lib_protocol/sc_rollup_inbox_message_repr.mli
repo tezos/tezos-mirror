@@ -53,7 +53,7 @@ type internal_inbox_message =
       sender : Contract_hash.t;
           (** The contract hash of an Layer 1 originated contract sending a message
           to the rollup. *)
-      source : Signature.public_key_hash;
+      source : Implicit_account_repr.t;
           (** The implicit account that originated the transaction. *)
       destination : Sc_rollup_repr.Address.t;
           (** The destination, as a rollup address, for the message. *)
@@ -75,7 +75,7 @@ type internal_inbox_message =
       slot_size : int;
       page_size : int;
       slots_by_publisher :
-        Dal_slot_index_repr.t list Signature.Public_key_hash.Map.t;
+        Dal_slot_index_repr.t list Implicit_account_repr.Map.t;
     }
       (** Internal message communicating the attested slots for the given
           [published_level]. Attested slots are grouped by
@@ -126,7 +126,7 @@ val dal_attested_slots_serialized :
   number_of_slots:int ->
   slot_size:int ->
   page_size:int ->
-  slots_by_publisher:Dal_slot_index_repr.t list Signature.Public_key_hash.Map.t ->
+  slots_by_publisher:Dal_slot_index_repr.t list Implicit_account_repr.Map.t ->
   serialized
 
 (** [dal_attested_slots_messages_of_cells ~number_of_slots ~slot_size ~page_size
@@ -157,7 +157,6 @@ module Internal_for_tests : sig
     number_of_slots:int ->
     slot_size:int ->
     page_size:int ->
-    slots_by_publisher:
-      Dal_slot_index_repr.t list Signature.Public_key_hash.Map.t ->
+    slots_by_publisher:Dal_slot_index_repr.t list Implicit_account_repr.Map.t ->
     internal_inbox_message list tzresult
 end

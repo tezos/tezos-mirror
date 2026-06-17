@@ -73,9 +73,7 @@ let validate_attestations ctxt ~attestation_level consensus_key attestations =
           | Some delegate_map ->
               let delegate = pkh_of_consensus_key consensus_key in
               let not_in_committee =
-                match
-                  Signature.Public_key_hash.Map.find delegate delegate_map
-                with
+                match Implicit_account_repr.Map.find delegate delegate_map with
                 | None -> true
                 | Some n ->
                     (* otherwise, we should be in [None] case *)

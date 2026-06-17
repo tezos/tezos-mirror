@@ -120,7 +120,7 @@ let record_attesting_participation ctxt ~delegate ~participation
           let stake_weight_info =
             List.find
               (fun Raw_context.{consensus_pk; _} ->
-                Signature.Public_key_hash.equal
+                Implicit_account_repr.equal
                   delegate
                   consensus_pk.Raw_context.delegate)
               stake_list
@@ -201,8 +201,8 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
   let open Lwt_result_syntax in
   let* ctxt = Stake_storage.set_active ctxt payload_producer in
   let* ctxt =
-    if not (Signature.Public_key_hash.equal payload_producer block_producer)
-    then Stake_storage.set_active ctxt block_producer
+    if not (Implicit_account_repr.equal payload_producer block_producer) then
+      Stake_storage.set_active ctxt block_producer
     else return ctxt
   in
   let pay_payload_producer ctxt delegate =
@@ -308,7 +308,7 @@ module For_RPC = struct
     in
     match
       List.assoc_opt
-        ~equal:Signature.Public_key_hash.equal
+        ~equal:Implicit_account_repr.equal
         delegate
         stake_distribution
     with
@@ -405,7 +405,7 @@ module For_RPC = struct
     in
     match
       List.assoc_opt
-        ~equal:Signature.Public_key_hash.equal
+        ~equal:Implicit_account_repr.equal
         delegate
         stake_distribution
     with

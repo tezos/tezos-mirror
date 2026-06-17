@@ -46,7 +46,7 @@ type error += Cannot_stake_on_fully_slashed_delegate
 val stake :
   Raw_context.t ->
   contract:Contract_repr.t ->
-  delegate:Signature.Public_key_hash.t ->
+  delegate:Implicit_account_repr.t ->
   Tez_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
@@ -63,7 +63,7 @@ val stake :
 val request_unstake :
   Raw_context.t ->
   contract:Contract_repr.t ->
-  delegate:Signature.Public_key_hash.t ->
+  delegate:Implicit_account_repr.t ->
   Tez_repr.t ->
   (Raw_context.t * Tez_repr.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
@@ -79,7 +79,7 @@ module For_RPC : sig
   val staked_balance :
     Raw_context.t ->
     contract:Contract_repr.t ->
-    delegate:Signature.Public_key_hash.t ->
+    delegate:Implicit_account_repr.t ->
     Tez_repr.t tzresult Lwt.t
 
   val staking_pseudotokens_balance :
@@ -89,11 +89,11 @@ module For_RPC : sig
 
   val get_frozen_deposits_pseudotokens :
     Raw_context.t ->
-    delegate:Signature.public_key_hash ->
+    delegate:Implicit_account_repr.t ->
     Staking_pseudotoken_repr.t tzresult Lwt.t
 
   val get_frozen_deposits_staked_tez :
     Raw_context.t ->
-    delegate:Signature.public_key_hash ->
+    delegate:Implicit_account_repr.t ->
     Tez_repr.t tzresult Lwt.t
 end

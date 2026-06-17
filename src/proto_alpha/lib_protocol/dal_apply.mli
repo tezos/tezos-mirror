@@ -54,7 +54,7 @@ val validate_attestations :
     [committee_level_to_shard_count]. *)
 val apply_attestations :
   t ->
-  delegate:Signature.public_key_hash ->
+  delegate:Implicit_account_repr.t ->
   attested_level:Raw_level.t ->
   Dal.Attestations.t ->
   tb_slot:Slot.t ->

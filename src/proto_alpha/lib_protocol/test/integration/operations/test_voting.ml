@@ -1481,7 +1481,10 @@ let test_proposals_source_not_in_vote_listings () =
      not reach with the blocks baked in this test. *)
   let* block, funder = context_init1 ~blocks_per_cycle:10l () in
   let fresh_account = Account.new_account () in
-  let proposer = Contract.Implicit fresh_account.pkh in
+  (* FIXME-PA *)
+  let proposer =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh fresh_account.pkh)
+  in
   let assert_fails_with_unregistered_delegate block =
     assert_validate_proposals_fails
       ~expected_error:proposals_from_unregistered_delegate
@@ -1506,7 +1509,13 @@ let test_proposals_source_not_in_vote_listings () =
   let* block = Block.bake block ~operation in
   (* Fail when the source is not a delegate. *)
   let* () = assert_fails_with_unregistered_delegate block __LOC__ in
-  let* operation = Op.delegation (B block) proposer (Some fresh_account.pkh) in
+  (* FIXME-PA *)
+  let* operation =
+    Op.delegation
+      (B block)
+      proposer
+      (Some (Implicit_account_repr.Forbidden.of_pkh fresh_account.pkh))
+  in
   let* block = Block.bake block ~operation in
   (* Fail when the source is a delegate, but not yet in the vote listings. *)
   assert_fails_with_source_not_in_vote_listings block __LOC__
@@ -1944,7 +1953,10 @@ let test_ballot_source_not_in_vote_listings () =
     context_init_exploration ~blocks_per_cycle:10l ()
   in
   let fresh_account = Account.new_account () in
-  let voter = Contract.Implicit fresh_account.pkh in
+  (* FIXME-PA *)
+  let voter =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh fresh_account.pkh)
+  in
   let assert_fails_with_source_not_in_vote_listings block =
     assert_validate_ballot_fails
       ~expected_error:source_not_in_vote_listings
@@ -1971,7 +1983,13 @@ let test_ballot_source_not_in_vote_listings () =
   let* block = Block.bake block ~operation in
   (* Fail when the source is not a delegate. *)
   let* () = assert_fails_with_unregistered_delegate block __LOC__ in
-  let* operation = Op.delegation (B block) voter (Some fresh_account.pkh) in
+  (* FIXME-PA *)
+  let* operation =
+    Op.delegation
+      (B block)
+      voter
+      (Some (Implicit_account_repr.Forbidden.of_pkh fresh_account.pkh))
+  in
   let* block = Block.bake block ~operation in
   (* Fail when the source is a delegate, but not yet in the vote listings. *)
   assert_fails_with_source_not_in_vote_listings block __LOC__

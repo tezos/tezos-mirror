@@ -6,13 +6,13 @@
 (*****************************************************************************)
 
 type t =
-  | Baker of Signature.public_key_hash
+  | Baker of Implicit_account_repr.t
   | Single_staker of {
       staker : Contract_repr.t;
-      delegate : Signature.public_key_hash;
+      delegate : Implicit_account_repr.t;
     }
-  | Shared_between_stakers of {delegate : Signature.public_key_hash}
-  | Baker_edge of Signature.public_key_hash
+  | Shared_between_stakers of {delegate : Implicit_account_repr.t}
+  | Baker_edge of Implicit_account_repr.t
 
 let baker pkh = Baker pkh
 
@@ -20,7 +20,7 @@ let baker_edge pkh = Baker_edge pkh
 
 let single_staker ~staker ~delegate =
   match (staker : Contract_repr.t) with
-  | Implicit pkh when Signature.Public_key_hash.(pkh = delegate) -> Baker pkh
+  | Implicit pkh when Implicit_account_repr.(pkh = delegate) -> Baker pkh
   | _ -> Single_staker {staker; delegate}
 
 let shared_between_stakers ~delegate = Shared_between_stakers {delegate}
@@ -31,19 +31,17 @@ let encoding =
   let single_encoding =
     obj2
       (req "contract" Contract_repr.encoding)
-      (req "delegate" Signature.Public_key_hash.encoding)
+      (req "delegate" Implicit_account_repr.encoding)
   in
   let shared_tag = 1 in
-  let shared_encoding =
-    obj1 (req "delegate" Signature.Public_key_hash.encoding)
-  in
+  let shared_encoding = obj1 (req "delegate" Implicit_account_repr.encoding) in
   let baker_tag = 2 in
   let baker_encoding =
-    obj1 (req "baker_own_stake" Signature.Public_key_hash.encoding)
+    obj1 (req "baker_own_stake" Implicit_account_repr.encoding)
   in
   let baker_edge_tag = 3 in
   let baker_edge_encoding =
-    obj1 (req "baker_edge" Signature.Public_key_hash.encoding)
+    obj1 (req "baker_edge" Implicit_account_repr.encoding)
   in
   def
     ~title:"frozen_staker"
@@ -92,18 +90,18 @@ let encoding =
 
 let compare sa sb =
   match (sa, sb) with
-  | Baker ba, Baker bb -> Signature.Public_key_hash.compare ba bb
+  | Baker ba, Baker bb -> Implicit_account_repr.compare ba bb
   | Baker _, _ -> -1
   | _, Baker _ -> 1
   | ( Single_staker {staker = sa; delegate = da},
       Single_staker {staker = sb; delegate = db} ) ->
       Compare.or_else (Contract_repr.compare sa sb) (fun () ->
-          Signature.Public_key_hash.compare da db)
+          Implicit_account_repr.compare da db)
   | ( Shared_between_stakers {delegate = da},
       Shared_between_stakers {delegate = db} ) ->
-      Signature.Public_key_hash.compare da db
+      Implicit_account_repr.compare da db
   | Single_staker _, Shared_between_stakers _ -> -1
   | Shared_between_stakers _, Single_staker _ -> 1
-  | Baker_edge ba, Baker_edge bb -> Signature.Public_key_hash.compare ba bb
+  | Baker_edge ba, Baker_edge bb -> Implicit_account_repr.compare ba bb
   | Baker_edge _, _ -> -1
   | _, Baker_edge _ -> 1

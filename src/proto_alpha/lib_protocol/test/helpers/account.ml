@@ -165,10 +165,13 @@ let make_bootstrap_account ?(balance = default_initial_full_balance)
     ?(delegate_to = None) ?(consensus_key = None) account =
   Parameters.
     {
-      public_key_hash = account.pkh;
+      (* FIXME-PA *)
+      public_key_hash = Implicit_account_repr.Forbidden.of_pkh account.pkh;
       public_key = Some account.pk;
       amount = balance;
-      delegate_to;
+      (* FIXME-PA *)
+      delegate_to =
+        Option.map Implicit_account_repr.Forbidden.of_pkh delegate_to;
       consensus_key;
     }
 

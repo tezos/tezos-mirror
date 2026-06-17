@@ -29,7 +29,7 @@ open Alpha_context
 
 type _ t =
   | Manager_info : {
-      source : Alpha_context.public_key_hash option;
+      source : Implicit_account_repr.t option;
       fee : Tez.t Limit.t;
       gas_limit : Gas.Arith.integral Limit.t;
       storage_limit : Z.t Limit.t;

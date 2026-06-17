@@ -63,8 +63,8 @@ val punish_double_signing :
   Raw_context.t ->
   operation_hash:Operation_hash.t ->
   Misbehaviour_repr.t ->
-  Signature.Public_key_hash.t ->
-  rewarded:Signature.public_key_hash ->
+  Implicit_account_repr.t ->
+  rewarded:Implicit_account_repr.t ->
   Raw_context.t tzresult Lwt.t
 
 (** Applies pending denunciations in {!Storage.Pending_denunciations}
@@ -91,7 +91,7 @@ module For_RPC : sig
       returns the estimated shared pending slashed amount of the given [delegate]
       according to the currently available denunciations. *)
   val get_estimated_shared_pending_slashed_amount :
-    Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
+    Raw_context.t -> Implicit_account_repr.t -> Tez_repr.t tzresult Lwt.t
 
   (** [get_estimated_own_pending_slashed_amount ctxt contract]
       returns the estimated own pending slashed amount of the given [contract]

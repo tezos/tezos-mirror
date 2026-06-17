@@ -576,7 +576,11 @@ let bootstrap_balance = Tez.of_mutez_exn 4_000_000_000_000L
 let compute_accounts =
   List.map (fun s ->
       let public_key = Signature.Public_key.of_b58check_exn s in
-      let public_key_hash = Signature.Public_key.hash public_key in
+      (* FIXME-PA *)
+      let public_key_hash =
+        Protocol.Implicit_account_repr.Forbidden.of_pkh
+          (Signature.Public_key.hash public_key)
+      in
       Parameters.
         {
           public_key_hash;
@@ -589,14 +593,14 @@ let compute_accounts =
 let bootstrap_accounts = compute_accounts bootstrap_accounts_strings
 
 let make_bootstrap_account (pkh, pk, amount, delegate_to, consensus_key) =
+  (* FIXME-PA. Two [of_pkh] calls below. Note that this function is
+     only used once, in etherlink/bin_node/lib_dev/tezlink/tezos_services.ml *)
+  let public_key_hash = Protocol.Implicit_account_repr.Forbidden.of_pkh pkh in
+  let delegate_to =
+    Option.map Protocol.Implicit_account_repr.Forbidden.of_pkh delegate_to
+  in
   Parameters.
-    {
-      public_key_hash = pkh;
-      public_key = Some pk;
-      amount;
-      delegate_to;
-      consensus_key;
-    }
+    {public_key_hash; public_key = Some pk; amount; delegate_to; consensus_key}
 
 let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
     ?(bootstrap_contracts = []) ?(bootstrap_smart_rollups = [])

@@ -82,7 +82,7 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
             delegates
         in
         let delegate_ids =
-          List.map Baking_state_types.Delegate_id.of_pkh delegates
+          List.map (fun d -> Baking_state_types.Delegate_id.of_pkh d) delegates
         in
         (* Ensures the DAL attestable slots cache is populated in time for the
            first block's attestation. *)

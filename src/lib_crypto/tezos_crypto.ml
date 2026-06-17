@@ -44,6 +44,7 @@ module Hashed = struct
   module Smart_rollup_merkelized_payload_hashes_hash =
     Smart_rollup_merkelized_payload_hashes_hash
   module Injector_operations_hash = Injector_operations_hash
+  module Account_hash = Account_hash
 end
 
 module Signature = struct

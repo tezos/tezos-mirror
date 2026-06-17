@@ -869,15 +869,17 @@ let test_dal_attested_slots_encoding () =
   let open Lwt_result_syntax in
   (* Create a slots_by_publisher map with one publisher having slot 4 attested *)
   let pkh =
-    Environment.Signature.Public_key_hash.of_b58check_exn
-      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (Implicit_account_repr.of_b58check_opt
+         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
   in
   let slot_index =
     WithExceptions.Option.get ~loc:__LOC__
     @@ Dal_slot_index_repr.of_int_opt ~number_of_slots:16 4
   in
   let slots_by_publisher =
-    Environment.Signature.Public_key_hash.Map.singleton pkh [slot_index]
+    Implicit_account_repr.Map.singleton pkh [slot_index]
   in
   let published_level = Raw_level_repr.of_int32_exn 8l in
   let msg =
@@ -935,8 +937,10 @@ let test_dal_attested_slots_messages_of_cells_split_large_messages () =
              WithExceptions.Option.get ~loc:__LOC__
              @@ Dal_slot_index_repr.of_int_opt ~number_of_slots i
            in
-           Environment.Signature.Public_key_hash.Map.add pkh [slot_index] acc)
-         Environment.Signature.Public_key_hash.Map.empty
+           (* FIXME-PA *)
+           let pkh = Implicit_account_repr.Forbidden.of_pkh pkh in
+           Implicit_account_repr.Map.add pkh [slot_index] acc)
+         Implicit_account_repr.Map.empty
   in
   let*? messages =
     Environment.wrap_tzresult
@@ -960,7 +964,7 @@ let test_dal_attested_slots_messages_of_cells_split_large_messages () =
       List.fold_left
         (fun acc -> function
           | Dal_attested_slots {slots_by_publisher; _} ->
-              Environment.Signature.Public_key_hash.Map.fold
+              Implicit_account_repr.Map.fold
                 (fun _key slots acc -> acc + List.length slots)
                 slots_by_publisher
                 acc

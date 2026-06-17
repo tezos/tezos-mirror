@@ -618,7 +618,7 @@ type multisig_action =
       parameter_type : Script.expr;
       parameter : Script.expr;
     }
-  | Change_delegate of public_key_hash option
+  | Change_delegate of Implicit_account_repr.t option
   | Lambda of Script.expr
   | Change_keys of Z.t * public_key list
 
@@ -681,7 +681,13 @@ let action_to_expr_legacy ~loc =
       let delegate_opt =
         match delegate with
         | None -> none ~loc ()
-        | Some delegate -> some ~loc (optimized_key_hash ~loc delegate)
+        (* FIXME-PA *)
+        | Some delegate ->
+            some
+              ~loc
+              (optimized_key_hash
+                 ~loc
+                 (Implicit_account_repr.Forbidden.to_pkh delegate))
       in
       return @@ right ~loc (left ~loc delegate_opt)
   | Change_keys (threshold, keys) ->
@@ -800,9 +806,11 @@ let action_of_expr_not_generic e =
       return
       @@ Change_delegate
            (Some
-              (Data_encoding.Binary.of_bytes_exn
-                 Signature.Public_key_hash.encoding
-                 s))
+              (* FIXME-PA *)
+              (Implicit_account_repr.Forbidden.of_pkh
+                 (Data_encoding.Binary.of_bytes_exn
+                    Signature.Public_key_hash.encoding
+                    s)))
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,

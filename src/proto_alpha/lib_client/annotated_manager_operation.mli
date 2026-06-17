@@ -32,7 +32,7 @@ open Alpha_context
 
 type _ t =
   | Manager_info : {
-      source : Alpha_context.public_key_hash option;
+      source : Implicit_account_repr.t option;
       fee : Tez.t Limit.t;
       gas_limit : Gas.Arith.integral Limit.t;
       storage_limit : Z.t Limit.t;
@@ -88,7 +88,7 @@ val set_storage_limit : Z.t Limit.t -> 'a t -> 'a t
 val set_counter : Manager_counter.t -> 'a t -> 'a t tzresult
 
 (** Set the source of the operation. Fail if the source is already set. *)
-val set_source : public_key_hash -> 'a t -> 'a t tzresult
+val set_source : Implicit_account_repr.t -> 'a t -> 'a t tzresult
 
 (** Convert an annotated manager operation to a proper manager operation.
     Fail if some fields in the annotated operation are not set. *)

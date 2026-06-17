@@ -39,7 +39,8 @@ let protocol_max_batch_size =
             Single
               (Manager_operation
                  {
-                   source = Signature.Public_key_hash.zero;
+                   (* FIXME-PA *)
+                   source = Protocol.Implicit_account_repr.zero;
                    fee = Tez.of_mutez_exn Int64.max_int;
                    counter = Manager_counter.Internal_for_tests.of_int max_int;
                    gas_limit =

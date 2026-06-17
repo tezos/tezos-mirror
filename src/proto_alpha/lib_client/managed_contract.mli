@@ -37,7 +37,7 @@ val check_smart_contract : #full -> 'a option -> ('a -> 'b Lwt.t) -> 'b Lwt.t
     The storage has to be of type `pair key_hash 'a`.
 *)
 val get_contract_manager :
-  #full -> Contract_hash.t -> public_key_hash tzresult Lwt.t
+  #full -> Contract_hash.t -> Implicit_account_repr.t tzresult Lwt.t
 
 (** Builds a delegation operation ready for injection *)
 val build_delegate_operation :
@@ -46,7 +46,7 @@ val build_delegate_operation :
   block:Block_services.block ->
   ?fee:Tez.t ->
   Contract_hash.t ->
-  public_key_hash option ->
+  Implicit_account_repr.t option ->
   Kind.transaction Annotated_manager_operation.t tzresult Lwt.t
 
 (** Set the delegate of a manageable contract.
@@ -65,11 +65,11 @@ val set_delegate :
   ?branch:int ->
   fee_parameter:Injection.fee_parameter ->
   ?fee:Tez.t ->
-  source:public_key_hash ->
+  source:Implicit_account_repr.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   Contract_hash.t ->
-  public_key_hash option ->
+  Implicit_account_repr.t option ->
   Kind.transaction Kind.manager Injection.result tzresult Lwt.t
 
 (** Builds a transaction operation ready for injection *)
@@ -103,7 +103,7 @@ val transfer :
   ?simulation:bool ->
   ?force:bool ->
   ?branch:int ->
-  source:public_key_hash ->
+  source:Implicit_account_repr.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   contract:Contract.t ->
@@ -122,10 +122,11 @@ val transfer :
   tzresult
   Lwt.t
 
-val build_lambda_for_set_delegate : delegate:public_key_hash option -> string
+val build_lambda_for_set_delegate :
+  delegate:Implicit_account_repr.t option -> string
 
 val build_lambda_for_transfer_to_implicit :
-  destination:public_key_hash -> amount:Tez.t -> string
+  destination:Implicit_account_repr.t -> amount:Tez.t -> string
 
 val build_lambda_for_transfer_to_originated :
   destination:Contract_hash.t ->

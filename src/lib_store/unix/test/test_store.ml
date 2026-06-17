@@ -798,8 +798,16 @@ let test_live_blocks store_dir =
           c
     in
     let counter = Manager_counter.Internal_for_tests.of_int 1 in
-    let operation = Delegation (Some c.pkh) in
-    make_operation ~source_pkh:c.pkh ~source_sk:c.sk ~counter ~branch operation
+    (* FIXME-PA *)
+    let operation =
+      Delegation (Some (Protocol.Implicit_account_repr.Forbidden.of_pkh c.pkh))
+    in
+    make_operation
+      ~source_pkh:(Protocol.Implicit_account_repr.Forbidden.of_pkh c.pkh)
+      ~source_sk:c.sk
+      ~counter
+      ~branch
+      operation
   in
   let chain_store = Store.main_chain_store store in
   let*! genesis = Store.Chain.genesis_block chain_store in

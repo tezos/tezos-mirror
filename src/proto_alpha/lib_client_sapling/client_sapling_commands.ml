@@ -218,7 +218,9 @@ let shield_cmd =
           ~src_pk
           ~src_sk
           ~destination:(Originated contract_dst)
-          ~source
+          ~source:
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
           ~arg
           ?confirmations:cctxt#confirmations
           ?fee
@@ -310,7 +312,9 @@ let unshield_cmd =
           ~src_sk
           ~src_pk
           ~destination:(Originated contract_dst)
-          ~source
+          ~source:
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
           ~arg
           ?confirmations:cctxt#confirmations
           ?fee
@@ -502,7 +506,9 @@ let submit_shielded_cmd =
           ~src_pk
           ~src_sk
           ~destination:(Originated destination)
-          ~source
+          ~source:
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
           ~arg:contract_input
           ?confirmations:cctxt#confirmations
           ?fee

@@ -25,13 +25,13 @@
     level and slot index. *)
 val is_already_denounced :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Level_repr.t ->
   Dal_slot_index_repr.t ->
   bool Lwt.t
 
 (** Returns whether the given delegate has been denounced in the current cycle. *)
-val is_denounced : Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
+val is_denounced : Raw_context.t -> Implicit_account_repr.t -> bool Lwt.t
 
 (** Records a denunciation in {!Storage.Dal_already_denounced}.
 
@@ -49,7 +49,7 @@ val is_denounced : Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
     [Anonymous.check_denunciation_age]. *)
 val add_denunciation :
   Raw_context.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   Level_repr.t ->
   Dal_slot_index_repr.t ->
   (Raw_context.t * bool) Lwt.t

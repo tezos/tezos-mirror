@@ -211,7 +211,9 @@ module Plugin = struct
     let* block_hash =
       Protocol_client_context.Alpha_block_services.hash cctxt ~chain ~block ()
     in
-    let*? source = Signature.Of_V_latest.get_public_key_hash source in
+    let*? source_sig = Signature.Of_V_latest.get_public_key_hash source in
+    (* FIXME-PA *)
+    let source = Implicit_account_repr.Forbidden.of_pkh source_sig in
     let* counter =
       let* pcounter =
         Plugin.Alpha_services.Contract.counter cpctxt (chain, `Head 0) source
@@ -378,7 +380,11 @@ module Plugin = struct
     let pkh_to_tb_slot_map =
       List.fold_left
         (fun map Plugin.RPC.Attestation_rights.{delegate; first_slot; _} ->
-          Signature.Public_key_hash.Map.add delegate first_slot map)
+          (* FIXME-PA *)
+          Signature.Public_key_hash.Map.add
+            (Implicit_account_repr.Forbidden.to_pkh delegate)
+            first_slot
+            map)
         Signature.Public_key_hash.Map.empty
         pkh_to_tb_slot
     in
@@ -448,11 +454,13 @@ module Plugin = struct
 
   let is_delegate ctxt ~pkh =
     let open Lwt_result_syntax in
-    let*? pkh = Signature.Of_V_latest.get_public_key_hash pkh in
+    let*? pkh_sig = Signature.Of_V_latest.get_public_key_hash pkh in
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     (* We just want to know whether <pkh> is a delegate. We call
        'context/delegates/<pkh>/deactivated' just because it should be cheaper
        than calling 'context/delegates/<pkh>/' (called [Delegate.info]). *)
+    (* FIXME-PA *)
+    let pkh = Implicit_account_repr.Forbidden.of_pkh pkh_sig in
     let*! res =
       Plugin.Alpha_services.Delegate.deactivated cpctxt (`Main, `Head 0) pkh
     in

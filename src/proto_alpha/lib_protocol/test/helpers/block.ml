@@ -76,9 +76,9 @@ let rpc_ctxt =
 (* This type is used only to provide a simpler interface to the exterior. *)
 type baker_policy =
   | By_round of int
-  | By_account of public_key_hash
-  | Excluding of public_key_hash list
-  | By_account_with_minimal_round of public_key_hash * int
+  | By_account of Implicit_account_repr.t
+  | Excluding of Implicit_account_repr.t list
+  | By_account_with_minimal_round of Implicit_account_repr.t * int
 
 type baking_mode = Application | Baking
 
@@ -99,7 +99,7 @@ let get_next_baker_by_round round block =
     round,
     WithExceptions.Option.to_exn ~none:(Failure "") timestamp )
 
-type error += No_slots_found_for of Signature.Public_key_hash.t
+type error += No_slots_found_for of Implicit_account_repr.t
 
 let () =
   register_error_kind
@@ -108,12 +108,8 @@ let () =
     ~title:"No slots found for given pkh"
     ~description:"No slots found for given public key hash"
     ~pp:(fun ppf pkh ->
-      Format.fprintf
-        ppf
-        "No slots found for %a"
-        Signature.Public_key_hash.pp
-        pkh)
-    Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
+      Format.fprintf ppf "No slots found for %a" Implicit_account_repr.pp pkh)
+    Data_encoding.(obj1 (req "pkh" Implicit_account_repr.encoding))
     (function No_slots_found_for pkh -> Some pkh | _ -> None)
     (fun pkh -> No_slots_found_for pkh)
 
@@ -142,6 +138,8 @@ let get_next_baker_by_account pkh block =
 let get_next_baker_excluding excludes block =
   let open Lwt_result_wrap_syntax in
   let* bakers = Plugin.RPC.Baking_rights.get rpc_ctxt block in
+  (* FIXME-PA *)
+  let excludes = List.map Implicit_account_repr.Forbidden.to_pkh excludes in
   let* baker_opt =
     List.find_es
       (fun {Plugin.RPC.Baking_rights.consensus_key; delegate; _} ->
@@ -228,8 +226,8 @@ let block_producer block =
 
 module Forge = struct
   type header = {
-    baker : public_key_hash;
-    consensus_key : public_key_hash;
+    baker : Implicit_account_repr.t;
+    consensus_key : Signature.Public_key_hash.t;
     (* the signer of the block *)
     shell : Block_header.shell_header;
     contents : Block_header.contents;
@@ -302,7 +300,13 @@ module Forge = struct
     in
     {baker; consensus_key; shell; contents}
 
-  let set_baker baker ?(consensus_key = baker) header =
+  let set_baker baker ?consensus_key header =
+    (* FIXME-PA *)
+    let consensus_key =
+      Option.value
+        ~default:(Implicit_account_repr.Forbidden.to_pkh baker)
+        consensus_key
+    in
     {header with baker; consensus_key}
 
   let sign_header {consensus_key; shell; contents; _} =

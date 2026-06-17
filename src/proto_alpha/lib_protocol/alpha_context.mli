@@ -62,8 +62,6 @@ type context = t
 
 type public_key = Signature.Public_key.t
 
-type public_key_hash = Signature.Public_key_hash.t
-
 type signature = Signature.t
 
 (** This module re-exports definitions from {!Slot_repr}. *)
@@ -976,7 +974,7 @@ module Constants : sig
       percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
       max_slashing_per_block : Percentage.t;
       max_slashing_threshold : Ratio.t;
-      testnet_dictator : public_key_hash option;
+      testnet_dictator : Implicit_account_repr.t option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
       cache_stake_distribution_cycles : int;
@@ -1093,7 +1091,7 @@ module Constants : sig
   val percentage_of_frozen_deposits_slashed_per_double_baking :
     context -> Percentage.t
 
-  val testnet_dictator : context -> public_key_hash option
+  val testnet_dictator : context -> Implicit_account_repr.t option
 
   val dal_enable : context -> bool
 
@@ -1376,7 +1374,10 @@ module Nonce : sig
 
   val encoding : nonce Data_encoding.t
 
-  type unrevealed = {nonce_hash : Nonce_hash.t; delegate : public_key_hash}
+  type unrevealed = {
+    nonce_hash : Nonce_hash.t;
+    delegate : Implicit_account_repr.t;
+  }
 
   val record_hash : context -> unrevealed -> context tzresult Lwt.t
 
@@ -1772,7 +1773,7 @@ end
 (** This module re-exports definitions from {!Contract_repr} and
     {!Contract_storage}. *)
 module Contract : sig
-  type t = Implicit of public_key_hash | Originated of Contract_hash.t
+  type t = Implicit of Implicit_account_repr.t | Originated of Contract_hash.t
 
   (** Functions related to contracts address. *)
 
@@ -1780,7 +1781,7 @@ module Contract : sig
 
   include BASIC_DATA with type t := t
 
-  val implicit_encoding : public_key_hash Data_encoding.t
+  val implicit_encoding : Implicit_account_repr.t Data_encoding.t
 
   val originated_encoding : Contract_hash.t Data_encoding.t
 
@@ -1817,41 +1818,48 @@ module Contract : sig
 
   (** See {!Contract_manager_storage.get_manager_key}. *)
   val get_manager_key :
-    ?error:error -> context -> public_key_hash -> public_key tzresult Lwt.t
+    ?error:error ->
+    context ->
+    Implicit_account_repr.t ->
+    public_key tzresult Lwt.t
 
   (** See {!Contract_manager_storage.is_manager_key_revealed}. *)
   val is_manager_key_revealed :
-    context -> public_key_hash -> bool tzresult Lwt.t
+    context -> Implicit_account_repr.t -> bool tzresult Lwt.t
 
   (** See {!Contract_manager_storage.check_public_key}. *)
-  val check_public_key : public_key -> public_key_hash -> unit tzresult
+  val check_public_key : public_key -> Implicit_account_repr.t -> unit tzresult
 
   (** See {!Contract_manager_storage.reveal_manager_key}. *)
   val reveal_manager_key :
     ?check_consistency:bool ->
     context ->
-    public_key_hash ->
+    Implicit_account_repr.t ->
     public_key ->
     context tzresult Lwt.t
 
   val get_counter :
-    context -> public_key_hash -> Manager_counter.t tzresult Lwt.t
+    context -> Implicit_account_repr.t -> Manager_counter.t tzresult Lwt.t
 
-  val increment_counter : context -> public_key_hash -> context tzresult Lwt.t
+  val increment_counter :
+    context -> Implicit_account_repr.t -> context tzresult Lwt.t
 
   val check_counter_increment :
-    context -> public_key_hash -> Manager_counter.t -> unit tzresult Lwt.t
+    context ->
+    Implicit_account_repr.t ->
+    Manager_counter.t ->
+    unit tzresult Lwt.t
 
   (** See {!Contract_storage.check_allocated_and_get_balance}. *)
   val check_allocated_and_get_balance :
-    context -> public_key_hash -> Tez.t tzresult Lwt.t
+    context -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
   (** See {!Contract_storage.simulate_spending}. *)
   val simulate_spending :
     context ->
     balance:Tez.t ->
     amount:Tez.t ->
-    public_key_hash ->
+    Implicit_account_repr.t ->
     (Tez.t * bool) tzresult Lwt.t
 
   (** Functions related to smart contracts. *)
@@ -1895,17 +1903,17 @@ module Contract : sig
     context tzresult Lwt.t
 
   (** See {!Contract_delegate_storage.is_delegate}. *)
-  val is_delegate : context -> public_key_hash -> bool tzresult Lwt.t
+  val is_delegate : context -> Implicit_account_repr.t -> bool tzresult Lwt.t
 
   (** See {!Contract_delegate_storage.delegate_status}. *)
   type delegate_status =
     | Delegate
-    | Delegated of Signature.Public_key_hash.t
+    | Delegated of Implicit_account_repr.t
     | Undelegated
 
   (** See {!Contract_delegate_storage.get_delegate_status}. *)
   val get_delegate_status :
-    context -> public_key_hash -> delegate_status tzresult Lwt.t
+    context -> Implicit_account_repr.t -> delegate_status tzresult Lwt.t
 
   val get_total_supply : context -> Tez.t tzresult Lwt.t
 
@@ -1936,13 +1944,14 @@ module Contract : sig
   (** Functions for handling the delegate of a contract.*)
   module Delegate : sig
     (** See {!Contract_delegate_storage.find}. *)
-    val find : context -> t -> public_key_hash option tzresult Lwt.t
+    val find : context -> t -> Implicit_account_repr.t option tzresult Lwt.t
 
     (** See {!Delegate_storage.Contract.init}. *)
-    val init : context -> t -> public_key_hash -> context tzresult Lwt.t
+    val init : context -> t -> Implicit_account_repr.t -> context tzresult Lwt.t
 
     (** See {!Delegate_storage.Contract.set}. *)
-    val set : context -> t -> public_key_hash option -> context tzresult Lwt.t
+    val set :
+      context -> t -> Implicit_account_repr.t option -> context tzresult Lwt.t
   end
 
   (** This module discloses definitions that are only useful for tests and must
@@ -2054,7 +2063,7 @@ module Zk_rollup : sig
     type t = {
       op_code : int;
       price : price;
-      l1_dst : Signature.Public_key_hash.t;
+      l1_dst : Implicit_account_repr.t;
       rollup_id : Address.t;
       payload : scalar array;
     }
@@ -2205,27 +2214,24 @@ module Receipt : sig
   end
 
   type unstaked_frozen_staker =
-    | Single of Contract.t * Signature.public_key_hash
-    | Shared of Signature.public_key_hash
+    | Single of Contract.t * Implicit_account_repr.t
+    | Shared of Implicit_account_repr.t
 
   type frozen_staker = private
-    | Baker of Signature.public_key_hash
-    | Single_staker of {
-        staker : Contract.t;
-        delegate : Signature.public_key_hash;
-      }
-    | Shared_between_stakers of {delegate : Signature.public_key_hash}
-    | Baker_edge of Signature.public_key_hash
+    | Baker of Implicit_account_repr.t
+    | Single_staker of {staker : Contract.t; delegate : Implicit_account_repr.t}
+    | Shared_between_stakers of {delegate : Implicit_account_repr.t}
+    | Baker_edge of Implicit_account_repr.t
 
-  val frozen_baker : Signature.public_key_hash -> frozen_staker
+  val frozen_baker : Implicit_account_repr.t -> frozen_staker
 
-  val frozen_baker_edge : Signature.public_key_hash -> frozen_staker
+  val frozen_baker_edge : Implicit_account_repr.t -> frozen_staker
 
   val frozen_single_staker :
-    staker:Contract.t -> delegate:Signature.public_key_hash -> frozen_staker
+    staker:Contract.t -> delegate:Implicit_account_repr.t -> frozen_staker
 
   val frozen_shared_between_stakers :
-    delegate:Signature.public_key_hash -> frozen_staker
+    delegate:Implicit_account_repr.t -> frozen_staker
 
   type 'token balance =
     | Contract : Contract.t -> Tez.t balance
@@ -2241,8 +2247,10 @@ module Receipt : sig
     | Dal_attesting_rewards : Tez.t balance
     | Storage_fees : Tez.t balance
     | Double_signing_punishments : Tez.t balance
-    | Lost_attesting_rewards : public_key_hash * bool * bool -> Tez.t balance
-    | Lost_dal_attesting_rewards : public_key_hash -> Tez.t balance
+    | Lost_attesting_rewards :
+        Implicit_account_repr.t * bool * bool
+        -> Tez.t balance
+    | Lost_dal_attesting_rewards : Implicit_account_repr.t -> Tez.t balance
     | Liquidity_baking_subsidies : Tez.t balance
     | Burned : Tez.t balance
     | Commitments : Blinded_public_key_hash.t -> Tez.t balance
@@ -2258,7 +2266,7 @@ module Receipt : sig
       }
         -> Staking_pseudotoken.t balance
     | Staking_delegate_denominator : {
-        delegate : public_key_hash;
+        delegate : Implicit_account_repr.t;
       }
         -> Staking_pseudotoken.t balance
 
@@ -2345,7 +2353,7 @@ end
 (** This module re-exports definitions from {!Delegate_consensus_key}. *)
 module Consensus_key : sig
   type pk = {
-    delegate : Signature.Public_key_hash.t;
+    delegate : Implicit_account_repr.t;
     consensus_pk : Signature.Public_key.t;
     consensus_pkh : Signature.Public_key_hash.t;
     companion_pk : Bls.Public_key.t option;
@@ -2353,7 +2361,7 @@ module Consensus_key : sig
   }
 
   type t = {
-    delegate : Signature.Public_key_hash.t;
+    delegate : Implicit_account_repr.t;
     consensus_pkh : Signature.Public_key_hash.t;
   }
 
@@ -2392,37 +2400,38 @@ end
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles},
    {!Delegate_rewards}, and {!Forbidden_delegates_storage}. *)
 module Delegate : sig
-  val check_not_tz5 : Signature.public_key_hash -> unit tzresult
+  val check_not_tz5 : Implicit_account_repr.t -> unit tzresult
 
   val frozen_deposits_limit :
-    context -> public_key_hash -> Tez.t option tzresult Lwt.t
+    context -> Implicit_account_repr.t -> Tez.t option tzresult Lwt.t
 
   val set_frozen_deposits_limit :
-    context -> public_key_hash -> Tez.t option -> context Lwt.t
+    context -> Implicit_account_repr.t -> Tez.t option -> context Lwt.t
 
   val fold :
     context ->
     order:[`Sorted | `Undefined] ->
     init:'a ->
-    f:(public_key_hash -> 'a -> 'a Lwt.t) ->
+    f:(Implicit_account_repr.t -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
 
-  val list : context -> public_key_hash list Lwt.t
+  val list : context -> Implicit_account_repr.t list Lwt.t
 
   val drain :
     context ->
-    delegate:public_key_hash ->
-    destination:public_key_hash ->
+    delegate:Implicit_account_repr.t ->
+    destination:Implicit_account_repr.t ->
     (context * bool * Tez.t * Receipt.balance_updates) tzresult Lwt.t
 
   val cycle_end :
     context ->
     Cycle.t ->
-    (context * Receipt.balance_updates * public_key_hash list) tzresult Lwt.t
+    (context * Receipt.balance_updates * Implicit_account_repr.t list) tzresult
+    Lwt.t
 
   (** See {!Already_denounced_storage.already_denounced}. *)
   val already_denounced :
-    context -> public_key_hash -> Misbehaviour.t -> bool tzresult Lwt.t
+    context -> Implicit_account_repr.t -> Misbehaviour.t -> bool tzresult Lwt.t
 
   type reward_and_burn = {reward : Tez.t; amount_to_burn : Tez.t}
 
@@ -2436,76 +2445,80 @@ module Delegate : sig
     context ->
     operation_hash:Operation_hash.t ->
     Misbehaviour.t ->
-    public_key_hash ->
-    rewarded:public_key_hash ->
+    Implicit_account_repr.t ->
+    rewarded:Implicit_account_repr.t ->
     context tzresult Lwt.t
 
   type level_participation = Participated | Didn't_participate
 
   val record_baking_activity_and_pay_rewards_and_fees :
     context ->
-    payload_producer:public_key_hash ->
-    block_producer:public_key_hash ->
+    payload_producer:Implicit_account_repr.t ->
+    block_producer:Implicit_account_repr.t ->
     baking_reward:Tez.t ->
     reward_bonus:Tez.t option ->
     (context * Receipt.balance_updates) tzresult Lwt.t
 
   val record_attesting_participation :
     context ->
-    delegate:public_key_hash ->
+    delegate:Implicit_account_repr.t ->
     participation:level_participation ->
     attesting_slots:int ->
     context tzresult Lwt.t
 
   val record_dal_participation :
     context ->
-    delegate:Signature.Public_key_hash.t ->
+    delegate:Implicit_account_repr.t ->
     number_of_slots_attested_by_delegate:int ->
     number_of_protocol_attested_slots:int ->
     context tzresult Lwt.t
 
   val current_frozen_deposits :
-    context -> public_key_hash -> Tez.t tzresult Lwt.t
+    context -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
   val initial_frozen_deposits :
-    context -> public_key_hash -> (context * Tez.t) tzresult Lwt.t
+    context -> Implicit_account_repr.t -> (context * Tez.t) tzresult Lwt.t
 
   (** See {!Contract_delegate_storage.delegated_contracts}. *)
-  val delegated_contracts : context -> public_key_hash -> Contract.t list Lwt.t
+  val delegated_contracts :
+    context -> Implicit_account_repr.t -> Contract.t list Lwt.t
 
-  val registered : context -> public_key_hash -> bool Lwt.t
+  val registered : context -> Implicit_account_repr.t -> bool Lwt.t
 
-  val deactivated : context -> public_key_hash -> bool tzresult Lwt.t
+  val deactivated : context -> Implicit_account_repr.t -> bool tzresult Lwt.t
 
   (** See {!Forbidden_delegates_storage.is_forbidden}. *)
-  val is_forbidden_delegate : t -> public_key_hash -> bool
+  val is_forbidden_delegate : t -> Implicit_account_repr.t -> bool
 
   (** See {!Delegate_activation_storage.last_cycle_before_deactivation}. *)
   val last_cycle_before_deactivation :
-    context -> public_key_hash -> Cycle.t tzresult Lwt.t
+    context -> Implicit_account_repr.t -> Cycle.t tzresult Lwt.t
 
   module Consensus_key : sig
     val check_not_tz5 :
       Operation_repr.consensus_key_kind -> Signature.public_key -> unit tzresult
 
     val active_pubkey :
-      context -> public_key_hash -> Consensus_key.pk tzresult Lwt.t
+      context -> Implicit_account_repr.t -> Consensus_key.pk tzresult Lwt.t
 
     val pending_updates :
       context ->
-      public_key_hash ->
-      (Cycle.t * public_key_hash * public_key) list tzresult Lwt.t
+      Implicit_account_repr.t ->
+      (Cycle.t * Signature.Public_key_hash.t * public_key) list tzresult Lwt.t
 
     val pending_companion_updates :
       context ->
-      public_key_hash ->
+      Implicit_account_repr.t ->
       (Cycle.t * Bls.Public_key_hash.t * Bls.Public_key.t) list tzresult Lwt.t
 
     val register_update :
-      context -> public_key_hash -> public_key -> context tzresult Lwt.t
+      context -> Implicit_account_repr.t -> public_key -> context tzresult Lwt.t
 
     val register_update_companion :
-      context -> public_key_hash -> Bls.Public_key.t -> context tzresult Lwt.t
+      context ->
+      Implicit_account_repr.t ->
+      Bls.Public_key.t ->
+      context tzresult Lwt.t
   end
 
   (** See {!Stake_storage.prepare_stake_distribution}. *)
@@ -2621,18 +2634,18 @@ module Delegate : sig
   module Staking_parameters : sig
     val register_update :
       context ->
-      Signature.Public_key_hash.t ->
+      Implicit_account_repr.t ->
       Staking_parameters_repr.t ->
       context tzresult Lwt.t
 
     val of_delegate :
       context ->
-      Signature.Public_key_hash.t ->
+      Implicit_account_repr.t ->
       Staking_parameters_repr.t tzresult Lwt.t
 
     val pending_updates :
       context ->
-      Signature.Public_key_hash.t ->
+      Implicit_account_repr.t ->
       (Cycle.t * Staking_parameters_repr.t) list tzresult Lwt.t
   end
 
@@ -2641,7 +2654,7 @@ module Delegate : sig
       context ->
       ?active_stake:Stake_repr.t ->
       source:[< Token.giver] ->
-      delegate:public_key_hash ->
+      delegate:Implicit_account_repr.t ->
       Tez.t ->
       (context * Receipt.balance_updates) tzresult Lwt.t
   end
@@ -2669,10 +2682,12 @@ module Delegate : sig
     }
 
     val participation_info :
-      context -> public_key_hash -> participation_info tzresult Lwt.t
+      context -> Implicit_account_repr.t -> participation_info tzresult Lwt.t
 
     val dal_participation_info :
-      context -> public_key_hash -> dal_participation_info tzresult Lwt.t
+      context ->
+      Implicit_account_repr.t ->
+      dal_participation_info tzresult Lwt.t
 
     (** Returns the full 'balance' of the implicit contract associated to a
         given key, i.e. the sum of the spendable balance (given by [balance] or
@@ -2685,28 +2700,34 @@ module Delegate : sig
         actually belongs to the delegate and not to its stakers.
 
     Only use this function for RPCs: this is expensive. *)
-    val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
+    val full_balance :
+      context -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
-    val delegated_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
+    val delegated_balance :
+      context -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
-    val staking_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
+    val staking_balance :
+      context -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
     val min_delegated_in_current_cycle :
-      context -> public_key_hash -> (Tez.t * Level_repr.t option) tzresult Lwt.t
+      context ->
+      Implicit_account_repr.t ->
+      (Tez.t * Level_repr.t option) tzresult Lwt.t
 
-    val has_pending_denunciations : context -> public_key_hash -> bool Lwt.t
+    val has_pending_denunciations :
+      context -> Implicit_account_repr.t -> bool Lwt.t
 
     val pending_denunciations :
-      context -> public_key_hash -> Denunciations_repr.t tzresult Lwt.t
+      context -> Implicit_account_repr.t -> Denunciations_repr.t tzresult Lwt.t
 
     val pending_denunciations_list :
-      context -> (public_key_hash * Denunciations_repr.item) list Lwt.t
+      context -> (Implicit_account_repr.t * Denunciations_repr.item) list Lwt.t
 
     (** [get_estimated_shared_pending_slashed_amount ctxt delegate]
       returns the estimated shared pending slashed amount of the given [delegate]
       according to the currently available denunciations. *)
     val get_estimated_shared_pending_slashed_amount :
-      context -> public_key_hash -> Tez.t tzresult Lwt.t
+      context -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
   end
 end
 
@@ -2716,8 +2737,8 @@ module Staking : sig
   val stake :
     context ->
     amount:Tez.t ->
-    sender:public_key_hash ->
-    delegate:public_key_hash ->
+    sender:Implicit_account_repr.t ->
+    delegate:Implicit_account_repr.t ->
     (context * Receipt.balance_updates) tzresult Lwt.t
 
   (** [request_unstake ctxt ~sender_contract ~delegate amount] records a request
@@ -2725,7 +2746,7 @@ module Staking : sig
   val request_unstake :
     context ->
     sender_contract:Contract.t ->
-    delegate:public_key_hash ->
+    delegate:Implicit_account_repr.t ->
     Tez.t ->
     (context * Receipt.balance_updates) tzresult Lwt.t
 
@@ -2799,29 +2820,31 @@ module Vote : sig
 
   (** See {!Vote_storage.get_delegate_proposal_count}. *)
   val get_delegate_proposal_count :
-    context -> public_key_hash -> int tzresult Lwt.t
+    context -> Implicit_account_repr.t -> int tzresult Lwt.t
 
   (** See {!Vote_storage.set_delegate_proposal_count}. *)
   val set_delegate_proposal_count :
-    context -> public_key_hash -> int -> context Lwt.t
+    context -> Implicit_account_repr.t -> int -> context Lwt.t
 
   (** See {!Vote_storage.has_proposed}. *)
-  val has_proposed : context -> public_key_hash -> proposal -> bool Lwt.t
+  val has_proposed :
+    context -> Implicit_account_repr.t -> proposal -> bool Lwt.t
 
   (** See {!Vote_storage.add_proposal}. *)
-  val add_proposal : context -> public_key_hash -> proposal -> context Lwt.t
+  val add_proposal :
+    context -> Implicit_account_repr.t -> proposal -> context Lwt.t
 
   val get_proposals : context -> int64 Protocol_hash.Map.t tzresult Lwt.t
 
   val clear_proposals : context -> context Lwt.t
 
-  val listings_encoding : (public_key_hash * int64) list Data_encoding.t
+  val listings_encoding : (Implicit_account_repr.t * int64) list Data_encoding.t
 
   val update_listings : context -> context tzresult Lwt.t
 
-  val in_listings : context -> public_key_hash -> bool Lwt.t
+  val in_listings : context -> Implicit_account_repr.t -> bool Lwt.t
 
-  val get_listings : context -> (public_key_hash * int64) list Lwt.t
+  val get_listings : context -> (Implicit_account_repr.t * int64) list Lwt.t
 
   type ballot = Yay | Nay | Pass
 
@@ -2841,15 +2864,16 @@ module Vote : sig
   val delegate_info_encoding : delegate_info Data_encoding.t
 
   val get_delegate_info :
-    context -> public_key_hash -> delegate_info tzresult Lwt.t
+    context -> Implicit_account_repr.t -> delegate_info tzresult Lwt.t
 
-  val get_voting_power_free : context -> public_key_hash -> int64 tzresult Lwt.t
+  val get_voting_power_free :
+    context -> Implicit_account_repr.t -> int64 tzresult Lwt.t
 
   val get_voting_power :
-    context -> public_key_hash -> (context * int64) tzresult Lwt.t
+    context -> Implicit_account_repr.t -> (context * int64) tzresult Lwt.t
 
   val get_current_voting_power_free :
-    context -> public_key_hash -> int64 tzresult Lwt.t
+    context -> Implicit_account_repr.t -> int64 tzresult Lwt.t
 
   val get_total_voting_power_free : context -> int64 tzresult Lwt.t
 
@@ -2871,14 +2895,14 @@ module Vote : sig
   (** See {!Vote_storage.pp_ballots}. *)
   val pp_ballots : Format.formatter -> ballots -> unit
 
-  val has_recorded_ballot : context -> public_key_hash -> bool Lwt.t
+  val has_recorded_ballot : context -> Implicit_account_repr.t -> bool Lwt.t
 
   val record_ballot :
-    context -> public_key_hash -> ballot -> context tzresult Lwt.t
+    context -> Implicit_account_repr.t -> ballot -> context tzresult Lwt.t
 
   val get_ballots : context -> ballots tzresult Lwt.t
 
-  val get_ballot_list : context -> (public_key_hash * ballot) list Lwt.t
+  val get_ballot_list : context -> (Implicit_account_repr.t * ballot) list Lwt.t
 
   val clear_ballots : context -> context Lwt.t
 
@@ -2977,7 +3001,7 @@ module Dal : sig
     type attestation_status = {
       total_shards : int;
       attested_shards : int;
-      attesters : Signature.Public_key_hash.Set.t;
+      attesters : Implicit_account_repr.Set.t;
       is_proto_attested : bool;
     }
 
@@ -3027,7 +3051,7 @@ module Dal : sig
 
     val record_number_of_attested_shards :
       context ->
-      delegate:Signature.public_key_hash ->
+      delegate:Implicit_account_repr.t ->
       attested_level:Raw_level.t ->
       t ->
       int Raw_level.Map.t ->
@@ -3311,17 +3335,21 @@ module Dal : sig
     (** See {!Dal_already_denounced_storage.add_denunciation}. *)
     val add_denunciation :
       context ->
-      public_key_hash ->
+      Implicit_account_repr.t ->
       Level.t ->
       Slot_index.t ->
       (context * bool) Lwt.t
 
     (** See {!Dal_already_denounced_storage.is_already_denounced}. *)
     val is_already_denounced :
-      context -> public_key_hash -> Level.t -> Slot_index.t -> bool Lwt.t
+      context ->
+      Implicit_account_repr.t ->
+      Level.t ->
+      Slot_index.t ->
+      bool Lwt.t
 
     (** See {!Dal_already_denounced_storage.is_denounced}. *)
-    val is_denounced : context -> public_key_hash -> bool Lwt.t
+    val is_denounced : context -> Implicit_account_repr.t -> bool Lwt.t
   end
 
   module Past_parameters : sig
@@ -3350,7 +3378,7 @@ module Dal_errors : sig
         commitment_proof : Dal.Slot.Commitment_proof.t;
       }
     | Dal_data_availibility_attester_not_in_committee of {
-        attester : Signature.Public_key_hash.t;
+        attester : Implicit_account_repr.t;
         committee_level : Raw_level.t;
         attested_level : Raw_level.t;
         lag_index : int;
@@ -3403,7 +3431,7 @@ module Sc_rollup : sig
   val must_exist : context -> t -> context tzresult Lwt.t
 
   module Whitelist : sig
-    type t = public_key_hash list
+    type t = Implicit_account_repr.t list
 
     val init :
       context ->
@@ -3456,7 +3484,8 @@ module Sc_rollup : sig
   end
 
   module Staker : sig
-    include S.SIGNATURE_PUBLIC_KEY_HASH with type t = public_key_hash
+    include
+      module type of Implicit_account_repr with type t = Implicit_account_repr.t
 
     val rpc_arg_staker1 : t RPC_arg.t
 
@@ -3506,7 +3535,7 @@ module Sc_rollup : sig
       | Transfer of {
           payload : Script.expr;
           sender : Contract_hash.t;
-          source : public_key_hash;
+          source : Implicit_account_repr.t;
           destination : t;
         }
       | Start_of_level
@@ -3521,8 +3550,7 @@ module Sc_rollup : sig
           number_of_slots : int;
           slot_size : int;
           page_size : int;
-          slots_by_publisher :
-            Dal.Slot_index.t list Signature.Public_key_hash.Map.t;
+          slots_by_publisher : Dal.Slot_index.t list Implicit_account_repr.Map.t;
         }
 
     val protocol_migration_internal_message : internal_inbox_message
@@ -3837,7 +3865,7 @@ module Sc_rollup : sig
       context ->
       payload:Script.expr ->
       sender:Contract_hash.t ->
-      source:public_key_hash ->
+      source:Implicit_account_repr.t ->
       destination:rollup ->
       context tzresult Lwt.t
 
@@ -4518,11 +4546,11 @@ module Sc_rollup : sig
     val staker_id_uncarbonated :
       context ->
       rollup:t ->
-      pkh:public_key_hash ->
+      pkh:Implicit_account_repr.t ->
       Staker.Index.t tzresult Lwt.t
 
     val stakers_pkhs_uncarbonated :
-      context -> rollup:t -> public_key_hash list Lwt.t
+      context -> rollup:t -> Implicit_account_repr.t list Lwt.t
   end
 
   module Refutation_storage : sig
@@ -4554,8 +4582,8 @@ module Sc_rollup : sig
     val start_game :
       context ->
       t ->
-      player:public_key_hash * Commitment.Hash.t ->
-      opponent:public_key_hash * Commitment.Hash.t ->
+      player:Implicit_account_repr.t * Commitment.Hash.t ->
+      opponent:Implicit_account_repr.t * Commitment.Hash.t ->
       context tzresult Lwt.t
 
     val game_move :
@@ -4691,22 +4719,22 @@ module Clst : sig
   module Delegates : sig
     val get_delegate_parameters :
       context ->
-      Signature.Public_key_hash.t ->
+      Implicit_account_repr.t ->
       Clst_delegates_parameters_repr.t option tzresult Lwt.t
 
     val get_pending_parameters :
       context ->
-      Signature.Public_key_hash.t ->
+      Implicit_account_repr.t ->
       (Cycle.t * Clst_delegates_parameters_repr.update) list tzresult Lwt.t
 
     val register_pending_parameters :
       context ->
-      Signature.Public_key_hash.t ->
+      Implicit_account_repr.t ->
       Clst_delegates_parameters_repr.t ->
       context tzresult Lwt.t
 
     val unregister :
-      context -> Signature.Public_key_hash.t -> context tzresult Lwt.t
+      context -> Implicit_account_repr.t -> context tzresult Lwt.t
 
     val activate_parameters : context -> new_cycle:Cycle.t -> context Lwt.t
   end
@@ -4732,7 +4760,7 @@ module Clst : sig
     [stez_frozen] field of the delegate's staking balance).
     Returns [Tez_repr.zero] if no sTez stake is allocated to the delegate. *)
     val allocated_rights_of_delegate :
-      context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
+      context -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
     (** [total_allocated_rights ctxt] returns the total tez allocated across all
     registered delegates from the sTez deposits for baking rights. *)
@@ -5127,13 +5155,13 @@ and _ contents =
     }
       -> Kind.activate_account contents
   | Proposals : {
-      source : public_key_hash;
+      source : Implicit_account_repr.t;
       period : int32;
       proposals : Protocol_hash.t list;
     }
       -> Kind.proposals contents
   | Ballot : {
-      source : public_key_hash;
+      source : Implicit_account_repr.t;
       period : int32;
       proposal : Protocol_hash.t;
       ballot : Vote.ballot;
@@ -5141,13 +5169,13 @@ and _ contents =
       -> Kind.ballot contents
   | Drain_delegate : {
       consensus_key : Signature.Public_key_hash.t;
-      delegate : Signature.Public_key_hash.t;
-      destination : Signature.Public_key_hash.t;
+      delegate : Implicit_account_repr.t;
+      destination : Implicit_account_repr.t;
     }
       -> Kind.drain_delegate contents
   | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
-      source : public_key_hash;
+      source : Implicit_account_repr.t;
       fee : Tez.t;
       counter : Manager_counter.t;
       operation : 'kind manager_operation;
@@ -5170,12 +5198,14 @@ and _ manager_operation =
     }
       -> Kind.transaction manager_operation
   | Origination : {
-      delegate : public_key_hash option;
+      delegate : Implicit_account_repr.t option;
       script : Script.michelson_with_storage;
       credit : Tez.t;
     }
       -> Kind.origination manager_operation
-  | Delegation : public_key_hash option -> Kind.delegation manager_operation
+  | Delegation :
+      Implicit_account_repr.t option
+      -> Kind.delegation manager_operation
   | Register_global_constant : {
       value : Script.lazy_expr;
     }
@@ -5245,7 +5275,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {
       sc_rollup : Sc_rollup.t;
-      staker : Signature.Public_key_hash.t;
+      staker : Implicit_account_repr.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
   | Zk_rollup_origination : {
@@ -5579,7 +5609,7 @@ module Stake_distribution : sig
 
   module For_RPC : sig
     val delegate_current_baking_power :
-      context -> Signature.public_key_hash -> int64 tzresult Lwt.t
+      context -> Implicit_account_repr.t -> int64 tzresult Lwt.t
 
     val total_baking_power : context -> Cycle.t -> int64 tzresult Lwt.t
   end
@@ -5588,7 +5618,7 @@ module Stake_distribution : sig
     val get_selected_distribution :
       context ->
       Cycle.t ->
-      (context * (Signature.public_key_hash * Stake_repr.t) list) tzresult Lwt.t
+      (context * (Implicit_account_repr.t * Stake_repr.t) list) tzresult Lwt.t
   end
 end
 
@@ -5684,15 +5714,15 @@ val current_context : context -> Context.t
 (** This module re-exports definitions from {!Parameters_repr}. *)
 module Parameters : sig
   type bootstrap_account = {
-    public_key_hash : public_key_hash;
+    public_key_hash : Implicit_account_repr.t;
     public_key : public_key option;
     amount : Tez.t;
-    delegate_to : public_key_hash option;
+    delegate_to : Implicit_account_repr.t option;
     consensus_key : public_key option;
   }
 
   type bootstrap_contract = {
-    delegate : public_key_hash option;
+    delegate : Implicit_account_repr.t option;
     amount : Tez.t;
     script : Script.michelson_with_storage;
     hash : Contract_hash.t option;
@@ -5876,8 +5906,8 @@ module Token : sig
   type receiver =
     [ `Storage_fees
     | `Double_signing_punishments
-    | `Lost_attesting_rewards of public_key_hash * bool * bool
-    | `Lost_dal_attesting_rewards of public_key_hash
+    | `Lost_attesting_rewards of Implicit_account_repr.t * bool * bool
+    | `Lost_dal_attesting_rewards of Implicit_account_repr.t
     | `Burned
     | `Sc_rollup_refutation_punishments
     | container ]
@@ -5918,11 +5948,11 @@ end
 
 (** This module re-exports definitions from {!Unstake_requests_storage}. *)
 module Unstake_requests : sig
-  type finalizable = (public_key_hash * Cycle.t * Tez.t) list
+  type finalizable = (Implicit_account_repr.t * Cycle.t * Tez.t) list
 
   module For_RPC : sig
     type stored_requests = private {
-      delegate : public_key_hash;
+      delegate : Implicit_account_repr.t;
       requests : (Cycle.t * Tez.t) list;
     }
 
@@ -5939,7 +5969,7 @@ module Unstake_requests : sig
 
     val apply_slash_to_unstaked_unfinalizable :
       context ->
-      delegate:public_key_hash ->
+      delegate:Implicit_account_repr.t ->
       requests:(Cycle.t * Tez.t) list ->
       (Cycle.t * Tez.t) list tzresult Lwt.t
 
@@ -5949,7 +5979,8 @@ module Unstake_requests : sig
 end
 
 module Unstaked_frozen_deposits : sig
-  val balance : context -> public_key_hash -> Cycle.t -> Tez.t tzresult Lwt.t
+  val balance :
+    context -> Implicit_account_repr.t -> Cycle.t -> Tez.t tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Staking_pseudotokens_storage}. *)
@@ -5958,7 +5989,7 @@ module Staking_pseudotokens : sig
     val staked_balance :
       context ->
       contract:Contract.t ->
-      delegate:public_key_hash ->
+      delegate:Implicit_account_repr.t ->
       Tez.t tzresult Lwt.t
 
     val staking_pseudotokens_balance :
@@ -5966,11 +5997,11 @@ module Staking_pseudotokens : sig
 
     val get_frozen_deposits_pseudotokens :
       context ->
-      delegate:Signature.public_key_hash ->
+      delegate:Implicit_account_repr.t ->
       Staking_pseudotoken.t tzresult Lwt.t
 
     val get_frozen_deposits_staked_tez :
-      context -> delegate:Signature.public_key_hash -> Tez.t tzresult Lwt.t
+      context -> delegate:Implicit_account_repr.t -> Tez.t tzresult Lwt.t
   end
 end
 

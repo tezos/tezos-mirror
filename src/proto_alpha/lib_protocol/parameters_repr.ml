@@ -25,15 +25,15 @@
 (*****************************************************************************)
 
 type bootstrap_account = {
-  public_key_hash : Signature.Public_key_hash.t;
+  public_key_hash : Implicit_account_repr.t;
   public_key : Signature.Public_key.t option;
   amount : Tez_repr.t;
-  delegate_to : Signature.Public_key_hash.t option;
+  delegate_to : Implicit_account_repr.t option;
   consensus_key : Signature.Public_key.t option;
 }
 
 type bootstrap_contract = {
-  delegate : Signature.Public_key_hash.t option;
+  delegate : Implicit_account_repr.t option;
   amount : Tez_repr.t;
   script : Script_repr.t;
   hash : Contract_hash.t option;
@@ -74,8 +74,10 @@ let bootstrap_account_encoding =
               consensus_key = None;
             } ->
               assert (
-                Signature.Public_key_hash.equal
-                  (Signature.Public_key.hash public_key)
+                Implicit_account_repr.equal
+                  (* FIXME-PA *)
+                  (Implicit_account_repr.Forbidden.of_pkh
+                     (Signature.Public_key.hash public_key))
                   public_key_hash) ;
               Some (public_key, amount)
           | {public_key = None; _}
@@ -85,7 +87,10 @@ let bootstrap_account_encoding =
         (fun (public_key, amount) ->
           {
             public_key = Some public_key;
-            public_key_hash = Signature.Public_key.hash public_key;
+            (* FIXME-PA *)
+            public_key_hash =
+              Implicit_account_repr.Forbidden.of_pkh
+                (Signature.Public_key.hash public_key);
             amount;
             delegate_to = None;
             consensus_key = None;
@@ -93,7 +98,7 @@ let bootstrap_account_encoding =
       case
         (Tag 1)
         ~title:"Public_key_unknown"
-        (tup2 Signature.Public_key_hash.encoding Tez_repr.encoding)
+        (tup2 Implicit_account_repr.encoding Tez_repr.encoding)
         (function
           | {
               public_key_hash;
@@ -121,7 +126,7 @@ let bootstrap_account_encoding =
         (tup3
            Signature.Public_key.encoding
            Tez_repr.encoding
-           Signature.Public_key_hash.encoding)
+           Implicit_account_repr.encoding)
         (function
           | {
               public_key_hash;
@@ -131,8 +136,10 @@ let bootstrap_account_encoding =
               consensus_key = None;
             } ->
               assert (
-                Signature.Public_key_hash.equal
-                  (Signature.Public_key.hash public_key)
+                Implicit_account_repr.equal
+                  (* FIXME-PA *)
+                  (Implicit_account_repr.Forbidden.of_pkh
+                     (Signature.Public_key.hash public_key))
                   public_key_hash) ;
               Some (public_key, amount, delegate)
           | {public_key = None; _}
@@ -142,7 +149,10 @@ let bootstrap_account_encoding =
         (fun (public_key, amount, delegate) ->
           {
             public_key = Some public_key;
-            public_key_hash = Signature.Public_key.hash public_key;
+            (* FIXME-PA *)
+            public_key_hash =
+              Implicit_account_repr.Forbidden.of_pkh
+                (Signature.Public_key.hash public_key);
             amount;
             delegate_to = Some delegate;
             consensus_key = None;
@@ -151,9 +161,9 @@ let bootstrap_account_encoding =
         (Tag 3)
         ~title:"Public_key_unknown_with_delegate"
         (tup3
-           Signature.Public_key_hash.encoding
+           Implicit_account_repr.encoding
            Tez_repr.encoding
-           Signature.Public_key_hash.encoding)
+           Implicit_account_repr.encoding)
         (function
           | {
               public_key_hash;
@@ -191,8 +201,10 @@ let bootstrap_account_encoding =
               consensus_key = Some consensus_key;
             } ->
               assert (
-                Signature.Public_key_hash.equal
-                  (Signature.Public_key.hash public_key)
+                Implicit_account_repr.equal
+                  (* FIXME-PA *)
+                  (Implicit_account_repr.Forbidden.of_pkh
+                     (Signature.Public_key.hash public_key))
                   public_key_hash) ;
               Some (public_key, amount, consensus_key)
           | {public_key = None; _}
@@ -202,7 +214,10 @@ let bootstrap_account_encoding =
         (fun (public_key, amount, consensus_key) ->
           {
             public_key = Some public_key;
-            public_key_hash = Signature.Public_key.hash public_key;
+            (* FIXME-PA *)
+            public_key_hash =
+              Implicit_account_repr.Forbidden.of_pkh
+                (Signature.Public_key.hash public_key);
             amount;
             delegate_to = None;
             consensus_key = Some consensus_key;
@@ -215,7 +230,7 @@ let bootstrap_contract_encoding =
     (fun {delegate; amount; script; hash} -> (delegate, amount, script, hash))
     (fun (delegate, amount, script, hash) -> {delegate; amount; script; hash})
     (obj4
-       (opt "delegate" Signature.Public_key_hash.encoding)
+       (opt "delegate" Implicit_account_repr.encoding)
        (req "amount" Tez_repr.encoding)
        (req "script" Script_repr.encoding)
        (opt "hash" Contract_hash.encoding))

@@ -99,7 +99,7 @@ val new_commitment :
   ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
 
 (** Fails if the contract is not an implicit one  *)
-val pkh_of_contract_exn : Contract.t -> Signature.Public_key_hash.t
+val pkh_of_contract_exn : Contract.t -> Implicit_account_repr.t
 
 (** [make_bootstrap_account ~balance ~delegate_to account] creates a
     {!Parameters.bootstrap_account} from an account with the default or set

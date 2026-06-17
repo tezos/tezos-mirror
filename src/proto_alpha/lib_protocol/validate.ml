@@ -133,12 +133,12 @@ let empty_consensus_state =
   }
 
 type voting_state = {
-  proposals_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
+  proposals_seen : Operation_hash.t Implicit_account_repr.Map.t;
       (** To each delegate that has submitted a Proposals operation in a
           previously validated operation, associates the hash of this
           operation. This includes Proposals from a potential Testnet
           Dictator. *)
-  ballots_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
+  ballots_seen : Operation_hash.t Implicit_account_repr.Map.t;
       (** To each delegate that has submitted a ballot in a previously
           validated operation, associates the hash of this operation.  *)
 }
@@ -152,10 +152,10 @@ let voting_state_encoding =
        (obj2
           (req
              "proposals_seen"
-             (Signature.Public_key_hash.Map.encoding Operation_hash.encoding))
+             (Implicit_account_repr.Map.encoding Operation_hash.encoding))
           (req
              "ballots_seen"
-             (Signature.Public_key_hash.Map.encoding Operation_hash.encoding)))
+             (Implicit_account_repr.Map.encoding Operation_hash.encoding)))
 
 module Double_baking_evidence_map = struct
   include Map.Make (struct
@@ -324,7 +324,7 @@ let init_manager_info ctxt =
 
 (** State used and modified when validating manager operations. *)
 type manager_state = {
-  managers_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
+  managers_seen : Operation_hash.t Implicit_account_repr.Map.t;
       (** To enforce the one-operation-per manager-per-block restriction
           (1M). The operation hash lets us indicate the conflicting
           operation in the {!Manager_restriction} error.
@@ -350,9 +350,9 @@ let manager_state_encoding =
        (obj1
           (req
              "managers_seen"
-             (Signature.Public_key_hash.Map.encoding Operation_hash.encoding)))
+             (Implicit_account_repr.Map.encoding Operation_hash.encoding)))
 
-let empty_manager_state = {managers_seen = Signature.Public_key_hash.Map.empty}
+let empty_manager_state = {managers_seen = Implicit_account_repr.Map.empty}
 
 (** Information needed to validate consensus operations and/or to
     finalize the block in both modes that handle a preexisting block:
@@ -464,8 +464,8 @@ let init_info ctxt mode chain_id ~predecessor_level_and_round =
 
 let empty_voting_state =
   {
-    proposals_seen = Signature.Public_key_hash.Map.empty;
-    ballots_seen = Signature.Public_key_hash.Map.empty;
+    proposals_seen = Implicit_account_repr.Map.empty;
+    ballots_seen = Implicit_account_repr.Map.empty;
   }
 
 let empty_operation_conflict_state =
@@ -1684,9 +1684,7 @@ module Voting = struct
     let open Result_syntax in
     let (Single (Proposals {source; _})) = operation.protocol_data.contents in
     match
-      Signature.Public_key_hash.Map.find_opt
-        source
-        vs.voting_state.proposals_seen
+      Implicit_account_repr.Map.find_opt source vs.voting_state.proposals_seen
     with
     | None -> return_unit
     | Some existing ->
@@ -1700,10 +1698,7 @@ module Voting = struct
   let add_proposals vs oph (operation : Kind.proposals operation) =
     let (Single (Proposals {source; _})) = operation.protocol_data.contents in
     let proposals_seen =
-      Signature.Public_key_hash.Map.add
-        source
-        oph
-        vs.voting_state.proposals_seen
+      Implicit_account_repr.Map.add source oph vs.voting_state.proposals_seen
     in
     let voting_state = {vs.voting_state with proposals_seen} in
     {vs with voting_state}
@@ -1711,7 +1706,7 @@ module Voting = struct
   let remove_proposals vs (operation : Kind.proposals operation) =
     let (Single (Proposals {source; _})) = operation.protocol_data.contents in
     let proposals_seen =
-      Signature.Public_key_hash.Map.remove source vs.voting_state.proposals_seen
+      Implicit_account_repr.Map.remove source vs.voting_state.proposals_seen
     in
     {vs with voting_state = {vs.voting_state with proposals_seen}}
 
@@ -1808,7 +1803,7 @@ module Voting = struct
   let check_ballot_conflict vs oph (operation : Kind.ballot operation) =
     let (Single (Ballot {source; _})) = operation.protocol_data.contents in
     match
-      Signature.Public_key_hash.Map.find_opt source vs.voting_state.ballots_seen
+      Implicit_account_repr.Map.find_opt source vs.voting_state.ballots_seen
     with
     | None -> ok_unit
     | Some existing ->
@@ -1821,7 +1816,7 @@ module Voting = struct
   let add_ballot vs oph (operation : Kind.ballot operation) =
     let (Single (Ballot {source; _})) = operation.protocol_data.contents in
     let ballots_seen =
-      Signature.Public_key_hash.Map.add source oph vs.voting_state.ballots_seen
+      Implicit_account_repr.Map.add source oph vs.voting_state.ballots_seen
     in
     let voting_state = {vs.voting_state with ballots_seen} in
     {vs with voting_state}
@@ -1829,7 +1824,7 @@ module Voting = struct
   let remove_ballot vs (operation : Kind.ballot operation) =
     let (Single (Ballot {source; _})) = operation.protocol_data.contents in
     let ballots_seen =
-      Signature.Public_key_hash.Map.remove source vs.voting_state.ballots_seen
+      Implicit_account_repr.Map.remove source vs.voting_state.ballots_seen
     in
     {vs with voting_state = {vs.voting_state with ballots_seen}}
 end
@@ -2287,7 +2282,7 @@ module Anonymous = struct
     in
     let*? () =
       error_unless
-        Signature.Public_key_hash.(delegate1 = delegate2)
+        Implicit_account_repr.(delegate1 = delegate2)
         (Inconsistent_denunciation {kind = Double_baking; delegate1; delegate2})
     in
     let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
@@ -2543,8 +2538,9 @@ module Anonymous = struct
         in
         let traps_fraction = dal_params.traps_fraction in
         let*? is_trap =
+          (* FIXME-PA *)
           Dal.Shard_with_proof.share_is_trap
-            delegate
+            (Implicit_account_repr.Forbidden.to_pkh delegate)
             shard_with_proof.shard.share
             ~traps_fraction
         in
@@ -2570,7 +2566,7 @@ module Anonymous = struct
         in
         let*? () =
           error_unless
-            (Signature.Public_key_hash.equal delegate shard_owner.delegate)
+            Implicit_account_repr.(delegate = shard_owner.delegate)
             (Invalid_accusation_wrong_shard_owner
                {
                  delegate;
@@ -2720,12 +2716,15 @@ module Anonymous = struct
     in
     let* () =
       fail_when
-        (Signature.Public_key_hash.equal active_pk.consensus_pkh delegate)
+        (* FIXME-PA *)
+        (Signature.Public_key_hash.equal
+           active_pk.consensus_pkh
+           (Implicit_account_repr.Forbidden.to_pkh delegate))
         (Invalid_drain_delegate_no_consensus_key delegate)
     in
     let* () =
       fail_when
-        (Signature.Public_key_hash.equal destination delegate)
+        Implicit_account_repr.(destination = delegate)
         (Invalid_drain_delegate_noop delegate)
     in
     let*! is_destination_allocated =
@@ -2772,7 +2771,7 @@ module Anonymous = struct
       operation.protocol_data.contents
     in
     match
-      Signature.Public_key_hash.Map.find_opt
+      Implicit_account_repr.Map.find_opt
         delegate
         state.manager_state.managers_seen
     with
@@ -2796,7 +2795,7 @@ module Anonymous = struct
       operation.protocol_data.contents
     in
     let managers_seen =
-      Signature.Public_key_hash.Map.add
+      Implicit_account_repr.Map.add
         delegate
         oph
         state.manager_state.managers_seen
@@ -2809,7 +2808,7 @@ module Anonymous = struct
       operation.protocol_data.contents
     in
     let managers_seen =
-      Signature.Public_key_hash.Map.remove
+      Implicit_account_repr.Map.remove
         delegate
         state.manager_state.managers_seen
     in
@@ -2936,8 +2935,9 @@ module Manager = struct
 
   let check_tz5_account_enabled ctxt (contract : Contract.t) =
     match contract with
-    | Implicit (Signature.Mldsa44 _)
-      when not (Constants.tz5_account_enable ctxt) ->
+    | Implicit pkh
+      when Implicit_account_repr.is_tz5 pkh
+           && not (Constants.tz5_account_enable ctxt) ->
         result_error Tz5_account_disabled
     | _ -> Ok ()
 
@@ -2945,7 +2945,7 @@ module Manager = struct
     Option.iter_e
       (fun expected_source ->
         error_unless
-          (Signature.Public_key_hash.equal source expected_source)
+          Implicit_account_repr.(source = expected_source)
           (Inconsistent_sources {expected_source; source}))
       expected_source
 
@@ -2959,7 +2959,7 @@ module Manager = struct
 
   (** Used in [check_consistency] below. *)
   type consistency_state = {
-    source : public_key_hash option;
+    source : Implicit_account_repr.t option;
         (** [None] while checking the first operation in the batch,
             then the source of the first operation in the batch. *)
     previous_counter : Manager_counter.t option;
@@ -3510,9 +3510,7 @@ module Manager = struct
     in
     (* One-operation-per-manager-per-block restriction (1M) *)
     match
-      Signature.Public_key_hash.Map.find_opt
-        source
-        vs.manager_state.managers_seen
+      Implicit_account_repr.Map.find_opt source vs.manager_state.managers_seen
     with
     | None -> ok_unit
     | Some existing ->
@@ -3539,10 +3537,7 @@ module Manager = struct
           source
     in
     let managers_seen =
-      Signature.Public_key_hash.Map.add
-        source
-        oph
-        vs.manager_state.managers_seen
+      Implicit_account_repr.Map.add source oph vs.manager_state.managers_seen
     in
     {vs with manager_state = {managers_seen}}
 
@@ -3574,7 +3569,7 @@ module Manager = struct
           source
     in
     let managers_seen =
-      Signature.Public_key_hash.Map.remove source vs.manager_state.managers_seen
+      Implicit_account_repr.Map.remove source vs.manager_state.managers_seen
     in
     {vs with manager_state = {managers_seen}}
 

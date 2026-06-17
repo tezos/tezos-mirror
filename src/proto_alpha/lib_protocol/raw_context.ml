@@ -57,7 +57,7 @@ module Int_set = Set.Make (Compare.Int)
  *)
 
 type consensus_pk = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Implicit_account_repr.t;
   consensus_pk : Signature.Public_key.t;
   consensus_pkh : Signature.Public_key_hash.t;
   companion_pk : Bls.Public_key.t option;
@@ -76,20 +76,28 @@ let consensus_pk_encoding =
          }
        ->
       let delegate =
-        if Signature.Public_key_hash.equal consensus_pkh delegate then None
+        (* FIXME-PA *)
+        if
+          Signature.Public_key_hash.equal
+            consensus_pkh
+            (Implicit_account_repr.Forbidden.to_pkh delegate)
+        then None
         else Some delegate
       in
       (consensus_pk, delegate, companion_pk))
     (fun (consensus_pk, delegate, companion_pk) ->
       let consensus_pkh = Signature.Public_key.hash consensus_pk in
       let companion_pkh = Option.map Bls.Public_key.hash companion_pk in
+      (* FIXME-PA *)
       let delegate =
-        match delegate with None -> consensus_pkh | Some del -> del
+        match delegate with
+        | None -> Implicit_account_repr.Forbidden.of_pkh consensus_pkh
+        | Some del -> del
       in
       {delegate; consensus_pk; consensus_pkh; companion_pk; companion_pkh})
     (obj3
        (req "consensus_pk" Signature.Public_key.encoding)
-       (opt "delegate" Signature.Public_key_hash.encoding)
+       (opt "delegate" Implicit_account_repr.encoding)
        (opt "companion_pk" Bls.Public_key.encoding))
 
 type consensus_power = {
@@ -123,10 +131,10 @@ module Raw_consensus = struct
         (** In mempool mode, hold delegates minimal slots for all allowed
             levels. [None] in all other modes. *)
     delegate_to_shard_count :
-      int Signature.Public_key_hash.Map.t Raw_level_repr.Map.t;
+      int Implicit_account_repr.Map.t Raw_level_repr.Map.t;
         (** Holds the number of assigned shards of delegates with at least one
             assigned shard for all relevant (future) committee levels. *)
-    forbidden_delegates : Signature.Public_key_hash.Set.t;
+    forbidden_delegates : Implicit_account_repr.Set.t;
         (** Delegates that are not allowed to bake or attest blocks; i.e.,
             delegates which have zero frozen deposit due to a previous
             slashing. *)
@@ -160,7 +168,7 @@ module Raw_consensus = struct
       allowed_preattestations = Some Slot_repr.Map.empty;
       allowed_consensus = None;
       delegate_to_shard_count = Raw_level_repr.Map.empty;
-      forbidden_delegates = Signature.Public_key_hash.Set.empty;
+      forbidden_delegates = Implicit_account_repr.Set.empty;
       attestations_seen = Slot_repr.Set.empty;
       preattestations_seen = Slot_repr.Set.empty;
       locked_round_evidence = None;
@@ -233,7 +241,7 @@ module Raw_consensus = struct
     {
       t with
       forbidden_delegates =
-        Signature.Public_key_hash.Set.add delegate t.forbidden_delegates;
+        Implicit_account_repr.Set.add delegate t.forbidden_delegates;
     }
 
   let set_preattestations_quorum_round round t =
@@ -310,7 +318,7 @@ type back = {
   dictator_proposal_seen : bool;
   sampler_state : (Seed_repr.seed * consensus_pk Sampler.t) Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
-    Stake_repr.t Signature.Public_key_hash.Map.t option;
+    Stake_repr.t Implicit_account_repr.Map.t option;
   reward_coeff_for_current_cycle : Q.t;
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal : Raw_dal.t;
@@ -2083,14 +2091,14 @@ module type CONSENSUS = sig
   val allowed_consensus : t -> consensus_power slot_map level_map option
 
   val delegate_to_shard_count :
-    t -> int Signature.Public_key_hash.Map.t raw_level_map
+    t -> int Implicit_account_repr.Map.t raw_level_map
 
   val shard_count_map :
     t ->
     committee_level:Raw_level_repr.t ->
-    int Signature.Public_key_hash.Map.t option
+    int Implicit_account_repr.Map.t option
 
-  val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
+  val forbidden_delegates : t -> Implicit_account_repr.Set.t
 
   type error += Slot_map_not_found of {loc : string}
 
@@ -2101,7 +2109,7 @@ module type CONSENSUS = sig
     allowed_attestations:consensus_power slot_map option ->
     allowed_preattestations:consensus_power slot_map option ->
     allowed_consensus:consensus_power slot_map level_map option ->
-    delegate_to_shard_count:int Signature.Public_key_hash.Map.t raw_level_map ->
+    delegate_to_shard_count:int Implicit_account_repr.Map.t raw_level_map ->
     t
 
   val record_attestation :
@@ -2110,9 +2118,9 @@ module type CONSENSUS = sig
   val record_preattestation :
     t -> initial_slot:slot -> power:attesting_power -> round -> t tzresult
 
-  val forbid_delegate : t -> Signature.Public_key_hash.t -> t
+  val forbid_delegate : t -> Implicit_account_repr.t -> t
 
-  val set_forbidden_delegates : t -> Signature.Public_key_hash.Set.t -> t
+  val set_forbidden_delegates : t -> Implicit_account_repr.Set.t -> t
 
   val attestations_seen : t -> slot_set
 

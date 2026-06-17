@@ -255,7 +255,7 @@ type t = {
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
   max_slashing_per_block : Percentage.t;
   max_slashing_threshold : Ratio_repr.t;
-  testnet_dictator : Signature.Public_key_hash.t option;
+  testnet_dictator : Implicit_account_repr.t option;
   initial_seed : State_hash.t option;
   cache_script_size : int;
   (* in bytes *)

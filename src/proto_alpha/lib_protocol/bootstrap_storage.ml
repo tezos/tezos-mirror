@@ -23,9 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Unrevealed_public_key of Signature.Public_key_hash.t
+(* FIXME-PA: is it still relevant? is the name ok? *)
+type error += Unrevealed_public_key of Implicit_account_repr.t
 
-type error += Delegator_with_consensus_key of Signature.Public_key_hash.t
+type error += Delegator_with_consensus_key of Implicit_account_repr.t
 
 let () =
   register_error_kind
@@ -37,9 +38,9 @@ let () =
       Format.fprintf
         ppf
         "Delegation from an unrevealed public key (for %a) is forbidden."
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         delegate)
-    Data_encoding.(obj1 (req "delegator" Signature.Public_key_hash.encoding))
+    Data_encoding.(obj1 (req "delegator" Implicit_account_repr.encoding))
     (function Unrevealed_public_key pkh -> Some pkh | _ -> None)
     (fun pkh -> Unrevealed_public_key pkh) ;
   register_error_kind
@@ -52,9 +53,9 @@ let () =
         ppf
         "Setting both a consensus key and a delegate other than self (for %a) \
          is forbidden."
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         delegate)
-    Data_encoding.(obj1 (req "bootstrap" Signature.Public_key_hash.encoding))
+    Data_encoding.(obj1 (req "bootstrap" Implicit_account_repr.encoding))
     (function Delegator_with_consensus_key pkh -> Some pkh | _ -> None)
     (fun pkh -> Delegator_with_consensus_key pkh)
 
@@ -101,8 +102,8 @@ let init_account (ctxt, balance_updates)
               tzfail (Delegator_with_consensus_key public_key_hash)
         in
         match delegate_to with
-        | Some delegate
-          when Signature.Public_key_hash.(delegate <> public_key_hash) ->
+        | Some delegate when Implicit_account_repr.(delegate <> public_key_hash)
+          ->
             return (ctxt, [])
         | _ ->
             (* Self-delegated => contract is a delegate.

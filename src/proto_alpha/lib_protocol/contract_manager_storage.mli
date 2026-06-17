@@ -28,8 +28,8 @@ type error +=
   | (* `Permanent *)
       Inconsistent_hash of {
       public_key : Signature.Public_key.t;
-      expected_hash : Signature.Public_key_hash.t;
-      provided_hash : Signature.Public_key_hash.t;
+      expected_hash : Implicit_account_repr.t;
+      provided_hash : Implicit_account_repr.t;
     }
   | (* `Branch *) Previously_revealed_key of Contract_repr.t
   | (* `Branch *) Missing_manager_contract of Contract_repr.t
@@ -44,13 +44,13 @@ val init :
   Raw_context.t tzresult Lwt.t
 
 val is_manager_key_revealed :
-  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> bool tzresult Lwt.t
 
 (** [check_publick_key pk pkh] asserts that the provided [pk] is
    consistent with the expected public key hash [pkh], otherwise
    fails with an [Inconsistent_hash] error. *)
 val check_public_key :
-  Signature.Public_key.t -> Signature.Public_key_hash.t -> unit tzresult
+  Signature.Public_key.t -> Implicit_account_repr.t -> unit tzresult
 
 (** [reveal_manager_key ?check_consistency ctxt manager pk] reveals
    the public key [pk] for a given unrevealed [manager]. If the
@@ -65,7 +65,7 @@ val check_public_key :
 val reveal_manager_key :
   ?check_consistency:bool ->
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Signature.Public_key.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -78,7 +78,7 @@ val reveal_manager_key :
 val get_manager_key :
   ?error:error ->
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Signature.Public_key.t tzresult Lwt.t
 
 val remove_existing :

@@ -70,8 +70,10 @@ let test_encodings balance =
 let test_encodings () =
   let open Lwt_result_syntax in
   let open Receipt in
-  let pkh = Signature.Public_key_hash.zero in
-  let pkh2, _pk, _sk = Signature.generate_key () in
+  let pkh = Implicit_account_repr.zero in
+  (* FIXME-PA *)
+  let pkh2_sig, _pk, _sk = Signature.generate_key () in
+  let pkh2 = Implicit_account_repr.Forbidden.of_pkh pkh2_sig in
   let staker1 = Receipt.frozen_shared_between_stakers ~delegate:pkh in
   let staker2 = Receipt.frozen_baker pkh in
   let staker3 =

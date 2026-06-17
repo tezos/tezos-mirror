@@ -51,10 +51,10 @@ type error +=
   | (* `Permanent *) Failure of string
   | (* `Branch *)
       Empty_implicit_contract of
-      Signature.Public_key_hash.t
+      Implicit_account_repr.t
   | (* `Branch *)
       Empty_implicit_delegated_contract of
-      Signature.Public_key_hash.t
+      Implicit_account_repr.t
 
 (** [allocated ctxt contract] returns [true] if and only if the
    contract is stored in {!Storage.Contract.Spendable_balance}. *)
@@ -82,12 +82,12 @@ val must_be_allocated : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 
 val check_counter_increment :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Manager_counter_repr.t ->
   unit tzresult Lwt.t
 
 val increment_counter :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** [get_balance ctxt contract] returns the balance of spendable tez owned by
     [contract] given raw context [ctxt]. This does not include the contract's
@@ -108,11 +108,11 @@ val get_balance_carbonated :
     This function is a fusion of {!must_be_allocated} and
     {!get_balance} for Implicit contracts exclusively. *)
 val check_allocated_and_get_balance :
-  Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> Tez_repr.t tzresult Lwt.t
 
 val get_counter :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Manager_counter_repr.t tzresult Lwt.t
 
 val get_script_code :
@@ -330,7 +330,7 @@ val simulate_spending :
   Raw_context.t ->
   balance:Tez_repr.t ->
   amount:Tez_repr.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   (Tez_repr.t * bool) tzresult Lwt.t
 
 val get_total_supply : Raw_context.t -> Tez_repr.t tzresult Lwt.t

@@ -527,7 +527,10 @@ module Make
     let address rng_state =
       if Base_samplers.uniform_bool rng_state then
         let destination =
-          Alpha_context.Destination.Contract (Implicit (implicit rng_state))
+          (* FIXME-PA *)
+          Alpha_context.Destination.Contract
+            (Implicit
+               (Implicit_account_repr.Forbidden.of_pkh (implicit rng_state)))
         in
         {destination; entrypoint = Alpha_context.Entrypoint.default}
       else
@@ -583,8 +586,10 @@ module Make
           let* b = Base_samplers.uniform_bool in
           if b then
             let* pkh = implicit in
+            (* FIXME-PA *)
             let destination =
-              Alpha_context.Destination.Contract (Implicit pkh)
+              Alpha_context.Destination.Contract
+                (Implicit (Implicit_account_repr.Forbidden.of_pkh pkh))
             in
             let entrypoint = Alpha_context.Entrypoint.default in
             return
@@ -784,7 +789,10 @@ module Make
      fun ty rng_state ->
       let contents = value ty rng_state in
       let ticketer =
-        Alpha_context.Contract.Implicit (Crypto_samplers.pkh rng_state)
+        (* FIXME-PA *)
+        Alpha_context.Contract.Implicit
+          (Implicit_account_repr.Forbidden.of_pkh
+             (Crypto_samplers.pkh rng_state))
       in
       let amount =
         let open Ticket_amount in

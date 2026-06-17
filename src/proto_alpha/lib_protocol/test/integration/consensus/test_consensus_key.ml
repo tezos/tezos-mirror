@@ -139,7 +139,12 @@ let test_drain_delegate_scenario f =
   let consensus_pk = consensus_account.pk in
   let consensus_pkh = consensus_account.pkh in
   let* blk' =
-    transfer_tokens genesis account2_pkh consensus_pkh Tez.one_mutez
+    (* FIXME-PA *)
+    transfer_tokens
+      genesis
+      account2_pkh
+      (Implicit_account_repr.Forbidden.of_pkh consensus_pkh)
+      Tez.one_mutez
   in
   let* blk' = update_consensus_key blk' delegate consensus_pk in
   f blk' consensus_pkh consensus_pk delegate
@@ -148,13 +153,25 @@ let test_drain_delegate ~low_balance ~exclude_ck ~ck_delegates () =
   let open Lwt_result_syntax in
   test_drain_delegate_scenario (fun blk consensus_pkh consensus_pk delegate ->
       let policy =
-        if exclude_ck then Block.Excluding [consensus_pkh]
+        (* FIXME-PA *)
+        if exclude_ck then
+          Block.Excluding [Implicit_account_repr.Forbidden.of_pkh consensus_pkh]
         else Block.By_account delegate
       in
       let* blk =
         if ck_delegates then
-          let* blk = may_reveal_manager_key blk (consensus_pkh, consensus_pk) in
-          delegate_stake blk consensus_pkh delegate
+          let* blk =
+            may_reveal_manager_key
+              blk
+              (* FIXME-PA *)
+              ( Implicit_account_repr.Forbidden.of_pkh consensus_pkh,
+                consensus_pk )
+          in
+          delegate_stake
+            blk
+            (* FIXME-PA *)
+            (Implicit_account_repr.Forbidden.of_pkh consensus_pkh)
+            delegate
         else return blk
       in
       let* delegate_balance =
@@ -163,12 +180,24 @@ let test_drain_delegate ~low_balance ~exclude_ck ~ck_delegates () =
       let* blk =
         if low_balance then
           let* blk =
-            transfer_tokens blk delegate consensus_pkh delegate_balance
+            (* FIXME-PA *)
+            transfer_tokens
+              blk
+              delegate
+              (Implicit_account_repr.Forbidden.of_pkh consensus_pkh)
+              delegate_balance
           in
-          let* blk = may_reveal_manager_key blk (consensus_pkh, consensus_pk) in
+          let* blk =
+            may_reveal_manager_key
+              blk
+              (* FIXME-PA *)
+              ( Implicit_account_repr.Forbidden.of_pkh consensus_pkh,
+                consensus_pk )
+          in
           transfer_tokens
             blk
-            consensus_pkh
+            (* FIXME-PA *)
+            (Implicit_account_repr.Forbidden.of_pkh consensus_pkh)
             delegate
             Tez.(of_mutez_exn 1_000_000L)
         else return blk
@@ -185,22 +214,39 @@ let test_drain_delegate ~low_balance ~exclude_ck ~ck_delegates () =
         blk
         consensus_pkh
         delegate
-        consensus_pkh
+        (* FIXME-PA *)
+        (Implicit_account_repr.Forbidden.of_pkh consensus_pkh)
         expected_final_balance)
 
 let test_drain_empty_delegate ~exclude_ck () =
   let open Lwt_result_syntax in
   test_drain_delegate_scenario (fun blk consensus_pkh _consensus_pk delegate ->
       let policy =
-        if exclude_ck then Block.Excluding [consensus_pkh]
+        if exclude_ck then
+          (* FIXME-PA *)
+          Block.Excluding [Implicit_account_repr.Forbidden.of_pkh consensus_pkh]
         else Block.By_account delegate
       in
       let* delegate_balance =
         Context.Contract.balance (B blk) (Contract.Implicit delegate)
       in
-      let* blk = transfer_tokens blk delegate consensus_pkh delegate_balance in
+      (* FIXME-PA *)
+      let* blk =
+        transfer_tokens
+          blk
+          delegate
+          (Implicit_account_repr.Forbidden.of_pkh consensus_pkh)
+          delegate_balance
+      in
       let*! res =
-        drain_delegate ~policy blk consensus_pkh delegate consensus_pkh Tez.zero
+        (* FIXME-PA *)
+        drain_delegate
+          ~policy
+          blk
+          consensus_pkh
+          delegate
+          (Implicit_account_repr.Forbidden.of_pkh consensus_pkh)
+          Tez.zero
       in
       Assert.proto_error_with_info
         ~loc:__LOC__
@@ -217,26 +263,34 @@ let test_tz4_consensus_key () =
   let consensus_pk = consensus_account.pk in
   let consensus_pkh = consensus_account.pkh in
   let* blk' =
-    transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
+    (* FIXME-PA *)
+    transfer_tokens
+      genesis
+      account1_pkh
+      (Implicit_account_repr.Forbidden.of_pkh consensus_pkh)
+      Tez.one_mutez
   in
   let* operation =
     Op.update_consensus_key (B blk') (Contract.Implicit delegate) consensus_pk
   in
   let* inc = Incremental.begin_construction blk' in
+
   let expect_failure =
     Error_helpers.expect_missing_bls_proof
       ~loc:__LOC__
       ~kind_pk:Consensus_pk
-      ~pk:consensus_pk
-      ~source_pkh:delegate
+      ~pk:consensus_pk (* FIXME-PA *)
+      ~source_pkh:(Implicit_account_repr.Forbidden.to_pkh delegate)
   in
   let* (_i : Incremental.t) =
     Incremental.validate_operation ~expect_failure inc operation
   in
   let proof_signer = Account.new_account ~algo:Bls () in
   let* operation_with_incorrect_proof =
-    Op.update_consensus_key
-      ~proof_signer:(Contract.Implicit proof_signer.pkh)
+    Op.update_consensus_key (* FIXME-PA *)
+      ~proof_signer:
+        (Contract.Implicit
+           (Implicit_account_repr.Forbidden.of_pkh proof_signer.pkh))
       (B blk')
       (Contract.Implicit delegate)
       consensus_pk
@@ -282,10 +336,13 @@ let test_tz4_consensus_key () =
       inc
       operation_with_incorrect_ciphersuite
   in
+
   (* update_consensus_key with correct proof *)
   let* operation_with_correct_proof =
-    Op.update_consensus_key
-      ~proof_signer:(Contract.Implicit consensus_account.pkh)
+    Op.update_consensus_key (* FIXME-PA *)
+      ~proof_signer:
+        (Contract.Implicit
+           (Implicit_account_repr.Forbidden.of_pkh consensus_account.pkh))
       (B blk')
       (Contract.Implicit delegate)
       consensus_pk
@@ -339,12 +396,19 @@ let test_consensus_key_with_unused_proof () =
   let consensus_pk = consensus_account.pk in
   let consensus_pkh = consensus_account.pkh in
   let* blk' =
-    transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
+    (* FIXME-PA *)
+    transfer_tokens
+      genesis
+      account1_pkh
+      (Implicit_account_repr.Forbidden.of_pkh consensus_pkh)
+      Tez.one_mutez
   in
   let proof_signer = Account.new_account ~algo:Bls () in
   let* operation =
-    Op.update_consensus_key
-      ~proof_signer:(Contract.Implicit proof_signer.pkh)
+    Op.update_consensus_key (* FIXME-PA *)
+      ~proof_signer:
+        (Contract.Implicit
+           (Implicit_account_repr.Forbidden.of_pkh proof_signer.pkh))
       (B blk')
       (Contract.Implicit delegate)
       consensus_pk
@@ -367,14 +431,26 @@ let test_attestation_with_consensus_key () =
   let consensus_pk = consensus_account.pk in
   let consensus_pkh = consensus_account.pkh in
   let* blk' =
-    transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
+    (* FIXME-PA *)
+    transfer_tokens
+      genesis
+      account1_pkh
+      (Implicit_account_repr.Forbidden.of_pkh consensus_pkh)
+      Tez.one_mutez
   in
   let* b_pre = update_consensus_key blk' delegate consensus_pk in
   let* b = Block.bake b_pre in
   (* There is only one delegate, so its minimal slot is zero. *)
   let*?@ slot = Slot.of_int 0 in
   let* attestation =
-    Op.attestation ~attesting_slot:{slot; consensus_pkh = account1_pkh} b
+    (* FIXME-PA *)
+    Op.attestation
+      ~attesting_slot:
+        {
+          slot;
+          consensus_pkh = Implicit_account_repr.Forbidden.to_pkh account1_pkh;
+        }
+      b
   in
   let*! res = Block.bake ~operation:attestation b in
   let* () =

@@ -148,7 +148,7 @@ let () =
     of the storage which are relevant in this module when a delegate
     or a staker are considered. *)
 type delegate_balances = {
-  delegate : Signature.public_key_hash;
+  delegate : Implicit_account_repr.t;
   frozen_deposits_staked_tez : Tez_repr.t;
   frozen_deposits_pseudotokens : Staking_pseudotoken_repr.t;
 }

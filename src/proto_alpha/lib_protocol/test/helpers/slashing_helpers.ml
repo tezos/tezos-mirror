@@ -84,7 +84,7 @@ module Denunciations_repr = struct
     Format.fprintf
       fmt
       "rewarded: %a; %a"
-      Signature.Public_key_hash.pp
+      Protocol.Implicit_account_repr.pp
       rewarded
       Misbehaviour_repr.pp
       misbehaviour
@@ -93,7 +93,7 @@ module Denunciations_repr = struct
       {operation_hash = _; rewarded = r1; misbehaviour = m1}
       {operation_hash = _; rewarded = r2; misbehaviour = m2} =
     Compare.or_else (Protocol.Misbehaviour_repr.compare m1 m2) @@ fun () ->
-    Signature.Public_key_hash.compare r1 r2
+    Protocol.Implicit_account_repr.compare r1 r2
 end
 
 module Full_denunciation = struct
@@ -132,6 +132,8 @@ module Full_denunciation = struct
         all_denunciations_to_apply
       |> List.map fst
       |> List.sort_uniq Signature.Public_key_hash.compare
+      (* FIXME-PA *)
+      |> List.map Protocol.Implicit_account_repr.Forbidden.of_pkh
     in
     slashing_percentage ~block_before_slash misbehaviour ~all_culprits
 end
@@ -165,7 +167,12 @@ let apply_slashing_account all_denunciations_to_apply
       ~current_level:(Protocol.Raw_level_repr.to_int32 misbehaviour.level)
   in
   let culprit_name = find_account_name_from_pkh_exn culprit account_map in
-  let rewarded_name = find_account_name_from_pkh_exn rewarded account_map in
+  (* FIXME-PA *)
+  let rewarded_name =
+    find_account_name_from_pkh_exn
+      (Protocol.Implicit_account_repr.Forbidden.to_pkh rewarded)
+      account_map
+  in
   Log.info
     "Slashing %a for %a"
     Signature.Public_key_hash.pp
@@ -261,7 +268,8 @@ let apply_slashing_state all_denunciations_to_apply
   let log_updates =
     List.map
       (fun x -> fst @@ State.find_account_from_pkh x state)
-      [culprit; rewarded]
+      (* FIXME-PA *)
+      [culprit; Protocol.Implicit_account_repr.Forbidden.to_pkh rewarded]
   in
   let state = State.update_map ~log_updates ~f:(fun _ -> account_map) state in
   return (state, total_burnt)

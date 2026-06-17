@@ -87,8 +87,8 @@ val conflicting_stakers_uncarbonated :
 val start_game :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  player:Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t ->
-  opponent:Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t ->
+  player:Implicit_account_repr.t * Sc_rollup_commitment_repr.Hash.t ->
+  opponent:Implicit_account_repr.t * Sc_rollup_commitment_repr.Hash.t ->
   Raw_context.t tzresult Lwt.t
 
 (** [game_move ctxt rollup player opponent refutation]
@@ -208,9 +208,9 @@ val migrate_clean_refutation_games :
 val check_conflict_point :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  refuter:Signature.public_key_hash ->
+  refuter:Implicit_account_repr.t ->
   refuter_commitment_hash:Commitment_hash.t ->
-  defender:Signature.public_key_hash ->
+  defender:Implicit_account_repr.t ->
   defender_commitment_hash:Commitment_hash.t ->
   (Sc_rollup_commitment_repr.t * Raw_context.t) tzresult Lwt.t
 

@@ -37,12 +37,14 @@ open Qcheck2_helpers
 
 (** {2 Generators}  *)
 let default_delegate =
-  let pkh, _, _ = Signature.generate_key () in
-  pkh
+  let pkh_sig, _, _ = Signature.generate_key () in
+  (* FIXME-PA *)
+  Implicit_account_repr.Forbidden.of_pkh pkh_sig
 
 let default_contract =
-  let pkh, _, _ = Signature.generate_key () in
-  Contract_repr.Implicit pkh
+  let pkh_sig, _, _ = Signature.generate_key () in
+  (* FIXME-PA *)
+  Contract_repr.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh_sig)
 
 let contract = Receipt_repr.Contract default_contract
 
@@ -74,8 +76,10 @@ let deposits =
   Receipt_repr.Deposits staker
 
 let lost_attesting_rewards =
-  let pkh, _, _ = Signature.generate_key () in
-  Receipt_repr.Lost_attesting_rewards (pkh, false, false)
+  let pkh_sig, _, _ = Signature.generate_key () in
+  (* FIXME-PA *)
+  Receipt_repr.Lost_attesting_rewards
+    (Implicit_account_repr.Forbidden.of_pkh pkh_sig, false, false)
 
 let unstaked_deposits =
   let open Gen in
@@ -85,13 +89,17 @@ let unstaked_deposits =
 let commitments = Receipt_repr.Commitments Blinded_public_key_hash.zero
 
 let frozen_bonds =
-  let pkh, _, _ = Signature.generate_key () in
+  let pkh_sig, _, _ = Signature.generate_key () in
+  (* FIXME-PA *)
   let bond_id =
     Bond_id_repr.Sc_rollup_bond_id
       (Sc_rollup_repr.Address.of_b58check_exn
          "sr1JPVatbbPoGp4vb6VfQ1jzEPMrYFcKq6VG")
   in
-  Receipt_repr.Frozen_bonds (Contract_repr.Implicit pkh, bond_id)
+  Receipt_repr.Frozen_bonds
+    (* FIXME-PA *)
+    ( Contract_repr.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh_sig),
+      bond_id )
 
 let generate_balance =
   let open Gen in

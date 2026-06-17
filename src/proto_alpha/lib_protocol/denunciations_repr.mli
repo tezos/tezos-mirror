@@ -14,7 +14,7 @@
     items (see type [t] below) in the context. *)
 type item = {
   operation_hash : Operation_hash.t;
-  rewarded : Signature.public_key_hash;
+  rewarded : Implicit_account_repr.t;
   misbehaviour : Misbehaviour_repr.t;
 }
 
@@ -27,4 +27,4 @@ val encoding : t Data_encoding.t
 
 (** Append a new pending denunciation to the end of the given list. *)
 val add :
-  Operation_hash.t -> Signature.public_key_hash -> Misbehaviour_repr.t -> t -> t
+  Operation_hash.t -> Implicit_account_repr.t -> Misbehaviour_repr.t -> t -> t

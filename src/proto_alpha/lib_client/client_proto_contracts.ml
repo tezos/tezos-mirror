@@ -117,19 +117,28 @@ module Contract_alias = struct
     | None -> (
         let* pkh_opt = Client_keys.Public_key_hash.find_opt cctxt s in
         match pkh_opt with
-        | Some v -> return (Contract.Implicit v)
+        (* FIXME-PA *)
+        | Some v ->
+            return
+              (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh v))
         | None -> failwith "no contract or key named %s" s)
 
   let find_key cctxt name =
     let open Lwt_result_syntax in
     let* v = Client_keys.Public_key_hash.find cctxt name in
-    return (Contract.Implicit v)
+    (* FIXME-PA *)
+    return (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh v))
 
   let rev_find cctxt (c : Contract.t) =
     let open Lwt_result_syntax in
     match c with
     | Implicit hash -> (
-        let* str_opt = Client_keys.Public_key_hash.rev_find cctxt hash in
+        (* FIXME-PA *)
+        let* str_opt =
+          Client_keys.Public_key_hash.rev_find
+            cctxt
+            (Implicit_account_repr.Forbidden.to_pkh hash)
+        in
         match str_opt with
         | Some name -> return_some ("key:" ^ name)
         | None -> return_none)
@@ -160,7 +169,8 @@ module Contract_alias = struct
     | ["alias"; alias] -> find cctxt alias
     | ["key"; text] ->
         let* v = Client_keys.Public_key_hash.find cctxt text in
-        return (Contract.Implicit v)
+        (* FIXME-PA *)
+        return (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh v))
     | ["text"; text] -> Contract_entity.of_source text
     | _ -> (
         let*! contract_opt = Contract_entity.of_source s in
@@ -253,7 +263,8 @@ let list_contracts cctxt =
       (fun (n, v) ->
         let* mem = Raw_contract_alias.mem cctxt n in
         let p = if mem then "key:" else "" in
-        let v' = Contract.Implicit v in
+        (* FIXME-PA *)
+        let v' = Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh v) in
         return (p, n, v'))
       keys
   in

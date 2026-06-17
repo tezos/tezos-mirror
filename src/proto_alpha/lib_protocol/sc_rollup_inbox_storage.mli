@@ -44,7 +44,7 @@ val add_deposit :
   Raw_context.t ->
   payload:Script_repr.expr ->
   sender:Contract_hash.t ->
-  source:Signature.public_key_hash ->
+  source:Implicit_account_repr.t ->
   destination:Sc_rollup_repr.Address.t ->
   Raw_context.t tzresult Lwt.t
 

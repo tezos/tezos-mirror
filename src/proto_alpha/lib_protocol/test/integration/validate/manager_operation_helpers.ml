@@ -24,7 +24,7 @@ let default_fund = Tez.of_mutez_exn 400_000_000_000L
 (** Context abstraction in a test. *)
 type ctxt = {
   block : Block.t;
-  bootstraps : public_key_hash list;
+  bootstraps : Implicit_account_repr.t list;
   originated_contract : Contract_hash.t option;
   sc_rollup : Sc_rollup.t option;
   zk_rollup : Zk_rollup.t option;
@@ -263,7 +263,9 @@ let pp_mode pp = function
   | Application -> Format.fprintf pp "Block"
 
 (** {2 Short-cuts} *)
-let contract_of (account : Account.t) = Contract.Implicit account.pkh
+let contract_of (account : Account.t) =
+  (* FIXME-PA *)
+  Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh account.pkh)
 
 (** Make a [mempool_mode], aka a boolean, as used in incremental from
    a [mode]. *)
@@ -296,12 +298,19 @@ let delegation block source delegate =
       ~force_reveal:true
       (B block)
       contract_source
-      (Some delegate_pkh)
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh delegate_pkh))
   in
   let* block = Block.bake block ~operation in
   let* del_opt_new = Context.Contract.delegate_opt (B block) contract_source in
   let* del = Assert.get_some ~loc:__LOC__ del_opt_new in
-  let* () = Assert.equal_pkh ~loc:__LOC__ del delegate_pkh in
+  let* () =
+    Assert.equal_pkh
+      ~loc:__LOC__
+      del
+      (* FIXME-PA *)
+      (Implicit_account_repr.Forbidden.of_pkh delegate_pkh)
+  in
   return block
 
 let originate_sc_rollup block rollup_account =
@@ -419,7 +428,8 @@ let init_ctxt_only ctxtreq =
 (** Build a generic setting for a test according to a context requirement
     on an existing context with 7 bootstraps accounts. *)
 let init_infos :
-    ctxt_req -> Block.t -> public_key_hash list -> infos tzresult Lwt.t =
+    ctxt_req -> Block.t -> Implicit_account_repr.t list -> infos tzresult Lwt.t
+    =
  fun ctxtreq block bootstraps ->
   let {
     fund_src;
@@ -439,7 +449,14 @@ let init_infos :
     | None -> return (block, None, None)
     | Some _ ->
         let account = Account.new_account () in
-        let* block = fund_account block bootstrap account.pkh fund in
+        (* FIXME-PA *)
+        let* block =
+          fund_account
+            block
+            bootstrap
+            (Implicit_account_repr.Forbidden.of_pkh account.pkh)
+            fund
+        in
         let* block, rollup =
           match originate_rollup with
           | None -> return (block, None)
@@ -463,7 +480,12 @@ let init_infos :
   in
   let source = Account.new_account () in
   let* block =
-    fund_account block (get_bootstrap bootstraps 0) source.pkh fund_src
+    (* FIXME-PA *)
+    fund_account
+      block
+      (get_bootstrap bootstraps 0)
+      (Implicit_account_repr.Forbidden.of_pkh source.pkh)
+      fund_src
   in
   let* block, dest, _ =
     create_and_fund block (get_bootstrap bootstraps 1) fund_dest
@@ -536,7 +558,12 @@ let ctxt_with_self_delegation : ctxt_req -> infos tzresult Lwt.t =
  fun ctxt_req ->
   let open Lwt_result_syntax in
   let* infos = init_ctxt ctxt_req in
-  let+ block = self_delegate infos.ctxt.block (get_source infos).pkh in
+  (* FIXME-PA *)
+  let+ block =
+    self_delegate
+      infos.ctxt.block
+      (Implicit_account_repr.Forbidden.of_pkh (get_source infos).pkh)
+  in
   let ctxt = {infos.ctxt with block} in
   {infos with ctxt}
 
@@ -598,8 +625,12 @@ let mk_delegation (oinfos : operation_req) (infos : infos) =
     (contract_of (get_source infos))
     (Some
        (match infos.accounts.del with
-       | None -> (get_source infos).pkh
-       | Some delegate -> delegate.pkh))
+       | None ->
+           (* FIXME-PA *)
+           Implicit_account_repr.Forbidden.of_pkh (get_source infos).pkh
+       | Some delegate ->
+           (* FIXME-PA *)
+           Implicit_account_repr.Forbidden.of_pkh delegate.pkh))
 
 let mk_undelegation (oinfos : operation_req) (infos : infos) =
   Op.delegation
@@ -621,7 +652,8 @@ let mk_self_delegation (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     (B infos.ctxt.block)
     (contract_of (get_source infos))
-    (Some (get_source infos).pkh)
+    (* FIXME-PA *)
+    (Some (Implicit_account_repr.Forbidden.of_pkh (get_source infos).pkh))
 
 let mk_origination (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
@@ -813,9 +845,10 @@ let mk_sc_rollup_refute (oinfos : operation_req) (infos : infos) =
     (B infos.ctxt.block)
     (contract_of (get_source infos))
     sc_rollup
+    (* FIXME-PA *)
     (match infos.accounts.dest with
-    | None -> (get_source infos).pkh
-    | Some dest -> dest.pkh)
+    | None -> Implicit_account_repr.Forbidden.of_pkh (get_source infos).pkh
+    | Some dest -> Implicit_account_repr.Forbidden.of_pkh dest.pkh)
     refutation
 
 let mk_sc_rollup_add_messages (oinfos : operation_req) (infos : infos) =
@@ -841,11 +874,12 @@ let mk_sc_rollup_timeout (oinfos : operation_req) (infos : infos) =
     (B infos.ctxt.block)
     (contract_of (get_source infos))
     sc_rollup
+    (* FIXME-PA *)
     (Sc_rollup.Game.Index.make
-       (get_source infos).pkh
+       (Implicit_account_repr.Forbidden.of_pkh (get_source infos).pkh)
        (match infos.accounts.dest with
-       | None -> (get_source infos).pkh
-       | Some dest -> dest.pkh))
+       | None -> Implicit_account_repr.Forbidden.of_pkh (get_source infos).pkh
+       | Some dest -> Implicit_account_repr.Forbidden.of_pkh dest.pkh))
 
 let mk_sc_rollup_execute_outbox_message (oinfos : operation_req) (infos : infos)
     =
@@ -1049,7 +1083,8 @@ let make_test_batched
    increment of the counters aka 1 for a single operation, n for a
    batch of n manager operations. *)
 type probes = {
-  source : Signature.Public_key_hash.t;
+  (* FIXME-PA *)
+  source : Implicit_account_repr.t;
   fee : Tez.t;
   gas_limit : Gas.Arith.integral;
   nb_counter : int;
@@ -1177,7 +1212,8 @@ let observe ~mode ~deallocated ctxt_pre ctxt_post op =
     | Ok () ->
         failwith
           "%a should have been deallocated@."
-          Signature.Public_key_hash.pp
+          (* FIXME-PA *)
+          Implicit_account_repr.pp
           (Context.Contract.pkh contract)
     | Error
         [

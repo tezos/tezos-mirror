@@ -1527,8 +1527,8 @@ module Scripts = struct
     let sender_and_payer ~sender_opt ~payer_opt ~default_sender =
       match (sender_opt, payer_opt) with
       | None, None ->
-          (Contract.Originated default_sender, Signature.Public_key_hash.zero)
-      | Some c, None -> (c, Signature.Public_key_hash.zero)
+          (Contract.Originated default_sender, Implicit_account_repr.zero)
+      | Some c, None -> (c, Implicit_account_repr.zero)
       | None, Some c -> (Contract.Implicit c, c)
       | Some sender, Some payer -> (sender, payer)
     in
@@ -3570,8 +3570,10 @@ module Dal = struct
     let all_delegates =
       Signature.Public_key_hash.Set.is_empty query_delegates
     in
-    Signature.Public_key_hash.Map.fold
+    Implicit_account_repr.Map.fold
       (fun delegate indexes acc ->
+        (* FIXME-PA *)
+        let delegate = Implicit_account_repr.Forbidden.to_pkh delegate in
         if
           all_delegates
           || Signature.Public_key_hash.Set.mem delegate query_delegates
@@ -4077,8 +4079,8 @@ let requested_levels ~default_level ctxt cycles levels =
 module Baking_rights = struct
   type t = {
     level : Raw_level.t;
-    delegate : public_key_hash;
-    consensus_key : public_key_hash;
+    delegate : Implicit_account_repr.t;
+    consensus_key : Signature.Public_key_hash.t;
     round : Round.t;
     timestamp : Timestamp.t option;
   }
@@ -4092,7 +4094,7 @@ module Baking_rights = struct
         {level; delegate; consensus_key; round; timestamp})
       (obj5
          (req "level" Raw_level.encoding)
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Implicit_account_repr.encoding)
          (req "round" Round.encoding)
          (opt "estimated_time" Timestamp.encoding)
          (req "consensus_key" Signature.Public_key_hash.encoding))
@@ -4107,7 +4109,7 @@ module Baking_rights = struct
     type baking_rights_query = {
       levels : Raw_level.t list;
       cycle : Cycle.t option;
-      delegates : Signature.Public_key_hash.t list;
+      delegates : Implicit_account_repr.t list;
       consensus_keys : Signature.Public_key_hash.t list;
       max_round : int option;
       all : bool;
@@ -4119,7 +4121,7 @@ module Baking_rights = struct
           {levels; cycle; delegates; consensus_keys; max_round; all})
       |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
       |+ opt_field "cycle" Cycle.rpc_arg (fun t -> t.cycle)
-      |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
+      |+ multi_field "delegate" Implicit_account_repr.rpc_arg (fun t ->
              t.delegates)
       |+ multi_field "consensus_key" Signature.Public_key_hash.rpc_arg (fun t ->
              t.consensus_keys)
@@ -4206,12 +4208,12 @@ module Baking_rights = struct
     @@ List.fold_left
          (fun (acc, previous) r ->
            if
-             Signature.Public_key_hash.Set.exists
-               (Signature.Public_key_hash.equal r.delegate)
+             Implicit_account_repr.Set.exists
+               (Implicit_account_repr.equal r.delegate)
                previous
            then (acc, previous)
-           else (r :: acc, Signature.Public_key_hash.Set.add r.delegate previous))
-         ([], Signature.Public_key_hash.Set.empty)
+           else (r :: acc, Implicit_account_repr.Set.add r.delegate previous))
+         ([], Implicit_account_repr.Set.empty)
          rights
 
   let register () =
@@ -4249,9 +4251,7 @@ module Baking_rights = struct
           | [] -> rights
           | _ :: _ as delegates ->
               let is_requested p =
-                List.exists
-                  (Signature.Public_key_hash.equal p.delegate)
-                  delegates
+                List.exists (Implicit_account_repr.equal p.delegate) delegates
               in
               List.filter is_requested rights
         in
@@ -4280,7 +4280,7 @@ end
 
 module Attestation_rights = struct
   type delegate_rights = {
-    delegate : Signature.Public_key_hash.t;
+    delegate : Implicit_account_repr.t;
     consensus_key : Signature.Public_key_hash.t;
     first_slot : Slot.t;
     attesting_power : int;
@@ -4300,7 +4300,7 @@ module Attestation_rights = struct
       (fun (delegate, first_slot, attesting_power, consensus_key) ->
         {delegate; first_slot; attesting_power; consensus_key})
       (obj4
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Implicit_account_repr.encoding)
          (req "first_slot" Slot.encoding)
          (req "attesting_power" uint16)
          (req "consensus_key" Signature.Public_key_hash.encoding))
@@ -4325,7 +4325,7 @@ module Attestation_rights = struct
     type attestation_rights_query = {
       levels : Raw_level.t list;
       cycle : Cycle.t option;
-      delegates : Signature.Public_key_hash.t list;
+      delegates : Implicit_account_repr.t list;
       consensus_keys : Signature.Public_key_hash.t list;
     }
 
@@ -4335,7 +4335,7 @@ module Attestation_rights = struct
           {levels; cycle; delegates; consensus_keys})
       |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
       |+ opt_field "cycle" Cycle.rpc_arg (fun t -> t.cycle)
-      |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
+      |+ multi_field "delegate" Implicit_account_repr.rpc_arg (fun t ->
              t.delegates)
       |+ multi_field "consensus_key" Signature.Public_key_hash.rpc_arg (fun t ->
              t.consensus_keys)
@@ -4436,9 +4436,7 @@ module Attestation_rights = struct
             List.exists
               (Signature.Public_key_hash.equal p.consensus_key)
               q.consensus_keys
-            || List.exists
-                 (Signature.Public_key_hash.equal p.delegate)
-                 q.delegates
+            || List.exists (Implicit_account_repr.equal p.delegate) q.delegates
           in
           List.filter_map
             (fun rights_at_level ->
@@ -4467,7 +4465,7 @@ end
 
 module Validators = struct
   type delegate = {
-    delegate : Signature.Public_key_hash.t;
+    delegate : Implicit_account_repr.t;
     consensus_key : Signature.public_key_hash;
     companion_key : Bls.Public_key_hash.t option;
     rounds : Round.t list;
@@ -4517,7 +4515,7 @@ module Validators = struct
           attestation_slot;
         })
       (obj6
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Implicit_account_repr.encoding)
          (req "rounds" (list Round.encoding))
          (req "consensus_key" Signature.Public_key_hash.encoding)
          (opt "companion_key" Bls.Public_key_hash.encoding)
@@ -4567,7 +4565,7 @@ module Validators = struct
 
     type validators_query = {
       levels : Raw_level.t list;
-      delegates : Signature.Public_key_hash.t list;
+      delegates : Implicit_account_repr.t list;
       consensus_keys : Signature.Public_key_hash.t list;
     }
 
@@ -4576,7 +4574,7 @@ module Validators = struct
       query (fun levels delegates consensus_keys ->
           {levels; delegates; consensus_keys})
       |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
-      |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
+      |+ multi_field "delegate" Implicit_account_repr.rpc_arg (fun t ->
              t.delegates)
       |+ multi_field "consensus_key" Signature.Public_key_hash.rpc_arg (fun t ->
              t.consensus_keys)
@@ -4605,7 +4603,7 @@ module Validators = struct
     let* ctxt, rights = Baking.attesting_rights ctxt ~attested_level in
     return
       ( ctxt,
-        Signature.Public_key_hash.Map.fold
+        Implicit_account_repr.Map.fold
           (fun _pkh
                {
                  Baking.delegate;
@@ -4680,9 +4678,7 @@ module Validators = struct
           | [] -> rights
           | _ :: _ as delegates ->
               let is_requested p =
-                List.exists
-                  (Signature.Public_key_hash.equal p.delegate)
-                  delegates
+                List.exists (Implicit_account_repr.equal p.delegate) delegates
               in
               filter_with is_requested rights
         in
@@ -4723,14 +4719,14 @@ let get_blocks_preservation_cycles ~get_context =
   in
   return constants_parametrics.blocks_preservation_cycles
 
-type swrr_credit_entry = {delegate : Signature.Public_key_hash.t; credit : Z.t}
+type swrr_credit_entry = {delegate : Implicit_account_repr.t; credit : Z.t}
 
 let swrr_credit_entry_encoding =
   let open Data_encoding in
   conv
     (fun {delegate; credit} -> (delegate, credit))
     (fun (delegate, credit) -> {delegate; credit})
-    (obj2 (req "delegate" Signature.Public_key_hash.encoding) (req "credit" z))
+    (obj2 (req "delegate" Implicit_account_repr.encoding) (req "credit" z))
 
 module S = struct
   open Data_encoding

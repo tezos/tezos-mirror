@@ -555,7 +555,10 @@ let test_emptying_account_gas () =
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let {Account.pkh; pk; _} = Account.new_account () in
-  let contract = Contract.Implicit pkh in
+  (* FIXME-PA *)
+  let contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh)
+  in
   let amount = Tez_helpers.of_int 10 in
   let* op1 = Op.transaction (B b) bootstrap contract amount in
   let* b = Block.bake ~operation:op1 b in

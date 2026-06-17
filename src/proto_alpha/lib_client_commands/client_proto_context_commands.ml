@@ -566,8 +566,12 @@ let commands_ro () =
             let*! () = cctxt#message "none" in
             return_unit
         | Some delegate ->
-            let* mn = Public_key_hash.rev_find cctxt delegate in
-            let* m = Public_key_hash.to_source delegate in
+            (* FIXME-PA *)
+            let delegate_pkh =
+              Implicit_account_repr.Forbidden.to_pkh delegate
+            in
+            let* mn = Public_key_hash.rev_find cctxt delegate_pkh in
+            let* m = Public_key_hash.to_source delegate_pkh in
             let*! () =
               cctxt#message
                 "%s (%s)"
@@ -858,7 +862,8 @@ let commands_ro () =
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            delegate
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate)
         in
         let*! () =
           match deposit with
@@ -964,7 +969,12 @@ let transfer_command amount (source : Contract.t) destination
         let* source =
           Managed_contract.get_contract_manager cctxt contract_hash
         in
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        (* FIXME-PA *)
+        let* _, src_pk, src_sk =
+          Client_keys.get_key
+            cctxt
+            (Implicit_account_repr.Forbidden.to_pkh source)
+        in
         Managed_contract.transfer
           cctxt
           ~chain:cctxt#chain
@@ -990,7 +1000,12 @@ let transfer_command amount (source : Contract.t) destination
           ?counter
           ()
     | Implicit source ->
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        (* FIXME-PA *)
+        let* _, src_pk, src_sk =
+          Client_keys.get_key
+            cctxt
+            (Implicit_account_repr.Forbidden.to_pkh source)
+        in
         transfer
           cctxt
           ~chain:cctxt#chain
@@ -1200,7 +1215,12 @@ let commands_rw () =
             let* source =
               Managed_contract.get_contract_manager cctxt contract
             in
-            let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+            (* FIXME-PA *)
+            let* _, src_pk, src_sk =
+              Client_keys.get_key
+                cctxt
+                (Implicit_account_repr.Forbidden.to_pkh source)
+            in
             let*! errors =
               Managed_contract.set_delegate
                 cctxt
@@ -1216,7 +1236,8 @@ let commands_rw () =
                 ~src_pk
                 ~src_sk
                 contract
-                (Some delegate)
+                (* FIXME-PA *)
+                (Some (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate))
             in
             let*! (_ :
                     (Operation_hash.t
@@ -1231,7 +1252,12 @@ let commands_rw () =
             in
             return_unit
         | Implicit mgr ->
-            let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
+            (* FIXME-PA *)
+            let* _, src_pk, manager_sk =
+              Client_keys.get_key
+                cctxt
+                (Protocol.Implicit_account_repr.Forbidden.to_pkh mgr)
+            in
             let* _ =
               set_delegate
                 cctxt
@@ -1245,7 +1271,8 @@ let commands_rw () =
                 ?fee
                 ?amount
                 mgr
-                (Some delegate)
+                (* FIXME-PA *)
+                (Some (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate))
                 ~src_pk
                 ~manager_sk
             in
@@ -1267,7 +1294,12 @@ let commands_rw () =
             let* source =
               Managed_contract.get_contract_manager cctxt contract
             in
-            let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+            (* FIXME-PA *)
+            let* _, src_pk, src_sk =
+              Client_keys.get_key
+                cctxt
+                (Protocol.Implicit_account_repr.Forbidden.to_pkh source)
+            in
             let*! errors =
               Managed_contract.set_delegate
                 cctxt
@@ -1293,7 +1325,12 @@ let commands_rw () =
             in
             return_unit
         | Implicit mgr ->
-            let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
+            (* FIXME-PA *)
+            let* _, src_pk, manager_sk =
+              Client_keys.get_key
+                cctxt
+                (Protocol.Implicit_account_repr.Forbidden.to_pkh mgr)
+            in
             let*! _ =
               set_delegate
                 cctxt
@@ -1377,10 +1414,16 @@ let commands_rw () =
             ?gas_limit
             ?safety_guard
             ?storage_limit
-            ~delegate
+            ~delegate:
+              (* FIXME-PA *)
+              (Option.map
+                 Protocol.Implicit_account_repr.Forbidden.of_pkh
+                 delegate)
             ~initial_storage
             ~balance
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~src_pk
             ~src_sk
             ~code
@@ -1516,7 +1559,12 @@ let commands_rw () =
                   Managed_contract.get_contract_manager cctxt contract
               | Implicit source -> return source
             in
-            let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+            (* FIXME-PA *)
+            let* _, src_pk, src_sk =
+              Client_keys.get_key
+                cctxt
+                (Protocol.Implicit_account_repr.Forbidden.to_pkh source)
+            in
             let* contents = List.mapi_ep prepare operations in
             let (Manager_list contents) =
               Annotated_manager_operation.manager_of_list contents
@@ -1638,7 +1686,9 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~src_pk
             ~src_sk
             ~fee_parameter
@@ -1723,7 +1773,9 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~src_pk
             ~src_sk
             ~fee_parameter
@@ -1792,7 +1844,9 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~src_pk
             ~src_sk
             ~fee_parameter
@@ -1918,7 +1972,9 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~src_pk
             ~src_sk
             ~fee_parameter
@@ -2044,7 +2100,11 @@ let commands_rw () =
            source
            cctxt
          ->
-        let contract = Contract.Implicit source in
+        (* FIXME-PA *)
+        let contract =
+          Contract.Implicit
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
+        in
         let arg = None in
         let entrypoint = Some Entrypoint.stake in
         (* TODO #6162
@@ -2121,7 +2181,11 @@ let commands_rw () =
            source
            cctxt
          ->
-        let contract = Contract.Implicit source in
+        (* FIXME-PA *)
+        let contract =
+          Contract.Implicit
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
+        in
         let entrypoint = Some Entrypoint.unstake in
         (* TODO #6162
            (unless --force)
@@ -2191,7 +2255,11 @@ let commands_rw () =
            source
            cctxt
          ->
-        let contract = Contract.Implicit source in
+        (* FIXME-PA *)
+        let contract =
+          Contract.Implicit
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
+        in
         let arg = None in
         let amount = Tez.zero in
         let entrypoint = Some Entrypoint.finalize_unstake in
@@ -2265,7 +2333,11 @@ let commands_rw () =
         let* stez_contract_hash =
           get_stez_contract_hash cctxt ~chain:cctxt#chain ~block:cctxt#block
         in
-        let contract = Contract.Implicit source in
+        (* FIXME-PA *)
+        let contract =
+          Contract.Implicit
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
+        in
         let arg = None in
         let entrypoint = Some (Entrypoint.of_string_strict_exn "deposit") in
         transfer_command
@@ -2333,7 +2405,11 @@ let commands_rw () =
         let* stez_contract_hash =
           get_stez_contract_hash cctxt ~chain:cctxt#chain ~block:cctxt#block
         in
-        let contract = Contract.Implicit source in
+        (* FIXME-PA *)
+        let contract =
+          Contract.Implicit
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
+        in
         let arg = Some (Int64.to_string (Tez.to_mutez amount)) in
         let entrypoint = Some (Entrypoint.of_string_strict_exn "redeem") in
         transfer_command
@@ -2412,7 +2488,11 @@ let commands_rw () =
                 "The --edge-of-baking-over-staking argument is mandatory"
           | Some x -> return x
         in
-        let contract = Contract.Implicit source in
+        (* FIXME-PA *)
+        let contract =
+          Contract.Implicit
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
+        in
         let arg =
           (* Is there a better way? *)
           Some
@@ -2424,7 +2504,12 @@ let commands_rw () =
         let amount = Tez.zero in
         let entrypoint = Some Entrypoint.set_delegate_parameters in
         let* () =
-          let* is_delegate = is_delegate cctxt source in
+          (* FIXME-PA *)
+          let* is_delegate =
+            is_delegate
+              cctxt
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
+          in
           if is_delegate || force then return_unit
           else
             cctxt#error
@@ -2494,7 +2579,12 @@ let commands_rw () =
          ->
         let open Lwt_result_syntax in
         let* () =
-          let* is_delegate = is_delegate cctxt source in
+          (* FIXME-PA *)
+          let* is_delegate =
+            is_delegate
+              cctxt
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
+          in
           if is_delegate || force then return_unit
           else
             cctxt#error
@@ -2502,7 +2592,12 @@ let commands_rw () =
                change their staking parameters. (You can use --force to inject \
                the operation anyway)"
         in
-        let* latest = get_latest_staking_parameters cctxt source in
+        (* FIXME-PA *)
+        let* latest =
+          get_latest_staking_parameters
+            cctxt
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
+        in
         let* ( limit_of_staking_over_baking_millionth,
                edge_of_baking_over_staking_billionth ) =
           match
@@ -2549,7 +2644,11 @@ let commands_rw () =
             "You must change at least one parameter. Latest pending parameters \
              correspond to the values you specified@."
         else
-          let contract = Contract.Implicit source in
+          (* FIXME-PA *)
+          let contract =
+            Contract.Implicit
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
+          in
           let arg =
             (* Is there a better way? *)
             Some
@@ -2601,7 +2700,9 @@ let commands_rw () =
             ~chain:cctxt#chain
             ~block:cctxt#block
             ?confirmations:cctxt#confirmations
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ?fee
             ~src_pk
             ~src_sk
@@ -2910,6 +3011,11 @@ let commands_rw () =
         let* _, _consensus_pk, consensus_sk =
           Client_keys.get_key cctxt consensus_pkh
         in
+        (* FIXME-PA *)
+        let delegate = Implicit_account_repr.Forbidden.of_pkh delegate_pkh in
+        let destination =
+          Implicit_account_repr.Forbidden.of_pkh consensus_pkh
+        in
         let*! r =
           drain_delegate
             cctxt
@@ -2920,7 +3026,8 @@ let commands_rw () =
             ~verbose_signing
             ~consensus_pkh
             ~consensus_sk
-            ~delegate:delegate_pkh
+            ~delegate
+            ~destination
             ()
         in
         match r with Ok _ -> return_unit | Error el -> Lwt.return_error el);
@@ -2947,6 +3054,11 @@ let commands_rw () =
         let* _, _consensus_pk, consensus_sk =
           Client_keys.get_key cctxt consensus_pkh
         in
+        (* FIXME-PA *)
+        let delegate = Implicit_account_repr.Forbidden.of_pkh delegate_pkh in
+        let destination =
+          Implicit_account_repr.Forbidden.of_pkh destination_pkh
+        in
         let*! r =
           drain_delegate
             cctxt
@@ -2957,8 +3069,8 @@ let commands_rw () =
             ~verbose_signing
             ~consensus_pkh
             ~consensus_sk
-            ~destination:destination_pkh
-            ~delegate:delegate_pkh
+            ~destination
+            ~delegate
             ()
         in
         match r with Ok _ -> return_unit | Error el -> Lwt.return_error el);
@@ -3066,7 +3178,8 @@ let commands_rw () =
             Plugin.Alpha_services.Delegate.voting_power
               cctxt
               (cctxt#chain, cctxt#block)
-              src_pkh
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh src_pkh)
           in
           match r with
           | Ok voting_power -> return (voting_power <> 0L)
@@ -3164,7 +3277,8 @@ let commands_rw () =
             ~chain:cctxt#chain
             ~block:cctxt#block
             ~src_sk
-            src_pkh
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh src_pkh)
             proposals
         in
         match r with
@@ -3270,7 +3384,8 @@ let commands_rw () =
             Plugin.Alpha_services.Delegate.voting_power
               cctxt
               (cctxt#chain, cctxt#block)
-              src_pkh
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh src_pkh)
           in
           match r with
           | Ok voting_power -> return (voting_power <> 0L)
@@ -3296,7 +3411,8 @@ let commands_rw () =
             ~chain:cctxt#chain
             ~block:cctxt#block
             ~src_sk
-            src_pkh
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh src_pkh)
             ~verbose_signing
             ~dry_run
             proposal
@@ -3339,7 +3455,8 @@ let commands_rw () =
             ~simulation
             ~fee_parameter
             ?fee
-            mgr
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh mgr)
             ~src_pk
             ~manager_sk
             (Some limit)
@@ -3376,7 +3493,8 @@ let commands_rw () =
             ~simulation
             ~fee_parameter
             ?fee
-            mgr
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh mgr)
             ~src_pk
             ~manager_sk
             None
@@ -3422,7 +3540,9 @@ let commands_rw () =
             ?fee
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source:payer
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh payer)
             ~src_pk
             ~manager_sk
             ~destination:contract
@@ -3508,7 +3628,9 @@ let commands_rw () =
                 ?counter
                 ?confirmations:cctxt#confirmations
                 ~simulation
-                ~source
+                ~source:
+                  (* FIXME-PA *)
+                  (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
                 ~src_pk
                 ~src_sk
                 ~fee_parameter
@@ -3597,7 +3719,9 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~src_pk
             ~src_sk
             ~fee_parameter
@@ -3713,7 +3837,9 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~messages
             ~src_pk
             ~src_sk
@@ -3795,7 +3921,9 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~rollup
             ~commitment
             ~src_pk
@@ -3851,7 +3979,9 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~rollup
             ~src_pk
             ~src_sk
@@ -3907,15 +4037,21 @@ let commands_rw () =
             cctxt
             (cctxt#chain, cctxt#block)
             rollup
-            staker1
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh staker1)
         in
         let* alice, bob =
           let* answer =
             List.find_es
               (fun (_, alice, bob) ->
-                let stakers = Sc_rollup.Game.Index.make staker1 staker2 in
+                (* FIXME-PA *)
+                let stakers =
+                  Sc_rollup.Game.Index.make
+                    (Protocol.Implicit_account_repr.Forbidden.of_pkh staker1)
+                    (Protocol.Implicit_account_repr.Forbidden.of_pkh staker2)
+                in
                 return
-                  Signature.Public_key_hash.(
+                  Protocol.Implicit_account_repr.(
                     alice = stakers.alice && bob = stakers.bob))
               games
           in
@@ -3939,7 +4075,9 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~rollup
             ~alice
             ~bob
@@ -4025,7 +4163,9 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh source)
             ~rollup
             ~cemented_commitment
             ~output_proof:(Bytes.to_string output_proof)
@@ -4084,12 +4224,14 @@ let commands_rw () =
             ?counter
             ?confirmations:cctxt#confirmations
             ~simulation
-            ~source
+            ~source:
+              (* FIXME-PA *) (Implicit_account_repr.Forbidden.of_pkh source)
             ~src_pk
             ~src_sk
             ~fee_parameter
             ~sc_rollup
-            ~staker
+            ~staker:
+              (* FIXME-PA *) (Implicit_account_repr.Forbidden.of_pkh staker)
             ()
         in
         return_unit);
@@ -4279,6 +4421,8 @@ let commands_rw () =
          ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        (* FIXME-PA *)
+        let source = Implicit_account_repr.Forbidden.of_pkh source in
         let* {parametric = {dal = {number_of_slots; _}; _}; _} =
           Alpha_services.Constants.all cctxt (cctxt#chain, `Head 0)
         in

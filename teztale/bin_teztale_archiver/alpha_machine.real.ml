@@ -47,7 +47,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                Consensus_ops.
                  {
                    address =
-                     Tezos_crypto.Signature.Of_V3.public_key_hash delegate;
+                     (* FIXME-PA *)
+                     Protocol.Implicit_account_repr.Forbidden.to_pkh delegate;
                    first_slot = slot_to_int first_slot;
                    power = attesting_power;
                  })
@@ -161,7 +162,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       cycle_info metadata cctxt (cctxt#chain, `Hash (hash, 0))
     in
     return
-      ( Tezos_crypto.Signature.Of_V3.public_key_hash
+      ( (* FIXME-PA *)
+        Protocol.Implicit_account_repr.Forbidden.to_pkh
           metadata.protocol_data.baker.delegate,
         cycle_info )
 
@@ -178,7 +180,9 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       List.rev_map
         (fun ({delegate; round; _} : RPC.Baking_rights.t) ->
           {
-            Data.delegate = Tezos_crypto.Signature.Of_V3.public_key_hash delegate;
+            Data.delegate =
+              (* FIXME-PA *)
+              Protocol.Implicit_account_repr.Forbidden.to_pkh delegate;
             round = Protocol.Alpha_context.Round.to_int32 round;
           })
         baking_rights
@@ -200,9 +204,6 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     return
     @@ List.map
          (fun Plugin.RPC.Dal.S.{delegate; indexes} ->
-           let delegate =
-             Tezos_crypto.Signature.Of_V3.public_key_hash delegate
-           in
            Data.Dal.{delegate; assigned_shard_indices = indexes})
          shard_assignments
 
@@ -258,7 +259,9 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                 round = Some (get_consensus_round protocol_data kind);
                 kind;
               };
-            delegate = Tezos_crypto.Signature.Of_V3.public_key_hash ck.delegate;
+            delegate =
+              (* FIXME-PA *)
+              Protocol.Implicit_account_repr.Forbidden.to_pkh ck.delegate;
             power =
               Protocol.Alpha_context.Attesting_power.get_slots_from_result power;
             is_aggregated = true;
@@ -296,7 +299,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                        kind = Consensus_ops.Preattestation;
                      };
                    delegate =
-                     Tezos_crypto.Signature.Of_V3.public_key_hash delegate;
+                     (* FIXME-PA *)
+                     Protocol.Implicit_account_repr.Forbidden.to_pkh delegate;
                    power =
                      Protocol.Alpha_context.Attesting_power
                      .get_slots_from_result
@@ -322,7 +326,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                        kind = Consensus_ops.Attestation;
                      };
                    delegate =
-                     Tezos_crypto.Signature.Of_V3.public_key_hash delegate;
+                     (* FIXME-PA *)
+                     Protocol.Implicit_account_repr.Forbidden.to_pkh delegate;
                    power =
                      Protocol.Alpha_context.Attesting_power
                      .get_slots_from_result
@@ -382,7 +387,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     let*? round = raw_block_round header.shell in
     let* cycle_info = cycle_info metadata cctxt (cctxt#chain, `Level level) in
     return
-      ( ( Tezos_crypto.Signature.Of_V3.public_key_hash
+      ( ( (* FIXME-PA *)
+          Protocol.Implicit_account_repr.Forbidden.to_pkh
             metadata.protocol_data.baker.delegate,
           header.shell.timestamp,
           round,

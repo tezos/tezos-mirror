@@ -94,6 +94,7 @@ module P2p_rejection = P2p_rejection
 module P2p_params = P2p_params
 module Distributed_db_version = Tezos_version.Distributed_db_version
 module Network_version = Tezos_version.Network_version
+module Account_hash = Tezos_crypto.Hashed.Account_hash
 module Block_hash = Tezos_crypto.Hashed.Block_hash
 module Block_metadata_hash = Tezos_crypto.Hashed.Block_metadata_hash
 module Chain_id = Tezos_crypto.Hashed.Chain_id

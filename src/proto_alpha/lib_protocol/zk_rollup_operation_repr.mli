@@ -50,7 +50,7 @@ type price = {id : Ticket_hash_repr.t; amount : Z.t}
 type t = {
   op_code : int;
   price : price;
-  l1_dst : Signature.Public_key_hash.t;
+  l1_dst : Implicit_account_repr.t;
   rollup_id : Zk_rollup_repr.t;
   payload : Zk_rollup_scalar.t array;
 }

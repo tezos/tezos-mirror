@@ -67,7 +67,7 @@ module Delegate_infos : sig
 
   (** [slot_owner t ~slot] returns the public key hash of the delegate that
       owns the given attestation slot. *)
-  val slot_owner : t -> slot:Slot.t -> Signature.Public_key_hash.t option
+  val slot_owner : t -> slot:Slot.t -> Implicit_account_repr.t option
 end
 
 type delegate_infos = Delegate_infos.t

@@ -340,7 +340,9 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
                 let*! ctxt =
                   Protocol.Storage.Contract.Companion_key.add
                     ctxt
-                    (Implicit key)
+                    (* FIXME-PA *)
+                    (Implicit
+                       (Protocol.Implicit_account_repr.Forbidden.of_pkh key))
                     ck_pk
                 in
                 (* Clear the cache: we need to update it with the companion key values. *)
@@ -355,7 +357,10 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
                       let sampler =
                         Protocol.Sampler.map
                           (fun (x : Protocol.Raw_context.consensus_pk) ->
-                            if Signature.Public_key_hash.equal x.delegate key
+                            (* FIXME-PA *)
+                            if
+                              Protocol.Implicit_account_repr.(
+                                Forbidden.of_pkh key = x.delegate)
                             then
                               {
                                 x with
@@ -407,7 +412,9 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
             let name = bootstrap_account.name in
             let contract =
               Protocol.Alpha_context.Contract.Implicit
-                bootstrap_account.account.pkh
+                (* FIXME-PA *)
+                (Protocol.Implicit_account_repr.Forbidden.of_pkh
+                   bootstrap_account.account.pkh)
             in
             let initial_full =
               Option.map Tez.of_mutez bootstrap_account.balance
@@ -454,8 +461,8 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
               init_account
                 ~name
                 ~revealed:true
-                ~delegate
-                ~pkh
+                ~delegate (* FIXME-PA *)
+                ~pkh:(Protocol.Implicit_account_repr.Forbidden.to_pkh pkh)
                 ~contract
                 ~parameters:default_params
                 ~liquid

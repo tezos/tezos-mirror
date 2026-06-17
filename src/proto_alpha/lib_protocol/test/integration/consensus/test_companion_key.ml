@@ -96,7 +96,12 @@ let check_ck_status ~loc ~ck ~registered_for (status : key_status)
   exec_unit (fun (block, state) ->
       let delegate = State.find_account registered_for state in
       let ck = State.find_account ck state in
-      let* info = Context.Delegate.info (B block) delegate.pkh in
+      (* FIXME-PA *)
+      let* info =
+        Context.Delegate.info
+          (B block)
+          (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
+      in
       let {
         Delegate_services.active_consensus_key;
         active_companion_key;
@@ -180,7 +185,12 @@ let check_no_active_companion ~loc ~delegate : (t, t) scenarios =
   let open Lwt_result_syntax in
   exec_unit (fun (block, state) ->
       let delegate = State.find_account delegate state in
-      let* info = Context.Delegate.info (B block) delegate.pkh in
+      (* FIXME-PA *)
+      let* info =
+        Context.Delegate.info
+          (B block)
+          (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
+      in
       Assert.is_none
         ~loc
         ~pp:Signature.Bls.Public_key_hash.pp
@@ -751,7 +761,12 @@ let test_in_registration_table_twice =
     exec_unit (fun (block, state) ->
         let delegate = State.find_account registered_for state in
         let ck = State.find_account ck state in
-        let* info = Context.Delegate.info (B block) delegate.pkh in
+        (* FIXME-PA *)
+        let* info =
+          Context.Delegate.info
+            (B block)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
+        in
         let {
           Delegate_services.pending_consensus_keys;
           pending_companion_keys;
@@ -854,7 +869,10 @@ let test_unregistered =
                     Protocol.Apply.Update_consensus_key_on_unregistered_delegate
                       (err_account_pkh, err_kind);
                   ] ->
-                    Signature.Public_key_hash.equal err_account_pkh account.pkh
+                    (* FIXME-PA *)
+                    Protocol.Implicit_account_repr.Forbidden.to_pkh
+                      err_account_pkh
+                    = account.pkh
                     && err_kind = kind
                 | _ -> false))
             (update_key ~kind ~ck_name:"ck" "account"))
@@ -1001,7 +1019,8 @@ let test_fail_companion_not_tz4 =
                 Protocol.Validate_errors.Manager.Update_companion_key_not_tz4
                   {source = err_source; public_key = err_pk};
               ] ->
-                Signature.Public_key_hash.equal err_source delegate.pkh
+                Protocol.Implicit_account_repr.(
+                  err_source = Forbidden.of_pkh delegate.pkh)
                 && Signature.Public_key.equal err_pk ck_account.pk
             | _ -> false))
         (update_key ~kind:Companion ~ck_name:"ck" delegate)

@@ -44,7 +44,11 @@ let test_simple_reveal () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
-  let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Alpha_context.Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract Tez.one in
   let* blk = Block.bake blk ~operation in
@@ -66,7 +70,11 @@ let test_empty_account_on_reveal () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
-  let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Alpha_context.Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   let amount = Tez.one_mutez in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract amount in
@@ -85,7 +93,8 @@ let test_empty_account_on_reveal () =
     | [
         Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract pkh);
       ]
-      when pkh = new_c.pkh ->
+    (* FIXME-PA *)
+      when Implicit_account_repr.(pkh = Forbidden.of_pkh new_c.pkh) ->
         return_unit
     | _ -> assert false
   in
@@ -102,7 +111,11 @@ let test_not_enough_funds_for_reveal () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 () in
   let new_c = Account.new_account () in
-  let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Alpha_context.Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract Tez.one_mutez in
   let* blk = Block.bake blk ~operation in
@@ -121,7 +134,11 @@ let test_transfer_fees_emptying_after_reveal_batched () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 () in
   let new_c = Account.new_account () in
-  let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Alpha_context.Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract Tez.one in
   let* blk = Block.bake blk ~operation in
@@ -138,7 +155,8 @@ let test_transfer_fees_emptying_after_reveal_batched () =
     | [
         Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract pkh);
       ]
-      when pkh = new_c.pkh ->
+    (* FIXME-PA *)
+      when Implicit_account_repr.(pkh = Forbidden.of_pkh new_c.pkh) ->
         return_unit
     | _ -> assert false
   in
@@ -156,10 +174,16 @@ let test_reveal_with_fake_account () =
   (* Create two fresh, unrevealed, accounts a and b. *)
   let account_a = Account.new_account () in
   let a_pkh = account_a.pkh in
-  let a_contract = Contract.Implicit a_pkh in
+  (* FIXME-PA *)
+  let a_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh a_pkh)
+  in
   let account_b = Account.new_account () in
   let b_pkh = account_b.pkh in
-  let b_contract = Contract.Implicit b_pkh in
+  (* FIXME-PA *)
+  let b_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh b_pkh)
+  in
   (* Assert a and b are fresh.*)
   (* TODO tezos/tezos#2996
 
@@ -211,7 +235,12 @@ let test_reveal_with_fake_account () =
      pkh. This operation should fail without updating account_a's
      balance *)
   let* operation =
-    Op.revelation ~fee:Tez.one_mutez ~forge_pkh:(Some a_pkh) (B b) account_b.pk
+    (* FIXME-PA *)
+    Op.revelation
+      ~fee:Tez.one_mutez
+      ~forge_pkh:(Some (Implicit_account_repr.Forbidden.of_pkh a_pkh))
+      (B b)
+      account_b.pk
   in
   let* i = Incremental.begin_construction b in
   let* i =
@@ -249,10 +278,16 @@ let test_reveal_with_fake_account_already_revealed () =
   (* Create two fresh, unrevealed, accounts a and b. *)
   let account_a = Account.new_account () in
   let a_pkh = account_a.pkh in
-  let a_contract = Contract.Implicit a_pkh in
+  (* FIXME-PA *)
+  let a_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh a_pkh)
+  in
   let account_b = Account.new_account () in
   let b_pkh = account_b.pkh in
-  let b_contract = Contract.Implicit b_pkh in
+  (* FIXME-PA *)
+  let b_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh b_pkh)
+  in
   (* Assert a and b are fresh.*)
   (* TODO tezos/tezos#2996
 
@@ -298,7 +333,12 @@ let test_reveal_with_fake_account_already_revealed () =
   (* Reveal the public key of b while impersonating account_a. This
      operation should fail without updating account_a's balance *)
   let* operation =
-    Op.revelation ~fee:Tez.one_mutez ~forge_pkh:(Some a_pkh) (B b) account_b.pk
+    (* FIXME-PA *)
+    Op.revelation
+      ~fee:Tez.one_mutez
+      ~forge_pkh:(Some (Implicit_account_repr.Forbidden.of_pkh a_pkh))
+      (B b)
+      account_b.pk
   in
   let* i = Incremental.begin_construction b in
   let* i =
@@ -338,7 +378,10 @@ let test_backtracked_reveal_in_batch () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract Tez.one in
   let* blk = Block.bake blk ~operation in
@@ -395,7 +438,10 @@ let test_already_revealed_manager_in_batch () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract Tez.one in
   let* blk = Block.bake blk ~operation in
@@ -482,7 +528,10 @@ let test_no_reveal_when_gas_exhausted () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   (* Fund the contract with a sufficient balance *)
   let* operation =
     Op.transaction (B blk) c new_contract (Tez.of_mutez_exn 1_000L)
@@ -545,7 +594,10 @@ let test_reveal_incorrect_position_in_batch () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract Tez.one in
   let* blk = Block.bake blk ~operation in
@@ -590,7 +642,10 @@ let test_duplicate_valid_reveals () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract Tez.one in
   let* blk = Block.bake blk ~operation in
@@ -628,7 +683,10 @@ let test_valid_reveal_after_gas_exhausted_one () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract Tez.one in
   let* blk = Block.bake blk ~operation in
@@ -673,7 +731,10 @@ let test_valid_reveal_after_insolvent_one () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract Tez.one in
   let* blk = Block.bake blk ~operation in
@@ -714,7 +775,10 @@ let test_valid_reveal_after_emptying_balance () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   let amount = Tez.one_mutez in
   (* Create the contract *)
   let* operation = Op.transaction (B blk) c new_contract amount in
@@ -750,7 +814,10 @@ let test_reveal_tz4 () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_bls_c = Account.new_account ~algo:Bls () in
-  let new_bls_contract = Contract.Implicit new_bls_c.pkh in
+  (* FIXME-PA *)
+  let new_bls_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_bls_c.pkh)
+  in
   let* op_transaction = Op.transaction (B blk) c new_bls_contract Tez.one in
   let* blk = Block.bake blk ~operation:op_transaction in
   let* () =
@@ -862,7 +929,10 @@ let test_reveal_with_unused_proof () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account ~algo:Ed25519 () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   let* op_transaction = Op.transaction (B blk) c new_contract Tez.one in
   let* blk = Block.bake blk ~operation:op_transaction in
   let* () =
@@ -890,7 +960,10 @@ let test_reveal_tz4_in_batch () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_bls_c = Account.new_account ~algo:Bls () in
-  let new_bls_contract = Contract.Implicit new_bls_c.pkh in
+  (* FIXME-PA *)
+  let new_bls_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_bls_c.pkh)
+  in
   let* op_transaction =
     Op.transaction (B blk) c new_bls_contract (Tez.of_mutez_exn 10_000_000L)
   in
@@ -989,7 +1062,10 @@ let test_reveal_with_unused_proof_in_batch () =
   let open Lwt_result_syntax in
   let* blk, c = Context.init1 ~consensus_threshold_size:0 () in
   let new_c = Account.new_account ~algo:Ed25519 () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   let* op_transaction =
     Op.transaction (B blk) c new_contract (Tez.of_mutez_exn 10_000_000L)
   in

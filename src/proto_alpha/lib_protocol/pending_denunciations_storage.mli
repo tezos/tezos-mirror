@@ -19,15 +19,15 @@
   *)
 val find :
   Raw_context.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   Denunciations_repr.item list tzresult Lwt.t
 
 (** Add a denunciation in the list of the given delegate  *)
 val add_denunciation :
   Raw_context.t ->
-  misbehaving_delegate:Signature.public_key_hash ->
+  misbehaving_delegate:Implicit_account_repr.t ->
   Operation_hash.t ->
-  rewarded_delegate:Signature.public_key_hash ->
+  rewarded_delegate:Implicit_account_repr.t ->
   Misbehaviour_repr.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -36,24 +36,20 @@ val add_denunciation :
 *)
 val set_denunciations :
   Raw_context.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   Denunciations_repr.t ->
   Raw_context.t Lwt.t
 
 (** Tells if the given delegate has some pending denunciations  *)
 val has_pending_denunciations :
-  Raw_context.t -> Signature.public_key_hash -> bool Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> bool Lwt.t
 
 (** See {!Storage.Pending_denunciations.fold}  *)
 val fold :
   Raw_context.t ->
   order:[`Sorted | `Undefined] ->
   init:'a ->
-  f:
-    (Signature.public_key_hash ->
-    Denunciations_repr.item list ->
-    'a ->
-    'a Lwt.t) ->
+  f:(Implicit_account_repr.t -> Denunciations_repr.item list -> 'a -> 'a Lwt.t) ->
   'a Lwt.t
 
 (** See {!Storage.Pending_denunciations.clear}  *)
@@ -63,5 +59,5 @@ module For_RPC : sig
   (** Returns a list of all denunciations paired with the offending delegate pkh. *)
   val pending_denunciations_list :
     Raw_context.t ->
-    (Signature.public_key_hash * Denunciations_repr.item) list Lwt.t
+    (Implicit_account_repr.t * Denunciations_repr.item) list Lwt.t
 end

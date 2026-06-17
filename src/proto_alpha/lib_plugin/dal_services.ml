@@ -43,11 +43,11 @@ let shards ctxt ~level =
       in
       let slot = Slot.to_int slot in
       let map =
-        Signature.Public_key_hash.Map.update
+        Implicit_account_repr.Map.update
           consensus_pk.delegate
           (function None -> Some [slot] | Some slots -> Some (slot :: slots))
           map
       in
       return (ctxt, map))
-    (ctxt, Signature.Public_key_hash.Map.empty)
+    (ctxt, Implicit_account_repr.Map.empty)
     slots

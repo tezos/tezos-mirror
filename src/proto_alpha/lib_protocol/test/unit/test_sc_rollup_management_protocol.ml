@@ -115,16 +115,16 @@ let assert_encoding_failure ~loc res =
 
 let test_encode_decode_internal_inbox_message_transfer () =
   let open Lwt_result_wrap_syntax in
-  let open WithExceptions in
   let* ctxt = init_ctxt () in
   let destination = Sc_rollup.Address.zero in
   let sender =
     Contract_hash.of_b58check_exn "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"
   in
   let source =
-    Result.get_ok
+    (* FIXME-PA *)
+    WithExceptions.Option.get
       ~loc:__LOC__
-      (Signature.Public_key_hash.of_b58check
+      (Implicit_account_repr.of_b58check_opt
          "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w")
   in
   let*?@ (Script_typed_ir.Ty_ex_c pair_nat_ticket_string_ty) =
@@ -322,12 +322,13 @@ let test_whitelist_encoding_size () =
   let open Lwt_result_syntax in
   let gen_pkh () =
     let account = Account.new_account () in
-    account.pkh
+    (* FIXME-PA *)
+    Implicit_account_repr.Forbidden.of_pkh account.pkh
   in
   (* 6 is for the rest of encoding: size, tag, ... *)
   let max_msg_size = Constants_repr.sc_rollup_message_size_limit - 6 in
   let encoding_size =
-    Data_encoding.Binary.length Signature.Public_key_hash.encoding (gen_pkh ())
+    Data_encoding.Binary.length Implicit_account_repr.encoding (gen_pkh ())
   in
   let max_allowed_whitelist_size = max_msg_size / encoding_size in
   let check_encoding ~valid encoding msg =

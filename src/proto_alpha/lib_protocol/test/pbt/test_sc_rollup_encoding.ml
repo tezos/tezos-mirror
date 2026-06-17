@@ -163,8 +163,9 @@ let pack_slots_headers_by_level list =
       |> List.map (fun (k, ssh) -> (k, SSH.elements ssh))
 
 let gen_pkh =
-  let pkh, _, _ = Signature.generate_key ~algo:Ed25519 () in
-  Gen.return pkh
+  let pkh_sig, _, _ = Signature.generate_key ~algo:Ed25519 () in
+  (* FIXME-PA *)
+  Gen.return (Implicit_account_repr.Forbidden.of_pkh pkh_sig)
 
 let gen_dal_slots_history () =
   let open Gen in
@@ -185,7 +186,7 @@ let gen_dal_slots_history () =
               attested_shards = (if is_proto_attested then 1 else 0);
               total_shards = 1;
               is_proto_attested;
-              attesters = Environment.Signature.Public_key_hash.Set.empty;
+              attesters = Implicit_account_repr.Set.empty;
             }
         in
         let published_level =
@@ -320,7 +321,8 @@ let gen_inbox_message =
     (* We won't test the encoding of these values. It's out of scope. *)
     let payload = Script_repr.unit in
     let sender = Contract_hash.zero in
-    let source = Signature.Public_key_hash.zero in
+    (* FIXME-PA *)
+    let source = Implicit_account_repr.zero in
     (* But the encoding of the rollup's address is our problem. *)
     let+ destination = gen_rollup in
     Internal (Transfer {payload; sender; source; destination})

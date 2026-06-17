@@ -55,7 +55,7 @@ struct
 
   (** The slot is not confirmed (skipped) iff the boolean is [true]. The flag is
       attached to the hypothetical publisher of the slot. *)
-  type slot_skipped = bool * Signature.public_key_hash
+  type slot_skipped = bool * Implicit_account_repr.t
 
   type level = int
 
@@ -109,7 +109,7 @@ struct
                   attested_shards = (if skip_slot then 0 else 1);
                   total_shards = 1;
                   is_proto_attested = not skip_slot;
-                  attesters = Environment.Signature.Public_key_hash.Set.empty;
+                  attesters = Implicit_account_repr.Set.empty;
                 }
             in
             if skip_slot then None
@@ -230,8 +230,9 @@ struct
     let gen_dal_config : levels QCheck2.Gen.t =
       let open QCheck2 in
       let gen_pkh =
-        let pkh, _, _ = Signature.generate_key ~algo:Ed25519 () in
-        Gen.return pkh
+        let pkh_sig, _, _ = Signature.generate_key ~algo:Ed25519 () in
+        (* FIXME-PA *)
+        Gen.return (Implicit_account_repr.Forbidden.of_pkh pkh_sig)
       in
       Gen.(
         let nb_slots = 0 -- Parameters.(dal_parameters.number_of_slots) in

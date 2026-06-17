@@ -353,13 +353,13 @@ and _ contents =
     }
       -> Kind.activate_account contents
   | Proposals : {
-      source : Signature.Public_key_hash.t;
+      source : Implicit_account_repr.t;
       period : int32;
       proposals : Protocol_hash.t list;
     }
       -> Kind.proposals contents
   | Ballot : {
-      source : Signature.Public_key_hash.t;
+      source : Implicit_account_repr.t;
       period : int32;
       proposal : Protocol_hash.t;
       ballot : Vote_repr.ballot;
@@ -367,13 +367,13 @@ and _ contents =
       -> Kind.ballot contents
   | Drain_delegate : {
       consensus_key : Signature.Public_key_hash.t;
-      delegate : Signature.Public_key_hash.t;
-      destination : Signature.Public_key_hash.t;
+      delegate : Implicit_account_repr.t;
+      destination : Implicit_account_repr.t;
     }
       -> Kind.drain_delegate contents
   | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
-      source : Signature.public_key_hash;
+      source : Implicit_account_repr.t;
       fee : Tez_repr.t;
       counter : Manager_counter_repr.t;
       operation : 'kind manager_operation;
@@ -396,13 +396,13 @@ and _ manager_operation =
     }
       -> Kind.transaction manager_operation
   | Origination : {
-      delegate : Signature.Public_key_hash.t option;
+      delegate : Implicit_account_repr.t option;
       script : Script_repr.t;
       credit : Tez_repr.t;
     }
       -> Kind.origination manager_operation
   | Delegation :
-      Signature.Public_key_hash.t option
+      Implicit_account_repr.t option
       -> Kind.delegation manager_operation
   | Register_global_constant : {
       value : Script_repr.lazy_expr;
@@ -473,7 +473,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {
       sc_rollup : Sc_rollup_repr.t;
-      staker : Signature.public_key_hash;
+      staker : Implicit_account_repr.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
   | Zk_rollup_origination : {
@@ -738,7 +738,7 @@ module Encoding = struct
           encoding =
             obj3
               (req "balance" Tez_repr.encoding)
-              (opt "delegate" Signature.Public_key_hash.encoding)
+              (opt "delegate" Implicit_account_repr.encoding)
               (req "script" Script_repr.encoding);
           select =
             (function Manager (Origination _ as op) -> Some op | _ -> None);
@@ -756,7 +756,7 @@ module Encoding = struct
         {
           tag = 3;
           name = "delegation";
-          encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
+          encoding = obj1 (opt "delegate" Implicit_account_repr.encoding);
           select =
             (function Manager (Delegation _ as op) -> Some op | _ -> None);
           proj = (function Delegation key -> key);
@@ -1128,7 +1128,7 @@ module Encoding = struct
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.Address.encoding)
-              (req "staker" Signature.Public_key_hash.encoding);
+              (req "staker" Implicit_account_repr.encoding);
           select =
             (function
             | Manager (Sc_rollup_recover_bond _ as op) -> Some op
@@ -1422,7 +1422,7 @@ module Encoding = struct
         name = "proposals";
         encoding =
           obj3
-            (req "source" Signature.Public_key_hash.encoding)
+            (req "source" Implicit_account_repr.encoding)
             (req "period" int32)
             (req
                "proposals"
@@ -1446,7 +1446,7 @@ module Encoding = struct
         name = "ballot";
         encoding =
           obj4
-            (req "source" Signature.Public_key_hash.encoding)
+            (req "source" Implicit_account_repr.encoding)
             (req "period" int32)
             (req "proposal" Protocol_hash.encoding)
             (req "ballot" Vote_repr.ballot_encoding);
@@ -1468,8 +1468,8 @@ module Encoding = struct
         encoding =
           obj3
             (req "consensus_key" Signature.Public_key_hash.encoding)
-            (req "delegate" Signature.Public_key_hash.encoding)
-            (req "destination" Signature.Public_key_hash.encoding);
+            (req "delegate" Implicit_account_repr.encoding)
+            (req "destination" Implicit_account_repr.encoding);
         select =
           (function Contents (Drain_delegate _ as op) -> Some op | _ -> None);
         proj =
@@ -1545,7 +1545,7 @@ module Encoding = struct
 
   let manager_encoding =
     obj5
-      (req "source" Signature.Public_key_hash.encoding)
+      (req "source" Implicit_account_repr.encoding)
       (req "fee" Tez_repr.encoding)
       (req "counter" Manager_counter_repr.encoding_for_operation)
       (req "gas_limit" (check_size 10 Gas_limit_repr.Arith.n_integral_encoding))
@@ -2537,11 +2537,9 @@ type _ weight =
       aggregate_infos
       -> consensus_pass_type weight
   | Weight_proposals :
-      int32 * Signature.Public_key_hash.t
+      int32 * Implicit_account_repr.t
       -> voting_pass_type weight
-  | Weight_ballot :
-      int32 * Signature.Public_key_hash.t
-      -> voting_pass_type weight
+  | Weight_ballot : int32 * Implicit_account_repr.t -> voting_pass_type weight
   | Weight_seed_nonce_revelation : int32 -> anonymous_pass_type weight
   | Weight_vdf_revelation : Seed_repr.vdf_solution -> anonymous_pass_type weight
   | Weight_double_consensus_operation :
@@ -2555,9 +2553,9 @@ type _ weight =
       Ed25519.Public_key_hash.t
       -> anonymous_pass_type weight
   | Weight_drain_delegate :
-      Signature.Public_key_hash.t
+      Implicit_account_repr.t
       -> anonymous_pass_type weight
-  | Weight_manager : Q.t * Signature.public_key_hash -> manager_pass_type weight
+  | Weight_manager : Q.t * Implicit_account_repr.t -> manager_pass_type weight
   | Weight_noop : noop_pass_type weight
 
 (** The weight of an operation is the pair of its pass and weight. *)
@@ -2603,7 +2601,7 @@ let cumulate_fee_and_gas_of_manager : type kind.
    sake of simplicity.
 *)
 let weight_manager : type kind.
-    kind Kind.manager contents_list -> Q.t * Signature.public_key_hash =
+    kind Kind.manager contents_list -> Q.t * Implicit_account_repr.t =
  fun op ->
   let fee, glimit = cumulate_fee_and_gas_of_manager op in
   let source =
@@ -2829,7 +2827,7 @@ let compare_vote_weight w1 w2 =
       (i1, source1)
       (i2, source2)
       ~cmp_fst:Compare.Int32.compare
-      ~cmp_snd:Signature.Public_key_hash.compare
+      ~cmp_snd:Implicit_account_repr.compare
   in
   match (w1, w2) with
   | Weight_proposals (i1, source1), Weight_proposals (i2, source2) ->
@@ -2922,7 +2920,7 @@ let compare_anonymous_weight w1 w2 =
   | Weight_drain_delegate _, Weight_activate_account _ -> -1
   | Weight_activate_account _, Weight_drain_delegate _ -> 1
   | Weight_drain_delegate pkh1, Weight_drain_delegate pkh2 ->
-      Signature.Public_key_hash.compare pkh1 pkh2
+      Implicit_account_repr.compare pkh1 pkh2
 
 (** {5 Comparison of valid {!Manager_operation}} *)
 
@@ -2937,7 +2935,7 @@ let compare_manager_weight weight1 weight2 =
         (manweight1, source1)
         (manweight2, source2)
         ~cmp_fst:Compare.Q.compare
-        ~cmp_snd:Signature.Public_key_hash.compare
+        ~cmp_snd:Implicit_account_repr.compare
 
 (** Two {!operation_weight} are compared by their [pass], see
    {!compare_inner_pass} for more details. When they have the same

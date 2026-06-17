@@ -41,7 +41,7 @@ val list : 'a #RPC_context.simple -> 'a -> Contract.t list shell_tzresult Lwt.t
 
 type info = {
   balance : Tez.t;
-  delegate : public_key_hash option;
+  delegate : Implicit_account_repr.t option;
   counter : Manager_counter.t option;
   script : Script.t option;
   revealed : bool option;
@@ -101,25 +101,25 @@ val full_balance :
 val manager_key :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   public_key option shell_tzresult Lwt.t
 
 val delegate :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
-  public_key_hash shell_tzresult Lwt.t
+  Implicit_account_repr.t shell_tzresult Lwt.t
 
 val delegate_opt :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
-  public_key_hash option shell_tzresult Lwt.t
+  Implicit_account_repr.t option shell_tzresult Lwt.t
 
 val counter :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   Manager_counter.t shell_tzresult Lwt.t
 
 val script :
@@ -166,7 +166,7 @@ val storage_opt :
 val estimated_own_pending_slashed_amount :
   'a #RPC_context.simple ->
   'a ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   Tez.t shell_tzresult Lwt.t
 
 val big_map_get :
@@ -230,7 +230,7 @@ val stez_redeemed_finalizable_balance :
 val stez_bakers :
   'a #RPC_context.simple ->
   'a ->
-  (Signature.public_key_hash * Protocol.Clst_delegates_parameters_repr.t) list
+  (Implicit_account_repr.t * Protocol.Clst_delegates_parameters_repr.t) list
   shell_tzresult
   Lwt.t
 
@@ -364,7 +364,7 @@ module S : sig
       RPC_context.t * Contract.t,
       unit,
       unit,
-      Signature.Public_key_hash.t )
+      Implicit_account_repr.t )
     RPC_service.service
 
   val counter :

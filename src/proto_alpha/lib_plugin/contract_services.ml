@@ -22,7 +22,7 @@ let big_map_root =
 
 type info = {
   balance : Tez.t;
-  delegate : public_key_hash option;
+  delegate : Implicit_account_repr.t option;
   counter : Manager_counter.t option;
   script : Script.t option;
   revealed : bool option;
@@ -37,7 +37,7 @@ let info_encoding =
       {balance; delegate; script; counter; revealed})
   @@ obj5
        (req "balance" Tez.encoding)
-       (opt "delegate" Signature.Public_key_hash.encoding)
+       (opt "delegate" Implicit_account_repr.encoding)
        (opt "script" Script.encoding)
        (opt "counter" Manager_counter.encoding_for_RPCs)
        (opt
@@ -206,7 +206,7 @@ module S = struct
     RPC_service.get_service
       ~description:"Access the delegate of a contract, if any."
       ~query:RPC_query.empty
-      ~output:Signature.Public_key_hash.encoding
+      ~output:Implicit_account_repr.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "delegate")
 
   let counter =
@@ -502,7 +502,8 @@ module S = struct
     let registered_baker_encoding =
       let open Data_encoding in
       obj2
-        (req "pkh" Signature.Public_key_hash.encoding)
+        (* FIXME-PA change pkh into another name *)
+        (req "pkh" Implicit_account_repr.encoding)
         (req "parameters" Clst_delegates_parameters_repr.encoding)
 
     let bakers =
@@ -524,7 +525,7 @@ module S = struct
           Data_encoding.(
             tup2
               Tez.encoding
-              (list (tup2 Signature.Public_key_hash.encoding Tez.encoding)))
+              (list (tup2 Implicit_account_repr.encoding Tez.encoding)))
         RPC_path.(open_root / "context" / "stez" / "staking_power")
 
     let under_feature_flag (ctxt : context) =

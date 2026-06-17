@@ -85,7 +85,10 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
   let* delegate, _consensus_key, round, real_timestamp =
     Block.get_next_baker ~policy predecessor
   in
-  let* delegate = Account.find delegate in
+  (* FIXME-PA *)
+  let* delegate =
+    Account.find (Implicit_account_repr.Forbidden.to_pkh delegate)
+  in
   let payload_round = Option.value ~default:round payload_round in
   let*?@ payload_round = Round.of_int payload_round in
   let timestamp = Option.value ~default:real_timestamp timestamp in

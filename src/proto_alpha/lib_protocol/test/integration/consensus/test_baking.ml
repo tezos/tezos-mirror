@@ -115,7 +115,8 @@ let test_voting_power_cache () =
     let* voting_power = Context.get_voting_power (B block) delegate1 in
     let* delegate1_baked_last_block =
       let* block_producer = Block.block_producer block in
-      return (Signature.Public_key_hash.equal block_producer.delegate delegate1)
+      (* FIXME-PA *)
+      return Implicit_account_repr.(block_producer.delegate = delegate1)
     in
     let* voting_period = Context.Vote.get_current_period (B block) in
     let is_last_block_of_period = Int32.equal voting_period.remaining 0l in
@@ -198,7 +199,7 @@ let get_contract_for_pkh contracts pkh =
     | [] -> assert false
     | c :: t ->
         let c_pkh = Context.Contract.pkh c in
-        if Signature.Public_key_hash.equal c_pkh pkh then return c
+        if Implicit_account_repr.(c_pkh = pkh) then return c
         else find_contract t
   in
   find_contract contracts
@@ -259,7 +260,7 @@ let test_rewards_block_and_payload_producer () =
   let attesting_power = Int64.to_int attesting_power in
   let* bonus_reward = Context.get_bonus_reward (B b2) ~attesting_power in
   let* reward_for_b1 =
-    if Signature.Public_key_hash.equal baker_b2 baker_b1 then
+    if Implicit_account_repr.(baker_b2 = baker_b1) then
       Context.get_baking_reward_fixed_portion (B b1)
     else return Tez.zero
   in
@@ -302,7 +303,7 @@ let test_rewards_block_and_payload_producer () =
     Context.Delegate.current_frozen_deposits (B b2') baker_b2
   in
   let reward_for_b1 =
-    if Signature.Public_key_hash.equal baker_b2 baker_b1 then baking_reward
+    if Implicit_account_repr.(baker_b2 = baker_b1) then baking_reward
     else Tez.zero
   in
   let expected_balance =
@@ -320,7 +321,7 @@ let test_rewards_block_and_payload_producer () =
   in
   let* baker_b1 = Context.get_baker (B genesis) ~round:Round.zero in
   let reward_for_b1' =
-    if Signature.Public_key_hash.equal baker_b2' baker_b1 then baking_reward
+    if Implicit_account_repr.(baker_b2' = baker_b1) then baking_reward
     else Tez.zero
   in
   let expected_balance' =
@@ -429,7 +430,12 @@ let test_committee_sampling () =
     in
     let stats = Stdlib.Hashtbl.create 10 in
     Stdlib.List.iter2
-      (fun acc specs -> Stdlib.Hashtbl.add stats acc.Account.pkh (specs, 0))
+      (* FIXME-PA *)
+      (fun acc specs ->
+        Stdlib.Hashtbl.add
+          stats
+          (Implicit_account_repr.Forbidden.of_pkh acc.Account.pkh)
+          (specs, 0))
       accounts
       distribution ;
     List.iter
@@ -456,7 +462,7 @@ let test_committee_sampling () =
               "@,\
                - %a init balance: %#Ld mutez, expected #slots: [%d, %d], \
                actual #slots: %d"
-              Signature.Public_key_hash.pp_short
+              Implicit_account_repr.pp_short
               pkh
               balance
               min_p

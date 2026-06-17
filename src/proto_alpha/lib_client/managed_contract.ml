@@ -57,7 +57,8 @@ let get_contract_manager (cctxt : #full) contract =
           Signature.Public_key_hash.encoding
           bytes
       with
-      | Some k -> return k
+      (* FIXME-PA *)
+      | Some k -> return (Implicit_account_repr.Forbidden.of_pkh k)
       | None ->
           cctxt#error
             "Cannot find a manager key in contracts storage (decoding bytes \
@@ -66,7 +67,8 @@ let get_contract_manager (cctxt : #full) contract =
              \"manager\" contract.")
   | Prim (_, D_Pair, String (_, value) :: _, _) | String (_, value) -> (
       match Signature.Public_key_hash.of_b58check_opt value with
-      | Some k -> return k
+      (* FIXME-PA *)
+      | Some k -> return (Implicit_account_repr.Forbidden.of_pkh k)
       | None ->
           cctxt#error
             "Cannot find a manager key in contracts storage (\"%s\" is not a \
@@ -92,7 +94,11 @@ let parse code =
 let build_lambda_for_set_delegate ~delegate =
   match delegate with
   | Some delegate ->
-      let (`Hex delegate) = Signature.Public_key_hash.to_hex delegate in
+      (* FIXME-PA *)
+      let (`Hex delegate) =
+        Signature.Public_key_hash.to_hex
+          (Implicit_account_repr.Forbidden.to_pkh delegate)
+      in
       Format.asprintf
         "{ DROP ; NIL operation ; PUSH key_hash 0x%s ; SOME ; SET_DELEGATE ; \
          CONS }"
@@ -105,9 +111,8 @@ let entrypoint_set_delegate = Entrypoint.set_delegate
 
 let entrypoint_remove_delegate = Entrypoint.remove_delegate
 
-let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
-    contract (* the KT1 to delegate *)
-    (delegate : Signature.public_key_hash option) =
+let build_delegate_operation (cctxt : #full) ~chain ~block ?fee contract
+    (* the KT1 to delegate *) (delegate : Implicit_account_repr.t option) =
   let open Lwt_result_syntax in
   let entrypoint = entrypoint_do in
   let* expr_opt =
@@ -147,8 +152,10 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
             let delegate_data =
               match delegate with
               | Some delegate ->
+                  (* FIXME-PA *)
                   let (`Hex delegate) =
-                    Signature.Public_key_hash.to_hex delegate
+                    Signature.Public_key_hash.to_hex
+                      (Implicit_account_repr.Forbidden.to_pkh delegate)
                   in
                   "0x" ^ delegate
               | None -> "Unit"
@@ -170,7 +177,7 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
 let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~fee_parameter ?fee ~source ~src_pk
     ~src_sk contract (* the KT1 to delegate *)
-    (delegate : Signature.public_key_hash option) =
+    (delegate : Implicit_account_repr.t option) =
   let open Lwt_result_syntax in
   let* operation =
     build_delegate_operation cctxt ~chain ~block ?fee contract delegate
@@ -204,7 +211,11 @@ let t_unit =
   Micheline.strip_locations (Prim (0, Michelson_v1_primitives.T_unit, [], []))
 
 let build_lambda_for_transfer_to_implicit ~destination ~amount =
-  let (`Hex destination) = Signature.Public_key_hash.to_hex destination in
+  (* FIXME-PA *)
+  let (`Hex destination) =
+    Signature.Public_key_hash.to_hex
+      (Implicit_account_repr.Forbidden.to_pkh destination)
+  in
   Format.asprintf
     "{ DROP ; NIL operation ;PUSH key_hash 0x%s; IMPLICIT_ACCOUNT;PUSH mutez \
      %Ld ;UNIT;TRANSFER_TOKENS ; CONS }"

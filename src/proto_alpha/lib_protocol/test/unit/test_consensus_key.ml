@@ -50,32 +50,54 @@ let create () =
 module Consensus_key = struct
   let active_key ctxt pkh =
     let open Lwt_result_wrap_syntax in
-    let*@ result = Delegate_consensus_key.active_key ctxt pkh in
+    (* FIXME-PA *)
+    let*@ result =
+      Delegate_consensus_key.active_key
+        ctxt
+        (Implicit_account_repr.Forbidden.of_pkh pkh)
+    in
     return result
 
   let active_pubkey ctxt pkh =
     let open Lwt_result_wrap_syntax in
-    let*@ result = Delegate_consensus_key.active_pubkey ctxt pkh in
+    (* FIXME-PA *)
+    let*@ result =
+      Delegate_consensus_key.active_pubkey
+        ctxt
+        (Implicit_account_repr.Forbidden.of_pkh pkh)
+    in
     return result
 
   let active_pubkey_for_cycle ctxt pkh cycle =
     let open Lwt_result_wrap_syntax in
+    (* FIXME-PA *)
     let*@ result =
       Delegate_consensus_key.active_pubkey_for_cycle
         ctxt
-        pkh
+        (Implicit_account_repr.Forbidden.of_pkh pkh)
         (Cycle_repr.of_int32_exn (Int32.of_int cycle))
     in
     return result
 
   let pending_updates ctxt pkh =
     let open Lwt_result_wrap_syntax in
-    let*@ result = Delegate_consensus_key.pending_updates ctxt pkh in
+    (* FIXME-PA *)
+    let*@ result =
+      Delegate_consensus_key.pending_updates
+        ctxt
+        (Implicit_account_repr.Forbidden.of_pkh pkh)
+    in
     return result
 
   let register_update ctxt pkh pk =
     let open Lwt_result_wrap_syntax in
-    let*@ result = Delegate_consensus_key.register_update ctxt pkh pk in
+    (* FIXME-PA *)
+    let*@ result =
+      Delegate_consensus_key.register_update
+        ctxt
+        (Implicit_account_repr.Forbidden.of_pkh pkh)
+        pk
+    in
     return result
 
   let activate ctxt ~new_cycle = Delegate_consensus_key.activate ctxt ~new_cycle

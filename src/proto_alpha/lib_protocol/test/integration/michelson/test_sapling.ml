@@ -707,6 +707,8 @@ module Interpreter_tests = struct
         list_addr
     in
     let src1_pkh = Context.Contract.pkh src1 in
+    (* FIXME-PA *)
+    let src1_pkh = Implicit_account_repr.Forbidden.to_pkh src1_pkh in
     let* incr = Incremental.begin_construction b3 in
     let alpha_ctxt = Incremental.alpha_ctxt incr in
     let*@ bound_data, _alpha_ctxt =

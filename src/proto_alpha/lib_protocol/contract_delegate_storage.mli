@@ -23,32 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module deals with the delegates of a contract. It is
-   responsible for maintaining the tables {!Storage.Contract.Delegate}
-   and {!Storage.Contract.Delegated}. *)
-
 (** [find ctxt contract] returns the delegate associated to [contract], or [None]
     if [contract] has no delegate. *)
 val find :
   Raw_context.t ->
   Contract_repr.t ->
-  Signature.Public_key_hash.t option tzresult Lwt.t
+  Implicit_account_repr.t option tzresult Lwt.t
 
 (** [is_delegate ctxt pkh] returns whether [pkh] is a delegate. *)
 val is_delegate :
-  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> bool tzresult Lwt.t
 
 (** [delegate_status] describes whether an implicit account is a delegate, or if
     it has a delegate (i.e. other than itself), or has no delegate. *)
 type delegate_status =
   | Delegate
-  | Delegated of Signature.Public_key_hash.t
+  | Delegated of Implicit_account_repr.t
   | Undelegated
 
 (** [get_delegate_status ctxt pkh] returns the delegation status associated to
     [pkh]. *)
 val get_delegate_status :
-  Raw_context.t -> Signature.Public_key_hash.t -> delegate_status tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> delegate_status tzresult Lwt.t
 
 (** [init ctxt contract delegate] sets the [delegate] associated to [contract].
 
@@ -56,7 +52,7 @@ val get_delegate_status :
 val init :
   Raw_context.t ->
   Contract_repr.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Raw_context.t tzresult Lwt.t
 
 (** [unlink ctxt contract] removes [contract] from the list of contracts that
@@ -80,10 +76,10 @@ val delete : Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
 val set :
   Raw_context.t ->
   Contract_repr.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Raw_context.t tzresult Lwt.t
 
 (** [delegated_contracts ctxt delegate] returns the list of contracts (implicit
     or originated) that delegated to [delegate]. *)
 val delegated_contracts :
-  Raw_context.t -> Signature.Public_key_hash.t -> Contract_repr.t list Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> Contract_repr.t list Lwt.t

@@ -13,9 +13,9 @@ open Protocol
 open Protocol.Alpha_context
 open Services_registration_plugin
 
-type error += Balance_rpc_non_delegate of public_key_hash
+type error += Balance_rpc_non_delegate of Implicit_account_repr.t
 
-type error += (* `Temporary *) Not_registered of Signature.Public_key_hash.t
+type error += (* `Temporary *) Not_registered of Implicit_account_repr.t
 
 let () =
   register_error_kind
@@ -32,9 +32,9 @@ let () =
          delegate. If you own this account and want to register it as a \
          delegate, use a delegation operation to delegate the account to \
          itself."
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         pkh)
-    Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
+    Data_encoding.(obj1 (req "pkh" Implicit_account_repr.encoding))
     (function Not_registered pkh -> Some pkh | _ -> None)
     (fun pkh -> Not_registered pkh)
 
@@ -50,11 +50,11 @@ let () =
         "The implicit account (%a) whose balance was requested is not a \
          registered delegate. To get the balance of this account you can use \
          the ../context/contracts/%a/balance RPC."
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         pkh
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         pkh)
-    Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
+    Data_encoding.(obj1 (req "pkh" Implicit_account_repr.encoding))
     (function Balance_rpc_non_delegate pkh -> Some pkh | _ -> None)
     (fun pkh -> Balance_rpc_non_delegate pkh)
 
@@ -333,7 +333,7 @@ type new_info = {
     companion_keys_info;
   (*
     Chunked RPCs at the end, because they might be arbitrarily large *)
-  stakers : (public_key_hash * Tez.t) list;
+  stakers : (Implicit_account_repr.t * Tez.t) list;
   delegators (* old name: delegated_contracts *) : Contract.t list;
 }
 (* Removed:
@@ -631,7 +631,7 @@ module S = struct
          or do not have such a minimal stake, respectively. Note, setting \
          these arguments to false has no effect."
       ~query:list_query
-      ~output:(list Signature.Public_key_hash.encoding)
+      ~output:(list Implicit_account_repr.encoding)
       raw_path
 
   let total_currently_staked =
@@ -648,7 +648,7 @@ module S = struct
             (req "overstaked" Tez_repr.encoding))
       RPC_path.(context_path / "total_currently_staked")
 
-  let path = RPC_path.(raw_path /: Signature.Public_key_hash.rpc_arg)
+  let path = RPC_path.(raw_path /: Implicit_account_repr.rpc_arg)
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7383 *)
   module Deprecated = struct
@@ -1224,14 +1224,14 @@ let own_staked_and_delegated ctxt pkh =
         let* finalizable_sum =
           List.fold_left_es
             (fun acc (delegate, _, (amount : Tez.t)) ->
-              if Signature.Public_key_hash.(delegate <> pkh) then
+              if Implicit_account_repr.(delegate <> pkh) then
                 Lwt.return Tez.(acc +? amount)
               else return acc)
             Tez.zero
             finalizable
         in
         let* unfinalizable_sum =
-          if Signature.Public_key_hash.(unfinalizable.delegate <> pkh) then
+          if Implicit_account_repr.(unfinalizable.delegate <> pkh) then
             List.fold_left_es
               (fun acc (_, (amount : Tez.t)) -> Lwt.return Tez.(acc +? amount))
               Tez.zero

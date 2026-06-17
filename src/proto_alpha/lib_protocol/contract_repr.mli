@@ -41,9 +41,7 @@
     used to create it. The owner of the corresponding private key is the
     holder of the account. An originated contract's hash is derived from its
     origination nonce (see below). *)
-type t =
-  | Implicit of Signature.Public_key_hash.t
-  | Originated of Contract_hash.t
+type t = Implicit of Implicit_account_repr.t | Originated of Contract_hash.t
 
 include Compare.S with type t := t
 
@@ -83,7 +81,7 @@ val encoding : t Data_encoding.t
 (** [implicit_encoding] is an encoding for public key hashes
     compatible with the [encoding] of contracts in the specific case
     of implicit accounts. *)
-val implicit_encoding : Signature.Public_key_hash.t Data_encoding.t
+val implicit_encoding : Implicit_account_repr.t Data_encoding.t
 
 (** [originated_encoding] is an encoding for contract hashes that is
     compatible with the [encoding] of contracts in the specific case
@@ -102,6 +100,5 @@ val rpc_arg : t RPC_arg.arg
 
 module Index : Storage_description.INDEX with type t = t
 
-(** A value [zero] for type {!t}. It's equal to [Implicit
-    Signature.Public_key_hash.zero]. *)
+(** A value [zero] for type {!t}. It's equal to [Implicit Implicit_account_repr.zero]. *)
 val zero : t

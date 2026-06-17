@@ -157,7 +157,7 @@ end = struct
     let denun_reward = Tez_helpers.(lost_deposit /! divider) in
     (* if the baker is the attester, he'll only loose half of the deposits *)
     let expected_attester_loss =
-      if Signature.Public_key_hash.equal baker d1 then
+      if Implicit_account_repr.(baker = d1) then
         Tez_helpers.(lost_deposit -! denun_reward)
       else lost_deposit
     in
@@ -173,7 +173,7 @@ end = struct
        burnt deposit of d1, so it's higher
     *)
     let high, low =
-      if Signature.Public_key_hash.equal baker d1 then (bal_good, bal_bad)
+      if Implicit_account_repr.(baker = d1) then (bal_good, bal_bad)
       else (bal_bad, bal_good)
     in
     let diff_baker = Tez_helpers.(high -! low) in

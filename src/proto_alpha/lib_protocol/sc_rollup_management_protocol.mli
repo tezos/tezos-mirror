@@ -70,7 +70,7 @@ val make_internal_transfer :
   ('a, _) Script_typed_ir.ty ->
   payload:'a ->
   sender:Contract_hash.t ->
-  source:public_key_hash ->
+  source:Implicit_account_repr.t ->
   destination:Sc_rollup.Address.t ->
   (Sc_rollup.Inbox_message.t * context) tzresult Lwt.t
 

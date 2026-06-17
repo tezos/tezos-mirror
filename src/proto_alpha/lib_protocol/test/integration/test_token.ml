@@ -76,9 +76,15 @@ let test_simple_balances () =
   let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   let* ctxt, pkh = create_context () in
-  let giver = `Contract (Contract.Implicit pkh) in
+  (* FIXME-PA *)
+  let giver =
+    `Contract (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh))
+  in
   let pkh, _pk, _sk = Signature.generate_key () in
-  let receiver = `Contract (Contract.Implicit pkh) in
+  let receiver =
+    (* FIXME-PA *)
+    `Contract (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh))
+  in
   let amount = Tez.one in
   let*@ ctxt', _ = Token.transfer ctxt giver receiver amount in
   let*@ ctxt, bal_giver = Token.Internal_for_tests.balance ctxt giver in
@@ -97,9 +103,12 @@ let test_simple_balance_updates () =
   let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   let* ctxt, pkh = create_context () in
-  let giver = Contract.Implicit pkh in
+  (* FIXME-PA *)
+  let giver = Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh) in
   let pkh, _pk, _sk = Signature.generate_key () in
-  let receiver = Contract.Implicit pkh in
+  let receiver =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh)
+  in
   let amount = Tez.one in
   let*@ ctxt', bal_updates =
     Token.transfer ctxt (`Contract giver) (`Contract receiver) amount
@@ -172,11 +181,18 @@ let test_allocated () =
   let open Lwt_result_syntax in
   Random.init 0 ;
   let* ctxt, baker_pkh = create_context () in
-  let receiver = `Contract (Contract.Implicit baker_pkh) in
+  (* FIXME-PA *)
+  let receiver =
+    `Contract
+      (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh baker_pkh))
+  in
   let* () = test_allocated_and_still_allocated_when_empty ctxt receiver true in
   (* Generate a fresh, empty, non-allocated implicit account. *)
   let pkh, _pk, _sk = Signature.generate_key () in
-  let receiver = `Contract (Contract.Implicit pkh) in
+  let receiver =
+    (* FIXME-PA *)
+    `Contract (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh))
+  in
   let* () = test_allocated_and_deallocated_when_empty ctxt receiver in
   let receiver = `Collected_commitments Blinded_public_key_hash.zero in
   let* () = test_allocated_and_deallocated_when_empty ctxt receiver in
@@ -184,7 +200,9 @@ let test_allocated () =
   let* () = test_allocated_and_still_allocated_when_empty ctxt receiver true in
   let receiver =
     let bond_id = Bond_id.Sc_rollup_bond_id (sc_rollup ()) in
-    `Frozen_bonds (Contract.Implicit pkh, bond_id)
+    (* FIXME-PA *)
+    `Frozen_bonds
+      (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh), bond_id)
   in
   test_allocated_and_deallocated_when_empty ctxt receiver
 
@@ -219,8 +237,11 @@ let test_transferring_to_receiver ctxt receiver amount expected_bupds =
   Assert.proto_error_with_info ~loc:__LOC__ res "Overflowing tez addition"
 
 let test_transferring_to_contract ctxt =
-  let pkh, _pk, _sk = Signature.generate_key () in
-  let receiver = Contract.Implicit pkh in
+  let pkh_sig, _pk, _sk = Signature.generate_key () in
+  (* FIXME-PA *)
+  let receiver =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh_sig)
+  in
   let amount = random_amount () in
   test_transferring_to_receiver
     ctxt
@@ -283,7 +304,7 @@ let test_transferring_to_burned ctxt =
           ])
       true
   in
-  let pkh = Signature.Public_key_hash.zero in
+  let pkh = Implicit_account_repr.zero in
   let p, r = (Random.bool (), Random.bool ()) in
   let*@ ctxt', bupds =
     Token.transfer ctxt `Minted (`Lost_attesting_rewards (pkh, p, r)) amount
@@ -322,7 +343,10 @@ let test_transferring_to_burned ctxt =
 
 let test_transferring_to_frozen_bonds ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in
-  let contract = Contract.Implicit pkh in
+  (* FIXME-PA *)
+  let contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh)
+  in
   let sc_rollup = sc_rollup () in
   let bond_id = Bond_id.Sc_rollup_bond_id sc_rollup in
   let amount = random_amount () in
@@ -444,7 +468,8 @@ let test_transferring_from_container ctxt giver amount expected_bupds =
 
 let test_transferring_from_contract ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in
-  let giver = Contract.Implicit pkh in
+  (* FIXME-PA *)
+  let giver = Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh) in
   let amount = random_amount () in
   test_transferring_from_container
     ctxt
@@ -471,7 +496,10 @@ let test_transferring_from_collected_fees ctxt =
 
 let test_transferring_from_frozen_bonds ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in
-  let contract = Contract.Implicit pkh in
+  (* FIXME-PA *)
+  let contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh)
+  in
   let sc_rollup = sc_rollup () in
   let bond_id = Bond_id.Sc_rollup_bond_id sc_rollup in
   let amount = random_amount () in
@@ -567,15 +595,21 @@ let is_receiver_infinite (x : [< Token.receiver]) =
 (** Generates all combinations of constructors. *)
 let build_test_cases () =
   let open Lwt_result_wrap_syntax in
-  let* ctxt, pkh = create_context () in
+  let* ctxt, pkh_sig = create_context () in
+  (* FIXME-PA: all 5 contracts *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh pkh_sig in
   let origin = `Contract (Contract.Implicit pkh) in
-  let user1, _, _ = Signature.generate_key () in
+  let user1_sig, _, _ = Signature.generate_key () in
+  let user1 = Implicit_account_repr.Forbidden.of_pkh user1_sig in
   let user1c = `Contract (Contract.Implicit user1) in
-  let user2, _, _ = Signature.generate_key () in
+  let user2_sig, _, _ = Signature.generate_key () in
+  let user2 = Implicit_account_repr.Forbidden.of_pkh user2_sig in
   let user2c = `Contract (Contract.Implicit user2) in
-  let baker1, baker1_pk, _ = Signature.generate_key () in
+  let baker1_sig, baker1_pk, _ = Signature.generate_key () in
+  let baker1 = Implicit_account_repr.Forbidden.of_pkh baker1_sig in
   let baker1c = `Contract (Contract.Implicit baker1) in
-  let baker2, baker2_pk, _ = Signature.generate_key () in
+  let baker2_sig, baker2_pk, _ = Signature.generate_key () in
+  let baker2 = Implicit_account_repr.Forbidden.of_pkh baker2_sig in
   let baker2c = `Contract (Contract.Implicit baker2) in
   (* Allocate contracts for user1, user2, baker1, and baker2. *)
   let allocate ctxt contract amount =
@@ -822,7 +856,9 @@ let test_transfer_n ctxt (giver : ([< Token.container] * Tez.t) list)
 let test_transfer_n_with_no_giver () =
   let open Lwt_result_syntax in
   Random.init 0 ;
-  let* ctxt, pkh = create_context () in
+  let* ctxt, pkh_sig = create_context () in
+  (* FIXME-PA *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh pkh_sig in
   let* () = test_transfer_n ctxt [] `Block_fees in
   let receiver = `Contract (Contract.Implicit pkh) in
   let* () = test_transfer_n ctxt [] receiver in
@@ -831,15 +867,21 @@ let test_transfer_n_with_no_giver () =
 let test_transfer_n_with_several_givers () =
   let open Lwt_result_wrap_syntax in
   Random.init 0 ;
-  let* ctxt, pkh = create_context () in
+  let* ctxt, pkh_sig = create_context () in
+  (* FIXME-PA: all 5 contracts *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh pkh_sig in
   let origin = `Contract (Contract.Implicit pkh) in
-  let user1, _, _ = Signature.generate_key () in
+  let user1_sig, _, _ = Signature.generate_key () in
+  let user1 = Implicit_account_repr.Forbidden.of_pkh user1_sig in
   let user1c = `Contract (Contract.Implicit user1) in
-  let user2, _, _ = Signature.generate_key () in
+  let user2_sig, _, _ = Signature.generate_key () in
+  let user2 = Implicit_account_repr.Forbidden.of_pkh user2_sig in
   let user2c = `Contract (Contract.Implicit user2) in
-  let user3, _, _ = Signature.generate_key () in
+  let user3_sig, _, _ = Signature.generate_key () in
+  let user3 = Implicit_account_repr.Forbidden.of_pkh user3_sig in
   let user3c = `Contract (Contract.Implicit user3) in
-  let user4, _, _ = Signature.generate_key () in
+  let user4_sig, _, _ = Signature.generate_key () in
+  let user4 = Implicit_account_repr.Forbidden.of_pkh user4_sig in
   let user4c = `Contract (Contract.Implicit user4) in
   (* Allocate contracts for user1, user2, user3, and user4. *)
   let amount =

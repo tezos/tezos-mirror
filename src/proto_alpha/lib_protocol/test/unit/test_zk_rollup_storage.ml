@@ -114,7 +114,9 @@ module Raw_context_tests = struct
   let pending_list_append () =
     let open Lwt_result_wrap_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _, _ = Signature.generate_key () in
+    let pkh_sig, _, _ = Signature.generate_key () in
+    (* FIXME-PA *)
+    let pkh = Implicit_account_repr.Forbidden.of_pkh pkh_sig in
     let op =
       no_ticket
         Zk_rollup_operation_repr.
@@ -143,7 +145,9 @@ module Raw_context_tests = struct
   let pending_list_append_errors () =
     let open Lwt_result_wrap_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _, _ = Signature.generate_key () in
+    let pkh_sig, _, _ = Signature.generate_key () in
+    (* FIXME-PA *)
+    let pkh = Implicit_account_repr.Forbidden.of_pkh pkh_sig in
     let op =
       no_ticket
         Zk_rollup_operation_repr.
@@ -191,7 +195,9 @@ module Raw_context_tests = struct
   let pending_list_get () =
     let open Lwt_result_wrap_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _pk, _sk = Signature.generate_key () in
+    let pkh_sig, _pk, _sk = Signature.generate_key () in
+    (* FIXME-PA *)
+    let pkh = Implicit_account_repr.Forbidden.of_pkh pkh_sig in
     let op =
       no_ticket
         Zk_rollup_operation_repr.
@@ -212,7 +218,9 @@ module Raw_context_tests = struct
   let pending_list_errors () =
     let open Lwt_result_wrap_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _pk, _sk = Signature.generate_key () in
+    let pkh_sig, _pk, _sk = Signature.generate_key () in
+    (* FIXME-PA *)
+    let pkh = Implicit_account_repr.Forbidden.of_pkh pkh_sig in
     let op =
       no_ticket
         Zk_rollup_operation_repr.

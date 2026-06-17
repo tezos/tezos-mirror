@@ -51,8 +51,8 @@ type giver = [infinite_source | container]
 type infinite_sink =
   [ `Storage_fees
   | `Double_signing_punishments
-  | `Lost_attesting_rewards of Signature.Public_key_hash.t * bool * bool
-  | `Lost_dal_attesting_rewards of Signature.Public_key_hash.t
+  | `Lost_attesting_rewards of Implicit_account_repr.t * bool * bool
+  | `Lost_dal_attesting_rewards of Implicit_account_repr.t
   | `Sc_rollup_refutation_punishments
   | `Burned ]
 

@@ -697,8 +697,7 @@ let test_attester_with_no_assigned_shards () =
     let* committee = Context.get_attesters (B b) in
     let in_committee =
       List.exists
-        (fun del ->
-          Signature.Public_key_hash.equal pkh del.RPC.Validators.delegate)
+        (fun del -> Implicit_account_repr.(pkh = del.RPC.Validators.delegate))
         committee
     in
     let* has_assigned_shards = Dal_helpers.has_assigned_shards (B b) pkh in
@@ -727,7 +726,7 @@ let test_attester_with_no_assigned_shards () =
                .Dal_data_availibility_attester_not_in_committee
                  {attester; committee_level; attested_level; lag_index});
           ]
-          when Signature.Public_key_hash.equal attester pkh
+          when Implicit_account_repr.(attester = pkh)
                && Raw_level.to_int32 committee_level = b.header.shell.level
                && attested_level = Raw_level.succ committee_level
                && lag_index = number_of_lags - 1 ->
@@ -795,7 +794,13 @@ let test_dal_attestation_threshold () =
       (fun (acc_ops, acc_power)
            ({delegate; indexes} : RPC.Dal.S.shards_assignment)
          ->
-        let* op = Op.attestation ~manager_pkh:delegate ~dal_content b in
+        (* FIXME-PA *)
+        let* op =
+          Op.attestation
+            ~manager_pkh:(Implicit_account_repr.Forbidden.of_pkh delegate)
+            ~dal_content
+            b
+        in
         let ops = op :: acc_ops in
         let power = acc_power + List.length indexes in
         let* _b, (metadata, _ops) =
@@ -1184,7 +1189,7 @@ let test_dal_rewards () =
   let* dal_info3 = Context.Delegate.dal_participation (B b) baker3 in
 
   let show_participation dal_info baker baker_name =
-    Log.info "Baker %s (%a)" baker_name Signature.Public_key_hash.pp baker ;
+    Log.info "Baker %s (%a)" baker_name Implicit_account_repr.pp baker ;
     Log.info
       "  Attestable slots: %d"
       dal_info.Delegate.For_RPC.delegate_attestable_dal_slots ;

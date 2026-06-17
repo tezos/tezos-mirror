@@ -57,7 +57,7 @@ struct
       {
         total_shards = 1;
         attested_shards = 1;
-        attesters = Environment.Signature.Public_key_hash.Set.empty;
+        attesters = Implicit_account_repr.Set.empty;
         is_proto_attested = true;
       }
 

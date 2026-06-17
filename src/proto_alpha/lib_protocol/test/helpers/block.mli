@@ -59,9 +59,9 @@ val rpc_ctxt : t Environment.RPC_context.simple
     policy, [pkhs] refer to the baker's active consensus key. *)
 type baker_policy =
   | By_round of int
-  | By_account of public_key_hash
-  | Excluding of public_key_hash list
-  | By_account_with_minimal_round of public_key_hash * int
+  | By_account of Implicit_account_repr.t
+  | Excluding of Implicit_account_repr.t list
+  | By_account_with_minimal_round of Implicit_account_repr.t * int
 
 (**
    The default baking functions below is to use (blocks) [Application] mode.
@@ -69,14 +69,19 @@ type baker_policy =
 *)
 type baking_mode = Application | Baking
 
-type error += No_slots_found_for of Signature.Public_key_hash.t
+type error += No_slots_found_for of Implicit_account_repr.t
 
 (** Returns (account, consensus_key, round, timestamp) of the next baker given
     a policy, defaults to By_round 0. *)
 val get_next_baker :
   ?policy:baker_policy ->
   t ->
-  (public_key_hash * public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
+  (Implicit_account_repr.t
+  * Signature.Public_key_hash.t
+  * int
+  * Time.Protocol.t)
+  tzresult
+  Lwt.t
 
 val get_round : block -> Round.t Environment.Error_monad.tzresult
 
@@ -120,8 +125,8 @@ module Forge : sig
 
   (** Sets the baker that will sign the header to an arbitrary pkh *)
   val set_baker :
-    public_key_hash ->
-    ?consensus_key:Signature.public_key_hash ->
+    Implicit_account_repr.t ->
+    ?consensus_key:Signature.Public_key_hash.t ->
     header ->
     header
 
@@ -449,9 +454,10 @@ val prepare_initial_context_params :
 
 (** [autostaked_opt delegate metadata] returns [Some amount] if [amount] tez
     have been staked for the given [delegate]. [None] otherwise. *)
-val autostaked_opt : public_key_hash -> block_header_metadata -> Tez.t option
+val autostaked_opt :
+  Implicit_account_repr.t -> block_header_metadata -> Tez.t option
 
 (**  same as [autostaked_opt] but fails in case autostaking didn't provoke a
      stake operation.  *)
 val autostaked :
-  ?loc:string -> public_key_hash -> block_header_metadata -> Tez.t
+  ?loc:string -> Implicit_account_repr.t -> block_header_metadata -> Tez.t

@@ -350,14 +350,14 @@ and _ contents =
       -> Kind.activate_account contents
   (* Proposals: A candidate protocol can be proposed for voting. *)
   | Proposals : {
-      source : Signature.Public_key_hash.t;
+      source : Implicit_account_repr.t;
       period : int32;
       proposals : Protocol_hash.t list;
     }
       -> Kind.proposals contents
   (* Ballot: The validators of the chain will then vote on proposals. *)
   | Ballot : {
-      source : Signature.Public_key_hash.t;
+      source : Implicit_account_repr.t;
       period : int32;
       proposal : Protocol_hash.t;
       ballot : Vote_repr.ballot;
@@ -368,8 +368,8 @@ and _ contents =
      when [consensus_key] is the active consensus key of [delegate].. *)
   | Drain_delegate : {
       consensus_key : Signature.Public_key_hash.t;
-      delegate : Signature.Public_key_hash.t;
-      destination : Signature.Public_key_hash.t;
+      delegate : Implicit_account_repr.t;
+      destination : Implicit_account_repr.t;
     }
       -> Kind.drain_delegate contents
   (* Failing_noop: An operation never considered by the state machine
@@ -381,7 +381,7 @@ and _ contents =
      interactions between contracts (whether implicit or
      smart). *)
   | Manager_operation : {
-      source : Signature.Public_key_hash.t;
+      source : Implicit_account_repr.t;
       fee : Tez_repr.t;
       counter : Manager_counter_repr.t;
       operation : 'kind manager_operation;
@@ -418,7 +418,7 @@ and _ manager_operation =
   (* [Origination] of a contract using a smart-contract [script] and
      initially credited with the amount [credit]. *)
   | Origination : {
-      delegate : Signature.Public_key_hash.t option;
+      delegate : Implicit_account_repr.t option;
       script : Script_repr.t;
       credit : Tez_repr.t;
     }
@@ -427,7 +427,7 @@ and _ manager_operation =
      key hash). When this value is None, delegation is reverted as it
      is set to nobody. *)
   | Delegation :
-      Signature.Public_key_hash.t option
+      Implicit_account_repr.t option
       -> Kind.delegation manager_operation
   (* [Register_global_constant] allows registration and substitution
      of a global constant available from any contract and registered in
@@ -543,7 +543,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {
       sc_rollup : Sc_rollup_repr.t;
-      staker : Signature.Public_key_hash.t;
+      staker : Implicit_account_repr.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
   | Zk_rollup_origination : {

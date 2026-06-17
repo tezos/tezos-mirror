@@ -43,7 +43,7 @@ type error +=
 
 (** The public key of a consensus key and the associated delegate. *)
 type pk = Raw_context.consensus_pk = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Implicit_account_repr.t;
   consensus_pk : Signature.Public_key.t;
   consensus_pkh : Signature.Public_key_hash.t;
   companion_pk : Bls.Public_key.t option;
@@ -58,7 +58,7 @@ type power = Raw_context.consensus_power = {
 
 (** The public key hash of a consensus key and the associated delegate. *)
 type t = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Implicit_account_repr.t;
   consensus_pkh : Signature.Public_key_hash.t;
 }
 
@@ -77,7 +77,7 @@ val check_not_tz5 :
 (** Initialize the consensus key when registering a delegate. *)
 val init :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Signature.Public_key.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -86,29 +86,25 @@ val init :
     a self delegate. *)
 val init_bootstrap :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Signature.Public_key.t ->
   Raw_context.t tzresult Lwt.t
 
 (** Returns the active consensus key for the current cycle. *)
 val active_pubkey :
-  Raw_context.t -> Signature.Public_key_hash.t -> pk tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> pk tzresult Lwt.t
 
 (** Returns the active consensus key for the current cycle. *)
-val active_key :
-  Raw_context.t -> Signature.Public_key_hash.t -> t tzresult Lwt.t
+val active_key : Raw_context.t -> Implicit_account_repr.t -> t tzresult Lwt.t
 
 (** Returns the active consensus key for the given cycle. *)
 val active_pubkey_for_cycle :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Cycle_repr.t ->
-  pk tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> Cycle_repr.t -> pk tzresult Lwt.t
 
 (** Returns the list of pending consensus-key updates in upcoming cycles. *)
 val pending_updates :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   (Cycle_repr.t * Signature.Public_key_hash.t * Signature.Public_key.t) list
   tzresult
   Lwt.t
@@ -116,20 +112,20 @@ val pending_updates :
 (** Returns the list of pending companion key updates in upcoming cycles. *)
 val pending_companion_updates :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   (Cycle_repr.t * Bls.Public_key_hash.t * Bls.Public_key.t) list tzresult Lwt.t
 
 (** Register a consensus-key update. *)
 val register_update :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Signature.Public_key.t ->
   Raw_context.t tzresult Lwt.t
 
 (** Register a companion-key update. *)
 val register_update_companion :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Bls.Public_key.t ->
   Raw_context.t tzresult Lwt.t
 

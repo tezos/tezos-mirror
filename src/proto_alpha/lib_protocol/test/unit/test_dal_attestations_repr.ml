@@ -674,7 +674,8 @@ let test_non_decodable_correct_size () =
     let open Account in
     Alpha_context.Consensus_key.
       {
-        delegate = dummy_account.pkh;
+        (* FIXME-PA *)
+        delegate = Implicit_account_repr.Forbidden.of_pkh dummy_account.pkh;
         consensus_pk = dummy_account.pk;
         consensus_pkh = dummy_account.pkh;
         companion_pk = None;
@@ -709,7 +710,7 @@ let test_non_decodable_correct_size () =
   let accountability =
     Dal_attestations_repr.Accountability.init ~number_of_slots ~number_of_lags
   in
-  let delegate = Signature.Public_key_hash.zero in
+  let delegate = Implicit_account_repr.zero in
   let attested_level = Raw_level_repr.of_int32_exn 100l in
   let result =
     Dal_attestations_repr.Accountability.record_number_of_attested_shards

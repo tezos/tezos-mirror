@@ -113,7 +113,11 @@ let check_all_bakers_attested ~kind =
            Format.pp_print_string)
         (List.map
            (fun (x : Protocol.Alpha_context.Consensus_key.t) ->
-             fst (State.find_account_from_pkh x.delegate state))
+             fst
+               (State.find_account_from_pkh
+                  (* FIXME-PA *)
+                  (Protocol.Implicit_account_repr.Forbidden.to_pkh x.delegate)
+                  state))
            active_bakers) ;
       let active_bakers_tz4, active_bakers_non_tz4 =
         List.partition
@@ -126,7 +130,8 @@ let check_all_bakers_attested ~kind =
           (fun (x : Protocol.Alpha_context.Consensus_key.t) ->
             check_attestation_metadata
               ~kind
-              x.delegate
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.to_pkh x.delegate)
               x.consensus_pkh
               (Stdlib.Option.get state.State.previous_metadata)
               (block, state))

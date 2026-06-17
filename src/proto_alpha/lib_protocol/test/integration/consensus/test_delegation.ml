@@ -80,7 +80,11 @@ let bootstrap_manager_is_bootstrap_delegate () =
   let* b, bootstrap0 = Context.init1 () in
   let* delegate0 = Context.Contract.delegate (B b) bootstrap0 in
   let* manager0 = Context.Contract.manager (B b) bootstrap0 in
-  Assert.equal_pkh ~loc:__LOC__ delegate0 manager0.pkh
+  (* FIXME-PA *)
+  Assert.equal_pkh
+    ~loc:__LOC__
+    delegate0
+    (Implicit_account_repr.Forbidden.of_pkh manager0.pkh)
 
 (** Bootstrap contracts cannot change their delegate. *)
 let bootstrap_delegate_cannot_change ~fee () =
@@ -92,7 +96,14 @@ let bootstrap_delegate_cannot_change ~fee () =
   let* balance0 = Context.Contract.balance (I i) bootstrap0 in
   let* delegate0 = Context.Contract.delegate (I i) bootstrap0 in
   (* change delegation to bootstrap1 *)
-  let* set_delegate = Op.delegation ~fee (I i) bootstrap0 (Some manager1.pkh) in
+  (* FIXME-PA *)
+  let* set_delegate =
+    Op.delegation
+      ~fee
+      (I i)
+      bootstrap0
+      (Some (Implicit_account_repr.Forbidden.of_pkh manager1.pkh))
+  in
   if fee > balance0 then expect_too_low_balance_error i set_delegate
   else
     let* i =
@@ -124,7 +135,9 @@ let bootstrap_delegate_cannot_be_removed ~fee () =
     let* i =
       Incremental.add_operation
         ~expect_apply_failure:
-          (expect_no_change_registered_delegate_pkh manager.pkh)
+          (* FIXME-PA *)
+          (expect_no_change_registered_delegate_pkh
+             (Implicit_account_repr.Forbidden.of_pkh manager.pkh))
         i
         set_delegate
     in
@@ -142,7 +155,10 @@ let delegate_can_be_changed_from_unregistered_contract ~fee () =
     Context.init2 ~consensus_threshold_size:0 ()
   in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let unregistered = Contract.Implicit unregistered_pkh in
   let* manager0 = Context.Contract.manager (B b) bootstrap0 in
   let* manager1 = Context.Contract.manager (B b) bootstrap1 in
@@ -159,14 +175,27 @@ let delegate_can_be_changed_from_unregistered_contract ~fee () =
       ~fee:Tez.zero
       (B b)
       unregistered
-      (Some manager0.pkh)
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh manager0.pkh))
   in
   let* b = Block.bake b ~operation:set_delegate in
   let* delegate = Context.Contract.delegate (B b) unregistered in
-  let* () = Assert.equal_pkh ~loc:__LOC__ delegate manager0.pkh in
+  (* FIXME-PA *)
+  let* () =
+    Assert.equal_pkh
+      ~loc:__LOC__
+      delegate
+      (Implicit_account_repr.Forbidden.of_pkh manager0.pkh)
+  in
   (* change delegation to bootstrap1 *)
   let* change_delegate =
-    Op.delegation ~force_reveal:true ~fee (B b) unregistered (Some manager1.pkh)
+    (* FIXME-PA *)
+    Op.delegation
+      ~force_reveal:true
+      ~fee
+      (B b)
+      unregistered
+      (Some (Implicit_account_repr.Forbidden.of_pkh manager1.pkh))
   in
   let* i = Incremental.begin_construction b in
   if fee > balance then expect_too_low_balance_error i change_delegate
@@ -174,7 +203,13 @@ let delegate_can_be_changed_from_unregistered_contract ~fee () =
     let* i = Incremental.add_operation i change_delegate in
     (* delegate has changed *)
     let* delegate_after = Context.Contract.delegate (I i) unregistered in
-    let* () = Assert.equal_pkh ~loc:__LOC__ delegate_after manager1.pkh in
+    let* () =
+      Assert.equal_pkh
+        ~loc:__LOC__
+        delegate_after
+        (* FIXME-PA *)
+        (Implicit_account_repr.Forbidden.of_pkh manager1.pkh)
+    in
     (* fee has been debited *)
     Assert.balance_was_debited ~loc:__LOC__ (I i) unregistered credit fee
 
@@ -184,7 +219,10 @@ let delegate_can_be_removed_from_unregistered_contract ~fee () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let unregistered = Contract.Implicit unregistered_pkh in
   let* manager = Context.Contract.manager (B b) bootstrap in
   let credit = of_int 10 in
@@ -206,11 +244,18 @@ let delegate_can_be_removed_from_unregistered_contract ~fee () =
       ~fee:Tez.zero
       (B b)
       unregistered
-      (Some manager.pkh)
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh manager.pkh))
   in
   let* b = Block.bake b ~operation:set_delegate in
   let* delegate = Context.Contract.delegate (B b) unregistered in
-  let* () = Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh in
+  let* () =
+    Assert.equal_pkh
+      ~loc:__LOC__
+      delegate
+      (* FIXME-PA *)
+      (Implicit_account_repr.Forbidden.of_pkh manager.pkh)
+  in
   (* remove delegation *)
   let* delete_delegate = Op.delegation ~fee (B b) unregistered None in
   let* i = Incremental.begin_construction b in
@@ -233,7 +278,8 @@ let bootstrap_manager_already_registered_delegate ~fee () =
   let* b, bootstrap = Context.init1 () in
   let* i = Incremental.begin_construction b in
   let* manager = Context.Contract.manager (I i) bootstrap in
-  let pkh = manager.pkh in
+  (* FIXME-PA *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh manager.pkh in
   let impl_contract = Contract.Implicit pkh in
   let* balance = Context.Contract.balance (I i) impl_contract in
   let* sec_reg = Op.delegation ~fee (I i) impl_contract (Some pkh) in
@@ -265,8 +311,8 @@ let delegate_to_bootstrap_by_origination ~fee () =
   let* op, orig_contract =
     Op.contract_origination
       ~fee
-      ~credit:Tez.zero
-      ~delegate:manager.pkh
+      ~credit:Tez.zero (* FIXME-PA *)
+      ~delegate:(Implicit_account_repr.Forbidden.of_pkh manager.pkh)
       (I i)
       bootstrap
       ~script:Op.dummy_script
@@ -308,7 +354,13 @@ let delegate_to_bootstrap_by_origination ~fee () =
     (* bootstrap is delegate, fee + origination burn have been debited *)
     let* i = Incremental.add_operation i op in
     let* delegate = Context.Contract.delegate (I i) orig_contract in
-    let* () = Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh in
+    let* () =
+      Assert.equal_pkh
+        ~loc:__LOC__
+        delegate
+        (* FIXME-PA *)
+        (Implicit_account_repr.Forbidden.of_pkh manager.pkh)
+    in
     Assert.balance_was_debited ~loc:__LOC__ (I i) bootstrap balance total_fee
 
 let undelegated_originated_bootstrap_contract () =
@@ -340,12 +392,15 @@ let undelegated_originated_bootstrap_contract () =
 let delegated_implicit_bootstrap_contract () =
   let open Lwt_result_wrap_syntax in
   let*? accounts = Account.generate_accounts 2 in
-  let to_pkh, from_pkh =
+  let to_pkh_sig, from_pkh_sig =
     match accounts with
     | [account1; account2] -> (account1.pkh, account2.pkh)
     | _ -> assert false
   in
-  let bootstrap_delegations = [None; Some to_pkh] in
+  (* FIXME-PA *)
+  let to_pkh = Implicit_account_repr.Forbidden.of_pkh to_pkh_sig in
+  let from_pkh = Implicit_account_repr.Forbidden.of_pkh from_pkh_sig in
+  let bootstrap_delegations = [None; Some to_pkh_sig] in
   let bootstrap_accounts =
     Account.make_bootstrap_accounts ~bootstrap_delegations accounts
   in
@@ -513,7 +568,10 @@ let test_unregistered_delegate_key_init_origination ~fee () =
   let* b, bootstrap = Context.init1 () in
   let* i = Incremental.begin_construction b in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   (* origination with delegate argument *)
   let* op, orig_contract =
     Op.contract_origination
@@ -556,10 +614,17 @@ let test_unregistered_delegate_key_init_delegation ~fee () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   let unregistered_delegate_account = Account.new_account () in
-  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_delegate_pkh =
+    Implicit_account_repr.Forbidden.of_pkh
+      Account.(unregistered_delegate_account.pkh)
+  in
   (* initial credit for the delegated contract *)
   let credit = of_int 10 in
   let* credit_contract =
@@ -611,10 +676,17 @@ let test_unregistered_delegate_key_switch_delegation ~fee () =
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   let unregistered_delegate_account = Account.new_account () in
-  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_delegate_pkh =
+    Implicit_account_repr.Forbidden.of_pkh
+      Account.(unregistered_delegate_account.pkh)
+  in
   (* initial credit for the delegated contract *)
   let credit = of_int 10 in
   let* init_credit =
@@ -668,7 +740,10 @@ let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   (* credit + check balance *)
   let* create_contract =
@@ -710,10 +785,17 @@ let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   let unregistered_delegate_account = Account.new_account () in
-  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_delegate_pkh =
+    Implicit_account_repr.Forbidden.of_pkh
+      Account.(unregistered_delegate_account.pkh)
+  in
   (* credit + check balance *)
   let* create_contract =
     Op.transaction
@@ -769,10 +851,17 @@ let test_unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   let unregistered_delegate_account = Account.new_account () in
-  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_delegate_pkh =
+    Implicit_account_repr.Forbidden.of_pkh
+      Account.(unregistered_delegate_account.pkh)
+  in
   (* credit + check balance *)
   let* create_contract =
     Op.transaction
@@ -836,7 +925,10 @@ let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   (* credit + check balance *)
   let* create_contract =
@@ -885,10 +977,17 @@ let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   let unregistered_delegate_account = Account.new_account () in
-  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_delegate_pkh =
+    Implicit_account_repr.Forbidden.of_pkh
+      Account.(unregistered_delegate_account.pkh)
+  in
   (* credit + check balance *)
   let* create_contract =
     Op.transaction
@@ -956,10 +1055,17 @@ let test_unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   let unregistered_delegate_account = Account.new_account () in
-  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_delegate_pkh =
+    Implicit_account_repr.Forbidden.of_pkh
+      Account.(unregistered_delegate_account.pkh)
+  in
   (* credit + check balance *)
   let* create_contract =
     Op.transaction
@@ -1027,7 +1133,10 @@ let test_failed_self_delegation_no_transaction () =
   let* b, _contract = Context.init1 () in
   let* i = Incremental.begin_construction b in
   let account = Account.new_account () in
-  let unregistered_pkh = Account.(account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   (* check balance *)
   let* balance = Context.Contract.balance (I i) impl_contract in
@@ -1046,7 +1155,10 @@ let test_failed_self_delegation_emptied_implicit_contract amount () =
   (* create an implicit contract *)
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
-  let unregistered_pkh = Account.(account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   (*  credit implicit contract and check balance *)
   let* create_contract =
@@ -1076,7 +1188,10 @@ let test_emptying_delegated_implicit_contract_fails amount () =
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let* bootstrap_manager = Context.Contract.manager (B b) bootstrap in
   let account = Account.new_account () in
-  let unregistered_pkh = Account.(account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(account.pkh)
+  in
   let impl_contract = Contract.Implicit unregistered_pkh in
   (* credit unregistered implicit contract and check balance *)
   let* create_contract =
@@ -1090,7 +1205,8 @@ let test_emptying_delegated_implicit_contract_fails amount () =
       ~force_reveal:true
       (B b)
       impl_contract
-      (Some bootstrap_manager.pkh)
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh bootstrap_manager.pkh))
   in
   let* b = Block.bake ~operation:delegation b in
   (* empty implicit contract and expect error since the contract is delegated *)
@@ -1116,7 +1232,10 @@ let test_valid_delegate_registration_init_delegation_credit amount () =
   (* create an implicit contract *)
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let delegate_account = Account.new_account () in
-  let delegate_pkh = Account.(delegate_account.pkh) in
+  (* FIXME-PA *)
+  let delegate_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(delegate_account.pkh)
+  in
   let impl_contract = Contract.Implicit delegate_pkh in
   (* credit > 0ꜩ + check balance *)
   let* create_contract =
@@ -1133,7 +1252,10 @@ let test_valid_delegate_registration_init_delegation_credit amount () =
   let* () = Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh in
   (* create an implicit contract with no delegate *)
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let delegator = Contract.Implicit unregistered_pkh in
   let* credit_contract =
     Op.transaction ~fee:Tez.zero (B b) bootstrap delegator Tez.one
@@ -1148,7 +1270,12 @@ let test_valid_delegate_registration_init_delegation_credit amount () =
   in
   (* delegation to the newly registered key *)
   let* delegation =
-    Op.delegation ~force_reveal:true (B b) delegator (Some delegate_account.pkh)
+    Op.delegation
+      ~force_reveal:true
+      (B b)
+      delegator
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh delegate_account.pkh))
   in
   let* b = Block.bake ~operation:delegation b in
   (* check delegation *)
@@ -1164,7 +1291,10 @@ let test_valid_delegate_registration_switch_delegation_credit amount () =
   (* create an implicit contract *)
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let delegate_account = Account.new_account () in
-  let delegate_pkh = Account.(delegate_account.pkh) in
+  (* FIXME-PA *)
+  let delegate_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(delegate_account.pkh)
+  in
   let impl_contract = Contract.Implicit delegate_pkh in
   (* credit > 0ꜩ + check balance *)
   let* create_contract =
@@ -1181,7 +1311,10 @@ let test_valid_delegate_registration_switch_delegation_credit amount () =
   let* () = Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh in
   (* create an implicit contract with bootstrap's account as delegate *)
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let delegator = Contract.Implicit unregistered_pkh in
   let* credit_contract =
     Op.transaction ~fee:Tez.zero (B b) bootstrap delegator Tez.one
@@ -1193,16 +1326,27 @@ let test_valid_delegate_registration_switch_delegation_credit amount () =
       ~force_reveal:true
       (B b)
       delegator
-      (Some bootstrap_manager.pkh)
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh bootstrap_manager.pkh))
   in
   let* b = Block.bake ~operation:delegation b in
   (* test delegate of new contract is bootstrap *)
   let* delegator_delegate = Context.Contract.delegate (B b) delegator in
   let* () =
-    Assert.equal_pkh ~loc:__LOC__ delegator_delegate bootstrap_manager.pkh
+    (* FIXME-PA *)
+    Assert.equal_pkh
+      ~loc:__LOC__
+      delegator_delegate
+      (Implicit_account_repr.Forbidden.of_pkh bootstrap_manager.pkh)
   in
   (* delegation with newly registered key *)
-  let* delegation = Op.delegation (B b) delegator (Some delegate_account.pkh) in
+  let* delegation =
+    Op.delegation
+      (B b)
+      delegator
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh delegate_account.pkh))
+  in
   let* b = Block.bake ~operation:delegation b in
   let* delegator_delegate = Context.Contract.delegate (B b) delegator in
   Assert.equal_pkh ~loc:__LOC__ delegator_delegate delegate_pkh
@@ -1213,7 +1357,10 @@ let test_valid_delegate_registration_init_delegation_credit_debit amount () =
   (* create an implicit contract *)
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let delegate_account = Account.new_account () in
-  let delegate_pkh = Account.(delegate_account.pkh) in
+  (* FIXME-PA *)
+  let delegate_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(delegate_account.pkh)
+  in
   let impl_contract = Contract.Implicit delegate_pkh in
   (* credit > 0ꜩ+ check balance *)
   let* create_contract =
@@ -1240,7 +1387,10 @@ let test_valid_delegate_registration_init_delegation_credit_debit amount () =
   let* () = Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate in
   (* create an implicit contract with no delegate *)
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let delegator = Contract.Implicit unregistered_pkh in
   let* credit_contract =
     Op.transaction ~fee:Tez.zero (B b) bootstrap delegator Tez.one
@@ -1255,7 +1405,12 @@ let test_valid_delegate_registration_init_delegation_credit_debit amount () =
   in
   (* delegation to the newly registered key *)
   let* delegation =
-    Op.delegation ~force_reveal:true (B b) delegator (Some delegate_account.pkh)
+    Op.delegation
+      ~force_reveal:true
+      (B b)
+      delegator
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh delegate_account.pkh))
   in
   let* b = Block.bake ~operation:delegation b in
   (* check delegation *)
@@ -1272,7 +1427,10 @@ let test_valid_delegate_registration_switch_delegation_credit_debit amount () =
   (* create an implicit contract *)
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let delegate_account = Account.new_account () in
-  let delegate_pkh = Account.(delegate_account.pkh) in
+  (* FIXME-PA *)
+  let delegate_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(delegate_account.pkh)
+  in
   let impl_contract = Contract.Implicit delegate_pkh in
   (* credit > 0ꜩ + check balance *)
   let* create_contract =
@@ -1296,7 +1454,10 @@ let test_valid_delegate_registration_switch_delegation_credit_debit amount () =
   let* () = Assert.balance_is ~loc:__LOC__ (B b) impl_contract Tez.zero in
   (* create an implicit contract with bootstrap's account as delegate *)
   let unregistered_account = Account.new_account () in
-  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  (* FIXME-PA *)
+  let unregistered_pkh =
+    Implicit_account_repr.Forbidden.of_pkh Account.(unregistered_account.pkh)
+  in
   let delegator = Contract.Implicit unregistered_pkh in
   let* credit_contract =
     Op.transaction ~fee:Tez.zero (B b) bootstrap delegator Tez.one
@@ -1308,17 +1469,27 @@ let test_valid_delegate_registration_switch_delegation_credit_debit amount () =
       ~force_reveal:true
       (B b)
       delegator
-      (Some bootstrap_manager.pkh)
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh bootstrap_manager.pkh))
   in
   let* b = Block.bake ~operation:delegation b in
   (* test delegate of new contract is bootstrap *)
   let* delegator_delegate = Context.Contract.delegate (B b) delegator in
   let* () =
-    Assert.equal_pkh ~loc:__LOC__ delegator_delegate bootstrap_manager.pkh
+    (* FIXME-PA *)
+    Assert.equal_pkh
+      ~loc:__LOC__
+      delegator_delegate
+      (Implicit_account_repr.Forbidden.of_pkh bootstrap_manager.pkh)
   in
   (* delegation with newly registered key *)
   let* delegation =
-    Op.delegation ~force_reveal:true (B b) delegator (Some delegate_account.pkh)
+    Op.delegation
+      ~force_reveal:true
+      (B b)
+      delegator
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh delegate_account.pkh))
   in
   let* b = Block.bake ~operation:delegation b in
   let* delegator_delegate = Context.Contract.delegate (B b) delegator in
@@ -1333,7 +1504,8 @@ let test_double_registration () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
-  let pkh = Account.(account.pkh) in
+  (* FIXME-PA *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh Account.(account.pkh) in
   let impl_contract = Contract.Implicit pkh in
   (* credit 1μꜩ+ check balance *)
   let* create_contract =
@@ -1362,7 +1534,8 @@ let test_double_registration_when_empty () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
-  let pkh = Account.(account.pkh) in
+  (* FIXME-PA *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh Account.(account.pkh) in
   let impl_contract = Contract.Implicit pkh in
   (* credit 1μꜩ+ check balance *)
   let* create_contract =
@@ -1397,7 +1570,8 @@ let test_double_registration_when_recredited () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
-  let pkh = Account.(account.pkh) in
+  (* FIXME-PA *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh Account.(account.pkh) in
   let impl_contract = Contract.Implicit pkh in
   (* credit 1μꜩ+ check balance *)
   let* create_contract =
@@ -1441,8 +1615,11 @@ let test_double_registration_when_recredited () =
 let test_unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
-  let {Account.pkh; _} = Account.new_account () in
-  let {Account.pkh = delegate_pkh; _} = Account.new_account () in
+  let acct1 = Account.new_account () in
+  let acct2 = Account.new_account () in
+  (* FIXME-PA *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh acct1.Account.pkh in
+  let delegate_pkh = Implicit_account_repr.Forbidden.of_pkh acct2.Account.pkh in
   let contract = Alpha_context.Contract.Implicit pkh in
   let* operation =
     Op.transaction ~force_reveal:true (B b) bootstrap contract (of_int 10)
@@ -1468,8 +1645,12 @@ let test_unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
 let test_unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
-  let {Account.pkh; pk; _} = Account.new_account () in
-  let {Account.pkh = delegate_pkh; _} = Account.new_account () in
+  let acct1 = Account.new_account () in
+  let acct2 = Account.new_account () in
+  let pk = acct1.Account.pk in
+  (* FIXME-PA *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh acct1.Account.pkh in
+  let delegate_pkh = Implicit_account_repr.Forbidden.of_pkh acct2.Account.pkh in
   let contract = Alpha_context.Contract.Implicit pkh in
   let* operation = Op.transaction (B b) bootstrap contract (of_int 10) in
   let* b = Block.bake ~operation b in
@@ -1493,8 +1674,12 @@ let test_unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
 let test_self_delegation_emptying_contract () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
-  let {Account.pkh; pk; _} = Account.new_account () in
-  let {Account.pkh = delegate_pkh; _} = Account.new_account () in
+  let acct1 = Account.new_account () in
+  let acct2 = Account.new_account () in
+  let pk = acct1.Account.pk in
+  (* FIXME-PA *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh acct1.Account.pkh in
+  let delegate_pkh = Implicit_account_repr.Forbidden.of_pkh acct2.Account.pkh in
   let contract = Alpha_context.Contract.Implicit pkh in
   let amount = of_int 10 in
   let* operation = Op.transaction (B b) bootstrap contract amount in
@@ -1525,10 +1710,12 @@ let test_self_delegation_emptying_contract () =
 let test_registered_self_delegate_key_init_delegation () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
-  let {Account.pkh; _} = Account.new_account () in
-  let {Account.pkh = delegate_pkh; pk = delegate_pk; _} =
-    Account.new_account ()
-  in
+  let acct1 = Account.new_account () in
+  let acct2 = Account.new_account () in
+  let delegate_pk = acct2.Account.pk in
+  (* FIXME-PA *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh acct1.Account.pkh in
+  let delegate_pkh = Implicit_account_repr.Forbidden.of_pkh acct2.Account.pkh in
   let contract = Alpha_context.Contract.Implicit pkh in
   let delegate_contract = Alpha_context.Contract.Implicit delegate_pkh in
   let* operation =
@@ -1554,10 +1741,12 @@ let test_registered_self_delegate_key_init_delegation () =
 let test_bls_account_self_delegate () =
   let open Lwt_result_syntax in
   let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
-  let {Account.pkh = tz4_pkh; pk = tz4_pk; _} =
-    Account.new_account ~algo:Bls ()
-  in
-  let tz4_contract = Alpha_context.Contract.Implicit tz4_pkh in
+  let tz4_acct = Account.new_account ~algo:Bls () in
+  let tz4_pk = tz4_acct.Account.pk in
+  let tz4_pkh_sig = tz4_acct.Account.pkh in
+  (* FIXME-PA *)
+  let tz4_pkh_impl = Implicit_account_repr.Forbidden.of_pkh tz4_pkh_sig in
+  let tz4_contract = Alpha_context.Contract.Implicit tz4_pkh_impl in
   let* operation =
     Op.transaction
       ~force_reveal:true
@@ -1569,7 +1758,7 @@ let test_bls_account_self_delegate () =
   let* b = Block.bake ~operation b in
   let* operation = Op.revelation (B b) tz4_pk in
   let* b = Block.bake ~operation b in
-  let* operation = Op.delegation (B b) tz4_contract (Some tz4_pkh) in
+  let* operation = Op.delegation (B b) tz4_contract (Some tz4_pkh_impl) in
   let* inc = Incremental.begin_construction b in
   let* (_i : Incremental.t) = Incremental.validate_operation inc operation in
   return_unit
@@ -1579,10 +1768,12 @@ let test_mldsa44_account_self_delegate () =
   let* b, bootstrap =
     Context.init1 ~tz5_account_enable:true ~consensus_threshold_size:0 ()
   in
-  let {Account.pkh = tz5_pkh; pk = tz5_pk; _} =
-    Account.new_account ~algo:Mldsa44 ()
-  in
-  let tz5_contract = Alpha_context.Contract.Implicit tz5_pkh in
+  let tz5_acct = Account.new_account ~algo:Mldsa44 () in
+  let tz5_pk = tz5_acct.Account.pk in
+  let tz5_pkh_sig = tz5_acct.Account.pkh in
+  (* FIXME-PA *)
+  let tz5_pkh_impl = Implicit_account_repr.Forbidden.of_pkh tz5_pkh_sig in
+  let tz5_contract = Alpha_context.Contract.Implicit tz5_pkh_impl in
   let* operation =
     Op.transaction
       ~force_reveal:true
@@ -1594,9 +1785,11 @@ let test_mldsa44_account_self_delegate () =
   let* b = Block.bake ~operation b in
   let* operation = Op.revelation (B b) tz5_pk in
   let* b = Block.bake ~operation b in
-  let* operation = Op.delegation (B b) tz5_contract (Some tz5_pkh) in
+  let* operation = Op.delegation (B b) tz5_contract (Some tz5_pkh_impl) in
   let* inc = Incremental.begin_construction b in
-  let tz5_pkh = match tz5_pkh with Mldsa44 pkh -> pkh | _ -> assert false in
+  let tz5_pkh =
+    match tz5_pkh_sig with Mldsa44 pkh -> pkh | _ -> assert false
+  in
   let expect_failure = function
     | [
         Environment.Ecoproto_error

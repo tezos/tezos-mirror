@@ -596,8 +596,9 @@ end = struct
              in
              {id; amount = Z.zero});
           l1_dst =
+            (* FIXME-PA *)
             Data_encoding.Binary.of_bytes_exn
-              Signature.Public_key_hash.encoding
+              Protocol.Implicit_account_repr.encoding
               dummy_l1_dst;
           rollup_id =
             Data_encoding.Binary.of_bytes_exn

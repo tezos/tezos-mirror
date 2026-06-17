@@ -13,24 +13,24 @@
    We need to distinguish these cases to enforce the staking over baking
    limit. *)
 type t = private
-  | Baker of Signature.public_key_hash  (** The baker itself. *)
+  | Baker of Implicit_account_repr.t  (** The baker itself. *)
   | Single_staker of {
       staker : Contract_repr.t;
-      delegate : Signature.public_key_hash;
+      delegate : Implicit_account_repr.t;
     }  (** A single staker, cannot be the delegate. *)
-  | Shared_between_stakers of {delegate : Signature.public_key_hash}
+  | Shared_between_stakers of {delegate : Implicit_account_repr.t}
       (** The delegate's stakers simultaneously (delegate excluded). *)
-  | Baker_edge of Signature.public_key_hash
+  | Baker_edge of Implicit_account_repr.t
       (** The baker edge over its stakers rewards. *)
 
-val baker : Signature.public_key_hash -> t
+val baker : Implicit_account_repr.t -> t
 
-val baker_edge : Signature.public_key_hash -> t
+val baker_edge : Implicit_account_repr.t -> t
 
 val single_staker :
-  staker:Contract_repr.t -> delegate:Signature.public_key_hash -> t
+  staker:Contract_repr.t -> delegate:Implicit_account_repr.t -> t
 
-val shared_between_stakers : delegate:Signature.public_key_hash -> t
+val shared_between_stakers : delegate:Implicit_account_repr.t -> t
 
 val encoding : t Data_encoding.t
 

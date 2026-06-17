@@ -474,7 +474,8 @@ let make_chunk state_hash tick = {state_hash; tick}
 
 let initial inbox dal_snapshot ~start_level
     ~(parent_commitment : Sc_rollup_commitment_repr.t)
-    ~(defender_commitment : Sc_rollup_commitment_repr.t) ~refuter ~defender
+    ~(defender_commitment : Sc_rollup_commitment_repr.t)
+    ~(refuter : Implicit_account_repr.t) ~(defender : Implicit_account_repr.t)
     ~default_number_of_sections =
   let ({alice; _} : Index.t) = Index.make refuter defender in
   let alice_to_play = Staker.equal alice refuter in

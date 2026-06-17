@@ -316,8 +316,8 @@ val initial :
   start_level:Raw_level_repr.t ->
   parent_commitment:Sc_rollup_commitment_repr.t ->
   defender_commitment:Sc_rollup_commitment_repr.t ->
-  refuter:Signature.public_key_hash ->
-  defender:Signature.public_key_hash ->
+  refuter:Implicit_account_repr.t ->
+  defender:Implicit_account_repr.t ->
   default_number_of_sections:int ->
   t
 

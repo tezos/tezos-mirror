@@ -69,7 +69,7 @@ let commitments =
     ]
 
 type secret_account = {
-  account : public_key_hash;
+  account : Implicit_account_repr.t;
   activation_code : Blinded_public_key_hash.activation_code;
   amount : Tez.t;
 }
@@ -102,7 +102,8 @@ let secrets () =
       let account = Account.{pkh; pk; sk} in
       Account.add_account account ;
       {
-        account = account.pkh;
+        (* FIXME-PA *)
+        account = Implicit_account_repr.Forbidden.of_pkh account.pkh;
         activation_code =
           Stdlib.Option.get
             (Blinded_public_key_hash.activation_code_of_hex secret);
@@ -361,7 +362,13 @@ let test_single_activation () =
   let* () =
     Assert.balance_is ~loc:__LOC__ (B blk) (Contract.Implicit account) Tez.zero
   in
-  let* operation = Op.activation (B blk) account activation_code in
+  (* FIXME-PA *)
+  let* operation =
+    Op.activation
+      (B blk)
+      (Implicit_account_repr.Forbidden.to_pkh account)
+      activation_code
+  in
   let* blk = Block.bake ~operation blk in
   (* Contract does exist *)
   Assert.balance_is
@@ -377,7 +384,13 @@ let test_multi_activation_1 () =
   let* (_ : Block.t) =
     List.fold_left_es
       (fun blk {account; activation_code; amount = expected_amount; _} ->
-        let* operation = Op.activation (B blk) account activation_code in
+        (* FIXME-PA *)
+        let* operation =
+          Op.activation
+            (B blk)
+            (Implicit_account_repr.Forbidden.to_pkh account)
+            activation_code
+        in
         let* blk = Block.bake ~operation blk in
         let+ () =
           Assert.balance_is
@@ -399,7 +412,14 @@ let test_multi_activation_2 () =
   let* ops =
     List.fold_left_es
       (fun ops {account; activation_code; _} ->
-        let+ op = Op.activation (B blk) account activation_code in
+        (* FIXME-PA *)
+        let+ op =
+          Op.activation
+            (B blk)
+            (* FIXME-PA *)
+            (Implicit_account_repr.Forbidden.to_pkh account)
+            activation_code
+        in
         op :: ops)
       []
       secrets
@@ -423,7 +443,13 @@ let test_activation_and_transfer () =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
   let first_contract = Contract.Implicit account in
-  let* operation = Op.activation (B blk) account activation_code in
+  (* FIXME-PA *)
+  let* operation =
+    Op.activation
+      (B blk)
+      (Implicit_account_repr.Forbidden.to_pkh account)
+      activation_code
+  in
   let* blk = Block.bake ~operation blk in
   let* amount = Context.Contract.balance (B blk) bootstrap_contract in
   let half_amount = Tez_helpers.(amount /! 2L) in
@@ -460,7 +486,13 @@ let test_transfer_to_unactivated_then_activate () =
       b_half_amount
   in
   let* inc = Incremental.add_operation inc op in
-  let* op' = Op.activation (I inc) account activation_code in
+  (* FIXME-PA *)
+  let* op' =
+    Op.activation
+      (I inc)
+      (Implicit_account_repr.Forbidden.to_pkh account)
+      activation_code
+  in
   let* inc = Incremental.add_operation inc op' in
   let* blk2 = Incremental.finalize_block inc in
   Assert.balance_was_credited
@@ -483,7 +515,13 @@ let test_invalid_activation_with_no_commitments () =
   let ({account; activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
-  let* operation = Op.activation (B blk) account activation_code in
+  (* FIXME-PA *)
+  let* operation =
+    Op.activation
+      (B blk)
+      (Implicit_account_repr.Forbidden.to_pkh account)
+      activation_code
+  in
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
     | Validate_errors.Anonymous.Invalid_activation _ -> true
@@ -499,7 +537,13 @@ let test_invalid_activation_wrong_secret () =
   let ({activation_code; _} as _second_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth secrets 1
   in
-  let* operation = Op.activation (B blk) account activation_code in
+  (* FIXME-PA *)
+  let* operation =
+    Op.activation
+      (B blk)
+      (Implicit_account_repr.Forbidden.to_pkh account)
+      activation_code
+  in
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
     | Validate_errors.Anonymous.Invalid_activation _ -> true
@@ -532,9 +576,21 @@ let test_invalid_double_activation () =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
   let* inc = Incremental.begin_construction blk in
-  let* op = Op.activation (I inc) account activation_code in
+  (* FIXME-PA *)
+  let* op =
+    Op.activation
+      (I inc)
+      (Implicit_account_repr.Forbidden.to_pkh account)
+      activation_code
+  in
   let* inc = Incremental.add_operation inc op in
-  let* op' = Op.activation (I inc) account activation_code in
+  (* FIXME-PA *)
+  let* op' =
+    Op.activation
+      (I inc)
+      (Implicit_account_repr.Forbidden.to_pkh account)
+      activation_code
+  in
   let*! res = Incremental.add_operation inc op' in
   Assert.proto_error ~loc:__LOC__ res (function
     | Validate_errors.Anonymous.Conflicting_activation _ -> true

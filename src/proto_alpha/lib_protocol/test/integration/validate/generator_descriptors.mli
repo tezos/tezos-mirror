@@ -50,8 +50,8 @@ type dbl_attestation_state = {
 type state = {
   block : Block.t;
   pred : Block.t option;
-  bootstraps : public_key_hash list;
-  delegates : (public_key_hash * public_key_hash option) list;
+  bootstraps : Implicit_account_repr.t list;
+  delegates : (Implicit_account_repr.t * Implicit_account_repr.t option) list;
   seed_nonce_to_reveal : (Raw_level.t * Nonce_hash.t) list;
   commitments : secret_account list;
   protocol_hashes : Protocol_hash.t list;

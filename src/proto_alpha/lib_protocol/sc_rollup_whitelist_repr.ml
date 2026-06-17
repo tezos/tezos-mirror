@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Signature.Public_key_hash.t list
+type t = Implicit_account_repr.t list
 
 let encoding =
   let open Data_encoding in
@@ -34,7 +34,7 @@ let encoding =
      update size (encoded in binary), where the encoding of a key is
      20 bytes long. *)
   check_size (Constants_repr.sc_rollup_message_size_limit - 2)
-  @@ list Signature.Public_key_hash.encoding
+  @@ list Implicit_account_repr.encoding
 
 let pp ppf =
   let open Format in
@@ -43,7 +43,7 @@ let pp ppf =
     "@[<hv>@[<hv 2>[@,%a@]@,]@]"
     (pp_print_list
        ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
-       Signature.Public_key_hash.pp_short)
+       Implicit_account_repr.pp_short)
 
 type last_whitelist_update = {
   message_index : Z.t;

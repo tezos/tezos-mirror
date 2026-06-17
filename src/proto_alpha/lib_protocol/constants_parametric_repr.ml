@@ -319,7 +319,7 @@ type t = {
   percentage_of_frozen_deposits_slashed_per_double_baking : Percentage.t;
   max_slashing_per_block : Percentage.t;
   max_slashing_threshold : Ratio_repr.t;
-  testnet_dictator : Signature.Public_key_hash.t option;
+  testnet_dictator : Implicit_account_repr.t option;
   initial_seed : State_hash.t option;
   (* If a new cache is added, please also modify the
      [cache_layout_size] value. *)
@@ -800,7 +800,7 @@ let encoding =
                       Percentage.encoding)
                    (req "max_slashing_per_block" Percentage.encoding)
                    (req "max_slashing_threshold" Ratio_repr.encoding)
-                   (opt "testnet_dictator" Signature.Public_key_hash.encoding)
+                   (opt "testnet_dictator" Implicit_account_repr.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
                    (obj5

@@ -33,14 +33,14 @@ type 'accu successful_operation_processor = {
   apply :
     'kind.
     'accu ->
-    source:public_key_hash ->
+    source:Implicit_account_repr.t ->
     'kind manager_operation ->
     'kind Apply_results.successful_manager_operation_result ->
     'accu;
   apply_internal :
     'kind.
     'accu ->
-    source:public_key_hash ->
+    source:Implicit_account_repr.t ->
     'kind Apply_internal_results.internal_operation ->
     'kind Apply_internal_results.successful_internal_operation_result ->
     'accu;
@@ -50,14 +50,14 @@ type 'accu operation_processor = {
   apply :
     'kind.
     'accu ->
-    source:public_key_hash ->
+    source:Implicit_account_repr.t ->
     'kind manager_operation ->
     'kind Apply_results.manager_operation_result ->
     'accu;
   apply_internal :
     'kind.
     'accu ->
-    source:public_key_hash ->
+    source:Implicit_account_repr.t ->
     'kind Apply_internal_results.internal_operation ->
     'kind Apply_internal_results.internal_operation_result ->
     'accu;

@@ -7,7 +7,7 @@
 
 module Selected_distribution_for_cycle = struct
   module Cache_client = struct
-    type cached_value = (Signature.Public_key_hash.t * Stake_repr.t) list
+    type cached_value = (Implicit_account_repr.t * Stake_repr.t) list
 
     let namespace = Cache_repr.create_namespace "stake_distribution"
 
@@ -81,8 +81,8 @@ let get_selected_distribution_as_map ctxt cycle =
   let* ctxt, stakes = Selected_distribution_for_cycle.get ctxt cycle in
   let stakes_map =
     List.fold_left
-      (fun map (pkh, stake) -> Signature.Public_key_hash.Map.add pkh stake map)
-      Signature.Public_key_hash.Map.empty
+      (fun map (pkh, stake) -> Implicit_account_repr.Map.add pkh stake map)
+      Implicit_account_repr.Map.empty
       stakes
   in
   return (ctxt, stakes_map)

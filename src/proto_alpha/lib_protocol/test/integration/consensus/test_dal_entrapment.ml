@@ -212,7 +212,12 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
     | None -> Test.fail ~__LOC__ "Unexpected case: there are no delegates"
     | Some (pkh, _) -> pkh
   in
-  let* attester = Context.get_attester ~manager_pkh:delegate (B blk) in
+  (* FIXME-PA *)
+  let* attester =
+    Context.get_attester
+      ~manager_pkh:(Implicit_account_repr.Forbidden.of_pkh delegate)
+      (B blk)
+  in
   let attesting_slot = Op.attesting_slot_of_attester attester in
   let* attestation = Op.raw_attestation blk ~attesting_slot ?dal_content in
   let consensus_slot = attesting_slot.slot in

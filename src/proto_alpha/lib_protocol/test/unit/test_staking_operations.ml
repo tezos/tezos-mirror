@@ -34,7 +34,8 @@ let originate_implicit_unrevealed_account b ?(amount = Tez_helpers.of_int 10)
     source =
   let open Lwt_result_syntax in
   let a = Account.new_account () in
-  let c = Contract.Implicit a.pkh in
+  (* FIXME-PA *)
+  let c = Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh a.pkh) in
   let* operation = Op.transaction (B b) ~fee:Tez.zero source c amount in
   let* b = Block.bake b ~operation in
   return (b, c)
@@ -72,6 +73,8 @@ let create_delegate_and_staker ~self_delegate_staker ?amount () =
   let pkh =
     if self_delegate_staker then staker_account.pkh else delegate_account.pkh
   in
+  (* FIXME-PA *)
+  let pkh = Implicit_account_repr.Forbidden.of_pkh pkh in
   let* set_delegate =
     Op.delegation ~force_reveal:true (B b) staker (Some pkh)
   in
@@ -151,7 +154,7 @@ let stake_low_spendable_balance ~self_delegate_staker =
     let*! b = Block.bake ~operation:stake b in
     Assert.proto_error ~loc:__LOC__ b (function
       | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
-          Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
+          Implicit_account_repr.equal c (Account.pkh_of_contract_exn staker)
       | _ -> false)
 
 let () =
@@ -212,7 +215,7 @@ let fee_low_spendable_balance_non_zero_staked ~self_delegate_staker =
     let*! b = Block.bake ~operation:unstake b in
     Assert.proto_error ~loc:__LOC__ b (function
       | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
-          Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
+          Implicit_account_repr.equal c (Account.pkh_of_contract_exn staker)
       | _ -> false)
 
 let () =
@@ -300,7 +303,7 @@ let fee_low_spendable_balance_non_zero_unfinalizable_unstake
     let*! b = Block.bake ~operation:finalize b in
     Assert.proto_error ~loc:__LOC__ b (function
       | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
-          Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
+          Implicit_account_repr.equal c (Account.pkh_of_contract_exn staker)
       | _ -> false)
 
 let () =
@@ -399,7 +402,7 @@ let fee_low_spendable_balance_non_zero_finalizable_unstake ~self_delegate_staker
     let*! b = Block.bake ~operation:finalize b in
     Assert.proto_error ~loc:__LOC__ b (function
       | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
-          Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
+          Implicit_account_repr.equal c (Account.pkh_of_contract_exn staker)
       | _ -> false)
 
 let () =
@@ -439,7 +442,12 @@ let finn_finalize_batch () =
     in
     let* delegate_account = Context.Contract.manager (B b) delegate in
     let* set_delegate =
-      Op.delegation ~force_reveal:true (B b) staker (Some delegate_account.pkh)
+      (* FIXME-PA *)
+      Op.delegation
+        ~force_reveal:true
+        (B b)
+        staker
+        (Some (Implicit_account_repr.Forbidden.of_pkh delegate_account.pkh))
     in
     let* b = Block.bake ~operation:set_delegate b in
     return (b, staker)
@@ -593,7 +601,12 @@ let finn_finalize_interferance () =
     in
     let* delegate_account = Context.Contract.manager (B b) delegate in
     let* set_delegate =
-      Op.delegation ~force_reveal:true (B b) staker (Some delegate_account.pkh)
+      (* FIXME-PA *)
+      Op.delegation
+        ~force_reveal:true
+        (B b)
+        staker
+        (Some (Implicit_account_repr.Forbidden.of_pkh delegate_account.pkh))
     in
     let* b = Block.bake ~operation:set_delegate b in
     return (b, staker)
@@ -692,7 +705,11 @@ let finn_finalize_interferance () =
   in
 
   (* Ensure finalising for an unallocated account doesn't cause the batch to fail. *)
-  let non_allocated_contract = Contract.Implicit (Account.new_account ()).pkh in
+  (* FIXME-PA *)
+  let non_allocated_contract =
+    Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh (Account.new_account ()).pkh)
+  in
   let* () =
     check_balances
       b

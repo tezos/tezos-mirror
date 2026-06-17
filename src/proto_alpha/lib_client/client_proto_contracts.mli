@@ -105,4 +105,4 @@ val get_delegate :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
-  public_key_hash option tzresult Lwt.t
+  Implicit_account_repr.t option tzresult Lwt.t

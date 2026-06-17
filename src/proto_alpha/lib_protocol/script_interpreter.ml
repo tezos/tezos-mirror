@@ -93,7 +93,7 @@ module S = Saturation_repr
 
 type step_constants = Script_typed_ir.step_constants = {
   sender : Destination.t;
-  payer : Signature.public_key_hash;
+  payer : Implicit_account_repr.t;
   self : Contract_hash.t;
   amount : Tez.t;
   balance : Tez.t;
@@ -1248,13 +1248,17 @@ module Raw = struct
               (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
           | IImplicit_account (_, k) ->
               let key = accu in
+              (* FIXME-PA tzx in Michelson *)
+              let key = Implicit_account_repr.Forbidden.of_pkh key in
               let res = Typed_implicit key in
               (step [@ocaml.tailcall]) g gas k ks res stack
           | IIs_implicit_account (_, k) ->
               let (address : address) = accu in
               let res =
                 match address.destination with
-                | Contract (Implicit pkh) -> Some pkh
+                | Contract (Implicit pkh) ->
+                    (* FIXME-PA tzx in Michelson *)
+                    Some (Implicit_account_repr.Forbidden.to_pkh pkh)
                 | _ -> None
               in
               (step [@ocaml.tailcall]) g gas k ks res stack
@@ -1286,6 +1290,10 @@ module Raw = struct
           | ICreate_contract {storage_type; code; k; loc = _} ->
               (* Removed the instruction's arguments manager, spendable and delegatable *)
               let delegate = accu in
+              (* FIXME-PA tzx in Michelson *)
+              let delegate =
+                Option.map Implicit_account_repr.Forbidden.of_pkh delegate
+              in
               let credit, (init, stack) = stack in
               let* res, contract, ctxt, gas =
                 create_contract g gas storage_type code delegate credit init
@@ -1297,6 +1305,10 @@ module Raw = struct
               (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
           | ISet_delegate (_, k) ->
               let delegate = accu in
+              (* FIXME-PA tzx in Michelson *)
+              let delegate =
+                Option.map Implicit_account_repr.Forbidden.of_pkh delegate
+              in
               let operation = Delegation delegate in
               let ctxt = update_context gas ctxt in
               let*? ctxt, nonce = fresh_internal_nonce ctxt in
@@ -1461,6 +1473,8 @@ module Raw = struct
           | INever _ -> ( match accu with _ -> .)
           | IVoting_power (_, k) ->
               let key_hash = accu in
+              (* FIXME-PA tzx in Michelson *)
+              let key_hash = Implicit_account_repr.Forbidden.of_pkh key_hash in
               let ctxt = update_context gas ctxt in
               let* ctxt, power = Vote.get_voting_power ctxt key_hash in
               let power = Script_int.(abs (of_int64 power)) in

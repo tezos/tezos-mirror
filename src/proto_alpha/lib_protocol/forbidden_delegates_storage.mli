@@ -12,11 +12,11 @@
 
 (** [is_forbidden ctxt delegate] returns [true] if the given [delegate]
     is forbidden to bake or attest. *)
-val is_forbidden : Raw_context.t -> Signature.Public_key_hash.t -> bool
+val is_forbidden : Raw_context.t -> Implicit_account_repr.t -> bool
 
 (** [forbid ctxt delegate] adds [delegate] to the set of forbidden
     delegates. *)
-val forbid : Raw_context.t -> Signature.public_key_hash -> Raw_context.t Lwt.t
+val forbid : Raw_context.t -> Implicit_account_repr.t -> Raw_context.t Lwt.t
 
 (** [load ctxt] reads from the storage the saved set of
     forbidden delegates and sets the raw context's in-memory cached value. *)

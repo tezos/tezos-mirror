@@ -6,8 +6,8 @@
 (*****************************************************************************)
 
 type t =
-  | Single of Contract_repr.t * Signature.public_key_hash
-  | Shared of Signature.public_key_hash
+  | Single of Contract_repr.t * Implicit_account_repr.t
+  | Shared of Implicit_account_repr.t
 
 let encoding =
   let open Data_encoding in
@@ -15,12 +15,10 @@ let encoding =
   let single_encoding =
     obj2
       (req "contract" Contract_repr.encoding)
-      (req "delegate" Signature.Public_key_hash.encoding)
+      (req "delegate" Implicit_account_repr.encoding)
   in
   let shared_tag = 1 in
-  let shared_encoding =
-    obj1 (req "delegate" Signature.Public_key_hash.encoding)
-  in
+  let shared_encoding = obj1 (req "delegate" Implicit_account_repr.encoding) in
   def
     ~title:"unstaked_frozen_staker"
     ~description:
@@ -54,8 +52,8 @@ let compare sa sb =
   match (sa, sb) with
   | Single (ca, da), Single (cb, db) ->
       Compare.or_else (Contract_repr.compare ca cb) (fun () ->
-          Signature.Public_key_hash.compare da db)
-  | Shared da, Shared db -> Signature.Public_key_hash.compare da db
+          Implicit_account_repr.compare da db)
+  | Shared da, Shared db -> Implicit_account_repr.compare da db
   | Single _, Shared _ -> -1
   | Shared _, Single _ -> 1
 

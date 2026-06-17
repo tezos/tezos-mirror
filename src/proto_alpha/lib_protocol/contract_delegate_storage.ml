@@ -27,7 +27,7 @@ let find = Storage.Contract.Delegate.find
 
 type delegate_status =
   | Delegate
-  | Delegated of Signature.Public_key_hash.t
+  | Delegated of Implicit_account_repr.t
   | Undelegated
 
 let get_delegate_status ctxt pkh =
@@ -35,7 +35,7 @@ let get_delegate_status ctxt pkh =
   let+ delegate = find ctxt (Contract_repr.Implicit pkh) in
   match delegate with
   | None -> Undelegated
-  | Some delegate when Signature.Public_key_hash.(delegate = pkh) -> Delegate
+  | Some delegate when Implicit_account_repr.(equal delegate pkh) -> Delegate
   | Some delegate -> Delegated delegate
 
 let is_delegate ctxt pkh =

@@ -43,7 +43,7 @@ val get_level : t -> Raw_level.t tzresult
 
 (** A delegate's keys and attesting slots at a given level. *)
 type attester = Plugin.RPC.Validators.delegate = {
-  delegate : Signature.public_key_hash;
+  delegate : Implicit_account_repr.t;
   consensus_key : Signature.public_key_hash;
   companion_key : Signature.Bls.Public_key_hash.t option;
   rounds : Round.t list;
@@ -61,13 +61,15 @@ val get_attesters : t -> attester list tzresult Lwt.t
     manager key ({!field-delegate}) and fails if there is no such
     attester. If [manager_pkh] is omitted, returns the first element
     of the output of {!get_attesters}. *)
-val get_attester : ?manager_pkh:public_key_hash -> t -> attester tzresult Lwt.t
+val get_attester :
+  ?manager_pkh:Implicit_account_repr.t -> t -> attester tzresult Lwt.t
 
 (** Return the two first elements of the list returns by [get_attesters]. *)
 val get_first_different_attesters : t -> (attester * attester) tzresult Lwt.t
 
 (** Return the [n]th element of the list returns by [get_attesters]. *)
-val get_attester_n : t -> int -> (public_key_hash * Round.t list) tzresult Lwt.t
+val get_attester_n :
+  t -> int -> (Implicit_account_repr.t * Round.t list) tzresult Lwt.t
 
 (** Whether the {!type-attester}'s **consensus key** is a BLS key. *)
 val attester_has_bls_key : attester -> bool
@@ -84,40 +86,51 @@ val get_attester_with_bls_key : t -> attester tzresult Lwt.t
     in the requested level. If ommited, [level] defaults to the next
     level. *)
 val get_attesting_power_for_delegate :
-  t -> ?level:Raw_level.t -> public_key_hash -> int64 tzresult Lwt.t
+  t -> ?level:Raw_level.t -> Implicit_account_repr.t -> int64 tzresult Lwt.t
 
 (** Sums the result of [get_attesting_power_for_delegate] over a list
     of levels. *)
 val get_cumulated_attesting_power_for_delegate :
-  t -> levels:Raw_level.t list -> public_key_hash -> int64 tzresult Lwt.t
+  t ->
+  levels:Raw_level.t list ->
+  Implicit_account_repr.t ->
+  int64 tzresult Lwt.t
 
 val get_current_voting_power :
-  t -> public_key_hash -> int64 Environment.Error_monad.shell_tzresult Lwt.t
+  t ->
+  Implicit_account_repr.t ->
+  int64 Environment.Error_monad.shell_tzresult Lwt.t
 
 val get_voting_power :
-  t -> public_key_hash -> int64 Environment.Error_monad.shell_tzresult Lwt.t
+  t ->
+  Implicit_account_repr.t ->
+  int64 Environment.Error_monad.shell_tzresult Lwt.t
 
 val get_total_voting_power :
   t -> int64 Environment.Error_monad.shell_tzresult Lwt.t
 
 val get_current_baking_power :
-  t -> public_key_hash -> int64 Environment.Error_monad.shell_tzresult Lwt.t
+  t ->
+  Implicit_account_repr.t ->
+  int64 Environment.Error_monad.shell_tzresult Lwt.t
 
 val get_bakers :
   ?filter:(Plugin.RPC.Baking_rights.t -> bool) ->
   ?cycle:Cycle.t ->
   t ->
-  public_key_hash list tzresult Lwt.t
+  Implicit_account_repr.t list tzresult Lwt.t
 
-val get_baker : t -> round:Round.t -> public_key_hash tzresult Lwt.t
+val get_baker : t -> round:Round.t -> Implicit_account_repr.t tzresult Lwt.t
 
 val get_first_different_baker :
-  public_key_hash -> public_key_hash trace -> public_key_hash
+  Implicit_account_repr.t ->
+  Implicit_account_repr.t trace ->
+  Implicit_account_repr.t
 
 val get_first_different_bakers :
-  ?excluding:public_key_hash list ->
+  ?excluding:Implicit_account_repr.t list ->
   t ->
-  (public_key_hash * public_key_hash) tzresult Lwt.t
+  (Implicit_account_repr.t * Implicit_account_repr.t) tzresult Lwt.t
 
 val get_seed_nonce_hash : t -> Nonce_hash.t tzresult Lwt.t
 
@@ -164,27 +177,24 @@ val get_ai_expected_issuance :
   t -> Adaptive_issuance_services.expected_rewards list tzresult Lwt.t
 
 val get_denunciations :
-  t ->
-  (Signature.Public_key_hash.t * Denunciations_repr.item) list tzresult Lwt.t
+  t -> (Implicit_account_repr.t * Denunciations_repr.item) list tzresult Lwt.t
 
 val get_denunciations_for_delegate :
-  t ->
-  Signature.Public_key_hash.t ->
-  Denunciations_repr.item list tzresult Lwt.t
+  t -> Implicit_account_repr.t -> Denunciations_repr.item list tzresult Lwt.t
 
 val get_consecutive_round_zero : t -> Int32.t tzresult Lwt.t
 
 val estimated_shared_pending_slashed_amount :
-  t -> public_key_hash -> Tez.t tzresult Lwt.t
+  t -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
 val estimated_own_pending_slashed_amount :
-  t -> public_key_hash -> Tez.t tzresult Lwt.t
+  t -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
 
   val get_ballot_list :
-    t -> (Signature.Public_key_hash.t * Vote.ballot) list tzresult Lwt.t
+    t -> (Implicit_account_repr.t * Vote.ballot) list tzresult Lwt.t
 
   val get_current_period : t -> Voting_period.info tzresult Lwt.t
 
@@ -192,8 +202,7 @@ module Vote : sig
 
   val get_participation_ema : Block.t -> int32 tzresult Lwt.t
 
-  val get_listings :
-    t -> (Signature.Public_key_hash.t * int64) list tzresult Lwt.t
+  val get_listings : t -> (Implicit_account_repr.t * int64) list tzresult Lwt.t
 
   val get_proposals : t -> int64 Environment.Protocol_hash.Map.t tzresult Lwt.t
 
@@ -215,7 +224,8 @@ module Vote : sig
 
       Note that unlike most functions in the current module, this one
       does not call an RPC. *)
-  val get_delegate_proposal_count : t -> public_key_hash -> int tzresult Lwt.t
+  val get_delegate_proposal_count :
+    t -> Implicit_account_repr.t -> int tzresult Lwt.t
 end
 
 module Dal : sig
@@ -232,7 +242,7 @@ module Contract : sig
 
   val equal : Contract.t -> Contract.t -> bool
 
-  val pkh : Contract.t -> public_key_hash
+  val pkh : Contract.t -> Implicit_account_repr.t
 
   (** Returns the balance of a contract, by default the main balance.
       If the contract is implicit the frozen balances are available too:
@@ -266,9 +276,10 @@ module Contract : sig
 
   val is_manager_key_revealed : t -> Contract.t -> bool tzresult Lwt.t
 
-  val delegate : t -> Contract.t -> public_key_hash tzresult Lwt.t
+  val delegate : t -> Contract.t -> Implicit_account_repr.t tzresult Lwt.t
 
-  val delegate_opt : t -> Contract.t -> public_key_hash option tzresult Lwt.t
+  val delegate_opt :
+    t -> Contract.t -> Implicit_account_repr.t option tzresult Lwt.t
 
   val storage : t -> Contract_hash.t -> Script.expr tzresult Lwt.t
 
@@ -301,7 +312,8 @@ module Delegate : sig
 
   type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
 
-  val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
+  val info :
+    t -> Implicit_account_repr.t -> Delegate_services.info tzresult Lwt.t
 
   (** Calls RPCs
       [/chains/<chain_id>/blocks/<blocsk_id>/contracts/<Implicit
@@ -310,52 +322,64 @@ module Delegate : sig
       checks that both RPCs output the same value, then returns this
       value. *)
   val full_balance :
-    ?__LOC__:string -> t -> public_key_hash -> Tez.t tzresult Lwt.t
+    ?__LOC__:string -> t -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
-  val current_frozen_deposits : t -> public_key_hash -> Tez.t tzresult Lwt.t
+  val current_frozen_deposits :
+    t -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
   (** calls the RPC [frozen_deposits]: we're using a different name to
      be more easily distinguishable from [current_frozen_deposits] *)
-  val initial_frozen_deposits : t -> public_key_hash -> Tez.t tzresult Lwt.t
+  val initial_frozen_deposits :
+    t -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
-  val staking_balance : t -> public_key_hash -> Tez.t tzresult Lwt.t
+  val staking_balance : t -> Implicit_account_repr.t -> Tez.t tzresult Lwt.t
 
   val unstaked_frozen_deposits :
     t ->
-    public_key_hash ->
+    Implicit_account_repr.t ->
     Plugin.Delegate_services.deposit_per_cycle list tzresult Lwt.t
 
-  val staking_denominator : t -> public_key_hash -> Z.t tzresult Lwt.t
+  val staking_denominator : t -> Implicit_account_repr.t -> Z.t tzresult Lwt.t
 
   val frozen_deposits_limit :
-    t -> public_key_hash -> Tez.t option tzresult Lwt.t
+    t -> Implicit_account_repr.t -> Tez.t option tzresult Lwt.t
 
-  val deactivated : t -> public_key_hash -> bool tzresult Lwt.t
+  val deactivated : t -> Implicit_account_repr.t -> bool tzresult Lwt.t
 
-  val grace_period : t -> public_key_hash -> Cycle.t tzresult Lwt.t
+  val grace_period : t -> Implicit_account_repr.t -> Cycle.t tzresult Lwt.t
 
-  val voting_info : t -> public_key_hash -> Vote.delegate_info tzresult Lwt.t
+  val voting_info :
+    t -> Implicit_account_repr.t -> Vote.delegate_info tzresult Lwt.t
 
   val consensus_key :
-    t -> public_key_hash -> Delegate_services.consensus_keys_info tzresult Lwt.t
+    t ->
+    Implicit_account_repr.t ->
+    Delegate_services.consensus_keys_info tzresult Lwt.t
 
   val companion_key :
-    t -> public_key_hash -> Delegate_services.companion_keys_info tzresult Lwt.t
+    t ->
+    Implicit_account_repr.t ->
+    Delegate_services.companion_keys_info tzresult Lwt.t
 
   val participation :
-    t -> public_key_hash -> Delegate.For_RPC.participation_info tzresult Lwt.t
+    t ->
+    Implicit_account_repr.t ->
+    Delegate.For_RPC.participation_info tzresult Lwt.t
 
   val dal_participation :
     t ->
-    public_key_hash ->
+    Implicit_account_repr.t ->
     Delegate.For_RPC.dal_participation_info tzresult Lwt.t
 
-  val is_forbidden : t -> public_key_hash -> bool tzresult Lwt.t
+  val is_forbidden : t -> Implicit_account_repr.t -> bool tzresult Lwt.t
 
-  val stake_for_cycle : t -> Cycle.t -> public_key_hash -> stake tzresult Lwt.t
+  val stake_for_cycle :
+    t -> Cycle.t -> Implicit_account_repr.t -> stake tzresult Lwt.t
 
   val baking_power_distribution_for_current_cycle :
-    t -> manager_pkh:public_key_hash -> (int64 * int64 option) tzresult Lwt.t
+    t ->
+    manager_pkh:Implicit_account_repr.t ->
+    (int64 * int64 option) tzresult Lwt.t
 end
 
 module Sc_rollup : sig
@@ -376,16 +400,15 @@ module Sc_rollup : sig
   val timeout :
     t ->
     Sc_rollup.t ->
-    Signature.Public_key_hash.t ->
-    Signature.Public_key_hash.t ->
+    Implicit_account_repr.t ->
+    Implicit_account_repr.t ->
     Sc_rollup.Game.timeout option tzresult Lwt.t
 
   val ongoing_games_for_staker :
     t ->
     Sc_rollup.t ->
-    Signature.public_key_hash ->
-    (Sc_rollup.Game.t * Signature.public_key_hash * Signature.public_key_hash)
-    list
+    Implicit_account_repr.t ->
+    (Sc_rollup.Game.t * Implicit_account_repr.t * Implicit_account_repr.t) list
     tzresult
     Lwt.t
 end

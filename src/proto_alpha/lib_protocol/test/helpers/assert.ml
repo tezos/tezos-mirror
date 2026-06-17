@@ -223,15 +223,24 @@ let equal_cycle_repr ~loc (a : Cycle_repr.t) (b : Cycle_repr.t) =
   equal ~loc Cycle_repr.( = ) "Cycle_repr aren't equal" Cycle_repr.pp a b
 
 (* pkh *)
-let equal_pkh ~loc (a : Signature.Public_key_hash.t)
-    (b : Signature.Public_key_hash.t) =
-  let module PKH = Signature.Public_key_hash in
-  equal ~loc PKH.equal "Public key hashes aren't equal" PKH.pp a b
+let equal_pkh ~loc (a : Implicit_account_repr.t) (b : Implicit_account_repr.t) =
+  equal
+    ~loc
+    (fun x y -> Implicit_account_repr.compare x y = 0)
+    "Public key hashes aren't equal"
+    Implicit_account_repr.pp
+    a
+    b
 
-let not_equal_pkh ~loc (a : Signature.Public_key_hash.t)
-    (b : Signature.Public_key_hash.t) =
-  let module PKH = Signature.Public_key_hash in
-  not_equal ~loc PKH.equal "Public key hashes are equal" PKH.pp a b
+let not_equal_pkh ~loc (a : Implicit_account_repr.t)
+    (b : Implicit_account_repr.t) =
+  not_equal
+    ~loc
+    (fun x y -> Implicit_account_repr.compare x y = 0)
+    "Public key hashes are equal"
+    Implicit_account_repr.pp
+    a
+    b
 
 (* protocol hash *)
 let equal_protocol_hash ~loc (a : Protocol_hash.t) (b : Protocol_hash.t) =

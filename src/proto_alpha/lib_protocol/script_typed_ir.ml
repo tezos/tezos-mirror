@@ -42,7 +42,7 @@ open Dependent_bool
 type step_constants = {
   sender : Destination.t;
       (** The address calling this contract, as returned by SENDER. *)
-  payer : Signature.public_key_hash;
+  payer : Implicit_account_repr.t;
       (** The address of the implicit account that initiated the chain of contract calls, as returned by SOURCE. *)
   self : Contract_hash.t;
       (** The address of the contract being executed, as returned by SELF and SELF_ADDRESS.
@@ -897,9 +897,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, Tez.t * ('a typed_contract * 'S), 'r, 'F) kinstr
   | IImplicit_account :
       Script.location * (unit typed_contract, 'S, 'r, 'F) kinstr
-      -> (public_key_hash, 'S, 'r, 'F) kinstr
+      -> (Signature.Public_key_hash.t, 'S, 'r, 'F) kinstr
   | IIs_implicit_account :
-      Script.location * (public_key_hash option, 'S, 'r, 'F) kinstr
+      Script.location * (Signature.Public_key_hash.t option, 'S, 'r, 'F) kinstr
       -> (address, 'S, 'r, 'F) kinstr
   | IIndex_address :
       Script.location * (n num, 'S, 'r, 'F) kinstr
@@ -913,10 +913,14 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       code : Script.expr;
       k : (operation, address * ('c * 'S), 'r, 'F) kinstr;
     }
-      -> (public_key_hash option, Tez.t * ('a * ('c * 'S)), 'r, 'F) kinstr
+      -> ( Signature.Public_key_hash.t option,
+           Tez.t * ('a * ('c * 'S)),
+           'r,
+           'F )
+         kinstr
   | ISet_delegate :
       Script.location * (operation, 'S, 'r, 'F) kinstr
-      -> (public_key_hash option, 'S, 'r, 'F) kinstr
+      -> (Signature.Public_key_hash.t option, 'S, 'r, 'F) kinstr
   | INow :
       Script.location * (Script_timestamp.t, 'a * 'S, 'r, 'F) kinstr
       -> ('a, 'S, 'r, 'F) kinstr
@@ -933,7 +937,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       Script.location * (bool, 'S, 'r, 'F) kinstr
       -> (public_key, signature * (bytes * 'S), 'r, 'F) kinstr
   | IHash_key :
-      Script.location * (public_key_hash, 'S, 'r, 'F) kinstr
+      Script.location * (Signature.Public_key_hash.t, 'S, 'r, 'F) kinstr
       -> (public_key, 'S, 'r, 'F) kinstr
   | IPack :
       Script.location * ('a, _) ty * (bytes, 'b * 'S, 'r, 'F) kinstr
@@ -1011,7 +1015,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | INever : Script.location -> (never, 'S, 'r, 'F) kinstr
   | IVoting_power :
       Script.location * (n num, 'S, 'r, 'F) kinstr
-      -> (public_key_hash, 'S, 'r, 'F) kinstr
+      -> (Signature.Public_key_hash.t, 'S, 'r, 'F) kinstr
   | ITotal_voting_power :
       Script.location * (n num, 'a * 'S, 'r, 'F) kinstr
       -> ('a, 'S, 'r, 'F) kinstr
@@ -1151,10 +1155,10 @@ and ('arg, 'ret) lambda =
       -> ('arg, 'ret) lambda
 
 and 'arg typed_contract =
-  | Typed_implicit : public_key_hash -> unit typed_contract
+  | Typed_implicit : Implicit_account_repr.t -> unit typed_contract
   | Typed_implicit_with_ticket : {
       ticket_ty : ('arg ticket, _) ty;
-      destination : public_key_hash;
+      destination : Implicit_account_repr.t;
     }
       -> 'arg ticket typed_contract
   | Typed_originated : {
@@ -1308,7 +1312,7 @@ and ('ty, 'comparable) ty =
   | String_t : (Script_string.t, yes) ty
   | Bytes_t : (bytes, yes) ty
   | Mutez_t : (Tez.t, yes) ty
-  | Key_hash_t : (public_key_hash, yes) ty
+  | Key_hash_t : (Signature.Public_key_hash.t, yes) ty
   | Key_t : (public_key, yes) ty
   | Timestamp_t : (Script_timestamp.t, yes) ty
   | Address_t : (address, yes) ty
@@ -1442,12 +1446,12 @@ and ('input, 'output) view_signature =
 
 and 'kind internal_operation_contents =
   | Transaction_to_implicit : {
-      destination : Signature.Public_key_hash.t;
+      destination : Implicit_account_repr.t;
       amount : Tez.t;
     }
       -> Kind.transaction internal_operation_contents
   | Transaction_to_implicit_with_ticket : {
-      destination : Signature.Public_key_hash.t;
+      destination : Implicit_account_repr.t;
       ticket_ty : ('content ticket, _) ty;
       ticket : 'content ticket;
       unparsed_ticket : Script.lazy_expr;
@@ -1486,7 +1490,7 @@ and 'kind internal_operation_contents =
     }
       -> Kind.transaction internal_operation_contents
   | Origination : {
-      delegate : Signature.Public_key_hash.t option;
+      delegate : Implicit_account_repr.t option;
       code : Script.expr;
       unparsed_storage : Script.expr;
       credit : Tez.t;
@@ -1496,7 +1500,7 @@ and 'kind internal_operation_contents =
     }
       -> Kind.origination internal_operation_contents
   | Delegation :
-      Signature.Public_key_hash.t option
+      Implicit_account_repr.t option
       -> Kind.delegation internal_operation_contents
 
 and 'kind internal_operation = {
@@ -1740,7 +1744,7 @@ let mutez_metadata : Tez.t ty_metadata = meta_basic
 
 let bool_metadata : bool ty_metadata = meta_basic
 
-let key_hash_metadata : public_key_hash ty_metadata = meta_basic
+let key_hash_metadata : Signature.Public_key_hash.t ty_metadata = meta_basic
 
 let key_metadata : public_key ty_metadata = meta_basic
 

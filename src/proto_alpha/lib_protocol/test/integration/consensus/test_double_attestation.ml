@@ -356,7 +356,7 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
                   (Apply_results.Double_consensus_operation_evidence_result
                      {punished_delegate; _});
             } ->
-            Signature.Public_key_hash.(punished_delegate = delegate)
+            Implicit_account_repr.(punished_delegate = delegate)
         | _ -> false)
       operations_recpts
   in
@@ -792,7 +792,7 @@ let test_freeze_more_with_low_balance =
   let check_unique_attester b account2 =
     let* attesters_list = Context.get_attesters (B b) in
     match attesters_list with
-    | [{delegate; _}] when Signature.Public_key_hash.equal account2 delegate ->
+    | [{delegate; _}] when Implicit_account_repr.(account2 = delegate) ->
         return_unit
     | _ -> failwith "We are supposed to only have account2 as attester."
   in

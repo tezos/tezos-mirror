@@ -22,7 +22,10 @@ let check_delegate_attested ~check_not_found ~kind delegate =
   exec_unit (fun (block, state) ->
       let delegate = State.find_account delegate state in
       let* consensus_key_info =
-        Context.Delegate.consensus_key (B state.grandparent) delegate.pkh
+        (* FIXME-PA *)
+        Context.Delegate.consensus_key
+          (B state.grandparent)
+          (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
       in
       let consensus_key = consensus_key_info.active in
       let* consensus_key = Account.find consensus_key.consensus_key_pkh in
@@ -67,11 +70,14 @@ let check_aggregated_committee ~check_not_found ~kind delegates =
             let* consensus_key_info =
               Context.Delegate.consensus_key
                 (B block_at_attested_level)
-                delegate.pkh
+                (* FIXME-PA *)
+                (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
             in
             return
               {
-                Protocol.Alpha_context.Consensus_key.delegate = delegate.pkh;
+                Protocol.Alpha_context.Consensus_key.delegate =
+                  (* FIXME-PA *)
+                  Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh;
                 consensus_pkh = consensus_key_info.active.consensus_key_pkh;
               })
           delegates
@@ -383,7 +389,12 @@ let test_attestations_keep_activation_status =
   (* Check is still activated *)
   --> exec_unit (fun (block, state) ->
           let src = State.find_account "delegate" state in
-          let* b = Context.Delegate.deactivated (B block) src.pkh in
+          (* FIXME-PA *)
+          let* b =
+            Context.Delegate.deactivated
+              (B block)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh src.pkh)
+          in
           Assert.is_true ~loc:__LOC__ (not b))
 
 (* === Consensus threshold tests === *)

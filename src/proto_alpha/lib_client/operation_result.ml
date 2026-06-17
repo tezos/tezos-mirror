@@ -118,16 +118,12 @@ let pp_internal_operation ppf (Internal_operation {operation; sender; _}) =
       match delegate with
       | None -> Format.fprintf ppf "@,No delegate for this contract"
       | Some delegate ->
-          Format.fprintf
-            ppf
-            "@,Delegate: %a"
-            Signature.Public_key_hash.pp
-            delegate)
+          Format.fprintf ppf "@,Delegate: %a" Implicit_account_repr.pp delegate)
   | Delegation delegate_opt -> (
       Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Destination.pp sender ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
-      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
+      | Some delegate -> Implicit_account_repr.pp ppf delegate)
   | Event {ty; tag; payload} ->
       Format.fprintf
         ppf
@@ -191,11 +187,7 @@ let pp_manager_operation_content (type kind) source ppf
       match delegate with
       | None -> Format.fprintf ppf "@,No delegate for this contract"
       | Some delegate ->
-          Format.fprintf
-            ppf
-            "@,Delegate: %a"
-            Signature.Public_key_hash.pp
-            delegate)
+          Format.fprintf ppf "@,Delegate: %a" Implicit_account_repr.pp delegate)
   | Reveal {public_key = key; proof} ->
       Format.fprintf
         ppf
@@ -218,7 +210,7 @@ let pp_manager_operation_content (type kind) source ppf
       Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
-      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
+      | Some delegate -> Implicit_account_repr.pp ppf delegate)
   | Register_global_constant {value} ->
       Format.fprintf
         ppf
@@ -364,7 +356,7 @@ let pp_manager_operation_content (type kind) source ppf
         "Smart rollup bond retrieval:@,Address: %a@,Staker: %a"
         Sc_rollup.Address.pp
         sc_rollup
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         staker
   | Dal_publish_commitment operation ->
       Format.fprintf
@@ -385,9 +377,10 @@ let pp_balance_updates ppf balance_updates =
      (tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU). Instead of printing this
      key hash, we want to make the result more informative. *)
   let pp_baker ppf baker =
-    if Signature.Public_key_hash.equal baker Signature.Public_key_hash.zero then
+    (* FIXME-PA *)
+    if Implicit_account_repr.(baker = zero) then
       Format.fprintf ppf "the baker who will include this operation"
-    else Signature.Public_key_hash.pp ppf baker
+    else Implicit_account_repr.pp ppf baker
   in
   let pp_unstaked_frozen_staker ppf (staker : Receipt.unstaked_frozen_staker) =
     match staker with
@@ -406,7 +399,7 @@ let pp_balance_updates ppf balance_updates =
     match staker with
     | Baker baker -> pp_baker ppf baker
     | Baker_edge baker ->
-        Format.fprintf ppf "baker edge %a" Signature.Public_key_hash.pp baker
+        Format.fprintf ppf "baker edge %a" Implicit_account_repr.pp baker
     | Single_staker {staker; delegate} ->
         Format.fprintf
           ppf
@@ -491,7 +484,7 @@ let pp_balance_updates ppf balance_updates =
           | Staking_delegate_denominator {delegate} ->
               Format.asprintf
                 "staking delegate denominator(%a)"
-                Signature.Public_key_hash.pp
+                Implicit_account_repr.pp
                 delegate
         in
         let balance =
@@ -972,7 +965,7 @@ let pp_manager_operation_result ppf
       Manager_operation_result
         {balance_updates; operation_result; internal_operation_results} ) =
   Format.fprintf ppf "@[<v 2>Manager signed operations:" ;
-  Format.fprintf ppf "@,From: %a" Signature.Public_key_hash.pp source ;
+  Format.fprintf ppf "@,From: %a" Implicit_account_repr.pp source ;
   Format.fprintf ppf "@,Fee to the baker: %s%a" tez_sym Tez.pp fee ;
   Format.fprintf ppf "@,Expected counter: %a" Manager_counter.pp counter ;
   Format.fprintf ppf "@,Gas limit: %a" Gas.Arith.pp_integral gas_limit ;
@@ -998,9 +991,9 @@ let pp_contents_and_result : type kind.
       "Misbehaviour: %a@,Punished delegate: %a@,Rewarded delegate: %a"
       Misbehaviour.pp
       misbehaviour
-      Signature.Public_key_hash.pp
+      Implicit_account_repr.pp
       punished_delegate
-      Signature.Public_key_hash.pp
+      Implicit_account_repr.pp
       rewarded_delegate
   in
   let pp_committee ppf (delegate, voting_power) =
@@ -1173,7 +1166,7 @@ let pp_contents_and_result : type kind.
            Period: %ld@,\
            Protocols:@,\
           \  @[<v 0>%a@]@]"
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           source
           period
           (Format.pp_print_list Protocol_hash.pp)
@@ -1182,7 +1175,7 @@ let pp_contents_and_result : type kind.
         Format.fprintf
           ppf
           "@[<v 2>Ballot:@,From: %a@,Period: %ld@,Protocol: %a@,Vote: %a@]"
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           source
           period
           Protocol_hash.pp
@@ -1200,9 +1193,9 @@ let pp_contents_and_result : type kind.
            Destination: %a%s%a@]"
           Signature.Public_key_hash.pp
           consensus_key
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           destination
           (if allocated_destination_contract then " (allocated)" else "")
           pp_balance_updates

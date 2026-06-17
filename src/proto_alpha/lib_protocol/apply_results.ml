@@ -884,22 +884,22 @@ let successful_manager_operation_result_encoding :
        ]
 
 type double_signing_result = {
-  punished_delegate : public_key_hash;
-  rewarded_delegate : public_key_hash;
+  punished_delegate : Implicit_account_repr.t;
+  rewarded_delegate : Implicit_account_repr.t;
   misbehaviour : Misbehaviour.t;
 }
 
 type 'kind contents_result =
   | Preattestation_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.public_key_hash;
+      delegate : Implicit_account_repr.t;
       consensus_key : Signature.public_key_hash;
       consensus_power : Attesting_power.result;
     }
       -> Kind.preattestation contents_result
   | Attestation_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.public_key_hash;
+      delegate : Implicit_account_repr.t;
       consensus_key : Signature.public_key_hash;
       consensus_power : Attesting_power.result;
     }
@@ -1040,7 +1040,7 @@ module Encoding = struct
     let open Data_encoding in
     obj4
       (dft "balance_updates" Receipt.balance_updates_encoding [])
-      (req "delegate" Signature.Public_key_hash.encoding)
+      (req "delegate" Implicit_account_repr.encoding)
       (req "consensus_power" Attesting_power.op_result_encoding)
       (req "consensus_key" Signature.Public_key_hash.encoding)
 
@@ -1249,8 +1249,8 @@ module Encoding = struct
       (fun (punished_delegate, rewarded_delegate, misbehaviour) ->
         {punished_delegate; rewarded_delegate; misbehaviour})
       (obj3
-         (req "punished_delegate" Signature.Public_key_hash.encoding)
-         (req "rewarded_delegate" Signature.Public_key_hash.encoding)
+         (req "punished_delegate" Implicit_account_repr.encoding)
+         (req "rewarded_delegate" Implicit_account_repr.encoding)
          (req "misbehaviour" Misbehaviour.encoding))
 
   let double_consensus_operation_evidence_case =
@@ -2623,7 +2623,7 @@ type block_metadata = {
   voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Gas.Arith.fp;
-  deactivated : Signature.Public_key_hash.t list;
+  deactivated : Implicit_account_repr.t list;
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
@@ -2706,12 +2706,12 @@ let block_metadata_encoding =
          })
        (merge_objs
           (obj8
-             (req "proposer" Signature.Public_key_hash.encoding)
-             (req "baker" Signature.Public_key_hash.encoding)
+             (req "proposer" Implicit_account_repr.encoding)
+             (req "baker" Implicit_account_repr.encoding)
              (req "level_info" Level.encoding)
              (req "voting_period_info" Voting_period.info_encoding)
              (req "nonce_hash" (option Nonce_hash.encoding))
-             (req "deactivated" (list Signature.Public_key_hash.encoding))
+             (req "deactivated" (list Implicit_account_repr.encoding))
              (dft "balance_updates" Receipt.balance_updates_encoding [])
              (req
                 "liquidity_baking_toggle_ema"

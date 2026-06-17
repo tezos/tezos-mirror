@@ -153,7 +153,7 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
                  power1 )
                ({delegate = d2; consensus_pkh = c2}, power2)
              ->
-            Signature.Public_key_hash.equal d1 d2
+            Implicit_account_repr.(d1 = d2)
             && Signature.Public_key_hash.equal c1 c2
             && Int64.equal power1 power2)
           resulting_committee
