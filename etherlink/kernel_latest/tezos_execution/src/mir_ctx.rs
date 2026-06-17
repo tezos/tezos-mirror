@@ -11,6 +11,7 @@ use crate::account_storage::{
 use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
+use crate::{consume_storage_read_milligas, consume_storage_write_milligas};
 use mir::parser::Parser;
 use mir::typechecker::{MichelineContractScript, MichelineView};
 use mir::{
@@ -19,7 +20,7 @@ use mir::{
         AddressHash, IntoMicheline, Micheline, PublicKeyHash, Type, TypedValue,
     },
     context::{CtxTrait, TypecheckingCtx},
-    gas::Gas,
+    gas::{interpret_cost, Gas, OutOfGas},
 };
 use num_bigint::{BigInt, BigUint};
 use tezos_crypto_rs::blake2b::digest_256;
@@ -1022,8 +1023,18 @@ pub fn clear_temporary_big_maps<Host: StorageV1, C: Context>(
 /// Hashes a Micheline expression using the packed format (with 0x05 prefix)
 /// to match L1's Script_expr_hash.
 /// See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L159
-fn hash_micheline_expr(expr: &Micheline<'_>) -> Result<ScriptExprHash, LazyStorageError> {
+fn hash_micheline_expr(
+    expr: &Micheline<'_>,
+    gas: &mut mir::gas::Gas,
+) -> Result<ScriptExprHash, LazyStorageError> {
     let bytes = expr.encode_for_pack()??;
+    // L1 charges the key hash via `hash_comparable_data` -> `hash_bytes`
+    // (`Cost_of.Interpreter.blake2b`). Charge MIR's blake2b model on the
+    // packed key bytes (same model as L1, with the values re-benchmarked by
+    // the re-pricing series, so not the protocol's current cost_N_IBlake2b).
+    let cost = interpret_cost::blake2b(&bytes)
+        .map_err(|_| LazyStorageError::OutOfGasError(OutOfGas))?;
+    gas.consume(cost)?;
     Ok(digest_256(&bytes).into())
 }
 
@@ -1039,6 +1050,30 @@ fn storage_error_to_lazy(e: tezos_storage::error::Error) -> LazyStorageError {
     ))
 }
 
+/// Charge for and read a big_map entry value, returning `None` (and charging
+/// the base lookup) when absent. Mirrors L1's carbonated
+/// `Big_map.Contents.find` (read_access: base on a miss, base + bytes when
+/// present). The key_type / value_type / total_bytes / keys-list auxiliary
+/// structures are L1's non-carbonated `Indexed_context.Make_map` and stay
+/// uncharged.
+fn read_big_map_value_metered(
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    host: &impl StorageV1,
+    path: &impl tezos_smart_rollup_host::path::Path,
+) -> Result<Option<Vec<u8>>, LazyStorageError> {
+    match host.store_value_size(path) {
+        Ok(size) => {
+            consume_storage_read_milligas(operation_gas, 1, size as u64)?;
+            Ok(Some(host.store_read_all(path)?))
+        }
+        Err(RuntimeError::PathNotFound) => {
+            consume_storage_read_milligas(operation_gas, 1, 0)?;
+            Ok(None)
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
 /// Computes the hash of a big_map key (TypedValue), used for storage path
 /// See [hash_micheline_expr] for details on the hashing format.
 fn hash_key(
@@ -1047,7 +1082,7 @@ fn hash_key(
 ) -> Result<ScriptExprHash, LazyStorageError> {
     let parser = Parser::new();
     let key_micheline = key.into_micheline_optimized_legacy(&parser.arena, gas)?;
-    hash_micheline_expr(&key_micheline)
+    hash_micheline_expr(&key_micheline, gas)
 }
 
 /// Function to convert a BtreeMap that represent the lazy_storage_diff
@@ -1241,9 +1276,14 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
         let value_path =
             value_path(self.context, id, &hash_key(key.clone(), self.gas())?)?;
-        if self.host.store_has(&value_path)?.is_none() {
+        // The entry value is L1's carbonated `Big_map.Contents`; charge its
+        // read. The value_type below is L1's non-carbonated `Value_type`, read
+        // without charging.
+        let Some(encoded_value) =
+            read_big_map_value_metered(self.operation_gas, self.host, &value_path)?
+        else {
             return Ok(None);
-        }
+        };
 
         let value_type_path = value_type_path(self.context, id)?;
         let encoded_value_type = self.host.store_read_all(&value_type_path)?;
@@ -1253,7 +1293,6 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
             &mut self.operation_gas.remaining,
         )??;
 
-        let encoded_value = self.host.store_read_all(&value_path)?;
         let value = Micheline::decode_raw(
             arena,
             &encoded_value,
@@ -1268,6 +1307,8 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
         let path = value_path(self.context, id, &hash_key(key.clone(), self.gas())?)?;
+        // Mirrors L1's carbonated `Big_map.Contents.mem`.
+        consume_storage_read_milligas(self.operation_gas, 1, 0)?;
         Ok(self.host.store_has(&path)?.is_some())
     }
 
@@ -1284,13 +1325,17 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let key_encoded = micheline_expr.encode(&mut self.operation_gas.remaining)??;
         // key_hashed: hash of packed encoding (with 0x05 prefix), used for storage path
         // See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L5563
-        let key_hashed = hash_micheline_expr(&micheline_expr)?;
+        let key_hashed = hash_micheline_expr(&micheline_expr, self.gas())?;
         let value_path = value_path(self.context, id, &key_hashed)?;
         match value {
             None => {
                 if self.host.store_has(&value_path)?.is_some() {
                     let previous_value_size: BigInt =
                         self.host.store_value_size(&value_path)?.into();
+                    // The entry value is L1's carbonated `Big_map.Contents`;
+                    // charge its removal. The keys-list and total_bytes updated
+                    // below are L1's non-carbonated auxiliary structures.
+                    consume_storage_write_milligas(self.operation_gas, 1, 0)?;
                     self.host.store_delete(&value_path)?;
                     BigMapKeys::remove_key(self.host, self.context, id, &key_hashed)?;
 
@@ -1333,6 +1378,12 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                 self.interpret_context
                     .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
 
+                // The entry value is L1's carbonated `Big_map.Contents`.
+                consume_storage_write_milligas(
+                    self.operation_gas,
+                    1,
+                    encoded.len() as u64,
+                )?;
                 self.host.store_write_all(&value_path, &encoded)?;
 
                 // Write the update in the big_map_diff
