@@ -61,23 +61,44 @@ local table = base.table;
     local q = prometheus('version', legendFormat='{{ distributed_db_version }}');
     info.new('Distributed db version', q, h, w, x, y),
 
+  // Both stat panels below smooth the underlying boolean/ternary metric
+  // with `max_over_time(...[2m])`. The metrics tend to dip briefly (one
+  // scrape, ~60s) during normal block-validator transitions; without the
+  // smoothing the stat panel renders red even on healthy nodes. The 2m
+  // window covers ~2 scrape intervals on the slowest configurations and
+  // is short enough that a genuine outage still surfaces within minutes.
+  // For sync_status, value 2 ("Stuck") is rare enough across the fleet
+  // (<1 transition per day per instance observed) that the max-over-time
+  // semantic is acceptable: a stuck node would stay at 2 for the full
+  // window and correctly render red.
   bootstrapStatus(h, w, x, y):
-    local q = prometheus('validator_chain_is_bootstrapped');
+    local q = query.prometheus.new(base.datasource, 'max_over_time(' + namespace + '_validator_chain_is_bootstrapped' + base.node_instance_query + '[2m])');
     info.new('Bootstrap status', q, h, w, x, y)
     + info.withMapping([['0', 'Bootstrapping', 'red'], ['1', 'Bootstrapped', 'green']]),
 
   syncStatus(h, w, x, y):
-    local q = prometheus('validator_chain_synchronisation_status');
+    local q = query.prometheus.new(base.datasource, 'max_over_time(' + namespace + '_validator_chain_synchronisation_status' + base.node_instance_query + '[2m])');
     info.new('Sync status', q, h, w, x, y)
     + info.withMapping([['0', 'Unsync', 'red'], ['1', 'Sync', 'green'], ['2', 'Stuck', 'red']]),
 
   uptime(h, w, x, y):
-    local q = query.prometheus.new(base.datasource, 'time()-(process_start_time_seconds' + base.node_instance_query + ')')
-              + query.prometheus.withLegendFormat('node uptime');
+    // process_start_time_seconds is emitted by every Prometheus scrape job
+    // on the host (node-exporter, process-exporter, octez-node, sometimes
+    // a per-pod process-exporter sidecar), all tagged with the same
+    // grafazos_instance. Pin grafazos_app="octez-node" AND
+    // container!="process-exporter" so we report only the octez-node
+    // process's own /metrics scrape, not a sidecar that targets it.
+    //
+    // The container!= filter is k8s-specific: PromQL treats a missing
+    // label as the empty string, so the != matcher passes through
+    // gcp-sentinel1 metrics that have no `container` label at all.
+    local selector = '{' + base.node_instance + '="$node_instance", grafazos_app="octez-node", container!="process-exporter"}';
+    local q = query.prometheus.new(base.datasource, 'time()-(process_start_time_seconds' + selector + ')')
+              + query.prometheus.withLegendFormat('');
     info.new('Node uptime', q, h, w, x, y)
-    + stat.panelOptions.withDescription('Reflects the uptime of the monitoring of the job, not the uptime of the process.')
+    + stat.panelOptions.withDescription('Time since the octez-node process last restarted on the selected instance (process uptime, not host uptime).')
     + stat.standardOptions.withUnit('dtdhms')
-    + stat.options.withTextMode('max'),
+    + stat.options.withTextMode('value'),
 
   headLevel(h, w, x, y):
     local q = prometheus('validator_chain_head_level', legendFormat='currrent head level');
