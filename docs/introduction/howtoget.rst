@@ -107,11 +107,9 @@ We support the following distribution/releases:
 
 - ``debian/trixie``
 - ``debian/bookworm``
-- ``ubuntu/noble`` (Up to Octez version 24 included)
-- ``ubuntu/jammy`` (Up to Octez version 24 included)
-- ``ubuntu/22.04`` (Starting from Octez version 25)
-- ``ubuntu/24.04`` (Starting from Octez version 25)
-- ``ubuntu/26.04`` (Starting from Octez version 25)
+- ``ubuntu/jammy`` (up to Octez version 24 included), becoming ``ubuntu/22.04`` (starting from Octez version 25)
+- ``ubuntu/noble`` (up to Octez version 24 included), becoming ``ubuntu/24.04`` (starting from Octez version 25)
+- ``ubuntu/26.04`` (starting from Octez version 25)
 
 both on ``amd64`` and ``arm64`` architectures.
 
@@ -153,6 +151,30 @@ If migrating from Serokell packages you can check out migration documentation
 
 To upgrade packages, use ``apt-get update`` and ``apt-get upgrade``.
 If runnning Octez as services, see also how to :ref:`restart them <services_upgrade>`.
+
+.. warning::
+
+	If you installed Ubuntu packages for Octez v24 (or earlier) from the APT repository, the old
+	codename-based path is no longer updated. Running ``apt-get update`` and
+	``apt-get upgrade`` will therefore not upgrade you to v25 until you repoint the
+	repository to the new version-number-based path.
+
+	To upgrade, set the ``release`` to your Ubuntu version number and re-add the
+	repository:
+
+	::
+
+	  export distribution=ubuntu
+	  export release=24.04  # or 22.04, 26.04
+
+	then follow the install instructions above to refresh
+	``/etc/apt/sources.list.d/octez.list``, and finally run::
+
+	  sudo apt-get update
+	  sudo apt-get upgrade
+
+	Debian users are not affected: the Debian repository keeps using codenames
+	(``debian/trixie``, ``debian/bookworm``).
 
 .. _installing_rpm:
 

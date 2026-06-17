@@ -74,6 +74,38 @@ Update Instructions
 This section contains update instructions specialized for the current release, handling only a few installation types that are most common or that require special handling for this version.
 For full instructions on updating your Octez suite for any types of installation, refer to :doc:`../introduction/howtoget`.
 
+Ubuntu packages
+~~~~~~~~~~~~~~~
+
+Starting from Octez v25, the Ubuntu APT repository is named after the
+distribution version number instead of its codename:
+
+- ``ubuntu/jammy`` becomes ``ubuntu/22.04``
+- ``ubuntu/noble`` becomes ``ubuntu/24.04``
+- ``ubuntu/26.04`` is newly supported
+
+If you installed Octez v24 (or earlier) from the APT repository, the old
+codename-based path is no longer updated. Running ``apt-get update`` and
+``apt-get upgrade`` will therefore not upgrade you to v25 until you repoint the
+repository to the new version-number-based path.
+
+To upgrade, set the ``release`` to your Ubuntu version number and re-add the
+repository:
+
+::
+
+  export distribution=ubuntu
+  export release=24.04  # or 22.04, 26.04
+
+then follow :ref:`the install instructions <installing_deb>` to refresh
+``/etc/apt/sources.list.d/octez.list``, and finally run::
+
+  sudo apt-get update
+  sudo apt-get upgrade
+
+Debian users are not affected: the Debian repository keeps using codenames
+(``debian/trixie``, ``debian/bookworm``).
+
 From sources
 ~~~~~~~~~~~~
 
