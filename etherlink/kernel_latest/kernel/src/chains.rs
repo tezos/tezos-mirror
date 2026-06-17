@@ -89,6 +89,38 @@ pub const TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
 pub const EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
     RefPath::assert_from(b"/evm/eth_accounts");
 
+/// Choose the SafeStorage roots to snapshot for a single Tezos operation.
+///
+/// [validate_and_apply_operation] wraps each operation in a transactional
+/// snapshot of every root in `full_roots` (one `store_copy` + `store_move`
+/// per root, twice — once for validation, once for application). Most
+/// operations only read or write account state under
+/// [TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH]; snapshotting the EVM roots and
+/// the Tez block/global-state root just to roll them back on failure is pure
+/// overhead. For batches that provably touch nothing else (see
+/// [Operation::touches_only_accounts]), narrow the snapshot to the accounts
+/// root alone; otherwise keep the full conservative set.
+fn operation_safe_roots(
+    operation: &Operation,
+    full_roots: &[OwnedPath],
+) -> Vec<OwnedPath> {
+    if operation.touches_only_accounts() {
+        let narrowed: Vec<OwnedPath> = full_roots
+            .iter()
+            .filter(|root| {
+                root.as_bytes() == TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH.as_bytes()
+            })
+            .cloned()
+            .collect();
+        // Fall back to the full set if the accounts root is unexpectedly
+        // absent, so we never snapshot fewer roots than the operation needs.
+        if !narrowed.is_empty() {
+            return narrowed;
+        }
+    }
+    full_roots.to_vec()
+}
+
 #[derive(Debug, Default)]
 pub struct ExperimentalFeatures {
     enable_michelson_gas_refund: bool,
@@ -1130,6 +1162,10 @@ where
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
             let journal = external_journal;
+            // Snapshot only the roots this operation can touch (often just the
+            // accounts root) instead of the full conservative set.
+            let safe_roots =
+                operation_safe_roots(&operation, &block_constants.safe_roots);
             let processed_operations = match tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
@@ -1141,7 +1177,7 @@ where
                 skip_signature_check,
                 fees,
                 fee_refund_config,
-                &block_constants.safe_roots,
+                &safe_roots,
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {

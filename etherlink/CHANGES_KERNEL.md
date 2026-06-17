@@ -33,6 +33,10 @@
   cross-runtime `BadRequest` body (both the interpreter and typecheck view
   arms), and the BSON metadata — not only the previously-metered cross-runtime
   path. (!22312)
+- The Michelson runtime snapshots only the Tez accounts root, instead of
+  all world-state roots, for operations that provably touch nothing else
+  (reveals and transfers to implicit accounts), removing the per-operation
+  `store_copy`/`store_move` of the other roots. (!22276)
 
 ## Version 6 (Farfadet)
 
