@@ -19,7 +19,7 @@ use tezos_data_encoding::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_execution::{
-    account_storage::{TezosAccount, TezosOriginatedAccount},
+    account_storage::TezosAccount,
     context, cross_runtime_transfer,
     enshrined_contracts::CracError,
     mir_ctx::{clear_temporary_big_maps, InterpretContext, OperationCtx, TcCtx},
@@ -1307,7 +1307,7 @@ impl RuntimeInterface for TezosRuntime {
                 })?;
             // L2-1529: materialize the alias *code-less*. Passing `None` writes
             // no `/data/code`, so the alias resolves to the single shared
-            // implementation (see `TezosOriginatedAccount::code`). The
+            // implementation (see `TezlinkOriginatedAccount::code`). The
             // per-alias `/data/storage` (the native address) is still written.
             // The internal operation built below keeps the full forwarder
             // script, preserving the receipt indexers saw before the switch.
@@ -1904,12 +1904,7 @@ mod tests {
         // code is not charged per alias), and used/paid bytes account for the
         // per-alias storage only. This also pins the receipt's
         // `paid_storage_size_diff`, which derives from these watermarks.
-        let storage_len =
-            tezos_execution::account_storage::TezosOriginatedAccount::storage(
-                &account, &host,
-            )
-            .unwrap()
-            .len() as u64;
+        let storage_len = account.storage(&host).unwrap().len() as u64;
         assert_eq!(account.code_size(&host).unwrap(), Zarith::from(0u64));
         assert_eq!(
             account.used_bytes(&host).unwrap(),

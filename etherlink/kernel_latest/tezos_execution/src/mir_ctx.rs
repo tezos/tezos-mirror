@@ -6,7 +6,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::account_storage::{
     Code, TezlinkOriginatedAccount, TezosAccount, TezosImplicitAccountTrait,
-    TezosOriginatedAccount,
 };
 use crate::address::OriginationNonce;
 use crate::context::big_maps::*;
@@ -187,7 +186,7 @@ impl ExecCtx {
     pub fn create(
         host: &mut impl StorageV1,
         sender_account: &impl TezosAccount,
-        dest_account: &impl TezosOriginatedAccount,
+        dest_account: &TezlinkOriginatedAccount,
         amount: &Narith,
     ) -> Result<Self, TransferError> {
         let sender = address_from_contract(sender_account.contract());
@@ -768,8 +767,7 @@ pub trait HasHost<Host> {
 }
 
 pub trait HasContractAccount {
-    type Account: TezosOriginatedAccount;
-    fn contract_account(&self) -> &Self::Account;
+    fn contract_account(&self) -> &TezlinkOriginatedAccount;
 }
 
 pub trait HasOperationGas {
@@ -841,8 +839,7 @@ pub trait HasCrossRuntime<Host: StorageV1>: HasJournal + HasRegistry {
 impl<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> HasContractAccount
     for Ctx<'a, 'operation, Host, R>
 {
-    type Account = TezlinkOriginatedAccount;
-    fn contract_account(&self) -> &Self::Account {
+    fn contract_account(&self) -> &TezlinkOriginatedAccount {
         &self.exec_ctx.contract_account
     }
 }
@@ -3451,8 +3448,7 @@ pub(crate) mod mock {
     impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry> HasContractAccount
         for MockCtx<'h, 'j, 'r, Host, R>
     {
-        type Account = TezlinkOriginatedAccount;
-        fn contract_account(&self) -> &Self::Account {
+        fn contract_account(&self) -> &TezlinkOriginatedAccount {
             &self.contract_account
         }
     }

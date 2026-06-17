@@ -1578,7 +1578,6 @@ mod tests {
     #[test]
     fn test_tezosx_michelson_chain_id_now_level() {
         use mir::gas::Gas;
-        use tezos_execution::account_storage::TezosOriginatedAccount;
         use tezos_execution::account_storage::{
             set_tezos_account_info, TezosAccountInfo,
         };

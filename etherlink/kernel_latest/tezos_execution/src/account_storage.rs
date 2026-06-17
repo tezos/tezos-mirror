@@ -287,7 +287,7 @@ pub enum Code {
 /// Durable-storage path of the single shared Michelson implementation that
 /// backs every Tezos X alias. An alias `KT1` carries no script of its own;
 /// when its `/data/code` is absent and it is classified [`Origin::Alias`], its
-/// code resolves to the bytes stored here (see [`TezosOriginatedAccount::code`]).
+/// code resolves to the bytes stored here (see [`TezlinkOriginatedAccount::code`]).
 ///
 /// The slot lives in a `__system__` subtree of the `tezosx/` account namespace
 /// (`__system__` is not a valid base58 account address, so it cannot collide
@@ -370,7 +370,7 @@ impl OriginatedContractInfo {
     /// The aggregated record of a freshly originated contract: its
     /// `used_bytes` is the code, storage and initial lazy-storage bytes it
     /// occupies, and `paid_bytes` starts at that same value. Single source of
-    /// truth for both [`TezosOriginatedAccount::init`] (which persists it) and
+    /// truth for both [`TezlinkOriginatedAccount::init`] (which persists it) and
     /// the origination gas charge (which sizes it before the write).
     pub(crate) fn for_new_contract(
         code_size: u64,
@@ -433,7 +433,7 @@ impl OriginatedContractInfo {
     /// than a fixed bound — the encoding is self-delimiting, so the length
     /// depends on the counter magnitudes. The read side does not call this:
     /// it sizes the read from the length the store returned (see
-    /// [TezosOriginatedAccount::read_info_with_len]), so this only runs once
+    /// [TezlinkOriginatedAccount::read_info_with_len]), so this only runs once
     /// per write, on the post-update record that has not been persisted yet.
     pub(crate) fn encoded_len(&self) -> Result<u64, tezos_storage::error::Error> {
         // `BinWriter` has no length-only path, so we serialise into a
@@ -446,10 +446,15 @@ impl OriginatedContractInfo {
     }
 }
 
-pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
-    fn kt1(&self) -> &ContractKt1Hash;
+impl TezlinkOriginatedAccount {
+    pub fn kt1(&self) -> &ContractKt1Hash {
+        &self.kt1
+    }
 
-    fn code(&self, host: &impl StorageV1) -> Result<Code, tezos_storage::error::Error> {
+    pub fn code(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Code, tezos_storage::error::Error> {
         if let Some(c) = enshrined_contracts::from_kt1(self.kt1()) {
             return Ok(Code::Enshrined(c));
         }
@@ -461,7 +466,8 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
             // missing contract. Resolving on the code-miss keeps the common
             // path at one read and never reads `/origin` for ordinary
             // contracts; the gate on `is_alias` also means implicit `tz1`
-            // accounts (which never reach this trait) are untouched.
+            // accounts (which are never `TezosOriginatedAccount` values) are
+            // untouched.
             Err(RuntimeError::PathNotFound) => {
                 if self.is_alias(host)? {
                     // The slot is guaranteed seeded before any code-less alias
@@ -493,7 +499,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     /// encoding ever changes, all of them move together.
     /// `read_optional_nom_value` already maps a missing path to `None` and
     /// rejects incomplete / trailing bytes.
-    fn origin(
+    pub fn origin(
         &self,
         host: &impl StorageV1,
     ) -> Result<Option<Origin>, tezos_storage::error::Error> {
@@ -502,7 +508,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
 
     /// Whether this originated account is a Tezos X alias (classified
     /// [`Origin::Alias`]), whose script resolves to the shared implementation.
-    fn is_alias(
+    pub fn is_alias(
         &self,
         host: &impl StorageV1,
     ) -> Result<bool, tezos_storage::error::Error> {
@@ -519,7 +525,10 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     /// so a Transaction to a never-originated KT1 produces a typed
     /// user-level error instead of falling through to a kernel-internal
     /// `code()` failure.
-    fn exists(&self, host: &impl StorageV1) -> Result<bool, tezos_storage::error::Error> {
+    pub fn exists(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<bool, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(true);
         }
@@ -536,7 +545,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     /// [INFO_MAX_BYTES]); a contract with no record yet (never originated)
     /// reads as an all-zero record. The individual getters use it so they
     /// keep their `&self, &host` signature and can run on read-only hosts.
-    fn read_info(
+    pub fn read_info(
         &self,
         host: &impl StorageV1,
     ) -> Result<OriginatedContractInfo, tezos_storage::error::Error> {
@@ -548,7 +557,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     /// the exact bytes the store returned instead of re-encoding the
     /// record. A contract with no record yet reads as an all-zero record
     /// of length `0`.
-    fn read_info_with_len(
+    pub fn read_info_with_len(
         &self,
         host: &impl StorageV1,
     ) -> Result<(OriginatedContractInfo, u64), tezos_storage::error::Error> {
@@ -573,7 +582,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     }
 
     /// Persist the aggregated record in a single host write.
-    fn write_info(
+    pub fn write_info(
         &self,
         host: &mut impl StorageV1,
         info: &OriginatedContractInfo,
@@ -587,7 +596,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     /// record in one shot, so there is no production caller. Gated to
     /// `test` so it doesn't masquerade as production API.
     #[cfg(test)]
-    fn set_code(
+    pub fn set_code(
         &self,
         host: &mut impl StorageV1,
         data: &[u8],
@@ -601,7 +610,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
         Ok(code_size.into())
     }
 
-    fn storage(
+    pub fn storage(
         &self,
         host: &impl StorageV1,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
@@ -613,14 +622,14 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
         Ok(storage)
     }
 
-    fn code_size(
+    pub fn code_size(
         &self,
         host: &impl StorageV1,
     ) -> Result<Zarith, tezos_storage::error::Error> {
         Ok(self.read_info(host)?.code_size.into())
     }
 
-    fn storage_size(
+    pub fn storage_size(
         &self,
         host: &mut impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
@@ -629,7 +638,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
 
     /// Returns the contract's `used_bytes` watermark, or `0` if nothing
     /// has been written yet.
-    fn used_bytes(
+    pub fn used_bytes(
         &self,
         host: &impl StorageV1,
     ) -> Result<Zarith, tezos_storage::error::Error> {
@@ -638,7 +647,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
 
     /// Returns the contract's `paid_bytes` watermark, or `0` if nothing
     /// has been written yet.
-    fn paid_bytes(
+    pub fn paid_bytes(
         &self,
         host: &impl StorageV1,
     ) -> Result<Zarith, tezos_storage::error::Error> {
@@ -659,7 +668,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     /// [Self::write_storage_and_info]. Gated to `test` so it doesn't
     /// masquerade as production API.
     #[cfg(test)]
-    fn set_storage(
+    pub fn set_storage(
         &self,
         host: &mut impl StorageV1,
         data: &[u8],
@@ -681,11 +690,11 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     ///
     /// `code` is `Some` for an ordinary origination. It is `None` for a
     /// Tezos X alias, which carries no script of its own: no `/data/code` is
-    /// written, so [`TezosOriginatedAccount::code`] resolves the account to the
+    /// written, so [`TezlinkOriginatedAccount::code`] resolves the account to the
     /// single shared alias implementation. A zero code size is still recorded
     /// in the aggregated `/info` record so storage-space accounting reads a
     /// definite code size of `0` — the shared code is not charged per alias.
-    fn init(
+    pub fn init(
         &self,
         host: &mut impl StorageV1,
         code: Option<&[u8]>,
@@ -744,7 +753,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     /// which already refreshes it), so it intentionally does not route
     /// through `with_storage_size` — that would re-apply the storage delta.
     #[cfg(test)]
-    fn update_storage_space(
+    pub fn update_storage_space(
         &self,
         host: &mut impl StorageV1,
         storage_size_diff: StorageDelta,
@@ -784,7 +793,7 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
     /// [OriginatedContractInfo::with_storage_size] and charges gas for the
     /// blob and the record *before* calling this, so the durable writes
     /// happen only once their cost is secured.
-    fn write_storage_and_info(
+    pub fn write_storage_and_info(
         &self,
         host: &mut impl StorageV1,
         data: &[u8],
@@ -796,12 +805,6 @@ pub trait TezosOriginatedAccount: TezosAccount + Clone + Sized {
         let path = code::storage_path(self)?;
         host.store_write_all(&path, data)?;
         self.write_info(host, info)
-    }
-}
-
-impl TezosOriginatedAccount for TezlinkOriginatedAccount {
-    fn kt1(&self) -> &ContractKt1Hash {
-        &self.kt1
     }
 }
 
@@ -1863,10 +1866,7 @@ mod test {
             .starts_with(b"/tez/tez_accounts"));
     }
 
-    fn classify_as_alias(
-        host: &mut impl StorageV1,
-        account: &impl TezosOriginatedAccount,
-    ) {
+    fn classify_as_alias(host: &mut impl StorageV1, account: &TezlinkOriginatedAccount) {
         use tezosx_interfaces::{AliasInfo, RuntimeId};
         let origin = Origin::Alias(AliasInfo {
             runtime: RuntimeId::Ethereum,

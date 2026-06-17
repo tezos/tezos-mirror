@@ -8,7 +8,7 @@
 
 use crate::account_storage::{
     get_origin_at, path_to_tezos_account, set_origin_at, TezlinkOriginatedAccount,
-    TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
+    TezosAccount, TezosImplicitAccount,
 };
 use mir::ast::{big_map::BigMapId, AddressHash};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -205,26 +205,22 @@ pub mod code {
     /// *blobs* (`/data/code`, `/data/storage`) stay separate.
     const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
-    pub fn info_path<A: TezosOriginatedAccount>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
+    pub fn info_path(account: &TezlinkOriginatedAccount) -> Result<OwnedPath, PathError> {
         concat(account.path(), &INFO_PATH)
     }
 
-    pub fn code_path<A: TezosOriginatedAccount>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
+    pub fn code_path(account: &TezlinkOriginatedAccount) -> Result<OwnedPath, PathError> {
         concat(account.path(), &CODE_PATH)
     }
 
-    pub fn storage_path<A: TezosOriginatedAccount>(
-        account: &A,
+    pub fn storage_path(
+        account: &TezlinkOriginatedAccount,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &STORAGE_PATH)
     }
 
-    pub fn origin_path<A: TezosOriginatedAccount>(
-        account: &A,
+    pub fn origin_path(
+        account: &TezlinkOriginatedAccount,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &ORIGIN_PATH)
     }

@@ -55,8 +55,7 @@ use tezosx_interfaces::{Origin, Registry};
 use tezosx_journal::TezosXJournal;
 
 use crate::account_storage::{
-    OriginatedContractInfo, StorageSpace, TezosImplicitAccount,
-    TezosImplicitAccountTrait, TezosOriginatedAccount,
+    OriginatedContractInfo, StorageSpace, TezosImplicitAccount, TezosImplicitAccountTrait,
 };
 pub use crate::address::OriginationNonce;
 use crate::gas::Cost;
@@ -2471,9 +2470,7 @@ pub(crate) mod test_utils {
 #[cfg(test)]
 mod tests {
     use crate::account_storage::TezosImplicitAccount;
-    use crate::account_storage::{
-        self, Code, TezosImplicitAccountTrait, TezosOriginatedAccount,
-    };
+    use crate::account_storage::{self, Code, TezosImplicitAccountTrait};
     use crate::context;
     use crate::{
         account_storage::TezlinkOriginatedAccount, address::OriginationNonce,
