@@ -525,7 +525,7 @@ mod tests {
         UpdateOrigin,
     };
 
-    use crate::account_storage::{TezlinkImplicitAccount, TezosImplicitAccount};
+    use crate::account_storage::{TezlinkImplicitAccount, TezosImplicitAccountTrait};
     use crate::context::{self, Context};
 
     const SOURCE_PKH: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";

@@ -704,7 +704,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
-    use tezos_execution::account_storage::TezosImplicitAccount;
+    use tezos_execution::account_storage::TezosImplicitAccountTrait;
     use tezos_execution::context::{self, Context as _};
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKey;

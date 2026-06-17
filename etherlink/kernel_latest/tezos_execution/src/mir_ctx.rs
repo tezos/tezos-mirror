@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::account_storage::{
-    Code, TezlinkAccount, TezlinkOriginatedAccount, TezosImplicitAccount,
+    Code, TezlinkAccount, TezlinkOriginatedAccount, TezosImplicitAccountTrait,
     TezosOriginatedAccount,
 };
 use crate::address::OriginationNonce;
@@ -96,7 +96,7 @@ pub struct TcCtx<'operation, Host: StorageV1, C: Context> {
     pub next_temporary_id: &'operation mut BigMapId,
 }
 
-pub struct OperationCtx<'operation, A: TezosImplicitAccount> {
+pub struct OperationCtx<'operation, A: TezosImplicitAccountTrait> {
     // In reality, 'source' and 'origination_nonce' have
     // a 'batch lifetime. Downgrade it to an 'operation
     // lifetime is not a problem for the compiler.

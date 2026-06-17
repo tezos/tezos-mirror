@@ -20,7 +20,7 @@ use tezos_tezlink::{
 };
 
 use crate::{
-    account_storage::{Manager, TezlinkAccount, TezosImplicitAccount},
+    account_storage::{Manager, TezlinkAccount, TezosImplicitAccountTrait},
     context::Context,
     gas::TezlinkOperationGas,
     storage_fees::HARD_STORAGE_LIMIT_PER_OPERATION,
@@ -98,7 +98,7 @@ fn compute_fees_balance_updates(
 /// making it a special case. In this case, we obtain the public key
 /// from the operation's payload. When processing a batch, the reveal operation is the
 /// first operation on it.
-fn get_revealed_key<Host: StorageV1, A: TezosImplicitAccount>(
+fn get_revealed_key<Host: StorageV1, A: TezosImplicitAccountTrait>(
     host: &Host,
     account: &A,
     first_content: &ManagerOperationContent,
@@ -214,7 +214,7 @@ pub struct ValidatedOperation {
     pub content: ManagerOperation<OperationContent>,
 }
 
-pub struct ValidatedBatch<A: TezosImplicitAccount> {
+pub struct ValidatedBatch<A: TezosImplicitAccountTrait> {
     pub source_account: A,
     // Used in TezosX to produce aliases
     pub source_public_key: Vec<u8>,

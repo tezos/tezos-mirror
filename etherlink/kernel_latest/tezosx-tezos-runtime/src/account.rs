@@ -10,7 +10,7 @@ use tezos_ethereum::rlp_helpers::{
     append_u256_le, append_u64_le, decode_field_u256_le, decode_field_u64_le,
 };
 use tezos_execution::account_storage::{
-    Manager, TezlinkAccount, TezosImplicitAccount as TezosImplicitAccountTrait,
+    Manager, TezlinkAccount, TezosImplicitAccountTrait,
 };
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -463,9 +463,7 @@ mod tests {
         use crate::account::TezosImplicitAccount;
         use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
         use tezos_evm_runtime::runtime::MockKernelHost;
-        use tezos_execution::account_storage::{
-            Manager, TezosImplicitAccount as TezosImplicitAccountTrait,
-        };
+        use tezos_execution::account_storage::{Manager, TezosImplicitAccountTrait};
 
         let mut host = MockKernelHost::default();
         let pkh =

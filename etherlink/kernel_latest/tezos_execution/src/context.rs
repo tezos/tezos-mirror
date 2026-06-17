@@ -10,7 +10,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Origin;
 
 use crate::account_storage::{
-    TezlinkImplicitAccount, TezlinkOriginatedAccount, TezosImplicitAccount,
+    TezlinkImplicitAccount, TezlinkOriginatedAccount, TezosImplicitAccountTrait,
     TezosOriginatedAccount,
 };
 
@@ -25,7 +25,7 @@ pub struct TezlinkContext {
 }
 
 pub trait Context {
-    type ImplicitAccountType: TezosImplicitAccount;
+    type ImplicitAccountType: TezosImplicitAccountTrait;
 
     type OriginatedAccountType: TezosOriginatedAccount;
 

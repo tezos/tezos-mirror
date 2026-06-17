@@ -1867,7 +1867,7 @@ mod tests {
     // Seed the Michelson world state so the alias snapshot has a subtree
     // to copy, as in production where migration creates it.
     fn test_host() -> MockKernelHost {
-        use tezos_execution::account_storage::TezosImplicitAccount;
+        use tezos_execution::account_storage::TezosImplicitAccountTrait;
         let mut host = MockKernelHost::default();
         let context =
             TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)

@@ -136,7 +136,7 @@ impl TezlinkAccount for TezlinkImplicitAccount {
     }
 }
 
-pub trait TezosImplicitAccount: TezlinkAccount + Sized {
+pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
     fn pkh(&self) -> &PublicKeyHash;
 
     /// Get the **counter** for the Tezlink account.
@@ -264,7 +264,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
     }
 }
 
-impl TezosImplicitAccount for TezlinkImplicitAccount {
+impl TezosImplicitAccountTrait for TezlinkImplicitAccount {
     fn pkh(&self) -> &PublicKeyHash {
         &self.pkh
     }
