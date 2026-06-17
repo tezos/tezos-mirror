@@ -11,11 +11,16 @@ use crate::{
     enshrined_contracts::{self, EnshrinedContracts},
 };
 use num_bigint::BigInt;
+use primitive_types::U256;
+use rlp::{Decodable, Encodable, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::{
     enc::BinWriter,
     nom::NomReader,
     types::{Narith, Zarith},
+};
+use tezos_ethereum::rlp_helpers::{
+    append_u256_le, append_u64_le, decode_field_u256_le, decode_field_u64_le,
 };
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
@@ -830,6 +835,61 @@ pub fn u256_to_narith(value: &primitive_types::U256) -> Narith {
     let mut bytes = [0u8; 32];
     value.to_big_endian(&mut bytes);
     Narith(num_bigint::BigUint::from_bytes_be(&bytes))
+}
+
+// Used as a value for the durable storage.
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
+pub struct TezosAccountInfo {
+    pub balance: U256,
+    pub nonce: u64,
+    pub pub_key: Option<PublicKey>,
+}
+
+impl Encodable for TezosAccountInfo {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        s.begin_list(3);
+        append_u256_le(s, &self.balance);
+        append_u64_le(s, &self.nonce);
+        match &self.pub_key {
+            Some(pub_key) => s.append(&pub_key.to_b58check().as_bytes()),
+            None => s.append_empty_data(),
+        };
+    }
+}
+
+impl Decodable for TezosAccountInfo {
+    fn decode(rlp: &Rlp) -> Result<Self, rlp::DecoderError> {
+        if !rlp.is_list() {
+            return Err(rlp::DecoderError::RlpExpectedToBeList);
+        }
+        if rlp.item_count()? != 3 {
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
+        }
+        let mut it = rlp.iter();
+        let balance_decoder = it.next().ok_or(rlp::DecoderError::RlpExpectedToBeList)?;
+        let balance = decode_field_u256_le(&balance_decoder, "balance")?;
+        let nonce_decoder = it.next().ok_or(rlp::DecoderError::RlpExpectedToBeList)?;
+        let nonce = decode_field_u64_le(&nonce_decoder, "nonce")?;
+        let pub_key_decoder = it.next().ok_or(rlp::DecoderError::RlpExpectedToBeList)?;
+        let pub_key: Option<PublicKey> = if pub_key_decoder.is_empty() {
+            None
+        } else {
+            let vec: Vec<u8> = pub_key_decoder.as_val()?;
+            let s: String = String::from_utf8(vec).map_err(|_| {
+                rlp::DecoderError::Custom("Invalid public key (not a string)")
+            })?;
+            let pub_key = PublicKey::from_b58check(&s).map_err(|_| {
+                rlp::DecoderError::Custom("Invalid public key (b58check)")
+            })?;
+            Some(pub_key)
+        };
+
+        Ok(TezosAccountInfo {
+            balance,
+            nonce,
+            pub_key,
+        })
+    }
 }
 
 #[cfg(test)]
