@@ -96,6 +96,12 @@
 
 ### Michelson Runtime
 
+- The `TICKET` instruction now rejects a non-comparable ticket content
+  (e.g. `ticket (ticket string)`) during typechecking, matching L1,
+  which requires ticket content to be comparable. Previously the
+  Michelson runtime typechecker accepted such scripts, diverging from
+  L1 and allowing ticket duplication via `READ_TICKET` on a nested
+  ticket. (!22218)
 - The Michelson storage-fees burn is now rendered on the CRAC-triggering
   operation: an Applied content that delegates storage cost to its
   callee carries the dual `(payer −V, storage fees +V)` balance-updates

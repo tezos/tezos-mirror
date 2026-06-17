@@ -616,6 +616,7 @@
   "swap_01.tc.tzt": true,
   "ticket_00.tzt": true,
   "ticket_01.tzt": true,
+  "ticket_02.tc.tzt": true,
   "transfertokens_00.tc.tzt": true,
   "transfertokens_00.tzt": false,
   "transfertokens_01.tzt": false,

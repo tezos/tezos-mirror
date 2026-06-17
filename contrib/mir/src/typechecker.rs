@@ -3447,6 +3447,13 @@ fn typecheck_instruction_step<'a, 'b>(
 
         (App(TICKET, [], _), [.., T::Nat, _]) => {
             let content_ty = pop!();
+            // The content of a ticket must be comparable; this mirrors the
+            // written `ticket t` parser (BuildKind::Ticket), which also
+            // enforces Comparable. Without this check, MIR would accept e.g.
+            // `ticket (ticket string)`, which L1 rejects ("comparable type
+            // expected"). Such nested tickets also enable ticket duplication
+            // via READ_TICKET.
+            content_ty.ensure_prop(gas, TypeProperty::Comparable)?;
             *stack_top_mut(stack)? = T::new_option(T::new_ticket(content_ty.clone()));
             I::Ticket(content_ty)
         }
@@ -10647,6 +10654,17 @@ mod typecheck_tests {
         assert_eq!(
             stk,
             &tc_stk![Type::new_option(Type::new_ticket(Type::Unit))]
+        );
+
+        // Trying to build a `ticket (ticket string)` fails because
+        // `ticket string` is not comparable.
+        let stk = &mut tc_stk![Type::Nat, Type::new_ticket(Type::String)];
+        assert_eq!(
+            typecheck_instruction(&parse("TICKET").unwrap(), &mut Gas::default(), stk),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Comparable,
+                Type::new_ticket(Type::String)
+            ))
         );
     }
 
