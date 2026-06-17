@@ -1500,9 +1500,10 @@ pub mod tests {
         gas::TezlinkOperationGas,
     };
     use mir::ast::big_map::{
-        dump_big_map_updates, BigMap, BigMapContent, BigMapFromId, BigMapId,
+        dump_big_map_updates, dump_big_map_walk, remove_unreferenced_big_maps, BigMap,
+        BigMapContent, BigMapFromId, BigMapId,
     };
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     #[macro_export]
@@ -1879,6 +1880,142 @@ pub mod tests {
             Type::Int,
             Type::Int,
             expected_content,
+        );
+    }
+
+    /// Regression for L2-1636: a big map persisted in the parent storage
+    /// is moved into an outgoing operation while the returned storage no
+    /// longer references it (the parent replaces its storage with a fresh
+    /// `EMPTY_BIG_MAP`). The contract-result dump walks the returned
+    /// storage first, then the operation list, and only then removes
+    /// started ids no longer owned by the returned storage. The operation
+    /// walk must copy the moved-out big map while its durable source still
+    /// exists; the source is removed afterwards.
+    #[test]
+    fn dump_moves_persisted_big_map_into_operation() {
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        let arena = Arena::new();
+
+        // Seed the persisted parent big map S (id 0).
+        let s = storage
+            .big_map_new(&Type::Int, &Type::String, false)
+            .unwrap();
+        assert_eq!(s, 0.into());
+        let s_content = BTreeMap::from([
+            (TypedValue::int(1), TypedValue::String("one".into())),
+            (TypedValue::int(2), TypedValue::String("two".into())),
+        ]);
+        for (key, value) in &s_content {
+            storage
+                .big_map_update(&s, key.clone(), Some(value.clone()))
+                .unwrap();
+        }
+
+        // Returned-storage walk: the parent returns a fresh empty big map
+        // (EMPTY_BIG_MAP) that does not reference S.
+        let mut returned_storage = BigMap {
+            content: BigMapContent::InMemory(BTreeMap::new()),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        let mut seen_in_storage = BTreeSet::new();
+        dump_big_map_walk(
+            &mut storage,
+            &mut [&mut returned_storage],
+            false,
+            &mut seen_in_storage,
+        )
+        .unwrap();
+        // S is not reachable from the returned storage.
+        assert!(!seen_in_storage.contains(&s));
+
+        // Operation-list walk: the outgoing operation carries S, moved out
+        // of the parent storage. This must succeed: S is still present.
+        let mut operation_map = BigMap {
+            content: BigMapContent::FromId(BigMapFromId {
+                id: s.clone(),
+                overlay: BTreeMap::new(),
+            }),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        let mut seen_in_operations = BTreeSet::new();
+        dump_big_map_walk(
+            &mut storage,
+            &mut [&mut operation_map],
+            true,
+            &mut seen_in_operations,
+        )
+        .expect("operation walk must copy S before it is removed");
+
+        // The operation now references a temporary copy, not S itself, and
+        // that copy carries S's content.
+        let operation_id = match &operation_map.content {
+            BigMapContent::FromId(m) => m.id.clone(),
+            BigMapContent::InMemory(_) => panic!("operation big map was not dumped"),
+        };
+        assert_ne!(operation_id, s);
+        assert!(operation_id.is_temporary());
+        assert_big_map_eq(
+            &mut storage,
+            &arena,
+            &operation_id,
+            Type::Int,
+            Type::String,
+            s_content,
+        );
+
+        // Removal runs last: S, no longer owned by the returned storage, is
+        // dropped from durable storage.
+        remove_unreferenced_big_maps(&mut storage, &[s.clone()], &seen_in_storage)
+            .unwrap();
+        assert!(
+            storage
+                .big_map_get_type(&s)
+                .expect("reading S type must not fail")
+                .is_none(),
+            "S should have been removed from durable storage"
+        );
+    }
+
+    /// Root-cause guard for L2-1636: copying a big map whose durable source
+    /// paths have already been removed fails. This is exactly the failure
+    /// the fix avoids by deferring removal until after the operation walk
+    /// has copied the source.
+    #[test]
+    fn dump_copy_after_source_removed_errors() {
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+
+        let s = storage
+            .big_map_new(&Type::Int, &Type::String, false)
+            .unwrap();
+        storage
+            .big_map_update(
+                &s,
+                TypedValue::int(1),
+                Some(TypedValue::String("one".into())),
+            )
+            .unwrap();
+
+        // Buggy ordering: the source is removed before the operation copy.
+        storage.big_map_remove(&s).unwrap();
+
+        let mut operation_map = BigMap {
+            content: BigMapContent::FromId(BigMapFromId {
+                id: s.clone(),
+                overlay: BTreeMap::new(),
+            }),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        let mut seen = BTreeSet::new();
+        let result =
+            dump_big_map_walk(&mut storage, &mut [&mut operation_map], true, &mut seen);
+        assert!(
+            result.is_err(),
+            "copying from a removed source must fail; deferring removal avoids this"
         );
     }
 

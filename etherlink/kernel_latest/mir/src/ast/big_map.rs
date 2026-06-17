@@ -820,6 +820,30 @@ pub fn dump_big_map_updates<'a>(
     // never appears in `seen_source_ids` is dropped storage that we
     // must clean up.
     let mut seen_source_ids: BTreeSet<BigMapId> = BTreeSet::new();
+    dump_big_map_walk(storage, finished_with_maps, temporary, &mut seen_source_ids)?;
+    remove_unreferenced_big_maps(storage, started_with_map_ids, &seen_source_ids)?;
+    Ok(())
+}
+
+/// Walk `finished_with_maps` in AST order, dumping each big map's updates
+/// to the lazy storage and recording every encountered `FromId` source id
+/// in `seen_source_ids`. See [dump_big_map_updates] for the full policy
+/// driving how each big map is dumped.
+///
+/// This performs the dump and the in-walk dedup, but NOT the removal of
+/// started ids that are no longer referenced — that decision is deferred
+/// to [remove_unreferenced_big_maps]. Splitting the two lets a caller run
+/// several walks against the same storage (e.g. the returned storage then
+/// the emitted operation list) and copy from a source id during a later
+/// walk before that id is removed. See the interpreter's contract-result
+/// dump, where a big map moved from parent storage into an outgoing
+/// operation must survive the storage walk's removal pass.
+pub fn dump_big_map_walk<'a>(
+    storage: &mut (impl LazyStorage<'a> + ?Sized),
+    finished_with_maps: &mut [&mut BigMap<'a>],
+    temporary: bool,
+    seen_source_ids: &mut BTreeSet<BigMapId>,
+) -> Result<(), LazyStorageError> {
     let mut deferred_in_place_updates: Vec<(
         BigMapId,
         BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
@@ -867,21 +891,37 @@ pub fn dump_big_map_updates<'a>(
         }
     }
 
-    // Remove big maps that started in storage but are no longer
-    // referenced by any finished map (neither kept in place nor used
-    // as a copy source).
-    for map_id in started_with_map_ids {
-        if !seen_source_ids.contains(map_id) {
-            storage.big_map_remove(map_id)?
-        }
-    }
-
     // Apply deferred in-place updates last so that any earlier copies
     // captured the pre-update state of their source.
     for (id, overlay) in deferred_in_place_updates {
         storage.big_map_bulk_update(&id, overlay)?;
     }
 
+    Ok(())
+}
+
+/// Remove every id in `started_with_map_ids` that is absent from
+/// `seen_source_ids` — i.e. storage that started the execution but is no
+/// longer reachable from any dumped big map (neither kept in place nor
+/// used as a copy source).
+///
+/// Call this only after every relevant [dump_big_map_walk] has run, so an
+/// id still reachable from a later walk's payload has been copied before
+/// it is removed. `seen_source_ids` must therefore reflect reachability
+/// from the result(s) that own those started ids — for a contract result,
+/// the returned storage, since a big map moved out into an operation is
+/// copied into the temporary range and no longer keeps the started id
+/// alive.
+pub fn remove_unreferenced_big_maps<'a>(
+    storage: &mut (impl LazyStorage<'a> + ?Sized),
+    started_with_map_ids: &[BigMapId],
+    seen_source_ids: &BTreeSet<BigMapId>,
+) -> Result<(), LazyStorageError> {
+    for map_id in started_with_map_ids {
+        if !seen_source_ids.contains(map_id) {
+            storage.big_map_remove(map_id)?
+        }
+    }
     Ok(())
 }
 
