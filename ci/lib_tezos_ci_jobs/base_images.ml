@@ -409,54 +409,42 @@ let job_ci_release_based_images =
     ~only_if_changed:Files.(ci_releases @ debian_base)
     "images.ci-release"
 
-(* This base image differs from the others in its build process: it is
-   bootstrapped directly from the upstream Docker Hub [docker:<version>]
-   image (declared in {!Images_external.upstream_docker}) rather than from
-   another internal base image (e.g. [debian:<release>]).
-   The resulting image includes the Docker daemon, gcloud CLI, hadolint
-   and regctl — it is the standard Docker-in-Docker image for CI jobs.
-   The changeset is also different to ensure this image is always up-to-date *)
-let make_job_docker_ci_based_images ?start_job ?(changeset = false) () =
+(* ── Cacio: alpine-docker-ci ─────────────────────────────────────────────── *)
+
+(* This job is special: it bootstraps from the upstream docker:<version> image
+   (not alpine-docker-ci itself) and has a custom build procedure. *)
+let job_docker_ci_based_images =
   let docker_version = Images.Base_images.docker_version in
-  let variables =
-    [
-      ("RELEASE", docker_version);
-      ("DISTRIBUTION", "alpine-docker-ci");
-      ("IMAGE_PATH", "");
-      ("GCLOUD_VERSION", "543.0.0");
-      ("HADOLINT_VERSION", "2.10.0");
-      ("DOCKER_VERSION", docker_version);
-      ("REGCTL_VERSION", "v0.4.3");
-      ("PLATFORM", "linux/amd64,linux/arm64");
-      ("CI_DOCKER_HUB", "false");
-    ]
-  in
-  job
-    ~rules:
-      (if changeset then
-         [
-           job_rule
-             ~changes:Changeset.(encode (make Files.alpine_docker_ci))
-             ~when_:On_success
-             ();
-         ]
-       else [job_rule ~when_:On_success ()])
-    ~tag:Gcp_very_high_cpu
+  CI.job
+    "images.alpine-docker-ci"
     ~__POS__
+    ~description:
+      "Build alpine-docker-ci base images (bootstrapped from upstream docker)"
+    ~stage:Cacio.Build
     ~image:Images.upstream_docker
-    ~variables
     ~services:[{name = Images.Base_images.dind_service}]
-    ~stage:Stages.build
-    ?dependencies:(Option.map (fun j -> Dependent [Job j]) start_job)
-    ~name:"images.alpine-docker-ci"
-    [
-      (* minimal set of tools needed to bootstrap the docker-ci image *)
-      "images/scripts/install-gcloud-apk.sh";
-      "export PATH=$PATH:/google-cloud-sdk/bin";
-      "scripts/ci/docker_initialize.sh";
-      "scripts/ci/build-base-images.sh \
-       images/base-images/Dockerfile.alpine-docker-ci";
-    ]
+    ~tag:Gcp_very_high_cpu
+    ~only_if_changed:Files.alpine_docker_ci
+    ~variables:
+      [
+        ("RELEASE", docker_version);
+        ("DISTRIBUTION", "alpine-docker-ci");
+        ("IMAGE_PATH", "");
+        ("GCLOUD_VERSION", "543.0.0");
+        ("HADOLINT_VERSION", "2.10.0");
+        ("DOCKER_VERSION", docker_version);
+        ("REGCTL_VERSION", "v0.4.3");
+        ("PLATFORM", "linux/amd64,linux/arm64");
+        ("CI_DOCKER_HUB", "false");
+      ]
+    ~script:
+      [
+        "images/scripts/install-gcloud-apk.sh";
+        "export PATH=$PATH:/google-cloud-sdk/bin";
+        "scripts/ci/docker_initialize.sh";
+        "scripts/ci/build-base-images.sh \
+         images/base-images/Dockerfile.alpine-docker-ci";
+      ]
 
 (* ── Rust family ────────────────────────────────────────────────────────── *)
 
@@ -524,22 +512,22 @@ let make_job_rust_based_images_merge ?(changeset = false) () =
 
 (* ── debian-homebrew ────────────────────────────────────────────────────── *)
 
-(* debian-homebrew: based on [debian:trixie] *)
-let make_job_debian_homebrew_base_images ?start_job ?(changeset = false) () =
-  let dep_debian = make_job_debian_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
+(* ── Cacio: debian-homebrew ──────────────────────────────────────────────── *)
+
+(* debian_base is included to trigger a rebuild when debian files change,
+   since ~needs_legacy does not participate in Cacio changeset propagation. *)
+let job_debian_homebrew_based_images =
+  base_image_job
     ~image_name:"debian-homebrew"
     ~base_name:(Pipeline_dep "debian")
-    ~dependencies:(Dependent [Job dep_debian])
     ~matrix:[("RELEASE", ["trixie"])]
     ~compilation:Amd64_only
-      (* Adding the changeset of [debian] job as we want to test the
-       build of [debian-homebrew] if [debian] is rebuild. *)
-    ~changes:(Changeset.make (Files.debian_homebrew @ Files.debian_base))
     "images/base-images/Dockerfile.debian-homebrew"
+    ~__POS__
+    ~description:"Build debian-homebrew base images"
+    ~only_if_changed:Files.(debian_homebrew @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    "images.debian-homebrew"
 
 (* ── debian-build and ubuntu-build families ─────────────────────────────── *)
 
@@ -625,67 +613,69 @@ let make_job_ubuntu_build_base_images_merge ?(changeset = false) () =
 
 (* ── Systemd images ──────────────────────────────────────────────────────── *)
 
-let make_job_debian_systemd_base_images ?start_job ?(changeset = false) () =
-  let dep_debian = make_job_debian_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
+(* ── Cacio: debian-systemd ───────────────────────────────────────────────── *)
+
+let job_debian_systemd_based_images =
+  base_image_job
     ~image_name:"debian-systemd"
     ~base_name:(Pipeline_dep "debian")
-    ~dependencies:(Dependent [Job dep_debian])
     ~matrix:Distribution.(release_matrix Debian)
     ~compilation:Amd64_only
-    ~changes:(Changeset.make (Files.debian_systemd @ Files.debian_base))
     "images/base-images/Dockerfile.debian-systemd"
-
-let make_job_ubuntu_systemd_base_images ?start_job ?(changeset = false) () =
-  let dep_ubuntu = make_job_ubuntu_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
     ~__POS__
+    ~description:"Build debian-systemd base images"
+    ~only_if_changed:Files.(debian_systemd @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    "images.debian-systemd"
+
+(* ── Cacio: ubuntu-systemd ───────────────────────────────────────────────── *)
+
+let job_ubuntu_systemd_based_images =
+  base_image_job
     ~image_name:"ubuntu-systemd"
     ~base_name:(Pipeline_dep "ubuntu")
-    ~dependencies:(Dependent [Job dep_ubuntu])
     ~matrix:Distribution.(release_matrix Ubuntu)
     ~compilation:Amd64_only
-    ~changes:(Changeset.make (Files.debian_systemd @ Files.debian_base))
     "images/base-images/Dockerfile.debian-systemd"
+    ~__POS__
+    ~description:"Build ubuntu-systemd base images"
+    ~only_if_changed:Files.(debian_systemd @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_ubuntu_based_images ())]
+    "images.ubuntu-systemd"
 
 (* ── debian-jsonnet ──────────────────────────────────────────────────────── *)
 
-(* debian-jsonnet: based on [debian:trixie] *)
-let make_job_jsonnet_base_images ?start_job ?(changeset = false) () =
-  let dep_debian = make_job_debian_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
+(* ── Cacio: debian-jsonnet ───────────────────────────────────────────────── *)
+
+let job_jsonnet_based_images =
+  base_image_job
     ~image_name:"debian-jsonnet"
     ~base_name:(Pipeline_dep "debian")
-    ~dependencies:(Dependent [Job dep_debian])
     ~matrix:[("RELEASE", ["trixie"])]
     ~compilation:Amd64_only
-    ~changes:(Changeset.make (Files.debian_jsonnet @ Files.debian_base))
     "images/base-images/Dockerfile.debian-jsonnet"
+    ~__POS__
+    ~description:"Build debian-jsonnet base images"
+    ~only_if_changed:Files.(debian_jsonnet @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    "images.debian-jsonnet"
 
 (* ── rust-sdk-bindings ───────────────────────────────────────────────────── *)
 
-(* rust-sdk-bindings: based on [debian:trixie] *)
-let make_job_rust_sdk_bindings_base_images ?start_job ?(changeset = false) () =
-  let dep_debian = make_job_debian_based_images () in
-  make_job_base_images
-    ?start_job
-    ~changeset
-    ~__POS__
+(* ── Cacio: rust-sdk-bindings ────────────────────────────────────────────── *)
+
+let job_rust_sdk_bindings_based_images =
+  base_image_job
     ~image_name:"debian-rust-sdk-bindings"
     ~base_name:(Pipeline_dep "debian")
-    ~dependencies:(Dependent [Job dep_debian])
     ~matrix:[("RELEASE", ["trixie"])]
     ~compilation:Amd64_only
-    ~changes:(Changeset.make (Files.rust_sdk_bindings @ Files.debian_base))
     "images/base-images/Dockerfile.rust-sdk-bindings"
+    ~__POS__
+    ~description:"Build debian-rust-sdk-bindings base images"
+    ~only_if_changed:Files.(rust_sdk_bindings @ debian_base)
+    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    "images.debian-rust-sdk-bindings"
 
 (* ── Assembly ────────────────────────────────────────────────────────────── *)
 
@@ -702,16 +692,10 @@ let jobs ?start_job ?(changeset = false) () =
     make_job_ubuntu_based_images ?start_job ~changeset ();
     make_job_rust_based_images ?start_job ~changeset ();
     make_job_rust_based_images_merge ~changeset ();
-    make_job_debian_homebrew_base_images ?start_job ~changeset ();
-    make_job_docker_ci_based_images ?start_job ~changeset ();
     make_job_debian_build_base_images ?start_job ~changeset ();
     make_job_debian_build_base_images_merge ~changeset ();
     make_job_ubuntu_build_base_images ?start_job ~changeset ();
     make_job_ubuntu_build_base_images_merge ~changeset ();
-    make_job_debian_systemd_base_images ?start_job ~changeset ();
-    make_job_ubuntu_systemd_base_images ?start_job ~changeset ();
-    make_job_jsonnet_base_images ?start_job ~changeset ();
-    make_job_rust_sdk_bindings_base_images ?start_job ~changeset ();
   ]
   @
   if enable_rpm_images then
@@ -724,7 +708,17 @@ let jobs ?start_job ?(changeset = false) () =
 (* ── Cacio pipeline registrations ───────────────────────────────────────── *)
 
 let () =
-  let jobs = [(Cacio.Auto, job_ci_release_based_images)] in
+  let jobs =
+    [
+      (Cacio.Auto, job_ci_release_based_images);
+      (Cacio.Auto, job_docker_ci_based_images);
+      (Cacio.Auto, job_debian_homebrew_based_images);
+      (Cacio.Auto, job_jsonnet_based_images);
+      (Cacio.Auto, job_rust_sdk_bindings_based_images);
+      (Cacio.Auto, job_debian_systemd_based_images);
+      (Cacio.Auto, job_ubuntu_systemd_based_images);
+    ]
+  in
   Cacio.register_merge_request_jobs jobs ;
   Cacio.register_jobs Cacio.Base_images_daily jobs
 
