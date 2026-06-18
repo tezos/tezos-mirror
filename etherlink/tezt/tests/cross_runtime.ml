@@ -10335,11 +10335,14 @@ let test_crac_failwith_receipt_is_gas_bounded () =
   let open Wrapper in
   let prefix = "CRAC-FAILWITH-BOUNDED" in
   let small_payload = 1 in
-  let large_payload = 3000 in
+  (* Large enough that the per-byte charge on the rendered body exceeds the
+     headroom left in the small run's budget, so forwarding that budget (step 3)
+     out-of-gasses on the charge rather than affording it. *)
+  let large_payload = 8000 in
   (* Generous ceiling: comfortably above one CRAC's cost including the large
      per-byte charge. Not a tuned value — only the tight budget below is
      load-bearing, and it is measured rather than hardcoded. *)
-  let generous_gas = 2_000_000 in
+  let generous_gas = 6_000_000 in
   Log.debug ~prefix "Originate small- and large-payload FAILWITH contracts" ;
   let* small_target =
     TezFailwithString.originate ~payload_length:small_payload ()

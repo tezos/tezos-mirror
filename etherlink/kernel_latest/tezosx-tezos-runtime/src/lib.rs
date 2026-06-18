@@ -395,9 +395,11 @@ fn build_crac_receipt(
 ///
 /// When `cross_runtime_transfer` fails, we still need a receipt in the
 /// Michelson block so indexers see the failed CRAC.  The top-level
-/// operation has `status: failed` and carries any partial internal
-/// operations (with backtracked / failed / skipped statuses) so
-/// indexers can see what was attempted.
+/// operation has `status: failed` with an empty error vector (use
+/// [`crac_top_level_failed_result`]); the full error is carried exactly
+/// once on the synthetic `alias(E_1)→target` failed-transfer internal
+/// op so indexers can see which contract call was attempted and why it
+/// failed.
 #[allow(clippy::too_many_arguments)]
 fn build_failed_crac_receipt(
     null_pkh: &PublicKeyHash,
@@ -452,7 +454,7 @@ fn build_failed_crac_receipt(
                 parameters: parameters.clone(),
             },
             result: ContentResult::Failed(ApplyOperationErrors::from(
-                ApplyOperationError::Transfer(error.clone()),
+                ApplyOperationError::Transfer(error),
             )),
         },
     ));
@@ -473,9 +475,7 @@ fn build_failed_crac_receipt(
 
     let top_level_result = OperationResult {
         balance_updates: vec![],
-        result: ContentResult::Failed(ApplyOperationErrors::from(
-            ApplyOperationError::Transfer(error),
-        )),
+        result: crac_top_level_failed_result(),
         internal_operation_results: all_internal,
     };
 
@@ -2542,16 +2542,18 @@ mod tests {
         );
     }
 
-    /// The top-level error of a failed CRAC receipt is persisted **twice** —
-    /// once as the top-level operation result and once as the synthetic
-    /// alias(E_1)→target failed-transfer internal op (so indexers see the
-    /// attempted call). `charge_persisted_error` prices `2 * wrapped_len` on
-    /// the strength of this; this test pins the premise so the charge and the
-    /// receipt shape cannot silently drift apart. If the receipt is ever
-    /// de-duplicated to carry the error once, this count drops to 1 and the
-    /// `2 *` factor in `charge_persisted_error` must drop with it.
+    /// The error of a failed CRAC receipt is persisted **once** — on the
+    /// synthetic alias(E_1)→target failed-transfer internal op so indexers see
+    /// the attempted call.  The top-level operation result carries an empty
+    /// error vector (`status: failed`, no payload).  This test pins the
+    /// premise so `charge_persisted_error`'s 1× factor and the receipt shape
+    /// cannot silently drift apart.
     #[test]
-    fn failed_crac_receipt_persists_top_level_error_twice() {
+    fn failed_crac_receipt_persists_top_level_error_once() {
+        use tezos_tezlink::operation_result::{
+            OperationDataAndMetadata, OperationResultSum,
+        };
+
         let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
         let source_contract = Contract::Originated(
             ContractKt1Hash::from_b58check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
@@ -2590,6 +2592,25 @@ mod tests {
         )
         .expect("build_failed_crac_receipt should succeed");
 
+        // Assert top-level has empty error vector.
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            applied.op_and_receipt;
+        let top = batch.operations.first().expect("single op in batch");
+        if let OperationResultSum::Transfer(ref result) = top.receipt {
+            match &result.result {
+                ContentResult::Failed(errs) => assert!(
+                    errs.errors.is_empty(),
+                    "top-level error vector must be empty; got: {:?}",
+                    errs.errors
+                ),
+                other => panic!("top-level result must be Failed, got: {other:?}"),
+            }
+        } else {
+            panic!("top-level receipt must be Transfer");
+        }
+
+        // Assert the payload appears exactly once in the serialized binary
+        // (on the alias(E_1)→target internal op, not on the top-level).
         let mut serialized = Vec::new();
         applied
             .op_and_receipt
@@ -2602,9 +2623,9 @@ mod tests {
             .filter(|w| *w == needle)
             .count();
         assert_eq!(
-            occurrences, 2,
-            "top-level error is persisted twice (top-level result + synthetic \
-             failed-transfer entry); charge_persisted_error prices 2× on this"
+            occurrences, 1,
+            "error payload must appear exactly once (alias→target internal op only); \
+             charge_persisted_error prices 1× on this"
         );
     }
 
