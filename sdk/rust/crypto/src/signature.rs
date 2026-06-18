@@ -23,7 +23,7 @@ use tezos_data_encoding::nom::error::DecodeError;
 use tezos_data_encoding::nom::{NomReader, NomResult};
 use thiserror::Error;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Signature {
     Ed25519(Ed25519Signature),
@@ -31,6 +31,30 @@ pub enum Signature {
     P256(P256Signature),
     Bls(BlsSignature),
     Unknown(UnknownSignature),
+}
+
+impl PartialEq for Signature {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl Ord for Signature {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_ref().cmp(other.as_ref())
+    }
+}
+
+impl PartialOrd for Signature {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl std::hash::Hash for Signature {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_ref().hash(state);
+    }
 }
 
 impl Signature {
@@ -246,11 +270,37 @@ impl<'a> NomReader<'a> for Signature {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     #[test]
     fn test() {
         assert_eq!(
-            &super::Signature::try_from([0; 64].to_vec()).unwrap().to_base58_check(),
+            &Signature::try_from([0; 64].to_vec()).unwrap().to_base58_check(),
             "sigMzJ4GVAvXEd2RjsKGfG2H9QvqTSKCZsuB2KiHbZRGFz72XgF6KaKADznh674fQgBatxw3xdHqTtMHUZAGRprxy64wg1aq"
         );
+    }
+
+    #[test]
+    fn test_eq() {
+        assert_eq!(
+            "edsigtj8LhbJ2B3qhZvqzA49raG65dydFcWZW9b9L7ntF3bb29zxaBFFL8SM1jeBUY66hG122znyVA4wpzLdwxcNZwSK3Szu7iD".parse::<Signature>().unwrap(),
+            "sigZJsaY57u7efWjrh22JfcxoZs9YKdsgumuPbPStG3Fa4rB1ygMLF3P76h3ZgScvLpTYR5HC8KSz4FYbkJU2bkPEwZERYJo".parse::<Signature>().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_hash_eq_consistency() {
+        use std::collections::HashSet;
+        let ed = "edsigtj8LhbJ2B3qhZvqzA49raG65dydFcWZW9b9L7ntF3bb29zxaBFFL8SM1jeBUY66hG122znyVA4wpzLdwxcNZwSK3Szu7iD"
+            .parse::<Signature>()
+            .unwrap();
+        let unknown = "sigZJsaY57u7efWjrh22JfcxoZs9YKdsgumuPbPStG3Fa4rB1ygMLF3P76h3ZgScvLpTYR5HC8KSz4FYbkJU2bkPEwZERYJo"
+            .parse::<Signature>()
+            .unwrap();
+        assert_eq!(ed, unknown);
+        let mut set = HashSet::new();
+        set.insert(ed);
+        set.insert(unknown);
+        assert_eq!(set.len(), 1);
     }
 }
