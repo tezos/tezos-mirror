@@ -60,8 +60,26 @@ zcash() {
 
 }
 
+keyring() {
+  # gnupg is needed by the Makefile to build .gpg keyrings from .asc files
+  apt-get update -qq && apt-get install -y -qq gnupg
+  # On the CI, source repository-keys.sh so that GPG_PUBLIC_KEY_1/_2 are set to
+  # the repository signing key(s): production keys fetched from GCP on protected
+  # branches, the in-repo test keys otherwise. This is the same key source used
+  # by create_debian_repo.sh to sign the APT repository, so the keyring embeds
+  # exactly the public key(s) the repository is signed with. Locally (no CI) we
+  # skip this and build-keyring-deb.sh falls back to the in-repo test keys.
+  if [ -n "${CI:-}" ]; then
+    # shellcheck source=scripts/ci/repository-keys.sh
+    . ./scripts/ci/repository-keys.sh
+  fi
+  # Delegate to the CI build script which handles both production (GCP)
+  # and test key injection, changelog update, and dpkg-buildpackage.
+  ./scripts/ci/build-keyring-deb.sh
+}
+
 usage() {
-  echo "Usage: $0 (binaries|zcash) [--dev]"
+  echo "Usage: $0 (binaries|zcash|keyring) [--dev]"
   exit 2
 }
 
@@ -155,7 +173,6 @@ debchange --changelog scripts/packaging/octez/debian/changelog \
   --newversion "$DEBVERSION" "$DEBCHANGELOG"
 debchange --changelog scripts/packaging/octez-data/debian/changelog \
   --newversion "1.0.0" "Sapling params"
-
 TARGET=all
 
 while [ $# -gt 0 ]; do
@@ -166,6 +183,10 @@ while [ $# -gt 0 ]; do
     ;;
   "zcash")
     TARGET=zcash
+    shift
+    ;;
+  "keyring")
+    TARGET=keyring
     shift
     ;;
   "--dev")
@@ -192,10 +213,15 @@ case ${TARGET} in
   echo "Building data packages only"
   zcash
   ;;
+"keyring")
+  echo "Building keyring package only"
+  keyring
+  ;;
 "all")
-  echo "Building binary and data packages"
+  echo "Building binary, data and keyring packages"
   packages
   zcash
+  keyring
   ;;
 esac
 
