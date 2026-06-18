@@ -349,6 +349,7 @@ where
                 // block-production path.
                 true,
                 true,
+                false, // da fees are disabled in simulation
             )
         }
         _ => chain_config.apply_transaction(

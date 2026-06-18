@@ -1420,7 +1420,7 @@ mod tests {
             &mut host,
             &pkh,
             TezosAccountInfo {
-                balance: U256::from(10),
+                balance: U256::from(10000),
                 nonce: 0,
                 pub_key: None,
             },
@@ -1436,7 +1436,7 @@ mod tests {
             "manager must be unrevealed before the reveal operation"
         );
 
-        let reveal = make_reveal_operation(1, 1, 500, 0, bootstrap);
+        let reveal = make_reveal_operation(1000, 1, 500, 0, bootstrap);
         store_blueprints::<_, TezosXChainConfig>(
             &mut host,
             vec![tezos_blueprint(vec![reveal], Timestamp::from(0i64))],
@@ -1498,8 +1498,8 @@ mod tests {
         // Seed bootstrap1 with enough mutez to cover both fees and the
         // transfer. With DA fees disabled and the destination already
         // present in the TezosX storage, there is no slot burn:
-        // bootstrap1 pays 1 (reveal fee) + 1 (transfer fee) + 35 (transfer).
-        let initial_balance = 100_u64;
+        // bootstrap1 pays 1000 (reveal fee) + 1000 (transfer fee) + 35 (transfer).
+        let initial_balance = 10000_u64;
         set_tezos_account_info(
             &mut host,
             &src_pkh,
@@ -1529,8 +1529,8 @@ mod tests {
             .expect("bootstrap1 should be allocated");
         assert_eq!(info_before.pub_key, None);
 
-        let reveal_fee = 1_u64;
-        let transfer_fee = 1_u64;
+        let reveal_fee = 1000_u64;
+        let transfer_fee = 1000_u64;
         let transfer_amount = 35_u64;
 
         let reveal = make_reveal_operation(reveal_fee, 1, 500, 0, bootstrap1.clone());
@@ -1658,7 +1658,7 @@ mod tests {
         .expect("Should have set bootstrap1 account info");
 
         let origination = make_origination_operation(
-            1,
+            1000,
             1,
             5000,
             500,
@@ -1674,7 +1674,7 @@ mod tests {
         );
 
         let call = make_transaction_operation(
-            1,
+            1000,
             2,
             2000,
             300,
@@ -1736,24 +1736,31 @@ mod tests {
     }
 
     /// L2-1727: a delayed-inbox Tezos operation is subject to L1's per-block
-    /// internal-operation cap *cumulatively*. The kernel threads the block's
-    /// prior internal-op count into the delayed `BlockCtx`
-    /// (`apply::apply_transaction`), so a sub-operation crossing the cap fails
+    /// internal-operation cap *cumulatively*. Delayed handling now lives in
+    /// [`TezosXChainConfig::apply_transaction`] (chains.rs), which derives the
+    /// block's prior internal-op count from
+    /// [`BlockInProgress::cumulative_tezos_operation_receipts`] and threads it
+    /// into the Michelson `BlockCtx`, so a sub-operation crossing the cap fails
     /// the delayed op *in isolation* (backtracked) instead of being applied.
     ///
-    /// Fail-on-revert guard: with the base hardcoded back to 0 the call below
-    /// stays `Applied` at base 65_535, so this test goes red.
+    /// Fail-on-revert guard: with the base forced back to 0 the call below
+    /// stays `Applied` even when seeded at 65_535, so this test goes red.
     #[test]
     fn delayed_internal_op_cap_is_cumulative() {
+        use crate::apply::tests::{dummy_crac_receipt, make_transfer};
         use crate::apply::RuntimeExecutionInfo;
+        use crate::block_in_progress::BlockInProgress;
         use mir::gas::Gas;
         use mir::interpreter::{compute_contract_address, MAX_INTERNAL_OPERATIONS};
+        use std::collections::VecDeque;
+        use tezos_tezlink::block::OperationsWithReceipts;
         use tezos_tezlink::operation_result::{
             ContentResult, OperationDataAndMetadata, OperationResult, OperationResultSum,
         };
         use tezosx_tezos_runtime::account::{set_tezos_account_info, TezosAccountInfo};
 
-        // Apply, via the real delayed-inbox path, a call to a contract that
+        // Apply, via the real delayed-inbox dispatch
+        // ([`TezosXChainConfig::apply_transaction`]), a call to a contract that
         // EMITs exactly one internal operation, with the block's prior
         // internal-op count seeded to `base`. Returns whether the top-level
         // operation was `Applied`.
@@ -1806,8 +1813,10 @@ mod tests {
                 .unwrap();
 
             // Originate the contract (block 0) through the production pipeline.
+            // The origination is fee-checked by [produce], so it must cover the
+            // execution fees a Tezos operation now pays.
             let origination = make_origination_operation(
-                1,
+                1000,
                 1,
                 5000,
                 500,
@@ -1839,38 +1848,56 @@ mod tests {
                 emitter,
                 Parameters::default(),
             );
-            let transaction = Transaction {
+            let transaction = TezosXTransaction::Ethereum(Box::new(Transaction {
                 tx_hash: call.hash().unwrap().into(),
                 content: TransactionContent::TezosDelayed(call),
-            };
+            }));
 
             let mut block_constants = first_block(&mut host);
             block_constants.michelson_runtime_block_constants.safe_roots = vec![
                 TEZ_SAFE_STORAGE_ROOT_PATH.into(),
                 TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH.into(),
             ];
+
+            // Seed the block's prior internal-op count to `base`: a single
+            // synthetic applied operation carrying `base` internal results is
+            // exactly what [`apply::count_internal_operations`] tallies when
+            // the delayed dispatch derives the cumulative base.
+            let mut block_in_progress = BlockInProgress::new(
+                block_constants.evm_runtime_block_constants.number,
+                VecDeque::new(),
+                U256::from(MINIMUM_BASE_FEE_PER_GAS),
+            );
+            block_in_progress.cumulative_tezos_operation_receipts =
+                OperationsWithReceipts {
+                    list: vec![dummy_crac_receipt(vec![
+                        make_transfer(0, 0);
+                        base as usize
+                    ])],
+                };
+
             let registry = RegistryImpl::default();
             let outbox_queue =
                 OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap();
 
-            let result = crate::apply::apply_transaction(
-                &mut host,
-                &registry,
-                &outbox_queue,
-                &block_constants.evm_runtime_block_constants,
-                transaction,
-                tezosx_journal::CracId::new(0, 0),
-                0,
-                None,
-                None,
-                &chain_config.spec_id,
-                &chain_config.limits,
-                false,
-                &block_constants.michelson_runtime_block_constants.safe_roots,
-                &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
-                base,
-            )
-            .expect("apply_transaction must not raise a kernel error");
+            // skip_fees_check keeps the assertion focused on the internal-op
+            // cap; fee payment on the delayed path is covered elsewhere.
+            let result = chain_config
+                .apply_transaction(
+                    &block_in_progress,
+                    &mut host,
+                    &registry,
+                    &outbox_queue,
+                    &block_constants,
+                    transaction,
+                    0,
+                    None,
+                    None,
+                    false, // skip_signature_check
+                    true,  // skip_fees_check
+                    false, // http_trace_enabled
+                )
+                .expect("apply_transaction must not raise a kernel error");
 
             let info = match result {
                 ExecutionResult::Valid(info) => info,

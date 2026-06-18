@@ -475,6 +475,9 @@
   longer desync. The separate per-byte bound on attacker-controlled error
   bodies persisted into the failed-call receipt is kept at its prior rate (it
   is a DoS guard, not an EVM-parity crossing cost). (!22323)
+- Execution fees-related checks are now correctly performed for Tezos
+  operations posted via the delayed inbox, and unused gas is properly refunded.
+  (!22260)
 
 ### Native Atomic Composability
 

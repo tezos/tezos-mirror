@@ -697,6 +697,7 @@ impl ChainConfigTrait for TezosXChainConfig {
         ))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn apply_transaction<Host>(
         &self,
         block_in_progress: &BlockInProgress,
@@ -726,8 +727,26 @@ impl ChainConfigTrait for TezosXChainConfig {
                     | TransactionContent::EthereumDelayed(_)
                     | TransactionContent::Deposit(_)
                     | TransactionContent::FaDeposit(_) => (1, index), // Ethereum
-                    TransactionContent::TezosDelayed(_) => {
-                        (0, block_in_progress.michelson_index)
+                    TransactionContent::TezosDelayed(raw_operation) => {
+                        let operation = TezlinkOperation {
+                            tx_hash: transaction.tx_hash,
+                            content: TezlinkContent::Tezos(raw_operation.clone()),
+                        };
+
+                        return self.apply_tezos_operation(
+                            block_in_progress,
+                            host,
+                            registry,
+                            outbox_queue,
+                            operation,
+                            block_constants,
+                            sequencer_pool_address,
+                            tracer_input,
+                            false, // da fees are disabled for delayed operations
+                            skip_signature_check,
+                            skip_fees_check,
+                            http_trace_enabled,
+                        );
                     } // Tezos
                 };
                 let crac_id = tezosx_journal::CracId::new(origin_runtime, id);
@@ -748,79 +767,23 @@ impl ChainConfigTrait for TezosXChainConfig {
                     &self.spec_id,
                     &self.limits,
                     http_trace_enabled,
-                    &block_constants.michelson_runtime_block_constants.safe_roots,
-                    // TODO: https://linear.app/tezos/issue/L2-1765
-                    // Read from michelson_runtime_block_constants.chain_id once the
-                    // chain id is folded into the Michelson runtime block constants,
-                    // so it travels with that runtime's per-block context.
-                    &self.michelson_chain_id,
                     internal_operations_base,
                 )
             }
-            TezosXTransaction::Tezos(operation) => {
-                let tx_hash = operation.tx_hash;
-                let crac_id =
-                    tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
-                // The seed must NOT be the operation's real hash: the
-                // normal Michelson path inside `apply_tezos_operation`
-                // builds its own `OriginationNonce::initial(real_hash)`
-                // starting at index 0, and if the journal's CRAC nonce
-                // shared the same seed both nonces would derive
-                // colliding KT1s at index 1.  Use a synthetic seed so
-                // the two nonce universes stay disjoint.
-                let operation_hash = TezosXJournal::synthetic_operation_hash(
-                    &crac_id,
-                    self.evm_chain_id.low_u64(),
-                    block_in_progress.number.low_u64(),
-                );
-                // Seed the journal with this block's EVM environment so any
-                // inbound CRAC the Michelson operation dispatches to the EVM
-                // runtime exposes the live block observables (BASEFEE,
-                // GASLIMIT, ...) rather than zero.
-                let mut journal = TezosXJournal::new(
-                    crac_id,
-                    operation_hash,
-                    block_constants.evm_runtime_block_constants.clone(),
-                );
-                journal.set_http_trace_enabled(http_trace_enabled);
-                let result = apply_tezos_operation(
-                    &self.michelson_chain_id,
-                    block_in_progress,
-                    host,
-                    registry,
-                    &block_constants.michelson_runtime_block_constants,
-                    operation,
-                    sequencer_pool_address,
-                    skip_signature_check,
-                    skip_fees_check,
-                    Some(outbox_queue),
-                    Some(&block_constants.evm_runtime_block_constants),
-                    &mut journal,
-                    self.experimental_features.is_michelson_gas_refund_enabled(),
-                    tracer_input.is_some(),
-                    http_trace_enabled,
-                );
-                // Persist HTTP traces regardless of [result] so that partial
-                // traces from an operation that failed mid-execution remain
-                // observable through the [http_trace*] RPCs. Matches the
-                // Ethereum / TezosDelayed apply sites in apply.rs.
-                //
-                // TODO: https://linear.app/tezos/issue/L2-1243
-                // The Tezlink-submitted path stores traces under the Tezos
-                // operation hash only, so [http_traceTransaction] queries
-                // that pass the fake Ethereum hash of a Tezos→EVM CRAC
-                // (the hash users see in [eth_getBlockByNumber]) return
-                // the empty list. Extend this site to dual-index the
-                // traces under each generated Ethereum fake hash once the
-                // mapping is available here.
-                crate::storage::maybe_store_http_traces_for_tx(
-                    host,
-                    http_trace_enabled,
-                    &tx_hash,
-                    &journal,
-                );
-                result
-            }
+            TezosXTransaction::Tezos(operation) => self.apply_tezos_operation(
+                block_in_progress,
+                host,
+                registry,
+                outbox_queue,
+                operation,
+                block_constants,
+                sequencer_pool_address,
+                tracer_input,
+                true, // da fees are enabled when the sequencer injects a transaction
+                skip_signature_check,
+                skip_fees_check,
+                http_trace_enabled,
+            ),
         }
     }
 
@@ -867,6 +830,91 @@ impl ChainConfigTrait for TezosXChainConfig {
                 EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
             ]
         }
+    }
+}
+
+impl TezosXChainConfig {
+    #[allow(clippy::too_many_arguments)]
+    fn apply_tezos_operation<Host>(
+        &self,
+        block_in_progress: &BlockInProgress,
+        host: &mut Host,
+        registry: &impl Registry,
+        outbox_queue: &OutboxQueue<'_, impl Path>,
+        operation: TezlinkOperation,
+        block_constants: &TezosXBlockConstants,
+        sequencer_pool_address: Option<H160>,
+        tracer_input: Option<TracerInput>,
+        da_fees_enabled: bool,
+        skip_signature_check: bool,
+        skip_fees_check: bool,
+        http_trace_enabled: bool,
+    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
+    where
+        Host: StorageV1,
+    {
+        let tx_hash = operation.tx_hash;
+        let crac_id = tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
+        // The seed must NOT be the operation's real hash: the
+        // normal Michelson path inside `apply_tezos_operation`
+        // builds its own `OriginationNonce::initial(real_hash)`
+        // starting at index 0, and if the journal's CRAC nonce
+        // shared the same seed both nonces would derive
+        // colliding KT1s at index 1.  Use a synthetic seed so
+        // the two nonce universes stay disjoint.
+        let operation_hash = TezosXJournal::synthetic_operation_hash(
+            &crac_id,
+            self.evm_chain_id.low_u64(),
+            block_in_progress.number.low_u64(),
+        );
+        // Seed the journal with this block's EVM environment so any
+        // inbound CRAC the Michelson operation dispatches to the EVM
+        // runtime exposes the live block observables (BASEFEE,
+        // GASLIMIT, ...) rather than zero.
+        let mut journal = TezosXJournal::new(
+            crac_id,
+            operation_hash,
+            block_constants.evm_runtime_block_constants.clone(),
+        );
+        journal.set_http_trace_enabled(http_trace_enabled);
+        let result = apply_tezos_operation(
+            &self.michelson_chain_id,
+            block_in_progress,
+            host,
+            registry,
+            &block_constants.michelson_runtime_block_constants,
+            operation,
+            sequencer_pool_address,
+            skip_signature_check,
+            skip_fees_check,
+            Some(outbox_queue),
+            Some(&block_constants.evm_runtime_block_constants),
+            &mut journal,
+            self.experimental_features.is_michelson_gas_refund_enabled(),
+            tracer_input.is_some(),
+            http_trace_enabled,
+            da_fees_enabled,
+        );
+        // Persist HTTP traces regardless of [result] so that partial
+        // traces from an operation that failed mid-execution remain
+        // observable through the [http_trace*] RPCs. Matches the
+        // Ethereum / TezosDelayed apply sites in apply.rs.
+        //
+        // TODO: https://linear.app/tezos/issue/L2-1243
+        // The Tezlink-submitted path stores traces under the Tezos
+        // operation hash only, so [http_traceTransaction] queries
+        // that pass the fake Ethereum hash of a Tezos→EVM CRAC
+        // (the hash users see in [eth_getBlockByNumber]) return
+        // the empty list. Extend this site to dual-index the
+        // traces under each generated Ethereum fake hash once the
+        // mapping is available here.
+        crate::storage::maybe_store_http_traces_for_tx(
+            host,
+            http_trace_enabled,
+            &tx_hash,
+            &journal,
+        );
+        result
     }
 }
 
@@ -1056,6 +1104,7 @@ fn get_fees_data(
     base_fee_per_gas: U256,
     michelson_to_evm_gas_multiplier: u64,
     sequencer_pool_address: Option<H160>,
+    enable_da_fees: bool,
 ) -> Result<FeesData, anyhow::Error> {
     if skip_fees_check {
         Ok(FeesData {
@@ -1063,7 +1112,11 @@ fn get_fees_data(
             credit_da_fees: CreditDaFees::Skip,
         })
     } else {
-        let required_da_fees = get_required_da_fees(operation, da_fee_per_byte_mutez)?;
+        let required_da_fees = if enable_da_fees {
+            get_required_da_fees(operation, da_fee_per_byte_mutez)?
+        } else {
+            0
+        };
 
         let total_gas_limit: u64 = operation
             .content
@@ -1110,6 +1163,7 @@ pub fn apply_tezos_operation<Host>(
     // (and its store_has probe) on whether each tracer is actually active.
     tracing_enabled: bool,
     http_trace_enabled: bool,
+    enable_da_fees: bool,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1,
@@ -1144,6 +1198,7 @@ where
                 block_in_progress.base_fee_per_gas,
                 block_constants.michelson_to_evm_gas_multiplier,
                 sequencer_pool_address,
+                enable_da_fees,
             )?;
 
             let fee_refund_config = if enable_gas_refund {
