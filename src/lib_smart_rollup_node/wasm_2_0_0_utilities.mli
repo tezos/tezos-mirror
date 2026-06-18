@@ -5,6 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [decode_storage state] decodes the WASM PVM durable storage held in the
+    node PVM [state]. *)
+val decode_storage :
+  _ Context.pvmstate ->
+  Tezos_scoru_wasm.Wasm_pvm_state.Internal_state.pvm_storage Lwt.t
+
 (** [dump_durable_storage ~block ~data_dir ~file] writes to [file] the current
     state of the WASM PVM from [data_dir], that is the state of the WASM PVM
     for the given [block]. *)

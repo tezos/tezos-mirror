@@ -166,13 +166,6 @@ module type S = sig
       unit tzresult Lwt.t
   end
 
-  module Wasm_2_0_0 : sig
-    (** [decode_durable_state enc tree] decodes a value using the encoder
-        [enc] from the provided [tree] *)
-    val decode_durable_state :
-      'a Tezos_tree_encoding.t -> Irmin_context.tree -> 'a Lwt.t
-  end
-
   module Fueled : sig
     module Free : FUELED_PVM with type fuel := Fuel.Free.t
 

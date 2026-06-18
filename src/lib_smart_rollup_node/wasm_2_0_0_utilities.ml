@@ -5,6 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [decode_storage state] decodes the WASM PVM durable storage held in the
+    node PVM [state]. The state is unwrapped to its Irmin tree and decoded
+    through the shared {!Wasm_2_0_0_irmin_state} encoding runner. *)
+let decode_storage state =
+  Wasm_2_0_0_irmin_state.Encoding_runner.decode_storage
+    !(Context_wrapper.Irmin.of_node_pvmstate state)
+
 let load_context ~data_dir (module Plugin : Protocol_plugin_sig.S) mode =
   let (module C) = Plugin.Pvm.context Wasm_2_0_0 in
   Context.load
@@ -45,8 +52,8 @@ let set_value_instr key value =
   let+ value = Tezos_lazy_containers.Chunked_byte_vector.to_string value in
   Installer_config.Set {value; to_ = String.concat "/" ("" :: key)}
 
-(* [generate_durable_storage ~plugin state] folds over the values in the
-   durable storage and turns each into an installer instruction. The order is
+(* [generate_durable_storage state] folds over the values in the durable
+   storage and turns each into an installer instruction. The order is
    unspecified.
 
    This decodes the durable storage from the tree and folds over the decoded
@@ -58,14 +65,11 @@ let set_value_instr key value =
    This accumulates every instruction in memory. It could instead take a
    continuation (e.g. dumping each instruction as it is produced) to avoid
    holding the whole state at once, as was already the case before. *)
-let generate_durable_storage ~(plugin : (module Protocol_plugin_sig.S)) state =
+let generate_durable_storage state =
   let open Lwt_syntax in
-  let module Plugin = (val plugin) in
-  let tree = !(Context_wrapper.Irmin.of_node_pvmstate state) in
-  let* durable =
-    Plugin.Pvm.Wasm_2_0_0.decode_durable_state
-      Tezos_scoru_wasm.Tree_state.durable_storage_encoding
-      tree
+  let* storage = decode_storage state in
+  let durable =
+    Tezos_scoru_wasm.Wasm_pvm_state.Internal_state.durable_of storage
   in
   let* instrs =
     Tezos_scoru_wasm.Durable.fold durable ~init:[] ~f:(fun key value acc ->
@@ -129,7 +133,7 @@ let dump_durable_storage ~block ~data_dir ~file =
   in
   let* context = load_context ~data_dir plugin Access_mode.Read_only in
   let* _ctxt, state = get_wasm_pvm_state context block_hash context_hash in
-  let* instrs = generate_durable_storage ~plugin state in
+  let* instrs = generate_durable_storage state in
   let* () = Installer_config.to_file instrs ~output:file in
   return_unit
 
@@ -141,14 +145,9 @@ let preload_kernel (node_ctxt : _ Node_context.t) header =
       let* _ctxt, pvm_state =
         get_wasm_pvm_state node_ctxt.context header.block_hash context
       in
-      let* (module Plugin) =
-        Protocol_plugins.proto_plugin_for_level node_ctxt header.level
-      in
-      let tree = !(Context_wrapper.Irmin.of_node_pvmstate pvm_state) in
-      let*! durable =
-        Plugin.Pvm.Wasm_2_0_0.decode_durable_state
-          Tezos_scoru_wasm.Tree_state.durable_storage_encoding
-          tree
+      let*! storage = decode_storage pvm_state in
+      let durable =
+        Tezos_scoru_wasm.Wasm_pvm_state.Internal_state.durable_of storage
       in
       let*! () =
         Tezos_scoru_wasm_fast.Exec.preload_kernel
