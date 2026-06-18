@@ -8376,6 +8376,180 @@ mod typecheck_tests {
         );
     }
 
+    /// Regression for L2-1635: a parent whose CREATE_CONTRACT embeds a child
+    /// script with an L1-invalid view must be rejected at origination
+    /// (typecheck_views=true), matching L1's parse_views on the embedded
+    /// script. Re-typecheck paths (typecheck_views=false, used for entrypoint
+    /// extraction and stored-contract execution) must NOT re-validate child
+    /// views, so contracts originated before this check keep executing and no
+    /// extra gas is charged.
+    #[test]
+    fn create_contract_validates_child_views_at_origination() {
+        fn origination(src: &str) -> Result<(), TcError> {
+            parse_contract_script(src)
+                .unwrap()
+                .split_script()
+                .unwrap()
+                .typecheck_script(&mut Gas::default(), true, true)
+                .map(|_| ())
+        }
+        fn re_typecheck(src: &str) -> Result<(), TcError> {
+            parse_contract_script(src)
+                .unwrap()
+                .split_script()
+                .unwrap()
+                .typecheck_script(&mut Gas::default(), true, false)
+                .map(|_| ())
+        }
+
+        // Child view output is a `big_map` (forbidden ViewOutput).
+        let bad_output = concat!(
+            "parameter unit; storage unit;",
+            "code { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"bad\" unit (big_map string nat) { DROP; EMPTY_BIG_MAP string nat } };",
+            "  DROP; DROP; UNIT; NIL operation; PAIR }"
+        );
+        assert_eq!(
+            origination(bad_output),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
+            ))
+        );
+        // Re-typecheck must not re-validate the child view (no brick, no extra gas).
+        assert!(re_typecheck(bad_output).is_ok());
+
+        // Child view body returns the wrong type.
+        let bad_return = concat!(
+            "parameter unit; storage unit;",
+            "code { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"bad\" unit unit { DROP; PUSH nat 0 } };",
+            "  DROP; DROP; UNIT; NIL operation; PAIR }"
+        );
+        assert!(matches!(
+            origination(bad_return),
+            Err(TcError::StacksNotEqual(..))
+        ));
+
+        // Child view body uses a forbidden-in-view instruction.
+        let effectful = concat!(
+            "parameter unit; storage unit;",
+            "code { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"bad\" unit unit { CDR; DROP; NONE key_hash; SET_DELEGATE; DROP; UNIT } };",
+            "  DROP; DROP; UNIT; NIL operation; PAIR }"
+        );
+        assert_eq!(
+            origination(effectful),
+            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))
+        );
+
+        // Positive control: a valid child view still typechecks.
+        let good = concat!(
+            "parameter unit; storage unit;",
+            "code { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"good\" unit nat { DROP; PUSH nat 0 } };",
+            "  DROP; DROP; UNIT; NIL operation; PAIR }"
+        );
+        assert!(origination(good).is_ok());
+
+        // Bad child view inside a value-level lambda nested in a PUSHed value
+        // (not a direct PUSH-of-lambda): must also be rejected at origination,
+        // matching L1 (parse_data typechecks lambda values eagerly). The lambda
+        // is wrapped in a pair so it flows through the value typechecker rather
+        // than the instruction-level OpenLambda path.
+        let nested_lambda = concat!(
+            "parameter unit; storage unit;",
+            "code { DROP;",
+            "  PUSH (pair nat (lambda unit unit))",
+            "    (Pair 0 { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "      CREATE_CONTRACT",
+            "        { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "          view \"bad\" unit (big_map string nat) { DROP; EMPTY_BIG_MAP string nat } };",
+            "      DROP; DROP; UNIT });",
+            "  DROP; UNIT; NIL operation; PAIR }"
+        );
+        assert_eq!(
+            origination(nested_lambda),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
+            ))
+        );
+        assert!(re_typecheck(nested_lambda).is_ok());
+
+        // Bad GRANDCHILD view inside a CREATE_CONTRACT nested in a LAMBDA in the
+        // parent's own VIEW body. CREATE_CONTRACT is forbidden directly in a
+        // view, but allowed inside a lambda-in-view, and L1 validates the
+        // embedded child's views there too. Must be rejected at origination.
+        let lambda_in_view = concat!(
+            "parameter unit; storage unit;",
+            "code { CAR; NIL operation; PAIR };",
+            "view \"v\" unit unit",
+            "  { DROP;",
+            "    LAMBDA unit unit",
+            "      { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "        CREATE_CONTRACT",
+            "          { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "            view \"bad\" unit (big_map string nat) { DROP; EMPTY_BIG_MAP string nat } };",
+            "        DROP; DROP; UNIT };",
+            "    DROP; UNIT }"
+        );
+        assert_eq!(
+            origination(lambda_in_view),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
+            ))
+        );
+        assert!(re_typecheck(lambda_in_view).is_ok());
+
+        // Storage-VALUE path: at origination the kernel typechecks the initial
+        // storage value via `typecheck_storage_with_views` (Enabled), a path
+        // `typecheck_script` never reaches. A storage lambda embedding a bad
+        // child view is rejected at origination, yet still accepted on the
+        // runtime re-typecheck (`typecheck_storage`, Disabled).
+        let parent = parse_contract_script(
+            "parameter unit; storage (lambda unit unit); code { CDR; NIL operation; PAIR }",
+        )
+        .unwrap()
+        .split_script()
+        .unwrap()
+        .typecheck_script(&mut Gas::default(), true, false)
+        .unwrap();
+        let storage_lambda = parse(concat!(
+            "{ DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"bad\" unit (big_map string nat) { DROP; EMPTY_BIG_MAP string nat } };",
+            "  DROP; DROP; UNIT }"
+        ))
+        .unwrap();
+        assert_eq!(
+            parent
+                .typecheck_storage_with_views(
+                    &mut Ctx::default(),
+                    &storage_lambda,
+                    TypecheckViews::Enabled,
+                )
+                .map(|_| ()),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
+            ))
+        );
+        assert!(parent
+            .typecheck_storage(&mut Ctx::default(), &storage_lambda)
+            .is_ok());
+    }
+
     #[test]
     fn test_invalid_map() {
         let mut gas = Gas::default();
