@@ -1,1 +1,0 @@
-../../scripts/install_datadog_static.sh

@@ -1,1 +1,0 @@
-../../scripts/install_opam_static.sh

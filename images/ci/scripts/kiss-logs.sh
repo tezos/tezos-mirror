@@ -1,1 +1,0 @@
-../../../scripts/kiss-logs.sh
