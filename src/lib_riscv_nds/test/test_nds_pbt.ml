@@ -602,6 +602,107 @@ let test_verify_rejects_unproven_read (module B : VERIFY_LIFECYCLE_BACKEND) () =
       "reading data absent from the proof should raise Verification_failed" ;
   unit
 
+(** Populate every database of a fresh n-database Normal-mode registry with
+    one distinct key/value pair. *)
+let build_registry_distinct_db (type a)
+    (module B : VERIFY_LIFECYCLE_BACKEND with type Normal.Registry.t = a) n =
+  let normal = B.create_normal_with_dbs n in
+  for i = 0 to n - 1 do
+    let key = Bytes.of_string (Printf.sprintf "key-%d" i) in
+    let value = Bytes.of_string (Printf.sprintf "value-%d" i) in
+    let^? () =
+      B.Normal.Database.set normal ~db_index:(Int64.of_int i) ~key ~value
+    in
+    ()
+  done ;
+  normal
+
+(** A proof that records no operations leaves the whole registry blinded:
+    a single blind leaf carrying its root hash.  Hashing such a fully-blinded
+    registry in verify mode must reproduce the original root hash. *)
+let test_verify_hashes_fully_blinded_registry
+    (module B : VERIFY_LIFECYCLE_BACKEND) () =
+  let normal = build_registry_distinct_db (module B) 5 in
+  let start_hash = B.Normal.Registry.hash normal in
+  (* Record nothing: the step touches no database, so the whole registry
+     collapses to a single blind leaf carrying its root hash. *)
+  let prove = B.Prove.start_proof normal in
+  let proof = B.Prove.produce_proof prove in
+  let proof_bytes = B.Prove.Proof.serialise proof in
+  let proof =
+    match B.Prove.Proof.deserialise proof_bytes with
+    | Ok proof -> proof
+    | Error err ->
+        Test.fail
+          "proof deserialisation failed: %a"
+          Error_monad.pp_print_trace
+          err
+  in
+  let verify = B.Verify.start_verify proof in
+  Check.(
+    (Bytes.to_string (B.Verify.Registry.hash verify)
+    = Bytes.to_string start_hash)
+      string)
+    ~error_msg:
+      "verify hash of fully-blinded registry %L does not match original root \
+       hash %R" ;
+  unit
+
+(** When only one of many databases is touched, the proof reveals that one
+    database and absorbs the others into blinded ancestors — a partially-blinded
+    registry. *)
+let test_verify_partially_blinded_registry (module B : VERIFY_LIFECYCLE_BACKEND)
+    () =
+  (* The choice of 16 is specifically to ensure that all databases have an
+     intermediate parent hash, before the root hash of the registry - as
+     the registry has MERKLE_ARITY = 4 in proofs. *)
+  let num_dbs = 16 in
+  let normal = build_registry_distinct_db (module B) num_dbs in
+  let start_hash = B.Normal.Registry.hash normal in
+
+  for i = 0 to num_dbs - 1 do
+    let prove = B.Prove.start_proof normal in
+    (* Touch a single database, leaving the other 15 blinded. *)
+    let^? (_ : bytes) =
+      B.Prove.Database.read
+        prove
+        ~db_index:(Int64.of_int i)
+        ~key:(Bytes.of_string (Printf.sprintf "key-%d" i))
+        ~offset:0L
+        ~len:100L
+    in
+    let proof = B.Prove.produce_proof prove in
+    let proof_bytes = B.Prove.Proof.serialise proof in
+    let proof =
+      match B.Prove.Proof.deserialise proof_bytes with
+      | Ok proof -> proof
+      | Error err ->
+          Test.fail
+            "proof deserialisation failed: %a"
+            Error_monad.pp_print_trace
+            err
+    in
+    let verify = B.Verify.start_verify proof in
+    let^? value =
+      B.Verify.Database.read
+        verify
+        ~db_index:(Int64.of_int i)
+        ~key:(Bytes.of_string (Printf.sprintf "key-%d" i))
+        ~offset:0L
+        ~len:100L
+    in
+    Check.((Bytes.to_string value = Printf.sprintf "value-%d" i) string)
+      ~error_msg:"verify read produced incorrect value %L, expected %R" ;
+    Check.(
+      (Bytes.to_string (B.Verify.Registry.hash verify)
+      = Bytes.to_string start_hash)
+        string)
+      ~error_msg:
+        "verify hash of partially-blinded registry %L does not match original \
+         root hash %R"
+  done ;
+  unit
+
 (** {2 Model-based (stateful) properties} *)
 
 (** Bisimulation: a random sequence of operations on the NDS must produce
@@ -722,10 +823,13 @@ let register_verify_tests (module B : VERIFY_LIFECYCLE_BACKEND) =
       ~tags:["unit"; "nds"; "verify"; B.name]
       body
   in
-  register "verify replays a proof" (fun () ->
-      test_verify_replays_proof (module B) ()) ;
-  register "verify rejects a read absent from the proof" (fun () ->
-      test_verify_rejects_unproven_read (module B) ())
+  register "verify replays a proof" @@ test_verify_replays_proof (module B) ;
+  register "verify rejects a read absent from the proof"
+  @@ test_verify_rejects_unproven_read (module B) ;
+  register "verify hashes a fully-blinded registry"
+  @@ test_verify_hashes_fully_blinded_registry (module B) ;
+  register "verify works over a partially-blinded registry"
+  @@ test_verify_partially_blinded_registry (module B)
 
 let register_with_backend (backend : (module BACKEND)) =
   (* Unit tests *)

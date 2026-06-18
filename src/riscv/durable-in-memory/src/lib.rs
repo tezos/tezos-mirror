@@ -480,7 +480,7 @@ pub fn octez_riscv_durable_in_memory_prove_database_hash(
 pub fn octez_riscv_durable_in_memory_verify_registry_hash(
     state: SafePointer<RegistryVerify>,
 ) -> OcamlFallible<Result<BytesWrapper<Hash>, VerificationError>> {
-    api_common::verify_registry_hash(&*state)
+    state.verify_hash()
 }
 
 #[ocaml::func]

@@ -14,14 +14,10 @@ use octez_riscv_data::components::vector::VectorMode;
 use octez_riscv_data::foldable::Foldable;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::hash::HashFold;
-use octez_riscv_data::hash::PartialHash;
-use octez_riscv_data::hash::PartialHashFold;
 use octez_riscv_data::merkle_proof::proof::Proof;
 use octez_riscv_data::mode::Mode;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_data::mode::Prove;
-use octez_riscv_data::mode::Verify;
-use octez_riscv_data::mode::utils::NotFound;
 use octez_riscv_durable_storage::database::DatabaseMode;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::errors::OperationalError;
@@ -53,16 +49,21 @@ trait_set! {
 ///
 /// Verify mode replays operations against a proof. When an operation touches data that is absent
 /// from the proof, the underlying state machine raises a [`NotFound`] panic via
-/// [`not_found`](octez_riscv_data::mode::utils::not_found). The Verify implementation catches this
-/// in its worker thread (see [`catch_not_found`](octez_riscv_data::mode::utils::catch_not_found))
+/// [`not_found`]. The Verify implementation catches this in its worker thread (see [`catch_not_found`])
 /// and surfaces it through [`Self::NotFoundError`].
 ///
 /// This does not occur for Normal and Prove mode (the full state is always available) so their
 /// [`Self::NotFoundError`] is [`Infallible`].
+///
+/// [`not_found`]: octez_riscv_data::mode::utils::not_found
+/// [`catch_not_found`]: octez_riscv_data::mode::utils::catch_not_found
+/// [`NotFound`]: octez_riscv_data::mode::utils::NotFound
 pub trait RegistryApply<KV: KeyValueStore, M: Mode> {
     /// Deterministic divergence error captured while applying an operation.
     ///
     /// [`Infallible`] for Normal/Prove; [`NotFound`] for Verify.
+    ///
+    /// [`NotFound`]: octez_riscv_data::mode::utils::NotFound
     type NotFoundError;
 
     /// Apply a mutable operation over the contained registry. If the mutable state is 'borrowed', this
@@ -133,31 +134,6 @@ where
     };
 
     Ok(res)
-}
-
-/// Compute the registry root hash of a verify-mode registry, or fail with `NotFound` if required
-/// data is absent in the proof.
-#[inline(always)]
-pub fn verify_registry_hash<KV, Err, S>(state: &S) -> OcamlFallible<Result<BytesWrapper<Hash>, Err>>
-where
-    KV: BackgroundKeyValueStore,
-    KV::Repo: Send + Sync,
-    S: RegistryApply<KV, Verify, NotFoundError = NotFound>,
-    Err: From<NotFound>,
-    ds_registry::Registry<KV, Verify>: Foldable<PartialHashFold>,
-{
-    let res =
-        state.apply_ro(move |registry| PartialHash::from_foldable(None, registry).to_hash())?;
-
-    let hash = match res {
-        Ok(Some(hash)) => hash,
-        // The fold completed but the partial proof was insufficient to produce a hash.
-        Ok(None) => return Ok(Err(Err::from(NotFound))),
-        // A touched node was absent from the proof.
-        Err(not_found) => return Ok(Err(Err::from(not_found))),
-    };
-
-    Ok(Ok(BytesWrapper::from(hash)))
 }
 
 /// Resize the registry to the given number of databases.

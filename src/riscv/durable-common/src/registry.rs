@@ -13,9 +13,15 @@ use std::sync::mpsc::SyncSender;
 use std::sync::mpsc::sync_channel;
 use std::thread::JoinHandle;
 
+use octez_riscv_api_common::OcamlFallible;
+use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::CustomGcResource;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::try_clone::TryClone;
+use octez_riscv_data::foldable::Foldable;
+use octez_riscv_data::hash::Hash;
+use octez_riscv_data::hash::PartialHash;
+use octez_riscv_data::hash::PartialHashFold;
 use octez_riscv_data::merkle_proof::FromProof;
 use octez_riscv_data::merkle_proof::proof_tree::MerkleProof;
 use octez_riscv_data::merkle_proof::proof_tree::ProofPart;
@@ -147,6 +153,10 @@ enum Command<KV: KeyValueStore, M: Mode> {
 pub struct BackgroundRegistry<KV: KeyValueStore, G, M: Mode> {
     cmd_sender: SyncSender<Command<KV, M>>,
     handle: Option<JoinHandle<()>>,
+    /// The proof this registry replays against, retained for verify mode only.
+    ///
+    /// See [`Self::verify_hash`] for more details.
+    proof: Option<MerkleProof>,
     _pd: PhantomData<G>,
 }
 
@@ -200,6 +210,8 @@ where
         Ok(Self {
             cmd_sender,
             handle: Some(handle),
+            // Prove mode never replays against a proof.
+            proof: None,
             _pd: PhantomData,
         })
     }
@@ -227,6 +239,8 @@ where
 {
     /// Build a verify-mode registry that replays operations against `proof`.
     pub fn from_proof(proof: MerkleProof) -> Result<Self, BuildVerifyError> {
+        let retained_proof = Some(proof.clone());
+
         let (init_sender, init_receiver) = sync_channel::<Result<(), String>>(0);
         let (cmd_sender, cmd_receiver) = sync_channel::<Command<KV, Verify>>(1);
 
@@ -264,8 +278,48 @@ where
         Ok(Self {
             cmd_sender,
             handle: Some(handle),
+            proof: retained_proof,
             _pd: PhantomData,
         })
+    }
+}
+
+impl<KV, G> BackgroundRegistry<KV, G, Verify>
+where
+    KV: BackgroundKeyValueStore,
+    KV::Repo: Send + Sync,
+{
+    /// Compute the registry root hash in verify mode.
+    ///
+    /// Folds the verify-mode registry with the retained proof threaded back in as
+    /// the source of previous (blinded) hashes. This lets a blinded registry
+    /// recompute its root hash from the subtree hashes the proof carries:
+    /// - a fully-blinded registry
+    /// - a partially-blinded registry (some databases present/blinded, the rest
+    ///   omitted & absorbed into blinded ancestors)
+    ///
+    /// Returns `NotFound` if the fold cannot produce a hash (may occur on invalid proofs).
+    pub fn verify_hash<Err>(&self) -> OcamlFallible<Result<BytesWrapper<Hash>, Err>>
+    where
+        Err: From<NotFound>,
+        Registry<KV, Verify>: Foldable<PartialHashFold>,
+    {
+        // TODO (TZX-183): `PartialHash::from_foldable` should take
+        //      the proof by `Option<Arc<_>>` to avoid unnecessary repeated
+        //      cloning.
+        let proof = self.proof.clone();
+        let res =
+            self.apply_ro(move |registry| PartialHash::from_foldable(proof, registry).to_hash())?;
+
+        let hash = match res {
+            Ok(Some(hash)) => hash,
+            // The proof did not contain enough information to recompute the hash.
+            Ok(None) => return Ok(Err(Err::from(NotFound))),
+            // A touched node was absent from the proof.
+            Err(not_found) => return Ok(Err(Err::from(not_found))),
+        };
+
+        Ok(Ok(BytesWrapper::from(hash)))
     }
 }
 
