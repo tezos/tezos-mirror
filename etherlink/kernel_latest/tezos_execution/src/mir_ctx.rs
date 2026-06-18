@@ -308,9 +308,11 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
     }
 
     fn origination_counter(&mut self) -> u32 {
+        // Use-then-increment like L1: first CREATE_CONTRACT uses index 0.
         let c: &mut u32 = &mut self.operation_ctx.origination_nonce.index;
+        let current = *c;
         *c += 1;
-        *c
+        current
     }
 
     fn operation_counter(&mut self) -> u128 {

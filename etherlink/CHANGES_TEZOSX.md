@@ -106,6 +106,13 @@
   (e.g. `CONTRACT operation`) during typechecking, matching L1. Previously the Michelson
   runtime typechecker accepted such scripts, diverging from L1.
   (!22217)
+- An originated contract's KT1 address is now derived from origination index 0
+  for the first origination of an operation, matching Tezos L1
+  (use-then-increment), instead of index 1. This realigns the KT1 returned by
+  `CREATE_CONTRACT` and stored in `originated_contracts` with the L1-canonical
+  address computed from the operation hash and the (renumbered) receipt nonce.
+  Every originated KT1 (including inbound-CRAC child contracts) shifts by one
+  index, so addresses on existing networks change. (L2-1642)
 - The Michelson storage-fees burn is now rendered on the CRAC-triggering
   operation: an Applied content that delegates storage cost to its
   callee carries the dual `(payer −V, storage fees +V)` balance-updates

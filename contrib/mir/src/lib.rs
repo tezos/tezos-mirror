@@ -1105,7 +1105,7 @@ mod tests {
             .unwrap()
             .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
-        let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
+        let expected_addr = "KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(CreateContract {
                 delegate: None,

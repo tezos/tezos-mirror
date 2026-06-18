@@ -8923,7 +8923,7 @@ mod interpreter_tests {
             .unwrap()
             .typecheck_script(ctx.gas(), true, true)
             .unwrap();
-        let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
+        let expected_addr = "KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(super::CreateContract {
                 delegate: None,

@@ -6154,6 +6154,141 @@ mod tests {
         );
     }
 
+    /// Regression for L2-1642: the KT1 returned by CREATE_CONTRACT, stored
+    /// in `originated_contracts`, and written to durable storage must be
+    /// derived from origination index 0 for the first origination of an
+    /// operation, matching Tezos L1 (use-then-increment). The pre-fix kernel
+    /// incremented before deriving, producing the first KT1 from index 1,
+    /// which disagreed with the L1-canonical address computed from the
+    /// (renumbered) receipt nonce. For a single internal origination the
+    /// per-operation local nonce is 0, which is exactly what `renumber_nonces`
+    /// (kernel/src/apply.rs) assigns at block finalization for the first
+    /// internal op, so this also pins the post-renumber value.
+    #[test]
+    fn test_create_contract_kt1_uses_l1_canonical_index_zero() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 100000);
+        reveal_account(&mut host, &src);
+        let context = context::TezlinkContext::init_context();
+        let mut gas = Gas::default();
+
+        // A contract whose code performs exactly one CREATE_CONTRACT.
+        let originated_code = "CDR; NIL operation; PAIR;";
+        let originated_script =
+            make_create_contract_block("unit", "unit", originated_code);
+        let init_script = make_script_emitting_internal_origination(&originated_script);
+
+        let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &contract_chapo_hash,
+            &init_script,
+            &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
+            &1000000_u64.into(),
+        );
+
+        // Operation hash of the call that triggers the internal CREATE_CONTRACT.
+        let op_hash = OperationHash::default();
+
+        let operation = make_operation(
+            10,
+            1,
+            22100,
+            500,
+            src.clone(),
+            vec![OperationContent::Transfer(TransferContent {
+                amount: 1000.into(),
+                destination: Contract::Originated(contract_chapo_hash),
+                parameters: Parameters {
+                    entrypoint: mir::ast::Entrypoint::default(),
+                    value: Micheline::from(())
+                        .encode(&mut Gas::default())
+                        .unwrap()
+                        .unwrap(),
+                },
+            })],
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &context,
+                op_hash.clone(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        let internal_receipts = get_internal_receipts(&receipts[0].receipt);
+        assert_eq!(
+            internal_receipts.len(),
+            1,
+            "There should be exactly one internal origination"
+        );
+
+        let (originated_kt1, nonce) = match &internal_receipts[0] {
+            InternalOperationSum::Origination(InternalContentWithMetadata {
+                result:
+                    ContentResult::Applied(OriginationSuccess {
+                        originated_contracts,
+                        ..
+                    }),
+                nonce,
+                ..
+            }) => {
+                assert_eq!(
+                    originated_contracts.len(),
+                    1,
+                    "There should be exactly one originated contract"
+                );
+                (originated_contracts[0].contract.clone(), *nonce)
+            }
+            other => panic!("Expected an Applied internal origination, got {other:?}"),
+        };
+
+        // The internal origination is the first (and only) internal op: its
+        // local nonce is 0, and renumber_nonces preserves 0 for the first
+        // internal op of the first operation in a block.
+        assert_eq!(nonce, 0, "First internal-operation nonce must be 0");
+
+        // L1-canonical: derived from index 0 (== the receipt nonce), not the
+        // pre-fix index 1 (L2-1642).
+        let l1_canonical = mir::interpreter::compute_contract_address(&op_hash, 0);
+        let pre_fix_buggy = mir::interpreter::compute_contract_address(&op_hash, 1);
+        assert_eq!(
+            originated_kt1, l1_canonical,
+            "Originated KT1 must use the L1-canonical index 0"
+        );
+        assert_eq!(
+            originated_kt1,
+            mir::interpreter::compute_contract_address(&op_hash, nonce as u32),
+            "Originated KT1 must agree with the (renumbered) receipt nonce"
+        );
+        assert_ne!(
+            originated_kt1, pre_fix_buggy,
+            "Originated KT1 must NOT use the pre-fix index 1 (L2-1642)"
+        );
+
+        // The contract is actually stored at the L1-canonical KT1.
+        let originated_account = context
+            .originated_from_kt1(&l1_canonical)
+            .expect("originated account handle");
+        assert!(
+            originated_account.exists(&host).unwrap(),
+            "Contract must be stored at the L1-canonical KT1"
+        );
+    }
+
     /// In this test, the CREATE_CONTRACT instruction is called three
     /// times.  The result of the first call is dropped.  The results
     /// of the two other calls are swapped.  The point is to check

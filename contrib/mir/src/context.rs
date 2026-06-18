@@ -275,7 +275,8 @@ pub struct Ctx<'a> {
     /// admit a custom implementation of [LazyStorage] trait. Defaults to a new,
     /// empty, [InMemoryLazyStorage].
     pub big_map_storage: InMemoryLazyStorage<'a>,
-    /// Origination counter. Incremented for each `CREATE_CONTRACT`. Defaults to `0`.
+    /// Index of the next contract to originate. Returned then incremented
+    /// for each `CREATE_CONTRACT` (use-then-increment). Defaults to `0`.
     origination_counter: u32,
     /// Operation counter used as a nonce for operations. Defaults to `0`.
     operation_counter: u128,
@@ -424,8 +425,10 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
     }
 
     fn origination_counter(&mut self) -> u32 {
+        // Use-then-increment like Tezos L1: first CREATE_CONTRACT uses index 0.
+        let current = self.origination_counter;
         self.origination_counter += 1;
-        self.origination_counter
+        current
     }
 
     fn operation_counter(&mut self) -> u128 {
