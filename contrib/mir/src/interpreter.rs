@@ -7704,6 +7704,82 @@ mod interpreter_tests {
         assert_eq!(ctx.balance, orig_balance);
     }
 
+    /// Regression for L2-1659: VIEW must replay L1's two callsite type
+    /// equality checks (callee output vs caller-requested return type, and
+    /// caller argument type vs callee input type) and push `None` on
+    /// mismatch. Before the fix MIR discarded the caller argument type and
+    /// never compared the requested return type, so it executed the target
+    /// view anyway and returned `Some(value)` where L1 returns `None`.
+    #[test]
+    fn view_replays_l1_caller_callee_type_checks() {
+        use crate::ast::View;
+        use crate::parser::test_helpers::parse;
+
+        // Target view, valid on its own: input `nat`, output `string`; the
+        // body drops the `(input, storage)` pair and returns "ok".
+        let kt1: AddressHash = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye".try_into().unwrap();
+        let view = View {
+            input_type: Type::Nat,
+            output_type: Type::String,
+            code: parse(r#"{ DROP ; PUSH string "ok" }"#).unwrap(),
+        };
+        let mut ctx = Ctx::default();
+        ctx.views = HashMap::from([(kt1.clone(), HashMap::from([("v".to_string(), view)]))]);
+        ctx.storage = HashMap::from([(kt1.clone(), (Type::Unit, V::Unit))]);
+
+        let address = V::Address(addr::Address {
+            hash: kt1.clone(),
+            entrypoint: Entrypoint::default(),
+        });
+
+        // Input-type mismatch (the PoC): caller passes `unit`, view expects
+        // `nat`. L1 returns None; pre-fix MIR returned Some("ok").
+        let mut stack = stk![address.clone(), V::Unit];
+        interpret(
+            &[IView {
+                name: "v".to_string(),
+                arg_type: Type::Unit,
+                return_type: Type::String,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        assert_eq!(stack, stk![V::Option(None)], "input-type mismatch must give None");
+
+        // Output-type mismatch: caller requests `nat`, view outputs `string`.
+        let mut stack = stk![address.clone(), V::nat(5)];
+        interpret(
+            &[IView {
+                name: "v".to_string(),
+                arg_type: Type::Nat,
+                return_type: Type::Nat,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        assert_eq!(stack, stk![V::Option(None)], "output-type mismatch must give None");
+
+        // Both types match: the view executes and returns Some("ok").
+        let mut stack = stk![address, V::nat(5)];
+        interpret(
+            &[IView {
+                name: "v".to_string(),
+                arg_type: Type::Nat,
+                return_type: Type::String,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        assert_eq!(
+            stack,
+            stk![V::new_option(Some(V::String("ok".into())))],
+            "matching types must execute the view"
+        );
+    }
+
     #[test]
     fn self_address() {
         let addr = super::Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
