@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+# The keyring is installed to /usr/share/keyrings/octez-archive-keyring.gpg
+# by debian/install. No automatic migration of APT sources — users update
+# their signed-by path as documented in docs/introduction/howtoget.rst.
+
+#DEBHELPER#
+
+exit 0
