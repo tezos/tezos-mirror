@@ -98,6 +98,7 @@
   "compare_pairintint_01.tzt": true,
   "compare_pairintint_02.tzt": true,
   "compare_pairintint_03.tzt": true,
+  "compare_signature_00.tzt": true,
   "compare_string_00.tzt": true,
   "compare_string_01.tzt": true,
   "compare_string_02.tzt": true,

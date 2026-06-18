@@ -10909,6 +10909,27 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn test_set_duplicate_signature_script_typechecking() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(r#"
+parameter unit ;
+storage (set signature) ;
+code { DROP ;
+  PUSH (set signature) {
+    "edsigtj8LhbJ2B3qhZvqzA49raG65dydFcWZW9b9L7ntF3bb29zxaBFFL8SM1jeBUY66hG122znyVA4wpzLdwxcNZwSK3Szu7iD" ;
+     0x568722d9942f516ab369e7803b5646775459ef93080842400354cb638800861bb051509fcef5ad6940ba38af3697d09f1be5be829b8f6f50610ef28606755d0e
+  } ;
+  NIL operation ; PAIR }"#)
+            .unwrap()
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut gas, true, true),
+            Err(TcError::DuplicateElements(Type::new_set(Type::Signature)))
+        );
+    }
+
+    #[test]
     fn map_key_comparable_check_fires_before_value_parsing() {
         // Single-arg `pair int` is a valid Micheline but rejected by
         // parse_ty (pair needs at least 2 type args). With the bug, the
