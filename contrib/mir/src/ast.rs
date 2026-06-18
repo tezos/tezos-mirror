@@ -1762,6 +1762,7 @@ pub enum Instruction<'a> {
     Map(overloads::Map, Vec<Self>),
     IView {
         name: String,
+        arg_type: Type,
         return_type: Type,
     },
 }
