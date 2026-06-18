@@ -26,12 +26,12 @@ WORKDIR /tmp
 ARG TARGETARCH
 
 # why the git config???
-COPY --chown=tezos:tezos .gitconfig /home/tezos/
+COPY --chown=tezos:tezos images/ci/.gitconfig /home/tezos/
 
 # Rust installer script
-COPY --chown=tezos:tezos install-rust.sh /tmp/
-COPY --chown=tezos:tezos scripts/install_opam_static.sh /tmp/
-COPY --chown=tezos:tezos scripts/install_sccache_static.sh /tmp/
+COPY --chown=tezos:tezos images/ci/install-rust.sh /tmp/
+COPY --chown=tezos:tezos images/scripts/install_opam_static.sh /tmp/
+COPY --chown=tezos:tezos images/scripts/install_sccache_static.sh /tmp/
 
 # setup kisscache
 # kiss-fetch.sh must be on PATH: the install_*.sh scripts probe for it with
@@ -104,7 +104,7 @@ WORKDIR /home/tezos
 
 # Create an opam-repository directory that is a clone of the public opam repository
 # filtered to only keep packages which we actually need.
-COPY --chown=tezos:tezos scripts/create_opam_repo.sh scripts/version.sh octez-deps.opam.locked release-tools-deps.opam.locked dream-httpaf.opam.locked dream.opam.locked cohttp.opam.locked cohttp-lwt.opam.locked cohttp-lwt-unix.opam.locked ./
+COPY --chown=tezos:tezos images/ci/scripts/create_opam_repo.sh scripts/version.sh opam/virtual/octez-deps.opam.locked opam/virtual/release-tools-deps.opam.locked opam/virtual/dream-httpaf.opam.locked opam/virtual/dream.opam.locked opam/virtual/cohttp.opam.locked opam/virtual/cohttp-lwt.opam.locked opam/virtual/cohttp-lwt-unix.opam.locked ./
 
 # Run the script, then clean up; we only need the result of the script (the opam repository).
 RUN ./create_opam_repo.sh \
