@@ -356,32 +356,33 @@ let make_job_base_image_distribution ?start_job ?(changeset = false) ?base_name
 
 (* ── Base distribution jobs ─────────────────────────────────────────────── *)
 
-let make_job_debian_based_images ?start_job ?(changeset = false) () =
-  let changes =
-    (* we need the [debian] base job if we have jobs of
-       images based on top of it *)
-    Changeset.make
-      (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
-     @ Files.merge_script @ Files.debian_build @ Files.merge_script
-     @ Files.debian_systemd @ Files.debian_jsonnet @ Files.rust_sdk_bindings)
-  in
-  make_job_base_image_distribution
-    ?start_job
-    ~changeset
-    ~changes
-    Distribution.Debian
+(* ── Cacio: debian ───────────────────────────────────────────────────────── *)
 
-let make_job_ubuntu_based_images ?start_job ?(changeset = false) () =
-  let changes =
-    Changeset.make
-      (Files.debian_base @ Files.debian_build @ Files.merge_script
-     @ Files.debian_systemd)
-  in
-  make_job_base_image_distribution
-    ?start_job
-    ~changeset
-    ~changes
-    Distribution.Ubuntu
+(* Root job. Cacio propagates the changeset to dependent jobs automatically
+   via [~needs], so only the files this job directly depends on are listed. *)
+let job_debian_based_images =
+  base_image_job
+    ~image_name:"debian"
+    ~matrix:Distribution.(release_matrix Debian)
+    ~compilation:Emulated
+    (Distribution.dockerfile Debian)
+    ~__POS__
+    ~description:"Build debian base images"
+    ~only_if_changed:Files.debian_base
+    "images.debian"
+
+(* ── Cacio: ubuntu ───────────────────────────────────────────────────────── *)
+
+let job_ubuntu_based_images =
+  base_image_job
+    ~image_name:"ubuntu"
+    ~matrix:Distribution.(release_matrix Ubuntu)
+    ~compilation:Emulated
+    (Distribution.dockerfile Ubuntu)
+    ~__POS__
+    ~description:"Build ubuntu base images"
+    ~only_if_changed:Files.debian_base
+    "images.ubuntu"
 
 let make_job_fedora_based_images ?start_job ?(changeset = false) () =
   make_job_base_image_distribution ?start_job ~changeset Distribution.Fedora
@@ -460,7 +461,7 @@ let job_rust_based_images =
     ~__POS__
     ~description:"Build debian-rust base images"
     ~only_if_changed:Files.(debian_rust_build @ debian_base)
-    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    ~needs:[(Cacio.Job, job_debian_based_images)]
     "images.debian-rust"
 
 (* ── Cacio: debian-rust.merge ────────────────────────────────────────────── *)
@@ -486,8 +487,9 @@ let job_rust_based_images_merge =
 
 (* ── Cacio: debian-homebrew ──────────────────────────────────────────────── *)
 
-(* debian_base is included to trigger a rebuild when debian files change,
-   since ~needs_legacy does not participate in Cacio changeset propagation. *)
+(* debian_base is included so that a change to debian files triggers a
+   rebuild of this derived image even when the debian job itself is not
+   explicitly in scope. *)
 let job_debian_homebrew_based_images =
   base_image_job
     ~image_name:"debian-homebrew"
@@ -498,7 +500,7 @@ let job_debian_homebrew_based_images =
     ~__POS__
     ~description:"Build debian-homebrew base images"
     ~only_if_changed:Files.(debian_homebrew @ debian_base)
-    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    ~needs:[(Cacio.Job, job_debian_based_images)]
     "images.debian-homebrew"
 
 (* ── debian-build and ubuntu-build families ─────────────────────────────── *)
@@ -515,7 +517,7 @@ let job_debian_build_based_images =
     ~__POS__
     ~description:"Build debian-build base images"
     ~only_if_changed:Files.(debian_build @ debian_base)
-    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    ~needs:[(Cacio.Job, job_debian_based_images)]
     "images.debian-build"
 
 (* ── Cacio: debian-build.merge ───────────────────────────────────────────── *)
@@ -544,7 +546,7 @@ let job_ubuntu_build_based_images =
     ~__POS__
     ~description:"Build ubuntu-build base images"
     ~only_if_changed:Files.(debian_build @ debian_base)
-    ~needs_legacy:[(Cacio.Job, make_job_ubuntu_based_images ())]
+    ~needs:[(Cacio.Job, job_ubuntu_based_images)]
     "images.ubuntu-build"
 
 (* ── Cacio: ubuntu-build.merge ───────────────────────────────────────────── *)
@@ -575,7 +577,7 @@ let job_debian_systemd_based_images =
     ~__POS__
     ~description:"Build debian-systemd base images"
     ~only_if_changed:Files.(debian_systemd @ debian_base)
-    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    ~needs:[(Cacio.Job, job_debian_based_images)]
     "images.debian-systemd"
 
 (* ── Cacio: ubuntu-systemd ───────────────────────────────────────────────── *)
@@ -590,7 +592,7 @@ let job_ubuntu_systemd_based_images =
     ~__POS__
     ~description:"Build ubuntu-systemd base images"
     ~only_if_changed:Files.(debian_systemd @ debian_base)
-    ~needs_legacy:[(Cacio.Job, make_job_ubuntu_based_images ())]
+    ~needs:[(Cacio.Job, job_ubuntu_based_images)]
     "images.ubuntu-systemd"
 
 (* ── debian-jsonnet ──────────────────────────────────────────────────────── *)
@@ -607,7 +609,7 @@ let job_jsonnet_based_images =
     ~__POS__
     ~description:"Build debian-jsonnet base images"
     ~only_if_changed:Files.(debian_jsonnet @ debian_base)
-    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    ~needs:[(Cacio.Job, job_debian_based_images)]
     "images.debian-jsonnet"
 
 (* ── rust-sdk-bindings ───────────────────────────────────────────────────── *)
@@ -624,7 +626,7 @@ let job_rust_sdk_bindings_based_images =
     ~__POS__
     ~description:"Build debian-rust-sdk-bindings base images"
     ~only_if_changed:Files.(rust_sdk_bindings @ debian_base)
-    ~needs_legacy:[(Cacio.Job, make_job_debian_based_images ())]
+    ~needs:[(Cacio.Job, job_debian_based_images)]
     "images.debian-rust-sdk-bindings"
 
 (* ── Assembly ────────────────────────────────────────────────────────────── *)
@@ -637,10 +639,7 @@ let job_rust_sdk_bindings_based_images =
    - in the manually triggered base images child pipeline as we may want to
      trigger all base images jobs. *)
 let jobs ?start_job ?(changeset = false) () =
-  [
-    make_job_debian_based_images ?start_job ~changeset ();
-    make_job_ubuntu_based_images ?start_job ~changeset ();
-  ]
+  []
   @
   if enable_rpm_images then
     [
@@ -667,6 +666,8 @@ let () =
       (Cacio.Auto, job_ubuntu_build_based_images_merge);
       (Cacio.Auto, job_rust_based_images);
       (Cacio.Auto, job_rust_based_images_merge);
+      (Cacio.Auto, job_debian_based_images);
+      (Cacio.Auto, job_ubuntu_based_images);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
