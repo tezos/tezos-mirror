@@ -26,7 +26,7 @@ Depends: adduser,
   curl,
   systemd
 Pre-Depends: jq
-Recommends: octez-client (= ${source:Version}), dialog
+Recommends: octez-client (= ${source:Version}), octez-archive-keyring, dialog
 Suggests: lz4
 Description: L1 Octez node for the Tezos network
  This package serves as the core implementation for the Tezos blockchain node.
@@ -38,7 +38,7 @@ Description: L1 Octez node for the Tezos network
 Package: octez-client
 Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends}, debconf (>= 0.5) | debconf-2.0
-Recommends: dialog
+Recommends: octez-archive-keyring, dialog
 Description: Client for interacting with the Tezos blockchain
  This package serves as the client-side interface for interacting with the
  Tezos blockchain. It includes command-line tools and functionalities for
@@ -74,7 +74,7 @@ Description: Octez baking software for the Tezos blockchain.
 Package: octez-signer
 Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends}, octez-client (= ${source:Version}), debconf (>= 0.5) | debconf-2.0
-Recommends: systemd, dialog
+Recommends: octez-archive-keyring, systemd, dialog
 Suggests: wireguard, openssh-client
 Description: Signing client for the Tezos blockchain.
  The Octez signer provides the essential tools and functionalities for securely
@@ -102,7 +102,7 @@ Package: octez-dal-node
 Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends},
  systemd, debconf (>= 0.5) | debconf-2.0
-Recommends: dialog
+Recommends: octez-archive-keyring, dialog
 Suggests: octez-baker (= ${source:Version})
 Description: Octez distribution Availability Layer (DAL) node
  The DAL node is responsible for temporarily storing data and providing it to
