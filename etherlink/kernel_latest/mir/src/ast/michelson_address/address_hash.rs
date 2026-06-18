@@ -60,6 +60,15 @@ impl From<ContractTz1Hash> for AddressHash {
     }
 }
 
+/// A cheap placeholder address hash (a zero `tz1`), used when moving an
+/// `AddressHash` (e.g. a ticket's `ticketer`) out of a `&mut` field without
+/// cloning. `ContractTz1Hash` already has a (zero) `Default`.
+impl Default for AddressHash {
+    fn default() -> Self {
+        AddressHash::Implicit(PublicKeyHash::Ed25519(ContractTz1Hash::default()))
+    }
+}
+
 impl From<ContractTz2Hash> for AddressHash {
     fn from(x: ContractTz2Hash) -> Self {
         Self::Implicit(PublicKeyHash::Secp256k1(x))

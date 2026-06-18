@@ -65,6 +65,19 @@ pub struct Ticket<'a> {
     pub amount: BigUint,
 }
 
+/// Cheap placeholder ticket (default ticketer/type, `Unit` content, zero
+/// amount), used when moving a `Ticket` out of a `&mut` field without cloning.
+impl Default for Ticket<'_> {
+    fn default() -> Self {
+        Ticket {
+            ticketer: AddressHash::default(),
+            content_type: Type::Unit,
+            content: TypedValue::Unit,
+            amount: BigUint::default(),
+        }
+    }
+}
+
 /// Representation for a Michelson type. Used primarily in the typechecker. Note
 /// this representation doesn't store annotations, as annotations are mostly
 /// deprecated and ingored. For entrypoints, see
@@ -414,6 +427,14 @@ fn drain_iteratively<T>(root: &mut T, mut extract: impl FnMut(&mut T, &mut Vec<T
 impl Drop for Type {
     fn drop(&mut self) {
         drain_iteratively(self, extract_type_children);
+    }
+}
+
+/// Trivial leaf default, used as a cheap placeholder when moving a [`Type`] out
+/// of a `&mut` field; the drained-out parent then drops without recursing.
+impl Default for Type {
+    fn default() -> Self {
+        Type::Unit
     }
 }
 
@@ -769,6 +790,15 @@ pub enum TypedValue<'a> {
     Bls12381G1(Box<bls::G1>),
     #[cfg(feature = "bls")]
     Bls12381G2(Box<bls::G2>),
+}
+
+/// Trivial leaf default (`Unit`), used as a cheap placeholder when moving a
+/// payload out of a `&mut TypedValue` field; the drained-out parent then drops
+/// without recursing.
+impl Default for TypedValue<'_> {
+    fn default() -> Self {
+        TypedValue::Unit
+    }
 }
 
 /// Iterative `Debug` so deeply nested values do not blow the WASM call

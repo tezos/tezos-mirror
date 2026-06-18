@@ -132,6 +132,14 @@ pub enum BigMapContent<'a> {
     FromId(BigMapFromId<'a>),
 }
 
+/// An empty in-memory big map, used as a cheap placeholder when moving the
+/// content out of a `&mut BigMap` without cloning.
+impl Default for BigMapContent<'_> {
+    fn default() -> Self {
+        BigMapContent::InMemory(BTreeMap::new())
+    }
+}
+
 /// Represents a big_map value.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct BigMap<'a> {

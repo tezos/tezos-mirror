@@ -71,6 +71,18 @@ pub enum Closure<'a> {
     },
 }
 
+/// A trivial empty lambda, used as a cheap placeholder when moving a `Closure`
+/// out of a `&mut` field without cloning (cloning could recurse through a deep
+/// `Apply` spine).
+impl Default for Closure<'_> {
+    fn default() -> Self {
+        Closure::Lambda(Lambda::Lambda {
+            micheline_code: Micheline::Seq(&[]),
+            code: Vec::new().into(),
+        })
+    }
+}
+
 /// Debug seeds the shared `TypedValue`/`Closure` walker so the alternating
 /// `Closure::Apply { arg_val: TypedValue, .. }` /
 /// `TypedValue::Lambda(Closure)` cycle (reachable via repeated `APPLY` of
