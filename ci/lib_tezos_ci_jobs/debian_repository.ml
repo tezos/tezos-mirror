@@ -14,6 +14,23 @@
 open Tezos_ci
 module CI = Cacio.Shared
 
+(* Types for the repository pipelines.
+   - Release: we run all the release jobs, but no tests
+   - Partial: we run only a subset of the tests jobs
+   - Full: we run the complete test matrix *)
+type repository_pipeline = Full | Partial | Release
+
+(** Return a tuple (ARCHITECTURES, <archs>) based on the type
+    of repository pipeline. *)
+let archs_variables pipeline =
+  let archs : Runner.Arch.t list =
+    match pipeline with Partial -> [Amd64] | Full | Release -> [Amd64; Arm64]
+  in
+  [
+    ( "ARCHITECTURES",
+      String.concat " " (List.map Runner.Arch.show_uniform archs) );
+  ]
+
 let tag_amd64 ~ramfs =
   if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
   else Runner.Tag.show Gcp_very_high_cpu
@@ -32,7 +49,7 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
     Set [arm64] to false to exclude from the matrix arm64 architecture.
     *)
 let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
-  | Common.Packaging.Partial ->
+  | Partial ->
       [[("RELEASE", ["bookworm"; "trixie"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
       [
@@ -73,8 +90,7 @@ let make_debian_variables distribution image_kind release version =
     Set [arm64] to false to exclude from the matrix arm64 architecture.
     *)
 let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
-  | Common.Packaging.Partial ->
-      [[("RELEASE", ["22.04"]); ("TAGS", [tag_amd64 ~ramfs])]]
+  | Partial -> [[("RELEASE", ["22.04"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
       [
         [
@@ -153,7 +169,7 @@ let make_apt_repo_job ~pipeline_type ~build_job ~distribution ~releases =
         (Artifacts, build_job pipeline_type);
       ]
     ~variables:
-      (Common.Packaging.archs_variables pipeline_type
+      (archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~id_tokens:Tezos_ci.id_tokens
@@ -401,7 +417,7 @@ let () =
 let register ~auto ~description pipeline_type =
   let pipeline_name =
     match (pipeline_type, auto) with
-    | Common.Packaging.Partial, false -> "debian_repository_partial"
+    | Partial, false -> "debian_repository_partial"
     | Partial, true -> "debian_repository_partial_auto"
     | Full, _ -> "debian_repository_full"
     | Release, _ -> "debian_repository_release"
