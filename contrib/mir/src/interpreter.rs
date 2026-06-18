@@ -31,7 +31,9 @@ use crate::interpreter::interpret_cost::SigCostError;
 use crate::lexer::Prim;
 use crate::serializer::DecodeError;
 use crate::stack::*;
-use crate::typechecker::{typecheck_contract_address, typecheck_value, TcError};
+use crate::typechecker::{
+    typecheck_contract_address, typecheck_value, TcError, TypecheckViews,
+};
 
 /// Errors possible during interpretation.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -358,7 +360,23 @@ impl<'a> ContractScript<'a> {
         ctx: &mut impl TypecheckingCtx<'a>,
         storage: &Micheline<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
-        typecheck_value(storage, ctx, &self.storage)
+        self.typecheck_storage_with_views(ctx, storage, TypecheckViews::Disabled)
+    }
+
+    /// [Self::typecheck_storage] threading `typecheck_views`: validates a
+    /// CREATE_CONTRACT in a storage-value lambda at origination (`true` only).
+    pub fn typecheck_storage_with_views(
+        &self,
+        ctx: &mut impl TypecheckingCtx<'a>,
+        storage: &Micheline<'a>,
+        typecheck_views: TypecheckViews,
+    ) -> Result<TypedValue<'a>, TcError> {
+        crate::typechecker::typecheck_value_with_views(
+            storage,
+            ctx,
+            &self.storage,
+            typecheck_views,
+        )
     }
 }
 
