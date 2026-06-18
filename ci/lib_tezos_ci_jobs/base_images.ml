@@ -6,7 +6,6 @@
 (*****************************************************************************)
 
 open Gitlab_ci.Types
-open Gitlab_ci.Util
 open Tezos_ci
 module CI = Cacio.Shared
 
@@ -160,8 +159,6 @@ module Distribution = struct
 
   let dockerfile = function
     | Debian | Ubuntu -> "images/base-images/Dockerfile.debian"
-
-  let base_changeset = function Debian | Ubuntu -> Files.debian_base
 end
 
 (* ── Cacio helpers ───────────────────────────────────────────────────────── *)
@@ -211,107 +208,6 @@ let base_image_job ~image_name ?(base_name = Upstream image_name) ~matrix
     ~script:[Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile]
     ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
     ~parallel:(Matrix [matrix @ extra_tags])
-
-(* ── CIAO helpers (used until RPM images are migrated) ──────────────────── *)
-
-(* This function can build docker images both in an emulated environment using
-   qemu or natively. The advantage of choosing emulated vs native depends on
-   the build time associated with the image. Small images are more efficiently
-   built in an emulated environment, while larger images are better build
-   natively.
-
-   [name] is the name of the job.
-
-   [matrix] is a parallel/matrix gitlab construct. Here we use it with the
-   RELEASE variable to build multiple images for the same distribution, but
-   different releases. This parameter is optional: Some images do no need this.
-
-   [image_name] is the name of the final docker image.
-
-   [base_name] is the name of the image upon the newly created image is FROM.
-   It can be either the upstream image, or an image generated in this pipeline.
-
-   [compilation] determines the type of the image.
-   If [compilation] parameter is either set to [Emulated] or omitted then we
-   build for two different architectures using qemu. This handles both build
-   and merging the manifest of the images.
-
-   If [compilation] is either [ Amd64_only ] or [ Arm64_only ] we build the
-   images natively, but the arm64 image is going to be suffixed with "-arm64".
-
-   If [compilation] is set to [Native] we build for both architectures using
-   a native runner. In this case we also must add a merge manifest job.
-
-   [changeset] should be [true] for [before_merging]/[merge_train] only. *)
-let make_job_base_images ?(changeset = false) ~__POS__ ?(matrix = [])
-    ~image_name ?(base_name = Upstream image_name)
-    ?(changes = Changeset.make []) ?(compilation = Emulated) ?(variables = [])
-    ?dependencies dockerfile =
-  let script = Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile in
-  (* cf. [scripts/ci/build-base-images.sh] for more details on the coupling between $PLATFORM and $TAGS *)
-  let platform, tags =
-    match compilation with
-    | Amd64_only -> ("linux/amd64", [])
-    | Arm64_only -> ("", [("TAGS", [Runner.Tag.show Gcp_arm64])])
-    | Emulated -> ("linux/amd64,linux/arm64", []) (* default *)
-    | Native ->
-        ( "",
-          [
-            ( "TAGS",
-              [Runner.Tag.show Gcp_very_high_cpu; Runner.Tag.show Gcp_arm64] );
-          ] )
-  in
-  let emulated = tags = [] in
-  let variables =
-    [
-      ("DISTRIBUTION", image_name);
-      (* if the base name is passed explicitely, then we assume is a
-         fully qualified image, otherwise we add the release component
-         to the image name *)
-      ( "IMAGE_PATH",
-        match base_name with
-        | Upstream name -> Format.asprintf "%s:$RELEASE" name
-        | Pipeline_dep name -> base_dep_img_name name );
-      ("PLATFORM", platform);
-    ]
-    @ variables
-  in
-  job_docker_authenticated
-    ~__POS__
-    ~name:("images." ^ image_name)
-    ~stage:Stages.build
-    ~variables
-    ~rules:
-      (if changeset then
-         [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()]
-       (* To force the run of the job. A bit hackish but simpler
-          than to have no rule and consistent with what is done in
-          [code_verification]. Will be done cleanly when migrated to
-          Cacio. *)
-         else [job_rule ~when_:On_success ()])
-    ~parallel:(Matrix [matrix @ tags])
-    ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
-    ?dependencies
-    [script]
-
-(* Specialisation of [make_job_base_images] for distribution images.
-   - if [changes] is not provided, we use the base changeset of the
-   distribution. This applies to base images that are not a
-   dependency of other images.  *)
-let make_job_base_image_distribution ?(changeset = false) ?base_name ?changes
-    distro =
-  make_job_base_images
-    ~changeset
-    ~__POS__
-    ~matrix:(Distribution.release_matrix distro)
-    ~image_name:(Distribution.name distro)
-    ?base_name
-    ~changes:
-      (* except for Debian, job changeset is the [Distribution.base_changeset] *)
-      (match changes with
-      | None -> Changeset.make @@ Distribution.base_changeset distro
-      | Some changes -> changes)
-    (Distribution.dockerfile distro)
 
 (* ── Base distribution jobs ─────────────────────────────────────────────── *)
 
@@ -578,13 +474,6 @@ let job_rust_sdk_bindings_based_images =
     ~needs:[(Cacio.Job, job_debian_based_images)]
     "images.debian-rust-sdk-bindings"
 
-(* ── Assembly ────────────────────────────────────────────────────────────── *)
-
-(* All base image jobs have been migrated to Cacio (registered below).
-   No CIAO jobs remain, so this list is empty; it is kept for the child
-   pipeline assembly. *)
-let jobs () = []
-
 (* ── Cacio pipeline registrations ───────────────────────────────────────── *)
 
 let () =
@@ -614,6 +503,4 @@ let child_pipeline =
   Pipeline.register_child
     "base_images"
     ~description:"Build CI base images"
-    ~jobs:
-      (job_datadog_pipeline_trace
-      :: (jobs () @ Cacio.get_jobs Cacio.Base_images_daily))
+    ~jobs:(job_datadog_pipeline_trace :: Cacio.get_jobs Cacio.Base_images_daily)
