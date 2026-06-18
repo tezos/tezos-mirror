@@ -1,0 +1,7 @@
+code APPLY ;
+input
+  {
+    Stack_elt (big_map nat string) {} ;
+    Stack_elt (lambda (pair (big_map nat string) unit) unit) { DROP ; UNIT } ;
+  } ;
+output (StaticError _) ;

@@ -3500,6 +3500,11 @@ fn typecheck_instruction_step<'a, 'b>(
                 }
             };
             ensure_ty_eq(gas, &pair_ty.0, &ty)?;
+            // NB: L1's APPLY checks the captured type is packable, but with
+            // `contract _` forbidden (`check_packable ~allow_contract:false`).
+            // The correct constraint is seemingly "pushable", as "pushable" is
+            // just "packable" without `contract _`
+            ty.ensure_prop(gas, TypeProperty::Pushable)?;
             stack.push(T::new_lambda(pair_ty.1.clone(), lam_ty.1.clone()));
             I::Apply { arg_ty: ty }
         }
@@ -7146,6 +7151,82 @@ mod typecheck_tests {
                 Type::Operation
             ))
         );
+    }
+
+    #[test]
+    fn apply_rejects_big_map_capture() {
+        // L1 calls `check_packable ~allow_contract:false` on the captured
+        // type; in MIR the equivalent property is `Pushable` (the only
+        // "packable, contracts disallowed" property). A `big_map` capture is
+        // not pushable, so APPLY must reject it, matching L1.
+        let mut stack = tc_stk![
+            Type::new_lambda(
+                Type::new_pair(Type::new_big_map(Type::Nat, Type::String), Type::Unit),
+                Type::Unit,
+            ),
+            Type::new_big_map(Type::Nat, Type::String),
+        ];
+        assert_eq!(
+            typecheck_instruction(&parse("APPLY").unwrap(), &mut Gas::default(), &mut stack),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Pushable,
+                Type::new_big_map(Type::Nat, Type::String),
+            ))
+        );
+    }
+
+    #[test]
+    fn apply_rejects_ticket_capture() {
+        let mut stack = tc_stk![
+            Type::new_lambda(
+                Type::new_pair(Type::new_ticket(Type::String), Type::Unit),
+                Type::Unit,
+            ),
+            Type::new_ticket(Type::String),
+        ];
+        assert_eq!(
+            typecheck_instruction(&parse("APPLY").unwrap(), &mut Gas::default(), &mut stack),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Pushable,
+                Type::new_ticket(Type::String),
+            ))
+        );
+    }
+
+    #[test]
+    fn apply_rejects_contract_capture() {
+        // `contract` is the type that separates pushable from packable: it is
+        // packable but not pushable. APPLY rejects it via the Pushable check,
+        // matching L1's `check_packable ~allow_contract:false`. Had we used
+        // Packable instead, this capture would have been wrongly accepted.
+        let mut stack = tc_stk![
+            Type::new_lambda(
+                Type::new_pair(Type::new_contract(Type::Unit), Type::Unit),
+                Type::Unit,
+            ),
+            Type::new_contract(Type::Unit),
+        ];
+        assert_eq!(
+            typecheck_instruction(&parse("APPLY").unwrap(), &mut Gas::default(), &mut stack),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::Pushable,
+                Type::new_contract(Type::Unit),
+            ))
+        );
+    }
+
+    #[test]
+    fn apply_accepts_packable_capture() {
+        // Control: a pushable capture (`nat`) is still accepted, and APPLY
+        // partially applies the lambda down to `lambda unit unit`.
+        let mut stack = tc_stk![
+            Type::new_lambda(Type::new_pair(Type::Nat, Type::Unit), Type::Unit),
+            Type::Nat,
+        ];
+        assert!(
+            typecheck_instruction(&parse("APPLY").unwrap(), &mut Gas::default(), &mut stack).is_ok()
+        );
+        assert_eq!(stack, tc_stk![Type::new_lambda(Type::Unit, Type::Unit)]);
     }
 
     #[test]
