@@ -229,12 +229,25 @@ fn fetch_michelson_runtime_chain_id(
     evm_chain_id: U256,
 ) -> ChainId {
     let chain_id_res = read_michelson_runtime_chain_id(host);
+    if let Err(err) = &chain_id_res {
+        log!(
+            Info,
+            "Failed to read the Michelson runtime chain id ({err:?}), deriving it from the EVM chain id."
+        );
+    }
     match chain_id_res {
         Ok(Some(michelson_chain_id)) => michelson_chain_id,
         Ok(None) | Err(_) => {
-            // Chain id not in storage yet: derive from the EVM chain id and persist.
+            // Chain id not in storage yet (or unreadable): derive from the EVM
+            // chain id and persist.
             let michelson_chain_id = derive_michelson_chain_id(evm_chain_id);
-            let _ = store_michelson_runtime_chain_id(host, &michelson_chain_id);
+            if let Err(err) = store_michelson_runtime_chain_id(host, &michelson_chain_id)
+            {
+                log!(
+                    Error,
+                    "Failed to persist the Michelson runtime chain id: {err:?}"
+                );
+            }
             michelson_chain_id
         }
     }
