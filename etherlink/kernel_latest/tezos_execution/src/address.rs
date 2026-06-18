@@ -25,8 +25,12 @@ impl OriginationNonce {
     /// Generate the KT1 address for a contract originated by the public key hash given in
     /// parameter
     pub fn generate_kt1(&mut self) -> ContractKt1Hash {
-        // First we increment the nonce
+        // Use-then-increment like L1 (raw_context.ml
+        // increment_origination_nonce): the first originated contract uses
+        // index 0, then the nonce is bumped for the next one.
+        let address =
+            mir::interpreter::compute_contract_address(&self.operation, self.index);
         self.index += 1;
-        mir::interpreter::compute_contract_address(&self.operation, self.index)
+        address
     }
 }
