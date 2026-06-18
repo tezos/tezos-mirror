@@ -187,8 +187,12 @@ git describe --tags
 # shellcheck source=./scripts/ci/create_octez_tarball.sh
 ./scripts/ci/create_octez_tarball.sh
 
-# Verify git expanded placeholders in archive
-tar -Oxf "${source_tarball}" "${gitlab_octez_source_package_name}/src/lib_version/exe/get_git_info.ml" | grep "let raw_current_version = \"${CI_COMMIT_TAG}\""
+# Verify git expanded the %(describe:tags) placeholder in the archive. Compare
+# against `git describe` (what the placeholder expands to) rather than
+# CI_COMMIT_TAG: in the test pipeline the commit may already carry a real tag
+# that describe resolves to instead of the synthetic CI_COMMIT_TAG.
+expected_version=$(git describe --tags "${CI_COMMIT_TAG}")
+tar -Oxf "${source_tarball}" "${gitlab_octez_source_package_name}/src/lib_version/exe/get_git_info.ml" | grep "let raw_current_version = \"${expected_version}\""
 
 # Checksums
 sha256sum "${source_tarball}" > "${source_tarball}.sha256"
