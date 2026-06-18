@@ -1621,27 +1621,41 @@ impl<'a> TypedValue<'a> {
     }
 }
 
-/// Drains nested `Rc<TypedValue>` children iteratively when dropping a
-/// potentially deep value (e.g. a comb of `Pair (Pair (... (Pair Int Int)))`),
-/// so the recursive `Rc<TypedValue>` destructor chain does not blow the
-/// WASM stack.
+/// Drains nested `Rc<TypedValue>` children iteratively, so the recursive
+/// `Rc<TypedValue>` destructor chain of a potentially deep value (e.g. a comb
+/// of `Pair (Pair (... (Pair Int Int)))`) does not blow the WASM stack.
 ///
-/// Not an `impl Drop` on [`TypedValue`] because that would forbid every
-/// by move destructure of its variants throughout the codebase. Called from
-/// [`Instruction`]'s `Drop` (for `PUSH` constants) and by callers that build
-/// deep values explicitly before drop.
-///
-/// Note: runtime-built deep values (a `PAIR`/`CONS` comb on the value stack,
-/// values popped/returned or left on the stack at interpreter teardown) are
-/// not yet drained by any production site, so they still recurse on the
-/// default destructor. Closing that gap — wiring this in at the release sites
-/// or giving `TypedValue` an iterative `Drop` — is tracked in Linear L2-1446.
+/// Since L2-1672, [`TypedValue`] has an `impl Drop` that runs exactly this
+/// drain, so *any* drop of a deep value is already safe and this function is
+/// no longer required for stack safety. It is retained for callers that want
+/// to drain a value early (while it is still borrowed), rather than waiting
+/// for it to fall out of scope.
 ///
 /// `pub(crate)`: the sentinel `replace` it performs assumes the caller is
 /// about to drop `v`, so it must not be exposed to callers that might hold the
 /// value aliased.
 pub(crate) fn drain_deep_typed_value(v: &mut TypedValue<'_>) {
     drain_iteratively(v, extract_tv_children);
+}
+
+/// Iterative `Drop` so dropping a deeply nested value (a comb of
+/// `Pair`/`Or`/`Option`, a long `List`/`Set`/`Map`, an `APPLY` closure spine, a
+/// ticket/operation payload, …) walks an explicit heap worklist instead of
+/// recursing through the derived destructor and overflowing the WASM/PVM call
+/// stack. This makes *every* release site safe — including `DROP`/`DIP n`
+/// (`Stack::drop_top` → `Vec::truncate`) and stack teardown — without each one
+/// having to remember to call [`drain_deep_typed_value`] first (L2-1672,
+/// closing the gap left by L2-1446).
+///
+/// Because of this impl, `TypedValue` can no longer be destructured by move
+/// with a plain `match` (Rust forbids moving fields out of a `Drop` type,
+/// `E0509`). Code that needs to consume a value's payload borrows the field
+/// mutably and moves it out with `std::mem::take` (or [`TakeOut::take_out`] in
+/// the generic `pop!` macros).
+impl Drop for TypedValue<'_> {
+    fn drop(&mut self) {
+        drain_iteratively(self, extract_tv_children);
+    }
 }
 
 /// Moves a payload out of a `&mut` field of a value that implements [`Drop`]
