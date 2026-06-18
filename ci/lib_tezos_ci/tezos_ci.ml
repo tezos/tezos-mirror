@@ -1506,27 +1506,6 @@ module Base_images = struct
 
   let ubuntu_26_04 = make_img "ubuntu:26.04" debian_version
 
-  (* RPM packaging *)
-
-  (* Version created by
-     https://gitlab.com/tezos/tezos/-/pipelines/2412618967
-
-     NB: these images are currently not build in our regular
-     pipelines. If we build them again, we will need to build fresh
-     ones.
-
-     Pipelines of the commit.
-     https://gitlab.com/tezos/tezos/-/commit/d79172a8/pipelines *)
-  let rpm_version = "master-d79172a8"
-
-  let rockylinux_9 = make_img "rockylinux:9" rpm_version
-
-  let rockylinux_10 = make_img "rockylinux:10" rpm_version
-
-  let fedora_39 = make_img "fedora:39" rpm_version
-
-  let fedora_42 = make_img "fedora:42" rpm_version
-
   (* [debian-jsonnet-trixie] *)
   (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
      after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)

@@ -616,8 +616,6 @@ module Images : sig
 
     val debian_version : string
 
-    val rpm_version : string
-
     val debian_bookworm : Image.t
 
     val debian_trixie : Image.t
@@ -633,21 +631,6 @@ module Images : sig
     val debian_build_trixie : Image.t
 
     val ubuntu_build_24_04 : Image.t
-
-    val rockylinux_9 : Image.t
-
-    (* FIXME: Images.rockylinux_10 is currently not used in the CI
-       code. However the corresponding base image is used but called
-       via an interpolated string:
-       cf. https://gitlab.com/tezos/tezos/-/blob/fc6f196b819642ce7c3a39f588de00bd8ebc28e8/.gitlab/ci/pipelines/rpm.daily.yml#L58
-       "${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-03271731"
-       We choose to keep this expression
-       for now anticipating a future refactoring that would use it. *)
-    val rockylinux_10 : Image.t
-
-    val fedora_39 : Image.t
-
-    val fedora_42 : Image.t
 
     val debian_homebrew_trixie : Image.t
 

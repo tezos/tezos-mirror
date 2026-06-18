@@ -264,10 +264,3 @@ let jobs pipeline_type =
     | Merge_train | Schedule_extended_test -> []
   in
   start_stage @ test @ manual
-  @
-  (* Remaining CIAO base image jobs (RPM only, currently disabled).
-     Non-RPM base image jobs are registered via Cacio (see base_images.ml). *)
-  match pipeline_type with
-  | Before_merging -> Base_images.jobs ~changeset:true ()
-  | Merge_train -> Base_images.jobs ~changeset:true ()
-  | Schedule_extended_test -> []
