@@ -59,32 +59,6 @@ let base_images : docker_image list =
               Format.asprintf "tezos-ubuntu-%s-%s" release debian_version);
         })
       (Base_images.Distribution.releases Ubuntu)
-  @
-  if Base_images.enable_rpm_images then
-    List.map
-      (fun release ->
-        {
-          name = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora";
-          tag = Images.Base_images.(Format.asprintf "%s-%s" release rpm_version);
-          dockerfile = "images/base-images/Dockerfile.rpm";
-          job_name =
-            Images.Base_images.(
-              Format.asprintf "tezos-fedora-%s-%s" release rpm_version);
-        })
-      (Base_images.Distribution.releases Fedora)
-    @ List.map
-        (fun release ->
-          {
-            name = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux";
-            tag =
-              Images.Base_images.(Format.asprintf "%s-%s" release rpm_version);
-            dockerfile = "images/base-images/Dockerfile.rpm";
-            job_name =
-              Images.Base_images.(
-                Format.asprintf "tezos-rockylinux-%s-%s" release rpm_version);
-          })
-        (Base_images.Distribution.releases Rockylinux)
-  else []
 
 (* Scans [docker_image:docker_tag] image. A scanning report artifact is produced.
    The source image is pulled, pushed to GCP Artifact Registry at
