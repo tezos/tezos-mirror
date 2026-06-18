@@ -101,6 +101,21 @@ impl Signature {
             Self::Unknown(_) => HashType::UnknownSignature,
         }
     }
+
+    pub fn check_validity(&self) -> Result<(), crate::CryptoError> {
+        match self {
+            Self::Secp256k1(s) => libsecp256k1::Signature::parse_standard_slice(s.as_ref())
+                .map(|_| ())
+                .map_err(|_| crate::CryptoError::InvalidSignature),
+            #[cfg(feature = "bls")]
+            Self::Bls(s) => blst::min_pk::Signature::try_from(s).map(|_| ()),
+            Self::Ed25519(_) | Self::P256(_) | Self::Unknown(_) => Ok(()),
+            #[cfg(not(feature = "bls"))]
+            Self::Bls(_) => Err(crate::CryptoError::Unsupported(
+                "bls feature disabled, BLS signature validation not supported",
+            )),
+        }
+    }
 }
 
 impl AsRef<[u8]> for Signature {
