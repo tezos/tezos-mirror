@@ -11,6 +11,9 @@
   registrations are reported in the operation receipt's `address_registry_diff` 
   field.
   (!22424 !22425)
+- Changing the sequencer key, via the `change_sequencer_key` precompile or a
+  governance sequencer upgrade, rejects public keys that are not valid curve
+  points. (!22502)
 - The account info record (`/info`) may now carry a fourth RLP field,
   the origin classification (alias payload included). Legacy 3-field
   records remain valid and are migrated lazily as accounts are touched;
