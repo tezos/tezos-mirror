@@ -55,8 +55,8 @@ sudo systemctl start octez-baker
 sudo systemctl status octez-node
 version_before_upgrade=$(get_node_version)
 
-# Packages to check
-mapfile -t packages < <(dpkg -l 'octez-*' | awk '$1 == "ii" && $2 != "octez-zcash-params" { print $2 }')
+# Packages to check (exclude arch-independent data/keyring packages from version comparison)
+mapfile -t packages < <(dpkg -l 'octez-*' | awk '$1 == "ii" && $2 != "octez-zcash-params" && $2 != "octez-archive-keyring" { print $2 }')
 
 # Record current versions
 declare -A old_versions
@@ -65,9 +65,16 @@ while read -r pkg ver; do
 done < <(dpkg -l "${packages[@]}" | awk '$1 == "ii" { print $2, $3 }')
 
 # [add next repository]
-sudo curl "$REPO/$DISTRO/octez.asc" | sudo gpg --dearmor -o /etc/apt/keyrings/octez-dev.gpg
-repository="deb [signed-by=/etc/apt/keyrings/octez-dev.gpg] $REPO/$DISTRO $RELEASE main"
-echo "$repository" | sudo tee /etc/apt/sources.list.d/octez-next.list
+# Bootstrap with curl, install the keyring, and switch APT to managed keyring.
+sudo mkdir -p /etc/apt/keyrings
+sudo curl -fsSL "$REPO/$DISTRO/octez.asc" |
+  sudo gpg --dearmor -o /etc/apt/keyrings/octez-dev.gpg
+echo "deb [signed-by=/etc/apt/keyrings/octez-dev.gpg] $REPO/$DISTRO $RELEASE main" |
+  sudo tee /etc/apt/sources.list.d/octez-next.list
+apt_get update
+apt_get install -y octez-archive-keyring
+sudo sed -i "s|signed-by=/etc/apt/keyrings/octez-dev.gpg|signed-by=/usr/share/keyrings/octez-archive-keyring.gpg|" \
+  /etc/apt/sources.list.d/octez-next.list
 apt_get update
 
 mapfile -t before_upgrade < <(

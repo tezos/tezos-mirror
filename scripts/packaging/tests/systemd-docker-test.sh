@@ -39,7 +39,10 @@ trap 'echo "Stopping and removing container systemd" && \
   (docker rm -f systemd || true) && (docker rmi systemd || true)' INT TERM EXIT
 
 # Run the container in the background and capture the PID of the background process
-screen -d -m /bin/sh -c "docker run -i --rm --privileged --name systemd -v $PWD/$TESTFILE:/$TESTFILE -v $PWD/scripts/packaging/tests/tests-common.inc.sh:/scripts/packaging/tests/tests-common.inc.sh $IMAGE"
+# Mount the test file and its parent directory so sub-scripts are available,
+# plus the shared tests-common.inc.sh helper.
+TESTDIR=$(dirname "$TESTFILE")
+screen -d -m /bin/sh -c "docker run -i --rm --privileged --name systemd -v $PWD/$TESTDIR:/$TESTDIR -v $PWD/$TESTFILE:/$TESTFILE -v $PWD/scripts/packaging/tests/tests-common.inc.sh:/scripts/packaging/tests/tests-common.inc.sh $IMAGE"
 
 timeout=30
 elapsed=0

@@ -34,7 +34,7 @@ shift
 RELEASES=$*
 
 for release in $RELEASES; do # unstable, 22_04, 24_04 ...
-  find "packages/${DISTRIBUTION}/${release}" -name '*amd64.deb' |
+  find "packages/${DISTRIBUTION}/${release}" \( -name '*amd64.deb' -o -name '*_all.deb' \) |
     parallel -j4 '
       echo "Lintian package {}"
       lintian "{}" --tag-display-limit 0 --verbose --allow-root

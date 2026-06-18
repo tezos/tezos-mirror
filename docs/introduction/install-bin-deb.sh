@@ -64,6 +64,10 @@ if [ "$RELEASETYPE" = "Master" ]; then
   echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] https://packages.nomadic-labs.com/$distribution $release main" |
     sudo tee /etc/apt/sources.list.d/octez.list
   sudo apt-get update
+  sudo apt-get install -y octez-archive-keyring
+  sudo sed -i 's|signed-by=/etc/apt/keyrings/octez.gpg|signed-by=/usr/share/keyrings/octez-archive-keyring.gpg|' \
+    /etc/apt/sources.list.d/octez.list
+  sudo apt-get update
   # [end add repository]
 else
   apt_get update

@@ -131,6 +131,22 @@ Now add the Tezos package repository:
    :start-after: [add repository]
    :end-before: [end add repository]
 
+The above commands download a bootstrap signing key, configure the repository,
+and then install the ``octez-archive-keyring`` package which ships the signing
+keys at ``/usr/share/keyrings/octez-archive-keyring.gpg``. The ``sed`` command
+switches APT to use the managed keyring. Once set up, signing key rotations are
+handled automatically through normal package updates -- there is no need to
+manually download keys when they are rotated.
+
+If you already have Octez packages installed with a manually downloaded key,
+you can migrate to the managed keyring by running::
+
+  sudo apt-get update
+  sudo apt-get install octez-archive-keyring
+  sudo sed -i 's|signed-by=[^ ]*.gpg|signed-by=/usr/share/keyrings/octez-archive-keyring.gpg|' \
+    /etc/apt/sources.list.d/octez.list
+  sudo apt-get update
+
 Then, to install the binaries, run the following command to install the octez-baker and all its dependencies:
 
 ::

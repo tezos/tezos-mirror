@@ -72,6 +72,12 @@ Docker Images
 Packaging
 ---------
 
+- Added ``octez-archive-keyring`` Debian package containing the APT repository
+  signing key, ensuring users can verify package authenticity even after key
+  rotation. The keyring is recommended by the ``octez-node``, ``octez-client``,
+  ``octez-signer``, and ``octez-dal-node`` packages.
+  (MR :gl:`!21826`)
+
 Smart Rollup node
 -----------------
 
