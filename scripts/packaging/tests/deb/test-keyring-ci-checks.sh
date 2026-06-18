@@ -125,7 +125,7 @@ echo ""
 echo "=== Check 4: Verify keyring reinstall is a no-op ==="
 
 sources_before=$(cat /etc/apt/sources.list.d/octez.list)
-apt-get install -y --reinstall octez-archive-keyring
+apt_get install -y --reinstall octez-archive-keyring
 sources_after=$(cat /etc/apt/sources.list.d/octez.list)
 
 if [ "$sources_before" != "$sources_after" ]; then
@@ -136,7 +136,7 @@ if [ "$sources_before" != "$sources_after" ]; then
 fi
 echo "PASS: keyring reinstall left sources.list unchanged"
 
-apt-get update
+apt_get update
 echo "PASS: apt-get update still works after reinstall"
 
 # --- Check 5: Key rotation resilience ---
@@ -148,7 +148,7 @@ echo "=== Check 5: Verify key rotation resilience (expired key + valid key) ==="
 
 # Generate an expired GPG key on-the-fly using faketime so the key is
 # genuinely expired (created 2 days ago with a 1-day validity).
-apt-get install -y faketime
+apt_get install -y faketime
 
 rotation_gnupghome=$(mktemp -d)
 chmod 700 "$rotation_gnupghome"
