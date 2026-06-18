@@ -37,6 +37,9 @@ let octez_node = Uses.octez_node
 let michelson_test_scripts =
   Uses.make ~tag:"michelson_test_scripts" ~path:"michelson_test_scripts" ()
 
+let tzt_reference_test_suite =
+  Uses.make ~tag:"tzt_reference_test_suite" ~path:"tzt_reference_test_suite" ()
+
 let octez_codec = Uses.make ~tag:"codec" ~path:"./octez-codec" ()
 
 let octez_snoop = Uses.make ~tag:"snoop" ~path:"./octez-snoop" ()
