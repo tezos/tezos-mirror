@@ -17,21 +17,8 @@ export AWS_SESSION_TOKEN="${STS[2]}"
 
 aws sts get-caller-identity
 
-if [ "$PACKAGE_FORMAT" = "deb" ]; then
-  # Update debian repository
-  deb-s3 upload --s3-region "${AWS_BUCKET_REGION}" \
-    --codename "${CODENAME}" \
-    --arch "${ARCH}" \
-    --bucket "${OCTEZ_DEB_BUCKET}" dist/debian/*.deb
-else
-  # Update rpm repository
-  #
-  # We're fetching the current state of the bucket, we're updating it with new packages
-  # and run createrepo to update the index.
-  #
-  aws s3 sync s3://"${OCTEZ_RPM_BUCKET}" rpm-bucket
-  mkdir -p rpm-bucket/"${CODENAME}"
-  cp dist/fedora/*.rpm rpm-bucket/"${CODENAME}"/
-  createrepo rpm-bucket/"${CODENAME}"
-  aws s3 sync rpm-bucket s3://"${OCTEZ_RPM_BUCKET}"
-fi
+# Update debian repository
+deb-s3 upload --s3-region "${AWS_BUCKET_REGION}" \
+  --codename "${CODENAME}" \
+  --arch "${ARCH}" \
+  --bucket "${OCTEZ_DEB_BUCKET}" dist/debian/*.deb

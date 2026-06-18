@@ -15,11 +15,6 @@
 #
 # baker-control.in      - a template for the Debian control file
 #
-# Place files in the rpm directory to declare packages similarly:
-#
-# baker-spec.in         - a template for the RPM SPEC file
-# cf. https://rpm-packaging-guide.github.io/#binary-rpms
-#
 # These files are shared with the Debian package build in pkg-common
 #
 # baker.conf            - an example configuration file (optional)
@@ -47,7 +42,7 @@ protocols=$(tr '\n' ' ' < $proto_file | sed -e 's/ $//g')
 # Package maintainer
 OCTEZ_PKGMAINTAINER=${OCTEZ_PKGMAINTAINER:-package@nomadic-labs.com}
 #
-# Package name used in dpkg or rpm name
+# Package name used in dpkg name
 OCTEZ_PKGNAME=${OCTEZ_PKGNAME:-octez}
 #
 # Real name used in scripts (usually octez)
@@ -119,8 +114,8 @@ getOctezVersion() {
 
   case "$RELEASETYPE" in
   ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
-    # rpm version do not accept '-' as a character
-    # https://rpm-software-management.github.io/rpm/manual/spec.html
+    # Debian package versions use '~' (which sorts before the release) for
+    # pre-releases; '-' separates the upstream version from the revision.
     RET=$(echo "$VERSION" | tr '-' '~')
     ;;
   SoftRelease)

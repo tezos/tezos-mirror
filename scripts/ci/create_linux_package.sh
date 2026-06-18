@@ -31,12 +31,6 @@ cd ../
 
 export DEB_BUILD_OPTIONS=nostrip
 
-if [ "$PACKAGE_FORMAT" = "deb" ]; then
-  mkdir -p ../dist/debian
-  python3 -m docker.package.package_generator --os ubuntu --type binary --binaries-dir ./binaries --build-sapling-package
-  mv ./*.{deb,changes,buildinfo} ../dist/debian
-else
-  mkdir -p ../dist/fedora
-  python3 -m docker.package.package_generator --os fedora --type binary --binaries-dir ./binaries --build-sapling-package
-  mv out/*.rpm ../dist/fedora
-fi
+mkdir -p ../dist/debian
+python3 -m docker.package.package_generator --os ubuntu --type binary --binaries-dir ./binaries --build-sapling-package
+mv ./*.{deb,changes,buildinfo} ../dist/debian
