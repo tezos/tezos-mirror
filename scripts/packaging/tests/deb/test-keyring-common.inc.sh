@@ -17,8 +17,12 @@ export DEBIAN_FRONTEND=noninteractive
 # install the keyring package, and switch APT to use the managed keyring.
 setup_keyring_test() {
   echo "=== Setup: install dependencies ==="
-  apt-get update
-  apt-get install -y sudo gpg gpg-agent curl apt-utils
+  # Use the apt_get retry wrapper (sourced above) rather than raw apt-get:
+  # the public Debian/Ubuntu mirrors intermittently fail with "Unknown error
+  # executing apt-key" / "Mirror sync in progress", which the wrapper absorbs
+  # by retrying. A raw apt-get here makes the whole job flaky.
+  apt_get update
+  apt_get install -y sudo gpg gpg-agent curl apt-utils
 
   echo "=== Setup: bootstrap repository with manual key ==="
   # Clean up any stale state from a previous run in the same container
@@ -30,11 +34,11 @@ setup_keyring_test() {
 
   echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] $REPO/$DISTRO $RELEASE main" |
     sudo tee /etc/apt/sources.list.d/octez.list
-  apt-get update
+  apt_get update
 
   echo "=== Setup: install keyring and switch APT to managed keyring ==="
-  apt-get install -y octez-archive-keyring
+  apt_get install -y octez-archive-keyring
   sudo sed -i "s|signed-by=/etc/apt/keyrings/octez.gpg|signed-by=$KEYRING|" \
     /etc/apt/sources.list.d/octez.list
-  apt-get update
+  apt_get update
 }

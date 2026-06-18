@@ -61,7 +61,7 @@ echo "PASS: sources.list uses managed keyring"
 # gpgv tolerates but Sequoia's sqv (APT's verifier on trixie) cannot parse.
 echo ""
 echo "=== Verify apt-get update authenticates via the managed keyring ==="
-keyring_update_log=$(LC_ALL=C apt-get update 2>&1)
+keyring_update_log=$(LC_ALL=C apt_get update 2>&1)
 echo "$keyring_update_log"
 if echo "$keyring_update_log" | grep -Eiq \
   'signature verification|not updated|returned an error|NO_PUBKEY|failed to parse keyring|Failed to fetch.*InRelease'; then
@@ -73,7 +73,7 @@ echo "PASS: apt-get update verified the repository using the managed keyring"
 # --- Step 4: Install a package using the keyring ---
 echo ""
 echo "=== Step 4: Install package with keyring ==="
-apt-get install -y octez-client
+apt_get install -y octez-client
 octez-client --version
 echo "PASS: octez-client installed successfully using keyring"
 
@@ -108,10 +108,10 @@ echo "=========================================="
 sudo sed -i "s|signed-by=$KEYRING|signed-by=/etc/apt/keyrings/octez.gpg|" \
   /etc/apt/sources.list.d/octez.list
 
-apt-get update
+apt_get update
 
 echo "=== Installing octez-client (should pull keyring via Recommends) ==="
-apt-get install -y octez-client
+apt_get install -y octez-client
 
 if dpkg -s octez-archive-keyring > /dev/null 2>&1; then
   echo "PASS: octez-archive-keyring was pulled in via Recommends"
@@ -123,7 +123,7 @@ fi
 # Switch to managed keyring (as the user would do manually)
 sudo sed -i "s|signed-by=/etc/apt/keyrings/octez.gpg|signed-by=$KEYRING|" \
   /etc/apt/sources.list.d/octez.list
-apt-get update
+apt_get update
 echo "PASS: apt-get update works after Recommends-driven keyring install"
 
 # Final cleanup
