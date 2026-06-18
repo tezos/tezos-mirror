@@ -118,6 +118,36 @@ oc.build-data_packages:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
 
+oc.build-keyring_package:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  stage: build
+  tags:
+  - $TAGS
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh keyring
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DISTRIBUTION: debian
+    RELEASE: trixie
+    TAGS: gcp
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
+
 oc.build:static-arm64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
@@ -273,9 +303,11 @@ apt_repo_ubuntu:
   - gcp
   needs:
   - oc.build-data_packages
+  - oc.build-keyring_package
   - oc.build-ubuntu
   dependencies:
   - oc.build-data_packages
+  - oc.build-keyring_package
   - oc.build-ubuntu
   timeout: 60 minutes
   interruptible: true
@@ -351,9 +383,11 @@ apt_repo_debian:
   - gcp
   needs:
   - oc.build-data_packages
+  - oc.build-keyring_package
   - oc.build-debian
   dependencies:
   - oc.build-data_packages
+  - oc.build-keyring_package
   - oc.build-debian
   timeout: 60 minutes
   interruptible: true
