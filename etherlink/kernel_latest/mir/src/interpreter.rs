@@ -280,8 +280,11 @@ impl<'a> ContractScript<'a> {
         let result = TypedValue::unwrap_rc(stack.pop().ok_or(
             InterpretError::InternalError(InterpretInvariant::EmptyValueStackPop),
         )?);
-        let (operation_list, storage) = match result {
-            V::Pair(operation_list, storage) => (operation_list, storage),
+        let mut result = result;
+        let (operation_list, storage) = match &mut result {
+            V::Pair(operation_list, storage) => {
+                (std::mem::take(operation_list), std::mem::take(storage))
+            }
             _ => {
                 return Err(InterpretError::InternalError(
                     InterpretInvariant::ExpectedPairResult,
@@ -333,8 +336,8 @@ impl<'a> ContractScript<'a> {
             &seen_in_storage,
         )?;
 
-        let vec = match operation_list {
-            V::List(vec) => vec,
+        let vec = match &mut operation_list {
+            V::List(vec) => std::mem::take(vec),
             _ => {
                 return Err(InterpretError::InternalError(
                     InterpretInvariant::ExpectedListOperation,
@@ -345,8 +348,9 @@ impl<'a> ContractScript<'a> {
 
         let mut ops = Vec::with_capacity(vec.len());
         for op in vec {
-            match TypedValue::unwrap_rc(op) {
-                V::Operation(op) => ops.push(*op),
+            let mut op = TypedValue::unwrap_rc(op);
+            match &mut op {
+                V::Operation(op) => ops.push(*std::mem::take(op)),
                 _ => {
                     return Err(InterpretError::InternalError(
                         InterpretInvariant::ExpectedOperationElement,
@@ -999,8 +1003,9 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::LoopLeftBody { body } => {
                 let stk = active_stack_mut(stacks)?;
                 ctx.gas().consume(interpret_cost::LOOP)?;
-                let or = match TypedValue::unwrap_rc(pop_value(stk)?) {
-                    TypedValue::Or(or) => or,
+                let mut or_v = TypedValue::unwrap_rc(pop_value(stk)?);
+                let or = match &mut or_v {
+                    TypedValue::Or(or) => std::mem::take(or),
                     _ => {
                         return Err(InterpretError::InternalError(
                             InterpretInvariant::TypeMismatchOnPop {
@@ -1400,9 +1405,13 @@ fn interpret_step<'a, 'b, 'c>(
     // than panicking.
     macro_rules! pop_v {
         ($p:path) => {{
-            match TypedValue::unwrap_rc(pop_value(stack)?) {
+            // `TypedValue`'s iterative `Drop` forbids moving a payload out by
+            // pattern match (E0509); borrow the field and `take_out` it,
+            // leaving the drained value to drop trivially at end of block.
+            let mut v = TypedValue::unwrap_rc(pop_value(stack)?);
+            match &mut v {
                 #[allow(unused_parens)]
-                $p(i) => i,
+                $p(i) => $crate::ast::TakeOut::take_out(i),
                 _ => {
                     return Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatchOnPop {
@@ -1774,9 +1783,12 @@ fn interpret_one<'a>(
             TypedValue::unwrap_rc(pop_rc!())
         }};
         ($p:path) => {{
-            match pop!() {
+            // `TypedValue`'s iterative `Drop` forbids moving a payload out by
+            // pattern match (E0509); borrow the field and `take_out` it.
+            let mut v = pop!();
+            match &mut v {
                 #[allow(unused_parens)]
-                $p(i) => i,
+                $p(i) => $crate::ast::TakeOut::take_out(i),
                 _ => {
                     return Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatchOnPop {
@@ -1788,14 +1800,17 @@ fn interpret_one<'a>(
         }};
         ($p:path, $( $a:ident ),+) => {
             #[allow(unused_parens)]
-            let ($($a),*) = match pop!() {
-                $p($($a),*) => ($($a),*),
-                _ => {
-                    return Err(InterpretError::InternalError(
-                        InterpretInvariant::TypeMismatchOnPop {
-                            expected: stringify!($p),
-                        },
-                    ))
+            let ($($a),*) = {
+                let mut v = pop!();
+                match &mut v {
+                    $p($($a),*) => ($($crate::ast::TakeOut::take_out($a)),*),
+                    _ => {
+                        return Err(InterpretError::InternalError(
+                            InterpretInvariant::TypeMismatchOnPop {
+                                expected: stringify!($p),
+                            },
+                        ))
+                    }
                 }
             };
         };
@@ -3048,8 +3063,8 @@ fn interpret_one<'a>(
         }
         I::SetDelegate => {
             let opt_keyhash = pop!(V::Option)
-                .map(|kh| match TypedValue::unwrap_rc(kh) {
-                    V::KeyHash(k) => Ok(k),
+                .map(|kh| match &mut TypedValue::unwrap_rc(kh) {
+                    V::KeyHash(k) => Ok(k.take_out()),
                     _ => Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatch {
                             expected: "V::KeyHash",
@@ -3179,16 +3194,16 @@ fn interpret_one<'a>(
         I::SplitTicket => {
             let ticket = *pop!(V::Ticket);
             pop!(V::Pair, amount_left, amount_right);
-            let amount_left = match TypedValue::unwrap_rc(amount_left) {
-                V::Nat(n) => n,
+            let amount_left = match &mut TypedValue::unwrap_rc(amount_left) {
+                V::Nat(n) => std::mem::take(n),
                 _ => {
                     return Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatch { expected: "V::Nat" },
                     ))
                 }
             };
-            let amount_right = match TypedValue::unwrap_rc(amount_right) {
-                V::Nat(n) => n,
+            let amount_right = match &mut TypedValue::unwrap_rc(amount_right) {
+                V::Nat(n) => std::mem::take(n),
                 _ => {
                     return Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatch { expected: "V::Nat" },
@@ -3218,8 +3233,8 @@ fn interpret_one<'a>(
         }
         I::JoinTickets => {
             pop!(V::Pair, ticket_left, ticket_right);
-            let mut ticket_left = match TypedValue::unwrap_rc(ticket_left) {
-                V::Ticket(t) => t,
+            let mut ticket_left = match &mut TypedValue::unwrap_rc(ticket_left) {
+                V::Ticket(t) => std::mem::take(t),
                 _ => {
                     return Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatch {
@@ -3228,8 +3243,8 @@ fn interpret_one<'a>(
                     ))
                 }
             };
-            let ticket_right = match TypedValue::unwrap_rc(ticket_right) {
-                V::Ticket(t) => t,
+            let ticket_right = match &mut TypedValue::unwrap_rc(ticket_right) {
+                V::Ticket(t) => std::mem::take(t),
                 _ => {
                     return Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatch {
@@ -3406,8 +3421,8 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::CREATE_CONTRACT)?;
             let counter = fresh_operation_counter(ctx)?;
             let opt_keyhash = pop!(V::Option)
-                .map(|keyhash| match TypedValue::unwrap_rc(keyhash) {
-                    V::KeyHash(k) => Ok(k),
+                .map(|keyhash| match &mut TypedValue::unwrap_rc(keyhash) {
+                    V::KeyHash(k) => Ok(k.take_out()),
                     _ => Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatch {
                             expected: "V::KeyHash",

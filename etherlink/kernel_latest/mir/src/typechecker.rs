@@ -4363,13 +4363,13 @@ fn step_typecheck_value<'a, 'b>(
             Ok(())
         }
         TvFrame::BuildContract { contract_ty } => {
-            let addr = results.pop().ok_or(TcError::InternalError(
+            let mut addr = results.pop().ok_or(TcError::InternalError(
                 TcInvariant::EmptyResultStack {
                     expected: "contract addr",
                 },
             ))?;
-            let t_addr = match addr {
-                TV::Address(a) => a,
+            let t_addr = match &mut addr {
+                TV::Address(a) => std::mem::take(a),
                 _ => {
                     return Err(TcError::InternalError(
                         TcInvariant::TypecheckValueWrongVariant {
@@ -4657,13 +4657,13 @@ fn step_typecheck_value<'a, 'b>(
                     expected: "ticket content",
                 },
             ))?;
-            let ticketer = results.pop().ok_or(TcError::InternalError(
+            let mut ticketer = results.pop().ok_or(TcError::InternalError(
                 TcInvariant::EmptyResultStack {
                     expected: "ticket ticketer",
                 },
             ))?;
-            let ticketer = match ticketer {
-                TV::Address(a) => a,
+            let ticketer = match &mut ticketer {
+                TV::Address(a) => std::mem::take(a),
                 _ => {
                     return Err(TcError::InternalError(
                         TcInvariant::TypecheckValueWrongVariant {
@@ -4672,8 +4672,9 @@ fn step_typecheck_value<'a, 'b>(
                     ))
                 }
             };
-            let amount = match amount {
-                TV::Nat(n) => n,
+            let mut amount = amount;
+            let amount = match &mut amount {
+                TV::Nat(n) => std::mem::take(n),
                 _ => {
                     return Err(TcError::InternalError(
                         TcInvariant::TypecheckValueWrongVariant {
@@ -4696,10 +4697,12 @@ fn step_typecheck_value<'a, 'b>(
                     expected: "ticket legacy pair",
                 },
             ))?;
-            match pair {
+            let mut pair = pair;
+            match &mut pair {
                 TV::Pair(left, right) => {
-                    let address = match TypedValue::unwrap_rc(left) {
-                        TV::Address(a) => a,
+                    let (left, right) = (std::mem::take(left), std::mem::take(right));
+                    let address = match &mut TypedValue::unwrap_rc(left) {
+                        TV::Address(a) => std::mem::take(a),
                         _ => {
                             return Err(TcError::InternalError(
                                 TcInvariant::TypecheckValueWrongVariant {
@@ -4708,16 +4711,16 @@ fn step_typecheck_value<'a, 'b>(
                             ))
                         }
                     };
-                    let (content, amount) = match TypedValue::unwrap_rc(right) {
-                        TV::Pair(c, a) => (c, a),
+                    let (content, amount) = match &mut TypedValue::unwrap_rc(right) {
+                        TV::Pair(c, a) => (std::mem::take(c), std::mem::take(a)),
                         _ => {
                             return Err(TcError::InternalError(
                                 TcInvariant::ExpectedTicketNestedPair,
                             ))
                         }
                     };
-                    let amount = match TypedValue::unwrap_rc(amount) {
-                        TV::Nat(n) => n,
+                    let amount = match &mut TypedValue::unwrap_rc(amount) {
+                        TV::Nat(n) => std::mem::take(n),
                         _ => {
                             return Err(TcError::InternalError(
                                 TcInvariant::ExpectedTicketNatAmount,

@@ -121,7 +121,6 @@ mod tests {
         },
         context::Ctx,
         gas::Gas,
-        irrefutable_match::irrefutable_match,
         parser::Parser,
         stack::Stack,
     };
@@ -247,14 +246,14 @@ mod tests {
         let mut stack = Stack::new();
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
             .unwrap();
-        let closure = irrefutable_match!(
-            TypedValue::unwrap_rc(stack.pop().unwrap());
-            TypedValue::Lambda
-        );
+        // The value is the lambda produced above; `TypedValue` itself
+        // implements `IntoMicheline` (delegating to its `Closure`), so the
+        // `Closure` need not be moved out of it.
+        let value = TypedValue::unwrap_rc(stack.pop().unwrap());
         let arena = Arena::new();
         let mut gas = Gas::default();
         assert_eq!(
-            closure
+            value
                 .into_micheline_optimized_legacy(&arena, &mut gas)
                 .unwrap(),
             // checked against octez-client
@@ -285,14 +284,14 @@ mod tests {
         let mut stack = Stack::new();
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
             .unwrap();
-        let closure = irrefutable_match!(
-            TypedValue::unwrap_rc(stack.pop().unwrap());
-            TypedValue::Lambda
-        );
+        // The value is the lambda produced above; `TypedValue` itself
+        // implements `IntoMicheline` (delegating to its `Closure`), so the
+        // `Closure` need not be moved out of it.
+        let value = TypedValue::unwrap_rc(stack.pop().unwrap());
         let arena = Arena::new();
         let mut gas = Gas::default();
         assert_eq!(
-            closure
+            value
                 .into_micheline_optimized_legacy(&arena, &mut gas)
                 .unwrap(),
             // checked against octez-client
@@ -344,14 +343,14 @@ mod tests {
         let mut stack = Stack::new();
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
             .unwrap();
-        let closure = irrefutable_match!(
-            TypedValue::unwrap_rc(stack.pop().unwrap());
-            TypedValue::Lambda
-        );
+        // The value is the lambda produced above; `TypedValue` itself
+        // implements `IntoMicheline` (delegating to its `Closure`), so the
+        // `Closure` need not be moved out of it.
+        let value = TypedValue::unwrap_rc(stack.pop().unwrap());
         let arena = Arena::new();
         let mut gas = Gas::default();
         assert_eq!(
-            closure
+            value
                 .into_micheline_optimized_legacy(&arena, &mut gas)
                 .unwrap(),
             // checked against octez-client's PACK behaviour.

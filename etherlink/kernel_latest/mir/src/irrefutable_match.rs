@@ -82,8 +82,6 @@ macro_rules! irrefutable_match {
     };
 }
 
-pub(crate) use irrefutable_match;
-
 #[cfg(test)]
 mod tests {
     #[derive(Debug)]
