@@ -106,7 +106,7 @@ type trigger = Auto | Immediate | Manual
         job ~stage ~image ...
     ]}
     then the risk of duplicating jobs by mistake would be really high.
-    For instance, if you wrote [~needs: [my_job Build fedora_37]]
+    For instance, if you wrote [~needs: [my_job Build debian_trixie]]
     in two places to include this job as a dependency of two jobs in the same pipeline,
     this dependency would be included twice, since each application of [my_job]
     would return a different job (even if those different jobs had the same name).
