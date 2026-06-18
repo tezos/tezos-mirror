@@ -3719,12 +3719,16 @@ fn typecheck_instruction_step<'a, 'b>(
                 }
                 _ => return Err(TcError::UnexpectedMicheline(format!("{name:?}"))),
             };
-            let _arg_type = pop!();
+            let arg_type = pop!();
             pop!();
             let return_type = parse_ty(gas, return_ty)?;
             return_type.ensure_prop(gas, TypeProperty::ViewOutput)?;
             stack.push(Type::new_option(return_type.clone()));
-            I::IView { name, return_type }
+            I::IView {
+                name,
+                arg_type,
+                return_type,
+            }
         }
         (App(VIEW, [_, _], _), [.., _, _]) => no_overload!(VIEW),
         (App(VIEW, [_, _], _), [] | [_]) => no_overload!(VIEW, len 2),
@@ -4960,7 +4964,7 @@ fn ensure_stacks_eq(gas: &mut Gas, stack1: &TypeStack, stack2: &TypeStack) -> Re
     Ok(())
 }
 
-fn ensure_ty_eq(gas: &mut Gas, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
+pub(crate) fn ensure_ty_eq(gas: &mut Gas, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
     gas.consume(gas::tc_cost::ty_eq(ty1.size_for_gas(), ty2.size_for_gas())?)?;
     if ty1 != ty2 {
         Err(TypesNotEqual(ty1.clone(), ty2.clone()).into())
@@ -8836,7 +8840,7 @@ mod typecheck_tests {
                           entrypoint: Entrypoint::default() }
                         ))),
                     Unit,
-                    IView { name: "hello_view".into(), return_type: Type::String }, Drop(None)]),
+                    IView { name: "hello_view".into(), arg_type: Type::Unit, return_type: Type::String }, Drop(None)]),
                 annotations: HashMap::from([(
                     FieldAnnotation::default(),
                     (Vec::new(), Type::Unit)

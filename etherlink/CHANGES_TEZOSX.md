@@ -96,6 +96,13 @@
 
 ### Michelson Runtime
 
+- The `VIEW` instruction now gates execution on two type-equality checks,
+  matching L1: the callee view's declared output type must equal the
+  caller-requested return type, and the caller's argument type must equal
+  the callee's declared input type. On mismatch `VIEW` pushes `None`
+  instead of executing the view (which previously could return `Some` with
+  a value of the wrong type). The checks are gas-metered like L1's `ty_eq`.
+  (L2-1659)
 - The `TICKET` instruction now rejects a non-comparable ticket content
   (e.g. `ticket (ticket string)`) during typechecking, matching L1,
   which requires ticket content to be comparable. Previously the

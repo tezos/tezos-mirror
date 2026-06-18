@@ -1229,6 +1229,26 @@ fn handle_step<'a, 'b>(
     Ok(())
 }
 
+/// Replays an L1 VIEW-callsite `ty_eq` (script_interpreter.ml `iview`):
+/// charges gas and compares two types. Returns `Ok(true)` on equality,
+/// `Ok(false)` on a genuine type mismatch (the caller pushes `None`, like
+/// L1's `return_none`), and `Err` for gas exhaustion / cost overflow, which
+/// abort the operation like L1 rather than collapsing into a `None` push.
+fn view_ty_eq<'a>(
+    gas: &mut crate::gas::Gas,
+    ty1: &Type,
+    ty2: &Type,
+) -> Result<bool, InterpretError<'a>> {
+    use crate::typechecker::TcError;
+    match crate::typechecker::ensure_ty_eq(gas, ty1, ty2) {
+        Ok(()) => Ok(true),
+        Err(TcError::TypesNotEqual(..)) => Ok(false),
+        Err(TcError::OutOfGas(e)) => Err(e.into()),
+        Err(TcError::CostOverflow(e)) => Err(e.into()),
+        Err(e) => Err(e.into()),
+    }
+}
+
 /// Per instruction dispatcher used by the iterative driver. Recursive
 /// instructions return an `Open` variant carrying the body and any state
 /// the driver needs; everything else delegates to `interpret_one` for
@@ -1471,7 +1491,11 @@ fn interpret_step<'a, 'b, 'c>(
                 }
             }
         }
-        I::IView { name, return_type } => {
+        I::IView {
+            name,
+            arg_type,
+            return_type,
+        } => {
             let input = TypedValue::unwrap_rc(pop_value(stack)?);
             let Address {
                 hash,
@@ -1509,26 +1533,58 @@ fn interpret_step<'a, 'b, 'c>(
             let input_type = view.input_type.parse_ty(ctx.gas())?;
             let output_type = view.output_type.parse_ty(ctx.gas())?;
 
-            if let Micheline::Seq(instrs) = view.code {
-                if let Ok(code) = crate::typechecker::typecheck_view(
-                    instrs,
-                    ctx.gas(),
-                    Type::Pair(PairBox::new(input_type, storage_ty)),
-                    output_type,
-                ) {
-                    let initial = stk![TypedValue::new_pair(input, storage)];
-                    return Ok(StepResult::OpenView {
-                        code,
-                        initial,
-                        new_self_address: AddressHash::Kt1(kt1),
-                        new_sender: ctx.self_address().clone(),
-                        new_amount: 0,
-                        new_balance: view_balance,
-                    });
+            // L1 (script_interpreter.ml `iview`) typechecks the view body
+            // first (`parse_view`), then gates execution on two gas-metered
+            // `ty_eq` checks, returning None on mismatch: the callee's declared
+            // output type against the caller-requested return type, then the
+            // caller's argument type against the callee's declared input type.
+            // We mirror that order, so the body typecheck is charged even when
+            // a `ty_eq` later fails. The `||` short-circuits so the input
+            // check's gas is not charged on an output mismatch, like L1's
+            // gas-monad; gas exhaustion propagates (it does not collapse to
+            // None).
+            let Micheline::Seq(instrs) = view.code else {
+                stack.push(V::Option(None));
+                return Ok(StepResult::Done);
+            };
+            let code = match crate::typechecker::typecheck_view(
+                instrs,
+                ctx.gas(),
+                Type::Pair(PairBox::new(input_type.clone(), storage_ty)),
+                output_type.clone(),
+            ) {
+                Ok(code) => code,
+                // Gas exhaustion / cost overflow must abort like L1, not
+                // collapse to None. An ill-typed view body keeps the existing
+                // None behaviour (tracked separately by L2-1635).
+                Err(crate::typechecker::TcError::OutOfGas(e)) => {
+                    return Err(e.into())
                 }
+                Err(crate::typechecker::TcError::CostOverflow(e)) => {
+                    return Err(e.into())
+                }
+                Err(_) => {
+                    stack.push(V::Option(None));
+                    return Ok(StepResult::Done);
+                }
+            };
+
+            if !view_ty_eq(ctx.gas(), &output_type, return_type)?
+                || !view_ty_eq(ctx.gas(), arg_type, &input_type)?
+            {
+                stack.push(V::Option(None));
+                return Ok(StepResult::Done);
             }
-            stack.push(V::Option(None));
-            Ok(StepResult::Done)
+
+            let initial = stk![TypedValue::new_pair(input, storage)];
+            Ok(StepResult::OpenView {
+                code,
+                initial,
+                new_self_address: AddressHash::Kt1(kt1),
+                new_sender: ctx.self_address().clone(),
+                new_amount: 0,
+                new_balance: view_balance,
+            })
         }
         // Non recursive arms: delegate to the side effect only function.
         _ => {
@@ -7646,6 +7702,82 @@ mod interpreter_tests {
         assert_eq!(ctx.sender, orig_sender);
         assert_eq!(ctx.amount, orig_amount);
         assert_eq!(ctx.balance, orig_balance);
+    }
+
+    /// Regression for L2-1659: VIEW must replay L1's two callsite type
+    /// equality checks (callee output vs caller-requested return type, and
+    /// caller argument type vs callee input type) and push `None` on
+    /// mismatch. Before the fix MIR discarded the caller argument type and
+    /// never compared the requested return type, so it executed the target
+    /// view anyway and returned `Some(value)` where L1 returns `None`.
+    #[test]
+    fn view_replays_l1_caller_callee_type_checks() {
+        use crate::ast::View;
+        use crate::parser::test_helpers::parse;
+
+        // Target view, valid on its own: input `nat`, output `string`; the
+        // body drops the `(input, storage)` pair and returns "ok".
+        let kt1: AddressHash = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye".try_into().unwrap();
+        let view = View {
+            input_type: Type::Nat,
+            output_type: Type::String,
+            code: parse(r#"{ DROP ; PUSH string "ok" }"#).unwrap(),
+        };
+        let mut ctx = Ctx::default();
+        ctx.views = HashMap::from([(kt1.clone(), HashMap::from([("v".to_string(), view)]))]);
+        ctx.storage = HashMap::from([(kt1.clone(), (Type::Unit, V::Unit))]);
+
+        let address = V::Address(addr::Address {
+            hash: kt1.clone(),
+            entrypoint: Entrypoint::default(),
+        });
+
+        // Input-type mismatch (the PoC): caller passes `unit`, view expects
+        // `nat`. L1 returns None; pre-fix MIR returned Some("ok").
+        let mut stack = stk![address.clone(), V::Unit];
+        interpret(
+            &[IView {
+                name: "v".to_string(),
+                arg_type: Type::Unit,
+                return_type: Type::String,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        assert_eq!(stack, stk![V::Option(None)], "input-type mismatch must give None");
+
+        // Output-type mismatch: caller requests `nat`, view outputs `string`.
+        let mut stack = stk![address.clone(), V::nat(5)];
+        interpret(
+            &[IView {
+                name: "v".to_string(),
+                arg_type: Type::Nat,
+                return_type: Type::Nat,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        assert_eq!(stack, stk![V::Option(None)], "output-type mismatch must give None");
+
+        // Both types match: the view executes and returns Some("ok").
+        let mut stack = stk![address, V::nat(5)];
+        interpret(
+            &[IView {
+                name: "v".to_string(),
+                arg_type: Type::Nat,
+                return_type: Type::String,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        assert_eq!(
+            stack,
+            stk![V::new_option(Some(V::String("ok".into())))],
+            "matching types must execute the view"
+        );
     }
 
     #[test]
