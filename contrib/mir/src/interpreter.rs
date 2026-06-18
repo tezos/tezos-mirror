@@ -9123,6 +9123,47 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn create_contract_in_parameter_validates_child_views() {
+        // L2-1635: a CREATE_CONTRACT reached at runtime through a parameter
+        // lambda must have its child views validated like L1 (parse_data ->
+        // parse_views), not silently accepted. wrap_parameter is the parameter
+        // typecheck site.
+        use crate::parser::test_helpers::{parse, parse_contract_script};
+        use crate::typechecker::type_props::TypeProperty;
+        let arena = Arena::new();
+        let script = parse_contract_script(
+            "parameter (lambda unit unit); storage unit; code { CDR; NIL operation; PAIR }",
+        )
+        .unwrap()
+        .split_script()
+        .unwrap()
+        .typecheck_script(&mut Gas::default(), true, false)
+        .unwrap();
+        let bad = parse(concat!(
+            "{ DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"bad\" unit (big_map string nat) { DROP; EMPTY_BIG_MAP string nat } };",
+            "  DROP; DROP; UNIT }"
+        ))
+        .unwrap();
+        assert_eq!(
+            script
+                .wrap_parameter(&arena, bad, &Entrypoint::default(), &mut Ctx::default())
+                .map(|_| ()),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
+            ))
+        );
+        // A well-formed lambda parameter still typechecks.
+        let good = parse("{ DROP; UNIT }").unwrap();
+        assert!(script
+            .wrap_parameter(&arena, good, &Entrypoint::default(), &mut Ctx::default())
+            .is_ok());
+    }
+
+    #[test]
     fn three_layered_balanced_entrypoints() {
         use crate::parser::test_helpers::parse;
 
