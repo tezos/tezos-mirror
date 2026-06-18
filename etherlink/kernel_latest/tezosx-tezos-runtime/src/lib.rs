@@ -97,6 +97,15 @@ pub fn crac_top_level_applied_result() -> ContentResult<TransferContent> {
     ContentResult::Applied(TransferTarget::from(TransferSuccess::default()))
 }
 
+/// Synthetic "failed" top-level result used by both the failed-CRAC
+/// receipt builder and the post-merge reconciliation in the kernel.
+/// Exposed so the two sites cannot drift: the error vector is intentionally
+/// empty — indexers read the error on the `alias(E_1)→target` internal op,
+/// so the top-level merely needs to advertise `status: failed`.
+pub fn crac_top_level_failed_result() -> ContentResult<TransferContent> {
+    ContentResult::Failed(ApplyOperationErrors { errors: vec![] })
+}
+
 /// Build an HTTP response from the result of [`execute_request`].
 ///
 /// `frame_result` carries the `%collect_result` payload taken out of the
