@@ -29,7 +29,6 @@ let job_test =
     ~description:"Tests bindings of the Rust SDK"
     ~image:Images.Base_images.debian_rust_sdk_bindings
     ~stage:Test
-    ~allow_failure:Yes
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
     ~script:
