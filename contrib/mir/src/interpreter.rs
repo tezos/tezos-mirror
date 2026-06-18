@@ -32,7 +32,8 @@ use crate::lexer::Prim;
 use crate::serializer::DecodeError;
 use crate::stack::*;
 use crate::typechecker::{
-    typecheck_contract_address, typecheck_value, TcError, TypecheckViews,
+    typecheck_contract_address, typecheck_value, typecheck_value_with_views, TcError,
+    TypecheckViews,
 };
 
 /// Errors possible during interpretation.
@@ -327,7 +328,16 @@ impl<'a> ContractScript<'a> {
     ) -> Result<TypedValue<'a>, TcError> {
         let parsed_annotation = FieldAnnotation::from_string(entrypoint.to_string());
         if let Some((annotation_path, annotation_type)) = self.annotations.get(&parsed_annotation) {
-            typecheck_value(&parameter, ctx, annotation_type)?;
+            // Validate child views in a parameter lambda like L1: parse_data
+            // elaborates an embedded CREATE_CONTRACT and runs parse_views. The
+            // Left/Right-wrapped re-typecheck below stays Disabled (already
+            // validated here, so the views are not metered twice).
+            typecheck_value_with_views(
+                &parameter,
+                ctx,
+                annotation_type,
+                TypecheckViews::Enabled,
+            )?;
             let mut result = parameter;
             for direction in annotation_path.iter().rev() {
                 match direction {
