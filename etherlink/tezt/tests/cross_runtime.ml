@@ -6266,8 +6266,13 @@ let check_fake_crac_tx_hash ~prefix ~expected_crac_id (block : Block.t) =
 (** Verify that [top] is a valid CRAC top-level content item per the RFC.
     Checks source = handler, destination = [expected_destination],
     status = [expected_status], and all synthetic fields = 0.
+    When [expect_empty_errors] is [true] (default [false]), also asserts
+    that the top-level [operation_result.errors] list is empty — use this
+    to verify that a failed CRAC top-level carries no error payload (the
+    error lives on the [alias→target] internal op instead).
     Returns the list of internal_operation_results from metadata. *)
-let check_crac_top_level ~prefix ~expected_destination ~expected_status top =
+let check_crac_top_level ~prefix ~expected_destination ~expected_status
+    ?(expect_empty_errors = false) top =
   let kind = JSON.(top |-> "kind" |> as_string) in
   Log.info ~prefix "top-level kind = %s" kind ;
   Check.(
@@ -6315,6 +6320,18 @@ let check_crac_top_level ~prefix ~expected_destination ~expected_status top =
     (top_status = expected_status)
       string
       ~error_msg:"Expected top-level status %R, got %L") ;
+  if expect_empty_errors then (
+    let errors =
+      JSON.(metadata |-> "operation_result" |-> "errors" |> as_list)
+    in
+    Log.info "%s: top-level errors count = %d" prefix (List.length errors) ;
+    Check.(
+      (List.length errors = 0)
+        int
+        ~error_msg:
+          "Expected top-level operation_result.errors to be empty (%R \
+           item(s)); the error payload must live on the alias→target internal \
+           op only, got %L item(s)")) ;
   JSON.(metadata |-> "internal_operation_results" |> as_list)
 
 (** Verify that [iop] is a valid CRAC event with the given [expected_crac_id].
@@ -10456,6 +10473,125 @@ let test_crac_failwith_receipt_is_gas_bounded () =
         "tight-run error_message is %L bytes (≥ 100): the full FAILWITH \
          payload leaked into the receipt; expected a gas-bounded OutOfGas \
          message (< 100 bytes)") ;
+  unit
+
+(** The error of a failed CRAC receipt is stored once — on the
+ *  [alias(E_1)→target] internal op — not on the top-level operation result.
+ *
+ *  EVM[evm_caller] --CRAC--> TEZ[TezFailwithString]
+ *
+ *  Run with a generous gas limit so the full payload persists (we are
+ *  testing shape, not the OOG path).  Assert:
+ *
+ *  - Top-level has [status: failed] with an EMPTY errors list.
+ *  - Exactly one internal op of kind "transaction" is [failed] and its
+ *    [error_message] is non-empty (the payload lives here).
+ *  - The 'x'-payload run appears exactly once across the whole operation
+ *    JSON (not twice as it did before de-duplication). *)
+let test_crac_failed_receipt_error_stored_once () =
+  register_crac_runner_test
+    ~title:"CRAC: failed receipt stores error once (not on top-level)"
+    ~tags:["crac_receipt"; "failwith"; "dedup"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-DEDUP" in
+  (* Use a long, distinctive payload so the 'x'-run is unlikely to collide
+     with unrelated 'x' sequences elsewhere in the JSON.  [TezFailwithString]
+     creates a script that FAILWITHs a string of exactly [payload_length] 'x'
+     characters. *)
+  let payload_length = 200 in
+  Log.debug
+    ~prefix
+    "Originate TezFailwithString (%d-byte payload)"
+    payload_length ;
+  let* target = TezFailwithString.originate ~payload_length () in
+  let (`Tez_runner (_, target_kt1)) = target in
+  Log.debug ~prefix "Deploy EVM caller pointing at TezFailwithString" ;
+  let* caller = EvmCracHttpCall.deploy_and_init target in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  Log.debug ~prefix "Run CRAC with generous gas (full payload persists)" ;
+  let* _ =
+    EvmCracHttpCall.call_run_catch_with_gas_limit ~gas_limit:2_000_000 caller
+  in
+  Log.debug ~prefix "Read the Michelson operation from the chain" ;
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let first_op = JSON.(ops |=> 0) in
+  let top = JSON.(first_op |-> "contents" |=> 0) in
+  Log.debug ~prefix "Assert top-level: status=failed, empty errors" ;
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"failed"
+      ~expect_empty_errors:true
+      top
+  in
+  Log.debug ~prefix "Assert alias→target internal op carries the error" ;
+  let failed_iop =
+    match
+      List.find_opt
+        (fun iop ->
+          JSON.(iop |-> "kind" |> as_string) = "transaction"
+          && JSON.(iop |-> "destination" |> as_string) = target_kt1
+          && JSON.(iop |-> "result" |-> "status" |> as_string) = "failed")
+        internals
+    with
+    | Some iop -> iop
+    | None ->
+        Test.fail
+          "%s: no failed internal transaction to %s in the receipt"
+          prefix
+          target_kt1
+  in
+  let error_msg =
+    JSON.(
+      failed_iop |-> "result" |-> "errors" |=> 0 |-> "error_message"
+      |> as_string)
+  in
+  Log.info "%s: alias→target error_message = %S" prefix error_msg ;
+  Check.(
+    (String.length error_msg > 0)
+      int
+      ~error_msg:
+        "alias→target internal op error_message must be non-empty; the error \
+         payload must live here, not on the top-level") ;
+  (* Count how many times the 200-'x' run appears in the whole operation
+     JSON text.  Before de-duplication it appeared twice (top-level result
+     + internal op).  After de-duplication it must appear exactly once. *)
+  let payload_run = String.make payload_length 'x' in
+  let op_json_str = JSON.encode first_op in
+  let count_occurrences s sub =
+    let sub_len = String.length sub in
+    let s_len = String.length s in
+    if sub_len = 0 then 0
+    else
+      let count = ref 0 in
+      let i = ref 0 in
+      while !i <= s_len - sub_len do
+        if String.sub s !i sub_len = sub then (
+          incr count ;
+          i := !i + sub_len)
+        else incr i
+      done ;
+      !count
+  in
+  let occurrences = count_occurrences op_json_str payload_run in
+  Log.info
+    "%s: %d-'x' payload run appears %d time(s) in op JSON"
+    prefix
+    payload_length
+    occurrences ;
+  Check.(
+    (occurrences = 1)
+      int
+      ~error_msg:
+        (sf
+           "The %d-'x' payload must appear exactly %%R time(s) in the \
+            operation JSON (once on the alias→target internal op, never on the \
+            empty-errors top-level); got %%L time(s)"
+           payload_length)) ;
   unit
 
 (** Generic call() precompile: EVM calls EVM via HTTP (same-runtime CRAC).
@@ -14711,6 +14847,7 @@ let () =
   test_crac_http_call_catch_revert () ;
   test_crac_http_call_catch_oog () ;
   test_crac_failwith_receipt_is_gas_bounded () ;
+  test_crac_failed_receipt_error_stored_once () ;
   test_crac_http_call_evm_to_evm () ;
   test_crac_http_call_evm_to_evm_preserves_msg_sender () ;
   test_crac_http_call_tez_to_tez () ;
