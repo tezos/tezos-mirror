@@ -465,6 +465,9 @@ let job_rust_based_images =
 
 (* ── Cacio: debian-rust.merge ────────────────────────────────────────────── *)
 
+(* Note: dedicated merge job exist because QEMU compilation takes too much time.
+   Without them the build job reaches a timeout. *)
+
 let job_rust_based_images_merge =
   docker_job
     ~extra_variables:
