@@ -103,6 +103,14 @@
   instead of executing the view (which previously could return `Some` with
   a value of the wrong type). The checks are gas-metered like L1's `ty_eq`.
   (L2-1659)
+- `CREATE_CONTRACT` now validates the embedded child script's view
+  declarations like L1, both at origination and when typechecking a
+  parameter value that carries an embedded `CREATE_CONTRACT`: a child view
+  with a forbidden input/output type (`big_map`, `ticket`, `operation`,
+  `sapling_state`), an ill-typed body, or a forbidden-in-view instruction is
+  now rejected instead of being silently originated. Re-typechecking an
+  already-stored contract (entrypoint extraction, execution) is unchanged,
+  so already-originated contracts keep executing. (L2-1635)
 - The `TICKET` instruction now rejects a non-comparable ticket content
   (e.g. `ticket (ticket string)`) during typechecking, matching L1,
   which requires ticket content to be comparable. Previously the
