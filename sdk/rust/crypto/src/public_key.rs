@@ -66,6 +66,39 @@ impl PublicKey {
             Self::Bls(tz4) => tz4.to_b58check(),
         }
     }
+
+    /// Ensures the key is a valid point on its curve: Ed25519, secp256k1 and
+    /// P256 against their curve, BLS against the prime-order subgroup. This is
+    /// intentionally stricter than L1 Michelson typechecking for Ed25519, which
+    /// accepts any length-valid Ed25519 key.
+    pub fn check_validity(&self) -> Result<(), CryptoError> {
+        match self {
+            PublicKey::Ed25519(pk) => ed25519_dalek::VerifyingKey::try_from(pk)
+                .map(|_| ())
+                .map_err(|_| CryptoError::InvalidPublicKey),
+            PublicKey::Secp256k1(pk) => libsecp256k1::PublicKey::parse_slice(
+                &pk.0,
+                Some(libsecp256k1::PublicKeyFormat::Compressed),
+            )
+            .map(|_| ())
+            .map_err(|_| CryptoError::InvalidPublicKey),
+            PublicKey::P256(pk) => p256::ecdsa::VerifyingKey::from_sec1_bytes(&pk.0)
+                .map(|_| ())
+                .map_err(|_| CryptoError::InvalidPublicKey),
+            // `key_validate` checks the point is on the curve and in the
+            // prime-order subgroup, matching L1's `in_g1` check.
+            #[cfg(feature = "bls")]
+            PublicKey::Bls(pk) => blst::min_pk::PublicKey::key_validate(&pk.0)
+                .map(|_| ())
+                .map_err(|_| CryptoError::InvalidPublicKey),
+            // Without blst the subgroup check is unavailable, so tz4 keys are
+            // rejected — consistent with BLS being forbidden in tezlink.
+            #[cfg(not(feature = "bls"))]
+            PublicKey::Bls(_) => Err(CryptoError::Unsupported(
+                "bls feature disabled, tz4 public key validation not supported",
+            )),
+        }
+    }
 }
 
 impl From<PublicKey> for Vec<u8> {
@@ -413,5 +446,118 @@ mod test {
             "BLpk1yE462s3cPX5t2HhvGPg3HSEUgqLi9q9Knwx7mbN4VuhEsvBYFvEz5Eu9shR7vZRY1k5PCtV",
             "tz4DWZXsrP3bdPaZ5B3M3iLVoRMAyxw9oKLH",
         );
+    }
+
+    #[test]
+    fn check_validity_accepts_valid_ed25519() {
+        let pk = PublicKey::from_b58check("edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK")
+            .expect("public key decoding should work");
+        assert_eq!(pk.check_validity(), Ok(()));
+    }
+
+    #[test]
+    fn check_validity_accepts_valid_secp256k1() {
+        let pk =
+            PublicKey::from_b58check("sppk7Zik17H7AxECMggqD1FyXUQdrGRFtz9X7aR8W2BhaJoWwSnPEGA")
+                .expect("public key decoding should work");
+        assert_eq!(pk.check_validity(), Ok(()));
+    }
+
+    #[test]
+    fn check_validity_accepts_valid_p256() {
+        let pk =
+            PublicKey::from_b58check("p2pk67VpBjWwoPULwXCpayec6rFxaAKv8VjJ8cVMHmLDCYARu31zx5Z")
+                .expect("public key decoding should work");
+        assert_eq!(pk.check_validity(), Ok(()));
+    }
+
+    #[cfg_attr(feature = "bls", test)]
+    #[cfg(feature = "bls")]
+    fn check_validity_accepts_valid_bls() {
+        let pk = PublicKey::from_b58check(
+            "BLpk1yE462s3cPX5t2HhvGPg3HSEUgqLi9q9Knwx7mbN4VuhEsvBYFvEz5Eu9shR7vZRY1k5PCtV",
+        )
+        .expect("public key decoding should work");
+        assert_eq!(pk.check_validity(), Ok(()));
+    }
+
+    #[test]
+    fn check_validity_rejects_off_curve_ed25519() {
+        // Tag 0x00 (Ed25519) followed by 32 bytes that are not a valid point.
+        let mut bytes = vec![0x00];
+        bytes.extend_from_slice(&[0x02; 32]);
+        let pk = PublicKey::nom_read_exact(&bytes).expect("length-only decoding should work");
+        assert!(matches!(pk, PublicKey::Ed25519(_)));
+        assert_eq!(pk.check_validity(), Err(CryptoError::InvalidPublicKey));
+    }
+
+    #[test]
+    fn check_validity_rejects_off_curve_secp256k1() {
+        // Tag 0x01 (secp256k1), compression byte 0x02 then 32 bytes that are not a
+        // valid curve point.
+        let mut bytes = vec![0x01, 0x02];
+        bytes.extend_from_slice(&[0xff; 32]);
+        let pk = PublicKey::nom_read_exact(&bytes).expect("length-only decoding should work");
+        assert!(matches!(pk, PublicKey::Secp256k1(_)));
+        assert_eq!(pk.check_validity(), Err(CryptoError::InvalidPublicKey));
+    }
+
+    #[test]
+    fn check_validity_rejects_off_curve_p256() {
+        // Tag 0x02 (P256), compression byte 0x02 then 32 bytes that are not a valid
+        // curve point.
+        let mut bytes = vec![0x02, 0x02];
+        bytes.extend_from_slice(&[0xff; 32]);
+        let pk = PublicKey::nom_read_exact(&bytes).expect("length-only decoding should work");
+        assert!(matches!(pk, PublicKey::P256(_)));
+        assert_eq!(pk.check_validity(), Err(CryptoError::InvalidPublicKey));
+    }
+
+    #[cfg_attr(feature = "bls", test)]
+    #[cfg(feature = "bls")]
+    fn check_validity_rejects_off_curve_bls() {
+        // Tag 0x03 (BLS) followed by 48 bytes that are not a valid curve point.
+        let mut bytes = vec![0x03];
+        bytes.extend_from_slice(&[0xff; 48]);
+        let pk = PublicKey::nom_read_exact(&bytes).expect("length-only decoding should work");
+        assert!(matches!(pk, PublicKey::Bls(_)));
+        assert_eq!(pk.check_validity(), Err(CryptoError::InvalidPublicKey));
+    }
+
+    #[test]
+    fn check_validity_rejects_off_curve_secp256k1_via_b58check() {
+        // An off-curve secp256k1 key round-trips through base58 (length-only) and is
+        // rejected by the curve check.
+        let mut bytes = vec![0x01, 0x02];
+        bytes.extend_from_slice(&[0xff; 32]);
+        let pk = PublicKey::nom_read_exact(&bytes).expect("length-only decoding should work");
+        let readable = pk.to_b58check();
+        let pk = PublicKey::from_b58check(&readable).expect("length-only decoding should work");
+        assert_eq!(pk.check_validity(), Err(CryptoError::InvalidPublicKey));
+    }
+
+    #[test]
+    fn check_validity_rejects_off_curve_p256_via_b58check() {
+        // An off-curve P256 key round-trips through base58 (length-only) and is
+        // rejected by the curve check.
+        let mut bytes = vec![0x02, 0x02];
+        bytes.extend_from_slice(&[0xff; 32]);
+        let pk = PublicKey::nom_read_exact(&bytes).expect("length-only decoding should work");
+        let readable = pk.to_b58check();
+        let pk = PublicKey::from_b58check(&readable).expect("length-only decoding should work");
+        assert_eq!(pk.check_validity(), Err(CryptoError::InvalidPublicKey));
+    }
+
+    #[cfg_attr(feature = "bls", test)]
+    #[cfg(feature = "bls")]
+    fn check_validity_rejects_off_curve_bls_via_b58check() {
+        // An off-curve BLS key round-trips through base58 (length-only) and is
+        // rejected by the subgroup check.
+        let mut bytes = vec![0x03];
+        bytes.extend_from_slice(&[0xff; 48]);
+        let pk = PublicKey::nom_read_exact(&bytes).expect("length-only decoding should work");
+        let readable = pk.to_b58check();
+        let pk = PublicKey::from_b58check(&readable).expect("length-only decoding should work");
+        assert_eq!(pk.check_validity(), Err(CryptoError::InvalidPublicKey));
     }
 }
