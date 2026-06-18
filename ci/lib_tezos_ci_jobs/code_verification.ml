@@ -265,14 +265,9 @@ let jobs pipeline_type =
   in
   start_stage @ test @ manual
   @
-  (* base image build jobs. *)
+  (* Remaining CIAO base image jobs (RPM only, currently disabled).
+     Non-RPM base image jobs are registered via Cacio (see base_images.ml). *)
   match pipeline_type with
-  (* In [before_merging] parent pipeline, base image jobs should start only
-       if [trigger] is started and if the changesets are touched. *)
-  | Before_merging -> Base_images.jobs ~start_job:job_start ~changeset:true ()
-  (* In [merge_train] pipeline, base image jobs should start as early as
-       as possible, but only if the changesets are touched. *)
+  | Before_merging -> Base_images.jobs ~changeset:true ()
   | Merge_train -> Base_images.jobs ~changeset:true ()
-  (* Not added in [schedule_extended_test]
-       as they run nightly in [base_images.daily]. *)
   | Schedule_extended_test -> []
