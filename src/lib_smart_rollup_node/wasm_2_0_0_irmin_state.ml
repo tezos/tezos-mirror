@@ -45,3 +45,29 @@ include Tezos_scoru_wasm.Tree_state.Make (Wrapped_tree)
 let empty_state () = Irmin_context.Tree.empty ()
 
 let state_hash tree = hash_tree tree |> Lwt.return
+
+module Storage = struct
+  module D = Tezos_scoru_wasm.Durable
+  module Cbv = Tezos_lazy_containers.Chunked_byte_vector
+
+  (* Locate the durable-storage subtree of a PVM [state]. This only navigates
+     to the subtree; the values it holds are materialised lazily by the reads
+     below, so decoding per read is cheap. *)
+  let decode state = Encoding_runner.decode_durable_storage state
+
+  let find_value state key =
+    let open Lwt_syntax in
+    let* durable = decode state in
+    D.find_value_as_bytes durable (D.key_of_string_exn key)
+
+  let value_length state key =
+    let open Lwt_syntax in
+    let* durable = decode state in
+    let+ value = D.find_value durable (D.key_of_string_exn key) in
+    Option.map Cbv.length value
+
+  let list state key =
+    let open Lwt_syntax in
+    let* durable = decode state in
+    D.list durable (D.key_of_string_exn key)
+end

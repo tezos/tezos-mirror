@@ -134,6 +134,15 @@ let find_value_exn tree key =
   let+ opt = find_value tree key in
   match opt with None -> raise Value_not_found | Some value -> value
 
+let find_value_as_bytes tree key =
+  let open Lwt.Syntax in
+  let* opt = find_value tree key in
+  match opt with
+  | None -> Lwt.return_none
+  | Some value ->
+      let+ bytes = Chunked_byte_vector.to_bytes value in
+      Some bytes
+
 (** helper function used in the copy/move *)
 let find_tree_exn tree key =
   let open Lwt.Syntax in

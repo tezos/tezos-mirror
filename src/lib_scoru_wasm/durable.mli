@@ -100,6 +100,10 @@ val find_value :
 val find_value_exn :
   t -> key -> Tezos_lazy_containers.Chunked_byte_vector.t Lwt.t
 
+(** [find_value_as_bytes durable key] is {!find_value} with the looked-up value
+    materialised as [bytes]. *)
+val find_value_as_bytes : t -> key -> bytes option Lwt.t
+
 (** [copy_tree_exn tree ?edit_readonly from_key to_key] produces a new tree in which a copy of
     the entire subtree at from_key is copied to to_key.
 

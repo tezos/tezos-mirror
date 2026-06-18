@@ -26,64 +26,6 @@
 open Protocol
 open Alpha_context
 
-(** Durable part of the storage of this PVM. *)
-module type Durable_state = sig
-  type state
-
-  (** [value_length state key] returns the length of data stored
-        for the [key] in the durable storage of the PVM state [state], if any. *)
-  val value_length : state -> string -> int64 option Lwt.t
-
-  (** [lookup state key] returns the data stored
-        for the [key] in the durable storage of the PVM state [state], if any. *)
-  val lookup : state -> string -> bytes option Lwt.t
-
-  (** [subtrees state key] returns subtrees
-        for the [key] in the durable storage of the PVM state [state].
-        Empty list in case if path doesn't exist. *)
-  val list : state -> string -> string list Lwt.t
-
-  module Tree_encoding_runner :
-    Tezos_tree_encoding.Runner.S with type tree = state
-end
-
-module Make_durable_state
-    (T : Tezos_tree_encoding.TREE with type tree = Irmin_context.tree) :
-  Durable_state with type state = T.tree = struct
-  module State = Tezos_scoru_wasm.Tree_state.Make (T)
-  module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
-
-  type state = T.tree
-
-  let decode_durable tree = State.Encoding_runner.decode_durable_storage tree
-
-  let value_length tree key_str =
-    let open Lwt_syntax in
-    let key = Tezos_scoru_wasm.Durable.key_of_string_exn key_str in
-    let* durable = decode_durable tree in
-    let+ res_opt = Tezos_scoru_wasm.Durable.find_value durable key in
-    Option.map Tezos_lazy_containers.Chunked_byte_vector.length res_opt
-
-  let lookup tree key_str =
-    let open Lwt_syntax in
-    let key = Tezos_scoru_wasm.Durable.key_of_string_exn key_str in
-    let* durable = decode_durable tree in
-    let* res_opt = Tezos_scoru_wasm.Durable.find_value durable key in
-    match res_opt with
-    | None -> return_none
-    | Some v ->
-        let+ bts = Tezos_lazy_containers.Chunked_byte_vector.to_bytes v in
-        Some bts
-
-  let list tree key_str =
-    let open Lwt_syntax in
-    let key = Tezos_scoru_wasm.Durable.key_of_string_exn key_str in
-    let* durable = decode_durable tree in
-    Tezos_scoru_wasm.Durable.list durable key
-end
-
-module Durable_state = Make_durable_state (Wasm_2_0_0_irmin_state.Wrapped_tree)
-
 type unsafe_patch =
   | Increase_max_nb_ticks of int64
   | Patch_durable_storage of {key : string; value : string}
@@ -116,8 +58,9 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
 
   module Inspect_durable_state = struct
     let lookup state keys =
-      let key = "/" ^ String.concat "/" keys in
-      Durable_state.lookup state key
+      Wasm_2_0_0_irmin_state.Storage.find_value
+        state
+        ("/" ^ String.concat "/" keys)
   end
 
   let string_of_status : status -> string = function
