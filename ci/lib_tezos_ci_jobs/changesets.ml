@@ -68,6 +68,9 @@ let changeset_debian_packages =
         "scripts/ci/build-debian-packages.sh";
         "scripts/ci/prepare-apt-repo.sh";
         "scripts/ci/create_debian_repo.sh";
+        "scripts/packaging/octez-archive-keyring/**/*";
+        "scripts/ci/build-keyring-deb.sh";
+        "scripts/packaging/tests/deb/test-keyring*";
         "docs/introduction/install-bin-deb.sh";
         "scripts/version.sh";
         "manifest/**/*.ml*";
