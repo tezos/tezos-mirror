@@ -5835,17 +5835,19 @@ fn visit_value<'a, 'b>(
         (T::Bytes, V::Bytes(bs)) => results.push(TV::Bytes(bs.clone())),
         (T::Key, V::String(str)) => {
             ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
-            results.push(TV::Key(
-                PublicKey::from_b58check(str)
-                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
-            ));
+            let key = PublicKey::from_b58check(str)
+                .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?;
+            key.check_validity()
+                .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?;
+            results.push(TV::Key(key));
         }
         (T::Key, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            results.push(TV::Key(
-                PublicKey::nom_read_exact(bs)
-                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
-            ));
+            let key = PublicKey::nom_read_exact(bs)
+                .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?;
+            key.check_validity()
+                .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?;
+            results.push(TV::Key(key));
         }
         (T::Signature, V::String(str)) => {
             ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
@@ -11761,6 +11763,86 @@ mod typecheck_tests {
                     .unwrap()
             ))))
         );
+    }
+
+    #[test]
+    fn push_key_invalid() {
+        // secp256k1, P256 and BLS literals whose tag and length are well-formed
+        // but whose bytes are not a point on the selected curve are rejected.
+        assert!(matches!(
+            parse(
+                "PUSH key 0x0102ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            )
+            .unwrap()
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        assert!(matches!(
+            parse(
+                "PUSH key 0x0202ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            )
+            .unwrap()
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        assert!(matches!(
+            parse(
+                "PUSH key 0x03ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            )
+            .unwrap()
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        // The same off-curve keys in the readable (base58) form are rejected too.
+        assert!(matches!(
+            parse("PUSH key \"sppk7bFP2oW86SDDFzqiDCMtbm8j4obhJ9AVYkG1XFzwz4ik6kGmM5V\"")
+                .unwrap()
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        assert!(matches!(
+            parse("PUSH key \"p2pk66WuZc7RC3dPJPEDJVKjhZb2M2MxpY7PwFghDxH48Zz8nivSqHC\"")
+                .unwrap()
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        assert!(matches!(
+            parse(
+                "PUSH key \"BLpk2HNLySEaiwT71MzNBuZneM4p3KEjyLJ9FS2Erp8AMJAkVPEstTddjquuAdrmPwumL1xRcttD\""
+            )
+            .unwrap()
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        // Ed25519 keys are validated too: an off-curve Ed25519 literal is
+        // rejected (stricter than L1, which accepts length-valid Ed25519).
+        assert!(matches!(
+            parse("PUSH key 0x000202020202020202020202020202020202020202020202020202020202020202")
+                .unwrap()
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
     }
 
     #[test]
