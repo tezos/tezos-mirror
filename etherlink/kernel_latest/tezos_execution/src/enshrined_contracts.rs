@@ -23,7 +23,9 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
-use tezos_tezlink::operation_result::{InternalOperationSum, TransferError};
+use tezos_tezlink::operation_result::{
+    ApplyOperationError, ContentResult, InternalOperationSum, TransferError,
+};
 use tezosx_interfaces::{
     gas::convert as convert_gas,
     headers::{format_tez_from_mutez, parse_u64_opt},
@@ -334,7 +336,7 @@ const TEZOSX_GATEWAY_BASE_COST_MILLIGAS: u64 = 100_000;
 /// allocation, callback/selector assembly, ...).
 ///
 /// TODO(L2-1165): replace with a benchmarked value.
-const TEZOSX_GATEWAY_PER_BYTE_MILLIGAS: u64 = 300;
+pub(crate) const TEZOSX_GATEWAY_PER_BYTE_MILLIGAS: u64 = 300;
 
 /// Surcharge when amount > 0 (balance reset after value transfer).
 /// Equivalent to SSTORE non-zero→zero (5,000 EVM gas × 100).
@@ -423,6 +425,102 @@ fn charge_gateway_payload_gas(
     operation_gas
         .cast_and_consume_milligas(cost)
         .map_err(TransferError::OutOfGas)
+}
+
+/// Meter the persisted form of a [`TransferError`] against the operation gas
+/// budget and return a [`CracError`] suitable for building a failed CRAC
+/// receipt.
+///
+/// The top-level error of a failed CRAC is persisted **twice** in the receipt
+/// `build_failed_crac_receipt` produces:
+///   - as the top-level operation result (`status: failed`), and
+///   - as the synthetic alias(E_1)→target failed-transfer internal op, which
+///     the failed-receipt structure records so indexers see the attempted
+///     call.
+///
+/// The BSON sink renders each copy as
+/// `format!("{:?}", ApplyOperationError::Transfer(&error))` — i.e. the Debug
+/// form of the *wrapping* `ApplyOperationError::Transfer(...)` variant, not the
+/// bare `TransferError`.  The wrapped form is `"Transfer(" + bare_debug + ")"`,
+/// so its byte length equals the bare Debug length plus the 10-byte constant
+/// wrapper (`"Transfer("` = 9 bytes, `")"` = 1 byte).  The durable receipt thus
+/// holds `2 * wrapped_len` bytes for this error, and this helper charges
+/// `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS` per persisted byte — the same rate
+/// [`charge_gateway_payload`] uses for the `GatewayError` response body — so
+/// the gas bound tracks the size actually persisted.
+///
+/// The wrapped length is derived from the bare Debug length without cloning
+/// the (potentially attacker-sized) error string.
+///
+/// On success the **original** error is returned wrapped in
+/// [`CracError::Operation`] so the receipt body is unchanged.  On gas
+/// exhaustion the error is replaced with
+/// [`TransferError::OutOfGas`] — the failed CRAC receipt is still
+/// produced (small), preserving the invariant that a failed CRAC receipt is
+/// always produced with a bounded body.
+//
+// TODO: https://linear.app/tezos/issue/L2-1623
+// The double-store is a receipt-shape artifact, not a deliberate design; if
+// the receipt is de-duplicated to carry the error once, drop the `2 *` factor.
+pub(crate) fn charge_persisted_error(
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    error: TransferError,
+) -> CracError {
+    // The failed CRAC receipt persists this error twice (top-level result +
+    // synthetic alias(E_1)→target failed-transfer entry), each rendered by
+    // the BSON sink as
+    //   format!("{:?}", ApplyOperationError::Transfer(&error))
+    //   = "Transfer(" + format!("{error:?}") + ")"
+    // Derive the wrapped length from the bare Debug length to avoid an
+    // O(N) clone of the (potentially attacker-sized) error string.
+    let bare_len = format!("{error:?}").len();
+    let wrapped_len = bare_len + "Transfer(".len() + ")".len();
+    let persisted_len = 2 * wrapped_len;
+    match charge_gateway_payload_gas(operation_gas, persisted_len) {
+        Ok(()) => CracError::Operation(error),
+        Err(_oog) => CracError::Operation(TransferError::OutOfGas(mir::gas::OutOfGas)),
+    }
+}
+
+/// Meter the persisted error bodies in `internal_receipts` that will land in
+/// the failed CRAC receipt BSON sink, charging
+/// `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS` per byte of the Debug-rendered
+/// `ApplyOperationError` body for each `ContentResult::Failed` entry.
+///
+/// This closes the bypass by which an attacker-controlled internal-op
+/// FAILWITH payload routes unmetered into the persisted receipt.  The BSON
+/// sink serialises every non-`PastError` `ApplyOperationError` as
+/// `format!("{error:?}")`, so that is the length we charge.
+///
+/// On gas exhaustion the oversized `Failed` body is replaced with
+/// `Failed(ApplyOperationError::OutOfGas(...).into())` so the internal-op
+/// entry survives with a bounded body, and the failed CRAC receipt is still
+/// produced (the internal-op entry is always preserved even on OOG).
+/// `Applied`, `Skipped`, and `BackTracked` entries are left untouched.
+pub(crate) fn charge_internal_receipt_bodies(
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    receipts: &mut [InternalOperationSum],
+) {
+    macro_rules! meter_failed {
+        ($r:expr) => {
+            if let ContentResult::Failed(ref errors) = $r.result {
+                let len: usize =
+                    errors.errors.iter().map(|e| format!("{e:?}").len()).sum();
+                if charge_gateway_payload_gas(operation_gas, len).is_err() {
+                    $r.result = ContentResult::Failed(
+                        ApplyOperationError::OutOfGas(mir::gas::OutOfGas).into(),
+                    );
+                }
+            }
+        };
+    }
+    for receipt in receipts.iter_mut() {
+        match receipt {
+            InternalOperationSum::Transfer(r) => meter_failed!(r),
+            InternalOperationSum::Origination(r) => meter_failed!(r),
+            InternalOperationSum::Event(r) => meter_failed!(r),
+        }
+    }
 }
 
 /// If `destination` is `Some`, deduct gas and return a `TRANSFER_TOKENS`
@@ -5456,6 +5554,108 @@ pub(crate) mod tests {
             synthetic_crac_marker_tag(&iop),
             None,
             "KT1 sender + tag 'cross_runtime_call_end' must return None (sender must be null)"
+        );
+    }
+
+    // ── charge_persisted_error tests ─────────────────────────────────────────
+
+    fn make_operation_gas(milligas: u64) -> crate::gas::TezlinkOperationGas {
+        crate::gas::TezlinkOperationGas::start_milligas(milligas)
+            .expect("milligas within limit")
+    }
+
+    /// A `MichelsonContractInterpretError` body is charged at the per-byte
+    /// rate, against the size *actually persisted*.  The failed CRAC receipt
+    /// stores the error twice (top-level result + synthetic failed-transfer
+    /// internal op), so the charge equals
+    /// `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * len` where `len` is the
+    /// Debug-rendered length of `ApplyOperationError::Transfer(error)` (the
+    /// wrapping variant stored by the BSON sink), i.e. bare Debug length + 10.
+    #[test]
+    fn charge_persisted_error_charges_per_byte() {
+        let msg = "x".repeat(10);
+        let err = TransferError::MichelsonContractInterpretError(msg.clone());
+        // The BSON sink stores the wrapped form: "Transfer(" + bare_debug + ")",
+        // persisted twice in the receipt.
+        let wrapped_len = format!("{err:?}").len() + "Transfer(".len() + ")".len();
+        let expected_cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * wrapped_len as u64;
+
+        let ample = expected_cost + 1_000_000;
+        let mut gas = make_operation_gas(ample);
+        let result = charge_persisted_error(&mut gas, err.clone());
+
+        // Original error is returned on success.
+        assert!(
+            matches!(result, CracError::Operation(TransferError::MichelsonContractInterpretError(ref s)) if *s == msg),
+            "expected original error returned, got: {result:?}"
+        );
+
+        let consumed = u64::from(gas.total_milligas_consumed());
+        assert_eq!(
+            consumed, expected_cost,
+            "charge should equal TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * {wrapped_len}"
+        );
+    }
+
+    /// A longer body costs proportionally more gas.
+    #[test]
+    fn charge_persisted_error_scales_with_length() {
+        let short_msg = "x".repeat(5);
+        let long_msg = "x".repeat(50);
+
+        let short_err = TransferError::MichelsonContractInterpretError(short_msg.clone());
+        let long_err = TransferError::MichelsonContractInterpretError(long_msg.clone());
+
+        // Wrapped lengths: "Transfer(" + bare_debug + ")" = bare + 10,
+        // persisted twice in the receipt.
+        let wrapper_overhead = "Transfer(".len() + ")".len();
+        let short_len = format!("{short_err:?}").len() + wrapper_overhead;
+        let long_len = format!("{long_err:?}").len() + wrapper_overhead;
+
+        let budget = 10_000_000u64;
+        let mut gas_short = make_operation_gas(budget);
+        let mut gas_long = make_operation_gas(budget);
+
+        charge_persisted_error(&mut gas_short, short_err);
+        charge_persisted_error(&mut gas_long, long_err);
+
+        let cost_short = u64::from(gas_short.total_milligas_consumed());
+        let cost_long = u64::from(gas_long.total_milligas_consumed());
+        assert_eq!(
+            cost_short,
+            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * short_len as u64
+        );
+        assert_eq!(
+            cost_long,
+            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * long_len as u64
+        );
+        assert!(
+            cost_long > cost_short,
+            "longer body should cost more gas: {cost_long} vs {cost_short}"
+        );
+    }
+
+    /// When the budget is exhausted the helper returns `OutOfGas` instead of
+    /// the original error.
+    #[test]
+    fn charge_persisted_error_oog_returns_out_of_gas() {
+        let msg = "x".repeat(100);
+        let err = TransferError::MichelsonContractInterpretError(msg);
+        // Wrapped length: "Transfer(" + bare_debug + ")" = bare + 10,
+        // persisted twice in the receipt.
+        let wrapped_len = format!("{err:?}").len() + "Transfer(".len() + ")".len();
+        let cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * wrapped_len as u64;
+
+        // Budget is strictly less than the required cost.
+        let mut gas = make_operation_gas(cost - 1);
+        let result = charge_persisted_error(&mut gas, err);
+
+        assert!(
+            matches!(
+                result,
+                CracError::Operation(TransferError::OutOfGas(mir::gas::OutOfGas))
+            ),
+            "expected OutOfGas on budget exhaustion, got: {result:?}"
         );
     }
 }

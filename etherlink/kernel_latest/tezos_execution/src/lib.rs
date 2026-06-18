@@ -4,6 +4,8 @@
 use account_storage::Code;
 use account_storage::Manager;
 use account_storage::TezlinkAccount;
+use enshrined_contracts::charge_internal_receipt_bodies;
+use enshrined_contracts::charge_persisted_error;
 use enshrined_contracts::get_enshrined_contract_entrypoint;
 use enshrined_contracts::CracError;
 use mir::ast::BinWriter;
@@ -1502,6 +1504,20 @@ where
                 internal_receipts
                     .iter_mut()
                     .for_each(|t| t.op.transform_result_backtrack());
+                // Meter the persisted error bodies of internal-op failures
+                // before recording the failed CRAC receipt.  Each
+                // `ContentResult::Failed` entry carries the FAILWITH body;
+                // charging here closes the bypass by which an attacker
+                // whose KT1 issues an internal TRANSFER_TOKENS to a
+                // FAILWITHing contract would otherwise route a large body
+                // into the receipt unmetered.  On OOG the oversized body is
+                // replaced with `OutOfGas` while the entry is preserved so
+                // the failed CRAC receipt always carries its internal-op list.
+                let mut internal_receipts = untag_internals(internal_receipts);
+                charge_internal_receipt_bodies(
+                    tc_ctx.operation_gas,
+                    &mut internal_receipts,
+                );
                 // Return the internal receipts so the failed CRAC
                 // receipt can include backtracked/failed/skipped ops
                 // (RFC Example 4).
@@ -1511,7 +1527,7 @@ where
                             "internal operation failed during cross-runtime call".into(),
                         ),
                     ),
-                    internal_receipts: untag_internals(internal_receipts),
+                    internal_receipts,
                 })
             }
         }
@@ -1523,9 +1539,23 @@ where
             internal_receipts
                 .iter_mut()
                 .for_each(|t| t.op.transform_result_backtrack());
+            // Meter the persisted error bodies of any internal-op failures
+            // accumulated before the top-level error, then meter the
+            // top-level error itself.  Only `CracError::Operation` errors
+            // are stored in the BSON sink; `CracError::BlockAbort` aborts
+            // the block so no receipt is produced and no per-byte charge
+            // applies.
+            let mut internal_receipts = untag_internals(internal_receipts);
+            charge_internal_receipt_bodies(tc_ctx.operation_gas, &mut internal_receipts);
+            let metered_error = match e {
+                CracError::Operation(te) => {
+                    charge_persisted_error(tc_ctx.operation_gas, te)
+                }
+                CracError::BlockAbort(_) => e,
+            };
             Err(CracTransferError {
-                error: e,
-                internal_receipts: untag_internals(internal_receipts),
+                error: metered_error,
+                internal_receipts,
             })
         }
     }
@@ -2343,15 +2373,20 @@ mod tests {
     use tezosx_journal::TezosXJournal;
     use typed_arena::Arena;
 
+    use crate::enshrined_contracts::{CracError, TEZOSX_GATEWAY_PER_BYTE_MILLIGAS};
     use crate::gas::TezlinkOperationGas;
     use crate::make_default_ctx;
     use crate::storage_fees::{COST_PER_BYTES, ORIGINATION_SIZE};
+    use crate::storage_read_cost_milligas;
     use crate::{
         account_storage::{Manager, TezlinkAccount},
-        burn_pass, context, validate_and_apply_operation, FeeRefundConfig,
-        OperationError, ProcessedOperation, TaggedInternalOp,
+        burn_pass, context, cross_runtime_transfer, validate_and_apply_operation,
+        CracTransferError, FeeRefundConfig, OperationError, ProcessedOperation,
+        TaggedInternalOp,
     };
+    use tezos_smart_rollup::types::Timestamp;
     use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+    use tezos_tezlink::enc_wrappers::BlockNumber;
 
     /// Test-only SafeStorage roots matching the `TezlinkContext::init_context`
     /// root path, so the inner SafeStorage wrap inside
@@ -8903,6 +8938,453 @@ mod tests {
         assert_eq!(
             skipped[1].operation_consumed_milligas, 0,
             "Skipped op should consume 0 gas"
+        );
+    }
+
+    // --- cross_runtime_transfer metering tests ---
+
+    /// Build a Michelson script that pushes `n` copies of the character 'x' as
+    /// a string then FAILWITHs with it, so the attacker-controlled error body
+    /// is exactly `n` bytes.
+    fn push_failwith_script(n: usize) -> String {
+        let payload = "x".repeat(n);
+        format!(
+            r#"parameter unit;
+               storage unit;
+               code {{ DROP; PUSH string "{payload}"; FAILWITH }}"#
+        )
+    }
+
+    /// Drive a `PUSH string "<n bytes>"; FAILWITH` script through
+    /// `cross_runtime_transfer` and return the `CracTransferError`.
+    ///
+    /// `milligas_limit` is the operation-level budget placed in the
+    /// `TezlinkOperationGas` that `cross_runtime_transfer` charges against.
+    fn run_failwith_crac(
+        n: usize,
+        milligas_limit: u64,
+    ) -> (CracTransferError, u64 /* consumed milligas */) {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+
+        // Sender: an implicit account (tz1).
+        let src = bootstrap1();
+        let sender_account = init_account(&mut host, &src.pkh, 100_000);
+
+        // Destination: a KT1 contract with `PUSH string; FAILWITH`.
+        let dest_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
+        init_contract(
+            &mut host,
+            &dest_kt1,
+            &push_failwith_script(n),
+            &Micheline::from(()),
+            &0_u64.into(),
+        );
+        let dest = Contract::Originated(dest_kt1);
+
+        let parameters = Parameters {
+            entrypoint: mir::ast::Entrypoint::default(),
+            value: Micheline::from(())
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+        };
+
+        let parser = Parser::new();
+        let mut operation_gas = TezlinkOperationGas::start_milligas(milligas_limit)
+            .expect("milligas within limit");
+        let mut tc_ctx = TcCtx {
+            host: &mut host,
+            context: &context,
+            operation_gas: &mut operation_gas,
+            big_map_diff: std::collections::BTreeMap::new(),
+            interpret_context: crate::mir_ctx::InterpretContext::new(),
+            next_temporary_id: &mut mir::ast::big_map::BigMapId { value: (-1).into() },
+        };
+        let mut origination_nonce = OriginationNonce::default();
+        let mut counter = 0u128;
+        let level = BlockNumber { block_number: 0 };
+        let now = Timestamp::from(0);
+        let chain_id = tezos_crypto_rs::hash::ChainId::from([0, 0, 0, 0]);
+        let mut operation_ctx = crate::mir_ctx::OperationCtx {
+            source: &sender_account,
+            origination_nonce: &mut origination_nonce,
+            counter: &mut counter,
+            level: &level,
+            now: &now,
+            chain_id: &chain_id,
+            source_public_key: &[],
+            crac_chain_depth: 0,
+            crac_origin: None,
+            delegated_storage_cost: 0,
+        };
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let mut nonce_counter: u16 = 0;
+
+        let result = cross_runtime_transfer(
+            &mut tc_ctx,
+            &mut operation_ctx,
+            &NotWiredRegistry,
+            &mut journal,
+            &sender_account,
+            &Narith::from(0u64),
+            &dest,
+            &parameters,
+            &parser,
+            &mut nonce_counter,
+        );
+        let err = match result {
+            Ok(_) => panic!("FAILWITH script must return an error"),
+            Err(e) => e,
+        };
+
+        let consumed = u64::from(operation_gas.total_milligas_consumed());
+        (err, consumed)
+    }
+
+    /// Gas consumed by `cross_runtime_transfer` scales with the FAILWITH
+    /// payload length.  The exact per-byte delta matches the sum of three
+    /// contributions that each scale linearly with `n`:
+    ///
+    /// 1. Storage code read (`STORAGE_READ_PER_BYTE_MILLIGAS` per code byte)
+    /// 2. Micheline decode (`interpret_cost::micheline_decoding_bytes` per code byte)
+    /// 3. `charge_persisted_error` (`TEZOSX_GATEWAY_PER_BYTE_MILLIGAS` per
+    ///    rendered Debug byte, charged on the two persisted copies of the
+    ///    error — top-level result + synthetic failed-transfer entry)
+    ///
+    /// The two scripts differ by exactly `N_LONG - N_SHORT = 190` bytes in
+    /// both binary encoding and rendered error length.
+    #[test]
+    fn cross_runtime_transfer_meters_failwith_body() {
+        // Ample budget: 10 M milligas — well above what either script needs.
+        const BUDGET: u64 = 10_000_000;
+        const N_SHORT: usize = 10;
+        const N_LONG: usize = 200;
+        let (err_short, gas_short) = run_failwith_crac(N_SHORT, BUDGET);
+        let (err_long, gas_long) = run_failwith_crac(N_LONG, BUDGET);
+
+        // Both should fail with an Operation-level error (MichelsonContractInterpretError).
+        assert!(
+            matches!(
+                err_short.error,
+                CracError::Operation(TransferError::MichelsonContractInterpretError(_))
+            ),
+            "expected interpret error (short), got: {:?}",
+            err_short.error
+        );
+        assert!(
+            matches!(
+                err_long.error,
+                CracError::Operation(TransferError::MichelsonContractInterpretError(_))
+            ),
+            "expected interpret error (long), got: {:?}",
+            err_long.error
+        );
+
+        // Exact per-byte delta: encode both scripts to get their binary sizes,
+        // then compute each contribution independently.
+        let parser = mir::parser::Parser::new();
+        let short_script_str = push_failwith_script(N_SHORT);
+        let long_script_str = push_failwith_script(N_LONG);
+        let short_code = parser
+            .parse_top_level(&short_script_str)
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let long_code = parser
+            .parse_top_level(&long_script_str)
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        // Storage read gas (charged per byte of code binary on load).
+        let storage_read_delta = storage_read_cost_milligas(1, long_code.len() as u64)
+            - storage_read_cost_milligas(1, short_code.len() as u64);
+        // Micheline decode gas (charged per byte of code binary on decode).
+        let decode_delta =
+            mir::gas::interpret_cost::micheline_decoding_bytes(long_code.len()).unwrap()
+                as u64
+                - mir::gas::interpret_cost::micheline_decoding_bytes(short_code.len())
+                    .unwrap() as u64;
+        // charge_persisted_error gas (charged per byte of the Debug-rendered error).
+        let short_rendered = match &err_short.error {
+            CracError::Operation(te) => format!("{te:?}").len() as u64,
+            other => panic!("expected Operation error (short), got: {other:?}"),
+        };
+        let long_rendered = match &err_long.error {
+            CracError::Operation(te) => format!("{te:?}").len() as u64,
+            other => panic!("expected Operation error (long), got: {other:?}"),
+        };
+        // The error is persisted twice (top-level result + synthetic
+        // failed-transfer entry), so the per-byte charge applies to 2× the
+        // rendered length delta.
+        let metering_delta =
+            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * (long_rendered - short_rendered);
+
+        assert_eq!(
+            gas_long - gas_short,
+            storage_read_delta + decode_delta + metering_delta,
+            "exact per-byte delta: storage_read({storage_read_delta}) \
+             + decode({decode_delta}) + metering({metering_delta})"
+        );
+    }
+
+    /// When the gas budget is too tight to meter the FAILWITH body,
+    /// `cross_runtime_transfer` returns `OutOfGas` AND still records the
+    /// failed CRAC receipt (small — no bloated body), preserving the
+    /// invariant that a failed CRAC receipt is always produced.  The
+    /// `internal_receipts` field on the error is still present (not dropped)
+    /// even on OOG.
+    #[test]
+    fn cross_runtime_transfer_oog_on_large_failwith_body() {
+        // A body that will overflow a tight budget.  We first run with an
+        // ample budget to find the actual gas cost, then re-run with a budget
+        // below that threshold.
+        const N: usize = 500;
+        const AMPLE: u64 = 10_000_000;
+        let (_, gas_ample) = run_failwith_crac(N, AMPLE);
+
+        // Budget just below what the ample run consumed → must OOG.
+        let tight_budget = gas_ample - 1;
+        let (err_tight, _gas_tight) = run_failwith_crac(N, tight_budget);
+
+        assert!(
+            matches!(
+                err_tight.error,
+                CracError::Operation(TransferError::OutOfGas(_))
+            ),
+            "expected OutOfGas on tight budget, got: {:?}",
+            err_tight.error
+        );
+        // Top-level FAILWITH has no internal ops, so internal_receipts is
+        // empty — but it must still be present as a field (not dropped).
+        assert!(
+            err_tight.internal_receipts.is_empty(),
+            "internal_receipts must be present (not dropped) even on OOG; \
+             got: {:?}",
+            err_tight.internal_receipts
+        );
+    }
+
+    /// Drive a CRAC where the top-level contract (`SCRIPT_EMITING_INTERNAL_TRANSFER`)
+    /// issues an internal `TRANSFER_TOKENS` to a `push_failwith_script(n)` contract.
+    /// The outer call succeeds but the inner FAILWITHs, so
+    /// `cross_runtime_transfer` takes the internal-revert branch and returns
+    /// `Err(CracTransferError { error: FailedToExecuteInternalOperation, internal_receipts: [Failed(...)] })`.
+    ///
+    /// Returns `(CracTransferError, consumed_milligas)`.
+    fn run_internal_failwith_crac(
+        n: usize,
+        milligas_limit: u64,
+    ) -> (CracTransferError, u64 /* consumed milligas */) {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+
+        // Sender: implicit account.
+        let src = bootstrap1();
+        let sender_account = init_account(&mut host, &src.pkh, 100_000);
+
+        // Outer contract: issues TRANSFER_TOKENS to a list of addresses.
+        // Balance 100 mutez so it can forward 10 mutez per internal op.
+        let outer_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
+        init_contract(
+            &mut host,
+            &outer_kt1,
+            SCRIPT_EMITING_INTERNAL_TRANSFER,
+            &Micheline::from(()),
+            &100_u64.into(),
+        );
+
+        // Inner contract: FAILWITHs with `n` bytes.
+        let inner_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
+        init_contract(
+            &mut host,
+            &inner_kt1,
+            &push_failwith_script(n),
+            &Micheline::from(()),
+            &0_u64.into(),
+        );
+
+        // Parameter for the outer contract: a single-element list containing the
+        // inner contract's address (binary Micheline representation).
+        let inner_addr_bytes =
+            Contract::Originated(inner_kt1.clone()).to_bytes().unwrap();
+        let inner_micheline_addr = Micheline::Bytes(inner_addr_bytes);
+        let addrs = vec![inner_micheline_addr];
+        let param_micheline = Micheline::Seq(&addrs);
+        let param_bytes = param_micheline
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+
+        let parameters = Parameters {
+            entrypoint: mir::ast::Entrypoint::default(),
+            value: param_bytes,
+        };
+
+        let parser = mir::parser::Parser::new();
+        let mut operation_gas = TezlinkOperationGas::start_milligas(milligas_limit)
+            .expect("milligas within limit");
+        let mut tc_ctx = TcCtx {
+            host: &mut host,
+            context: &context,
+            operation_gas: &mut operation_gas,
+            big_map_diff: std::collections::BTreeMap::new(),
+            interpret_context: crate::mir_ctx::InterpretContext::new(),
+            next_temporary_id: &mut mir::ast::big_map::BigMapId { value: (-1).into() },
+        };
+        let mut origination_nonce = OriginationNonce::default();
+        let mut counter = 0u128;
+        let level = BlockNumber { block_number: 0 };
+        let now = Timestamp::from(0);
+        let chain_id = tezos_crypto_rs::hash::ChainId::from([0, 0, 0, 0]);
+        let mut operation_ctx = crate::mir_ctx::OperationCtx {
+            source: &sender_account,
+            origination_nonce: &mut origination_nonce,
+            counter: &mut counter,
+            level: &level,
+            now: &now,
+            chain_id: &chain_id,
+            source_public_key: &[],
+            crac_chain_depth: 0,
+            crac_origin: None,
+            delegated_storage_cost: 0,
+        };
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let mut nonce_counter: u16 = 0;
+
+        let dest = Contract::Originated(outer_kt1);
+        let result = cross_runtime_transfer(
+            &mut tc_ctx,
+            &mut operation_ctx,
+            &NotWiredRegistry,
+            &mut journal,
+            &sender_account,
+            &Narith::from(0u64),
+            &dest,
+            &parameters,
+            &parser,
+            &mut nonce_counter,
+        );
+        let err = match result {
+            Ok(_) => {
+                panic!("cross_runtime_transfer must fail when an internal op FAILWITHs")
+            }
+            Err(e) => e,
+        };
+
+        let consumed = u64::from(operation_gas.total_milligas_consumed());
+        (err, consumed)
+    }
+
+    /// Gas consumed by `cross_runtime_transfer` scales with the FAILWITH
+    /// payload of an **internal** op — closing the bypass by which an
+    /// attacker-controlled `TRANSFER_TOKENS` target could route a large body
+    /// into the persisted receipt without paying gas.
+    ///
+    /// (a) Consumed gas scales with `n` (internal body is metered).
+    /// (b) Under a tight budget the call OOGs AND the `internal_receipts`
+    ///     entry is still present but carries a small (bounded) body.
+    #[test]
+    fn cross_runtime_transfer_meters_internal_failwith_body() {
+        const BUDGET: u64 = 10_000_000;
+        const N_SHORT: usize = 10;
+        const N_LONG: usize = 200;
+
+        let (err_short, gas_short) = run_internal_failwith_crac(N_SHORT, BUDGET);
+        let (err_long, gas_long) = run_internal_failwith_crac(N_LONG, BUDGET);
+
+        // (a) The internal-revert branch is taken: top-level error is
+        // `FailedToExecuteInternalOperation` and internal_receipts are present.
+        assert!(
+            matches!(
+                err_short.error,
+                CracError::Operation(TransferError::FailedToExecuteInternalOperation(_))
+            ),
+            "expected FailedToExecuteInternalOperation (short), got: {:?}",
+            err_short.error
+        );
+        assert!(
+            matches!(
+                err_long.error,
+                CracError::Operation(TransferError::FailedToExecuteInternalOperation(_))
+            ),
+            "expected FailedToExecuteInternalOperation (long), got: {:?}",
+            err_long.error
+        );
+
+        // The internal receipt carries the `Failed` entry.
+        assert_eq!(
+            err_short.internal_receipts.len(),
+            1,
+            "expected one internal receipt (short)"
+        );
+        assert_eq!(
+            err_long.internal_receipts.len(),
+            1,
+            "expected one internal receipt (long)"
+        );
+
+        // Gas scales with the internal FAILWITH body length — metering is applied.
+        assert!(
+            gas_long > gas_short,
+            "longer internal FAILWITH body should cost more gas: \
+             {gas_long} vs {gas_short}"
+        );
+
+        // (b) Under a tight budget the transfer OOGs.
+        // Find the exact cost of the long run then use budget-1.
+        let tight_budget = gas_long - 1;
+        let (err_oog, _) = run_internal_failwith_crac(N_LONG, tight_budget);
+
+        assert!(
+            matches!(
+                err_oog.error,
+                CracError::Operation(TransferError::FailedToExecuteInternalOperation(_))
+                    | CracError::Operation(TransferError::OutOfGas(_))
+            ),
+            "expected operation-level error on OOG (internal-revert path), got: {:?}",
+            err_oog.error
+        );
+
+        // The internal receipt entry must still be present on OOG: the failed
+        // CRAC receipt is always produced even when the body is bounded.
+        assert_eq!(
+            err_oog.internal_receipts.len(),
+            1,
+            "internal_receipts must not be dropped on OOG; got: {:?}",
+            err_oog.internal_receipts
+        );
+
+        // The internal-receipt body must be bounded (not the full n-byte payload):
+        // when OOG the oversized `Failed(errors)` is replaced with
+        // `Failed(OutOfGas)`.
+        let oog_body_len = match &err_oog.internal_receipts[0] {
+            InternalOperationSum::Transfer(r) => match &r.result {
+                ContentResult::Failed(errors) => errors
+                    .errors
+                    .iter()
+                    .map(|e| format!("{e:?}").len())
+                    .sum::<usize>(),
+                other => {
+                    panic!("expected Failed internal receipt on OOG, got: {other:?}")
+                }
+            },
+            other => panic!("expected Transfer internal receipt, got: {other:?}"),
+        };
+        // A bounded body must be much smaller than the N_LONG-byte payload.
+        let long_payload_debug_len = format!(
+            "{:?}",
+            ApplyOperationError::Transfer(
+                TransferError::MichelsonContractInterpretError("x".repeat(N_LONG))
+            )
+        )
+        .len();
+        assert!(
+            oog_body_len < long_payload_debug_len,
+            "OOG internal receipt body ({oog_body_len} bytes) must be smaller \
+             than the full payload ({long_payload_debug_len} bytes)"
         );
     }
 

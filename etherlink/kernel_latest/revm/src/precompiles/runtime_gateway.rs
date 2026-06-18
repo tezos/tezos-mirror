@@ -255,12 +255,20 @@ fn classify_and_charge_crac_response(
         )?;
         Ok(response.into_body())
     } else if response.status().is_client_error() {
+        let status = response.status();
+        let decoded_body = String::from_utf8_lossy(response.body()).into_owned();
+        // The gateway charges a per-word transport surcharge on every payload
+        // crossing the runtime boundary (calldata, request body, and the
+        // response body on the success path) to price the precompile's
+        // per-byte marshalling, which native EVM gas does not meter.  The
+        // failure path skipped it on the response body, so charge it here on
+        // the decoded 4xx body before building the revert, mirroring
+        // `charge_and_encode_crac_response`.  Best-effort: on OOG the revert
+        // is still produced so the EVM caller can catch the error rather than
+        // aborting the block.
+        let _ = charge_payload(gas, decoded_body.len());
         Err(CustomPrecompileError::Revert(
-            format!(
-                "Cross-runtime call failed with status {}: {}",
-                response.status(),
-                String::from_utf8_lossy(response.body())
-            ),
+            format!("Cross-runtime call failed with status {status}: {decoded_body}"),
             *gas,
         ))
     } else {
@@ -2751,6 +2759,74 @@ mod tests {
                     if !msg.contains(X_TEZOS_STORAGE_COST)
             ),
             "the header on a non-2xx response must be ignored, got: {result:?}"
+        );
+    }
+
+    // ── classify_and_charge_crac_response: 4xx body charging ─────────────────
+
+    /// A 400 response body is charged at the per-word rate before the Revert
+    /// is returned.  The charge equals `ceil(body_len / 32) * RUNTIME_GATEWAY_PER_WORD_COST`.
+    #[test]
+    fn crac_response_4xx_charges_body_per_word() {
+        // 64-byte body = 2 EVM words.
+        let body = "x".repeat(64);
+        let expected_words = 64u64.div_ceil(32);
+        let expected_charge = RUNTIME_GATEWAY_PER_WORD_COST * expected_words;
+
+        let response = http::Response::builder()
+            .status(http::StatusCode::BAD_REQUEST)
+            .header(X_TEZOS_GAS_CONSUMED, "0")
+            .body(body.as_bytes().to_vec())
+            .unwrap();
+
+        let budget = expected_charge + 1_000_000;
+        let mut gas = Gas::new(budget);
+        let result = super::classify_and_charge_crac_response(
+            response,
+            RuntimeId::Tezos,
+            &mut gas,
+            1_000_000_000,
+        );
+
+        // Must be a catchable Revert, not a block abort.
+        assert!(
+            matches!(result, Err(CustomPrecompileError::Revert(_, _))),
+            "expected Revert for 400, got: {result:?}"
+        );
+
+        // Gas spent = per-word charge on the body (callee_gas = 0 here).
+        let spent = budget - gas.remaining();
+        assert_eq!(
+            spent, expected_charge,
+            "expected {expected_charge} milligas for {expected_words} words, got {spent}"
+        );
+    }
+
+    /// When the budget is exhausted while charging the 4xx body, the Revert
+    /// is still produced (OOG does not become a block abort).
+    #[test]
+    fn crac_response_4xx_oog_produces_revert_not_abort() {
+        // Large body that will exhaust any modest budget.
+        let body = "x".repeat(1024);
+        let response = http::Response::builder()
+            .status(http::StatusCode::BAD_REQUEST)
+            .header(X_TEZOS_GAS_CONSUMED, "0")
+            .body(body.as_bytes().to_vec())
+            .unwrap();
+
+        // Very tight budget — insufficient for the per-word body charge.
+        let mut gas = Gas::new(1);
+        let result = super::classify_and_charge_crac_response(
+            response,
+            RuntimeId::Tezos,
+            &mut gas,
+            1_000_000_000,
+        );
+
+        // Must remain a Revert, not a block-abort Abort.
+        assert!(
+            matches!(result, Err(CustomPrecompileError::Revert(_, _))),
+            "OOG on 4xx body must produce Revert, not Abort; got: {result:?}"
         );
     }
 }
