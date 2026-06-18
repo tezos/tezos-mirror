@@ -1,0 +1,21 @@
+Source: octez-archive-keyring
+Section: misc
+Priority: optional
+Maintainer: Nomadic Labs <pkg@nomadic-labs.com>
+Homepage: https://gitlab.com/tezos/tezos
+Build-Depends: debhelper (>= 12), gnupg
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: octez-archive-keyring
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Description: GPG archive signing keys for the Octez package repository
+ The Octez project digitally signs its APT repository Release files.
+ This package contains the archive keys used for that, enabling
+ automatic key rotation through normal package updates.
+ .
+ Installing this package and upgrading it regularly ensures that the
+ latest signing keys are always available, removing the need to
+ manually download and install GPG keys when they are rotated.
