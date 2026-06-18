@@ -38,7 +38,11 @@
 # Exports:
 #   GPG_KEY_ID, GPG_KEY_ID_BIS,
 #   GPG_PASSPHRASE, GPG_PASSPHRASE_BIS,
-#   GPG_PUBLIC_KEY (merged public key content),
+#   GPG_PUBLIC_KEY (merged public key content, used to sign/serve the APT repo),
+#   GPG_PUBLIC_KEY_1, GPG_PUBLIC_KEY_2 (the individual public keys, kept
+#     separate so build-keyring-deb.sh can write one active-keys/*.asc entry
+#     per key; the keyring then ships both keys, which the keyring verification
+#     test scripts/packaging/tests/deb/test-keyring-ci-checks.sh checks for),
 #   GPG_DUAL_SIGNING ("true" or "false")
 #
 # Side effects:
@@ -211,6 +215,11 @@ fetch_public_key_from_bucket() {
     key_latest=$(fetch_gcs_object "${token}" "${bucket}" "${object}" "${gen_1}") || return 1
     key_prev=$(fetch_gcs_object "${token}" "${bucket}" "${object}" "${gen_2}") || return 1
 
+    # GPG_PUBLIC_KEY_1/_2 keep the two keys separate (consumed by
+    # build-keyring-deb.sh, one active-keys/*.asc entry per key);
+    # GPG_PUBLIC_KEY is the merged blob used to sign/serve the APT repo.
+    GPG_PUBLIC_KEY_1="${key_latest}"
+    GPG_PUBLIC_KEY_2="${key_prev}"
     GPG_PUBLIC_KEY="${key_latest}
 ${key_prev}"
     echo "Merged public keys from generations ${gen_1} and ${gen_2}." >&2
@@ -218,11 +227,13 @@ ${key_prev}"
   elif [ -n "${gen_1}" ]; then
     echo "WARNING: Only one generation in bucket." >&2
     GPG_PUBLIC_KEY=$(fetch_gcs_object "${token}" "${bucket}" "${object}" "${gen_1}") || return 1
+    GPG_PUBLIC_KEY_1="${GPG_PUBLIC_KEY}"
 
   else
     # Versioning may be disabled — fetch the live object directly
     echo "WARNING: No generations listed (versioning may be disabled) — fetching live object." >&2
     GPG_PUBLIC_KEY=$(fetch_gcs_object "${token}" "${bucket}" "${object}") || return 1
+    GPG_PUBLIC_KEY_1="${GPG_PUBLIC_KEY}"
   fi
 
   return 0
@@ -420,6 +431,11 @@ export GPG_KEY_ID_BIS=""
 export GPG_PASSPHRASE=""
 export GPG_PASSPHRASE_BIS=""
 export GPG_PUBLIC_KEY=""
+# GPG_PUBLIC_KEY_1/_2 hold the individual public keys (vs the merged
+# GPG_PUBLIC_KEY); build-keyring-deb.sh writes one active-keys/*.asc per key
+# and the keyring verification tests check both are present in the keyring.
+export GPG_PUBLIC_KEY_1=""
+export GPG_PUBLIC_KEY_2=""
 export GPG_DUAL_SIGNING="false"
 
 ##############################################
@@ -481,6 +497,12 @@ if [ "${CI_COMMIT_REF_PROTECTED}" = "true" ]; then
     GPG_KEY_ID=$(import_gpg_key "${GPG_LINUX_PACKAGES_FALLBACK_PRIVATE_KEY}")
     GPG_PASSPHRASE="${GPG_LINUX_PACKAGES_FALLBACK_PASSPHRASE}"
     GPG_PUBLIC_KEY="${GPG_LINUX_PACKAGES_FALLBACK_PUBLIC_KEY}"
+    # Also expose the fallback public key individually, so build-keyring-deb.sh
+    # embeds it in the keyring. Without this, GPG_PUBLIC_KEY_1 stays empty and
+    # the keyring would ship the in-repo test keys while the repository is
+    # signed with the fallback key (the keyring would not match the repo). The
+    # fallback is a single key, so GPG_PUBLIC_KEY_2 stays unset.
+    GPG_PUBLIC_KEY_1="${GPG_LINUX_PACKAGES_FALLBACK_PUBLIC_KEY}"
 
     echo "Fallback key imported - key ID: ${GPG_KEY_ID}" >&2
   fi
@@ -496,11 +518,23 @@ else
 
   GPG_KEY_ID="24EA481996EB8138"
   GPG_PASSPHRASE="07cde771b39a4ed394864baa46126b"
-  GPG_PUBLIC_KEY=$(cat "./scripts/packaging/package-signing-key.asc")
 
-  # Import test key into GPG keyring
+  # Import primary test key into GPG keyring
   base64 -d < ./scripts/packaging/test_repo_private.key | gpg --batch --import -- 2> /dev/null
   echo "Test key imported into GPG keyring." >&2
+
+  # Import second test key for dual-signing (simulates key rotation)
+  GPG_KEY_ID_BIS="166DD7F354AB5BBC"
+  GPG_PASSPHRASE_BIS="test-rotation-key-2025"
+  base64 -d < ./scripts/packaging/test_repo_private_key_2.key | gpg --batch --import -- 2> /dev/null
+  echo "Test key 2 imported into GPG keyring (dual-signing enabled)." >&2
+  GPG_DUAL_SIGNING="true"
+
+  # Export individual public keys for the keyring build, and merge for octez.asc
+  GPG_PUBLIC_KEY_1=$(cat "./scripts/packaging/package-signing-key.asc")
+  GPG_PUBLIC_KEY_2=$(cat "./scripts/packaging/package-signing-key-2.asc")
+  GPG_PUBLIC_KEY="${GPG_PUBLIC_KEY_1}
+${GPG_PUBLIC_KEY_2}"
 fi
 
 ##############################################
@@ -519,6 +553,8 @@ export GPG_KEY_ID_BIS
 export GPG_PASSPHRASE
 export GPG_PASSPHRASE_BIS
 export GPG_PUBLIC_KEY
+export GPG_PUBLIC_KEY_1
+export GPG_PUBLIC_KEY_2
 export GPG_DUAL_SIGNING
 
 echo "GPG keys configured (dual_signing=${GPG_DUAL_SIGNING})." >&2

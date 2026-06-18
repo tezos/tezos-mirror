@@ -85,50 +85,62 @@ esac
 # Retrieve and import GPG keys (keyring is ready after this)
 . ./scripts/ci/repository-keys.sh
 
+# Preset a key's passphrase into gpg-agent so that batch signing with
+# multiple -u flags works without --passphrase-fd (which only reads once).
+# Usage: gpg_preset_passphrase <key_id> <passphrase>
+gpg_preset_passphrase() {
+  _key_id="$1"
+  _passphrase="$2"
+  _preset_cmd=$(command -v gpg-preset-passphrase || echo /usr/lib/gnupg/gpg-preset-passphrase)
+  # Preset the passphrase for every keygrip of the key (primary and subkeys),
+  # not just the first one. The signing key may be a dedicated signing subkey,
+  # in which case gpg signs with the subkey's keygrip rather than the primary's.
+  # Presetting only the primary keygrip would leave gpg-agent to prompt through
+  # pinentry, which is absent in CI and fails with "signing failed: No such file
+  # or directory". The whole key is protected by a single passphrase, so
+  # presetting it for each keygrip is safe.
+  gpg --list-keys --with-keygrip --with-colons "$_key_id" 2> /dev/null |
+    grep ^grp | cut -d: -f10 | while read -r _keygrip; do
+    "$_preset_cmd" --preset --passphrase "$_passphrase" "$_keygrip"
+  done
+}
+
+# Set up gpg-agent with preset passphrases so all signing operations
+# work in batch mode without --passphrase-fd.
+echo "allow-preset-passphrase" >> "${GNUPGHOME:-$HOME/.gnupg}/gpg-agent.conf"
+gpgconf --kill gpg-agent
+gpgconf --launch gpg-agent
+gpg_preset_passphrase "$GPG_KEY_ID" "$GPG_PASSPHRASE"
+if [ "$GPG_DUAL_SIGNING" = "true" ]; then
+  gpg_preset_passphrase "$GPG_KEY_ID_BIS" "$GPG_PASSPHRASE_BIS"
+fi
+
 # Signs a release directory's Release file with GPG clearsign and detached
-# signature. If GPG_DUAL_SIGNING is true, appends a second detached signature.
-# Verifies both resulting signature files.
+# signature. When GPG_DUAL_SIGNING is true, both InRelease and Release.gpg
+# carry signatures from both keys.
 # Usage: gpg_sign_release <release_dir>
 gpg_sign_release() {
   release_dir="$1"
 
-  # InRelease: clearsigned (embedded signature + content), primary key only
-  echo "Signing release file: ${release_dir}/InRelease"
-  echo "Using key: $GPG_KEY_ID"
-  echo "Output: ${release_dir}/InRelease"
-  echo "$GPG_PASSPHRASE" |
-    gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-      -u "$GPG_KEY_ID" --clearsign \
-      -o "${release_dir}/InRelease" \
-      "${release_dir}/Release"
-
-  # Release.gpg: detached signature; BIS key is concatenated if dual-signing.
-  # InRelease is not enough for dual signing as it contains only the result from
-  # the newest GPG key. Detached signatures can be concatenated.
-  echo "Signing release file: ${release_dir}/Release"
-  echo "Using key: $GPG_KEY_ID"
-  echo "Output: ${release_dir}/Release.gpg"
-  echo "$GPG_PASSPHRASE" |
-    gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-      -u "$GPG_KEY_ID" --detach-sign \
-      -o "${release_dir}/Release.gpg" \
-      "${release_dir}/Release"
-
-  echo "GPG dual signing: $GPG_DUAL_SIGNING"
   if [ "$GPG_DUAL_SIGNING" = "true" ]; then
-    echo "Signing release file: ${release_dir}/Release"
-    echo "Using key: $GPG_KEY_ID_BIS"
-    echo "Output: ${release_dir}/Release.gpg.bis"
-    echo "$GPG_PASSPHRASE_BIS" |
-      gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-        -u "$GPG_KEY_ID_BIS" --detach-sign \
-        -o "${release_dir}/Release.gpg.bis" \
-        "${release_dir}/Release"
-
-    echo "Appending ${release_dir}/Release.gpg.bis to ${release_dir}/Release.gpg"
-    cat "${release_dir}/Release.gpg.bis" >> "${release_dir}/Release.gpg"
-    rm "${release_dir}/Release.gpg.bis"
+    sign_flags="-u $GPG_KEY_ID -u $GPG_KEY_ID_BIS"
+    echo "Dual-signing with keys: $GPG_KEY_ID, $GPG_KEY_ID_BIS"
+  else
+    sign_flags="-u $GPG_KEY_ID"
+    echo "Signing with key: $GPG_KEY_ID"
   fi
+
+  # InRelease: clearsigned
+  # shellcheck disable=SC2086
+  gpg --batch $sign_flags --clearsign \
+    -o "${release_dir}/InRelease" \
+    "${release_dir}/Release"
+
+  # Release.gpg: detached signature
+  # shellcheck disable=SC2086
+  gpg --batch $sign_flags --detach-sign \
+    -o "${release_dir}/Release.gpg" \
+    "${release_dir}/Release"
 }
 
 mkdir -p "$TARGETDIR/dists"
@@ -151,12 +163,12 @@ for release in $RELEASES; do             # unstable, 22_04, 24_04 ...
       echo "Adding package $file to $TARGETDIR/${target}/"
     done
 
-    # we also add the data packages that we built for
-    # trixie, that are distribution independent.
+    # We also add arch-independent packages (data packages and keyring)
+    # that are built once for trixie but are distribution independent.
     if [ -z "$PREFIX" ]; then
       for file in packages/debian/trixie/*_all.deb; do
         cp "$file" "$TARGETDIR/${target}/"
-        echo "Adding data package $file to $TARGETDIR/${target}/"
+        echo "Adding arch-independent package $file to $TARGETDIR/${target}/"
       done
     fi
 
