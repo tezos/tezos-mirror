@@ -151,6 +151,11 @@ pub enum TcError {
     /// bounds instead.
     #[error("expected a natural between 0 and 1023, but got {0}")]
     ExpectedU10(BigInt),
+    /// Instructions `GET n` and `UPDATE n` accept a comb-index argument that
+    /// must be a natural between 0 and 2047 inclusive. Found an integer outside
+    /// this bounds instead.
+    #[error("expected a natural between 0 and 2047, but got {0}")]
+    ExpectedU11(BigInt),
     /// Encountered an error when working with annotations.
     #[error(transparent)]
     AnnotationError(#[from] AnnotationError),
@@ -3406,7 +3411,7 @@ fn typecheck_instruction_step<'a, 'b>(
             // NB: it's important to NOT pop from the stack here, otherwise
             // no_overload! below won't report the type on the top of the stack.
             let ty = stack_top_mut(stack)?;
-            let n = validate_u10(n)?;
+            let n = validate_u11(n)?;
             gas.consume(tc_cost::get_n(n as usize)?)?;
             let res = match get_nth_field_ref(n, ty) {
                 Ok(res) => res,
@@ -3444,7 +3449,7 @@ fn typecheck_instruction_step<'a, 'b>(
         (App(UPDATE, [], _), [] | [_] | [_, _]) => no_overload!(UPDATE, len 3),
 
         (App(UPDATE, [Micheline::Int(n)], _), [.., _, _]) => {
-            let n = validate_u10(n)?;
+            let n = validate_u11(n)?;
             let new_val = pop!();
             let old_val = match get_nth_field_ref(n, stack_top_mut(stack)?) {
                 Ok(res) => res,
@@ -5281,6 +5286,14 @@ fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
     let res = u16::try_from(n).map_err(|_| TcError::ExpectedU10(n.clone()))?;
     if res >= 1024 {
         return Err(TcError::ExpectedU10(n.clone()));
+    }
+    Ok(res)
+}
+
+fn validate_u11(n: &BigInt) -> Result<u16, TcError> {
+    let res = u16::try_from(n).map_err(|_| TcError::ExpectedU11(n.clone()))?;
+    if res >= 2048 {
+        return Err(TcError::ExpectedU11(n.clone()));
     }
     Ok(res)
 }
@@ -8128,12 +8141,24 @@ mod typecheck_tests {
             let mut stack = tc_stk![ty];
             assert_eq!(
                 typecheck_instruction(
-                    &parse("GET 1024").unwrap(),
+                    &parse("GET 2048").unwrap(),
                     &mut Gas::default(),
                     &mut stack
                 ),
-                Err(TcError::ExpectedU10(1024.into()))
+                Err(TcError::ExpectedU11(2048.into()))
             );
+        }
+
+        #[test]
+        fn ok_2047() {
+            // 2047 is the largest index accepted under the 11-bit bound. Being
+            // odd, GET 2047 reads the car after 1023 cdr-steps, so place the
+            // target field as the car of the innermost pair below 1023 wrappers.
+            let mut ty = Type::new_pair(Type::Nat, Type::Unit);
+            for _ in 0..1023 {
+                ty = Type::new_pair(Type::Unit, ty);
+            }
+            check(2047, ty, Type::Nat);
         }
     }
 
@@ -8227,12 +8252,27 @@ mod typecheck_tests {
             let mut stack = tc_stk![ty, Type::Unit];
             assert_eq!(
                 typecheck_instruction(
-                    &parse("UPDATE 1024").unwrap(),
+                    &parse("UPDATE 2048").unwrap(),
                     &mut Gas::default(),
                     &mut stack
                 ),
-                Err(TcError::ExpectedU10(1024.into()))
+                Err(TcError::ExpectedU11(2048.into()))
             );
+        }
+
+        #[test]
+        fn ok_2047() {
+            // 2047 is the largest index accepted under the 11-bit bound. Being
+            // odd, UPDATE 2047 targets the car after 1023 cdr-steps; it replaces
+            // that Nat with the Unit pushed by check, yielding the same comb with
+            // Unit in the innermost car.
+            let mut ty = Type::new_pair(Type::Nat, Type::Unit);
+            let mut expected = Type::new_pair(Type::Unit, Type::Unit);
+            for _ in 0..1023 {
+                ty = Type::new_pair(Type::Unit, ty);
+                expected = Type::new_pair(Type::Unit, expected);
+            }
+            check(2047, ty, expected);
         }
     }
 
