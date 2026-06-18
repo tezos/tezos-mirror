@@ -719,7 +719,18 @@ where
         operation: journal.michelson.operation_hash().clone(),
         index: journal.michelson.origination_index(),
     };
-    let mut counter = 0u128;
+    // Resume the MIR internal-operation counter from the Michelson
+    // journal, mirroring `origination_index` above (L2-1676). The
+    // counter is the replay identity L1 enforces for internal
+    // operations; without resuming it, each reentrant inbound Michelson
+    // frame would restart from 0, so two internal operations in an
+    // `EVM → Michelson → EVM → Michelson` chain could share the same
+    // counter and break L1's single internal-nonce namespace for the
+    // manager operation's internal-op tree. The post-execution value is
+    // written back below (`set_internal_operation_counter`), and a
+    // subsequent `revert_frame` rolls it back to the value captured at
+    // frame entry — exactly like `origination_index`.
+    let mut counter = journal.michelson.internal_operation_counter();
     let mut operation_ctx = OperationCtx {
         source: &source_account,
         origination_nonce: &mut nonce,
@@ -827,6 +838,11 @@ where
         }
     };
     let received_delegated_storage_cost = operation_ctx.delegated_storage_cost;
+    // Capture the post-execution MIR counter before `operation_ctx`
+    // (which borrows the local `counter`) is dropped, so it can be
+    // persisted back to the journal below for the next reentrant frame
+    // to resume from (L2-1676).
+    let final_internal_operation_counter = *operation_ctx.counter;
     // Persist the post-execution origination index back to the
     // journal on every path (success, failure, OOG): MIR has had
     // its mutable borrow of `nonce` released by `cross_runtime_transfer`
@@ -838,6 +854,16 @@ where
     // A subsequent `revert_frame` on the enclosing EVM frame will
     // roll the index back to the value captured at frame entry.
     journal.michelson.set_origination_index(nonce.index);
+    // Persist the post-execution MIR internal-operation counter back to
+    // the journal on every path, identically to `origination_index`
+    // above: the next reentrant inbound Michelson frame resumes from
+    // this value so internal-operation replay identities stay monotonic
+    // across the whole NAC transaction, and a subsequent `revert_frame`
+    // on the enclosing EVM frame rolls it back to the frame-entry value
+    // (L2-1676).
+    journal
+        .michelson
+        .set_internal_operation_counter(final_internal_operation_counter);
     let result = match transfer_result {
         Ok(r) => r,
         Err(CracTransferError {
@@ -2739,6 +2765,176 @@ mod tests {
             event.content.tag.as_ref().and_then(|e| e.as_str()),
             Some("cross_runtime_call"),
             "first internal op must be the synthetic CRAC-ID event"
+        );
+    }
+
+    /// L2-1676: the MIR internal-operation counter — the replay
+    /// identity L1 enforces — must be resumed from (and written back to)
+    /// the Michelson journal so it stays monotonic across reentrant
+    /// inbound Michelson frames, matching L1's single internal-nonce
+    /// namespace for the manager operation's internal-op tree. Each
+    /// inbound CRAC builds a fresh `OperationCtx`; before this fix its
+    /// `counter` restarted at 0, so two internal operations in distinct
+    /// frames of an `EVM → Michelson → EVM → Michelson` chain could
+    /// share one counter.
+    ///
+    /// This drives a single inbound CRAC to a contract that emits one
+    /// internal transfer, with the journal counter pre-seeded to a
+    /// sentinel. If the counter is correctly resumed, the emitted
+    /// internal operation takes `sentinel + 1` and that value is
+    /// persisted back. Reverting either half of the wiring (the
+    /// frame-entry resume or the frame-exit persist) makes the final
+    /// counter `1` rather than `sentinel + 1`, failing the test.
+    #[test]
+    fn inbound_crac_resumes_internal_operation_counter() {
+        use crate::headers::{
+            X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_LIMIT,
+            X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+        };
+        use mir::ast::micheline::Micheline;
+        use tezos_crypto_rs::blake2b::digest_160;
+        use tezos_crypto_rs::hash::{ContractKt1Hash, OperationHash};
+        use tezosx_journal::CracId;
+
+        // The frame's counter is resumed from this sentinel. A non-zero,
+        // non-one value disambiguates "resumed from the journal" from
+        // "restarted at 0" — the unfixed behaviour would yield 1.
+        const SEEDED_COUNTER: u128 = 41;
+
+        // alias(E_0)/alias(E_1): top-level CRAC source and immediate
+        // caller — valid KT1 aliases, not otherwise exercised here.
+        const SOURCE_KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
+        const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
+
+        let mut host = MockKernelHost::default();
+        let runtime = test_runtime();
+        let registry = NotWiredRegistry;
+
+        let context = crate::context::TezosRuntimeContext::from_root(
+            &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        )
+        .unwrap();
+        let parser = mir::parser::Parser::new();
+
+        // Receiver: accepts unit, emits nothing — so it contributes no
+        // further counter increments.
+        let receiver_kt1 = ContractKt1Hash::from(digest_160(b"l2-1676-receiver"));
+        let receiver = context.originated_from_kt1(&receiver_kt1).unwrap();
+        let receiver_script = parser
+            .parse_top_level(
+                "parameter unit; storage unit; code { CDR; NIL operation; PAIR }",
+            )
+            .unwrap();
+        receiver
+            .init(
+                &mut host,
+                Some(
+                    &receiver_script
+                        .encode(&mut Gas::default())
+                        .unwrap()
+                        .unwrap(),
+                ),
+                &Micheline::from(())
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+                0.into(),
+            )
+            .unwrap();
+
+        // Parent: on call, emits exactly one internal transfer to the
+        // address passed as parameter — a single `operation_counter()`
+        // increment.
+        let parent_kt1 = ContractKt1Hash::from(digest_160(b"l2-1676-parent"));
+        let parent = context.originated_from_kt1(&parent_kt1).unwrap();
+        let parent_script = parser
+            .parse_top_level(
+                r#"
+                parameter address;
+                storage unit;
+                code {
+                    CAR;
+                    CONTRACT unit;
+                    IF_NONE { PUSH string "Invalid contract address"; FAILWITH } {};
+                    PUSH mutez 0;
+                    PUSH unit Unit;
+                    TRANSFER_TOKENS;
+                    NIL operation;
+                    SWAP; CONS;
+                    PUSH unit Unit;
+                    SWAP;
+                    PAIR
+                }"#,
+            )
+            .unwrap();
+        parent
+            .init(
+                &mut host,
+                Some(&parent_script.encode(&mut Gas::default()).unwrap().unwrap()),
+                &Micheline::from(())
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+                0.into(),
+            )
+            .unwrap();
+
+        let crac_id = CracId::new(u8::from(RuntimeId::Ethereum), 0);
+        let crac_id_str = crac_id.to_string();
+        let mut journal = TezosXJournal::new(
+            crac_id,
+            OperationHash::default(),
+            BlockConstants::dummy(),
+        );
+
+        // Pre-seed the journal counter to model a prior reentrant frame
+        // having already assigned identities up to SEEDED_COUNTER.
+        journal
+            .michelson
+            .set_internal_operation_counter(SEEDED_COUNTER);
+
+        // The parameter is the receiver address the parent forwards to.
+        let body =
+            Micheline::Bytes(Contract::Originated(receiver_kt1).to_bytes().unwrap())
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap();
+
+        let request = http::Request::builder()
+            .method(http::Method::POST)
+            .uri(format!("http://tezos/{}", parent_kt1.to_base58_check()))
+            .header(X_TEZOS_AMOUNT, "0")
+            .header(X_TEZOS_GAS_LIMIT, "600000000")
+            .header(X_TEZOS_TIMESTAMP, "1000000")
+            .header(X_TEZOS_BLOCK_NUMBER, "1")
+            .header(X_TEZOS_SENDER, SENDER_KT1)
+            .header(X_TEZOS_SOURCE, SOURCE_KT1)
+            .header(X_TEZOS_CRAC_ID, crac_id_str.as_str())
+            .body(body)
+            .unwrap();
+
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "inbound CRAC must succeed, got {:?} ({})",
+            resp.status(),
+            String::from_utf8_lossy(resp.body())
+        );
+
+        // The parent emitted one internal operation, which must have
+        // taken the identity SEEDED_COUNTER + 1 (resumed, not reset),
+        // and that value must be persisted back to the journal for the
+        // next reentrant frame.
+        assert_eq!(
+            journal.michelson.internal_operation_counter(),
+            SEEDED_COUNTER + 1,
+            "the frame must resume the MIR counter from the journal \
+             (got {}, expected {}); a value of 1 means the counter \
+             reset to 0 instead of resuming",
+            journal.michelson.internal_operation_counter(),
+            SEEDED_COUNTER + 1
         );
     }
 

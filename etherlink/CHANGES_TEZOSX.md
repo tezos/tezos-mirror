@@ -161,7 +161,12 @@
   backtracks. Two internal operations sharing the same operation
   counter within a single top-level operation are now rejected
   (matching L1 `Internal_operation_replay`) and the whole operation
-  backtracks. (!22219)
+  backtracks. The operation counter is now also threaded through the
+  Michelson journal across reentrant inbound cross-runtime frames, so
+  the replay identity spans the whole atomic cross-runtime transaction
+  rather than restarting at zero for each `EVM → Michelson` frame —
+  matching L1's single internal-nonce namespace for a manager
+  operation's internal-op tree. (!22219)
 - The Michelson storage-fees burn is now rendered on the CRAC-triggering
   operation: an Applied content that delegates storage cost to its
   callee carries the dual `(payer −V, storage fees +V)` balance-updates

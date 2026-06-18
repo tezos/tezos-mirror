@@ -52,6 +52,13 @@ struct ExternalCheckpoint {
     /// the saved value is dropped (the index already reflects the
     /// post-frame state).
     origination_index: u32,
+    /// `internal_operation_counter` at the time the checkpoint was
+    /// created.  Threaded identically to `origination_index`: on
+    /// revert it is rolled back so MIR counters consumed inside the
+    /// reverted EVM frame are released, and on commit the saved value
+    /// is dropped (the counter already reflects the post-frame state).
+    /// See the field of the same name on [`MichelsonJournal`] (L2-1676).
+    internal_operation_counter: u128,
 }
 
 /// Error returned by [`MichelsonJournal::set_dispatch_result`].
@@ -160,6 +167,22 @@ pub struct MichelsonJournal {
     /// callees in turn) get consecutive indices — and therefore
     /// distinct child KT1s — rather than restarting from 0 each time.
     origination_index: u32,
+    /// Monotonic MIR internal-operation counter — the replay identity
+    /// L1 enforces for internal operations (`Internal_operation_replay`).
+    /// Persisted across reentrant inbound Michelson frames within the
+    /// same synthetic manager operation so that, in an
+    /// `EVM → Michelson → EVM → Michelson` chain, each Michelson frame
+    /// resumes from the previous frame's value instead of restarting
+    /// from 0.  Without this, two internal operations in distinct
+    /// reentrant frames would share the same MIR counter, breaking L1's
+    /// single internal-nonce namespace for the manager operation's
+    /// internal-op tree (L2-1676).  Threaded exactly like
+    /// `origination_index`: read with
+    /// [`internal_operation_counter`](Self::internal_operation_counter),
+    /// written back with
+    /// [`set_internal_operation_counter`](Self::set_internal_operation_counter),
+    /// rolled back on `revert_frame`, kept on `commit_frame`.
+    internal_operation_counter: u128,
 }
 
 impl Default for MichelsonJournal {
@@ -194,6 +217,7 @@ impl MichelsonJournal {
             pending_alias_origination_internals: Vec::new(),
             operation_hash,
             origination_index: 0,
+            internal_operation_counter: 0,
         }
     }
 
@@ -282,6 +306,29 @@ impl MichelsonJournal {
     pub fn set_origination_index(&mut self, index: u32) {
         self.origination_index = index;
     }
+
+    /// Current MIR internal-operation counter — the highest replay
+    /// identity assigned to an internal operation so far in this
+    /// synthetic manager operation.  An inbound CRAC handler resumes
+    /// from this value so that internal operations keep a monotonic,
+    /// collision-free identity across reentrant Michelson frames,
+    /// matching L1's single internal-nonce namespace (L2-1676).  Pair
+    /// every read with
+    /// [`set_internal_operation_counter`](Self::set_internal_operation_counter)
+    /// to write the post-execution value back.
+    pub fn internal_operation_counter(&self) -> u128 {
+        self.internal_operation_counter
+    }
+
+    /// Persist `counter` as the new MIR internal-operation counter,
+    /// called by the inbound-CRAC handler at the end of an
+    /// `execute_entrypoint_call` to record the highest counter the
+    /// frame's Michelson execution reached.  The next reentrant
+    /// Michelson frame resumes from this value rather than restarting
+    /// from 0 (L2-1676).
+    pub fn set_internal_operation_counter(&mut self, counter: u128) {
+        self.internal_operation_counter = counter;
+    }
 }
 
 pub fn indexed_path<T: Path>(depth: usize, path: &T) -> Result<OwnedPath, RuntimeError> {
@@ -300,6 +347,7 @@ impl MichelsonJournal {
             snapshot_watermark: self.snapshots.len(),
             receipt_count: self.pending_crac_receipts.len(),
             origination_index: self.origination_index,
+            internal_operation_counter: self.internal_operation_counter,
         });
     }
 
@@ -364,12 +412,18 @@ impl MichelsonJournal {
                 snapshot_watermark: 0,
                 receipt_count: 0,
                 origination_index: 0,
+                internal_operation_counter: 0,
             });
         // The saved origination index is dropped on commit: any
         // increments performed during this frame are kept, so a later
         // CRAC in the same synthetic op continues from the post-frame
         // value rather than re-using already-burned indices.
         let _ = checkpoint.origination_index;
+        // Likewise the saved MIR internal-operation counter is dropped
+        // on commit: counters consumed in this frame stay consumed, so
+        // a later reentrant frame keeps a monotonic, collision-free
+        // replay identity (L2-1676).
+        let _ = checkpoint.internal_operation_counter;
         let drain_from = if self.external_checkpoints.is_empty() {
             checkpoint.snapshot_watermark
         } else {
@@ -405,6 +459,7 @@ impl MichelsonJournal {
                 snapshot_watermark: 0,
                 receipt_count: 0,
                 origination_index: 0,
+                internal_operation_counter: 0,
             });
         // Roll the origination-nonce index back to its value at
         // checkpoint entry: any `CREATE_CONTRACT` performed inside the
@@ -416,6 +471,12 @@ impl MichelsonJournal {
         // followed by a caller-side EVM revert does not leak burned
         // indices.
         self.origination_index = checkpoint.origination_index;
+        // Roll the MIR internal-operation counter back the same way:
+        // the internal operations applied inside the reverted frame are
+        // backtracked, so their replay identities are released and the
+        // next reentrant frame resumes from the pre-frame counter
+        // (L2-1676).
+        self.internal_operation_counter = checkpoint.internal_operation_counter;
         // Drain (not truncate) the CRAC receipts pushed during this
         // frame, transform their statuses to `BackTracked`, and
         // migrate them to the backtracked list.  Like
@@ -1539,5 +1600,73 @@ mod tests {
         // Outer commits: index stays at 2.
         journal.commit_frame(&mut host).unwrap();
         assert_eq!(journal.origination_index(), 2);
+    }
+
+    // L2-1676: the MIR internal-operation counter is the replay
+    // identity L1 enforces. The value returned by
+    // `internal_operation_counter()` is the value last written via
+    // `set_internal_operation_counter`; reentrant inbound Michelson
+    // frames in the same synthetic op resume from it instead of
+    // restarting at 0, so internal-operation identities stay monotonic
+    // across the whole NAC transaction.
+    #[test]
+    fn test_internal_operation_counter_persists_across_calls() {
+        let mut journal = MichelsonJournal::new(dummy_hash(0x01));
+        assert_eq!(journal.internal_operation_counter(), 0);
+        journal.set_internal_operation_counter(2); // frame A emitted 2 internal ops
+        assert_eq!(journal.internal_operation_counter(), 2);
+        journal.set_internal_operation_counter(3); // frame B emitted 1 more
+        assert_eq!(journal.internal_operation_counter(), 3);
+    }
+
+    // Reverting an EVM frame rolls the MIR counter back to the value at
+    // frame entry: the internal operations applied inside the reverted
+    // frame are backtracked, so their replay identities are released and
+    // the next reentrant frame resumes from the pre-frame counter.
+    #[test]
+    fn test_internal_operation_counter_rolls_back_on_revert_frame() {
+        let mut host = MockHost::default();
+        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
+        // Outer EVM frame enters at counter 0.
+        journal.push_external_checkpoint();
+        // Inbound CRAC inside that frame emitted two internal ops.
+        journal.set_internal_operation_counter(2);
+        assert_eq!(journal.internal_operation_counter(), 2);
+        // Outer frame reverts: counter must drop back to 0.
+        journal.revert_frame(&mut host).unwrap();
+        assert_eq!(journal.internal_operation_counter(), 0);
+    }
+
+    // Committing an EVM frame keeps the increments performed inside it.
+    // The next reentrant frame continues from the post-frame counter,
+    // never re-using an already-assigned replay identity.
+    #[test]
+    fn test_internal_operation_counter_persists_on_commit_frame() {
+        let mut host = MockHost::default();
+        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
+        journal.push_external_checkpoint();
+        journal.set_internal_operation_counter(2);
+        journal.commit_frame(&mut host).unwrap();
+        assert_eq!(journal.internal_operation_counter(), 2);
+    }
+
+    // Nested frames: an inner revert only rolls back the inner frame's
+    // increments; the outer frame's prior increments survive.
+    #[test]
+    fn test_internal_operation_counter_nested_revert_only_inner() {
+        let mut host = MockHost::default();
+        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
+        // Outer frame
+        journal.push_external_checkpoint();
+        journal.set_internal_operation_counter(2); // outer frame emitted 2
+                                                   // Inner frame
+        journal.push_external_checkpoint();
+        journal.set_internal_operation_counter(5); // inner frame emitted 3 more
+                                                   // Inner reverts: counter back to 2 (outer's tail), NOT to 0.
+        journal.revert_frame(&mut host).unwrap();
+        assert_eq!(journal.internal_operation_counter(), 2);
+        // Outer commits: counter stays at 2.
+        journal.commit_frame(&mut host).unwrap();
+        assert_eq!(journal.internal_operation_counter(), 2);
     }
 }

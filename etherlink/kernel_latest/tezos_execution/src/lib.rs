@@ -9586,6 +9586,7 @@ mod tests {
             crac_chain_depth: 0,
             crac_origin: None,
             delegated_storage_cost: 0,
+            applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let mut nonce_counter: u16 = 0;
@@ -9819,6 +9820,7 @@ mod tests {
             crac_chain_depth: 0,
             crac_origin: None,
             delegated_storage_cost: 0,
+            applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let mut nonce_counter: u16 = 0;
