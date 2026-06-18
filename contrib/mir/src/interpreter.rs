@@ -4154,6 +4154,61 @@ mod interpreter_tests {
                 mk_0x("f01dc4"),
             );
         }
+
+        #[test]
+        fn bytes_logic_gas() {
+            use overloads as o;
+
+            // Gas consumed running `instr` over two byte operands of the given
+            // lengths (top-of-stack operand first).
+            #[track_caller]
+            fn consumed(instr: Instruction, len1: usize, len2: usize) -> u32 {
+                let mut stack = stk![V::Bytes(vec![0xff; len2]), V::Bytes(vec![0xff; len1])];
+                let mut ctx = Ctx::default();
+                assert!(interpret_one(&instr, &mut ctx, &mut stack).is_ok());
+                Gas::default().milligas().unwrap() - ctx.gas().milligas().unwrap()
+            }
+
+            // Each byte op must charge, and the charge must scale with work:
+            // at least ~0.5 gas per processed byte over the size delta. A bare
+            // `> 0` (or even strictly-growing) bound would pass even if the
+            // O(n) loop charged a near-constant amount, which is the very
+            // undercharge this guards against (`Xor::Bytes` once consumed
+            // nothing at all). The floor is well below the actual marginal
+            // rate, so it survives benchmark re-pricing.
+            for instr in [And(o::And::Bytes), Or(o::Or::Bytes), Xor(o::Xor::Bytes)] {
+                assert!(consumed(instr.clone(), 2, 2) > 0);
+                assert!(
+                    consumed(instr.clone(), 1000, 1000) - consumed(instr, 2, 2)
+                        >= (1000 - 2) / 2
+                );
+            }
+
+            // The charge follows each opcode's protocol length model and is
+            // independent of operand order.
+            // AND scales with the smaller operand (`min`): the 1000-byte side
+            // is irrelevant, the charge matches the 2-byte/2-byte case.
+            assert_eq!(
+                consumed(And(o::And::Bytes), 1000, 2),
+                consumed(And(o::And::Bytes), 2, 1000)
+            );
+            assert_eq!(
+                consumed(And(o::And::Bytes), 1000, 2),
+                consumed(And(o::And::Bytes), 2, 2)
+            );
+            // OR and XOR scale with the larger operand (`max`): the charge
+            // matches the 1000-byte/1000-byte case regardless of the small side.
+            for instr in [Or(o::Or::Bytes), Xor(o::Xor::Bytes)] {
+                assert_eq!(
+                    consumed(instr.clone(), 1000, 2),
+                    consumed(instr.clone(), 2, 1000)
+                );
+                assert_eq!(
+                    consumed(instr.clone(), 1000, 2),
+                    consumed(instr, 1000, 1000)
+                );
+            }
+        }
     }
 
     #[test]
