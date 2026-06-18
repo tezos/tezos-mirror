@@ -6,7 +6,6 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::BlockInProgress;
-use crate::chains::ChainFamily;
 use crate::event::Event;
 use crate::simulation::SimulationResult;
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
@@ -148,7 +147,7 @@ pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
 pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
     RefPath::assert_from(b"/evm/world_state/transactions_objects");
 
-const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/world_state/chain_id");
+const EVM_CHAIN_ID_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/chain_id");
 
 const MICHELSON_RUNTIME_CHAIN_ID: RefPath =
     RefPath::assert_from(b"/tez/world_state/chain_id");
@@ -174,10 +173,6 @@ const MICHELSON_RUNTIME_SUNRISE_LEVEL: RefPath =
 
 pub const ENABLE_MICHELSON_GAS_REFUND: RefPath =
     RefPath::assert_from(b"/base/feature_flags/enable_michelson_gas_refund");
-
-// Root for chain configurations. Informations about a chain are available by appending its chain ID.
-pub const CHAIN_CONFIGURATIONS: RefPath =
-    RefPath::assert_from(b"/base/chain_configurations");
 
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
@@ -280,12 +275,6 @@ pub const ENABLE_FA_BRIDGE: RefPath =
 
 const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: RefPath =
     RefPath::assert_from(b"/base/max_blueprint_lookahead_in_seconds");
-
-pub fn chain_config_path(chain_id: &U256) -> Result<OwnedPath, Error> {
-    let raw_chain_id_path: Vec<u8> = format!("/{chain_id}").into();
-    let chain_id_path = OwnedPath::try_from(raw_chain_id_path)?;
-    concat(&CHAIN_CONFIGURATIONS, &chain_id_path).map_err(Error::from)
-}
 
 pub fn store_simulation_result<T>(
     host: &mut impl StorageV1,
@@ -623,12 +612,15 @@ where
     Ok(())
 }
 
-pub fn store_chain_id(host: &mut impl StorageV1, chain_id: U256) -> Result<(), Error> {
-    write_u256_le(host, &EVM_CHAIN_ID, chain_id).map_err(Error::from)
+pub fn store_evm_chain_id(
+    host: &mut impl StorageV1,
+    evm_chain_id: U256,
+) -> Result<(), Error> {
+    write_u256_le(host, &EVM_CHAIN_ID_PATH, evm_chain_id).map_err(Error::from)
 }
 
-pub fn read_chain_id(host: &impl StorageV1) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_CHAIN_ID).map_err(Error::from)
+pub fn read_evm_chain_id(host: &impl StorageV1) -> Result<U256, Error> {
+    read_u256_le(host, &EVM_CHAIN_ID_PATH).map_err(Error::from)
 }
 
 pub fn store_michelson_runtime_chain_id(
@@ -1166,22 +1158,6 @@ pub fn max_blueprint_lookahead_in_seconds(host: &impl StorageV1) -> anyhow::Resu
     let bytes = host.store_read(&MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS, 0, 8)?;
     let bytes: [u8; 8] = bytes.as_slice().try_into()?;
     Ok(i64::from_le_bytes(bytes))
-}
-
-// Storage functions related to a chain configuration
-
-pub fn read_chain_family(
-    host: &impl StorageV1,
-    chain_id: U256,
-) -> anyhow::Result<ChainFamily> {
-    let chain_configurations_path = chain_config_path(&chain_id)?;
-    let chain_family_path = RefPath::assert_from(b"/chain_family");
-    let path = concat(&chain_configurations_path, &chain_family_path)?;
-    let bytes = host
-        .store_read_all(&path)
-        .context(format!("Cannot read chain family for chain {chain_id}"))?;
-    let chain_family = String::from_utf8(bytes)?;
-    Ok(chain_family.into())
 }
 
 /// Smart Contract of the delayed bridge

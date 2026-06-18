@@ -8,7 +8,7 @@ use crate::blueprint_storage::{
     clear_all_blueprints, read_current_blueprint_header, store_forced_blueprint,
     store_inbox_blueprint,
 };
-use crate::chains::{ChainConfig, ChainConfigTrait, EvmChainConfig, TezosXTransaction};
+use crate::chains::{ChainConfigTrait, TezosXChainConfig, TezosXTransaction};
 use crate::configuration::{
     Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
 };
@@ -35,7 +35,7 @@ pub fn fetch_proxy_blueprints<Host>(
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
-    chain_configuration: &EvmChainConfig,
+    chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
@@ -167,46 +167,21 @@ where
 pub fn fetch_blueprints<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    chain_config: &crate::chains::ChainConfig,
+    chain_config: &crate::chains::TezosXChainConfig,
     config: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
-    match (chain_config, &mut config.mode) {
-        (
-            ChainConfig::Evm(chain_config),
-            ConfigurationMode::Sequencer {
-                delayed_bridge,
-                delayed_inbox,
-                sequencer,
-                dal,
-                evm_node_flag: _,
-                max_blueprint_lookahead_in_seconds: _,
-            },
-        ) => fetch_sequencer_blueprints(
-            host,
-            smart_rollup_address,
-            &config.tezos_contracts,
-            delayed_bridge.clone(),
+    match &mut config.mode {
+        ConfigurationMode::Sequencer {
+            delayed_bridge,
             delayed_inbox,
-            sequencer.clone(),
-            dal.clone(),
-            config.maximum_allowed_ticks,
-            config.enable_fa_bridge,
-            &**chain_config,
-        ),
-        (
-            ChainConfig::Michelson(chain_config),
-            ConfigurationMode::Sequencer {
-                delayed_bridge,
-                delayed_inbox,
-                sequencer,
-                dal,
-                evm_node_flag: _,
-                max_blueprint_lookahead_in_seconds: _,
-            },
-        ) => fetch_sequencer_blueprints(
+            sequencer,
+            dal,
+            evm_node_flag: _,
+            max_blueprint_lookahead_in_seconds: _,
+        } => fetch_sequencer_blueprints(
             host,
             smart_rollup_address,
             &config.tezos_contracts,
@@ -218,19 +193,13 @@ where
             config.enable_fa_bridge,
             chain_config,
         ),
-        (ChainConfig::Evm(chain_config), ConfigurationMode::Proxy) => {
-            fetch_proxy_blueprints(
-                host,
-                smart_rollup_address,
-                &config.tezos_contracts,
-                config.enable_fa_bridge,
-                chain_config,
-            )
-        }
-        (ChainConfig::Michelson(_), ConfigurationMode::Proxy) => {
-            // Proxy mode is only available for the EVM chain.
-            Ok(StageOneStatus::Done)
-        }
+        ConfigurationMode::Proxy => fetch_proxy_blueprints(
+            host,
+            smart_rollup_address,
+            &config.tezos_contracts,
+            config.enable_fa_bridge,
+            chain_config,
+        ),
     }
 }
 
@@ -239,8 +208,7 @@ mod tests {
     use crate::{
         blueprint_storage::EVMBlockHeader,
         chains::{
-            test_chain_config, test_evm_chain_config, ChainHeaderTrait,
-            ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            test_tezosx_chain_config, ChainHeaderTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
         },
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
@@ -443,7 +411,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -472,7 +440,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -496,7 +464,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -532,7 +500,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -565,13 +533,13 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
-        if read_blueprint::<_, EvmChainConfig>(
+        if read_blueprint::<_, TezosXChainConfig>(
             &mut host,
             &mut conf,
             U256::from(10),
@@ -605,7 +573,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -635,7 +603,7 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        let chain_config = test_evm_chain_config();
+        let chain_config = test_tezosx_chain_config();
 
         match read_proxy_inbox(
             &mut host,
@@ -689,7 +657,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -730,7 +698,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -772,7 +740,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -802,7 +770,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -837,7 +805,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -869,7 +837,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -948,7 +916,7 @@ mod tests {
         let filled_slots = filled_slots.unwrap_or(dal_slots);
         fill_slots(host, filled_slots);
 
-        fetch_blueprints(host, DEFAULT_SR_ADDRESS, &test_chain_config(), conf)
+        fetch_blueprints(host, DEFAULT_SR_ADDRESS, &test_tezosx_chain_config(), conf)
             .expect("fetch failed");
     }
 
@@ -1042,7 +1010,7 @@ mod tests {
         let status = fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -1082,7 +1050,7 @@ mod tests {
         let status = fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -1131,7 +1099,7 @@ mod tests {
         let status = fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");
@@ -1171,7 +1139,7 @@ mod tests {
         fetch_blueprints(
             &mut host,
             DEFAULT_SR_ADDRESS,
-            &test_chain_config(),
+            &test_tezosx_chain_config(),
             &mut conf,
         )
         .expect("fetch failed");

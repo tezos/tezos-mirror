@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::configuration::{
-    fetch_chain_configuration, fetch_configuration, Configuration, CHAIN_ID,
+    fetch_configuration, fetch_tezosx_configuration, Configuration,
 };
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
@@ -23,10 +23,9 @@ use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
 use revm_etherlink::precompiles::initializer::init_precompile_bytecodes;
 use storage::{
-    read_chain_id, read_da_fee, read_kernel_version, read_minimum_base_fee_per_gas,
-    read_tracer_input, store_chain_id, store_da_fee, store_kernel_version,
-    store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
-    STORAGE_VERSION_PATH,
+    read_da_fee, read_kernel_version, read_minimum_base_fee_per_gas, read_tracer_input,
+    store_da_fee, store_kernel_version, store_minimum_base_fee_per_gas,
+    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -122,14 +121,14 @@ where
 pub fn stage_one<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    chain_config: &chains::ChainConfig,
+    chain_config: &chains::TezosXChainConfig,
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     log!(Debug, "Entering stage one.");
-    log!(Debug, "Chain Configuration: {}", chain_config);
+    log!(Debug, "Chain Configuration: {chain_config:?}");
     log!(Debug, "Configuration: {}", configuration);
 
     fetch_blueprints(host, smart_rollup_address, chain_config, configuration)
@@ -158,17 +157,6 @@ fn init_storage_versioning(host: &mut impl StorageV1) -> Result<(), Error> {
             Ok(_) => Ok(()),
             Err(_) => store_storage_version(host, STORAGE_VERSION),
         },
-    }
-}
-
-fn retrieve_chain_id(host: &mut impl StorageV1) -> Result<U256, Error> {
-    match read_chain_id(host) {
-        Ok(chain_id) => Ok(chain_id),
-        Err(_) => {
-            let chain_id = U256::from(CHAIN_ID);
-            store_chain_id(host, chain_id)?;
-            Ok(chain_id)
-        }
     }
 }
 
@@ -242,8 +230,6 @@ pub fn run<Host>(host: &mut Host) -> Result<(), anyhow::Error>
 where
     Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
 {
-    let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
-
     // We always start by doing the migration if needed.
     match stage_zero(host) {
         Ok(MigrationStatus::None) => {
@@ -294,15 +280,12 @@ where
     let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let chain_configuration = fetch_chain_configuration(host, chain_id);
+    let chain_configuration = fetch_tezosx_configuration(host);
     let mut configuration = fetch_configuration(host);
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Initialize custom precompile
-    let tezosx_enabled = match &chain_configuration {
-        chains::ChainConfig::Evm(config) => config.tezos_runtime_feature_flag(),
-        chains::ChainConfig::Michelson(_) => false,
-    };
+    let tezosx_enabled = chain_configuration.tezos_runtime_feature_flag();
     init_precompile_bytecodes(host, tezosx_enabled)
         .map_err(|_| Error::RevmPrecompileInitError)?;
 
@@ -329,22 +312,13 @@ where
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
         log!(Debug, "Entering stage two.");
-        if let block::ComputationResult::RebootNeeded = match chain_configuration {
-            chains::ChainConfig::Evm(chain_configuration) => block::produce(
-                host,
-                &*chain_configuration,
-                &mut configuration,
-                sequencer_pool_address,
-                trace_input,
-            ),
-            chains::ChainConfig::Michelson(chain_configuration) => block::produce(
-                host,
-                &chain_configuration,
-                &mut configuration,
-                sequencer_pool_address,
-                trace_input,
-            ),
-        }
+        if let block::ComputationResult::RebootNeeded = block::produce(
+            host,
+            &chain_configuration,
+            &mut configuration,
+            sequencer_pool_address,
+            trace_input,
+        )
         .context("Failed during stage 2")?
         {
             host.mark_for_reboot()?;
@@ -476,7 +450,7 @@ mod tests {
     use crate::fees;
     use crate::parsing::RollupType;
     use crate::run;
-    use crate::storage::{store_chain_id, ENABLE_FA_BRIDGE};
+    use crate::storage::{store_evm_chain_id, ENABLE_FA_BRIDGE};
     use alloy_primitives::keccak256;
     use alloy_sol_types::sol;
     use pretty_assertions::assert_eq;
@@ -601,7 +575,7 @@ mod tests {
             b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
         )
         .unwrap();
-        store_chain_id(&mut host, DUMMY_CHAIN_ID).unwrap();
+        store_evm_chain_id(&mut host, DUMMY_CHAIN_ID).unwrap();
 
         // run level in order to initialize outbox counter (by SOL message)
         let level = host.host.run_level(|_| ());

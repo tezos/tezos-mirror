@@ -5,16 +5,16 @@
 
 use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
-    chains::{ChainConfig, ChainFamily, EvmChainConfig, EvmLimits, ExperimentalFeatures},
+    chains::{EvmLimits, ExperimentalFeatures, TezosXChainConfig},
     delayed_inbox::DelayedInbox,
     retrieve_minimum_base_fee_per_gas,
     storage::{
         dal_slots, enable_dal, is_enable_fa_bridge, max_blueprint_lookahead_in_seconds,
-        read_admin, read_chain_family, read_delayed_transaction_bridge,
+        read_admin, read_delayed_transaction_bridge, read_evm_chain_id,
         read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_michelson_runtime_chain_id,
         read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
-        store_michelson_runtime_chain_id,
+        store_evm_chain_id, store_michelson_runtime_chain_id,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
@@ -22,7 +22,7 @@ use primitive_types::U256;
 use revm_etherlink::storage::{read_ticketer, version::read_evm_version};
 use tezos_crypto_rs::{
     blake2b,
-    hash::{ChainId, ContractKt1Hash, HashTrait},
+    hash::{ChainId, ContractKt1Hash},
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
@@ -31,7 +31,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
-pub const CHAIN_ID: u32 = 1337;
+pub const EVM_CHAIN_ID: u32 = 1337;
 
 #[derive(Debug, Clone, Default)]
 pub struct DalConfiguration {
@@ -198,12 +198,19 @@ where
     }
 }
 
-fn fetch_evm_chain_configuration<Host>(host: &mut Host, chain_id: U256) -> ChainConfig
-where
-    Host: StorageV1,
-{
-    let config = fetch_pure_evm_config(host, chain_id);
-    ChainConfig::Evm(Box::new(config))
+pub fn fetch_evm_chain_id(host: &mut impl StorageV1) -> U256 {
+    read_evm_chain_id(host).unwrap_or_else(|err| {
+        // Chain id not in storage yet: fall back to the default and persist.
+        log!(
+            Info,
+            "Failed to read the EVM chain id ({err:?}), falling back to the default."
+        );
+        let evm_chain_id = U256::from(EVM_CHAIN_ID);
+        if let Err(err) = store_evm_chain_id(host, evm_chain_id) {
+            log!(Error, "Failed to persist the default EVM chain id: {err:?}");
+        }
+        evm_chain_id
+    })
 }
 
 /// Derive the Michelson runtime chain ID from the EVM chain ID by
@@ -222,82 +229,49 @@ fn fetch_michelson_runtime_chain_id(
     evm_chain_id: U256,
 ) -> ChainId {
     let chain_id_res = read_michelson_runtime_chain_id(host);
+    if let Err(err) = &chain_id_res {
+        log!(
+            Info,
+            "Failed to read the Michelson runtime chain id ({err:?}), deriving it from the EVM chain id."
+        );
+    }
     match chain_id_res {
-        Ok(Some(chain_id)) => chain_id,
+        Ok(Some(michelson_chain_id)) => michelson_chain_id,
         Ok(None) | Err(_) => {
-            // Chain id not in storage yet: derive from the EVM chain id and persist.
-            let chain_id = derive_michelson_chain_id(evm_chain_id);
-            let _ = store_michelson_runtime_chain_id(host, &chain_id);
-            chain_id
+            // Chain id not in storage yet (or unreadable): derive from the EVM
+            // chain id and persist.
+            let michelson_chain_id = derive_michelson_chain_id(evm_chain_id);
+            if let Err(err) = store_michelson_runtime_chain_id(host, &michelson_chain_id)
+            {
+                log!(
+                    Error,
+                    "Failed to persist the Michelson runtime chain id: {err:?}"
+                );
+            }
+            michelson_chain_id
         }
     }
 }
 
-pub fn fetch_pure_evm_config<Host>(host: &mut Host, chain_id: U256) -> EvmChainConfig
+pub fn fetch_tezosx_configuration<Host>(host: &mut Host) -> TezosXChainConfig
 where
     Host: StorageV1,
 {
+    // Read both runtime chain ids from storage. The EVM chain id falls back to
+    // the default and is persisted on first use; the Michelson runtime chain id
+    // is derived from it and persisted if absent.
+    let evm_chain_id = fetch_evm_chain_id(host);
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    let michelson_runtime_chain_id = fetch_michelson_runtime_chain_id(host, chain_id);
-    EvmChainConfig::create_config(
-        chain_id,
+    let michelson_chain_id = fetch_michelson_runtime_chain_id(host, evm_chain_id);
+    TezosXChainConfig::create_config(
+        evm_chain_id,
         limits,
         spec_id,
         experimental_features,
-        michelson_runtime_chain_id,
+        michelson_chain_id,
     )
-}
-
-fn fetch_michelson_chain_configuration(
-    _host: &mut impl StorageV1,
-    chain_id: ChainId,
-) -> ChainConfig {
-    ChainConfig::new_michelson_config(chain_id)
-}
-
-fn try_chain_id_from_u256(chain_id: U256) -> Option<ChainId> {
-    // Tezos-compatible chain ids have only 4 bytes.
-    let chain_id_low_bytes = chain_id.low_u32();
-
-    if chain_id != chain_id_low_bytes.into() {
-        log!(
-            Error,
-            "Configured chain family is Michelson but chain id does not fit on 4 bytes."
-        );
-        return None;
-    }
-
-    match ChainId::try_from_bytes(&chain_id_low_bytes.to_le_bytes()) {
-        Err(_) => {
-            // This is unexpected, any u32 should be decodable as a chain id
-            log!(Error,
-                "Configured chain family is Michelson and the chain id fits on 4 bytes but converting to ChainId failed."
-            );
-            None
-        }
-        Ok(chain_id) => Some(chain_id),
-    }
-}
-
-pub fn fetch_chain_configuration<Host>(host: &mut Host, chain_id: U256) -> ChainConfig
-where
-    Host: StorageV1,
-{
-    // if the info is not in durable storage, we must not fail, but treat it as EVM
-    let chain_family = read_chain_family(host, chain_id).unwrap_or_default();
-    match chain_family {
-        ChainFamily::Evm => fetch_evm_chain_configuration(host, chain_id),
-        ChainFamily::Michelson => {
-            if let Some(chain_id) = try_chain_id_from_u256(chain_id) {
-                fetch_michelson_chain_configuration(host, chain_id)
-            } else {
-                log!(Error, "Falling back to EVM chain family.");
-                fetch_evm_chain_configuration(host, chain_id)
-            }
-        }
-    }
 }
 
 pub fn fetch_configuration<Host>(host: &mut Host) -> Configuration
