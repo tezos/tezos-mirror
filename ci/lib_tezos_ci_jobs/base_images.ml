@@ -60,17 +60,6 @@ module Files = struct
 
    *)
 
-  let rpm_base =
-    [
-      "images/base-images/Dockerfile.rpm";
-      (* scripts used in Dockerfile *)
-      "scripts/kiss-fetch.sh";
-      "images/scripts/configure_rpm_proxy.sh";
-      "images/scripts/install_datadog_static.sh";
-      "images/scripts/install-gcloud-dnf.sh";
-    ]
-    @ build_script
-
   let debian_base =
     [
       "images/base-images/Dockerfile.debian";
@@ -159,35 +148,21 @@ module Files = struct
 end
 
 module Distribution = struct
-  type t = Debian | Ubuntu | Fedora | Rockylinux
+  type t = Debian | Ubuntu
 
-  let name = function
-    | Debian -> "debian"
-    | Ubuntu -> "ubuntu"
-    | Fedora -> "fedora"
-    | Rockylinux -> "rockylinux"
+  let name = function Debian -> "debian" | Ubuntu -> "ubuntu"
 
   let releases = function
     | Debian -> ["bookworm"; "trixie"]
     | Ubuntu -> ["22.04"; "24.04"; "26.04"]
-    | Fedora -> ["39"; "42"]
-    | Rockylinux -> ["9"; "10"]
 
   let release_matrix distro = [("RELEASE", releases distro)]
 
   let dockerfile = function
     | Debian | Ubuntu -> "images/base-images/Dockerfile.debian"
-    | Fedora | Rockylinux -> "images/base-images/Dockerfile.rpm"
 
-  let base_changeset = function
-    | Debian | Ubuntu -> Files.debian_base
-    | Fedora | Rockylinux -> Files.rpm_base
+  let base_changeset = function Debian | Ubuntu -> Files.debian_base
 end
-
-(* Set to [true] to include RPM-based distribution images (Fedora, Rockylinux)
-   in the pipeline. Set to [false] to deprecate them.
-   See https://gitlab.com/tezos/tezos/-/work_items/8205 *)
-let enable_rpm_images = false
 
 (* ── Cacio helpers ───────────────────────────────────────────────────────── *)
 
@@ -320,7 +295,6 @@ let make_job_base_images ?(changeset = false) ~__POS__ ?(matrix = [])
     [script]
 
 (* Specialisation of [make_job_base_images] for distribution images.
-   - [base_name] used only for Rockylinux.
    - if [changes] is not provided, we use the base changeset of the
    distribution. This applies to base images that are not a
    dependency of other images.  *)
@@ -368,15 +342,6 @@ let job_ubuntu_based_images =
     ~description:"Build ubuntu base images"
     ~only_if_changed:Files.debian_base
     "images.ubuntu"
-
-let make_job_fedora_based_images ?(changeset = false) () =
-  make_job_base_image_distribution ~changeset Distribution.Fedora
-
-let make_job_rockylinux_based_images ?(changeset = false) () =
-  make_job_base_image_distribution
-    ~changeset
-    ~base_name:(Upstream "rockylinux/rockylinux")
-    Distribution.Rockylinux
 
 (* ── Standalone jobs (no job dependencies within this file) ─────────────── *)
 
@@ -615,15 +580,10 @@ let job_rust_sdk_bindings_based_images =
 
 (* ── Assembly ────────────────────────────────────────────────────────────── *)
 
-(* Returns the remaining CIAO jobs (RPM images, pending migration).
-   [changeset] should be set to [true] for [before_merging]/[merge_train] only. *)
-let jobs ?(changeset = false) () =
-  if enable_rpm_images then
-    [
-      make_job_fedora_based_images ~changeset ();
-      make_job_rockylinux_based_images ~changeset ();
-    ]
-  else []
+(* All base image jobs have been migrated to Cacio (registered below).
+   No CIAO jobs remain, so this list is empty; it is kept for the child
+   pipeline assembly. *)
+let jobs () = []
 
 (* ── Cacio pipeline registrations ───────────────────────────────────────── *)
 
