@@ -441,14 +441,6 @@ dpkg: all
 	./scripts/dpkg/make_dpkg.sh scripts/dpkg/B && \
 	./scripts/dpkg/make_dpkg.sh scripts/dpkg/A
 
-.PHONY: rpm
-rpm: all
-	export TIMESTAMP=$$(date '+%Y%m%d%H%M') ; \
-	export CI_COMMIT_SHORT_SHA=$$(git rev-parse --short HEAD) ; \
-	export CI_COMMIT_REF_NAME=$$(git rev-parse --abbrev-ref HEAD) ; \
-	export CI_COMMIT_TAG=$$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD) ; \
-  ./scripts/rpm/make_rpm.sh
-
 .PHONY: build-deps
 build-deps:
 	@./scripts/install_build_deps.sh
@@ -540,12 +532,8 @@ pkg-common-clean:
 dpkg-clean: pkg-common-clean
 	@-rm -rf _dpkgstage *.deb
 
-.PHONY: rpm-clean
-rpm-clean: pkg-common-clean
-	@-rm -rf _rpmbuild *.rpm
-
 .PHONY: clean
-clean: coverage-clean clean-old-names dpkg-clean rpm-clean
+clean: coverage-clean clean-old-names dpkg-clean
 	@-dune clean
 	@-rm -f ${ALL_EXECUTABLES}
 	@-${MAKE} -C docs clean
