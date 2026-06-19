@@ -31,7 +31,10 @@ use crate::interpreter::interpret_cost::SigCostError;
 use crate::lexer::Prim;
 use crate::serializer::DecodeError;
 use crate::stack::*;
-use crate::typechecker::{typecheck_contract_address, typecheck_value, TcError};
+use crate::typechecker::{
+    typecheck_contract_address, typecheck_value, typecheck_value_with_views, TcError,
+    TypecheckViews,
+};
 
 /// Errors possible during interpretation.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -325,7 +328,16 @@ impl<'a> ContractScript<'a> {
     ) -> Result<TypedValue<'a>, TcError> {
         let parsed_annotation = FieldAnnotation::from_string(entrypoint.to_string());
         if let Some((annotation_path, annotation_type)) = self.annotations.get(&parsed_annotation) {
-            typecheck_value(&parameter, ctx, annotation_type)?;
+            // Validate child views in a parameter lambda like L1: parse_data
+            // elaborates an embedded CREATE_CONTRACT and runs parse_views. The
+            // Left/Right-wrapped re-typecheck below stays Disabled (already
+            // validated here, so the views are not metered twice).
+            typecheck_value_with_views(
+                &parameter,
+                ctx,
+                annotation_type,
+                TypecheckViews::Enabled,
+            )?;
             let mut result = parameter;
             for direction in annotation_path.iter().rev() {
                 match direction {
@@ -358,7 +370,23 @@ impl<'a> ContractScript<'a> {
         ctx: &mut impl TypecheckingCtx<'a>,
         storage: &Micheline<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
-        typecheck_value(storage, ctx, &self.storage)
+        self.typecheck_storage_with_views(ctx, storage, TypecheckViews::Disabled)
+    }
+
+    /// [Self::typecheck_storage] threading `typecheck_views`: validates a
+    /// CREATE_CONTRACT in a storage-value lambda at origination (`true` only).
+    pub fn typecheck_storage_with_views(
+        &self,
+        ctx: &mut impl TypecheckingCtx<'a>,
+        storage: &Micheline<'a>,
+        typecheck_views: TypecheckViews,
+    ) -> Result<TypedValue<'a>, TcError> {
+        crate::typechecker::typecheck_value_with_views(
+            storage,
+            ctx,
+            &self.storage,
+            typecheck_views,
+        )
     }
 }
 
@@ -9092,6 +9120,47 @@ mod interpreter_tests {
             start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::CREATE_CONTRACT + interpret_cost::INTERPRET_RET
         );
+    }
+
+    #[test]
+    fn create_contract_in_parameter_validates_child_views() {
+        // L2-1635: a CREATE_CONTRACT reached at runtime through a parameter
+        // lambda must have its child views validated like L1 (parse_data ->
+        // parse_views), not silently accepted. wrap_parameter is the parameter
+        // typecheck site.
+        use crate::parser::test_helpers::{parse, parse_contract_script};
+        use crate::typechecker::type_props::TypeProperty;
+        let arena = Arena::new();
+        let script = parse_contract_script(
+            "parameter (lambda unit unit); storage unit; code { CDR; NIL operation; PAIR }",
+        )
+        .unwrap()
+        .split_script()
+        .unwrap()
+        .typecheck_script(&mut Gas::default(), true, false)
+        .unwrap();
+        let bad = parse(concat!(
+            "{ DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"bad\" unit (big_map string nat) { DROP; EMPTY_BIG_MAP string nat } };",
+            "  DROP; DROP; UNIT }"
+        ))
+        .unwrap();
+        assert_eq!(
+            script
+                .wrap_parameter(&arena, bad, &Entrypoint::default(), &mut Ctx::default())
+                .map(|_| ()),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
+            ))
+        );
+        // A well-formed lambda parameter still typechecks.
+        let good = parse("{ DROP; UNIT }").unwrap();
+        assert!(script
+            .wrap_parameter(&arena, good, &Entrypoint::default(), &mut Ctx::default())
+            .is_ok());
     }
 
     #[test]

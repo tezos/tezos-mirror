@@ -16,6 +16,7 @@ use mir::{
     context::CtxTrait,
     gas::{Gas, OutOfGas},
     parser::Parser,
+    typechecker::TypecheckViews,
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
@@ -1585,7 +1586,8 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
             .map_err(OriginationError::from)?
             .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     contract_typechecked
-        .typecheck_storage(ctx, &storage_micheline)
+        // Origination: validate storage-value lambda child views (L2-1635).
+        .typecheck_storage_with_views(ctx, &storage_micheline, TypecheckViews::Enabled)
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
 }
 

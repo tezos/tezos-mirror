@@ -464,6 +464,14 @@ impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
             parse_parameter_ty_with_entrypoints(gas, parameter_ty)?;
         let storage = storage_ty.parse_ty(gas)?;
         let mut views = HashMap::new();
+        // `typecheck_views` stays a bool here: it is a pre-existing public
+        // parameter shared with the frozen kernels. Convert once at this
+        // boundary to the swap-safe internal flag.
+        let tc_views = if typecheck_views {
+            TypecheckViews::Enabled
+        } else {
+            TypecheckViews::Disabled
+        };
         for (name, view) in mich_views {
             let input_type = view.input_type.parse_ty(gas)?;
             let output_type = view.output_type.parse_ty(gas)?;
@@ -472,11 +480,12 @@ impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
                 output_type.ensure_prop(gas, TypeProperty::ViewOutput)?;
                 match view.code {
                     Micheline::Seq(instrs) => {
-                        typecheck_view(
+                        typecheck_view_with_views(
                             instrs,
                             gas,
                             Type::Pair(PairBox::new(input_type.clone(), storage.clone())),
                             output_type.clone(),
+                            tc_views,
                         )?;
                     }
                     _ => return Err(TcError::NonSeqViewInstrs(name)),
@@ -504,7 +513,14 @@ impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
             },
         )?;
         let mut stack = tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
-        let code = typecheck_instruction(code, gas, Some(&entrypoints), &mut stack, false)?;
+        let code = typecheck_instruction_with_views(
+            code,
+            gas,
+            Some(&entrypoints),
+            &mut stack,
+            false,
+            tc_views,
+        )?;
         unify_stacks(
             gas,
             &mut tc_stk![Type::new_pair(
@@ -1401,6 +1417,24 @@ enum TcIFrame<'a, 'b> {
     },
 }
 
+/// Whether an embedded `CREATE_CONTRACT`'s child-script views are validated.
+/// `Enabled` only at origination (matching L1); re-typecheck and runtime paths
+/// use `Disabled`. A distinct type (not a bare `bool`) so it cannot be
+/// transposed with an adjacent flag such as `in_view` or `recursive`.
+#[derive(Clone, Copy)]
+pub enum TypecheckViews {
+    /// Validate embedded child-script views (origination).
+    Enabled,
+    /// Skip child-view validation (re-typecheck, runtime).
+    Disabled,
+}
+
+impl TypecheckViews {
+    fn enabled(self) -> bool {
+        matches!(self, TypecheckViews::Enabled)
+    }
+}
+
 /// Iterative driver: typechecks every nested block from one explicit
 /// worklist instead of recursing through `typecheck` / `typecheck_instruction`.
 fn typecheck<'a, 'b>(
@@ -1409,6 +1443,7 @@ fn typecheck<'a, 'b>(
     self_entrypoints: Option<&'b Entrypoints>,
     opt_stack: &mut FailingTypeStack,
     in_view: bool,
+    typecheck_views: TypecheckViews,
 ) -> Result<Vec<Instruction<'a>>, TcError> {
     let mut frames: Vec<TcIFrame<'a, 'b>> = vec![TcIFrame::NextInstr { block: ast, idx: 0 }];
     // One accumulator per active block. The root accumulator is at index 0;
@@ -1418,6 +1453,9 @@ fn typecheck<'a, 'b>(
     // when a LAMBDA / LAMBDA_REC body is entered (fresh scope with
     // self_entrypoints=None, in_view=false). MAP_BLOCK does NOT switch
     // these — it inherits the outer context.
+    // `typecheck_views` is intentionally NOT in this set (unlike in_view): it
+    // is an origination-wide constant, so a CREATE_CONTRACT in a lambda body
+    // stays origination-validated. Resetting it here would reopen L2-1635.
     let mut cur_self_entrypoints = self_entrypoints;
     let mut cur_in_view = in_view;
     while let Some(frame) = frames.pop() {
@@ -1442,6 +1480,7 @@ fn typecheck<'a, 'b>(
                     cur_self_entrypoints,
                     opt_stack,
                     cur_in_view,
+                    typecheck_views,
                 )?;
                 match step {
                     StepResult::Done(typed) => {
@@ -2054,12 +2093,34 @@ pub(crate) fn typecheck_instruction<'a, 'b>(
     opt_stack: &mut FailingTypeStack,
     in_view: bool,
 ) -> Result<Instruction<'a>, TcError> {
+    typecheck_instruction_with_views(
+        i,
+        gas,
+        self_entrypoints,
+        opt_stack,
+        in_view,
+        TypecheckViews::Disabled,
+    )
+}
+
+/// Like [typecheck_instruction] but threads `typecheck_views`: `true` at
+/// origination validates an embedded `CREATE_CONTRACT`'s child-script views
+/// like L1; re-typecheck and runtime callers pass `false`.
+fn typecheck_instruction_with_views<'a, 'b>(
+    i: &'b Micheline<'a>,
+    gas: &mut Gas,
+    self_entrypoints: Option<&Entrypoints>,
+    opt_stack: &mut FailingTypeStack,
+    in_view: bool,
+    typecheck_views: TypecheckViews,
+) -> Result<Instruction<'a>, TcError> {
     let mut results = typecheck(
         std::slice::from_ref(i),
         gas,
         self_entrypoints,
         opt_stack,
         in_view,
+        typecheck_views,
     )?;
     Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "typecheck_instruction produced one" }))?)
 }
@@ -2074,6 +2135,7 @@ fn typecheck_instruction_step<'a, 'b>(
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
     in_view: bool,
+    typecheck_views: TypecheckViews,
 ) -> Result<StepResult<'a, 'b>, TcError> {
     use Instruction as I;
     use NoMatchingOverloadReason as NMOR;
@@ -2873,7 +2935,7 @@ fn typecheck_instruction_step<'a, 'b>(
                 _ => {
                     // contracts and big maps are not pushable so it's OK to typecheck values using default
                     let mut ctx = crate::context::PushableTypecheckingContext { gas };
-                    let v = typecheck_value(v, &mut ctx, &t)?;
+                    let v = typecheck_value_with_views(v, &mut ctx, &t, typecheck_views)?;
                     stack.push(t);
                     I::Push(Rc::new(v))
                 }
@@ -3695,9 +3757,13 @@ fn typecheck_instruction_step<'a, 'b>(
             let allow_lazy_storage_in_storage = true;
             #[cfg(not(feature = "allow_lazy_storage_transfer"))]
             let allow_lazy_storage_in_storage = false;
-            let contract_script =
-                cs.split_script()?
-                    .typecheck_script(gas, allow_lazy_storage_in_storage, false)?;
+            // Validate the child script's views like L1 (parse_views), but
+            // only at origination (re-typecheck/runtime pass typecheck_views=false).
+            let contract_script = cs.split_script()?.typecheck_script(
+                gas,
+                allow_lazy_storage_in_storage,
+                typecheck_views.enabled(),
+            )?;
             ensure_ty_eq(gas, &contract_script.storage, new_storage)?;
             stack.drop_top(3)?;
             stack.push(Type::Address);
@@ -3983,11 +4049,23 @@ pub fn typecheck_value<'a, 'b>(
     ctx: &mut impl TypecheckingCtx<'a>,
     t: &Type,
 ) -> Result<TypedValue<'a>, TcError> {
+    typecheck_value_with_views(v, ctx, t, TypecheckViews::Disabled)
+}
+
+/// [typecheck_value] threading `typecheck_views`: validates a `CREATE_CONTRACT`
+/// embedded in a value-level lambda (a pushed value, or an initial storage
+/// value) at origination. See [typecheck_instruction_with_views].
+pub(crate) fn typecheck_value_with_views<'a, 'b>(
+    v: &'b Micheline<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
+    t: &Type,
+    typecheck_views: TypecheckViews,
+) -> Result<TypedValue<'a>, TcError> {
     let mut frames: Vec<TvFrame<'a, 'b>> = vec![TvFrame::Visit { v, t: t.clone() }];
     let mut results: Vec<TypedValue<'a>> = Vec::new();
 
     while let Some(frame) = frames.pop() {
-        step_typecheck_value(frame, ctx, &mut frames, &mut results)?;
+        step_typecheck_value(frame, ctx, &mut frames, &mut results, typecheck_views)?;
     }
     Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "typecheck_value root" }))?)
 }
@@ -3997,13 +4075,14 @@ fn step_typecheck_value<'a, 'b>(
     ctx: &mut impl TypecheckingCtx<'a>,
     frames: &mut Vec<TvFrame<'a, 'b>>,
     results: &mut Vec<TypedValue<'a>>,
+    typecheck_views: TypecheckViews,
 ) -> Result<(), TcError> {
     use Micheline as V;
     use Type as T;
     use TypedValue as TV;
 
     match frame {
-        TvFrame::Visit { v, t } => visit_value(v, t, ctx, frames, results),
+        TvFrame::Visit { v, t } => visit_value(v, t, ctx, frames, results, typecheck_views),
         TvFrame::VisitPairTail { vs, t } => {
             // Implements the recursive code's
             // `typecheck_value(&V::App(Pair, vrs, NO_ANNS), ctx, tr)` step
@@ -4398,6 +4477,7 @@ fn visit_value<'a, 'b>(
     ctx: &mut impl TypecheckingCtx<'a>,
     frames: &mut Vec<TvFrame<'a, 'b>>,
     results: &mut Vec<TypedValue<'a>>,
+    typecheck_views: TypecheckViews,
 ) -> Result<(), TcError> {
     use Micheline as V;
     use Type as T;
@@ -4742,6 +4822,7 @@ fn visit_value<'a, 'b>(
                 in_ty.clone(),
                 out_ty.clone(),
                 matches!(raw, V::App(Prim::Lambda_rec, ..)),
+                typecheck_views,
             )?)));
         }
         (
@@ -4778,7 +4859,8 @@ fn visit_value<'a, 'b>(
             // against the ticket type, matching the recursive form's
             // outer `_ => Err(invalid())` arm. Pushing BuildTicketLegacy
             // afterwards keeps the deconstruction in the worklist.
-            let pair = typecheck_value(m, ctx, &pair_t).map_err(|_| invalid())?;
+            let pair = typecheck_value_with_views(m, ctx, &pair_t, typecheck_views)
+                .map_err(|_| invalid())?;
             results.push(pair);
             frames.push(TvFrame::BuildTicketLegacy { content_type });
         }
@@ -4857,6 +4939,7 @@ pub fn typecheck_lambda<'a>(
     in_ty: Type,
     out_ty: Type,
     recursive: bool,
+    typecheck_views: TypecheckViews,
 ) -> Result<Lambda<'a>, TcError> {
     let stk = &mut if recursive {
         let self_ty = Type::new_lambda(in_ty.clone(), out_ty.clone());
@@ -4864,8 +4947,8 @@ pub fn typecheck_lambda<'a>(
     } else {
         tc_stk![in_ty.clone()]
     };
-    // in_view=false: lambdas create a new scope, view restrictions don't propagate
-    let code = Rc::from(typecheck(instrs, gas, None, stk, false)?);
+    // in_view=false: lambdas create a new scope, view restrictions don't propagate.
+    let code = Rc::from(typecheck(instrs, gas, None, stk, false, typecheck_views)?);
     unify_stacks(gas, stk, tc_stk![out_ty.clone()])?;
     let micheline_code = Micheline::Seq(instrs);
     Ok(if recursive {
@@ -4892,8 +4975,21 @@ pub fn typecheck_view<'a>(
     in_ty: Type,
     out_ty: Type,
 ) -> Result<Rc<[Instruction<'a>]>, TcError> {
+    typecheck_view_with_views(instrs, gas, in_ty, out_ty, TypecheckViews::Disabled)
+}
+
+/// [typecheck_view] threading `typecheck_views`. `CREATE_CONTRACT` is forbidden
+/// directly in a view but allowed inside a lambda-in-view, so its child-script
+/// views must still be validated at origination.
+pub(crate) fn typecheck_view_with_views<'a>(
+    instrs: &'a [Micheline<'a>],
+    gas: &mut Gas,
+    in_ty: Type,
+    out_ty: Type,
+    typecheck_views: TypecheckViews,
+) -> Result<Rc<[Instruction<'a>]>, TcError> {
     let stk = &mut tc_stk![in_ty];
-    let code = Rc::from(typecheck(instrs, gas, None, stk, true)?);
+    let code = Rc::from(typecheck(instrs, gas, None, stk, true, typecheck_views)?);
     unify_stacks(gas, stk, tc_stk![out_ty])?;
     Ok(code)
 }
@@ -5054,7 +5150,8 @@ mod typecheck_tests {
         let mut gas = Gas::new(u32::MAX);
         let mut stack = tc_stk![];
         let _result =
-            typecheck(program, &mut gas, None, &mut stack, false).expect("deep IF typechecks");
+            typecheck(program, &mut gas, None, &mut stack, false, TypecheckViews::Disabled)
+                .expect("deep IF typechecks");
     }
 
     /// Typechecks a 100k deep right leaning pair value at the matching
@@ -8279,6 +8376,180 @@ mod typecheck_tests {
         );
     }
 
+    /// Regression for L2-1635: a parent whose CREATE_CONTRACT embeds a child
+    /// script with an L1-invalid view must be rejected at origination
+    /// (typecheck_views=true), matching L1's parse_views on the embedded
+    /// script. Re-typecheck paths (typecheck_views=false, used for entrypoint
+    /// extraction and stored-contract execution) must NOT re-validate child
+    /// views, so contracts originated before this check keep executing and no
+    /// extra gas is charged.
+    #[test]
+    fn create_contract_validates_child_views_at_origination() {
+        fn origination(src: &str) -> Result<(), TcError> {
+            parse_contract_script(src)
+                .unwrap()
+                .split_script()
+                .unwrap()
+                .typecheck_script(&mut Gas::default(), true, true)
+                .map(|_| ())
+        }
+        fn re_typecheck(src: &str) -> Result<(), TcError> {
+            parse_contract_script(src)
+                .unwrap()
+                .split_script()
+                .unwrap()
+                .typecheck_script(&mut Gas::default(), true, false)
+                .map(|_| ())
+        }
+
+        // Child view output is a `big_map` (forbidden ViewOutput).
+        let bad_output = concat!(
+            "parameter unit; storage unit;",
+            "code { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"bad\" unit (big_map string nat) { DROP; EMPTY_BIG_MAP string nat } };",
+            "  DROP; DROP; UNIT; NIL operation; PAIR }"
+        );
+        assert_eq!(
+            origination(bad_output),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
+            ))
+        );
+        // Re-typecheck must not re-validate the child view (no brick, no extra gas).
+        assert!(re_typecheck(bad_output).is_ok());
+
+        // Child view body returns the wrong type.
+        let bad_return = concat!(
+            "parameter unit; storage unit;",
+            "code { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"bad\" unit unit { DROP; PUSH nat 0 } };",
+            "  DROP; DROP; UNIT; NIL operation; PAIR }"
+        );
+        assert!(matches!(
+            origination(bad_return),
+            Err(TcError::StacksNotEqual(..))
+        ));
+
+        // Child view body uses a forbidden-in-view instruction.
+        let effectful = concat!(
+            "parameter unit; storage unit;",
+            "code { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"bad\" unit unit { CDR; DROP; NONE key_hash; SET_DELEGATE; DROP; UNIT } };",
+            "  DROP; DROP; UNIT; NIL operation; PAIR }"
+        );
+        assert_eq!(
+            origination(effectful),
+            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))
+        );
+
+        // Positive control: a valid child view still typechecks.
+        let good = concat!(
+            "parameter unit; storage unit;",
+            "code { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"good\" unit nat { DROP; PUSH nat 0 } };",
+            "  DROP; DROP; UNIT; NIL operation; PAIR }"
+        );
+        assert!(origination(good).is_ok());
+
+        // Bad child view inside a value-level lambda nested in a PUSHed value
+        // (not a direct PUSH-of-lambda): must also be rejected at origination,
+        // matching L1 (parse_data typechecks lambda values eagerly). The lambda
+        // is wrapped in a pair so it flows through the value typechecker rather
+        // than the instruction-level OpenLambda path.
+        let nested_lambda = concat!(
+            "parameter unit; storage unit;",
+            "code { DROP;",
+            "  PUSH (pair nat (lambda unit unit))",
+            "    (Pair 0 { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "      CREATE_CONTRACT",
+            "        { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "          view \"bad\" unit (big_map string nat) { DROP; EMPTY_BIG_MAP string nat } };",
+            "      DROP; DROP; UNIT });",
+            "  DROP; UNIT; NIL operation; PAIR }"
+        );
+        assert_eq!(
+            origination(nested_lambda),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
+            ))
+        );
+        assert!(re_typecheck(nested_lambda).is_ok());
+
+        // Bad GRANDCHILD view inside a CREATE_CONTRACT nested in a LAMBDA in the
+        // parent's own VIEW body. CREATE_CONTRACT is forbidden directly in a
+        // view, but allowed inside a lambda-in-view, and L1 validates the
+        // embedded child's views there too. Must be rejected at origination.
+        let lambda_in_view = concat!(
+            "parameter unit; storage unit;",
+            "code { CAR; NIL operation; PAIR };",
+            "view \"v\" unit unit",
+            "  { DROP;",
+            "    LAMBDA unit unit",
+            "      { DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "        CREATE_CONTRACT",
+            "          { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "            view \"bad\" unit (big_map string nat) { DROP; EMPTY_BIG_MAP string nat } };",
+            "        DROP; DROP; UNIT };",
+            "    DROP; UNIT }"
+        );
+        assert_eq!(
+            origination(lambda_in_view),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
+            ))
+        );
+        assert!(re_typecheck(lambda_in_view).is_ok());
+
+        // Storage-VALUE path: at origination the kernel typechecks the initial
+        // storage value via `typecheck_storage_with_views` (Enabled), a path
+        // `typecheck_script` never reaches. A storage lambda embedding a bad
+        // child view is rejected at origination, yet still accepted on the
+        // runtime re-typecheck (`typecheck_storage`, Disabled).
+        let parent = parse_contract_script(
+            "parameter unit; storage (lambda unit unit); code { CDR; NIL operation; PAIR }",
+        )
+        .unwrap()
+        .split_script()
+        .unwrap()
+        .typecheck_script(&mut Gas::default(), true, false)
+        .unwrap();
+        let storage_lambda = parse(concat!(
+            "{ DROP; UNIT; PUSH mutez 0; NONE key_hash;",
+            "  CREATE_CONTRACT",
+            "    { parameter unit; storage unit; code { CDR; NIL operation; PAIR };",
+            "      view \"bad\" unit (big_map string nat) { DROP; EMPTY_BIG_MAP string nat } };",
+            "  DROP; DROP; UNIT }"
+        ))
+        .unwrap();
+        assert_eq!(
+            parent
+                .typecheck_storage_with_views(
+                    &mut Ctx::default(),
+                    &storage_lambda,
+                    TypecheckViews::Enabled,
+                )
+                .map(|_| ()),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(PairBox::new(Type::String, Type::Nat))
+            ))
+        );
+        assert!(parent
+            .typecheck_storage(&mut Ctx::default(), &storage_lambda)
+            .is_ok());
+    }
+
     #[test]
     fn test_invalid_map() {
         let mut gas = Gas::default();
@@ -10336,7 +10607,7 @@ mod typecheck_tests {
         }
         let mut gas = Gas::new(u32::MAX);
         let stk = &mut tc_stk![];
-        let result = typecheck(current_body, &mut gas, None, stk, false);
+        let result = typecheck(current_body, &mut gas, None, stk, false, TypecheckViews::Disabled);
         std::mem::forget(std::mem::replace(stk, tc_stk![]));
         match result {
             Ok(body) => {
@@ -10539,7 +10810,14 @@ mod typecheck_tests {
                 }
                 let mut gas = Gas::new(u32::MAX);
                 let stk = &mut tc_stk![];
-                let result = typecheck(current, &mut gas, None, stk, false);
+                let result = typecheck(
+                    current,
+                    &mut gas,
+                    None,
+                    stk,
+                    false,
+                    TypecheckViews::Disabled,
+                );
                 std::mem::forget(std::mem::replace(stk, tc_stk![]));
                 let body = result.expect("deep lambda nesting must typecheck");
                 std::mem::forget(body);
