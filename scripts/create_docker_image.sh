@@ -111,10 +111,13 @@ OPTIONS
         --variants VARIANTS
             Distribution variants to build. A space-separated list of
             values from: "debug", "bare" and "minimal". If empty
-            (i.e. '--variants ""'), then only the "build image" of
-            'build.Dockerfile' is built. Default: "debug bare
-            minimal". The minimal variant is tagged IMAGE_NAME:IMAGE_TAG
-            whereas the others are tagged IMAGE_NAME-VARIANT:IMAGE_TAG.
+            (i.e. '--variants ""'), then no variant image is produced:
+            only the intermediate build stage of 'build.Dockerfile' is
+            computed into the build cache (it is exported as
+            'type=cacheonly', so nothing is loaded into the local image
+            store). Default: "debug bare minimal". The minimal variant
+            is tagged IMAGE_NAME:IMAGE_TAG whereas the others are tagged
+            IMAGE_NAME-VARIANT:IMAGE_TAG.
 
         --docker-target TARGET
             'without-evm-artifacts' (default) or 'with-evm-artifacts'.
@@ -266,101 +269,56 @@ if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
   fi
 fi
 
-# ${BASE_IMAGE}/${BASE_IMAGE_VERSION} is the CI image that is built on master
-# using the latest tag from ./images/image_tag.sh images/ci  that corresponds
-# to the state of the repo specified in version.sh .
+# The whole distribution is built by a single `docker buildx bake` invocation
+# (see docker-bake.hcl). The intermediate build image (build.Dockerfile) is
+# computed once and consumed in-graph by the variant builds (Dockerfile) via a
+# build context, so it never round-trips through a registry. bake reads its
+# inputs from the environment, one variable per `variable` block.
 #
-# $GIT_SHORTREF / $GIT_DATETIME / $GIT_VERSION are used by libversion to assign
-# the correct version to the octez binaries at compile time
-#
-# ${RUST_TOOLCHAIN_IMAGE_NAME}:${RUST_TOOLCHAIN_IMAGE_TAG} is the master image
-# to build L2 binaries.
-#
-# [--allow network.host] is unconditional even though it is only
-# needed for [sccache]. Indeed build.Dockerfile has [RUN
-# --network=host]. Cf. also the matching comment in build.Dockerfile
-# for more details.
-#
-echo "### Building tezos..."
+# Notes:
+# - $GIT_SHORTREF / $GIT_DATETIME / $GIT_VERSION are used by libversion to
+#   assign the correct version to the octez binaries at compile time.
+# - ${RUST_TOOLCHAIN_IMAGE_NAME}:${RUST_TOOLCHAIN_IMAGE_TAG} is the master image
+#   used to build L2 binaries.
+# - [--allow network.host] is needed because build.Dockerfile has
+#   [RUN --network=host] (for sccache). Cf. the matching comment in
+#   build.Dockerfile.
+# - CI_PIPELINE_ID / CI_PIPELINE_URL / CI_JOB_ID / CI_JOB_URL / CI_COMMIT_SHA
+#   are exported by GitLab CI and picked up by bake automatically.
 
-docker buildx build \
-  --build-arg "BASE_IMAGE=$ci_image_name" \
-  --build-arg "BASE_IMAGE_VERSION=build:$ci_image_version" \
-  --build-arg "OCTEZ_EXECUTABLES=${executables}" \
-  --build-arg "GIT_SHORTREF=${commit_short_sha}" \
-  --build-arg "GIT_DATETIME=${commit_datetime}" \
-  --build-arg "GIT_VERSION=${commit_tag}" \
-  --build-arg "RUST_TOOLCHAIN_IMAGE_NAME=$rust_toolchain_image_name" \
-  --build-arg "RUST_TOOLCHAIN_IMAGE_TAG=$rust_toolchain_image_tag" \
-  ${sccache_bucket:+--build-arg "SCCACHE_GCS_BUCKET=${sccache_bucket}"} \
+# Map the requested variants to bake targets. With no variants
+# (--variants ""), only the intermediate "build" target is computed; it is
+# exported as type=cacheonly, so no image is loaded into the local store.
+if [ -z "$variants" ]; then
+  bake_targets="build"
+else
+  bake_targets="$variants"
+fi
+
+echo "### Building tezos via docker buildx bake (targets: ${bake_targets})..."
+
+# shellcheck disable=SC2086
+IMAGE_NAME="$image_name" \
+  MINIMAL_IMAGE_NAME="${image_name%?}" \
+  IMAGE_VERSION="$image_version" \
+  BUILD_IMAGE_NAME="$build_image_name" \
+  CI_IMAGE_NAME="$ci_image_name" \
+  CI_IMAGE_VERSION="$ci_image_version" \
+  DOCKER_TARGET="$docker_target" \
+  OCTEZ_EXECUTABLES="$executables" \
+  GIT_SHORTREF="$commit_short_sha" \
+  GIT_DATETIME="$commit_datetime" \
+  GIT_VERSION="$commit_tag" \
+  COMMIT_SHORT_SHA="$commit_short_sha" \
+  RUST_TOOLCHAIN_IMAGE_NAME="$rust_toolchain_image_name" \
+  RUST_TOOLCHAIN_IMAGE_TAG="$rust_toolchain_image_tag" \
+  SCCACHE_GCS_BUCKET="$sccache_bucket" \
+  docker buildx bake \
   --allow network.host \
-  --target "$docker_target" \
-  --tag "$build_image_name:$image_version" \
-  -f build.Dockerfile \
-  "$src_dir"
+  -f "$src_dir/docker-bake.hcl" \
+  $bake_targets
 
-echo "### Successfully built docker image: $build_image_name:$image_version"
-
-for variant in $variants; do
-  case "$variant" in
-  debug)
-    docker buildx build \
-      --build-arg "BASE_IMAGE=$ci_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
-      --build-arg "BUILD_IMAGE=${build_image_name}" \
-      --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
-      --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
-      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
-      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
-      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
-      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
-      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-      --target=debug \
-      --tag "${image_name}debug:$image_version" \
-      "$src_dir"
-
-    echo "### Successfully built docker image: ${image_name}debug:$image_version"
-    ;;
-
-  bare)
-    docker buildx build \
-      --build-arg "BASE_IMAGE=$ci_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
-      --build-arg "BUILD_IMAGE=${build_image_name}" \
-      --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
-      --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
-      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
-      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
-      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
-      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
-      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-      --target=bare \
-      --tag "${image_name}bare:$image_version" \
-      "$src_dir"
-
-    echo "### Successfully built docker image: ${image_name}bare:$image_version"
-    ;;
-
-  minimal)
-    docker buildx build \
-      --build-arg "BASE_IMAGE=$ci_image_name" \
-      --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
-      --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
-      --build-arg "BUILD_IMAGE=${build_image_name}" \
-      --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
-      --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
-      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
-      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
-      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
-      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
-      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-      --target=minimal \
-      --tag "${image_name%?}:$image_version" \
-      "$src_dir"
-
-    echo "### Successfully built docker image: ${image_name%?}:$image_version"
-    ;;
-  esac
-done
+# The variants are loaded into the local image store; the "build" target is
+# cache-only (no image). Pushing to the registry is delegated to
+# docker_push_all.sh downstream.
+echo "### Successfully ran docker buildx bake (targets: ${bake_targets})"

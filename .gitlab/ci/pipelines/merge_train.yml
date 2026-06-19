@@ -5294,6 +5294,8 @@ oc.docker:arm64:
   - changes:
     - Dockerfile
     - build.Dockerfile
+    - docker-bake.hcl
+    - scripts/create_docker_image.sh
     when: on_success
   needs:
   - oc.docker:ci:arm64
@@ -5335,6 +5337,8 @@ oc.docker:amd64:
   - changes:
     - Dockerfile
     - build.Dockerfile
+    - docker-bake.hcl
+    - scripts/create_docker_image.sh
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
