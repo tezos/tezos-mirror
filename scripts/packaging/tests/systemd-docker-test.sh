@@ -34,9 +34,12 @@ else
   docker build --build-arg IMAGE="$DISTRIBUTION:$RELEASE" -f "$DOCKERFILE" . -t systemd
 fi
 
-# Trap signals (EXIT, INT, TERM) and perform cleanup
-trap 'echo "Stopping and removing container systemd" && \
-  (docker rm -f systemd || true) && (docker rmi systemd || true)' INT TERM EXIT
+# Trap signals (EXIT, INT, TERM) and perform cleanup. The image is removed only
+# on the local path (DEP_IMAGE unset), where we tagged it "systemd" ourselves;
+# a pulled DEP_IMAGE keeps its registry name, so removing "systemd" would error.
+trap 'echo "Stopping and removing container systemd"
+  docker rm -f systemd || true
+  if [ -z "${DEP_IMAGE+x}" ]; then docker rmi systemd || true; fi' INT TERM EXIT
 
 # Run the container in the background and capture the PID of the background process
 # Mount the test file and its parent directory so sub-scripts are available,
