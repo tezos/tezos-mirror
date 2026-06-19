@@ -419,31 +419,6 @@ module Images : sig
 
   val node_alpine : Image.t
 
-  module CI : sig
-    val job_docker_ci :
-      Runner.Arch.t -> ?storage:Runner.Storage.t -> unit -> tezos_job
-
-    val runtime : Image.t
-
-    val monitoring : Image.t
-
-    val prebuild : Image.t
-
-    val prebuild_master : Image.t
-
-    val build : Image.t
-
-    val build_master : Image.t
-
-    val test : Image.t
-
-    val test_master : Image.t
-
-    val e2etest : Image.t
-
-    val release_page : Image.t
-  end
-
   module Base_images : sig
     (** The prefix of the path of the base images. *)
     val path_prefix : string
