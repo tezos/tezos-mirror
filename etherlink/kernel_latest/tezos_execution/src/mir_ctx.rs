@@ -335,8 +335,9 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
 
     fn operation_counter(&mut self) -> u128 {
         let c: &mut u128 = self.operation_ctx.counter;
+        let current = *c;
         *c += 1;
-        *c
+        current
     }
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {
@@ -3234,8 +3235,9 @@ pub(crate) mod mock {
         }
 
         fn operation_counter(&mut self) -> u128 {
+            let current = self.operation_counter;
             self.operation_counter += 1;
-            self.operation_counter
+            current
         }
 
         fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {

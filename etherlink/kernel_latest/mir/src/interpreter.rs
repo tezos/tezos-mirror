@@ -102,6 +102,10 @@ pub enum InterpretError<'a> {
     #[allow(missing_docs)]
     #[error(transparent)]
     EnshrinedViewDispatch(#[from] EnshrinedViewDispatchError),
+    /// A single execution produced more than L1's 65,535 internal
+    /// operations (matching L1's `Too_many_internal_operations`).
+    #[error("too many internal operations")]
+    TooManyInternalOperations,
     /// Internal invariant violation reachable only on a typechecker bug or
     /// malformed input — analogous to [`TcError::InternalError`] but raised
     /// from the interpreter side, so the value lands directly in
@@ -1713,6 +1717,21 @@ fn interpret_step<'a, 'b, 'c>(
     }
 }
 
+/// L1 caps internal operations at 65,535 (`raw_context.fresh_internal_nonce`):
+/// the first allocates nonce 0 and allocating nonce 65,535 fails with
+/// `Too_many_internal_operations`. Mirror that bound at production.
+const MAX_INTERNAL_OPERATIONS: u128 = 65_535;
+
+fn fresh_operation_counter<'a>(
+    ctx: &mut impl CtxTrait<'a>,
+) -> Result<u128, InterpretError<'a>> {
+    let counter = ctx.operation_counter();
+    if counter >= MAX_INTERNAL_OPERATIONS {
+        return Err(InterpretError::TooManyInternalOperations);
+    }
+    Ok(counter)
+}
+
 fn interpret_one<'a>(
     i: &Instruction<'a>,
     ctx: &mut impl CtxTrait<'a>,
@@ -3016,7 +3035,7 @@ fn interpret_one<'a>(
             let param = pop!();
             let mutez_amount = pop!(V::Mutez);
             let contract_address = pop!(V::Contract);
-            let counter = ctx.operation_counter();
+            let counter = fresh_operation_counter(ctx)?;
             ctx.gas().consume(interpret_cost::TRANSFER_TOKENS)?;
             stack.push(V::new_operation(
                 Operation::TransferTokens(TransferTokens {
@@ -3038,7 +3057,7 @@ fn interpret_one<'a>(
                     )),
                 })
                 .transpose()?;
-            let counter: u128 = ctx.operation_counter();
+            let counter = fresh_operation_counter(ctx)?;
             ctx.gas().consume(interpret_cost::SET_DELEGATE)?;
             stack.push(V::new_operation(
                 Operation::SetDelegate(SetDelegate(opt_keyhash)),
@@ -3327,7 +3346,7 @@ fn interpret_one<'a>(
             stack.push(TypedValue::Nat(ctx.total_voting_power()))
         }
         I::Emit { tag, arg_ty } => {
-            let counter: u128 = ctx.operation_counter();
+            let counter = fresh_operation_counter(ctx)?;
             let emit_val = pop!();
             ctx.gas().consume(interpret_cost::EMIT)?;
             stack.push(TypedValue::new_operation(
@@ -3385,7 +3404,7 @@ fn interpret_one<'a>(
         }
         I::CreateContract(cs, micheline) => {
             ctx.gas().consume(interpret_cost::CREATE_CONTRACT)?;
-            let counter: u128 = ctx.operation_counter();
+            let counter = fresh_operation_counter(ctx)?;
             let opt_keyhash = pop!(V::Option)
                 .map(|keyhash| match TypedValue::unwrap_rc(keyhash) {
                     V::KeyHash(k) => Ok(k),
@@ -6921,7 +6940,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&[TransferTokens], ctx, stk), Ok(()));
         assert_eq!(
             stk,
-            &stk![V::new_operation(Operation::TransferTokens(tt), 101)]
+            &stk![V::new_operation(Operation::TransferTokens(tt), 100)]
         );
         assert_eq!(
             start_milligas - ctx.gas().milligas().unwrap(),
@@ -6942,7 +6961,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&[I::SetDelegate], ctx, stk), Ok(()));
         assert_eq!(
             stk,
-            &stk![V::new_operation(Operation::SetDelegate(sd), 101)]
+            &stk![V::new_operation(Operation::SetDelegate(sd), 100)]
         );
         assert_eq!(
             start_milligas - ctx.gas().milligas().unwrap(),
@@ -6972,8 +6991,8 @@ mod interpreter_tests {
         assert_eq!(
             stk,
             &stk![
-                V::new_operation(Operation::SetDelegate(sd.clone()), 101),
-                V::new_operation(Operation::SetDelegate(sd), 102)
+                V::new_operation(Operation::SetDelegate(sd.clone()), 100),
+                V::new_operation(Operation::SetDelegate(sd), 101)
             ]
         );
     }
@@ -8241,7 +8260,7 @@ mod interpreter_tests {
                     value: TypedValue::nat(20),
                     arg_ty: Left(Type::Nat)
                 }),
-                101
+                100
             )]
         );
         assert_eq!(
@@ -8276,7 +8295,7 @@ mod interpreter_tests {
                     value: TypedValue::nat(20),
                     arg_ty: Or::Right(emit_type_mich)
                 }),
-                101
+                100
             )]
         );
         assert_eq!(
@@ -9427,7 +9446,7 @@ mod interpreter_tests {
                 micheline_code: &cs_mich,
                 address: ContractKt1Hash::try_from(expected_addr).unwrap(),
             }),
-            101,
+            100,
         );
         let mut stack = stk![
             TypedValue::Unit,
