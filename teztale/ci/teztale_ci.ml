@@ -141,10 +141,12 @@ let register () =
   Cacio.register_jobs
     Scheduled_test_release
     [
-      (* Explicitly include the build jobs so that they have trigger [Auto]. *)
+      (* The build jobs run to exercise them during the scheduled test release.
+         No manual job is registered here: it is not relevant to have manual
+         jobs in a pipeline that is triggered automatically on a schedule. The
+         release page is tested using test release tags instead. *)
       (Auto, job_build `release Amd64);
       (Auto, job_build `release Arm64);
-      (Manual, job_release_page `test `build_dependencies);
     ] ;
   CI.register_dedicated_release_pipeline
     [
