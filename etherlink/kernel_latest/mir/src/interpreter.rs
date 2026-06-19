@@ -6998,6 +6998,28 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn internal_operation_count_capped_like_l1() {
+        // L1 caps internal operations at 65535
+        // (raw_context.fresh_internal_nonce): nonce 65534 is the last one
+        // allocatable, allocating 65535 fails with Too_many_internal_operations.
+        let emit = Instruction::Emit {
+            tag: None,
+            arg_ty: Left(Type::Nat),
+        };
+        // Last nonce within the limit: succeeds.
+        let ctx = &mut Ctx::default();
+        ctx.set_operation_counter(MAX_INTERNAL_OPERATIONS - 1);
+        assert!(interpret(&[emit.clone()], ctx, &mut stk![V::nat(0)]).is_ok());
+        // Next allocation is over the limit: fails like L1.
+        let ctx = &mut Ctx::default();
+        ctx.set_operation_counter(MAX_INTERNAL_OPERATIONS);
+        assert_eq!(
+            interpret(&[emit], ctx, &mut stk![V::nat(0)]),
+            Err(InterpretError::TooManyInternalOperations)
+        );
+    }
+
+    #[test]
     fn self_instr_ep() {
         let mut stk = Stack::new();
         let ctx = &mut Ctx::default();
