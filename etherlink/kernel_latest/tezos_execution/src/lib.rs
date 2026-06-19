@@ -2208,7 +2208,12 @@ where
         next_temporary_id,
     };
     let parser = Parser::new();
-    let mut counter = 0u128;
+    // Block-cumulative internal-operation counter: the block's prior count
+    // (`internal_operations_base`) plus what this batch already produced
+    // (`nonce_counter`). The MIR cap fires at L1's 65,535 limit against this.
+    let mut counter = block_ctx
+        .internal_operations_base
+        .saturating_add(u128::from(*nonce_counter));
     let storage_limit = &validated_operation.content.storage_limit;
     let balance_updates = validated_operation.balance_updates;
     let receipt = match &validated_operation.content.operation {
@@ -2447,6 +2452,7 @@ mod tests {
                 level: &0u32.into(),
                 now: &0i64.into(),
                 chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+                internal_operations_base: 0,
             }
         };
     }

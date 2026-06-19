@@ -1073,6 +1073,9 @@ where
         level: &level,
         now: &now,
         chain_id,
+        internal_operations_base: crate::apply::count_internal_operations(
+            &block_in_progress.cumulative_tezos_operation_receipts.list,
+        ),
     };
 
     match operation.content {

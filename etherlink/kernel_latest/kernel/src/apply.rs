@@ -438,6 +438,32 @@ fn force_top_level_failed(receipt: &mut AppliedOperation) {
     }
 }
 
+/// Count the internal operations already recorded in a block's receipts.
+/// Used as the cumulative base for L1's per-block internal-operation cap on
+/// the operation path: the count mirrors exactly what [`renumber_nonces`]
+/// numbers. Cross-runtime (CRAC) and delayed-inbox sub-operations cap
+/// per-execution (base 0) and are not yet folded into this cumulative base;
+/// their internal-op counts are bounded by the triggering EVM gas.
+pub fn count_internal_operations(operations: &[AppliedOperation]) -> u128 {
+    let mut count: u128 = 0;
+    for op in operations {
+        let OperationDataAndMetadata::OperationWithMetadata(batch) = &op.op_and_receipt;
+        for op_with_meta in &batch.operations {
+            let internals = match &op_with_meta.receipt {
+                OperationResultSum::Transfer(result) => {
+                    &result.internal_operation_results
+                }
+                OperationResultSum::Origination(result) => {
+                    &result.internal_operation_results
+                }
+                OperationResultSum::Reveal(_) => continue,
+            };
+            count += internals.len() as u128;
+        }
+    }
+    count
+}
+
 /// Assign block-sequential nonces to all internal operations across
 /// all applied operations, matching Tezos L1 semantics where nonces
 /// are shared across all operations in a block and never reset.
@@ -1334,6 +1360,9 @@ where
                     now: &Timestamp::from(i64_timestamp),
                     // SAFETY: chain_id_bytes is defined as 32 bytes long.
                     chain_id: &ChainId::try_from_bytes(&chain_id_bytes[..4])?,
+                    // CRAC/delayed sub-operation: its internal ops are bounded
+                    // by EVM gas; the per-execution cap from base 0 applies.
+                    internal_operations_base: 0,
                 },
                 skip_signature_check,
                 None,
