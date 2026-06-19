@@ -2867,7 +2867,15 @@ fn interpret_one<'a>(
                     .ok()?;
                 crate::interpreter::typecheck_value(&mich, ctx, ty).ok()
             };
-            stack.push(V::new_option(try_unpack()));
+            let result = try_unpack();
+            // L1 charges Interp_costs.unpack_failed (minus the 0x05 tag) when a
+            // packed payload fails to decode or typecheck
+            // (script_interpreter_defs.ml `unpack`).
+            if result.is_none() && bytes.first() == Some(&0x05) {
+                ctx.gas()
+                    .consume(interpret_cost::unpack_failed(bytes.len() - 1)?)?;
+            }
+            stack.push(V::new_option(result));
         }
         I::CheckSignature => {
             let key = pop!(V::Key);
@@ -8846,6 +8854,46 @@ mod interpreter_tests {
         assert_eq!(interpret_one(&Unpack(Type::Int), ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::new_option(Some(V::int(-987654321)))]);
         assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
+    }
+
+    #[test]
+    fn unpack_failure_charges_size_dependent_penalty() {
+        // L2-1656: a failing UNPACK of a packed (0x05) payload must charge L1's
+        // size-dependent unpack_failed penalty before pushing None. Without the
+        // fix only the flat unpack + decode is charged, well below the penalty.
+        let check = |payload: Vec<u8>, ty: Type| {
+            let len = payload.len() - 1;
+            let ctx = &mut Ctx::default();
+            let before = ctx.gas().milligas().unwrap();
+            let mut stack = stk![V::Bytes(payload)];
+            assert_eq!(interpret_one(&Unpack(ty), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![V::new_option(None)]);
+            let consumed = before - ctx.gas().milligas().unwrap();
+            assert!(consumed >= interpret_cost::unpack_failed(len).unwrap());
+        };
+        // Typecheck failure: a packed int UNPACKed as `string` decodes but
+        // fails to typecheck.
+        check(hex::decode("0500f1a2f3ad07").unwrap(), Type::String);
+        // Binary-decode failure: 0x05 tag followed by an invalid Micheline tag.
+        check(hex::decode("05ffffffff").unwrap(), Type::Int);
+    }
+
+    #[test]
+    fn unpack_failure_without_pack_tag_charges_no_penalty() {
+        // L2-1656: the unpack_failed penalty is charged only for packed
+        // (0x05) payloads. A non-0x05 payload fails to unpack (no pack tag)
+        // and must NOT be charged the penalty, pinning the
+        // `bytes.first() == Some(&0x05)` guard.
+        let payload = hex::decode("00ffffffff").unwrap();
+        let ctx = &mut Ctx::default();
+        let before = ctx.gas().milligas().unwrap();
+        let mut stack = stk![V::Bytes(payload.clone())];
+        assert_eq!(interpret_one(&Unpack(Type::Int), ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::new_option(None)]);
+        let consumed = before - ctx.gas().milligas().unwrap();
+        // No penalty: consumed stays far below unpack_failed, which the guard
+        // would otherwise add for a payload of this size.
+        assert!(consumed < interpret_cost::unpack_failed(payload.len() - 1).unwrap());
     }
 
     /// L2-1377: `UNPACK address` must accept entrypoint bytes outside
