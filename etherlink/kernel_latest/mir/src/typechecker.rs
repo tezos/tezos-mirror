@@ -5076,6 +5076,12 @@ pub(crate) fn ensure_ty_eq(gas: &mut Gas, ty1: &Type, ty2: &Type) -> Result<(), 
 
 #[cfg(test)]
 mod typecheck_tests {
+    // These tests build deeply-nested Micheline trees in a `typed_arena`
+    // via `alloc_extend` with fixed-size iterators (exact size hint, no
+    // reentrancy). The crate's `disallowed_methods` lint flags
+    // `alloc_extend` for production panic-safety, which does not apply to
+    // these test-only allocations.
+    #![allow(clippy::disallowed_methods)]
     use super::{Lambda, Or};
     use crate::ast::big_map::LazyStorage;
     use crate::ast::michelson_address as addr;

@@ -3349,6 +3349,7 @@ fn get_nth_field_ref<'a, 'b>(
 ///     (`n=0` is the whole comb, `n=2` is `Pair(f1, ...)`, etc.)
 ///   - odd  `n`: the field at depth `(n-1)/2`
 ///     (`n=1` is `f0`, `n=3` is `f1`, etc.)
+///
 /// Descending into the right child consumes two indices at once: the
 /// "suffix at this level" (even) and the "field at this level" (odd),
 /// hence `m -= 2`.

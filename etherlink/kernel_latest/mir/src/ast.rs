@@ -86,16 +86,19 @@ impl<T> PairBox<T> {
             inner: Some(Rc::new((l, r))),
         }
     }
+    /// Take the Rc out, leaving `None`. Used by the iterative drop.
+    fn take(&mut self) -> Option<Rc<(T, T)>> {
+        self.inner.take()
+    }
+}
+
+impl<T> AsRef<(T, T)> for PairBox<T> {
     /// View the inner pair.
-    pub fn as_ref(&self) -> &(T, T) {
+    fn as_ref(&self) -> &(T, T) {
         self.inner
             .as_ref()
             .expect("PairBox always Some outside iterative Drop")
             .as_ref()
-    }
-    /// Take the Rc out, leaving `None`. Used by the iterative drop.
-    fn take(&mut self) -> Option<Rc<(T, T)>> {
-        self.inner.take()
     }
 }
 
@@ -151,13 +154,6 @@ impl<T> SingleBox<T> {
     pub fn from_rc(rc: Rc<T>) -> Self {
         SingleBox { inner: Some(rc) }
     }
-    /// View the inner value.
-    pub fn as_ref(&self) -> &T {
-        self.inner
-            .as_ref()
-            .expect("SingleBox always Some outside iterative Drop")
-            .as_ref()
-    }
     /// Clone the inner Rc (cheap, just bumps refcount).
     pub fn clone_rc(&self) -> Rc<T> {
         Rc::clone(
@@ -169,6 +165,16 @@ impl<T> SingleBox<T> {
     /// Take the Rc out, leaving `None`. Used by the iterative drop.
     fn take(&mut self) -> Option<Rc<T>> {
         self.inner.take()
+    }
+}
+
+impl<T> AsRef<T> for SingleBox<T> {
+    /// View the inner value.
+    fn as_ref(&self) -> &T {
+        self.inner
+            .as_ref()
+            .expect("SingleBox always Some outside iterative Drop")
+            .as_ref()
     }
 }
 

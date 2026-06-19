@@ -145,7 +145,7 @@ fn open_len(out: &mut Vec<u8>) -> Range<usize> {
 
 /// Patch a length placeholder with the byte distance from the placeholder
 /// to the current write head.
-fn patch_len(out: &mut Vec<u8>, len_place: Range<usize>) {
+fn patch_len(out: &mut [u8], len_place: Range<usize>) {
     let len = (out.len() - len_place.end) as Len;
     out[len_place].copy_from_slice(&len.to_be_bytes());
 }
@@ -282,6 +282,10 @@ impl Micheline<'_> {
 
 #[cfg(test)]
 mod test_encoding {
+    // Tests build deeply-nested Micheline in a `typed_arena` via
+    // `alloc_extend` with fixed-size iterators (safe); the crate's
+    // `disallowed_methods` lint targets production panic-safety only.
+    #![allow(clippy::disallowed_methods)]
     use super::*;
 
     #[track_caller]

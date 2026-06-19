@@ -205,7 +205,7 @@ fn read_prim(bytes: &mut BytesIt) -> Result<Prim, DecodeError> {
         return Err(DecodeError::UnknownPrim(p));
     }
     // SAFETY: Prim is repr(u8) and the value is within bounds.
-    Ok(unsafe { std::mem::transmute(p) })
+    Ok(unsafe { std::mem::transmute::<u8, Prim>(p) })
 }
 
 /// Parse a length prefixed annotation block. Always returns owned

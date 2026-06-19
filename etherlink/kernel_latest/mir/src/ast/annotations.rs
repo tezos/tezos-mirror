@@ -47,6 +47,13 @@ impl Annotation<'_> {
             Annotation::Type(s) => 1 + s.as_ref().len(),
         }
     }
+
+    /// Whether the annotation is empty. Only a special annotation with an
+    /// empty body can be empty; field, variable, and type annotations always
+    /// include their leading symbol.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl std::fmt::Display for Annotation<'_> {

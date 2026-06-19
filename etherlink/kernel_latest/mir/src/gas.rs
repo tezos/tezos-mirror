@@ -538,8 +538,8 @@ pub mod interpret_cost {
     /// interpreter does not materialize a fresh sub-stack per `Apply`
     /// invocation — the OCaml runtime stack absorbs the inner frame
     /// under TCE. MIR allocates a `Vec<Rc<TypedValue>>` per push
-    /// (`Vec` header + initial allocation + initial entries: lambda
-    /// + arg for `EXEC`, view arg for `VIEW`), so the host-memory
+    /// (`Vec` header + initial allocation + initial entries: lambda +
+    /// arg for `EXEC`, view arg for `VIEW`), so the host-memory
     /// footprint per push is ~5 × that of a bare [`FRAME_PUSH`];
     /// `STACK_PUSH` is sized accordingly. Pushed only by `OpenExec`
     /// / `OpenView` in `handle_step`, so on a divergent recursive
