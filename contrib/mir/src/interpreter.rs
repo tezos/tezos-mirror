@@ -5451,6 +5451,24 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn compare_signature_same_bytes_distinct_variant() {
+        use crate::ast::Signature;
+        let edsig = Signature::from_base58_check(
+            "edsigtj8LhbJ2B3qhZvqzA49raG65dydFcWZW9b9L7ntF3bb29zxaBFFL8SM1jeBUY66hG122znyVA4wpzLdwxcNZwSK3Szu7iD",
+        )
+        .unwrap();
+        let unknown = Signature::try_from(
+            hex::decode("568722d9942f516ab369e7803b5646775459ef93080842400354cb638800861bb051509fcef5ad6940ba38af3697d09f1be5be829b8f6f50610ef28606755d0e")
+                .unwrap(),
+        )
+        .unwrap();
+        let mut stack = stk![V::Signature(edsig), V::Signature(unknown)];
+        let mut ctx = Ctx::default();
+        assert!(interpret(&[Compare], &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, stk![V::int(0)]);
+    }
+
+    #[test]
     fn amount() {
         let mut stack = Stack::new();
         let mut ctx = Ctx::default();

@@ -1,0 +1,3 @@
+code { COMPARE } ;
+input { Stack_elt signature "edsigtj8LhbJ2B3qhZvqzA49raG65dydFcWZW9b9L7ntF3bb29zxaBFFL8SM1jeBUY66hG122znyVA4wpzLdwxcNZwSK3Szu7iD" ; Stack_elt signature "sigZJsaY57u7efWjrh22JfcxoZs9YKdsgumuPbPStG3Fa4rB1ygMLF3P76h3ZgScvLpTYR5HC8KSz4FYbkJU2bkPEwZERYJo" } ;
+output { Stack_elt int 0 }

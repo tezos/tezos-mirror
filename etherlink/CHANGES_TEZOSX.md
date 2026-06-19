@@ -102,6 +102,13 @@
   Previously the Michelson runtime typechecker accepted such scripts,
   diverging from L1 and producing closure storage that failed to reload
   on the next call. (!22248)
+- Michelson `signature` values are now compared and hashed by their raw
+  bytes, matching L1 (`Signature.compare` over `to_bytes`). Previously the
+  ordering keyed on the signature variant first, so the same bytes read as
+  an `edsig...` literal and as optimized bytes ranked as distinct values;
+  the Michelson runtime then accepted a `set signature` that L1 rejects as
+  a duplicate, with divergence on `COMPARE`, set/map validation and storage
+  round-trips. (!22244)
 - The `VIEW` instruction now gates execution on two type-equality checks,
   matching L1: the callee view's declared output type must equal the
   caller-requested return type, and the caller's argument type must equal
