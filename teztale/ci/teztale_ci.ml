@@ -68,6 +68,7 @@ let job_release_page =
     ~__POS__
     ~image:Tezos_ci.Images.CI.release_page
     ~stage:Publish
+    ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:
       "Update the Teztale release page. If running in a test pipeline, the \
        assets are pushed in the [release-page-test.nomadic-labs.com] bucket. \

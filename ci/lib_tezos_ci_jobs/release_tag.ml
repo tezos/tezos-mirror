@@ -204,6 +204,7 @@ let job_release_page =
     ~__POS__
     ~image:Images.CI.release_page
     ~stage:Publish
+    ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:
       "A job to update the Octez release page. If running in a test pipleine, \
        the assets are pushed in the [release-page-test.nomadic-labs.com] \
