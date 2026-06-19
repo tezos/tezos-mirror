@@ -1,10 +1,16 @@
+# check=skip=InvalidDefaultArgInFrom,SecretsUsedInArgOrEnv
+# Note: `check=skip` is file-global (BuildKit cannot scope it per line). It
+# suppresses InvalidDefaultArgInFrom (the `FROM ${BASE_IMAGE}/...` ARGs are
+# always supplied at build time) and the SecretsUsedInArgOrEnv false positive on
+# `ARG SCCACHE_GCS_KEY_PREFIX` (a path prefix, not a secret). A genuinely bad
+# FROM or a real secret in ARG/ENV added later will therefore not be flagged.
 ARG BASE_IMAGE
 ARG BASE_IMAGE_VERSION
 ARG RUST_TOOLCHAIN_IMAGE_NAME
 ARG RUST_TOOLCHAIN_IMAGE_TAG
 
 # hadolint ignore=DL3006
-FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} as without-evm-artifacts
+FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} AS without-evm-artifacts
 # use alpine /bin/ash and set pipefail.
 # see https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
@@ -132,7 +138,7 @@ RUN --network=host \
 
 # We move the EVM kernel in the final image in a dedicated stage to parallelize
 # the two builder stages.
-FROM without-evm-artifacts as with-evm-artifacts
+FROM without-evm-artifacts AS with-evm-artifacts
 COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_installer.wasm evm_kernel
 COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/_evm_installer_preimages/ evm_kernel/_evm_installer_preimages
 COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_benchmark_kernel.wasm evm_kernel
