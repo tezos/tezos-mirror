@@ -8856,6 +8856,28 @@ mod interpreter_tests {
         assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
     }
 
+    #[test]
+    fn unpack_failure_charges_size_dependent_penalty() {
+        // L2-1656: a failing UNPACK of a packed (0x05) payload must charge L1's
+        // size-dependent unpack_failed penalty before pushing None. Without the
+        // fix only the flat unpack + decode is charged, well below the penalty.
+        let check = |payload: Vec<u8>, ty: Type| {
+            let len = payload.len() - 1;
+            let ctx = &mut Ctx::default();
+            let before = ctx.gas().milligas().unwrap();
+            let mut stack = stk![V::Bytes(payload)];
+            assert_eq!(interpret_one(&Unpack(ty), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![V::new_option(None)]);
+            let consumed = before - ctx.gas().milligas().unwrap();
+            assert!(consumed >= interpret_cost::unpack_failed(len).unwrap());
+        };
+        // Typecheck failure: a packed int UNPACKed as `string` decodes but
+        // fails to typecheck.
+        check(hex::decode("0500f1a2f3ad07").unwrap(), Type::String);
+        // Binary-decode failure: 0x05 tag followed by an invalid Micheline tag.
+        check(hex::decode("05ffffffff").unwrap(), Type::Int);
+    }
+
     /// L2-1377: `UNPACK address` must accept entrypoint bytes outside
     /// the Michelson script-source charset, matching Tezos L1. Each
     /// payload below is the optimized PACK of a `tz1...%<ep>` address:
