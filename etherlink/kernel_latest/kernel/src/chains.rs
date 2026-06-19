@@ -44,10 +44,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
 
 use tezos_execution::{
-    context::{self, Context as _},
-    get_required_da_fees,
-    mir_ctx::BlockCtx,
-    FeeRefundConfig, ProcessedOperation,
+    get_required_da_fees, mir_ctx::BlockCtx, FeeRefundConfig, ProcessedOperation,
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
@@ -67,7 +64,6 @@ use tezosx_journal::TezosXJournal;
 
 use crate::apply::push_withdrawals_to_outbox;
 use revm_etherlink::journal::commit_evm_journal_from_external;
-use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 pub use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
@@ -525,7 +521,7 @@ impl TransactionTrait for TezosXTransaction {
 pub struct TezosXBlockConstants {
     pub evm_runtime_block_constants: tezos_ethereum::block::BlockConstants,
     #[allow(dead_code)]
-    pub michelson_runtime_block_constants: TezlinkBlockConstants<TezosRuntimeContext>,
+    pub michelson_runtime_block_constants: TezlinkBlockConstants,
 }
 
 fn read_or_init_michelson_to_evm_gas_multiplier(host: &mut impl StorageV1) -> u64 {
@@ -567,7 +563,6 @@ impl ChainConfigTrait for TezosXChainConfig {
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
         let level: BlockNumber = block_in_progress.number.try_into()?;
-        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
         let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
             .map_err(|_| crate::Error::InvalidConversion)?;
         let michelson_to_evm_gas_multiplier =
@@ -588,7 +583,6 @@ impl ChainConfigTrait for TezosXChainConfig {
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level,
-                context,
                 da_fee_per_byte_mutez,
                 michelson_to_evm_gas_multiplier,
                 safe_roots,
@@ -961,9 +955,8 @@ fn tezos_operation_from_bytes(bytes: &[u8]) -> anyhow::Result<TezlinkOperation> 
     })
 }
 
-pub struct TezlinkBlockConstants<Context: context::Context> {
+pub struct TezlinkBlockConstants {
     pub level: BlockNumber,
-    pub context: Context,
     /// DA fee per byte in mutez, read once at block start from durable storage.
     /// When `disable_da_fees` is set, this is 0.
     pub da_fee_per_byte_mutez: u64,
@@ -1148,7 +1141,7 @@ pub fn apply_tezos_operation<Host>(
     block_in_progress: &BlockInProgress,
     host: &mut Host,
     registry: &impl Registry,
-    block_constants: &TezlinkBlockConstants<impl context::Context>,
+    block_constants: &TezlinkBlockConstants,
     operation: TezlinkOperation,
     sequencer_pool_address: Option<H160>,
     skip_signature_check: bool,
@@ -1166,8 +1159,6 @@ pub fn apply_tezos_operation<Host>(
 where
     Host: StorageV1,
 {
-    let context = &block_constants.context;
-
     let level = block_constants.level;
     let now = block_in_progress.timestamp;
     let block_ctx = BlockCtx {
@@ -1224,7 +1215,6 @@ where
                 host,
                 registry,
                 journal,
-                context,
                 hash.clone(),
                 operation,
                 &block_ctx,
@@ -1296,7 +1286,7 @@ where
         TezlinkContent::Deposit(deposit) => {
             log!(Debug, "Execute Tezlink deposit: {deposit:?}");
 
-            let deposit_result = execute_tezlink_deposit(host, context, &deposit)?;
+            let deposit_result = execute_tezlink_deposit(host, &deposit)?;
 
             let source = PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
 

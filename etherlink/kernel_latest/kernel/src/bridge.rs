@@ -30,7 +30,6 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::{log, Level::Error, Level::Info};
 use tezos_execution::account_storage::{TezlinkAccount, TezosImplicitAccountTrait};
-use tezos_execution::context::Context;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -607,17 +606,15 @@ where
 
 pub const TEZLINK_DEPOSITOR: [u8; 22] = [0u8; 22];
 
-fn tezlink_deposit<Host, C: Context>(
+fn tezlink_deposit<Host>(
     host: &mut Host,
-    context: &C,
     amount: u64,
     receiver: Contract,
 ) -> Result<TransferSuccess, TransferError>
 where
     Host: StorageV1,
 {
-    let to_account = context
-        .implicit_from_contract(&receiver)
+    let to_account = tezos_execution::context::implicit_from_contract(&receiver)
         .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
 
     let _was_allocated = to_account
@@ -641,14 +638,15 @@ where
 
 type TezlinkOutcome = (ContentResult<TransferContent>, TransferContent);
 
-pub fn execute_tezlink_deposit<Host, C: Context>(
+pub fn execute_tezlink_deposit<Host>(
     host: &mut Host,
-    context: &C,
     deposit: &Deposit,
 ) -> Result<DepositResult<TezlinkOutcome>, BridgeError>
 where
     Host: StorageV1,
 {
+    // Deposits only resolve implicit accounts (whose path is derived from the
+    // pkh), so the Tezos accounts root is not consulted here.
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
     let receiver = deposit.receiver.to_contract()?;
@@ -662,7 +660,7 @@ where
         parameters: Parameters::default(),
     };
 
-    let result = match tezlink_deposit(host, context, amount, receiver) {
+    let result = match tezlink_deposit(host, amount, receiver) {
         Ok(success) => ContentResult::Applied(TransferTarget::ToContrat(success)),
         Err(err) => ContentResult::Failed(ApplyOperationErrors {
             errors: vec![err.into()],

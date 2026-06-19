@@ -161,17 +161,13 @@ fn f64_to_u64(f: F64) -> u64 {
 mod test {
     use super::*;
     use crate::block_in_progress::BlockInProgress;
-    use crate::chains::{
-        TezlinkBlockConstants, TezosXBlockConstants, TEZOS_ACCOUNTS_ROOT,
-    };
+    use crate::chains::{TezlinkBlockConstants, TezosXBlockConstants};
     use primitive_types::H160;
     use proptest::prelude::*;
     use std::collections::VecDeque;
     use tezos_ethereum::block::BlockConstants;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_execution::context::Context;
     use tezos_smart_rollup_host::storage::StorageV1;
-    use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
     proptest! {
         #[test]
@@ -214,7 +210,6 @@ mod test {
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level: 0.into(),
-                context: TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap(),
                 da_fee_per_byte_mutez: 0,
                 michelson_to_evm_gas_multiplier: 0,
                 safe_roots: vec![],

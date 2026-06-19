@@ -14,7 +14,7 @@ use crate::{
     block::bip_from_blueprint,
     blueprint::Blueprint,
     blueprint_storage::read_current_blueprint_header,
-    chains::{self, ChainConfigTrait, TezosXChainConfig, TEZOS_ACCOUNTS_ROOT},
+    chains::{self, ChainConfigTrait, TezosXChainConfig},
     configuration::fetch_tezosx_configuration,
     delayed_inbox::DelayedInbox,
     sub_block,
@@ -32,10 +32,8 @@ use tezos_ethereum::rlp_helpers::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
-use tezos_execution::context::Context as _;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
-use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 #[cfg(target_arch = "wasm32")]
 use tezos_smart_rollup_core::rollup_host::RollupHost;
@@ -489,25 +487,14 @@ fn handle_query_entrypoints_to<Host, R>(
         }
     };
     // This entrypoint is only used in the context of the Tezos X Michelson runtime.
-    let context = match TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT) {
-        Ok(c) => c,
-        Err(err) => {
-            log!(Error, "Tezos X entrypoints: context error: {:?}", err);
-            return;
-        }
-    };
     // RPC inspection path: no on-chain operation gas to bill against.
     // Gas::default() is the L1 max per op, but the L2 per-op cap depends
     // on the conversion coefficient and is currently larger, so default
     // would reject RPC calls that would succeed in an operation. Use
     // Gas::unmetered() instead.
-    let entrypoints = tezos_execution::get_contract_entrypoint(
-        &*host,
-        &context,
-        &address,
-        &mut Gas::unmetered(),
-    );
-    let views = tezos_execution::get_enshrined_contract_views(&*host, &context, &address)
+    let entrypoints =
+        tezos_execution::get_contract_entrypoint(&*host, &address, &mut Gas::unmetered());
+    let views = tezos_execution::get_enshrined_contract_views(&*host, &address)
         .unwrap_or_default();
     let result = match encode_entrypoints_result(entrypoints, views) {
         Ok(bytes) => bytes,

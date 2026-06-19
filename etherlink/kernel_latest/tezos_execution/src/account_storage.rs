@@ -6,10 +6,8 @@
 
 //! Tezos account state and storage
 
-use crate::{
-    context,
-    enshrined_contracts::{self, EnshrinedContracts},
-};
+use crate::context::{self, account, code};
+use crate::enshrined_contracts::{self, EnshrinedContracts};
 use num_bigint::BigInt;
 use primitive_types::U256;
 use rlp::{Decodable, Encodable, Rlp};
@@ -34,6 +32,18 @@ use tezos_storage::{
     read_optional_nom_value_bounded_with_len, store_bin,
 };
 use tezosx_interfaces::{Origin, TezosXRuntimeError};
+
+/// Sibling path that holds the classification record of an originated KT1
+/// account: the segment is appended to the account prefix and the resulting
+/// path lives next to the rest of the account state. Implicit accounts carry
+/// no `/origin` record: a tz1/2/3 is Tezos-native by construction (see
+/// [`crate::context::read_origin_for_address`]), so only KT1 accounts
+/// (which may be `Native` or an `Alias` forwarder) store a classification.
+pub use crate::context::code::ORIGIN_PATH;
+
+// Path where all the infos of a Tezos contract are stored under the same key.
+// This path must contains balance, nonce and optionally a revealed public key.
+const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
 /// Upper bound, in bytes, on a `Narith`-encoded balance or counter.
 /// Both hold values that fit in a `u64` in practice — balance is bounded
@@ -88,7 +98,7 @@ pub trait TezlinkAccount {
         &self,
         host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = context::account::balance_path(self)?;
+        let path = account::balance_path(self)?;
         Ok(
             read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
                 .unwrap_or(0_u64.into()),
@@ -101,7 +111,7 @@ pub trait TezlinkAccount {
         host: &mut impl StorageV1,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = context::account::balance_path(self)?;
+        let path = account::balance_path(self)?;
         store_bin(balance, host, &path)
     }
 
@@ -125,22 +135,6 @@ pub trait TezlinkAccount {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct TezlinkImplicitAccount {
-    pub(crate) path: OwnedPath,
-    pub(crate) pkh: PublicKeyHash,
-}
-
-impl TezlinkAccount for TezlinkImplicitAccount {
-    #[inline]
-    fn path(&self) -> &OwnedPath {
-        &self.path
-    }
-    fn contract(&self) -> Contract {
-        Contract::Implicit(self.pkh.clone())
-    }
-}
-
 pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
     fn pkh(&self) -> &PublicKeyHash;
 
@@ -149,7 +143,7 @@ pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
         &self,
         host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = context::account::counter_path(self)?;
+        let path = account::counter_path(self)?;
         Ok(
             read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
                 .unwrap_or(0_u64.into()),
@@ -162,7 +156,7 @@ pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
         host: &mut impl StorageV1,
         counter: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = context::account::counter_path(self)?;
+        let path = account::counter_path(self)?;
         store_bin(counter, host, &path)
     }
 
@@ -182,7 +176,7 @@ pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
         &self,
         host: &impl StorageV1,
     ) -> Result<Manager, tezos_storage::error::Error> {
-        let path = context::account::manager_path(self)?;
+        let path = account::manager_path(self)?;
         let manager: Manager = read_nom_value_bounded(host, &path, MANAGER_MAX_BYTES)?;
         Ok(manager)
     }
@@ -202,7 +196,7 @@ pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
         host: &mut impl StorageV1,
         public_key_hash: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = context::account::manager_path(self)?;
+        let path = account::manager_path(self)?;
         // The tag for public key hash is 0 (see the Manager enum above)
         let mut buffer = vec![0_u8];
         public_key_hash
@@ -231,7 +225,7 @@ pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
         host: &mut impl StorageV1,
         public_key: &PublicKey,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = context::account::manager_path(self)?;
+        let path = account::manager_path(self)?;
         // The tag for public key is 2 (see the Manager enum above)
         let mut buffer = vec![2_u8];
         public_key
@@ -264,14 +258,8 @@ pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
         &self,
         host: &impl StorageV1,
     ) -> Result<bool, tezos_storage::error::Error> {
-        let path = context::account::balance_path(self)?;
+        let path = account::balance_path(self)?;
         Ok(Some(ValueType::Value) == host.store_has(&path)?)
-    }
-}
-
-impl TezosImplicitAccountTrait for TezlinkImplicitAccount {
-    fn pkh(&self) -> &PublicKeyHash {
-        &self.pkh
     }
 }
 
@@ -355,7 +343,7 @@ impl From<BigInt> for StorageDelta {
 }
 
 /// Aggregated storage-accounting record for an originated contract,
-/// persisted at [context::code::info_path]. It bundles the four small
+/// persisted at [code::info_path]. It bundles the four small
 /// counters (`code_size`, `storage_size`, `used_bytes`, `paid_bytes`) into
 /// a single value, so the whole accounting state is read and written with a
 /// single host call. The code and storage *blobs* (`/data/code`,
@@ -465,7 +453,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         if let Some(c) = enshrined_contracts::from_kt1(self.kt1()) {
             return Ok(Code::Enshrined(c));
         }
-        let code_path = context::code::code_path(self)?;
+        let code_path = code::code_path(self)?;
         match host.store_read_all(&code_path) {
             Ok(code) => Ok(Code::Code(code)),
             // A KT1 with no `/data/code` is either a Tezos X alias — whose
@@ -501,15 +489,15 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// path. `None` when the account carries no classification.
     ///
     /// This is the same decode as [`get_origin_at`] /
-    /// `Context::read_origin_for_address`, kept here because `tezos_execution`
-    /// sits below those: if the on-disk `Origin` encoding ever changes, all of
-    /// them move together. `read_optional_nom_value` already maps a missing
-    /// path to `None` and rejects incomplete / trailing bytes.
+    /// [`crate::context::read_origin_for_address`]: if the on-disk `Origin`
+    /// encoding ever changes, all of them move together.
+    /// `read_optional_nom_value` already maps a missing path to `None` and
+    /// rejects incomplete / trailing bytes.
     fn origin(
         &self,
         host: &impl StorageV1,
     ) -> Result<Option<Origin>, tezos_storage::error::Error> {
-        read_optional_nom_value(host, &context::code::origin_path(self)?)
+        read_optional_nom_value(host, &code::origin_path(self)?)
     }
 
     /// Whether this originated account is a Tezos X alias (classified
@@ -535,7 +523,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(true);
         }
-        let code_path = context::code::code_path(self)?;
+        let code_path = code::code_path(self)?;
         if Some(ValueType::Value) == host.store_has(&code_path)? {
             return Ok(true);
         }
@@ -564,7 +552,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         &self,
         host: &impl StorageV1,
     ) -> Result<(OriginatedContractInfo, u64), tezos_storage::error::Error> {
-        let info_path = context::code::info_path(self)?;
+        let info_path = code::info_path(self)?;
         Ok(
             read_optional_nom_value_bounded_with_len(host, &info_path, INFO_MAX_BYTES)?
                 .map_or_else(
@@ -590,7 +578,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         host: &mut impl StorageV1,
         info: &OriginatedContractInfo,
     ) -> Result<(), tezos_storage::error::Error> {
-        let info_path = context::code::info_path(self)?;
+        let info_path = code::info_path(self)?;
         store_bin(info, host, &info_path)
     }
 
@@ -604,7 +592,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         host: &mut impl StorageV1,
         data: &[u8],
     ) -> Result<Zarith, tezos_storage::error::Error> {
-        let path = context::code::code_path(self)?;
+        let path = code::code_path(self)?;
         host.store_write_all(&path, data)?;
         let code_size = data.len() as u64;
         let mut info = self.read_info(host)?;
@@ -620,7 +608,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(vec![]);
         }
-        let storage_path = context::code::storage_path(self)?;
+        let storage_path = code::storage_path(self)?;
         let storage = host.store_read_all(&storage_path)?;
         Ok(storage)
     }
@@ -679,7 +667,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(0.into());
         }
-        let path = context::code::storage_path(self)?;
+        let path = code::storage_path(self)?;
         host.store_write_all(&path, data)?;
         let mut info = self.read_info(host)?;
         let new_storage_size = data.len() as u64;
@@ -721,13 +709,13 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         // charged per alias.
         let code_size = match code {
             Some(code) => {
-                let code_path = context::code::code_path(self)?;
+                let code_path = code::code_path(self)?;
                 host.store_write_all(&code_path, code)?;
                 code.len() as u64
             }
             None => 0,
         };
-        let storage_path = context::code::storage_path(self)?;
+        let storage_path = code::storage_path(self)?;
         host.store_write_all(&storage_path, storage)?;
         let storage_size = storage.len() as u64;
         let info = OriginatedContractInfo::for_new_contract(
@@ -805,7 +793,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(());
         }
-        let path = context::code::storage_path(self)?;
+        let path = code::storage_path(self)?;
         host.store_write_all(&path, data)?;
         self.write_info(host, info)
     }
@@ -891,32 +879,16 @@ impl Decodable for TezosAccountInfo {
     }
 }
 
-// Path where Tezos accounts are stored.
-pub(crate) const TEZOS_ACCOUNTS_PATH: RefPath =
-    RefPath::assert_from(b"/tez/tez_accounts/tezosx");
-
-// Path where all the infos of a Tezos contract are stored under the same key.
-// This path must contains balance, nonce and optionally a revealed public key.
-const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
-
-/// Sibling path that holds the classification record of an originated KT1
-/// account: the segment is appended to the account prefix and the resulting
-/// path lives next to the rest of the account state. Implicit accounts carry
-/// no `/origin` record: a tz1/2/3 is Tezos-native by construction (see
-/// [`crate::context`]), so only KT1 accounts (which may be `Native` or an
-/// `Alias` forwarder) store a classification.
-pub use crate::context::code::ORIGIN_PATH;
-
 /// Path of the durable storage subtree for an implicit account. The
 /// info RLP record sits under this prefix at the info segment; the
 /// classification record sits at the origin segment.
 pub fn path_to_implicit_account_prefix(
     pub_key_hash: &PublicKeyHash,
 ) -> Result<OwnedPath, TezosXRuntimeError> {
-    let address_path: Vec<u8> = format!("/{pub_key_hash}").into();
+    let address_path: Vec<u8> = format!("/tezosx/{pub_key_hash}").into();
     let address_path = OwnedPath::try_from(address_path)
         .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-    Ok(concat(&TEZOS_ACCOUNTS_PATH, &address_path)?)
+    Ok(concat(&context::TEZOS_ACCOUNTS_ROOT, &address_path)?)
 }
 
 pub fn path_to_tezos_account(
@@ -1005,8 +977,8 @@ pub fn set_origin_at(
 }
 
 pub struct TezosImplicitAccount {
-    pub pkh: PublicKeyHash,
-    pub path: OwnedPath,
+    pub(crate) pkh: PublicKeyHash,
+    pub(crate) path: OwnedPath,
 }
 
 impl TezlinkAccount for TezosImplicitAccount {
@@ -1218,76 +1190,72 @@ mod tests {
 
 #[cfg(test)]
 mod test {
-    use crate::context::Context;
-
     use super::*;
+    use crate::account_storage::{
+        narith_to_u256, set_tezos_account_info, TezosAccountInfo, TezosImplicitAccount,
+    };
+    use crate::context::{
+        implicit_from_contract, implicit_from_public_key_hash, originated_from_contract,
+    };
+    use primitive_types::U256;
     use tezos_crypto_rs::PublicKeyWithHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup_host::path::concat;
-    use tezos_smart_rollup_host::path::Path;
-    use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
+
+    /// Build the live implicit account for `pkh` (RLP `/info` layout).
+    fn implicit(pkh: &PublicKeyHash) -> TezosImplicitAccount {
+        implicit_from_public_key_hash(pkh).expect("implicit account resolution")
+    }
+
+    /// Build the live implicit account for an implicit `contract`.
+    fn implicit_of(contract: &Contract) -> TezosImplicitAccount {
+        implicit_from_contract(contract).expect("implicit account resolution")
+    }
+
+    /// Build the originated account for `contract` under the test root.
+    fn originated(contract: &Contract) -> TezlinkOriginatedAccount {
+        originated_from_contract(contract).expect("originated account resolution")
+    }
 
     /// obtained by `octez-client show address bootstrap1` in mockup mode
     const BOOTSTRAP1_PKH: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
     const BOOTSTRAP1_PK: &str = "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
     const KT1: &str = "KT1QbKzQAyJtzprfvUJZv8VGqwQNch2o89di";
 
-    /// obtained by `octez-codec encode alpha.contract from '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'`
-    const BOOTSTRAP1_CONTRACT: RefPath =
-        RefPath::assert_from(b"/000002298c03ed7d454a101eb7022bc95f7e5f41ac78");
-
-    /// obtained by `PublicKey::from_b58check("edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav")`
-    const BOOTSTRAP1_PUBLIC_KEY_HEX: &str =
-        "02004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f";
-
-    /// Set a key of bootstrap1 account according to the structure of a Tezos context
-    /// We don't use function from [TezlinkImplicitAccount] on purpose to verify that
-    /// it reads at the right path
-    fn set_bootstrap1_key(
+    /// Seed the live RLP `/info` record for `pkh` directly via the durable
+    /// storage helper, bypassing the account API, so the read tests below
+    /// verify that the account reads from the right path / layout.
+    fn seed_account_info(
         host: &mut impl StorageV1,
-        value_path: &impl Path,
-        value: &[u8],
+        pkh: &PublicKeyHash,
+        info: TezosAccountInfo,
     ) {
-        let index = RefPath::assert_from(b"/tez/tez_accounts/contracts/index");
-        let contract = concat(&index, &BOOTSTRAP1_CONTRACT)
-            .expect("Concatenation should have succeeded");
-        let contract_path =
-            concat(&contract, value_path).expect("Concatenation should have succeeded");
-        host.store_write_all(&contract_path, value).unwrap();
+        set_tezos_account_info(host, pkh, info)
+            .expect("seeding the account info should succeed");
     }
 
-    // Read test use hard coded path on purpose to verify the Tezos compatibility.
-    // These paths comes from the context.json generated by the create mockup command
-    // of octez-client.
+    // Read tests seed the live RLP `/info` record directly (not through the
+    // account API) to verify the account reads at the right path / layout.
     #[test]
     fn test_read_balance() {
         let mut host = MockKernelHost::default();
 
         let balance: Narith = 2944_u64.into();
-        // octez-codec decode alpha.contract from '000002298c03ed7d454a101eb7022bc95f7e5f41ac78'
-        // Result: "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-        let path = RefPath::assert_from(b"/tez/tez_accounts/contracts/index/000002298c03ed7d454a101eb7022bc95f7e5f41ac78/balance");
-        store_bin(&balance, &mut host, &path)
-            .expect("Store balance should have succeeded");
 
-        let mut balance_array = vec![];
-        balance.bin_write(&mut balance_array).unwrap();
-        set_bootstrap1_key(
+        let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
+            .expect("PublicKeyHash base58 conversion should succeeded");
+
+        seed_account_info(
             &mut host,
-            &RefPath::assert_from(b"/balance"),
-            &balance_array,
+            &pkh,
+            TezosAccountInfo {
+                balance: narith_to_u256(&balance).unwrap(),
+                nonce: 0,
+                pub_key: None,
+            },
         );
 
-        // Initialize path for Tezlink context at /tez/tez_accounts
-        let context = context::TezlinkContext::init_context();
-
-        let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
-            .expect("Contract base58 conversion should succeeded");
-
-        let account = context
-            .implicit_from_contract(&contract)
-            .expect("Account creation should have succeeded");
+        let account = implicit(&pkh);
 
         let read_balance = account
             .balance(&host)
@@ -1302,19 +1270,20 @@ mod test {
 
         let counter: Narith = 3u64.into();
 
-        let mut bytes = vec![];
-        counter.bin_write(&mut bytes).unwrap();
-        set_bootstrap1_key(&mut host, &RefPath::assert_from(b"/counter"), &bytes);
+        let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
+            .expect("PublicKeyHash base58 conversion should succeeded");
 
-        // Initialize path for Tezlink context at /tez/tez_accounts
-        let context = context::TezlinkContext::init_context();
+        seed_account_info(
+            &mut host,
+            &pkh,
+            TezosAccountInfo {
+                balance: U256::zero(),
+                nonce: 3,
+                pub_key: None,
+            },
+        );
 
-        let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
-            .expect("Contract base58 conversion should succeeded");
-
-        let account = context
-            .implicit_from_contract(&contract)
-            .expect("Account creation should have succeeded");
+        let account = implicit(&pkh);
 
         let read_counter = account
             .counter(&host)
@@ -1329,15 +1298,10 @@ mod test {
 
         let balance = 4579_u64.into();
 
-        // Initialize path for Tezlink context at /tez/tez_accounts
-        let context = context::TezlinkContext::init_context();
-
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let account = context
-            .implicit_from_contract(&contract)
-            .expect("Account creation should have succeeded");
+        let account = implicit_of(&contract);
 
         let () = account
             .set_balance(&mut host, &balance)
@@ -1356,15 +1320,10 @@ mod test {
 
         let counter: Narith = 6u64.into();
 
-        // Initialize path for Tezlink context at /tez/tez_accounts
-        let context = context::TezlinkContext::init_context();
-
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let account = context
-            .implicit_from_contract(&contract)
-            .expect("Account creation should have succeeded");
+        let account = implicit_of(&contract);
 
         let () = account
             .set_counter(&mut host, &counter)
@@ -1381,50 +1340,43 @@ mod test {
     fn test_read_manager() {
         let mut host = MockKernelHost::default();
 
-        let public_key_hexa = hex::decode(BOOTSTRAP1_PUBLIC_KEY_HEX).unwrap();
+        let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
+            .expect("PublicKeyHash base58 conversion should succeeded");
+        let public_key = PublicKey::from_b58check(BOOTSTRAP1_PK).unwrap();
 
-        set_bootstrap1_key(
+        seed_account_info(
             &mut host,
-            &RefPath::assert_from(b"/manager"),
-            &public_key_hexa,
+            &pkh,
+            TezosAccountInfo {
+                balance: U256::zero(),
+                nonce: 0,
+                pub_key: Some(public_key),
+            },
         );
 
-        // Initialize path for Tezlink context at /tez/tez_accounts
-        let context = context::TezlinkContext::init_context();
-
-        let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
-            .expect("Contract base58 conversion should succeeded");
-
-        let account = context
-            .implicit_from_contract(&contract)
-            .expect("Account creation should have succeeded");
+        let account = implicit(&pkh);
 
         let manager = account.manager(&host).expect("Can't read manager");
 
-        let pkh = match manager {
+        let read_pkh = match manager {
             Manager::NotRevealed(pkh) => {
                 panic!("Manager should be revealed (manager key is a pkh: {pkh:?})")
             }
             Manager::Revealed(pk) => pk.pk_hash(),
         };
 
-        assert_eq!(contract, Contract::Implicit(pkh));
+        assert_eq!(Contract::Implicit(pkh), Contract::Implicit(read_pkh));
     }
 
     #[test]
     fn test_set_read_manager_public_key() {
         let mut host = MockKernelHost::default();
 
-        // Initialize path for Tezlink context at /tez/tez_accounts
-        let context = context::TezlinkContext::init_context();
-
         // Create an account for bootstrap1
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let account = context
-            .implicit_from_contract(&contract)
-            .expect("Account creation should have succeeded");
+        let account = implicit_of(&contract);
 
         let public_key = PublicKey::from_b58check(BOOTSTRAP1_PK).unwrap();
 
@@ -1445,17 +1397,12 @@ mod test {
     fn test_set_read_manager_public_key_hash() {
         let mut host = MockKernelHost::default();
 
-        // Initialize path for Tezlink context at /tez/tez_accounts
-        let context = context::TezlinkContext::init_context();
-
         // Create an account for bootstrap1
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         let contract = Contract::Implicit(pkh);
-        let account = context
-            .implicit_from_contract(&contract)
-            .expect("Account creation should have succeeded");
+        let account = implicit_of(&contract);
 
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
             .expect("PublicKeyHash base58 conversion should succeeded");
@@ -1477,17 +1424,12 @@ mod test {
     fn test_account_initialization() {
         let mut host = MockKernelHost::default();
 
-        // Initialize path for Tezlink context at /tez/tez_accounts
-        let context = context::TezlinkContext::init_context();
-
         // Create an account for bootstrap1
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         let contract = Contract::Implicit(pkh);
-        let account = context
-            .implicit_from_contract(&contract)
-            .expect("Account creation should have succeeded");
+        let account = implicit_of(&contract);
 
         let exist = account
             .allocated(&host)
@@ -1528,14 +1470,9 @@ mod test {
     fn test_set_read_large_code() {
         let mut host = MockKernelHost::default();
 
-        // Initialize path for Tezlink context at /tez/tez_accounts
-        let context = context::TezlinkContext::init_context();
-
         // Create an originated account for KT1
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context
-            .originated_from_contract(&contract)
-            .expect("Account creation should have succeeded");
+        let account = originated(&contract);
 
         let code = vec![1u8; 10_000];
 
@@ -1560,9 +1497,8 @@ mod test {
     #[test]
     fn test_update_storage_space_after_grow() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         let code = vec![0xab_u8; 30];
         let storage = vec![0xcd_u8; 20];
@@ -1607,9 +1543,8 @@ mod test {
     #[test]
     fn test_update_storage_space_after_shrink() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         let code = vec![0xab_u8; 30];
         let storage = vec![0xcd_u8; 20];
@@ -1641,9 +1576,8 @@ mod test {
     #[test]
     fn test_set_storage_returns_signed_diff() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         let first = account.set_storage(&mut host, &[0u8; 30]).unwrap();
         assert_eq!(first, 30.into(), "first write reports new_len");
@@ -1663,13 +1597,12 @@ mod test {
     #[test]
     fn test_set_storage_returns_zero_for_enshrined() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
 
         // Gateway is an enshrined contract; set_storage early-returns on it
         // without touching durable storage.
         const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
         let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         let diff = account.set_storage(&mut host, &[0xef_u8; 15]).unwrap();
         assert_eq!(
@@ -1686,8 +1619,8 @@ mod test {
         assert_eq!(used_bytes, Zarith::from(0u64));
         assert_eq!(allocated_bytes, Zarith::from(0u64));
 
-        let storage_path = context::code::storage_path(&account).unwrap();
-        let info_path = context::code::info_path(&account).unwrap();
+        let storage_path = code::storage_path(&account).unwrap();
+        let info_path = code::info_path(&account).unwrap();
         assert_eq!(host.store_has(&storage_path).unwrap(), None);
         assert_eq!(host.store_has(&info_path).unwrap(), None);
     }
@@ -1699,11 +1632,10 @@ mod test {
     #[test]
     fn test_exists_returns_true_for_enshrined() {
         let host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
 
         const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
         let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         assert!(account.exists(&host).unwrap());
     }
@@ -1714,10 +1646,9 @@ mod test {
     #[test]
     fn test_exists_returns_false_when_never_originated() {
         let host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         assert!(!account.exists(&host).unwrap());
     }
@@ -1728,10 +1659,9 @@ mod test {
     #[test]
     fn test_exists_returns_true_after_set_code() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         assert!(!account.exists(&host).unwrap());
         account.set_code(&mut host, &[0xab_u8; 4]).unwrap();
@@ -1746,9 +1676,8 @@ mod test {
     #[test]
     fn test_getters_default_to_zero_on_absent_path() {
         let host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         assert_eq!(account.used_bytes(&host).unwrap(), Zarith::from(0u64));
         assert_eq!(account.paid_bytes(&host).unwrap(), Zarith::from(0u64));
@@ -1760,9 +1689,8 @@ mod test {
         host: &mut MockKernelHost,
         storage_len: usize,
     ) -> TezlinkOriginatedAccount {
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
         let code = vec![0xab_u8; 30];
         let storage = vec![0xcd_u8; storage_len];
         account.init(host, Some(&code), &storage, 0.into()).unwrap();
@@ -1884,9 +1812,8 @@ mod test {
     #[test]
     fn test_init_with_initial_lazy_storage() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         let code = vec![0xab_u8; 30];
         let storage = vec![0xcd_u8; 20];
@@ -1910,10 +1837,9 @@ mod test {
     #[test]
     fn test_update_storage_space_enshrined_ignores_diffs() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
         let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         let StorageSpace {
             used_bytes,
@@ -1948,7 +1874,7 @@ mod test {
         });
         let mut buf = vec![];
         origin.bin_write(&mut buf).unwrap();
-        host.store_write_all(&context::code::origin_path(account).unwrap(), &buf)
+        host.store_write_all(&code::origin_path(account).unwrap(), &buf)
             .unwrap();
     }
 
@@ -1957,9 +1883,8 @@ mod test {
     #[test]
     fn alias_code_resolves_to_shared_implementation() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         classify_as_alias(&mut host, &account);
         let implementation = vec![0x02u8, 0x00, 0x00, 0x00, 0x00];
@@ -1974,9 +1899,8 @@ mod test {
     #[test]
     fn alias_without_seeded_implementation_errors() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         classify_as_alias(&mut host, &account);
         // Pin the error type: an unseeded slot is an internal invariant breach,
@@ -1995,9 +1919,8 @@ mod test {
     #[test]
     fn code_less_non_alias_is_missing() {
         let host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         // Pin the variant: a code-less non-alias must surface as the plain
         // missing-path error, not get routed through the alias branch (which
@@ -2018,13 +1941,12 @@ mod test {
     #[test]
     fn code_less_native_classified_is_missing() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         let mut buf = vec![];
         Origin::Native.bin_write(&mut buf).unwrap();
-        host.store_write_all(&context::code::origin_path(&account).unwrap(), &buf)
+        host.store_write_all(&code::origin_path(&account).unwrap(), &buf)
             .unwrap();
 
         assert!(matches!(
@@ -2041,9 +1963,8 @@ mod test {
     #[test]
     fn regular_contract_returns_own_code() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         let own_code = vec![0x05u8, 0x01, 0x02, 0x03];
         account.set_code(&mut host, &own_code).unwrap();
@@ -2102,9 +2023,8 @@ mod test {
     #[test]
     fn test_init_writes_aggregated_record() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let contract = Contract::from_b58check(KT1).unwrap();
-        let account = context.originated_from_contract(&contract).unwrap();
+        let account = originated(&contract);
 
         let code = vec![0xab_u8; 30];
         let storage = vec![0xcd_u8; 20];
@@ -2113,7 +2033,7 @@ mod test {
             .unwrap();
 
         let info: OriginatedContractInfo =
-            read_optional_nom_value(&host, &context::code::info_path(&account).unwrap())
+            read_optional_nom_value(&host, &code::info_path(&account).unwrap())
                 .unwrap()
                 .expect("the aggregated record must be present after init");
         assert_eq!(info.code_size, Narith::from(30u64));

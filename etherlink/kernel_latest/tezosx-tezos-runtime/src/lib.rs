@@ -20,8 +20,7 @@ use tezos_data_encoding::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_execution::{
     account_storage::{TezlinkAccount, TezosOriginatedAccount},
-    context::Context,
-    cross_runtime_transfer,
+    context, cross_runtime_transfer,
     enshrined_contracts::CracError,
     mir_ctx::{clear_temporary_big_maps, InterpretContext, OperationCtx, TcCtx},
     originate_contract, storage_fees, typecheck_code_and_storage, CracTransferError,
@@ -55,16 +54,7 @@ use tezosx_interfaces::{
 };
 use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
-use tezos_smart_rollup_host::path::RefPath;
-
-/// Unified storage root for all Tezos account state — Michelson originated
-/// KT1 contracts (under `contracts/`), big_maps (under `big_map/`) and
-/// TezosX projected accounts (under `tezosx/`). Mirrors the kernel's
-/// `chains::TEZOS_ACCOUNTS_ROOT` (the kernel and the
-/// TezosX runtime live in separate crates so the constant is duplicated
-/// to avoid a circular dependency).
-pub(crate) const TEZOS_ACCOUNTS_ROOT: RefPath =
-    RefPath::assert_from(b"/tez/tez_accounts");
+use tezos_smart_rollup_host::path::OwnedPath;
 
 /// Re-export the canonical null PKH from `tezos_execution` so the rest
 /// of this crate can keep its short name.  Both the synthetic CRAC
@@ -72,7 +62,6 @@ pub(crate) const TEZOS_ACCOUNTS_ROOT: RefPath =
 /// `tezos_execution::enshrined_contracts` match against the same constant.
 pub(crate) use tezos_execution::NULL_PKH;
 
-use crate::context::TezosRuntimeContext;
 use tezos_execution::account_storage::{
     get_origin_at, get_tezos_account_info_or_init, narith_to_u256, set_origin_at,
     set_tezos_account_info,
@@ -81,7 +70,6 @@ use tezos_execution::account_storage::{
 pub struct TezosRuntime(pub ChainId);
 
 pub mod alias_forwarder;
-pub mod context;
 pub mod headers;
 pub mod url;
 pub mod view;
@@ -726,8 +714,6 @@ where
         value,
     };
 
-    let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
-
     // Verify the incoming CRAC ID matches the journal's (set by the
     // block builder).  This ensures consistency across runtime boundaries.
     if let Some(ref crac_id) = hdrs.crac_id {
@@ -744,13 +730,9 @@ where
         TezosXRuntimeError::ConversionError(format!("Failed to parse null address: {e}"))
     })?;
     let source_account =
-        context
-            .implicit_from_public_key_hash(&source_pkh)
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to fetch source account: {e:?}"
-                ))
-            })?;
+        context::implicit_from_public_key_hash(&source_pkh).map_err(|e| {
+            TezosXRuntimeError::Custom(format!("Failed to fetch source account: {e:?}"))
+        })?;
 
     // Seed the per-operation temporary big-map id to -1 (negative =
     // temporary, per `BigMapId::is_temporary`), matching the native
@@ -764,7 +746,6 @@ where
     };
     let mut tc_ctx = TcCtx {
         host: &mut *host,
-        context: &context,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
         interpret_context: InterpretContext::new(),
@@ -871,7 +852,7 @@ where
     // `tezos_execution::transfer` for the destination.
     let transfer_result = match &hdrs.sender {
         Contract::Originated(kt1) => {
-            let sender_account = context.originated_from_kt1(kt1).map_err(|e| {
+            let sender_account = context::originated_from_kt1(kt1).map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
                     "Failed to fetch sender account: {e:?}"
                 ))
@@ -891,7 +872,7 @@ where
         }
         Contract::Implicit(pkh) => {
             let sender_account =
-                context.implicit_from_public_key_hash(pkh).map_err(|e| {
+                context::implicit_from_public_key_hash(pkh).map_err(|e| {
                     TezosXRuntimeError::Custom(format!(
                         "Failed to fetch sender account: {e:?}"
                     ))
@@ -1022,7 +1003,7 @@ where
     // `cross_runtime_transfer` reverts the world-state checkpoint,
     // which already removes any temp big-maps written during the
     // reverted execution.
-    if let Err(e) = clear_temporary_big_maps(host, &context, &mut next_temp_id) {
+    if let Err(e) = clear_temporary_big_maps(host, &mut next_temp_id) {
         log!(
             Error,
             "Failed to clear temporary big-maps after cross-runtime call: {e}"
@@ -1205,8 +1186,7 @@ impl RuntimeInterface for TezosRuntime {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(&alias_info.native_address));
         let kt1_str = kt1.to_base58_check();
 
-        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
-        let account = context.originated_from_kt1(&kt1)?;
+        let account = context::originated_from_kt1(&kt1)?;
         let account_path = account.path().clone();
 
         // Branch 1: already classified as alias. Returning early
@@ -1223,7 +1203,7 @@ impl RuntimeInterface for TezosRuntime {
             None => {}
         }
 
-        let world_state = context.path();
+        let world_state = OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT);
         journal
             .michelson
             .checkpoint(host, &world_state)
@@ -1295,13 +1275,11 @@ impl RuntimeInterface for TezosRuntime {
             TezosXRuntimeError::ConversionError(format!("Failed to parse null PKH: {e}"))
         })?;
         let source_account =
-            context
-                .implicit_from_public_key_hash(&null_pkh)
-                .map_err(|e| {
-                    TezosXRuntimeError::Custom(format!(
-                        "Failed to fetch null source account: {e:?}"
-                    ))
-                })?;
+            context::implicit_from_public_key_hash(&null_pkh).map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to fetch null source account: {e:?}"
+                ))
+            })?;
 
         let script = Script { code, storage };
         let origin = Origin::Alias(alias_info);
@@ -1315,7 +1293,6 @@ impl RuntimeInterface for TezosRuntime {
             };
             let mut tc_ctx = TcCtx {
                 host: &mut *host,
-                context: &context,
                 operation_gas: &mut gas,
                 big_map_diff: BTreeMap::new(),
                 interpret_context: InterpretContext::new(),
@@ -1471,8 +1448,7 @@ impl RuntimeInterface for TezosRuntime {
             Contract::Implicit(pkh) => AddressHash::Implicit(pkh),
             Contract::Originated(kt1) => AddressHash::Kt1(kt1),
         };
-        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
-        let origin = context.read_origin_for_address(host, &address_hash)?;
+        let origin = context::read_origin_for_address(host, &address_hash)?;
         Ok((Classification::from(origin), consumed))
     }
 
@@ -1516,8 +1492,7 @@ impl TezosRuntime {
         host: &impl StorageV1,
         kt1: &ContractKt1Hash,
     ) -> Result<U256, TezosXRuntimeError> {
-        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
-        let originated_account = context.originated_from_kt1(kt1)?;
+        let originated_account = context::originated_from_kt1(kt1)?;
         let balance = originated_account.balance(host)?;
         narith_to_u256(&balance)
     }
@@ -1862,9 +1837,8 @@ mod tests {
     fn test_host() -> MockKernelHost {
         use tezos_execution::account_storage::TezosImplicitAccountTrait;
         let mut host = MockKernelHost::default();
-        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
         let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
-        let account = context.implicit_from_public_key_hash(&null_pkh).unwrap();
+        let account = context::implicit_from_public_key_hash(&null_pkh).unwrap();
         account.allocate(&mut host).unwrap();
         host
     }
@@ -1915,8 +1889,7 @@ mod tests {
             .expect("ensure_alias should succeed");
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
-        let account = context.originated_from_kt1(&kt1).unwrap();
+        let account = context::originated_from_kt1(&kt1).unwrap();
 
         // L2-1529: a materialized alias carries no per-contract script —
         // nothing is written at `/data/code`. Its code is the single shared
@@ -1984,8 +1957,7 @@ mod tests {
             .expect("ensure_alias should succeed");
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
-        let account = context.originated_from_kt1(&kt1).unwrap();
+        let account = context::originated_from_kt1(&kt1).unwrap();
 
         let storage = account.storage(&host).unwrap();
         let expected =
@@ -2165,8 +2137,7 @@ mod tests {
         // Locate the alias account and delete its origin path to
         // simulate a legacy account written before this work.
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
-        let account = context.originated_from_kt1(&kt1).unwrap();
+        let account = context::originated_from_kt1(&kt1).unwrap();
         let origin_path = concat(account.path(), &ORIGIN_PATH).unwrap();
         host.store_delete(&origin_path).unwrap();
         assert!(get_origin_at(&host, &account.path().clone())
@@ -2207,8 +2178,7 @@ mod tests {
         let runtime = test_runtime();
         let evm_address = "0x5555555555555555555555555555555555555555";
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
-        let account = context.originated_from_kt1(&kt1).unwrap();
+        let account = context::originated_from_kt1(&kt1).unwrap();
 
         set_origin_at(&mut host, &account.path().clone(), &Origin::Native).unwrap();
 
@@ -2960,12 +2930,9 @@ mod tests {
         let registry = NotWiredRegistry;
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
 
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
-                .unwrap();
         let parser = mir::parser::Parser::new();
         let dest_kt1 = ContractKt1Hash::from(digest_160(b"l2-1439-failwith"));
-        let dest = context.originated_from_kt1(&dest_kt1).unwrap();
+        let dest = context::originated_from_kt1(&dest_kt1).unwrap();
         let script = parser
             .parse_top_level(
                 r#"parameter unit; storage unit;
@@ -3028,12 +2995,9 @@ mod tests {
         let registry = NotWiredRegistry;
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
 
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
-                .unwrap();
         let parser = mir::parser::Parser::new();
         let dest_kt1 = ContractKt1Hash::from(digest_160(b"l2-1439-view-failwith"));
-        let dest = context.originated_from_kt1(&dest_kt1).unwrap();
+        let dest = context::originated_from_kt1(&dest_kt1).unwrap();
         let script = parser
             .parse_top_level(
                 r#"parameter unit; storage unit;
@@ -3243,14 +3207,12 @@ mod tests {
         let runtime = test_runtime();
         let registry = NotWiredRegistry;
 
-        let context =
-            crate::context::TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
         let parser = mir::parser::Parser::new();
 
         // Receiver: accepts unit, emits nothing — so it contributes no
         // further counter increments.
         let receiver_kt1 = ContractKt1Hash::from(digest_160(b"l2-1676-receiver"));
-        let receiver = context.originated_from_kt1(&receiver_kt1).unwrap();
+        let receiver = context::originated_from_kt1(&receiver_kt1).unwrap();
         let receiver_script = parser
             .parse_top_level(
                 "parameter unit; storage unit; code { CDR; NIL operation; PAIR }",
@@ -3277,7 +3239,7 @@ mod tests {
         // address passed as parameter — a single `operation_counter()`
         // increment.
         let parent_kt1 = ContractKt1Hash::from(digest_160(b"l2-1676-parent"));
-        let parent = context.originated_from_kt1(&parent_kt1).unwrap();
+        let parent = context::originated_from_kt1(&parent_kt1).unwrap();
         let parent_script = parser
             .parse_top_level(
                 r#"
@@ -3399,13 +3361,10 @@ mod tests {
             let mut host = MockKernelHost::default();
             let runtime = test_runtime();
             let registry = NotWiredRegistry;
-            let context =
-                crate::context::TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)
-                    .unwrap();
             let parser = mir::parser::Parser::new();
 
             let receiver_kt1 = ContractKt1Hash::from(digest_160(b"l2-1727-receiver"));
-            let receiver = context.originated_from_kt1(&receiver_kt1).unwrap();
+            let receiver = context::originated_from_kt1(&receiver_kt1).unwrap();
             let receiver_script = parser
                 .parse_top_level(
                     "parameter unit; storage unit; code { CDR; NIL operation; PAIR }",
@@ -3429,7 +3388,7 @@ mod tests {
                 .unwrap();
 
             let parent_kt1 = ContractKt1Hash::from(digest_160(b"l2-1727-parent"));
-            let parent = context.originated_from_kt1(&parent_kt1).unwrap();
+            let parent = context::originated_from_kt1(&parent_kt1).unwrap();
             let parent_script = parser
                 .parse_top_level(
                     r#"
@@ -3521,7 +3480,6 @@ mod tests {
             Classification, Origin, RuntimeInterface, ALIAS_LOOKUP_MILLIGAS,
         };
 
-        use crate::TEZOS_ACCOUNTS_ROOT;
         use tezos_execution::account_storage::set_origin_at;
 
         fn test_runtime() -> TezosRuntime {
@@ -3565,15 +3523,12 @@ mod tests {
             let mut host = MockKernelHost::default();
             let runtime = test_runtime();
 
-            let context =
-                crate::context::TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)
-                    .unwrap();
             // Use a real-looking KT1 derived from blake2b to avoid parse errors.
             let kt1 = ContractKt1Hash::from(tezos_crypto_rs::blake2b::digest_160(
                 b"test_kt1_seed",
             ));
             let kt1_b58 = kt1.to_base58_check();
-            let account = context.originated_from_kt1(&kt1).unwrap();
+            let account = context::originated_from_kt1(&kt1).unwrap();
             let account_path = account.path().clone();
             set_origin_at(&mut host, &account_path, &Origin::Native).unwrap();
 
