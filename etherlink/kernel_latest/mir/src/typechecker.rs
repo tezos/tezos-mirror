@@ -62,11 +62,18 @@ pub enum TcError {
     /// Encountered FAIL instruction not in tail position.
     #[error("FAIL instruction is not in tail position")]
     FailNotInTail,
-    /// Typechecking would recurse beyond the protocol depth limit (10000).
-    /// Mirrors L1's `Typechecking_too_many_recursive_calls`
-    /// (`script_ir_translator.ml:571`). Shared, like L1's single `stack_depth`,
-    /// by the value-level Lambda recursion and the embedded `CREATE_CONTRACT`
-    /// child-script nesting.
+    /// Typechecking nested more lambdas / embedded scripts than the
+    /// protocol-defined depth limit (10000). Mirrors L1's
+    /// `Typechecking_too_many_recursive_calls`
+    /// (`src/proto_alpha/lib_protocol/script_ir_translator.ml:571`). The
+    /// `TypecheckDepthGuard` counter is shared — like L1's single
+    /// `stack_depth` — by the lambda *value* paths (the value-level
+    /// `T::Lambda` arm and `PUSH (lambda …)`) and the embedded
+    /// `CREATE_CONTRACT` child-script nesting. Since L2-1663 / L2-1702 these no
+    /// longer recurse on the Rust stack (the body runs on the shared
+    /// worklist), so the guard is a pure L1-parity semantic bound, not
+    /// stack-overflow protection. The bare `LAMBDA` / `LAMBDA_REC` instruction
+    /// path is guard-free (iterative, bounded by gas only).
     #[error("too many recursive calls during typechecking")]
     TypecheckingTooManyRecursiveCalls,
     /// A type expression exceeded [`MICHELSON_MAXIMUM_TYPE_SIZE`] nodes.
@@ -1546,6 +1553,16 @@ enum StepResult<'a, 'b> {
         /// Depth guard, balanced by `AfterChildScript` on Ok and Err paths.
         depth_guard: TypecheckDepthGuard,
     },
+    /// `PUSH <ty> <value>` for a non-lambda pushable value: route the value
+    /// through the shared worklist (value frames + `AfterPushValue`) instead
+    /// of a synchronous `typecheck_value`, so a container-hidden lambda
+    /// literal inside `value` cannot re-enter `typecheck_lambda` on the Rust
+    /// call stack (L2-1663). `ty` has already been parsed and checked
+    /// `Pushable` by the step.
+    OpenPushValue {
+        ty: Type,
+        value: &'b Micheline<'a>,
+    },
 }
 
 /// Which container wraps the result of a `MAP` block — selected from the
@@ -1680,6 +1697,35 @@ enum TcIFrame<'a, 'b> {
         saved_self_entrypoints: DriverSelfEp<'b>,
         saved_in_view: bool,
     },
+    /// Finalize a `PUSH <ty> <value>` whose value was just typechecked on
+    /// the shared worklist (a value frame produced one `TypedValue` in
+    /// `value_results`). Pops that value, pushes `ty` onto the (instruction)
+    /// `opt_stack`, and emits `Instruction::Push` into the current
+    /// `block_results`. Routing the value through a worklist frame instead
+    /// of a synchronous `typecheck_value` keeps a container-hidden lambda
+    /// literal inside the value from re-entering `typecheck_lambda` on the
+    /// Rust call stack (L2-1663).
+    AfterPushValue {
+        ty: Type,
+    },
+    /// Finalize a value-level lambda (`typecheck_value`'s `T::Lambda` arm)
+    /// whose body was just typechecked on the shared worklist. Mirrors
+    /// [`TcIFrame::AfterLambda`] with `for_push`-style finalization, but the
+    /// result is a `TypedValue::Lambda` pushed onto `value_results` rather
+    /// than an `Instruction` — so the enclosing value frame (e.g.
+    /// `BuildPair`) can consume it. Restores the saved outer instruction
+    /// state and drops the RAII depth guard. Added for L2-1663 so
+    /// container-hidden lambdas no longer grow the Rust call stack.
+    AfterLambdaValue {
+        in_ty: Type,
+        out_ty: Type,
+        recursive: bool,
+        micheline_code: Micheline<'a>,
+        saved_outer_stack: FailingTypeStack,
+        saved_self_entrypoints: DriverSelfEp<'b>,
+        saved_in_view: bool,
+        depth_guard: Option<TypecheckDepthGuard>,
+    },
 }
 
 /// Whether an embedded `CREATE_CONTRACT`'s child-script views are validated.
@@ -1720,36 +1766,123 @@ impl DriverSelfEp<'_> {
     }
 }
 
+/// Unified worklist frame: the typechecker drives instruction typechecking
+/// (`TcIFrame`) and value typechecking (`TvFrame`) from a single explicit
+/// stack so the two never recurse into each other on the Rust call stack.
+/// `PUSH` schedules a value frame (+ `AfterPushValue`) and a value-level
+/// lambda schedules instruction frames (+ `AfterLambdaValue`); both bridges
+/// stay on the heap worklist (L2-1663).
+// `V` is the larger variant, but boxing it (as clippy suggests) would add a
+// heap allocation per value frame on the hot value path. The value worklist
+// already stored `TvFrame` inline in its own `Vec` before unification, so
+// unifying onto one stack does not regress value-frame memory; the slack is
+// only paid by instruction frames, whose depth is gas-bounded.
+#[allow(clippy::large_enum_variant)]
+enum WFrame<'a, 'b> {
+    I(TcIFrame<'a, 'b>),
+    V(TvFrame<'a, 'b>),
+}
+
+impl<'a, 'b> From<TcIFrame<'a, 'b>> for WFrame<'a, 'b> {
+    fn from(f: TcIFrame<'a, 'b>) -> Self {
+        WFrame::I(f)
+    }
+}
+
+impl<'a, 'b> From<TvFrame<'a, 'b>> for WFrame<'a, 'b> {
+    fn from(f: TvFrame<'a, 'b>) -> Self {
+        WFrame::V(f)
+    }
+}
+
+/// Thin newtype over the worklist `Vec` whose `push` accepts either frame
+/// kind via `Into<WFrame>`. This lets the instruction- and value-frame
+/// handlers keep their existing `frames.push(TcIFrame::…)` /
+/// `frames.push(TvFrame::…)` call sites unchanged while sharing one stack.
+struct FrameStack<'a, 'b>(Vec<WFrame<'a, 'b>>);
+
+impl<'a, 'b> FrameStack<'a, 'b> {
+    fn push(&mut self, frame: impl Into<WFrame<'a, 'b>>) {
+        self.0.push(frame.into());
+    }
+
+    fn pop(&mut self) -> Option<WFrame<'a, 'b>> {
+        self.0.pop()
+    }
+}
+
+/// Mutable instruction-side state borrowed by the value-frame handler so the
+/// value-level lambda arm can set up its body on the shared worklist (save
+/// and swap the instruction stack / scope, push a fresh `block_results`
+/// accumulator). Every non-lambda value frame ignores it.
+struct LambdaScope<'a, 'b, 'c> {
+    block_results: &'c mut Vec<Vec<Instruction<'a>>>,
+    opt_stack: &'c mut FailingTypeStack,
+    self_entrypoints: &'c mut DriverSelfEp<'b>,
+    in_view: &'c mut bool,
+}
+
+/// Result of [`drive`]: the root instruction accumulator and the value
+/// result stack. Instruction entrypoints read `block_results`; value
+/// entrypoints read `value_results`.
+struct DriveOut<'a> {
+    block_results: Vec<Instruction<'a>>,
+    value_results: Vec<TypedValue<'a>>,
+}
+
 /// Iterative driver: typechecks every nested block from one explicit
 /// worklist instead of recursing through `typecheck` / `typecheck_instruction`.
-fn typecheck<'a, 'b>(
-    ast: &'b [Micheline<'a>],
-    gas: &mut Gas,
-    self_entrypoints: Option<&'b Entrypoints>,
+fn drive<'a, 'b>(
+    mut frames: FrameStack<'a, 'b>,
+    ctx: &mut impl TypecheckingCtx<'a>,
+    mut cur_self_entrypoints: DriverSelfEp<'b>,
+    mut cur_in_view: bool,
     opt_stack: &mut FailingTypeStack,
-    in_view: bool,
     typecheck_views: TypecheckViews,
-) -> Result<Vec<Instruction<'a>>, TcError> {
-    let mut frames: Vec<TcIFrame<'a, 'b>> =
-        vec![TcIFrame::NextInstr { block: ast, idx: 0 }];
-    // One accumulator per active block. The root accumulator is at index 0;
-    // nested blocks push and pop their own.
-    let mut block_results: Vec<Vec<Instruction<'a>>> = vec![Vec::new()];
-    // Mutable state across the driver: switched by Open/After Lambda frames
-    // when a LAMBDA / LAMBDA_REC body is entered (fresh scope with
-    // self_entrypoints=None, in_view=false), and by Open/After CreateContract
-    // frames when an embedded child script's code body is entered (fresh scope
-    // with the child's own entrypoints). MAP_BLOCK does NOT switch these — it
-    // inherits the outer context.
-    // `typecheck_views` is intentionally NOT in this set (unlike in_view): it
+    allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
+) -> Result<DriveOut<'a>, TcError> {
+    // One accumulator per active instruction block. The root accumulator is
+    // at index 0; nested blocks — and value-level lambda bodies — push and
+    // pop their own. Value frames accumulate into `value_results` instead.
+    // Mutable scope state (`cur_self_entrypoints` / `cur_in_view`) is switched
+    // by Open/After Lambda frames when a LAMBDA / LAMBDA_REC body is entered
+    // (fresh scope with self_entrypoints=None, in_view=false), and by
+    // Open/After CreateContract frames when an embedded child script's code
+    // body is entered (fresh scope with the child's own entrypoints).
+    // MAP_BLOCK does NOT switch these — it inherits the outer context.
+    // `typecheck_views` is intentionally NOT switched here (unlike in_view): it
     // is an origination-wide constant, so a CREATE_CONTRACT in a lambda body
-    // stays origination-validated. Resetting it here would reopen L2-1635.
-    let mut cur_self_entrypoints = match self_entrypoints {
-        Some(e) => DriverSelfEp::Borrowed(e),
-        None => DriverSelfEp::None,
-    };
-    let mut cur_in_view = in_view;
-    while let Some(frame) = frames.pop() {
+    // stays origination-validated. Resetting it would reopen L2-1635.
+    let mut block_results: Vec<Vec<Instruction<'a>>> = vec![Vec::new()];
+    let mut value_results: Vec<TypedValue<'a>> = Vec::new();
+    while let Some(wframe) = frames.pop() {
+        // Value frames are handled here and `continue`; instruction frames
+        // fall through to the (unchanged) `match frame` below. `gas` is a
+        // reborrow of the context's gas, so the instruction handling reads
+        // exactly as it did before the value/instruction worklists were
+        // unified (it never needs `ctx` beyond gas).
+        let frame = match wframe {
+            WFrame::V(vframe) => {
+                let mut scope = LambdaScope {
+                    block_results: &mut block_results,
+                    opt_stack: &mut *opt_stack,
+                    self_entrypoints: &mut cur_self_entrypoints,
+                    in_view: &mut cur_in_view,
+                };
+                step_typecheck_value(
+                    vframe,
+                    ctx,
+                    &mut frames,
+                    &mut value_results,
+                    &mut scope,
+                    typecheck_views,
+                    allow_forged_lazy_storage_id,
+                )?;
+                continue;
+            }
+            WFrame::I(frame) => frame,
+        };
+        let gas: &mut Gas = ctx.gas();
         match frame {
             TcIFrame::NextInstr { block, idx } => {
                 if idx >= block.len() {
@@ -2078,6 +2211,17 @@ fn typecheck<'a, 'b>(
                                 output_ty: view.output_ty,
                             });
                         }
+                    }
+                    StepResult::OpenPushValue { ty, value } => {
+                        // LIFO: resume the outer block after PUSH, then
+                        // finalize (AfterPushValue), then typecheck the value
+                        // itself on the shared worklist. The value typecheck
+                        // runs under the driver's `ctx`; PUSH already proved
+                        // `ty` is `Pushable`, so the value cannot be a
+                        // big_map / contract that would need a richer context.
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterPushValue { ty: ty.clone() });
+                        frames.push(TvFrame::Visit { v: value, t: ty });
                     }
                 }
             }
@@ -2557,6 +2701,68 @@ fn typecheck<'a, 'b>(
                 cur_self_entrypoints = saved_self_entrypoints;
                 cur_in_view = saved_in_view;
             }
+            TcIFrame::AfterPushValue { ty } => {
+                // The value frame scheduled by OpenPushValue produced exactly
+                // one `TypedValue`. Push `ty` onto the instruction stack and
+                // emit `Instruction::Push` — same order as the previous
+                // synchronous PUSH (value typechecked, then `t` pushed).
+                let value = value_results.pop().ok_or(TcError::InternalError(
+                    TcInvariant::EmptyResultStack {
+                        expected: "push value",
+                    },
+                ))?;
+                opt_stack.access_mut(TcError::FailNotInTail)?.push(ty);
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack {
+                        expected: "push parent",
+                    }))?
+                    .push(Instruction::Push(Rc::new(value)));
+            }
+            TcIFrame::AfterLambdaValue {
+                in_ty,
+                out_ty,
+                recursive,
+                micheline_code,
+                saved_outer_stack,
+                saved_self_entrypoints,
+                saved_in_view,
+                depth_guard,
+            } => {
+                // Mirror AfterLambda's `for_push` finalize, but emit a
+                // `TypedValue::Lambda` into `value_results` (for the enclosing
+                // value frame to consume) instead of an `Instruction`. Bind
+                // the guard locally so its Drop fires on every match-arm exit
+                // — Ok finalize or `?`-propagated Err (L2-1663).
+                let _depth_guard = depth_guard;
+                let body_instrs = block_results.pop().ok_or(TcError::InternalError(
+                    TcInvariant::EmptyResultStack {
+                        expected: "value lambda body",
+                    },
+                ))?;
+                // Unify the body's resulting stack with [out_ty], matching the
+                // recursive `typecheck_lambda` it replaces.
+                unify_stacks(gas, opt_stack, tc_stk![out_ty.clone()])?;
+                // Restore the saved (value-irrelevant) outer instruction state.
+                *opt_stack = saved_outer_stack;
+                cur_self_entrypoints = saved_self_entrypoints;
+                cur_in_view = saved_in_view;
+                let code = Rc::from(body_instrs);
+                let lam = if recursive {
+                    Lambda::LambdaRec {
+                        micheline_code,
+                        code,
+                        in_ty,
+                        out_ty,
+                    }
+                } else {
+                    Lambda::Lambda {
+                        micheline_code,
+                        code,
+                    }
+                };
+                value_results.push(TypedValue::Lambda(Closure::Lambda(lam)));
+            }
         }
     }
 
@@ -2574,6 +2780,15 @@ fn typecheck<'a, 'b>(
         "block_results stack not drained: {} entries left",
         block_results.len(),
     );
+    // Defense-in-depth: at most one value result survives — exactly one for a
+    // value entrypoint (the root value), zero for an instruction entrypoint
+    // (every PUSH value is consumed by its AfterPushValue). More would mean an
+    // OpenPushValue / AfterPushValue (or AfterLambdaValue) imbalance.
+    debug_assert!(
+        value_results.len() <= 1,
+        "value_results stack not drained: {} entries left",
+        value_results.len(),
+    );
     if block_results.len() != 1 {
         return Err(TcError::InternalError(TcInvariant::ResultStackLen {
             expected: 1,
@@ -2581,13 +2796,51 @@ fn typecheck<'a, 'b>(
             where_: "typecheck driver tail",
         }));
     }
-    block_results
-        .pop()
-        .ok_or(TcError::InternalError(TcInvariant::ResultStackLen {
+    let root = block_results.pop().ok_or(TcError::InternalError(
+        TcInvariant::ResultStackLen {
             expected: 1,
             got: 0,
             where_: "typecheck driver tail (after len check)",
-        }))
+        },
+    ))?;
+    Ok(DriveOut {
+        block_results: root,
+        value_results,
+    })
+}
+
+/// Typecheck a block of instructions on a fresh shared worklist. Thin wrapper
+/// over [`drive`]: any value reached from within instruction typechecking
+/// comes via `PUSH` and is therefore `Pushable`, so the value frames run under
+/// a trivial [`crate::context::PushableTypecheckingContext`] (neither
+/// contracts nor big_maps are pushable).
+fn typecheck<'a, 'b>(
+    ast: &'b [Micheline<'a>],
+    gas: &mut Gas,
+    self_entrypoints: Option<&'b Entrypoints>,
+    opt_stack: &mut FailingTypeStack,
+    in_view: bool,
+    typecheck_views: TypecheckViews,
+) -> Result<Vec<Instruction<'a>>, TcError> {
+    let mut ctx = crate::context::PushableTypecheckingContext { gas };
+    let frames = FrameStack(vec![WFrame::I(TcIFrame::NextInstr { block: ast, idx: 0 })]);
+    let cur_self_entrypoints = match self_entrypoints {
+        Some(e) => DriverSelfEp::Borrowed(e),
+        None => DriverSelfEp::None,
+    };
+    // Instruction entry: any value reached is via `PUSH` and is `Pushable`, so
+    // a forged lazy-storage id cannot occur (`big_map` is not pushable); pass
+    // `AllowForgedLazyStorageId::No`.
+    let out = drive(
+        frames,
+        &mut ctx,
+        cur_self_entrypoints,
+        in_view,
+        opt_stack,
+        typecheck_views,
+        AllowForgedLazyStorageId::No,
+    )?;
+    Ok(out.block_results)
 }
 
 macro_rules! nothing_to_none {
@@ -3500,18 +3753,19 @@ fn typecheck_instruction_step<'a, 'b>(
                     });
                 }
                 _ => {
-                    // contracts and big maps are not pushable so the forged-id
-                    // policy is irrelevant here
-                    let mut ctx = crate::context::PushableTypecheckingContext { gas };
-                    let v = typecheck_value_with_views(
-                        v,
-                        &mut ctx,
-                        &t,
-                        typecheck_views,
-                        AllowForgedLazyStorageId::No,
-                    )?;
-                    stack.push(t);
-                    I::Push(Rc::new(v))
+                    // Non-lambda pushable value. Route it through the shared
+                    // worklist (OpenPushValue -> value frames ->
+                    // AfterPushValue) instead of a synchronous
+                    // `typecheck_value`, so a container-hidden lambda literal
+                    // inside the value cannot re-enter `typecheck_lambda` on
+                    // the Rust call stack (L2-1663). The stack push of `t` and
+                    // the `Instruction::Push` construction are deferred to the
+                    // AfterPushValue finalizer, after the value has
+                    // typechecked — same observable order as the previous
+                    // synchronous form (value typechecked, then `t` pushed).
+                    // Contracts and big maps are not pushable, so value
+                    // typechecking never needs a non-trivial context here.
+                    return Ok(StepResult::OpenPushValue { ty: t, value: v });
                 }
             }
         }
@@ -4738,20 +4992,24 @@ pub(crate) fn typecheck_value_with_views<'a, 'b>(
     typecheck_views: TypecheckViews,
     allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
 ) -> Result<TypedValue<'a>, TcError> {
-    let mut frames: Vec<TvFrame<'a, 'b>> = vec![TvFrame::Visit { v, t: t.clone() }];
-    let mut results: Vec<TypedValue<'a>> = Vec::new();
-
-    while let Some(frame) = frames.pop() {
-        step_typecheck_value(
-            frame,
-            ctx,
-            &mut frames,
-            &mut results,
-            typecheck_views,
-            allow_forged_lazy_storage_id,
-        )?;
-    }
-    results
+    // Run the shared worklist driver from a single value frame. A value-level
+    // lambda body is instructions; routing them through `drive` (rather than a
+    // synchronous `typecheck_lambda`) keeps container-hidden lambdas off the
+    // Rust call stack (L2-1663). The instruction stack is irrelevant for a
+    // bare value — a value-level lambda swaps in its own `[in_ty]` body stack
+    // (see `AfterLambdaValue`) and restores this scratch stack on finalize.
+    let mut scratch_stack = tc_stk![];
+    let frames = FrameStack(vec![WFrame::V(TvFrame::Visit { v, t: t.clone() })]);
+    let mut out = drive(
+        frames,
+        ctx,
+        DriverSelfEp::None,
+        false,
+        &mut scratch_stack,
+        typecheck_views,
+        allow_forged_lazy_storage_id,
+    )?;
+    out.value_results
         .pop()
         .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack {
             expected: "typecheck_value root",
@@ -4761,8 +5019,9 @@ pub(crate) fn typecheck_value_with_views<'a, 'b>(
 fn step_typecheck_value<'a, 'b>(
     frame: TvFrame<'a, 'b>,
     ctx: &mut impl TypecheckingCtx<'a>,
-    frames: &mut Vec<TvFrame<'a, 'b>>,
+    frames: &mut FrameStack<'a, 'b>,
     results: &mut Vec<TypedValue<'a>>,
+    scope: &mut LambdaScope<'a, 'b, '_>,
     typecheck_views: TypecheckViews,
     allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
 ) -> Result<(), TcError> {
@@ -4777,6 +5036,7 @@ fn step_typecheck_value<'a, 'b>(
             ctx,
             frames,
             results,
+            scope,
             typecheck_views,
             allow_forged_lazy_storage_id,
         ),
@@ -5236,12 +5496,14 @@ fn step_typecheck_value<'a, 'b>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn visit_value<'a, 'b>(
     v: &'b Micheline<'a>,
     t: Type,
     ctx: &mut impl TypecheckingCtx<'a>,
-    frames: &mut Vec<TvFrame<'a, 'b>>,
+    frames: &mut FrameStack<'a, 'b>,
     results: &mut Vec<TypedValue<'a>>,
+    scope: &mut LambdaScope<'a, 'b, '_>,
     typecheck_views: TypecheckViews,
     allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
 ) -> Result<(), TcError> {
@@ -5587,24 +5849,62 @@ fn visit_value<'a, 'b>(
             raw @ (V::Seq(instrs) | V::App(Prim::Lambda_rec, [V::Seq(instrs)], _)),
         ) => {
             let (in_ty, out_ty) = tys.as_ref();
-            // The value-level Lambda path recurses through `typecheck_lambda`
-            // → `typecheck` → `step_typecheck_instruction` (PUSH) →
-            // `typecheck_value` → this arm. Each level adds Rust frames; an
-            // adversarial nested `PUSH (lambda …) {PUSH (lambda …) {…}}` can
-            // exhaust the kernel's 1 MiB WASM stack within a single
-            // operation's gas budget. Mirror L1's defense — see
+            let in_ty = in_ty.clone();
+            let out_ty = out_ty.clone();
+            let recursive = matches!(raw, V::App(Prim::Lambda_rec, ..));
+            // Before L2-1663 this arm called `typecheck_lambda` synchronously,
+            // recursing `typecheck_value` → `typecheck_lambda` → `typecheck` →
+            // step (PUSH) → `typecheck_value` and adding Rust frames per
+            // nesting level: an adversarial `Pair … (lambda { PUSH (pair …
+            // (lambda …)) … })` container chain exhausted the kernel's ~1 MiB
+            // stack well below the L1-parity 10000 depth cap (a native abort
+            // rather than a bounded `TypecheckingTooManyRecursiveCalls`).
+            // Now the body runs on the shared `drive` worklist via
+            // OpenLambda-style scheduling (NextInstr + AfterLambdaValue), so
+            // depth is bounded by gas/heap only. The RAII depth guard still
+            // counts each value-level lambda for L1 semantic parity; it is
+            // threaded into AfterLambdaValue so its Drop fires exactly once,
+            // whether finalize succeeds, errors mid-way, or the worklist is
+            // torn down on the driver's Err exit. Mirror L1's defense — see
             // `script_ir_translator.ml:571` for the `stack_depth > 10000`
             // check that returns `Typechecking_too_many_recursive_calls`.
-            // RAII guard ensures depth balance even on Err propagation.
-            let _depth_guard = TypecheckDepthGuard::enter()?;
-            results.push(TV::Lambda(Closure::Lambda(typecheck_lambda(
-                instrs,
-                ctx.gas(),
-                in_ty.clone(),
-                out_ty.clone(),
-                matches!(raw, V::App(Prim::Lambda_rec, ..)),
-                typecheck_views,
-            )?)));
+            // RAII guard ensures depth balance even on Err propagation; it is
+            // threaded into AfterLambdaValue so its Drop fires exactly once.
+            let depth_guard = TypecheckDepthGuard::enter()?;
+            let micheline_code = Micheline::Seq(instrs);
+            // Build the body's initial stack: [in_ty] for plain LAMBDA,
+            // [self_ty, in_ty] for LAMBDA_REC (self_ty on bottom). Swap the
+            // (value-irrelevant) outer instruction stack out and reset the
+            // scope to a fresh lambda scope, mirroring OpenLambda.
+            let body_initial = if recursive {
+                let self_ty = Type::new_lambda(in_ty.clone(), out_ty.clone());
+                tc_stk![self_ty, in_ty.clone()]
+            } else {
+                tc_stk![in_ty.clone()]
+            };
+            let saved_outer_stack = std::mem::replace(scope.opt_stack, body_initial);
+            // `DriverSelfEp` is not `Copy`; save the outer value and reset to
+            // `None` (LAMBDA bodies forbid `SELF`) in one swap.
+            let saved_self_entrypoints =
+                std::mem::replace(scope.self_entrypoints, DriverSelfEp::None);
+            let saved_in_view = *scope.in_view;
+            *scope.in_view = false;
+            // LIFO: AfterLambdaValue finalizes once the body block is drained.
+            frames.push(TcIFrame::AfterLambdaValue {
+                in_ty,
+                out_ty,
+                recursive,
+                micheline_code,
+                saved_outer_stack,
+                saved_self_entrypoints,
+                saved_in_view,
+                depth_guard: Option::Some(depth_guard),
+            });
+            scope.block_results.push(Vec::new());
+            frames.push(TcIFrame::NextInstr {
+                block: instrs,
+                idx: 0,
+            });
         }
         (
             T::Ticket(content_type),
@@ -5687,7 +5987,7 @@ fn visit_map_or_bigmap_inmem<'a, 'b>(
     key_t: Type,
     val_t: Type,
     finalize: MapFinalize,
-    frames: &mut Vec<TvFrame<'a, 'b>>,
+    frames: &mut FrameStack<'a, 'b>,
     results: &mut Vec<TypedValue<'a>>,
 ) -> Result<(), TcError> {
     use TypedValue as TV;
@@ -5719,43 +6019,15 @@ fn visit_map_or_bigmap_inmem<'a, 'b>(
     Ok(())
 }
 
-#[allow(missing_docs)]
-pub fn typecheck_lambda<'a>(
-    instrs: &'a [Micheline<'a>],
-    gas: &mut Gas,
-    in_ty: Type,
-    out_ty: Type,
-    recursive: bool,
-    typecheck_views: TypecheckViews,
-) -> Result<Lambda<'a>, TcError> {
-    let stk = &mut if recursive {
-        let self_ty = Type::new_lambda(in_ty.clone(), out_ty.clone());
-        tc_stk![self_ty, in_ty.clone()]
-    } else {
-        tc_stk![in_ty.clone()]
-    };
-    // in_view=false: lambdas create a new scope, view restrictions don't propagate.
-    let code = Rc::from(typecheck(instrs, gas, None, stk, false, typecheck_views)?);
-    unify_stacks(gas, stk, tc_stk![out_ty.clone()])?;
-    let micheline_code = Micheline::Seq(instrs);
-    Ok(if recursive {
-        Lambda::LambdaRec {
-            micheline_code,
-            code,
-            in_ty,
-            out_ty,
-        }
-    } else {
-        Lambda::Lambda {
-            micheline_code,
-            code,
-        }
-    })
-}
-
-/// Typecheck a view body. Similar to [typecheck_lambda] but specialized for
-/// views: sets the `in_view` flag to forbid side-effectful
-/// instructions.
+/// Typecheck a view body. Like a lambda body it runs on a fresh `[in_ty]`
+/// stack with `self_entrypoints = None`, but sets the `in_view` flag to forbid
+/// side-effectful instructions.
+///
+/// (Lambda *values* are no longer typechecked by a dedicated helper: since
+/// L2-1663 both the `PUSH (lambda …)` instruction arm and the value-level
+/// `T::Lambda` arm schedule the body on the shared `drive` worklist —
+/// `OpenLambda`/`AfterLambda` and `AfterLambdaValue` respectively — so no
+/// synchronous lambda-typechecking entry point remains.)
 pub fn typecheck_view<'a>(
     instrs: &'a [Micheline<'a>],
     gas: &mut Gas,
@@ -12178,6 +12450,193 @@ mod typecheck_tests {
             .unwrap()
             .join()
             .expect("worker thread completes");
+    }
+
+    // Builds a chain of lambda literals each hidden inside a `pair` value, so
+    // every level reaches `typecheck_value`'s container-driven `T::Lambda` arm
+    // rather than the `PUSH (lambda …)` instruction special case. The
+    // top-level value is `Pair Unit { … }` at `pair unit (lambda unit unit)`,
+    // and each lambda body is `{ PUSH (pair unit (lambda unit unit)) (Pair Unit
+    // <inner-lambda>) ; DROP }` (the DROP returns the body stack to `[unit]`
+    // for the `out_ty` unification).
+    //
+    // `mem::forget` isolates the L2-1663 typecheck fix under test. Dropping the
+    // deep result instead would still overflow: the value is an *alternating*
+    // `TypedValue` -> `Lambda` -> `Rc<[Instruction]>` -> `Push(Rc<TypedValue>)`
+    // -> ... nesting, and neither iterative `Drop` drains across that boundary
+    // (`TypedValue`'s drain does not walk a lambda's instruction code, and
+    // `Instruction`'s drop re-enters `TypedValue`'s), so the drop recurses one
+    // frame per level. That is a separate stack-overflow path (the deep-value
+    // *drop* family, cf. L2-1672) which this MR does not address and which the
+    // production origination path avoids by draining within the 32 KB
+    // operation-size bound; `forget` keeps this test focused on typechecking.
+    fn typecheck_nested_container_lambda<'a>(
+        arena: &'a typed_arena::Arena<Micheline<'a>>,
+        depth: usize,
+    ) -> Result<(), TcError> {
+        let unit_ty = Micheline::App(Prim::unit, &[], NO_ANNS);
+        let lambda_ty = Micheline::App(
+            Prim::lambda,
+            arena.alloc_extend([unit_ty.clone(), unit_ty.clone()]),
+            NO_ANNS,
+        );
+        let pair_ty = Micheline::App(
+            Prim::pair,
+            arena.alloc_extend([unit_ty.clone(), lambda_ty]),
+            NO_ANNS,
+        );
+        let unit_val = Micheline::App(Prim::Unit, &[], NO_ANNS);
+        let drop_instr = Micheline::App(Prim::DROP, &[], NO_ANNS);
+
+        let mut current_body: &[Micheline<'_>] = &[];
+        for _ in 0..depth {
+            let lambda_value = Micheline::Seq(current_body);
+            let pair_value = Micheline::App(
+                Prim::Pair,
+                arena.alloc_extend([unit_val.clone(), lambda_value]),
+                NO_ANNS,
+            );
+            let push = Micheline::App(
+                Prim::PUSH,
+                arena.alloc_extend([pair_ty.clone(), pair_value]),
+                NO_ANNS,
+            );
+            current_body = arena.alloc_extend([push, drop_instr.clone()]);
+        }
+        let top_value = Micheline::App(
+            Prim::Pair,
+            arena.alloc_extend([unit_val.clone(), Micheline::Seq(current_body)]),
+            NO_ANNS,
+        );
+
+        let mut ctx = Ctx::default();
+        ctx.gas = Gas::new(u32::MAX);
+        let ty = Type::new_pair(Type::Unit, Type::new_lambda(Type::Unit, Type::Unit));
+        match typecheck_value(&top_value, &mut ctx, &ty, AllowForgedLazyStorageId::No) {
+            Ok(tv) => {
+                std::mem::forget(tv);
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    // Regression for L2-1663. Before the fix the value-level `T::Lambda` arm
+    // called `typecheck_lambda` synchronously, so a lambda hidden inside a
+    // container value re-entered `typecheck_value` → `typecheck_lambda` →
+    // `typecheck` → step (PUSH) → `typecheck_value` and added Rust frames per
+    // nesting level: this chain aborted the kernel's ~1 MiB stack near depth
+    // 38 (a native abort, *before* the L1-parity 10 000 depth guard could
+    // return `TypecheckingTooManyRecursiveCalls`). With the value-lambda body
+    // routed through the shared `drive` worklist (AfterLambdaValue), depth is
+    // bounded by gas/heap only. Run on a 1 MiB worker thread matching the
+    // kernel budget; `mem::forget` (in the helper) skips the recursive Drop.
+    #[test]
+    fn deeply_nested_container_lambda_value_typechecks_without_stack_overflow() {
+        use std::thread;
+        const DEPTH: usize = 5_000;
+        thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+                typecheck_nested_container_lambda(&arena, DEPTH)
+                    .expect("container-hidden lambda chain must typecheck iteratively");
+                TYPECHECK_RECURSION_DEPTH.with(|d| {
+                    assert_eq!(
+                        d.get(),
+                        0,
+                        "depth counter must return to 0 after the iterative container-lambda chain",
+                    );
+                });
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Value-path analogue of
+    /// `push_lambda_literal_at_l1_depth_limit_returns_clean_error`: a
+    /// container-hidden lambda *value* must also be bounded by the shared
+    /// `TypecheckDepthGuard`. The value-level `T::Lambda` arm calls
+    /// `TypecheckDepthGuard::enter()?` before scheduling the body, so with the
+    /// counter pre-loaded past the L1-parity limit the very first entry must
+    /// return a clean `TypecheckingTooManyRecursiveCalls`, not recurse. Covers
+    /// the reject branch of the value path (the success branch is exercised by
+    /// `deeply_nested_container_lambda_value_typechecks_without_stack_overflow`).
+    #[test]
+    fn container_lambda_value_at_l1_depth_limit_returns_clean_error() {
+        TYPECHECK_RECURSION_DEPTH.with(|d| d.set(MAX_TYPECHECK_RECURSION_DEPTH + 1));
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let result = typecheck_nested_container_lambda(&arena, 1);
+        TYPECHECK_RECURSION_DEPTH.with(|d| d.set(0));
+        match result {
+            Err(TcError::TypecheckingTooManyRecursiveCalls) => {}
+            other => panic!(
+                "expected TypecheckingTooManyRecursiveCalls on the value path; got {other:?}",
+            ),
+        }
+    }
+
+    /// A container-hidden `Lambda_rec` *value* (not the `PUSH`/instruction
+    /// path) must typecheck through the value-level `T::Lambda` arm and build a
+    /// `Lambda::LambdaRec`. Guards against a `recursive`-flag mistake in that
+    /// arm (`recursive = matches!(raw, V::App(Prim::Lambda_rec, ..))`), which
+    /// the `push_lambda_rec*` tests do not cover (they go through the
+    /// instruction `for_push` path).
+    #[test]
+    fn container_lambda_rec_value_typechecks() {
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let unit_val = Micheline::App(Prim::Unit, &[], NO_ANNS);
+        // `Lambda_rec { SWAP ; DROP }` is well-typed at `lambda unit unit`
+        // (body stack `[self; unit]` -> SWAP -> `[unit; self]` -> DROP ->
+        // `[unit]`), matching the `push_lambda_rec` instruction-path test.
+        let body = Micheline::Seq(arena.alloc_extend([
+            Micheline::App(Prim::SWAP, &[], NO_ANNS),
+            Micheline::App(Prim::DROP, &[], NO_ANNS),
+        ]));
+        let lam_rec =
+            Micheline::App(Prim::Lambda_rec, arena.alloc_extend([body]), NO_ANNS);
+        let value =
+            Micheline::App(Prim::Pair, arena.alloc_extend([unit_val, lam_rec]), NO_ANNS);
+        let ty = Type::new_pair(Type::Unit, Type::new_lambda(Type::Unit, Type::Unit));
+        let mut ctx = Ctx::default();
+        ctx.gas = Gas::new(u32::MAX);
+        let tv = typecheck_value(&value, &mut ctx, &ty, AllowForgedLazyStorageId::No)
+            .expect("container-hidden Lambda_rec value must typecheck");
+        match &tv {
+            TypedValue::Pair(_, r) => match &**r {
+                TypedValue::Lambda(Closure::Lambda(Lambda::LambdaRec { .. })) => {}
+                other => {
+                    panic!("expected a LambdaRec closure in the pair; got {other:?}")
+                }
+            },
+            other => panic!("expected a Pair value; got {other:?}"),
+        }
+        drain_deep_typed_value(&mut { tv });
+
+        // Negative case: `Lambda_rec { DROP }` leaves `[self]` (a lambda), which
+        // cannot unify with `out_ty = unit` — the value-path arm must reject it,
+        // mirroring `push_lambda_rec_bad_result`.
+        let arena2: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let bad_body = Micheline::Seq(arena2.alloc_extend([Micheline::App(
+            Prim::DROP,
+            &[],
+            NO_ANNS,
+        )]));
+        let bad_lam =
+            Micheline::App(Prim::Lambda_rec, arena2.alloc_extend([bad_body]), NO_ANNS);
+        let bad_value = Micheline::App(
+            Prim::Pair,
+            arena2.alloc_extend([Micheline::App(Prim::Unit, &[], NO_ANNS), bad_lam]),
+            NO_ANNS,
+        );
+        let mut ctx2 = Ctx::default();
+        ctx2.gas = Gas::new(u32::MAX);
+        assert!(
+            typecheck_value(&bad_value, &mut ctx2, &ty, AllowForgedLazyStorageId::No)
+                .is_err(),
+            "an ill-typed container-hidden Lambda_rec body must be rejected on the value path",
+        );
     }
 
     // Regression: pre-fix, nested LAMBDAs grew the Rust call stack by one

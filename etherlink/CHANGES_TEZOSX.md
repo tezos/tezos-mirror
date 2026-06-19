@@ -239,6 +239,18 @@
   rather than restarting at zero for each `EVM → Michelson` frame —
   matching L1's single internal-nonce namespace for a manager
   operation's internal-op tree. (!22219)
+- MIR: prevent kernel stack overflow when typechecking a lambda literal
+  hidden inside a container value (e.g. `Pair … (lambda …)` in storage,
+  parameter, or `PUSH` data). The earlier top-level `PUSH (lambda …)` fix
+  did not cover container-hidden lambdas, which still re-entered
+  `typecheck_lambda` synchronously and grew the kernel's ~1 MiB WASM stack
+  one round-trip per nesting level — overflowing (a native abort) well
+  below the L1-parity 10 000-deep typecheck guard. The value and
+  instruction typecheckers now share a single explicit worklist, so a
+  container-hidden lambda body is scheduled on the heap worklist instead of
+  the Rust call stack; depth is bounded by gas and the existing 10 000-deep
+  guard, which now returns `TypecheckingTooManyRecursiveCalls` instead of
+  crashing the kernel. (!22272)
 - The Michelson storage-fees burn is now rendered on the CRAC-triggering
   operation: an Applied content that delegates storage cost to its
   callee carries the dual `(payer −V, storage fees +V)` balance-updates

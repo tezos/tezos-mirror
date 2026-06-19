@@ -66,9 +66,11 @@ Status:
   (e.g. `set (option (option …))`) parses fine then traps inside
   the property check.
 - **Interpreter** — gas charged per instruction step. The instruction
-  worklist is iterative, but: (a) `typecheck_lambda` /
-  `typecheck_map_block` still recurse on nested LAMBDA / MAP_BLOCK,
-  growing the Rust stack one frame per nesting level; (b) the public
+  worklist is iterative, but: (a) `typecheck_map_block` still recurses on
+  nested MAP_BLOCK, growing the Rust stack one frame per nesting level
+  (the lambda paths no longer do: since L2-1663 both `PUSH (lambda …)` and
+  value-level lambdas run their body on the shared worklist, and the
+  dedicated `typecheck_lambda` helper was removed); (b) the public
   `Instruction::interpret` skips the worklist driver entirely; (c) on
   `Err` unwind (FAILWITH mid-ITER, OOG mid-DIP), the `Vec<InterpFrame>`
   and `Vec<IStack>` drop their `Rc<TypedValue>` children via the
@@ -113,8 +115,9 @@ Worst case under the current design:
 Three residual paths still grow the Rust stack proportional to input
 depth, and so retain the original WASM-PVM-trap hazard:
 
-- `typecheck_lambda` / `typecheck_map_block` / `typecheck_view` →
-  `typecheck` (call-graph cycle through Rust function calls).
+- `typecheck_map_block` / `typecheck_view` → `typecheck` (call-graph cycle
+  through Rust function calls). (The lambda paths were converted to the shared
+  worklist in L2-1663, removing the `typecheck_lambda` helper.)
 - `ensure_prop`, `size_for_gas`, the derived `PartialEq for Type` (when
   the manual impl in `Type` has not yet landed).
 - `Rc<TypedValue>` and the auto-derived `Drop` on values built by the
