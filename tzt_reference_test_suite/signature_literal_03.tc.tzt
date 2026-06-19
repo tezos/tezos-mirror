@@ -1,0 +1,6 @@
+# Incorrect BLS (readable) signature literal
+
+code { PUSH signature "BLsigAkSe6MJGJy1mUjjCU7vAWujPLPmy7W2ZbuN4a5hHrBvSbyJSSEbU85YjnneciRHhs7SKju3dGPahkjhDgTwE6XZ8EKLwFxMbstQ97JqDEyhmw8se29mfCcN8PbE36eUhKVro75TwD"; DROP };
+
+input { Stack_elt unit Unit };
+output (StaticError _ );

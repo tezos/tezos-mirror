@@ -1,0 +1,6 @@
+# Correct BLS (optimized) signature literal
+
+code { PUSH signature 0x803282bd376c320dd753280ff65086eb325ec04ede4cfbdf8da9e754c2627d4568885d006dfdd494213302ba4e99e58904fe2a9637c7297947174b695f3e965cf935ca41217398e184b7e14fe7cec7982b87f1f0b6091deb2ed734ddef207fa8; DROP };
+
+input { Stack_elt unit Unit };
+output { Stack_elt unit Unit };

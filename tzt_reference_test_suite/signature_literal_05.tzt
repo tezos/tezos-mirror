@@ -1,0 +1,6 @@
+# Correct unknown signature literal (64 bytes)
+
+code { PUSH signature 0x00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff; DROP };
+
+input { Stack_elt unit Unit };
+output { Stack_elt unit Unit };

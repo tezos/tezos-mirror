@@ -1,0 +1,6 @@
+# Correct BLS (readable) signature literal
+
+code { PUSH signature "BLsig9WknWnGmPcJw1q9oCBr53UyjAWxxYNS5wz5HBKmCcuxCfK1Hwhs92YDFocvxUhXfUosgcTuzAEuAAjKzjy7isNhU3o2e8snmZyo9E85oRudCpM1MNtkeAAYEkSXUPLKtRYa9yFwni"; DROP };
+
+input { Stack_elt unit Unit };
+output { Stack_elt unit Unit };

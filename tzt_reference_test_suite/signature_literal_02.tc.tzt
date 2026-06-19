@@ -1,0 +1,6 @@
+# Incorrect p256 signature literal
+
+code { PUSH signature "p2siguUh7cMKLJXW8PecJ7iiVvhn4fJpxZUsxHaydVRn92CK5RDjbf12U6v2b5Uo2XJ9Nu9BTtnfsHvX3qQ3d8CLhqJdhShnqZ"; DROP };
+
+input { Stack_elt unit Unit };
+output (StaticError _ );

@@ -1,0 +1,6 @@
+# Incorrect BLS (optimized) signature literal
+
+code { PUSH signature 0x9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; DROP };
+
+input { Stack_elt unit Unit };
+output (StaticError _ );

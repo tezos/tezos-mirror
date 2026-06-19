@@ -1,0 +1,6 @@
+# Incorrect secp256k1 signature literal
+
+code { PUSH signature "spsig1fJWmkWTSFeayPrYU3RomkHGpRNpgnfd11c8ezKJTi4ihXcBwXqGj28MGHSVktuEZe1FqTyeZEtbTfFMKi7uPi2Ys35tuL"; DROP };
+
+input { Stack_elt unit Unit };
+output (StaticError _ );
