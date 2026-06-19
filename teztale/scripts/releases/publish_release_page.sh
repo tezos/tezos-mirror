@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 
+# Publishes the Teztale release page: renders the HTML page from the published
+# versions.json, then uploads it to S3 and invalidates the CDN.
+#
+# The release assets and versions.json are deployed beforehand by
+# [deploy_release_page_assets.sh]. This script only reflects what is already
+# published, so it can be re-run at any time to regenerate the page without
+# re-running a release.
+
 set -eu
 
 REGION="${REGION:-eu-west-1}"
 
 if [ -z "${S3_BUCKET:-}" ]; then
-  echo "S3_BUCKET variable is not set, impossible to publish assets and release page."
+  echo "S3_BUCKET variable is not set, impossible to publish the release page."
   exit 1
 fi
 
@@ -24,73 +32,9 @@ dune build ci/bin_release_page/src/
 VM="_build/default/ci/bin_release_page/src/version_manager.exe"
 S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}/teztale"
 
+# Download the published versions.json so the page reflects what is published.
 echo "Downloading versions.json..."
 $VM download --path "${S3_PATH}"
-
-# If it's a release, we actually push the assets to the s3 bucket
-if [ -n "${CI_COMMIT_TAG}" ]; then
-
-  # Initialize Teztale release variables needed later to determine relevant version information:
-  # - major and minor version numbers (resp. [release_major_version], [release_minor_version])
-  # - and, optionally, release candidate or beta version number ([release_rc_version], [release_beta_version]).
-  # shellcheck source=./teztale/scripts/releases/release.sh
-  . ./teztale/scripts/releases/release.sh
-
-  if [ -z "${release}" ]; then
-    echo "This is not a Teztale release. No assets will be added to the release page."
-  else
-
-    echo "Adding version ${release} to release page..."
-    $VM \
-      add \
-      --major "${release_major_version}" \
-      --minor "${release_minor_version}" \
-      ${release_rc_version:+--rc "${release_rc_version}"} \
-      ${release_beta_version:+--beta "${release_beta_version}"}
-
-    if [ -z "${release_rc_version}" ] && [ -z "${release_beta_version}" ]; then
-      echo "Setting version as latest..."
-      $VM \
-        set-latest \
-        --major "${release_major_version}" \
-        --minor "${release_minor_version}"
-    fi
-
-    # Upload binaries to S3 bucket
-    echo "Uploading binaries..."
-    aws s3 sync "./teztale-binaries/x86_64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/teztale/teztale-v${release_no_v}/binaries/x86_64" --region "${REGION}"
-    aws s3 sync "./teztale-binaries/arm64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/teztale/teztale-v${release_no_v}/binaries/arm64" --region "${REGION}"
-
-    # Create and push archives
-    tar -czf "${release}.tar.gz" --transform 's|^\teztale-binaries/x86_64/|teztale/|' teztale-binaries/x86_64/*
-    aws s3 cp "./${release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH:-}/teztale/teztale-v${release_no_v}/binaries/x86_64/" --region "${REGION}"
-    sha256sum "${release}.tar.gz" >> "./x86_64_sha256sums.txt"
-    tar -czf "${release}.tar.gz" --transform 's|^\teztale-binaries/arm64/|teztale/|' teztale-binaries/arm64/*
-    sha256sum "${release}.tar.gz" >> "./arm64_sha256sums.txt"
-    aws s3 cp "./${release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH:-}/teztale/teztale-v${release_no_v}/binaries/arm64/" --region "${REGION}"
-
-    # Push checksums for x86_64 binaries
-    echo "Generating checksums for x86_64 binaries"
-    for binary in ./teztale-binaries/x86_64/*; do
-      filename=$(basename "$binary")
-      [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./x86_64_sha256sums.txt"
-    done
-    aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/teztale/teztale-v${release_no_v}/binaries/x86_64/sha256sums.txt"
-
-    # Push checksums for arm64 binaries
-    echo "Generating checksums for arm64 binaries"
-    for binary in ./teztale-binaries/arm64/*; do
-      filename=$(basename "$binary")
-      [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./arm64_sha256sums.txt"
-    done
-    aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/teztale/teztale-v${release_no_v}/binaries/arm64/sha256sums.txt"
-  fi
-else
-  echo "No tag found. No asset will be added to the release page."
-fi
-
-echo "Uploading versions.json..."
-$VM upload --path "${S3_PATH}"
 
 echo "Building release page"
 dune exec ./ci/bin_release_page/src/release_page.exe -- --component 'teztale' \
