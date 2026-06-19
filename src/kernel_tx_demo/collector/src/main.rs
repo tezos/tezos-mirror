@@ -7,11 +7,8 @@ use notify::{RecursiveMode, Result, Watcher};
 use std::cmp;
 use std::fs::File;
 use std::io::{Read, Seek};
-use std::net::TcpStream;
-use websocket::sender::Sender;
-use websocket::sync::{Client, Server};
-use websocket::ws::Sender as SenderTrait;
-use websocket::Message;
+use std::net::{TcpListener, TcpStream};
+use tungstenite::{accept, Message, WebSocket};
 
 /// Simple program to greet a person
 #[derive(Parser)]
@@ -63,15 +60,15 @@ fn main() -> anyhow::Result<()> {
     let mut should_stop = false;
 
     //Open a websocket listener
-    let mut listener = Server::bind(format!("0.0.0.0:{port}"))?;
+    let listener = TcpListener::bind(format!("0.0.0.0:{port}"))?;
 
     println!("Ready to receive new connection");
 
-    let (listeners_tx, listeners_rx) = std::sync::mpsc::channel::<Option<Client<TcpStream>>>();
+    let (listeners_tx, listeners_rx) = std::sync::mpsc::channel::<Option<WebSocket<TcpStream>>>();
     let listeners_tx_clone_for_ctrlc = listeners_tx.clone();
     std::thread::spawn(move || loop {
         match listener.accept() {
-            Ok(socket) => match socket.accept() {
+            Ok((stream, _addr)) => match accept(stream) {
                 Ok(client) => {
                     println!("New client connected");
                     listeners_tx.send(Some(client)).unwrap();
@@ -148,11 +145,8 @@ fn main() -> anyhow::Result<()> {
                             let buf: Vec<u8> = iter
                                 .flat_map(|x| [row, column, x[0], x[1], x[2], x[3]])
                                 .collect();
-                            let message = Message::binary(buf);
-                            let mut sender = Sender::new(false);
-                            let mut writer = Vec::new();
-                            sender.send_message(&mut writer, &message).unwrap();
-                            match client.writer_mut().write_all(&writer) {
+                            let message = Message::Binary(buf);
+                            match client.send(message) {
                                 Ok(_) => {
                                     pointer += read_amount;
                                 }

@@ -11,5 +11,4 @@ anyhow = { version = "1", features = ["backtrace"] }
 ctrlc = "3"
 notify = "5.0.0"
 clap = { version = "4", features = ["derive"] }
-websocket = "0.26.5"
-openssl = { version = "0.10.63", features = ["vendored"] }
+tungstenite = "0.21"
