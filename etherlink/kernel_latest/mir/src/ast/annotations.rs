@@ -187,7 +187,7 @@ impl<'a> Annotations<'a> {
     }
 
     /// Add an annotation to the list of annotations.
-    pub fn push(&mut self, annotation: Annotation<'a>) -> () {
+    pub fn push(&mut self, annotation: Annotation<'a>) {
         self.0.push(annotation)
     }
 }

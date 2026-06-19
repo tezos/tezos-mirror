@@ -917,7 +917,7 @@ pub mod interpret_cost {
                     _,
                 ) => return Err(CompareError::Incomparable),
             };
-            total = total + node;
+            total += node;
         }
         Ok(total.as_gas_cost()?)
     }
@@ -1006,7 +1006,7 @@ pub mod interpret_cost {
                 // non-comparable values cannot be collection keys
                 _ => 0,
             };
-            total = total + sz;
+            total += sz;
         }
         total.ok_or(CostOverflow)
     }

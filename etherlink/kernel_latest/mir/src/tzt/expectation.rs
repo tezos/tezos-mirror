@@ -127,6 +127,50 @@ fn unify_interpreter_error<'a>(
     }
 }
 
+pub fn check_expectation<'a>(
+    ctx: &mut Ctx<'a>,
+    expected: TestExpectation<'a>,
+    real: Result<(FailingTypeStack, IStack<'a>), TestError<'a>>,
+) -> Result<(), TztTestError<'a>> {
+    use TestExpectation::*;
+    use TztTestError::*;
+    match (expected, real) {
+        (ExpectSuccess(stk_exp), Ok((res_type_stack, result_stack))) => {
+            let (exp_stk_types, exp_stk_values): (Vec<Type>, Vec<TypedValue>) =
+                stk_exp.into_iter().unzip();
+
+            let expected_type_stack = FailingTypeStack::Ok(TopIsFirst::from(exp_stk_types).0);
+            let expected_stack = TopIsFirst::from(exp_stk_values).0;
+            // If the run was success, and the expectation is also of success check the expected
+            // stack. Stack types and values should match.
+            if compare_typed_stacks(
+                &res_type_stack,
+                result_stack.clone(),
+                &expected_type_stack,
+                expected_stack.clone(),
+            ) {
+                Ok(())
+            } else {
+                Err(StackMismatch(
+                    (expected_type_stack, expected_stack),
+                    (res_type_stack, result_stack),
+                ))
+            }
+        }
+        (ExpectSuccess(_), Err(e)) => {
+            // If the run was failed, but the expectation expected
+            // a success, fail the test with appropriate error..
+            Err(UnexpectedError(e))
+        }
+        (ExpectError(e), Ok((_, i_stack))) => {
+            // If the run was success, but the expectation expected
+            // a failure, fail the test.
+            Err(UnexpectedSuccess(e, i_stack))
+        }
+        (ExpectError(err_exp), Err(t_error)) => check_error_expectation(ctx, err_exp, t_error),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,49 +268,5 @@ mod tests {
             TestError::TypecheckerError(TcError::CompareError(CompareError::Incomparable)),
         )
         .is_err());
-    }
-}
-
-pub fn check_expectation<'a>(
-    ctx: &mut Ctx<'a>,
-    expected: TestExpectation<'a>,
-    real: Result<(FailingTypeStack, IStack<'a>), TestError<'a>>,
-) -> Result<(), TztTestError<'a>> {
-    use TestExpectation::*;
-    use TztTestError::*;
-    match (expected, real) {
-        (ExpectSuccess(stk_exp), Ok((res_type_stack, result_stack))) => {
-            let (exp_stk_types, exp_stk_values): (Vec<Type>, Vec<TypedValue>) =
-                stk_exp.into_iter().unzip();
-
-            let expected_type_stack = FailingTypeStack::Ok(TopIsFirst::from(exp_stk_types).0);
-            let expected_stack = TopIsFirst::from(exp_stk_values).0;
-            // If the run was success, and the expectation is also of success check the expected
-            // stack. Stack types and values should match.
-            if compare_typed_stacks(
-                &res_type_stack,
-                result_stack.clone(),
-                &expected_type_stack,
-                expected_stack.clone(),
-            ) {
-                Ok(())
-            } else {
-                Err(StackMismatch(
-                    (expected_type_stack, expected_stack),
-                    (res_type_stack, result_stack),
-                ))
-            }
-        }
-        (ExpectSuccess(_), Err(e)) => {
-            // If the run was failed, but the expectation expected
-            // a success, fail the test with appropriate error..
-            Err(UnexpectedError(e))
-        }
-        (ExpectError(e), Ok((_, i_stack))) => {
-            // If the run was success, but the expectation expected
-            // a failure, fail the test.
-            Err(UnexpectedSuccess(e, i_stack))
-        }
-        (ExpectError(err_exp), Err(t_error)) => check_error_expectation(ctx, err_exp, t_error),
     }
 }

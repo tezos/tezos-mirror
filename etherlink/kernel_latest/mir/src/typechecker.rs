@@ -762,8 +762,8 @@ fn push_pair_children_visit<'a, 'b>(
 /// Register the field annotation of this `ty` as an entrypoint if the
 /// node is being parsed as part of an entrypoint-bearing path, then push
 /// the parsed Type onto the result stack.
-fn finalize_node<'a, 'b>(
-    ty: &'b Micheline<'a>,
+fn finalize_node<'a>(
+    ty: &Micheline<'a>,
     parsed_ty: Type,
     with_entrypoints: bool,
     path: Vec<Direction>,
@@ -1185,7 +1185,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
             }
         }
     }
-    Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "root type" }))?)
+    results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "root type" }))
 }
 
 #[allow(clippy::type_complexity)]
@@ -2086,8 +2086,8 @@ fn stack_top_mut(stack: &mut TypeStack) -> Result<&mut Type, TcError> {
         .map_err(|_| TcError::InternalError(TcInvariant::EmptyTypeStack))
 }
 
-pub(crate) fn typecheck_instruction<'a, 'b>(
-    i: &'b Micheline<'a>,
+pub(crate) fn typecheck_instruction<'a>(
+    i: &Micheline<'a>,
     gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
@@ -2106,8 +2106,8 @@ pub(crate) fn typecheck_instruction<'a, 'b>(
 /// Like [typecheck_instruction] but threads `typecheck_views`: `true` at
 /// origination validates an embedded `CREATE_CONTRACT`'s child-script views
 /// like L1; re-typecheck and runtime callers pass `false`.
-fn typecheck_instruction_with_views<'a, 'b>(
-    i: &'b Micheline<'a>,
+fn typecheck_instruction_with_views<'a>(
+    i: &Micheline<'a>,
     gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
@@ -2122,7 +2122,7 @@ fn typecheck_instruction_with_views<'a, 'b>(
         in_view,
         typecheck_views,
     )?;
-    Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "typecheck_instruction produced one" }))?)
+    results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "typecheck_instruction produced one" }))
 }
 
 /// Per instruction step used by the iterative driver. For non recursive
@@ -4072,7 +4072,7 @@ pub(crate) fn typecheck_value_with_views<'a, 'b>(
     while let Some(frame) = frames.pop() {
         step_typecheck_value(frame, ctx, &mut frames, &mut results, typecheck_views)?;
     }
-    Ok(results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "typecheck_value root" }))?)
+    results.pop().ok_or(TcError::InternalError(TcInvariant::EmptyResultStack { expected: "typecheck_value root" }))
 }
 
 fn step_typecheck_value<'a, 'b>(

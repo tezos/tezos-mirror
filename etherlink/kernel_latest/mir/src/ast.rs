@@ -899,28 +899,28 @@ pub(crate) fn debug_fmt_walk<'a, 'b>(
                 // Leaves: format directly. None of these inner Debug
                 // impls walk a `TypedValue` themselves, so they are
                 // iteratively safe.
-                TV::Int(n) => write!(f, "Int({:?})", n)?,
-                TV::Nat(n) => write!(f, "Nat({:?})", n)?,
-                TV::Mutez(m) => write!(f, "Mutez({:?})", m)?,
-                TV::Bool(b) => write!(f, "Bool({:?})", b)?,
-                TV::String(s) => write!(f, "String({:?})", s)?,
+                TV::Int(n) => write!(f, "Int({n:?})")?,
+                TV::Nat(n) => write!(f, "Nat({n:?})")?,
+                TV::Mutez(m) => write!(f, "Mutez({m:?})")?,
+                TV::Bool(b) => write!(f, "Bool({b:?})")?,
+                TV::String(s) => write!(f, "String({s:?})")?,
                 TV::Unit => f.write_str("Unit")?,
-                TV::Bytes(b) => write!(f, "Bytes({:?})", b)?,
-                TV::Address(a) => write!(f, "Address({:?})", a)?,
-                TV::ChainId(c) => write!(f, "ChainId({:?})", c)?,
-                TV::Contract(a) => write!(f, "Contract({:?})", a)?,
-                TV::Key(k) => write!(f, "Key({:?})", k)?,
-                TV::Signature(s) => write!(f, "Signature({:?})", s)?,
-                TV::KeyHash(h) => write!(f, "KeyHash({:?})", h)?,
-                TV::Timestamp(t) => write!(f, "Timestamp({:?})", t)?,
-                TV::Operation(op) => write!(f, "Operation({:?})", op)?,
-                TV::BigMap(bm) => write!(f, "BigMap({:?})", bm)?,
+                TV::Bytes(b) => write!(f, "Bytes({b:?})")?,
+                TV::Address(a) => write!(f, "Address({a:?})")?,
+                TV::ChainId(c) => write!(f, "ChainId({c:?})")?,
+                TV::Contract(a) => write!(f, "Contract({a:?})")?,
+                TV::Key(k) => write!(f, "Key({k:?})")?,
+                TV::Signature(s) => write!(f, "Signature({s:?})")?,
+                TV::KeyHash(h) => write!(f, "KeyHash({h:?})")?,
+                TV::Timestamp(t) => write!(f, "Timestamp({t:?})")?,
+                TV::Operation(op) => write!(f, "Operation({op:?})")?,
+                TV::BigMap(bm) => write!(f, "BigMap({bm:?})")?,
                 #[cfg(feature = "bls")]
-                TV::Bls12381Fr(x) => write!(f, "Bls12381Fr({:?})", x)?,
+                TV::Bls12381Fr(x) => write!(f, "Bls12381Fr({x:?})")?,
                 #[cfg(feature = "bls")]
-                TV::Bls12381G1(x) => write!(f, "Bls12381G1({:?})", x)?,
+                TV::Bls12381G1(x) => write!(f, "Bls12381G1({x:?})")?,
                 #[cfg(feature = "bls")]
-                TV::Bls12381G2(x) => write!(f, "Bls12381G2({:?})", x)?,
+                TV::Bls12381G2(x) => write!(f, "Bls12381G2({x:?})")?,
                 // Lambda: enqueue the closure on the shared worklist so the
                 // alternating `arg_val: TypedValue` / `closure: Closure`
                 // chain (reachable via `APPLY` of lambda values) never
@@ -2449,7 +2449,7 @@ mod debug_tests {
                 for _ in 0..DEPTH {
                     deep = Type::new_pair(Type::Int, deep);
                 }
-                let formatted = format!("{:?}", deep);
+                let formatted = format!("{deep:?}");
                 assert!(formatted.starts_with("Pair("));
                 assert!(formatted.ends_with(')'));
             })
@@ -2471,7 +2471,7 @@ mod debug_tests {
                 for _ in 0..DEPTH {
                     deep = TypedValue::Pair(Rc::new(TypedValue::Unit), Rc::new(deep));
                 }
-                let formatted = format!("{:?}", deep);
+                let formatted = format!("{deep:?}");
                 assert!(formatted.starts_with("Pair("));
                 assert!(formatted.ends_with(')'));
                 // Drain so the iterative auto Drop on TypedValue (still a

@@ -1229,8 +1229,8 @@ fn handle_step<'a, 'b>(
             new_amount,
             new_balance,
         } => {
-            let saved_self_address = ctx.self_address().clone();
-            let saved_sender = ctx.sender().clone();
+            let saved_self_address = ctx.self_address();
+            let saved_sender = ctx.sender();
             let saved_amount = ctx.amount();
             let saved_balance = ctx.balance();
             // Queue the `AfterView` restore frame first so that, if any
@@ -1609,7 +1609,7 @@ fn interpret_step<'a, 'b, 'c>(
                 code,
                 initial,
                 new_self_address: AddressHash::Kt1(kt1),
-                new_sender: ctx.self_address().clone(),
+                new_sender: ctx.self_address(),
                 new_amount: 0,
                 new_balance: view_balance,
             })
@@ -3251,7 +3251,7 @@ fn interpret_one<'a>(
                     Ok((g1, g2))
                 })
                 .collect::<Result<_, _>>()?;
-            let res = bls::pairing::pairing_check(pairs.into_iter());
+            let res = bls::pairing::pairing_check(pairs);
             stack.push(V::Bool(res));
         }
         I::CreateContract(cs, micheline) => {
@@ -7782,7 +7782,7 @@ mod interpreter_tests {
         ctx.storage = HashMap::from([(kt1.clone(), (Type::Unit, V::Unit))]);
 
         let address = V::Address(addr::Address {
-            hash: kt1.clone(),
+            hash: kt1,
             entrypoint: Entrypoint::default(),
         });
 
