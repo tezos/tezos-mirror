@@ -34,11 +34,11 @@ module Files = struct
 
   let mir =
     [
-      "contrib/mir/**/*.rs";
-      "contrib/mir/**/*.lalrpop";
+      "etherlink/kernel_latest/mir/**/*.rs";
+      "etherlink/kernel_latest/mir/**/*.lalrpop";
       (* Cargo.toml, clippy.toml *)
-      "contrib/mir/**/*.toml";
-      "contrib/mir/**/Cargo.lock";
+      "etherlink/kernel_latest/mir/**/*.toml";
+      "etherlink/kernel_latest/mir/**/Cargo.lock";
     ]
 
   let tzt = ["tzt_reference_test_suite/**/*"]
@@ -255,17 +255,6 @@ let job_test_revm_compatibility =
         "./revm-evaluation-assessor --test-cases ./evm_fixtures/";
       ]
 
-let job_mir_unit =
-  CI.job
-    "mir_unit"
-    ~__POS__
-    ~description:"Run unit tests for MIR."
-    ~image:Images.CI.test
-    ~stage:Test
-    ~only_if_changed:Files.mir
-    ~cargo_cache:true
-    ~script:["cargo test --manifest-path contrib/mir/Cargo.toml"]
-
 let job_mir_tzt =
   CI.job
     "mir_tzt"
@@ -277,8 +266,8 @@ let job_mir_tzt =
     ~cargo_cache:true
     ~script:
       [
-        "cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner \
-         tzt_reference_test_suite/*.tzt";
+        "cargo run --manifest-path etherlink/kernel_latest/mir/Cargo.toml \
+         --bin tzt_runner tzt_reference_test_suite/*.tzt";
       ]
 
 let job_build_tezt =
@@ -452,7 +441,6 @@ let register () =
       (Auto, job_test_kernel);
       (Auto, job_test_evm_compatibility);
       (Auto, job_test_revm_compatibility);
-      (Auto, job_mir_unit);
       (Auto, job_mir_tzt);
       (Auto, job_tezt `merge_request);
       (Manual, job_tezt_slow `merge_request);
@@ -491,7 +479,6 @@ let register () =
       (Auto, job_tezt_slow `scheduled);
       (Auto, job_tezt_extra `scheduled);
       (Auto, job_tezt_flaky `scheduled);
-      (Auto, job_mir_unit);
       (Auto, job_mir_tzt);
     ] ;
   ()

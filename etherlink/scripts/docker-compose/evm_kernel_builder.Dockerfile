@@ -10,7 +10,6 @@ WORKDIR /build
 COPY kernels.mk etherlink.mk /build/
 COPY src/kernel_sdk /build/src/kernel_sdk
 COPY etherlink /build/etherlink
-COPY contrib/mir /build/contrib/mir
 COPY sdk /build/sdk
 COPY vendors/http /build/vendors/http
 RUN make -f etherlink.mk build-deps
