@@ -1,0 +1,7 @@
+code APPLY ;
+input
+  {
+    Stack_elt (ticket string) (Pair "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" "x" 1) ;
+    Stack_elt (lambda (pair (ticket string) unit) unit) { DROP ; UNIT } ;
+  } ;
+output (StaticError _) ;

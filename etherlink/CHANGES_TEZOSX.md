@@ -96,6 +96,12 @@
 
 ### Michelson Runtime
 
+- The `APPLY` instruction now rejects a non-packable captured value
+  (e.g. `big_map` or `ticket`) during typechecking, matching L1, which
+  requires the captured type to be packable with contracts disallowed.
+  Previously the Michelson runtime typechecker accepted such scripts,
+  diverging from L1 and producing closure storage that failed to reload
+  on the next call. (!22248)
 - The `VIEW` instruction now gates execution on two type-equality checks,
   matching L1: the callee view's declared output type must equal the
   caller-requested return type, and the caller's argument type must equal

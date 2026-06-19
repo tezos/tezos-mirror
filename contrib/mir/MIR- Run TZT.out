@@ -45,6 +45,8 @@
   "apply_00.tzt": true,
   "apply_01.tzt": true,
   "apply_02.tzt": true,
+  "apply_03.tc.tzt": true,
+  "apply_04.tc.tzt": true,
   "balance_00.tzt": true,
   "blake2b_00.tzt": true,
   "blake2b_01.tzt": true,
