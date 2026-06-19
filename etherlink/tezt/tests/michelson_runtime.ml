@@ -5352,9 +5352,38 @@ let nested_or_param_script depth =
    a parsed type. *)
 let deep_pair_depth = 1000
 
+(* L2-1663: a lambda literal hidden inside a [pair] storage value. Each level
+   is [(Pair Unit { PUSH (pair unit (lambda unit unit)) <inner> ; DROP })], so
+   typechecking the initial storage at origination drives the value-level
+   lambda through [typecheck_value]'s container path (not the top-level
+   [PUSH (lambda ...)] special case). Before the iterative fix this recursed on
+   the kernel's ~1 MiB Rust stack and trapped; after it, the value is
+   typechecked normally. (The resulting deep typed value is then stored and
+   released through the origination teardown's iterative draining, so this test
+   stays within the size-bounded depth where that path is safe.) The innermost
+   lambda body is empty, and each enclosing body PUSHes the next [pair] value
+   then DROPs it so the body stack returns to [unit] for the lambda's
+   [out_ty]. *)
+let nested_container_lambda_storage depth =
+  let buf = Buffer.create 8192 in
+  for _ = 1 to depth do
+    Buffer.add_string buf "(Pair Unit { PUSH (pair unit (lambda unit unit)) "
+  done ;
+  Buffer.add_string buf "(Pair Unit {})" ;
+  for _ = 1 to depth do
+    Buffer.add_string buf " ; DROP })"
+  done ;
+  Buffer.contents buf
+
 let deep_if_depth = 1300
 
 let deep_or_depth = 1000
+
+(* Far above the ~38-level kernel overflow threshold for the container-hidden
+   lambda shape (per-level Rust frame cost is large), yet well under both the
+   32 KB operation-size limit (~30 B/level encoded) and the 10000-deep
+   typecheck guard, so origination is accepted after the fix. *)
+let deep_container_lambda_depth = 300
 
 (* [test_deep_type_in_invalid_arg_error] needs the deep parameter type to be
    accepted at origination, so it stays at the type-size cap; the transfer then
@@ -5440,6 +5469,64 @@ let test_deep_or_param =
   in
   let*@ _ = produce_block sequencer in
   unit
+
+(* L2-1663: originate a contract whose initial storage carries a lambda
+   literal hidden inside a deeply nested [pair] value. The kernel typechecks
+   the storage value at origination, driving the value-level lambda through
+   [typecheck_value]'s container path. Pre-fix this trapped the kernel's WASM
+   stack (on both the sequencer Wasmer runtime and the smaller-stack PVM);
+   after the iterative fix origination is accepted on both. We replay the
+   origination block through the rollup-node PVM ([bake_until_sync]) because
+   the PVM runs the kernel on the small consensus stack, where a residual
+   recursive walker would overflow even if the larger sequencer stack did not.
+   Depth 300 sits well above the overflow threshold (~38 nesting levels on a
+   ~1 MiB stack pre-fix) yet well under both the 32 KB operation-size limit
+   (origination is size-rejected around depth ~1300) and the 10000-deep
+   typecheck guard, so post-fix the storage value typechecks and is stored. *)
+(* Originate a contract whose initial storage nests a lambda literal inside a
+   [pair] [depth] levels deep, then replay the origination block through the
+   rollup-node PVM. Shared by the typecheck (L2-1663) and drop (L2-1703)
+   regressions, which differ only in the nesting [depth] they exercise. *)
+let register_deep_container_lambda_storage_test ~title ?(extra_tags = []) ~alias
+    ~depth ~burn_cap () =
+  register_tezosx_test
+    ~title
+    ~tags:(["stack_overflow"; "origination"; "typecheck"] @ extra_tags)
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let path =
+    write_temp_michelson
+      ~name:alias
+      ~contents:
+        "parameter unit ; storage (pair unit (lambda unit unit)) ; code { CDR \
+         ; NIL operation ; PAIR }"
+  in
+  let* _alias =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:(nested_container_lambda_storage depth)
+      ~prg:path
+      ~burn_cap
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  (* Re-execute the origination block through the rollup-node PVM (small
+     consensus stack) so a walker that overflowed only on the small stack would
+     stall this sync. *)
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  unit
+
+let test_deep_container_lambda_storage =
+  register_deep_container_lambda_storage_test
+    ~title:"Deep container-hidden lambda storage value is accepted"
+    ~alias:"deep_container_lambda"
+    ~depth:deep_container_lambda_depth
+    ~burn_cap:(Tez.of_int 10)
+    ()
 
 (* Originates a contract whose recursive lambda loops via self execution.
    After the conversion the interpreter exhausts gas instead of trapping
@@ -6118,5 +6205,6 @@ let () =
   test_deep_pair_param [Alpha] ;
   test_deep_if_code [Alpha] ;
   test_deep_or_param [Alpha] ;
+  test_deep_container_lambda_storage [Alpha] ;
   test_recursive_lambda_exhausts_gas [Alpha] ;
   test_deep_type_in_invalid_arg_error [Alpha]
