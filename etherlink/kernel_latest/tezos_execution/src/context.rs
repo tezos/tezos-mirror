@@ -273,3 +273,68 @@ pub mod account {
         concat(account.path(), &MANAGER_PATH)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_crypto_rs::blake2b;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_interfaces::{AliasInfo, RuntimeId};
+
+    #[test]
+    fn record_origin_writes_given_origin_for_kt1() {
+        let mut host = MockKernelHost::default();
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"some-test-seed"));
+
+        let originated = originated_from_kt1(&kt1).unwrap();
+        let path = originated.path().clone();
+
+        // Before origination, no classification.
+        assert!(get_origin_at(&host, &path).unwrap().is_none());
+
+        record_origin(&mut host, &kt1, &Origin::Native).unwrap();
+
+        // After origination, Native.
+        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(Origin::Native));
+
+        // record_origin with Alias overwrites with Alias.
+        let alias = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Ethereum,
+            native_address: b"0xfeedface".to_vec(),
+        });
+        record_origin(&mut host, &kt1, &alias).unwrap();
+        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(alias));
+    }
+
+    #[test]
+    fn read_origin_for_address_implicit_is_native_by_construction() {
+        let host = MockKernelHost::default();
+        let pkh =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let address = AddressHash::Implicit(pkh);
+
+        // An implicit account is Native by construction: classification needs
+        // no durable read and stores no `/origin` record.
+        assert_eq!(
+            read_origin_for_address(&host, &address).unwrap(),
+            Some(Origin::Native),
+        );
+    }
+
+    #[test]
+    fn read_origin_for_address_kt1_round_trips_classification() {
+        let mut host = MockKernelHost::default();
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"kt1-test-seed"));
+        let address = AddressHash::Kt1(kt1.clone());
+
+        // Unrecorded: returns None.
+        assert!(read_origin_for_address(&host, &address).unwrap().is_none());
+
+        // Native: returns Native.
+        record_origin(&mut host, &kt1, &Origin::Native).unwrap();
+        assert_eq!(
+            read_origin_for_address(&host, &address).unwrap(),
+            Some(Origin::Native),
+        );
+    }
+}
