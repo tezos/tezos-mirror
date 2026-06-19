@@ -1,0 +1,6 @@
+# Correct ed25519 signature literal
+
+code { PUSH signature "edsigtp1GGNSTUyG2cmbpNV9guD4dS5FvrSEA3YV7bhP5AQnGTzmLNwtYoLHC7msobDDvNbKhwfM9mj43jSCksZEy4S4wECpCNd"; DROP };
+
+input { Stack_elt unit Unit };
+output { Stack_elt unit Unit };

@@ -51,6 +51,12 @@ impl From<entrypoint::ByteReprError> for ByteReprError {
     }
 }
 
+impl From<tezos_crypto_rs::CryptoError> for ByteReprError {
+    fn from(value: tezos_crypto_rs::CryptoError) -> Self {
+        Self::WrongFormat(value.to_string())
+    }
+}
+
 /// Trait for values representable by either raw bytes or base58check-derived
 /// strings.
 pub trait ByteReprTrait: Sized {

@@ -1,0 +1,6 @@
+# Correct secp256k1 signature literal
+
+code { PUSH signature "spsig1EbF4wrCw5gpXsjpYEPppVyTq5QfxK4XQhYMB1FELNxzMupZfp9XUyjFGHS5X21haQL5AncDFNh1kUde8ZNZTgFNBsAega"; DROP };
+
+input { Stack_elt unit Unit };
+output { Stack_elt unit Unit };

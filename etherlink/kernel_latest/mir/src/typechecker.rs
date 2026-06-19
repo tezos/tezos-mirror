@@ -5025,17 +5025,19 @@ fn visit_value<'a, 'b>(
         }
         (T::Signature, V::String(str)) => {
             ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
-            results
-                .push(TV::Signature(Signature::from_base58_check(str).map_err(
-                    |e| TcError::ByteReprError(T::Signature, e.into()),
-                )?));
+            let sig = Signature::from_base58_check(str)
+                .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?;
+            sig.check_validity()
+                .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?;
+            results.push(TV::Signature(sig));
         }
         (T::Signature, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            results
-                .push(TV::Signature(Signature::try_from(bs.clone()).map_err(
-                    |e| TcError::ByteReprError(T::Signature, e.into()),
-                )?));
+            let sig = Signature::try_from(bs.clone())
+                .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?;
+            sig.check_validity()
+                .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?;
+            results.push(TV::Signature(sig));
         }
         (T::KeyHash, V::String(str)) => {
             ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
