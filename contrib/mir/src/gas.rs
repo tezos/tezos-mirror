@@ -1266,6 +1266,17 @@ pub mod interpret_cost {
         Ok(140)
     }
 
+    // corresponds to Interp_costs.unpack_failed in the Tezos protocol: the
+    // size-dependent penalty charged when a packed (0x05) payload fails to
+    // decode or typecheck. `len` excludes the 0x05 tag. alloc_mbytes_cost(1) =
+    // 30000, alloc_cost(3) + step_cost(1) = 9000 (milligas).
+    pub fn unpack_failed(len: usize) -> Result<u32, CostOverflow> {
+        let n = Checked::from(len);
+        // d = Z.numbits len (significant bits; 0 for len = 0)
+        let d = Checked::from((usize::BITS - len.leading_zeros()) as usize);
+        (n * 30000 + n * d * 9000).as_gas_cost()
+    }
+
     pub fn pair_n(size: usize) -> Result<u32, CostOverflow> {
         // corresponds to cost_N_IComb in the Tezos protocol; the protocol's
         // S.sub floors at 0, hence saturating_sub

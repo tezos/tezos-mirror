@@ -2867,7 +2867,15 @@ fn interpret_one<'a>(
                     .ok()?;
                 crate::interpreter::typecheck_value(&mich, ctx, ty).ok()
             };
-            stack.push(V::new_option(try_unpack()));
+            let result = try_unpack();
+            // L1 charges Interp_costs.unpack_failed (minus the 0x05 tag) when a
+            // packed payload fails to decode or typecheck
+            // (script_interpreter_defs.ml `unpack`).
+            if result.is_none() && bytes.first() == Some(&0x05) {
+                ctx.gas()
+                    .consume(interpret_cost::unpack_failed(bytes.len() - 1)?)?;
+            }
+            stack.push(V::new_option(result));
         }
         I::CheckSignature => {
             let key = pop!(V::Key);
