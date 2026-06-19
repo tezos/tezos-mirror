@@ -8878,6 +8878,24 @@ mod interpreter_tests {
         check(hex::decode("05ffffffff").unwrap(), Type::Int);
     }
 
+    #[test]
+    fn unpack_failure_without_pack_tag_charges_no_penalty() {
+        // L2-1656: the unpack_failed penalty is charged only for packed
+        // (0x05) payloads. A non-0x05 payload fails to unpack (no pack tag)
+        // and must NOT be charged the penalty, pinning the
+        // `bytes.first() == Some(&0x05)` guard.
+        let payload = hex::decode("00ffffffff").unwrap();
+        let ctx = &mut Ctx::default();
+        let before = ctx.gas().milligas().unwrap();
+        let mut stack = stk![V::Bytes(payload.clone())];
+        assert_eq!(interpret_one(&Unpack(Type::Int), ctx, &mut stack), Ok(()));
+        assert_eq!(stack, stk![V::new_option(None)]);
+        let consumed = before - ctx.gas().milligas().unwrap();
+        // No penalty: consumed stays far below unpack_failed, which the guard
+        // would otherwise add for a payload of this size.
+        assert!(consumed < interpret_cost::unpack_failed(payload.len() - 1).unwrap());
+    }
+
     /// L2-1377: `UNPACK address` must accept entrypoint bytes outside
     /// the Michelson script-source charset, matching Tezos L1. Each
     /// payload below is the optimized PACK of a `tz1...%<ep>` address:
