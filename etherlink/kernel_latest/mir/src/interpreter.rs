@@ -179,7 +179,9 @@ pub enum InterpretInvariant {
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum EnshrinedViewDispatchError {
-    #[error("enshrined view dispatch: could not resolve caller alias in the peer runtime")]
+    #[error(
+        "enshrined view dispatch: could not resolve caller alias in the peer runtime"
+    )]
     AliasResolution,
     #[error("enshrined view dispatch: gas-budget translation overflow")]
     BudgetOverflow,
@@ -191,7 +193,9 @@ pub enum EnshrinedViewDispatchError {
     /// construction). Routes to 500.
     #[error("enshrined view dispatch: could not build dispatch request")]
     DispatchSetup,
-    #[error("enshrined view dispatch: unclassifiable peer-runtime response: status {status}")]
+    #[error(
+        "enshrined view dispatch: unclassifiable peer-runtime response: status {status}"
+    )]
     UnclassifiableResponse { status: u16 },
 }
 
@@ -248,8 +252,10 @@ impl<'a> ContractScript<'a> {
         parameter: Micheline<'a>,
         entrypoint: &Entrypoint,
         storage_in: &Micheline<'a>,
-    ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
-    {
+    ) -> Result<
+        (impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>),
+        ContractInterpretError<'a>,
+    > {
         let wrapped_parameter = self.wrap_parameter(arena, parameter, entrypoint, ctx)?;
         let mut storage = self.typecheck_storage(ctx, storage_in)?;
         let mut started_with_map_ids = vec![];
@@ -265,15 +271,16 @@ impl<'a> ContractScript<'a> {
 
         use TypedValue as V;
 
-        let result = TypedValue::unwrap_rc(stack.pop().ok_or(InterpretError::InternalError(
-            InterpretInvariant::EmptyValueStackPop,
-        ))?);
+        let result = TypedValue::unwrap_rc(stack.pop().ok_or(
+            InterpretError::InternalError(InterpretInvariant::EmptyValueStackPop),
+        )?);
         let (operation_list, storage) = match result {
             V::Pair(operation_list, storage) => (operation_list, storage),
             _ => {
-                return Err(
-                    InterpretError::InternalError(InterpretInvariant::ExpectedPairResult).into(),
+                return Err(InterpretError::InternalError(
+                    InterpretInvariant::ExpectedPairResult,
                 )
+                .into())
             }
         };
         let mut operation_list = TypedValue::unwrap_rc(operation_list);
@@ -297,9 +304,10 @@ impl<'a> ContractScript<'a> {
         let vec = match operation_list {
             V::List(vec) => vec,
             _ => {
-                return Err(
-                    InterpretError::InternalError(InterpretInvariant::ExpectedListOperation).into(),
+                return Err(InterpretError::InternalError(
+                    InterpretInvariant::ExpectedListOperation,
                 )
+                .into())
             }
         };
 
@@ -327,7 +335,9 @@ impl<'a> ContractScript<'a> {
         ctx: &mut impl CtxTrait<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
         let parsed_annotation = FieldAnnotation::from_string(entrypoint.to_string());
-        if let Some((annotation_path, annotation_type)) = self.annotations.get(&parsed_annotation) {
+        if let Some((annotation_path, annotation_type)) =
+            self.annotations.get(&parsed_annotation)
+        {
             // Validate child views in a parameter lambda like L1: parse_data
             // elaborates an embedded CREATE_CONTRACT and runs parse_views. The
             // Left/Right-wrapped re-typecheck below stays Disabled (already
@@ -455,7 +465,8 @@ enum InterpFrame<'a, 'b> {
     },
     IterMap {
         body: CodeRef<'a, 'b>,
-        remaining: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        remaining:
+            std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     },
     MapListAccum {
         body: CodeRef<'a, 'b>,
@@ -465,7 +476,8 @@ enum InterpFrame<'a, 'b> {
     MapOptionAfter,
     MapMapAccum {
         body: CodeRef<'a, 'b>,
-        remaining: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        remaining:
+            std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         acc: BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         current_key: Option<Rc<TypedValue<'a>>>,
     },
@@ -506,7 +518,8 @@ enum StepResult<'a, 'b> {
     },
     OpenIterMap {
         body: CodeRef<'a, 'b>,
-        iter: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        iter:
+            std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     },
     OpenMapList {
         body: CodeRef<'a, 'b>,
@@ -515,7 +528,8 @@ enum StepResult<'a, 'b> {
     OpenMapOption(CodeRef<'a, 'b>),
     OpenMapMap {
         body: CodeRef<'a, 'b>,
-        iter: std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        iter:
+            std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         first_key: Rc<TypedValue<'a>>,
     },
     /// EXEC: enter a lambda body on a fresh sub stack containing args.
@@ -733,9 +747,7 @@ fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
                     pending.push(v);
                 }
             }
-            InterpFrame::MapListAccum {
-                remaining, acc, ..
-            } => {
+            InterpFrame::MapListAccum { remaining, acc, .. } => {
                 pending.extend(remaining);
                 pending.extend(acc);
             }
@@ -908,9 +920,11 @@ fn run_interp_driver<'a, 'b>(
                     CodeRef::Borrowed(s) => {
                         run_done_until(s, &mut idx, stack, ctx, arena, CodeRef::Borrowed)?
                     }
-                    CodeRef::Owned(rc) => run_done_until(rc, &mut idx, stack, ctx, arena, |b| {
-                        CodeRef::Owned(body_to_owned(b))
-                    })?,
+                    CodeRef::Owned(rc) => {
+                        run_done_until(rc, &mut idx, stack, ctx, arena, |b| {
+                            CodeRef::Owned(body_to_owned(b))
+                        })?
+                    }
                 };
                 if let Some(step) = pending {
                     frames.push(InterpFrame::NextInstr { block, idx });
@@ -941,9 +955,7 @@ fn run_interp_driver<'a, 'b>(
                     }
                 };
                 if cond {
-                    frames.push(InterpFrame::LoopBody {
-                        body: body.clone(),
-                    });
+                    frames.push(InterpFrame::LoopBody { body: body.clone() });
                     frames.push(InterpFrame::NextInstr {
                         block: body,
                         idx: 0,
@@ -968,9 +980,7 @@ fn run_interp_driver<'a, 'b>(
                 match or {
                     Or::Left(x) => {
                         stk.push(x);
-                        frames.push(InterpFrame::LoopLeftBody {
-                            body: body.clone(),
-                        });
+                        frames.push(InterpFrame::LoopLeftBody { body: body.clone() });
                         frames.push(InterpFrame::NextInstr {
                             block: body,
                             idx: 0,
@@ -1134,24 +1144,36 @@ fn handle_step<'a, 'b>(
     match step {
         StepResult::Done => {}
         StepResult::OpenBlock(body) => {
-            push_frame(frames, ctx, InterpFrame::NextInstr {
-                block: body,
-                idx: 0,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::NextInstr {
+                    block: body,
+                    idx: 0,
+                },
+            )?;
         }
         StepResult::OpenDip {
             body,
             protected,
             opt_height,
         } => {
-            push_frame(frames, ctx, InterpFrame::AfterDip {
-                protected,
-                opt_height,
-            })?;
-            push_frame(frames, ctx, InterpFrame::NextInstr {
-                block: body,
-                idx: 0,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::AfterDip {
+                    protected,
+                    opt_height,
+                },
+            )?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::NextInstr {
+                    block: body,
+                    idx: 0,
+                },
+            )?;
         }
         StepResult::OpenLoop(body) => {
             push_frame(frames, ctx, InterpFrame::LoopBody { body })?;
@@ -1160,66 +1182,102 @@ fn handle_step<'a, 'b>(
             push_frame(frames, ctx, InterpFrame::LoopLeftBody { body })?;
         }
         StepResult::OpenIterList { body, iter } => {
-            push_frame(frames, ctx, InterpFrame::IterList {
-                body,
-                remaining: iter,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::IterList {
+                    body,
+                    remaining: iter,
+                },
+            )?;
         }
         StepResult::OpenIterSet { body, iter } => {
-            push_frame(frames, ctx, InterpFrame::IterSet {
-                body,
-                remaining: iter,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::IterSet {
+                    body,
+                    remaining: iter,
+                },
+            )?;
         }
         StepResult::OpenIterMap { body, iter } => {
-            push_frame(frames, ctx, InterpFrame::IterMap {
-                body,
-                remaining: iter,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::IterMap {
+                    body,
+                    remaining: iter,
+                },
+            )?;
         }
         StepResult::OpenMapList { body, iter } => {
             // First element was already pushed by interpret_step; run the
             // body and then collect from MapListAccum.
-            push_frame(frames, ctx, InterpFrame::MapListAccum {
-                body: body.clone(),
-                remaining: iter,
-                acc: Vec::new(),
-            })?;
-            push_frame(frames, ctx, InterpFrame::NextInstr {
-                block: body,
-                idx: 0,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::MapListAccum {
+                    body: body.clone(),
+                    remaining: iter,
+                    acc: Vec::new(),
+                },
+            )?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::NextInstr {
+                    block: body,
+                    idx: 0,
+                },
+            )?;
         }
         StepResult::OpenMapOption(body) => {
             push_frame(frames, ctx, InterpFrame::MapOptionAfter)?;
-            push_frame(frames, ctx, InterpFrame::NextInstr {
-                block: body,
-                idx: 0,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::NextInstr {
+                    block: body,
+                    idx: 0,
+                },
+            )?;
         }
         StepResult::OpenMapMap {
             body,
             iter,
             first_key,
         } => {
-            push_frame(frames, ctx, InterpFrame::MapMapAccum {
-                body: body.clone(),
-                remaining: iter,
-                acc: BTreeMap::new(),
-                current_key: Some(first_key),
-            })?;
-            push_frame(frames, ctx, InterpFrame::NextInstr {
-                block: body,
-                idx: 0,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::MapMapAccum {
+                    body: body.clone(),
+                    remaining: iter,
+                    acc: BTreeMap::new(),
+                    current_key: Some(first_key),
+                },
+            )?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::NextInstr {
+                    block: body,
+                    idx: 0,
+                },
+            )?;
         }
         StepResult::OpenExec { code, initial } => {
             push_stack(stacks, ctx, initial)?;
             push_frame(frames, ctx, InterpFrame::AfterExec)?;
-            push_frame(frames, ctx, InterpFrame::NextInstr {
-                block: CodeRef::Owned(code),
-                idx: 0,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::NextInstr {
+                    block: CodeRef::Owned(code),
+                    idx: 0,
+                },
+            )?;
         }
         StepResult::OpenView {
             code,
@@ -1240,18 +1298,26 @@ fn handle_step<'a, 'b>(
             // back to it. Mutating `ctx` first and then pushing would
             // leave a window where `ctx` is in the inner-view state
             // without any restore frame on the worklist.
-            push_frame(frames, ctx, InterpFrame::AfterView {
-                saved_self_address,
-                saved_sender,
-                saved_amount,
-                saved_balance,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::AfterView {
+                    saved_self_address,
+                    saved_sender,
+                    saved_amount,
+                    saved_balance,
+                },
+            )?;
             ctx.set_view_context(new_self_address, new_sender, new_amount, new_balance);
             push_stack(stacks, ctx, initial)?;
-            push_frame(frames, ctx, InterpFrame::NextInstr {
-                block: CodeRef::Owned(code),
-                idx: 0,
-            })?;
+            push_frame(
+                frames,
+                ctx,
+                InterpFrame::NextInstr {
+                    block: CodeRef::Owned(code),
+                    idx: 0,
+                },
+            )?;
         }
     }
     Ok(())
@@ -1555,7 +1621,8 @@ fn interpret_step<'a, 'b, 'c>(
             };
 
             let storage_ty = view_storage_ty.parse_ty(ctx.gas())?;
-            let storage_ty_mich = storage_ty.into_micheline_optimized_legacy(arena, ctx.gas())?;
+            let storage_ty_mich =
+                storage_ty.into_micheline_optimized_legacy(arena, ctx.gas())?;
             let storage = Micheline::decode_raw(arena, &view_storage, ctx.gas())??
                 .typecheck_value(ctx, &storage_ty_mich)?;
             let input_type = view.input_type.parse_ty(ctx.gas())?;
@@ -1585,12 +1652,8 @@ fn interpret_step<'a, 'b, 'c>(
                 // Gas exhaustion / cost overflow must abort like L1, not
                 // collapse to None. An ill-typed view body keeps the existing
                 // None behaviour (tracked separately by L2-1635).
-                Err(crate::typechecker::TcError::OutOfGas(e)) => {
-                    return Err(e.into())
-                }
-                Err(crate::typechecker::TcError::CostOverflow(e)) => {
-                    return Err(e.into())
-                }
+                Err(crate::typechecker::TcError::OutOfGas(e)) => return Err(e.into()),
+                Err(crate::typechecker::TcError::CostOverflow(e)) => return Err(e.into()),
                 Err(_) => {
                     stack.push(V::Option(None));
                     return Ok(StepResult::Done);
@@ -1873,13 +1936,15 @@ fn interpret_one<'a>(
             overloads::Mul::MutezNat => {
                 ctx.gas().consume(interpret_cost::MUL_TEZ_NAT)?;
                 let x1 = pop!(V::Mutez);
-                let x2 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::Overflow)?;
+                let x2 =
+                    i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::Overflow)?;
                 let res = x1.checked_mul(x2).ok_or(InterpretError::Overflow)?;
                 stack.push(V::Mutez(res));
             }
             overloads::Mul::NatMutez => {
                 ctx.gas().consume(interpret_cost::MUL_NAT_TEZ)?;
-                let x1 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::Overflow)?;
+                let x1 =
+                    i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::Overflow)?;
                 let x2 = pop!(V::Mutez);
                 let res = x1.checked_mul(x2).ok_or(InterpretError::Overflow)?;
                 stack.push(V::Mutez(res));
@@ -2013,33 +2078,50 @@ fn interpret_one<'a>(
                 if x2.sign() == Sign::NoSign {
                     stack.push(V::Option(None));
                 } else {
-                    let (quotient, remainder) = BigUint::div_rem(x1.magnitude(), x2.magnitude());
+                    let (quotient, remainder) =
+                        BigUint::div_rem(x1.magnitude(), x2.magnitude());
                     match (x1.sign(), x2.sign()) {
                         (Sign::Minus, Sign::Minus) => {
-                            stack.push(V::new_option(Some(if remainder > BigUint::zero() {
-                                V::new_pair(
-                                    V::Int(BigInt::from_biguint(Sign::Plus, quotient) + 1),
-                                    V::Nat(x2.magnitude() - remainder),
-                                )
-                            } else {
-                                V::new_pair(
-                                    V::Int(BigInt::from_biguint(Sign::Plus, quotient)),
-                                    V::Nat(remainder),
-                                )
-                            })));
+                            stack.push(V::new_option(Some(
+                                if remainder > BigUint::zero() {
+                                    V::new_pair(
+                                        V::Int(
+                                            BigInt::from_biguint(Sign::Plus, quotient)
+                                                + 1,
+                                        ),
+                                        V::Nat(x2.magnitude() - remainder),
+                                    )
+                                } else {
+                                    V::new_pair(
+                                        V::Int(BigInt::from_biguint(
+                                            Sign::Plus,
+                                            quotient,
+                                        )),
+                                        V::Nat(remainder),
+                                    )
+                                },
+                            )));
                         }
                         (Sign::Minus, Sign::Plus) => {
-                            stack.push(V::new_option(Some(if remainder > BigUint::zero() {
-                                V::new_pair(
-                                    V::Int(BigInt::from_biguint(Sign::Minus, quotient) - 1),
-                                    V::Nat(x2.magnitude() - remainder),
-                                )
-                            } else {
-                                V::new_pair(
-                                    V::Int(BigInt::from_biguint(Sign::Minus, quotient)),
-                                    V::Nat(remainder),
-                                )
-                            })));
+                            stack.push(V::new_option(Some(
+                                if remainder > BigUint::zero() {
+                                    V::new_pair(
+                                        V::Int(
+                                            BigInt::from_biguint(Sign::Minus, quotient)
+                                                - 1,
+                                        ),
+                                        V::Nat(x2.magnitude() - remainder),
+                                    )
+                                } else {
+                                    V::new_pair(
+                                        V::Int(BigInt::from_biguint(
+                                            Sign::Minus,
+                                            quotient,
+                                        )),
+                                        V::Nat(remainder),
+                                    )
+                                },
+                            )));
                         }
                         (_, Sign::Plus) => {
                             stack.push(V::new_option(Some(V::new_pair(
@@ -2074,7 +2156,10 @@ fn interpret_one<'a>(
                             ))));
                         }
                         _ => {
-                            stack.push(V::new_option(Some(V::new_pair(V::Mutez(0), V::Mutez(x1)))));
+                            stack.push(V::new_option(Some(V::new_pair(
+                                V::Mutez(0),
+                                V::Mutez(x1),
+                            ))));
                         }
                     }
                 }
@@ -2158,7 +2243,8 @@ fn interpret_one<'a>(
                 let mut carry = 0u8;
 
                 for (i, &byte) in o1.iter().enumerate().rev() {
-                    result[i + if left_pad { 1 } else { 0 }] = (byte << bit_shifts) | carry;
+                    result[i + if left_pad { 1 } else { 0 }] =
+                        (byte << bit_shifts) | carry;
                     if left_pad {
                         carry = byte >> (8 - bit_shifts);
                     }
@@ -2264,7 +2350,8 @@ fn interpret_one<'a>(
                 if o1.len() < o2.len() {
                     std::mem::swap(&mut o1, o2)
                 }
-                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev()) {
+                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev())
+                {
                     *b2 &= b1;
                 }
             }
@@ -2293,7 +2380,8 @@ fn interpret_one<'a>(
                 if o1.len() > o2.len() {
                     std::mem::swap(&mut o1, o2)
                 }
-                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev()) {
+                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev())
+                {
                     *b2 |= b1;
                 }
             }
@@ -2322,7 +2410,8 @@ fn interpret_one<'a>(
                 if o1.len() > o2.len() {
                     std::mem::swap(&mut o1, o2)
                 }
-                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev()) {
+                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev())
+                {
                     *b2 ^= b1;
                 }
             }
@@ -2355,9 +2444,18 @@ fn interpret_one<'a>(
         // driver (interpret_step returns StepResult::Open*). interpret_one is
         // only reached via the driver's `_` fallthrough for non-control-flow
         // ops, so seeing one here is a driver invariant violation.
-        I::Seq(..) | I::Dip(..) | I::If(..) | I::IfNone(..) | I::IfCons(..)
-        | I::IfLeft(..) | I::Loop(..) | I::LoopLeft(..) | I::Iter(..)
-        | I::Map(..) | I::Exec | I::IView { .. } => Err(InterpretError::InternalError(
+        I::Seq(..)
+        | I::Dip(..)
+        | I::If(..)
+        | I::IfNone(..)
+        | I::IfCons(..)
+        | I::IfLeft(..)
+        | I::Loop(..)
+        | I::LoopLeft(..)
+        | I::Iter(..)
+        | I::Map(..)
+        | I::Exec
+        | I::IView { .. } => Err(InterpretError::InternalError(
             InterpretInvariant::UnreachableState,
         ))?,
         I::Drop(opt_height) => {
@@ -2533,7 +2631,8 @@ fn interpret_one<'a>(
             let mut cur = pop_rc!();
             let total = *n as usize;
             stack.reserve(total);
-            let mut lefts: Vec<Rc<TypedValue<'a>>> = Vec::with_capacity(total.saturating_sub(1));
+            let mut lefts: Vec<Rc<TypedValue<'a>>> =
+                Vec::with_capacity(total.saturating_sub(1));
             for _ in 0..(n - 1) {
                 let next = match cur.as_ref() {
                     V::Pair(l, r) => {
@@ -2951,14 +3050,16 @@ fn interpret_one<'a>(
             let result = match overload {
                 overloads::Slice::String => {
                     pop_ref!(str, String);
-                    ctx.gas().consume(interpret_cost::slice_string(str.len())?)?;
+                    ctx.gas()
+                        .consume(interpret_cost::slice_string(str.len())?)?;
                     validate_bounds(offset, length, str.len())
                         .and_then(|range| str.get(range))
                         .map(|str| V::String(str.to_string()))
                 }
                 overloads::Slice::Bytes => {
                     pop_ref!(bytes, Bytes);
-                    ctx.gas().consume(interpret_cost::slice_bytes(bytes.len())?)?;
+                    ctx.gas()
+                        .consume(interpret_cost::slice_bytes(bytes.len())?)?;
                     validate_bounds(offset, length, bytes.len())
                         .and_then(|range| bytes.get(range))
                         .map(|bytes| V::Bytes(bytes.to_owned()))
@@ -3270,7 +3371,8 @@ fn interpret_one<'a>(
             let amount = pop!(V::Mutez);
             let storage = pop!();
             let origination_counter = ctx.origination_counter();
-            let address = compute_contract_address(ctx.operation_group_hash(), origination_counter);
+            let address =
+                compute_contract_address(ctx.operation_group_hash(), origination_counter);
             stack.push(TypedValue::Address(Address {
                 hash: AddressHash::Kt1(address.clone()),
                 entrypoint: Entrypoint::default(),
@@ -3444,7 +3546,9 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(10), V::nat(20)];
         let expected_stack = stk![V::nat(30)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Add(overloads::Add::NatNat), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Add(overloads::Add::NatNat), &mut ctx, &mut stack).is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -3467,13 +3571,15 @@ mod interpreter_tests {
         Seq(body.clone())
             .interpret(&mut ctx_a, arena_a, &mut stack_a)
             .unwrap();
-        let gas_seq = Gas::default().milligas().unwrap() - ctx_a.gas().milligas().unwrap();
+        let gas_seq =
+            Gas::default().milligas().unwrap() - ctx_a.gas().milligas().unwrap();
 
         // The same instructions run as a single block must cost the same.
         let mut ctx_b = Ctx::default();
         let mut stack_b: IStack = Stack::new();
         interpret(&body, &mut ctx_b, &mut stack_b).unwrap();
-        let gas_block = Gas::default().milligas().unwrap() - ctx_b.gas().milligas().unwrap();
+        let gas_block =
+            Gas::default().milligas().unwrap() - ctx_b.gas().milligas().unwrap();
 
         assert_eq!(
             gas_seq, gas_block,
@@ -3567,7 +3673,8 @@ mod interpreter_tests {
                 stack.push(Rc::clone(&shared));
                 stack.push(shared);
                 stack.push(Rc::new(V::int(42)));
-                let outcome = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
+                let outcome =
+                    interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
                 assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
                 drop(outcome);
                 drop(stack);
@@ -3607,7 +3714,8 @@ mod interpreter_tests {
                 // bottom-stack drain in `fn interpret`, dropping the caller's
                 // `stack` here would overflow.
                 let mut stack: IStack = stk![deep, marker.clone()];
-                let outcome = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
+                let outcome =
+                    interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
                 assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
                 // In-place drain preserves stack length and atomic values;
                 // the marker is still observable post-Err. The deep value
@@ -3641,7 +3749,8 @@ mod interpreter_tests {
                     deep = V::new_pair(V::int(0), deep);
                 }
                 let mut stack: IStack = stk![deep];
-                let outcome = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
+                let outcome =
+                    interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
                 assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
                 drop(outcome);
             })
@@ -3686,7 +3795,8 @@ mod interpreter_tests {
                     },
                     InterpFrame::IterMap {
                         body: body(),
-                        remaining: BTreeMap::from([(Rc::new(V::int(0)), deep())]).into_iter(),
+                        remaining: BTreeMap::from([(Rc::new(V::int(0)), deep())])
+                            .into_iter(),
                     },
                     InterpFrame::MapListAccum {
                         body: body(),
@@ -3695,7 +3805,8 @@ mod interpreter_tests {
                     },
                     InterpFrame::MapMapAccum {
                         body: body(),
-                        remaining: BTreeMap::from([(Rc::new(V::int(0)), deep())]).into_iter(),
+                        remaining: BTreeMap::from([(Rc::new(V::int(0)), deep())])
+                            .into_iter(),
                         acc: BTreeMap::from([(Rc::new(V::int(0)), deep())]),
                         current_key: Some(deep()),
                     },
@@ -3784,7 +3895,8 @@ mod interpreter_tests {
         };
 
         // The lambda iterates its input list, running a nested IF per element.
-        let lam = "LAMBDA (list int) unit { ITER { DROP ; PUSH bool True ; IF {} {} } ; UNIT }";
+        let lam =
+            "LAMBDA (list int) unit { ITER { DROP ; PUSH bool True ; IF {} {} } ; UNIT }";
         let c2 = run(&format!(
             "{{ {lam} ; NIL int ; PUSH int 2 ; CONS ; PUSH int 1 ; CONS ; EXEC ; DROP }}"
         ));
@@ -3816,7 +3928,9 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Sub(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
+            assert!(
+                Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap()
+            );
         }
 
         macro_rules! test {
@@ -3897,7 +4011,9 @@ mod interpreter_tests {
         ];
         let expected_stack = stk![V::Bls12381Fr(bls::Fr::one())];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Add(overloads::Add::Bls12381Fr), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Add(overloads::Add::Bls12381Fr), &mut ctx, &mut stack).is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -3910,7 +4026,9 @@ mod interpreter_tests {
         ];
         let expected_stack = stk![V::new_bls12381_g1(bls::G1::one())];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Add(overloads::Add::Bls12381G1), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Add(overloads::Add::Bls12381G1), &mut ctx, &mut stack).is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -3923,7 +4041,9 @@ mod interpreter_tests {
         ];
         let expected_stack = stk![V::new_bls12381_g2(bls::G2::one())];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Add(overloads::Add::Bls12381G2), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Add(overloads::Add::Bls12381G2), &mut ctx, &mut stack).is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -3931,7 +4051,9 @@ mod interpreter_tests {
     fn test_add_mutez() {
         let mut stack = stk![V::Mutez(2i64.pow(62)), V::Mutez(20)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Add(overloads::Add::MutezMutez), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Add(overloads::Add::MutezMutez), &mut ctx, &mut stack).is_ok()
+        );
         assert_eq!(
             ctx.gas().milligas().unwrap(),
             Gas::default().milligas().unwrap() - 45
@@ -3984,7 +4106,10 @@ mod interpreter_tests {
         let mut stack = stk![V::Int("662688060".parse().unwrap()), V::Timestamp(int_o1),];
         let expected_stack = stk![V::Timestamp(int_result)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Add(overloads::Add::TimestampInt), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Add(overloads::Add::TimestampInt), &mut ctx, &mut stack)
+                .is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -4003,7 +4128,10 @@ mod interpreter_tests {
         let mut stack = stk![V::Timestamp(int_o2), V::Int("29489840".parse().unwrap()),];
         let expected_stack = stk![V::Timestamp(int_result)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Add(overloads::Add::IntTimestamp), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Add(overloads::Add::IntTimestamp), &mut ctx, &mut stack)
+                .is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -4022,7 +4150,10 @@ mod interpreter_tests {
         let mut stack = stk![V::Int("662688060".parse().unwrap()), V::Timestamp(int_o1),];
         let expected_stack = stk![V::Timestamp(int_result)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Sub(overloads::Sub::TimestampInt), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Sub(overloads::Sub::TimestampInt), &mut ctx, &mut stack)
+                .is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -4054,13 +4185,20 @@ mod interpreter_tests {
         use super::*;
 
         #[track_caller]
-        fn check(instr: Instruction, val1: TypedValue, val2: TypedValue, expected: TypedValue) {
+        fn check(
+            instr: Instruction,
+            val1: TypedValue,
+            val2: TypedValue,
+            expected: TypedValue,
+        ) {
             let mut stack = stk![val2, val1];
             let mut ctx = Ctx::default();
             assert!(interpret_one(&instr, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, stk![expected]);
             // every arm must charge gas (Xor::Bytes once consumed nothing)
-            assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
+            assert!(
+                ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap()
+            );
         }
 
         #[test]
@@ -4256,7 +4394,8 @@ mod interpreter_tests {
             // lengths (top-of-stack operand first).
             #[track_caller]
             fn consumed(instr: Instruction, len1: usize, len2: usize) -> u32 {
-                let mut stack = stk![V::Bytes(vec![0xff; len2]), V::Bytes(vec![0xff; len1])];
+                let mut stack =
+                    stk![V::Bytes(vec![0xff; len2]), V::Bytes(vec![0xff; len1])];
                 let mut ctx = Ctx::default();
                 assert!(interpret_one(&instr, &mut ctx, &mut stack).is_ok());
                 Gas::default().milligas().unwrap() - ctx.gas().milligas().unwrap()
@@ -4324,16 +4463,27 @@ mod interpreter_tests {
         check(on::Int, V::int(-1), V::int(0));
         check(
             on::Int,
-            V::Int(BigInt::parse_bytes(b"123456789123456789123456789123456789", 10).unwrap()),
-            V::Int(BigInt::parse_bytes(b"-123456789123456789123456789123456790", 10).unwrap()),
+            V::Int(
+                BigInt::parse_bytes(b"123456789123456789123456789123456789", 10).unwrap(),
+            ),
+            V::Int(
+                BigInt::parse_bytes(b"-123456789123456789123456789123456790", 10)
+                    .unwrap(),
+            ),
         );
 
         check(on::Nat, V::nat(0), V::int(-1));
         check(on::Nat, V::nat(5), V::int(-6));
         check(
             on::Nat,
-            V::Nat(BigUint::parse_bytes(b"123456789123456789123456789123456789", 10).unwrap()),
-            V::Int(BigInt::parse_bytes(b"-123456789123456789123456789123456790", 10).unwrap()),
+            V::Nat(
+                BigUint::parse_bytes(b"123456789123456789123456789123456789", 10)
+                    .unwrap(),
+            ),
+            V::Int(
+                BigInt::parse_bytes(b"-123456789123456789123456789123456790", 10)
+                    .unwrap(),
+            ),
         );
 
         check(on::Bytes, mk_0x(""), mk_0x(""));
@@ -4359,7 +4509,9 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(20), V::nat(5), V::nat(10)];
         let expected_stack = stk![V::nat(5), V::nat(10)];
         let mut ctx = Ctx::default();
-        assert!(interpret(&[Dip(Some(2), vec![Drop(None)])], &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret(&[Dip(Some(2), vec![Drop(None)])], &mut ctx, &mut stack).is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -4409,7 +4561,9 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             assert!(interpret_one(&instr, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
+            assert!(
+                ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap()
+            );
         }
 
         #[test]
@@ -4492,7 +4646,9 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             assert!(interpret_one(&Abs, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
+            assert!(
+                ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap()
+            );
         }
         test(0, 0u32);
         test(10, 10u32);
@@ -4504,11 +4660,14 @@ mod interpreter_tests {
         #[track_caller]
         fn test(arg: impl Into<BigInt>, res: Option<impl Into<BigUint>>) {
             let mut stack = stk![V::nat(20), V::Int(arg.into())];
-            let expected_stack = stk![V::nat(20), V::new_option(res.map(|x| V::Nat(x.into())))];
+            let expected_stack =
+                stk![V::nat(20), V::new_option(res.map(|x| V::Nat(x.into())))];
             let mut ctx = Ctx::default();
             assert!(interpret_one(&IsNat, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
+            assert!(
+                ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap()
+            );
         }
         test(0, Some(0u32));
         test(10, Some(10u32));
@@ -4530,7 +4689,9 @@ mod interpreter_tests {
         let mut stack = stk![V::Bls12381Fr(bls::Fr::one())];
         let expected_stack = stk![V::int(1)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Int(overloads::Int::Bls12381Fr), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Int(overloads::Int::Bls12381Fr), &mut ctx, &mut stack).is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -4540,7 +4701,9 @@ mod interpreter_tests {
             let mut stack = stk![V::Bytes(hex::decode(input).unwrap())];
             let expected_stack = stk![V::Int(result.into())];
             let mut ctx = Ctx::default();
-            assert!(interpret_one(&Int(overloads::Int::Bytes), &mut ctx, &mut stack).is_ok());
+            assert!(
+                interpret_one(&Int(overloads::Int::Bytes), &mut ctx, &mut stack).is_ok()
+            );
             assert_eq!(stack, expected_stack);
         }
         // checked against octez-client
@@ -4593,7 +4756,12 @@ mod interpreter_tests {
                 let mut stack = stk![V::Nat(input.into())];
                 let expected_stack = stk![V::Bytes(hex::decode(result).unwrap())];
                 let mut ctx = Ctx::default();
-                assert!(interpret_one(&Bytes(overloads::Bytes::Nat), &mut ctx, &mut stack).is_ok());
+                assert!(interpret_one(
+                    &Bytes(overloads::Bytes::Nat),
+                    &mut ctx,
+                    &mut stack
+                )
+                .is_ok());
                 assert_eq!(stack, expected_stack);
             }
             // checked against octez-client
@@ -4613,7 +4781,12 @@ mod interpreter_tests {
                 let mut stack = stk![V::Int(input.into())];
                 let expected_stack = stk![V::Bytes(hex::decode(result).unwrap())];
                 let mut ctx = Ctx::default();
-                assert!(interpret_one(&Bytes(overloads::Bytes::Int), &mut ctx, &mut stack).is_ok());
+                assert!(interpret_one(
+                    &Bytes(overloads::Bytes::Int),
+                    &mut ctx,
+                    &mut stack
+                )
+                .is_ok());
                 assert_eq!(stack, expected_stack);
             }
             // checked against octez-client
@@ -4782,7 +4955,10 @@ mod interpreter_tests {
     fn test_iter_set_zero() {
         let mut stack = stk![V::int(0), V::Set(BTreeSet::new())];
         assert!(interpret(
-            &[Iter(overloads::Iter::Set, vec![Add(overloads::Add::IntInt)])],
+            &[Iter(
+                overloads::Iter::Set,
+                vec![Add(overloads::Add::IntInt)]
+            )],
             &mut Ctx::default(),
             &mut stack,
         )
@@ -4826,7 +5002,10 @@ mod interpreter_tests {
     fn test_iter_map_zero() {
         let mut stack = stk![V::int(0), V::Map(BTreeMap::new())];
         assert!(interpret(
-            &[Iter(overloads::Iter::Map, vec![Car, Add(overloads::Add::IntInt)])],
+            &[Iter(
+                overloads::Iter::Map,
+                vec![Car, Add(overloads::Add::IntInt)]
+            )],
             &mut Ctx::default(),
             &mut stack,
         )
@@ -4846,7 +5025,8 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
 
             assert!(
-                interpret(&[Map(overload, vec![ISome])], &mut ctx, &mut input_stack,).is_ok()
+                interpret(&[Map(overload, vec![ISome])], &mut ctx, &mut input_stack,)
+                    .is_ok()
             );
 
             assert_eq!(input_stack, expected_stack);
@@ -4914,10 +5094,12 @@ mod interpreter_tests {
     fn test_map_empty_collection() {
         fn test(overload: overloads::Map, mut stack: IStack<'_>) {
             let expected_stack = stack.clone();
-            assert!(
-                interpret(&[Map(overload, vec![ISome])], &mut Ctx::default(), &mut stack,)
-                    .is_ok()
-            );
+            assert!(interpret(
+                &[Map(overload, vec![ISome])],
+                &mut Ctx::default(),
+                &mut stack,
+            )
+            .is_ok());
             assert_eq!(stack, expected_stack);
         }
 
@@ -4928,7 +5110,11 @@ mod interpreter_tests {
 
     #[test]
     fn test_map_in_order() {
-        fn test(overload: overloads::Map, mut input_stack: IStack<'_>, expected_stack: IStack<'_>) {
+        fn test(
+            overload: overloads::Map,
+            mut input_stack: IStack<'_>,
+            expected_stack: IStack<'_>,
+        ) {
             assert!(interpret(
                 &[Map(overload, vec![Cons, Unit])],
                 &mut Ctx::default(),
@@ -5177,7 +5363,8 @@ mod interpreter_tests {
 
     #[test]
     fn pair_n_3() {
-        let mut stack = stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)]; // NB: bool is top
+        let mut stack =
+            stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)]; // NB: bool is top
         let ctx = &mut Ctx::default();
         assert_eq!(interpret_one(&PairN(3), ctx, &mut stack), Ok(()));
         assert_eq!(
@@ -5192,7 +5379,8 @@ mod interpreter_tests {
 
     #[test]
     fn pair_n_4() {
-        let mut stack = stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)]; // NB: bool is top
+        let mut stack =
+            stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)]; // NB: bool is top
         let ctx = &mut Ctx::default();
         assert_eq!(interpret_one(&PairN(4), ctx, &mut stack), Ok(()));
         assert_eq!(
@@ -6642,7 +6830,8 @@ mod interpreter_tests {
 
     #[test]
     fn pack_instr() {
-        let stack = &mut stk![TypedValue::new_pair(TypedValue::int(12), TypedValue::Unit)];
+        let stack =
+            &mut stk![TypedValue::new_pair(TypedValue::int(12), TypedValue::Unit)];
         assert_eq!(interpret(&[Pack], &mut Ctx::default(), stack), Ok(()));
         assert_eq!(
             stack,
@@ -6687,8 +6876,10 @@ mod interpreter_tests {
     fn transfer_tokens() {
         let tt = super::TransferTokens {
             param: TypedValue::nat(42),
-            destination_address: addr::Address::try_from("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw")
-                .unwrap(),
+            destination_address: addr::Address::try_from(
+                "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
+            )
+            .unwrap(),
             amount: 0,
         };
         let stk = &mut stk![
@@ -6888,9 +7079,10 @@ mod interpreter_tests {
 
     #[test]
     fn address_instr() {
-        let address: addr::Address = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT%some_entrypoint"
-            .try_into()
-            .unwrap();
+        let address: addr::Address =
+            "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT%some_entrypoint"
+                .try_into()
+                .unwrap();
         let contract = V::Contract(address.clone());
         let stk = &mut stk![contract];
         let ctx = &mut Ctx::default();
@@ -6907,7 +7099,8 @@ mod interpreter_tests {
     #[test]
     fn slice_instr_string() {
         fn test(str: &str, offset: u64, length: u64, expected: Option<&str>) {
-            let stk = &mut stk![V::String(str.to_string()), V::nat(length), V::nat(offset)];
+            let stk =
+                &mut stk![V::String(str.to_string()), V::nat(length), V::nat(offset)];
             let ctx = &mut Ctx::default();
             let expected = expected.map(|str| V::String(str.to_string()));
             assert_eq!(
@@ -7043,10 +7236,7 @@ mod interpreter_tests {
             })),
             TypedValue::new_pair(TypedValue::int(1), TypedValue::nat(5))
         ];
-        assert_eq!(
-            interpret(&[Exec], &mut Ctx::default(), &mut stack),
-            Ok(())
-        );
+        assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::int(6)]);
     }
 
@@ -7075,10 +7265,7 @@ mod interpreter_tests {
             TypedValue::Lambda(lam.clone()),
             TypedValue::new_pair(TypedValue::Bool(true), TypedValue::nat(5))
         ];
-        assert_eq!(
-            interpret(&[Exec], &mut Ctx::default(), &mut stack),
-            Ok(())
-        );
+        assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::nat(10)]);
     }
 
@@ -7107,10 +7294,7 @@ mod interpreter_tests {
             TypedValue::Lambda(lam.clone()),
             TypedValue::new_pair(TypedValue::Bool(false), TypedValue::nat(5))
         ];
-        assert_eq!(
-            interpret(&[Exec], &mut Ctx::default(), &mut stack),
-            Ok(())
-        );
+        assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::nat(5)]);
     }
 
@@ -7162,10 +7346,7 @@ mod interpreter_tests {
             })]
         );
         stack.push(TypedValue::nat(5));
-        assert_eq!(
-            interpret(&[Exec], &mut Ctx::default(), &mut stack),
-            Ok(())
-        );
+        assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::int(6)]);
     }
 
@@ -7208,10 +7389,7 @@ mod interpreter_tests {
             })]
         );
         stack.push(TypedValue::nat(5));
-        assert_eq!(
-            interpret(&[Exec], &mut Ctx::default(), &mut stack),
-            Ok(())
-        );
+        assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::nat(10)]);
     }
 
@@ -7254,10 +7432,7 @@ mod interpreter_tests {
             })]
         );
         stack.push(TypedValue::nat(5));
-        assert_eq!(
-            interpret(&[Exec], &mut Ctx::default(), &mut stack),
-            Ok(())
-        );
+        assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::nat(5)]);
     }
 
@@ -7297,8 +7472,11 @@ mod interpreter_tests {
         );
         assert_eq!(
             start_milligas - ctx.gas().milligas().unwrap(),
-            interpret_cost::split_ticket(&ticket_exp_left.amount, &ticket_exp_right.amount)
-                .unwrap()
+            interpret_cost::split_ticket(
+                &ticket_exp_left.amount,
+                &ticket_exp_right.amount
+            )
+            .unwrap()
                 + interpret_cost::INTERPRET_RET
         );
 
@@ -7377,7 +7555,8 @@ mod interpreter_tests {
         use crate::interpreter::AddressHash;
         let mut ctx = Ctx::default();
         let ticket = Ticket {
-            ticketer: AddressHash::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap(),
+            ticketer: AddressHash::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye")
+                .unwrap(),
             amount: 100u32.into(),
             content_type: Type::Nat,
             content: V::nat(10),
@@ -7385,7 +7564,8 @@ mod interpreter_tests {
         let ticket_left = V::new_ticket(ticket.clone());
         let ticket_right = V::new_ticket(Ticket {
             amount: 20u32.into(),
-            ticketer: AddressHash::try_from("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT").unwrap(),
+            ticketer: AddressHash::try_from("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+                .unwrap(),
             ..ticket
         });
         let mut stack = stk![V::new_pair(ticket_left, ticket_right),];
@@ -7473,7 +7653,10 @@ mod interpreter_tests {
         ) {
             let mut ctx = Ctx::default();
             if let Some(e) = opt_entrypoints {
-                ctx.set_known_contracts([(address.hash, HashMap::from_iter(Vec::from(e)))]);
+                ctx.set_known_contracts([(
+                    address.hash,
+                    HashMap::from_iter(Vec::from(e)),
+                )]);
             }
 
             let start_milligas = ctx.gas().milligas().unwrap();
@@ -7493,7 +7676,8 @@ mod interpreter_tests {
             stk![TypedValue::new_option(Some(V::Contract(addr)))],
             Contract(Type::Unit, Entrypoint::default()),
             Some(
-                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas()).unwrap()
+                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas())
+                    .unwrap()
                     + interpret_cost::CONTRACT
                     + interpret_cost::INTERPRET_RET,
             ),
@@ -7508,7 +7692,8 @@ mod interpreter_tests {
             stk![TypedValue::new_option(Some(V::Contract(addr)))],
             Contract(Type::Int, Entrypoint::default()),
             Some(
-                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas()).unwrap()
+                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas())
+                    .unwrap()
                     + interpret_cost::CONTRACT
                     + interpret_cost::INTERPRET_RET,
             ),
@@ -7524,7 +7709,8 @@ mod interpreter_tests {
             stk![TypedValue::new_option(Some(V::Contract(addr)))],
             Contract(Type::Int, Entrypoint::default()),
             Some(
-                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas()).unwrap()
+                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas())
+                    .unwrap()
                     + interpret_cost::CONTRACT
                     + interpret_cost::INTERPRET_RET,
             ),
@@ -7544,7 +7730,8 @@ mod interpreter_tests {
             stk![TypedValue::new_option(Some(V::Contract(expected_address)))],
             Contract(Type::Int, Entrypoint::try_from("foo").unwrap()),
             Some(
-                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas()).unwrap()
+                tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas())
+                    .unwrap()
                     + interpret_cost::CONTRACT
                     + interpret_cost::INTERPRET_RET,
             ),
@@ -7618,7 +7805,8 @@ mod interpreter_tests {
         );
 
         // When the address is implicit.
-        let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+        let addr: Address =
+            Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
         let expected_address: Address = Address {
             entrypoint: Entrypoint::default(),
             ..addr.clone()
@@ -7633,7 +7821,8 @@ mod interpreter_tests {
         );
 
         // When the address is implicit.and contract type is Ticket
-        let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+        let addr: Address =
+            Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
         let expected_address: Address = Address {
             entrypoint: Entrypoint::default(),
             ..addr.clone()
@@ -7648,7 +7837,8 @@ mod interpreter_tests {
         );
 
         // When the address is implicit and the Contract calls type is something other then unit
-        let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+        let addr: Address =
+            Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
         run_contract_test(
             addr.clone(),
             None,
@@ -7659,7 +7849,8 @@ mod interpreter_tests {
         );
 
         // When the address is implicit and contains an entrypoint
-        let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6%foo").unwrap();
+        let addr: Address =
+            Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6%foo").unwrap();
         run_contract_test(
             addr.clone(),
             None,
@@ -7670,7 +7861,8 @@ mod interpreter_tests {
         );
 
         // When the address is implicit and contract call contains an entrypoint
-        let addr: Address = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6%foo").unwrap();
+        let addr: Address =
+            Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6%foo").unwrap();
         run_contract_test(
             addr.clone(),
             None,
@@ -7725,7 +7917,8 @@ mod interpreter_tests {
         let orig_amount = ctx.amount;
         let orig_balance = ctx.balance;
 
-        let inner: AddressHash = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye".try_into().unwrap();
+        let inner: AddressHash =
+            "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye".try_into().unwrap();
 
         // Frames as they would look mid-unwind from a nested view: the
         // outermost AfterView (lowest index) carries the original context;
@@ -7749,11 +7942,17 @@ mod interpreter_tests {
         // Live context overridden to a view's values (as set_view_context
         // did on view entry).
         ctx.set_view_context(inner.clone(), inner, 999, 12345);
-        assert_ne!(ctx.self_address, orig_self, "precondition: context overridden");
+        assert_ne!(
+            ctx.self_address, orig_self,
+            "precondition: context overridden"
+        );
 
         super::restore_pending_view_context(&mut ctx, &frames);
 
-        assert_eq!(ctx.self_address, orig_self, "self_address restored to outermost");
+        assert_eq!(
+            ctx.self_address, orig_self,
+            "self_address restored to outermost"
+        );
         assert_eq!(ctx.sender, orig_sender);
         assert_eq!(ctx.amount, orig_amount);
         assert_eq!(ctx.balance, orig_balance);
@@ -7779,7 +7978,8 @@ mod interpreter_tests {
             code: parse(r#"{ DROP ; PUSH string "ok" }"#).unwrap(),
         };
         let mut ctx = Ctx::default();
-        ctx.views = HashMap::from([(kt1.clone(), HashMap::from([("v".to_string(), view)]))]);
+        ctx.views =
+            HashMap::from([(kt1.clone(), HashMap::from([("v".to_string(), view)]))]);
         ctx.storage = HashMap::from([(kt1.clone(), (Type::Unit, V::Unit))]);
 
         let address = V::Address(addr::Address {
@@ -7800,7 +8000,11 @@ mod interpreter_tests {
             &mut stack,
         )
         .unwrap();
-        assert_eq!(stack, stk![V::Option(None)], "input-type mismatch must give None");
+        assert_eq!(
+            stack,
+            stk![V::Option(None)],
+            "input-type mismatch must give None"
+        );
 
         // Output-type mismatch: caller requests `nat`, view outputs `string`.
         let mut stack = stk![address.clone(), V::nat(5)];
@@ -7814,7 +8018,11 @@ mod interpreter_tests {
             &mut stack,
         )
         .unwrap();
-        assert_eq!(stack, stk![V::Option(None)], "output-type mismatch must give None");
+        assert_eq!(
+            stack,
+            stk![V::Option(None)],
+            "output-type mismatch must give None"
+        );
 
         // Both types match: the view executes and returns Some("ok").
         let mut stack = stk![address, V::nat(5)];
@@ -7837,7 +8045,8 @@ mod interpreter_tests {
 
     #[test]
     fn self_address() {
-        let addr = super::Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        let addr =
+            super::Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
         let mut ctx = Ctx::default();
         ctx.self_address = addr.hash.clone();
         let mut stack = Stack::new();
@@ -7852,7 +8061,8 @@ mod interpreter_tests {
 
     #[test]
     fn sender() {
-        let addr = super::Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
+        let addr =
+            super::Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
         let mut ctx = Ctx::default();
         ctx.sender = addr.hash.clone();
         let mut stack = Stack::new();
@@ -7867,7 +8077,8 @@ mod interpreter_tests {
 
     #[test]
     fn source() {
-        let addr = super::PublicKeyHash::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
+        let addr = super::PublicKeyHash::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP")
+            .unwrap();
         let mut ctx = Ctx::default();
         ctx.source = addr.clone();
         let mut stack = Stack::new();
@@ -7903,7 +8114,8 @@ mod interpreter_tests {
     #[test]
     fn implicit_account() {
         let mut ctx = Ctx::default();
-        let key_hash = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash =
+            PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
         let mut stack = stk![V::KeyHash(key_hash)];
         let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[ImplicitAccount], &mut ctx, &mut stack), Ok(()));
@@ -7921,9 +8133,12 @@ mod interpreter_tests {
 
     #[test]
     fn voting_power() {
-        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
-        let key_hash_3 = PublicKeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
+        let key_hash_1 =
+            PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 =
+            PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_3 =
+            PublicKeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
 
         let mut ctx = Ctx::default();
         ctx.set_voting_powers([
@@ -7954,8 +8169,10 @@ mod interpreter_tests {
 
     #[test]
     fn total_voting_power() {
-        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_1 =
+            PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 =
+            PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
         let mut ctx = Ctx::default();
         ctx.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
         let mut stack = Stack::new();
@@ -8074,7 +8291,9 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Mul(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
+            assert!(
+                Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap()
+            );
         }
 
         #[cfg(feature = "bls")]
@@ -8276,7 +8495,9 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&EDiv(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
+            assert!(
+                Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap()
+            );
         }
 
         macro_rules! test {
@@ -8612,7 +8833,9 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Neg(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
+            assert!(
+                Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap()
+            );
         }
 
         #[cfg(feature = "bls")]
@@ -8687,7 +8910,9 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Lsl(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
+            assert!(
+                Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap()
+            );
         }
 
         macro_rules! test {
@@ -8748,7 +8973,9 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Lsr(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
+            assert!(
+                Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap()
+            );
         }
 
         macro_rules! test {
@@ -8818,7 +9045,9 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&SubMutez, ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![V::new_option(res.map(V::Mutez))]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
+            assert!(
+                Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap()
+            );
         }
         test(0, 0, Some(0));
         test(0, 1, None);
@@ -8833,7 +9062,8 @@ mod interpreter_tests {
     #[test]
     fn test_dig() {
         let mut stack = stk![V::Unit, V::nat(10), V::int(20), V::Bool(true), V::nat(5)];
-        let expected_stack = stk![V::nat(10), V::int(20), V::Bool(true), V::nat(5), V::Unit,];
+        let expected_stack =
+            stk![V::nat(10), V::int(20), V::Bool(true), V::nat(5), V::Unit,];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Dig(4), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -8842,7 +9072,8 @@ mod interpreter_tests {
     #[test]
     fn test_dug() {
         let mut stack = stk![V::Unit, V::nat(10), V::int(20), V::Bool(true), V::nat(5)];
-        let expected_stack = stk![V::nat(5), V::Unit, V::nat(10), V::int(20), V::Bool(true),];
+        let expected_stack =
+            stk![V::nat(5), V::Unit, V::nat(10), V::int(20), V::Bool(true),];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Dug(4), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
@@ -8908,23 +9139,7 @@ mod interpreter_tests {
 
         // hash + "!" (one byte ep), L1 accepts; MIR used to reject.
         let payload =
-            hex::decode("050a0000001700007b09f782e0bcd67739510afa819d85976119d5ef21").unwrap();
-        let mut stack = stk![V::Bytes(payload)];
-        let ctx = &mut Ctx::default();
-        assert_eq!(
-            interpret_one(&Unpack(Type::Address), ctx, &mut stack),
-            Ok(())
-        );
-        assert_eq!(
-            stack,
-            stk![V::new_option(Some(V::Address(
-                Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%!").unwrap()
-            )))]
-        );
-
-        // hash + ".foo" (first-char dot, L1 accepts; MIR used to reject).
-        let payload =
-            hex::decode("050a0000001a00007b09f782e0bcd67739510afa819d85976119d5ef2e666f6f")
+            hex::decode("050a0000001700007b09f782e0bcd67739510afa819d85976119d5ef21")
                 .unwrap();
         let mut stack = stk![V::Bytes(payload)];
         let ctx = &mut Ctx::default();
@@ -8935,7 +9150,27 @@ mod interpreter_tests {
         assert_eq!(
             stack,
             stk![V::new_option(Some(V::Address(
-                Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%.foo").unwrap()
+                Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%!")
+                    .unwrap()
+            )))]
+        );
+
+        // hash + ".foo" (first-char dot, L1 accepts; MIR used to reject).
+        let payload = hex::decode(
+            "050a0000001a00007b09f782e0bcd67739510afa819d85976119d5ef2e666f6f",
+        )
+        .unwrap();
+        let mut stack = stk![V::Bytes(payload)];
+        let ctx = &mut Ctx::default();
+        assert_eq!(
+            interpret_one(&Unpack(Type::Address), ctx, &mut stack),
+            Ok(())
+        );
+        assert_eq!(
+            stack,
+            stk![V::new_option(Some(V::Address(
+                Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%.foo")
+                    .unwrap()
             )))]
         );
 
@@ -8945,7 +9180,8 @@ mod interpreter_tests {
         // `from_bytes` because a non-UTF-8 entrypoint has no readable
         // base58 form.
         let payload =
-            hex::decode("050a0000001700007b09f782e0bcd67739510afa819d85976119d5efff").unwrap();
+            hex::decode("050a0000001700007b09f782e0bcd67739510afa819d85976119d5efff")
+                .unwrap();
         let mut stack = stk![V::Bytes(payload)];
         let ctx = &mut Ctx::default();
         assert_eq!(
@@ -8959,9 +9195,10 @@ mod interpreter_tests {
         assert_eq!(stack, stk![V::new_option(Some(V::Address(expected)))]);
 
         // Control: explicit "default" remains forbidden -> None.
-        let payload =
-            hex::decode("050a0000001d00007b09f782e0bcd67739510afa819d85976119d5ef64656661756c74")
-                .unwrap();
+        let payload = hex::decode(
+            "050a0000001d00007b09f782e0bcd67739510afa819d85976119d5ef64656661756c74",
+        )
+        .unwrap();
         let mut stack = stk![V::Bytes(payload)];
         let ctx = &mut Ctx::default();
         assert_eq!(
@@ -8972,7 +9209,8 @@ mod interpreter_tests {
 
         // Control: > 31 entrypoint bytes is still rejected -> None
         // (shared length bound with L1).
-        let mut hex = String::from("050a0000003600007b09f782e0bcd67739510afa819d85976119d5ef");
+        let mut hex =
+            String::from("050a0000003600007b09f782e0bcd67739510afa819d85976119d5ef");
         for _ in 0..32 {
             hex.push_str("71"); // 'q' x 32
         }
@@ -9140,9 +9378,10 @@ mod interpreter_tests {
     fn create_contract() {
         use crate::parser::test_helpers::parse;
 
-        let cs_mich =
-            parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
-                .unwrap();
+        let cs_mich = parse(
+            "{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}",
+        )
+        .unwrap();
         let mut ctx = Ctx::default();
         ctx.set_operation_counter(100);
         let cs = cs_mich

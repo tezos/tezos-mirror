@@ -99,8 +99,9 @@ mod tests {
     use typed_arena::Arena;
 
     fn read_file_to_string(path: &str) -> String {
-        read_to_string(path)
-            .unwrap_or_else(|err| panic!("Opening file {path} should have succeeded: {err}"))
+        read_to_string(path).unwrap_or_else(|err| {
+            panic!("Opening file {path} should have succeeded: {err}")
+        })
     }
 
     #[test]
@@ -112,10 +113,12 @@ mod tests {
 
         let re = Regex::new(r"([0-9]+): ([a-zA-Z0-9_]+)").unwrap();
 
-        for (_, [tag, prim]) in re.captures_iter(&alpha_primitive_list).map(|c| c.extract()) {
-            let tag: u8 = tag
-                .parse()
-                .unwrap_or_else(|err| panic!("tag {tag} should be decodable as u8: {err}"));
+        for (_, [tag, prim]) in
+            re.captures_iter(&alpha_primitive_list).map(|c| c.extract())
+        {
+            let tag: u8 = tag.parse().unwrap_or_else(|err| {
+                panic!("tag {tag} should be decodable as u8: {err}")
+            });
             let prim: Prim = Prim::from_str(prim).unwrap_or_else(|err| {
                 panic!("string {prim} should be convertible to a primitive: {err}")
             });
@@ -125,11 +128,14 @@ mod tests {
             // case involving primitives: application of a primitive
             // to no argument and no annotation
             let serialized = [APP_NO_ARGS_NO_ANNOTS_TAG, tag];
-            let micheline = Micheline::decode_raw(&arena, &serialized, &mut Gas::default())
-                .unwrap_or_else(|err| {
-                    panic!("decode_raw should not OOG with unmetered Gas: {err:?}")
-                })
-                .unwrap_or_else(|err| panic!("tag {tag} should be decodable as primitive: {err}"));
+            let micheline =
+                Micheline::decode_raw(&arena, &serialized, &mut Gas::default())
+                    .unwrap_or_else(|err| {
+                        panic!("decode_raw should not OOG with unmetered Gas: {err:?}")
+                    })
+                    .unwrap_or_else(|err| {
+                        panic!("tag {tag} should be decodable as primitive: {err}")
+                    });
             assert_eq!(
                 micheline,
                 Micheline::prim0_uncarbonated(prim),

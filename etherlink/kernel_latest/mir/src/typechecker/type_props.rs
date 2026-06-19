@@ -58,8 +58,8 @@ impl Type {
             gas.consume(tc_cost::TYPE_PROP_STEP)?;
             let invalid = || Err(TcError::InvalidTypeProperty(prop, t.clone()));
             match t {
-                Nat | Int | Bool | Mutez | String | Unit | Never | Address | ChainId | Bytes
-                | Key | Signature | KeyHash | Timestamp => (),
+                Nat | Int | Bool | Mutez | String | Unit | Never | Address | ChainId
+                | Bytes | Key | Signature | KeyHash | Timestamp => (),
                 Ticket(_) => match prop {
                     TypeProperty::Comparable
                     | TypeProperty::Pushable
@@ -225,7 +225,10 @@ mod tests {
                 let res = t.ensure_prop(&mut gas, TypeProperty::Comparable);
                 std::mem::forget(t);
                 match res {
-                    Err(TcError::InvalidTypeProperty(TypeProperty::Comparable, offender)) => {
+                    Err(TcError::InvalidTypeProperty(
+                        TypeProperty::Comparable,
+                        offender,
+                    )) => {
                         std::mem::forget(offender);
                     }
                     other => panic!("expected Comparable rejection, got {other:?}"),

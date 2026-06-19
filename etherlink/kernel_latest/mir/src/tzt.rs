@@ -156,7 +156,10 @@ fn typecheck_stack<'a>(
 
 impl<'a> Parser<'a> {
     /// Parse top-level definition of a TZT test.
-    pub fn parse_tzt_test(&'a self, src: &'a str) -> Result<TztTest<'a>, Box<dyn Error + 'a>> {
+    pub fn parse_tzt_test(
+        &'a self,
+        src: &'a str,
+    ) -> Result<TztTest<'a>, Box<dyn Error + 'a>> {
         tztTestEntitiesParser::new()
             .parse(&self.arena, spanned_lexer(src))?
             .try_into()
@@ -189,12 +192,14 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_parameter: Option<Micheline> = None;
         let mut m_self: Option<Micheline> = None;
         let mut m_other_contracts: Option<Vec<(Micheline, Micheline)>> = None;
-        let mut m_big_maps: Option<Vec<(Micheline, Micheline, Micheline, Micheline)>> = None;
+        let mut m_big_maps: Option<Vec<(Micheline, Micheline, Micheline, Micheline)>> =
+            None;
         let mut m_now: Option<BigInt> = None;
         let mut m_source: Option<Micheline> = None;
         let mut m_sender: Option<Micheline> = None;
         let mut m_storages: Option<Vec<(Micheline, Micheline, Micheline)>> = None;
-        let mut m_views: Option<Vec<(micheline::Micheline<'_>, Vec<RawNamedView<'_>>)>> = None;
+        let mut m_views: Option<Vec<(micheline::Micheline<'_>, Vec<RawNamedView<'_>>)>> =
+            None;
 
         // This would hold the untypechecked, expected output value. This is because If the self
         // and parameters values are specified, then we need to fetch them and populate the context
@@ -214,13 +219,17 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                     }
                     input_stk_backup = Some(stk);
                 }
-                Output(tzt_output) => set_tzt_field("output", &mut m_output_inter, tzt_output)?,
+                Output(tzt_output) => {
+                    set_tzt_field("output", &mut m_output_inter, tzt_output)?
+                }
                 Amount(m) => set_tzt_field("amount", &mut m_amount, m)?,
                 Balance(m) => set_tzt_field("balance", &mut m_balance, m)?,
                 ChainId(id) => set_tzt_field("chain_id", &mut m_chain_id, id)?,
                 Parameter(ty) => set_tzt_field("parameter", &mut m_parameter, ty)?,
                 SelfAddr(v) => set_tzt_field("self", &mut m_self, v)?,
-                OtherContracts(v) => set_tzt_field("other_contracts", &mut m_other_contracts, v)?,
+                OtherContracts(v) => {
+                    set_tzt_field("other_contracts", &mut m_other_contracts, v)?
+                }
                 Now(n) => set_tzt_field("now", &mut m_now, n.into())?,
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
                 SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
@@ -308,7 +317,9 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                             a.insert(address_hash, entrypoints);
                         }
                         Some(_) => {
-                            return Err("Address cannot repeat in 'other_contracts'".into());
+                            return Err(
+                                "Address cannot repeat in 'other_contracts'".into()
+                            );
                         }
                     }
                 }
@@ -321,7 +332,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             Some(bm) => {
                 let mut a = BTreeMap::new();
                 for (idx, key_ty, val_ty, elts) in bm {
-                    let typed_idx = typecheck_value(&idx, &mut Ctx::default(), &Type::Int)?;
+                    let typed_idx =
+                        typecheck_value(&idx, &mut Ctx::default(), &Type::Int)?;
                     let idx: BigMapId = match typed_idx {
                         TypedValue::Int(i) => i.into(),
                         other => {
@@ -400,11 +412,18 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 let tzt_storages: HashMap<AddressHash, (Type, TypedValue)> = tzt_storages
                     .into_iter()
                     .map(|(address_raw, storage_type_raw, storage_raw)| {
-                        let typed_address =
-                            typecheck_value(&address_raw, &mut Ctx::default(), &Type::Address)?;
-                        let storage_type = parse_ty(Ctx::default().gas(), &storage_type_raw)?;
-                        let storage =
-                            typecheck_value(&storage_raw, &mut Ctx::default(), &storage_type)?;
+                        let typed_address = typecheck_value(
+                            &address_raw,
+                            &mut Ctx::default(),
+                            &Type::Address,
+                        )?;
+                        let storage_type =
+                            parse_ty(Ctx::default().gas(), &storage_type_raw)?;
+                        let storage = typecheck_value(
+                            &storage_raw,
+                            &mut Ctx::default(),
+                            &storage_type,
+                        )?;
 
                         let address = match typed_address {
                             TypedValue::Address(Address {
@@ -428,18 +447,27 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 let tzt_views: HashMap<AddressHash, HashMap<String, View>> = tzt_views
                     .into_iter()
                     .map(|(address_raw, views)| {
-                        let typed_address =
-                            typecheck_value(&address_raw, &mut Ctx::default(), &Type::Address)?;
+                        let typed_address = typecheck_value(
+                            &address_raw,
+                            &mut Ctx::default(),
+                            &Type::Address,
+                        )?;
                         let views: HashMap<String, View> = views
                             .into_iter()
                             .map(|(name_raw, arg_type_raw, return_type_raw, code)| {
                                 let name = match name_raw {
                                     Micheline::String(name) => name,
-                                    _ => return Err("View does not have a valid name.".into()),
+                                    _ => {
+                                        return Err(
+                                            "View does not have a valid name.".into()
+                                        )
+                                    }
                                 };
 
-                                let input_type = parse_ty(Ctx::default().gas(), &arg_type_raw)?;
-                                let output_type = parse_ty(Ctx::default().gas(), &return_type_raw)?;
+                                let input_type =
+                                    parse_ty(Ctx::default().gas(), &arg_type_raw)?;
+                                let output_type =
+                                    parse_ty(Ctx::default().gas(), &return_type_raw)?;
                                 Ok((
                                     name,
                                     View {
@@ -634,7 +662,8 @@ fn execute_tzt_test_code<'a>(
 
     let mut t_stack: FailingTypeStack = FailingTypeStack::Ok(TopIsFirst::from(typs).0);
 
-    let parameter = m_parameter.unwrap_or(Entrypoints::from([(Entrypoint::default(), Type::Unit)]));
+    let parameter =
+        m_parameter.unwrap_or(Entrypoints::from([(Entrypoint::default(), Type::Unit)]));
 
     // Run the code and save the status of the
     // final result as a Result<(), TestError>.

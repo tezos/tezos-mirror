@@ -271,8 +271,8 @@ impl Type {
         while let Some(t) = stack.pop() {
             total += 1;
             match t {
-                Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address
-                | ChainId | Bytes | Key | Signature | KeyHash | Timestamp => {}
+                Nat | Int | Bool | Mutez | String | Unit | Never | Operation
+                | Address | ChainId | Bytes | Key | Signature | KeyHash | Timestamp => {}
                 #[cfg(feature = "bls")]
                 Bls12381Fr | Bls12381G1 | Bls12381G2 => {}
                 Pair(p) | Or(p) | Map(p) | BigMap(p) | Lambda(p) => {
@@ -349,7 +349,8 @@ impl PartialEq for Type {
         // SmallVec to avoid a per-call heap allocation on shallow types —
         // this runs per control-flow stack-merge (IF/LOOP/MAP/ITER); deep
         // types spill to the heap as before.
-        let mut stack: smallvec::SmallVec<[(&Type, &Type); 8]> = smallvec::smallvec![(self, other)];
+        let mut stack: smallvec::SmallVec<[(&Type, &Type); 8]> =
+            smallvec::smallvec![(self, other)];
         while let Some((a, b)) = stack.pop() {
             match (a, b) {
                 (Nat, Nat)
@@ -368,7 +369,9 @@ impl PartialEq for Type {
                 | (KeyHash, KeyHash)
                 | (Timestamp, Timestamp) => {}
                 #[cfg(feature = "bls")]
-                (Bls12381Fr, Bls12381Fr) | (Bls12381G1, Bls12381G1) | (Bls12381G2, Bls12381G2) => {}
+                (Bls12381Fr, Bls12381Fr)
+                | (Bls12381G1, Bls12381G1)
+                | (Bls12381G2, Bls12381G2) => {}
                 (Pair(p), Pair(q))
                 | (Or(p), Or(q))
                 | (Map(p), Map(q))
@@ -624,11 +627,17 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
                     KeyHash => results.push(Micheline::prim0(Prim::key_hash, gas)?),
                     Never => results.push(Micheline::prim0(Prim::never, gas)?),
                     #[cfg(feature = "bls")]
-                    Bls12381Fr => results.push(Micheline::prim0(Prim::bls12_381_fr, gas)?),
+                    Bls12381Fr => {
+                        results.push(Micheline::prim0(Prim::bls12_381_fr, gas)?)
+                    }
                     #[cfg(feature = "bls")]
-                    Bls12381G1 => results.push(Micheline::prim0(Prim::bls12_381_g1, gas)?),
+                    Bls12381G1 => {
+                        results.push(Micheline::prim0(Prim::bls12_381_g1, gas)?)
+                    }
                     #[cfg(feature = "bls")]
-                    Bls12381G2 => results.push(Micheline::prim0(Prim::bls12_381_g2, gas)?),
+                    Bls12381G2 => {
+                        results.push(Micheline::prim0(Prim::bls12_381_g2, gas)?)
+                    }
 
                     Option(x) => {
                         frames.push(TyImFrame::BuildPrim1(Prim::option));
@@ -808,8 +817,14 @@ pub(crate) enum DebugFrame<'b, 'a: 'b> {
         std::collections::btree_map::Iter<'b, Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         bool,
     ),
-    SetEntries(std::collections::btree_set::Iter<'b, Rc<TypedValue<'a>>>, bool),
-    ListEntries(crate::ast::michelson_list::Iter<'b, Rc<TypedValue<'a>>>, bool),
+    SetEntries(
+        std::collections::btree_set::Iter<'b, Rc<TypedValue<'a>>>,
+        bool,
+    ),
+    ListEntries(
+        crate::ast::michelson_list::Iter<'b, Rc<TypedValue<'a>>>,
+        bool,
+    ),
 }
 
 pub(crate) fn debug_fmt_walk<'a, 'b>(
@@ -1123,14 +1138,19 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                             // Bare lambda: emit its stored Micheline directly.
                             results.push(match terminal {
                                 Lambda::Lambda { micheline_code, .. } => micheline_code,
-                                Lambda::LambdaRec { micheline_code, .. } => {
-                                    V::prim1(arena, Prim::Lambda_rec, micheline_code, gas)?
-                                }
+                                Lambda::LambdaRec { micheline_code, .. } => V::prim1(
+                                    arena,
+                                    Prim::Lambda_rec,
+                                    micheline_code,
+                                    gas,
+                                )?,
                             });
                         } else {
                             // Tail of the innermost seq, after `PUSH; PAIR`.
                             let inner_tail: Vec<V<'a>> = match terminal {
-                                Lambda::Lambda { micheline_code, .. } => vec![micheline_code],
+                                Lambda::Lambda { micheline_code, .. } => {
+                                    vec![micheline_code]
+                                }
                                 Lambda::LambdaRec {
                                     in_ty,
                                     out_ty,
@@ -1140,8 +1160,12 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     V::prim3(
                                         arena,
                                         Prim::LAMBDA_REC,
-                                        (&in_ty).into_micheline_optimized_legacy(arena, gas)?,
-                                        (&out_ty).into_micheline_optimized_legacy(arena, gas)?,
+                                        (&in_ty).into_micheline_optimized_legacy(
+                                            arena, gas,
+                                        )?,
+                                        (&out_ty).into_micheline_optimized_legacy(
+                                            arena, gas,
+                                        )?,
                                         micheline_code,
                                         gas,
                                     )?,
@@ -1149,12 +1173,15 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     V::prim0(Prim::EXEC, gas)?,
                                 ],
                             };
-                            let mut arg_ty_michs: Vec<V<'a>> = Vec::with_capacity(applies.len());
+                            let mut arg_ty_michs: Vec<V<'a>> =
+                                Vec::with_capacity(applies.len());
                             let mut arg_vals: Vec<TypedValue<'a>> =
                                 Vec::with_capacity(applies.len());
                             for (arg_ty, arg_val) in applies {
-                                arg_ty_michs
-                                    .push((&arg_ty).into_micheline_optimized_legacy(arena, gas)?);
+                                arg_ty_michs.push(
+                                    (&arg_ty)
+                                        .into_micheline_optimized_legacy(arena, gas)?,
+                                );
                                 arg_vals.push(arg_val);
                             }
                             frames.push(TvImFrame::BuildClosure {
@@ -1169,11 +1196,17 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         }
                     }
                     #[cfg(feature = "bls")]
-                    TV::Bls12381Fr(x) => results.push(V::bytes(x.to_bytes().to_vec(), gas)?),
+                    TV::Bls12381Fr(x) => {
+                        results.push(V::bytes(x.to_bytes().to_vec(), gas)?)
+                    }
                     #[cfg(feature = "bls")]
-                    TV::Bls12381G1(x) => results.push(V::bytes(x.to_bytes().to_vec(), gas)?),
+                    TV::Bls12381G1(x) => {
+                        results.push(V::bytes(x.to_bytes().to_vec(), gas)?)
+                    }
                     #[cfg(feature = "bls")]
-                    TV::Bls12381G2(x) => results.push(V::bytes(x.to_bytes().to_vec(), gas)?),
+                    TV::Bls12381G2(x) => {
+                        results.push(V::bytes(x.to_bytes().to_vec(), gas)?)
+                    }
 
                     // This transformation for pairs deviates from the optimized
                     // representation of the reference implementation, because
@@ -1216,7 +1249,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         }
                     }
                     TV::Map(m) => {
-                        let mut entries: Vec<(Rc<Self>, Rc<Self>)> = m.into_iter().collect();
+                        let mut entries: Vec<(Rc<Self>, Rc<Self>)> =
+                            m.into_iter().collect();
                         frames.push(TvImFrame::BuildSeqOf {
                             count: entries.len(),
                         });
@@ -1253,11 +1287,15 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     frames.push(TvImFrame::BuildPrim2(Prim::Elt));
                                     match val {
                                         Some(v) => {
-                                            frames.push(TvImFrame::BuildPrim1(Prim::Some));
+                                            frames
+                                                .push(TvImFrame::BuildPrim1(Prim::Some));
                                             frames.push(TvImFrame::Visit(v));
                                         }
                                         None => {
-                                            frames.push(TvImFrame::Leaf(V::prim0(Prim::None, gas)?));
+                                            frames.push(TvImFrame::Leaf(V::prim0(
+                                                Prim::None,
+                                                gas,
+                                            )?));
                                         }
                                     }
                                     frames.push(TvImFrame::Visit(key));
@@ -1273,7 +1311,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         Operation::TransferTokens(tt) => {
                             frames.push(TvImFrame::BuildTransferTokens);
                             frames.push(TvImFrame::Visit(TV::Mutez(tt.amount)));
-                            frames.push(TvImFrame::Visit(TV::Address(tt.destination_address)));
+                            frames.push(TvImFrame::Visit(TV::Address(
+                                tt.destination_address,
+                            )));
                             frames.push(TvImFrame::Visit(tt.param));
                         }
                         Operation::SetDelegate(sd) => {
@@ -1288,7 +1328,12 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                 )?,
                                 None => V::prim0(Prim::None, gas)?,
                             };
-                            results.push(V::prim1(arena, Prim::Set_delegate, inner, gas)?);
+                            results.push(V::prim1(
+                                arena,
+                                Prim::Set_delegate,
+                                inner,
+                                gas,
+                            )?);
                         }
                         Operation::Emit(em) => {
                             let arg_ty_mich = match em.arg_ty {
@@ -1348,15 +1393,28 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     results.push(V::seq(slice, gas)?);
                 }
                 TvImFrame::BuildTransferTokens => {
-                    let mutez = results.pop().expect("BuildTransferTokens: missing mutez");
+                    let mutez =
+                        results.pop().expect("BuildTransferTokens: missing mutez");
                     let addr = results.pop().expect("BuildTransferTokens: missing addr");
-                    let param = results.pop().expect("BuildTransferTokens: missing param");
-                    results.push(V::prim3(arena, Prim::Transfer_tokens, param, addr, mutez, gas)?);
+                    let param =
+                        results.pop().expect("BuildTransferTokens: missing param");
+                    results.push(V::prim3(
+                        arena,
+                        Prim::Transfer_tokens,
+                        param,
+                        addr,
+                        mutez,
+                        gas,
+                    )?);
                 }
                 TvImFrame::BuildEmit { arg_ty_mich, tag } => {
                     let value_mich = results.pop().expect("BuildEmit: missing value");
-                    let mut node =
-                        Micheline::prim_n_arr(arena, Prim::Emit, [value_mich, arg_ty_mich], gas)?;
+                    let mut node = Micheline::prim_n_arr(
+                        arena,
+                        Prim::Emit,
+                        [value_mich, arg_ty_mich],
+                        gas,
+                    )?;
                     // Use `annotate` (not a raw stamp-on) so the field-tag
                     // annotation is charged `unparsing_cost::annotation`.
                     if let Some(tag) = tag {
@@ -1369,7 +1427,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     delegate_mich,
                     mutez_mich,
                 } => {
-                    let storage_mich = results.pop().expect("BuildCreateContract: missing storage");
+                    let storage_mich =
+                        results.pop().expect("BuildCreateContract: missing storage");
                     results.push(Micheline::prim_n_arr(
                         arena,
                         Prim::Create_contract,
@@ -1608,9 +1667,13 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue
             // Operations carry `TypedValue` payloads (transfer parameter, emit
             // value, originated storage) that may be deep; drain them.
             match &mut info.operation {
-                Operation::TransferTokens(tt) => stack.push(replace(&mut tt.param, TV::Unit)),
+                Operation::TransferTokens(tt) => {
+                    stack.push(replace(&mut tt.param, TV::Unit))
+                }
                 Operation::Emit(e) => stack.push(replace(&mut e.value, TV::Unit)),
-                Operation::CreateContract(c) => stack.push(replace(&mut c.storage, TV::Unit)),
+                Operation::CreateContract(c) => {
+                    stack.push(replace(&mut c.storage, TV::Unit))
+                }
                 Operation::SetDelegate(_) => {}
             }
         }
@@ -2196,15 +2259,18 @@ mod test_untypers {
         )));
 
         // Build (list unit) with 1000 shared references to the same empty list
-        let inner_lists: Vec<Rc<TypedValue>> = (0..1000).map(|_| Rc::clone(&unit_list)).collect();
+        let inner_lists: Vec<Rc<TypedValue>> =
+            (0..1000).map(|_| Rc::clone(&unit_list)).collect();
         let inner_list = Rc::new(TypedValue::List(MichelsonList::from(inner_lists)));
 
         // Build (list (list unit)) with 1000 shared references to the same (list unit)
-        let middle_lists: Vec<Rc<TypedValue>> = (0..1000).map(|_| Rc::clone(&inner_list)).collect();
+        let middle_lists: Vec<Rc<TypedValue>> =
+            (0..1000).map(|_| Rc::clone(&inner_list)).collect();
         let middle_list = Rc::new(TypedValue::List(MichelsonList::from(middle_lists)));
 
         // Build (list (list (list unit))) with 1000 shared references
-        let outer_lists: Vec<Rc<TypedValue>> = (0..1000).map(|_| Rc::clone(&middle_list)).collect();
+        let outer_lists: Vec<Rc<TypedValue>> =
+            (0..1000).map(|_| Rc::clone(&middle_list)).collect();
         let outer_list = TypedValue::List(MichelsonList::from(outer_lists));
 
         // This structure has 1000 * 1000 * 1000 = 1,000,000,000 virtual entries to traverse
@@ -2237,7 +2303,8 @@ mod test_untypers {
         fn unparse(tv: TypedValue<'static>) -> u32 {
             let arena = Arena::new();
             let mut gas = Gas::default();
-            tv.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
+            tv.into_micheline_optimized_legacy(&arena, &mut gas)
+                .unwrap();
             Gas::default().milligas().unwrap() - gas.milligas().unwrap()
         }
 
@@ -2429,7 +2496,8 @@ mod drop_safety {
             }
             let arena = Arena::new();
             let mut gas = Gas::unmetered();
-            tv.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
+            tv.into_micheline_optimized_legacy(&arena, &mut gas)
+                .unwrap();
         });
     }
 }

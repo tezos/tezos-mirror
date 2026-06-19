@@ -114,7 +114,10 @@ clippy. When it's known to be safe, `allow` directive is added on the call.
 */
 
 impl<'a> Micheline<'a> {
-    pub(crate) fn alloc_seq<const N: usize>(arena: &'a Arena<Self>, args: [Self; N]) -> &'a [Self] {
+    pub(crate) fn alloc_seq<const N: usize>(
+        arena: &'a Arena<Self>,
+        args: [Self; N],
+    ) -> &'a [Self] {
         // The call is safe, the iterable, being an array, doesn't allocate in
         // the arena during iteration. See Note: alloc_extend
         #[allow(clippy::disallowed_methods)]
@@ -234,7 +237,11 @@ impl<'a> Micheline<'a> {
     }
 
     /// Construct a primitive application from already-allocated arguments.
-    pub fn prim_n(prim: Prim, args: &'a [Micheline<'a>], gas: &mut Gas) -> Result<Self, OutOfGas> {
+    pub fn prim_n(
+        prim: Prim,
+        args: &'a [Micheline<'a>],
+        gas: &mut Gas,
+    ) -> Result<Self, OutOfGas> {
         gas.consume(unparsing_cost::NODE)?;
         Ok(Self::App(prim, args, NO_ANNS))
     }
@@ -275,10 +282,16 @@ impl<'a> Micheline<'a> {
     }
 
     /// Add an annotation on a Micheline node.
-    pub fn annotate(&mut self, annotation: Annotation<'a>, gas: &mut Gas) -> Result<(), OutOfGas> {
+    pub fn annotate(
+        &mut self,
+        annotation: Annotation<'a>,
+        gas: &mut Gas,
+    ) -> Result<(), OutOfGas> {
         match self {
             Self::App(_prim, _args, ref mut annots) => {
-                gas.consume(unparsing_cost::annotation(&annotation).map_err(|_| OutOfGas)?)?;
+                gas.consume(
+                    unparsing_cost::annotation(&annotation).map_err(|_| OutOfGas)?,
+                )?;
                 annots.push(annotation);
                 Ok(())
             }

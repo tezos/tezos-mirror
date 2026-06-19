@@ -9,8 +9,8 @@
 use super::{ByteReprError, ByteReprTrait};
 use tezos_crypto_rs::{
     hash::{
-        ContractKt1Hash, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash,
-        HashTrait, SmartRollupHash,
+        ContractKt1Hash, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash,
+        ContractTz4Hash, HashTrait, SmartRollupHash,
     },
     public_key_hash::PublicKeyHash,
 };
@@ -92,7 +92,11 @@ impl TryFrom<&str> for AddressHash {
     }
 }
 
-pub(super) fn check_size(data: &[u8], min_size: usize, name: &str) -> Result<(), ByteReprError> {
+pub(super) fn check_size(
+    data: &[u8],
+    min_size: usize,
+    name: &str,
+) -> Result<(), ByteReprError> {
     let size = data.len();
     if size < min_size {
         Err(ByteReprError::WrongFormat(format!(

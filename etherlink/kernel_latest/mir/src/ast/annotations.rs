@@ -175,7 +175,9 @@ impl<'a> Annotations<'a> {
     /// field annotations in the list, returns `Ok(None)`. If there is exactly
     /// one field annotation, returns `Ok(Some(field_annotation))`. If there are
     /// more than one, returns `Err(`[`AnnotationError::TooManyFieldAnns`]`)`
-    pub fn get_single_field_ann(&self) -> Result<Option<FieldAnnotation<'a>>, AnnotationError> {
+    pub fn get_single_field_ann(
+        &self,
+    ) -> Result<Option<FieldAnnotation<'a>>, AnnotationError> {
         use Annotation::*;
         let mut res = None;
         for i in &self.0 {

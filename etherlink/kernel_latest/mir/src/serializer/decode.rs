@@ -80,7 +80,10 @@ impl<'a> Micheline<'a> {
         bytes: &[u8],
         gas: &mut Gas,
     ) -> Result<Result<Micheline<'a>, DecodeError>, OutOfGas> {
-        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len()).map_err(|_| OutOfGas)?)?;
+        gas.consume(
+            interpret_cost::micheline_decoding_bytes(bytes.len())
+                .map_err(|_| OutOfGas)?,
+        )?;
         Ok(Self::decode_raw_unmetered(bytes, arena))
     }
 
@@ -112,7 +115,10 @@ impl<'a> Micheline<'a> {
         bytes: &[u8],
         gas: &mut Gas,
     ) -> Result<Result<(Micheline<'a>, usize), DecodeError>, OutOfGas> {
-        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len()).map_err(|_| OutOfGas)?)?;
+        gas.consume(
+            interpret_cost::micheline_decoding_bytes(bytes.len())
+                .map_err(|_| OutOfGas)?,
+        )?;
         let mut it: BytesIt = bytes.into();
         Ok(decode_micheline(arena, &mut it).map(|res| (res, bytes.len() - it.0.len())))
     }
@@ -127,7 +133,10 @@ impl<'a> Micheline<'a> {
         bytes: &[u8],
         gas: &mut Gas,
     ) -> Result<Result<Micheline<'a>, DecodeError>, OutOfGas> {
-        gas.consume(interpret_cost::micheline_decoding_bytes(bytes.len()).map_err(|_| OutOfGas)?)?;
+        gas.consume(
+            interpret_cost::micheline_decoding_bytes(bytes.len())
+                .map_err(|_| OutOfGas)?,
+        )?;
         if bytes.first() != Some(&0x05) {
             return Ok(Err(DecodeError::NoPackTag));
         }
@@ -233,7 +242,10 @@ fn decode_micheline<'a, 'b>(
 
     // Single helper to deliver a finished node to the top frame, or return
     // it as the root when the stack is empty.
-    fn deliver<'a>(frames: &mut Vec<DecFrame<'a>>, m: Micheline<'a>) -> Option<Micheline<'a>> {
+    fn deliver<'a>(
+        frames: &mut Vec<DecFrame<'a>>,
+        m: Micheline<'a>,
+    ) -> Option<Micheline<'a>> {
         match frames.last_mut() {
             None => Some(m),
             Some(DecFrame::AppArgs { remaining, acc, .. }) => {
@@ -255,7 +267,9 @@ fn decode_micheline<'a, 'b>(
         loop {
             let done = match frames.last() {
                 Some(DecFrame::AppArgs { remaining: 0, .. }) => true,
-                Some(DecFrame::Container { .. }) => iters.last().unwrap().peek().is_none(),
+                Some(DecFrame::Container { .. }) => {
+                    iters.last().unwrap().peek().is_none()
+                }
                 _ => false,
             };
             if !done {
@@ -724,9 +738,10 @@ mod test {
             bytes.extend_from_slice(&0u32.to_be_bytes());
 
             let arena: Arena<Micheline<'_>> = Arena::new();
-            let result = Micheline::decode_raw(&arena, &bytes, &mut crate::gas::Gas::default())
-                .expect("gas suffices")
-                .expect("deep seq decodes");
+            let result =
+                Micheline::decode_raw(&arena, &bytes, &mut crate::gas::Gas::default())
+                    .expect("gas suffices")
+                    .expect("deep seq decodes");
             // peel off DEPTH layers
             let mut node = &result;
             for _ in 0..DEPTH {
@@ -756,9 +771,10 @@ mod test {
             bytes.push(0x0b);
 
             let arena: Arena<Micheline<'_>> = Arena::new();
-            let result = Micheline::decode_raw(&arena, &bytes, &mut crate::gas::Gas::default())
-                .expect("gas suffices")
-                .expect("deep Some decodes");
+            let result =
+                Micheline::decode_raw(&arena, &bytes, &mut crate::gas::Gas::default())
+                    .expect("gas suffices")
+                    .expect("deep Some decodes");
             // peel off DEPTH `Some` layers
             let mut node = &result;
             for _ in 0..DEPTH {
@@ -840,7 +856,11 @@ mod test {
             {
                 let arena = Arena::new();
                 assert!(matches!(
-                    Micheline::decode_raw(&arena, &true_with_ann(255), &mut Gas::default()),
+                    Micheline::decode_raw(
+                        &arena,
+                        &true_with_ann(255),
+                        &mut Gas::default()
+                    ),
                     Ok(Ok(_))
                 ));
             }
@@ -848,7 +868,11 @@ mod test {
             {
                 let arena = Arena::new();
                 assert_eq!(
-                    Micheline::decode_raw(&arena, &true_with_ann(256), &mut Gas::default()),
+                    Micheline::decode_raw(
+                        &arena,
+                        &true_with_ann(256),
+                        &mut Gas::default()
+                    ),
                     Ok(Err(DecodeError::OversizedAnnotation(256)))
                 );
             }

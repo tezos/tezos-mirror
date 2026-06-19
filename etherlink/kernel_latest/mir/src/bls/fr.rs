@@ -62,8 +62,8 @@ impl Fr {
             BigInt::from_slice(
                 Sign::Plus,
                 &[
-                    1, 4294967295, 4294859774, 1404937218, 161601541, 859428872, 698187080,
-                    1944954707,
+                    1, 4294967295, 4294859774, 1404937218, 161601541, 859428872,
+                    698187080, 1944954707,
                 ],
             )
         })
@@ -167,8 +167,10 @@ mod tests {
             &Fr::from_bytes(&[1]).unwrap().to_bytes(),
             [&[1u8] as &[u8], &[0; 31]].concat().as_slice()
         );
-        let hex = &hex::decode("6582983f01c028b8959d31d2d5e537dd7ca38eaf8490c269727b2e5bd3ea961a")
-            .unwrap();
+        let hex = &hex::decode(
+            "6582983f01c028b8959d31d2d5e537dd7ca38eaf8490c269727b2e5bd3ea961a",
+        )
+        .unwrap();
         assert_eq!(&Fr::from_bytes(hex).unwrap().to_bytes(), hex.as_slice());
     }
 
@@ -183,22 +185,28 @@ mod tests {
         let int = BigInt::from_str(&"42".repeat(72)).unwrap();
         assert_eq!(
             &Fr::from_big_int(&int).to_bytes(),
-            hex::decode("992529bdf61eb9e4a480fff193adb5e4a78ab7820d308f5582c015c2ded0103e")
-                .unwrap()
-                .as_slice()
+            hex::decode(
+                "992529bdf61eb9e4a480fff193adb5e4a78ab7820d308f5582c015c2ded0103e"
+            )
+            .unwrap()
+            .as_slice()
         );
         let neg_int = -BigInt::from_str(&"42".repeat(72)).unwrap();
         assert_eq!(
             &Fr::from_big_int(&neg_int).to_bytes(),
-            hex::decode("68dad64208e1461b5adbfe0d6ff6076f5d4dea86faa7aaddc5bc876774d6dc35")
-                .unwrap()
-                .as_slice()
+            hex::decode(
+                "68dad64208e1461b5adbfe0d6ff6076f5d4dea86faa7aaddc5bc876774d6dc35"
+            )
+            .unwrap()
+            .as_slice()
         );
         assert_eq!(
             &Fr::from_big_int(&(-1).into()),
             &Fr::from_bytes(
-                &hex::decode("00000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73")
-                    .unwrap()
+                &hex::decode(
+                    "00000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73"
+                )
+                .unwrap()
             )
             .unwrap(),
         )
@@ -214,8 +222,10 @@ mod tests {
             .modpow(&1.into(), Fr::order());
         assert_eq!(
             Fr::from_bytes(
-                &hex::decode("992529bdf61eb9e4a480fff193adb5e4a78ab7820d308f5582c015c2ded0103e")
-                    .unwrap()
+                &hex::decode(
+                    "992529bdf61eb9e4a480fff193adb5e4a78ab7820d308f5582c015c2ded0103e"
+                )
+                .unwrap()
             )
             .unwrap()
             .to_big_int(),
@@ -225,8 +235,10 @@ mod tests {
         let neg_int_mod = neg_int.modpow(&BigInt::one(), Fr::order());
         assert_eq!(
             Fr::from_bytes(
-                &hex::decode("68dad64208e1461b5adbfe0d6ff6076f5d4dea86faa7aaddc5bc876774d6dc35")
-                    .unwrap()
+                &hex::decode(
+                    "68dad64208e1461b5adbfe0d6ff6076f5d4dea86faa7aaddc5bc876774d6dc35"
+                )
+                .unwrap()
             )
             .unwrap()
             .to_big_int(),
@@ -234,8 +246,10 @@ mod tests {
         );
         assert_eq!(
             Fr::from_bytes(
-                &hex::decode("00000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73")
-                    .unwrap()
+                &hex::decode(
+                    "00000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73"
+                )
+                .unwrap()
             )
             .unwrap()
             .to_big_int(),
@@ -250,13 +264,17 @@ mod tests {
         let two = &Fr::from_big_int(&2.into());
         let big = &Fr::from_big_int(&BigInt::from_str(&"42".repeat(72)).unwrap());
         let big1 = &Fr::from_bytes(
-            &hex::decode("9a2529bdf61eb9e4a480fff193adb5e4a78ab7820d308f5582c015c2ded0103e")
-                .unwrap(),
+            &hex::decode(
+                "9a2529bdf61eb9e4a480fff193adb5e4a78ab7820d308f5582c015c2ded0103e",
+            )
+            .unwrap(),
         )
         .unwrap();
         let big2 = &Fr::from_bytes(
-            &hex::decode("314b527aee3d72c94aa500e424b7ad754a3dcdfb1288e477bc038e5a6afa3308")
-                .unwrap(),
+            &hex::decode(
+                "314b527aee3d72c94aa500e424b7ad754a3dcdfb1288e477bc038e5a6afa3308",
+            )
+            .unwrap(),
         )
         .unwrap();
 
@@ -277,8 +295,10 @@ mod tests {
         let one = &Fr::from_big_int(&1.into());
         let big = &Fr::from_big_int(&BigInt::from_str(&"42".repeat(72)).unwrap());
         let big2 = &Fr::from_bytes(
-            &hex::decode("cb6a743dd190f86475268c95979c93e8b6b84b3bf10754822c8eecc4d9ae281c")
-                .unwrap(),
+            &hex::decode(
+                "cb6a743dd190f86475268c95979c93e8b6b84b3bf10754822c8eecc4d9ae281c",
+            )
+            .unwrap(),
         )
         .unwrap();
 
@@ -300,8 +320,10 @@ mod tests {
         let neg_one = &Fr::from_big_int(&(-1).into());
         let big = &Fr::from_big_int(&BigInt::from_str(&"42".repeat(72)).unwrap());
         let neg_big = &Fr::from_bytes(
-            &hex::decode("68dad64208e1461b5adbfe0d6ff6076f5d4dea86faa7aaddc5bc876774d6dc35")
-                .unwrap(),
+            &hex::decode(
+                "68dad64208e1461b5adbfe0d6ff6076f5d4dea86faa7aaddc5bc876774d6dc35",
+            )
+            .unwrap(),
         )
         .unwrap();
 

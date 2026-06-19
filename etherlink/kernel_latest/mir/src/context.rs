@@ -79,8 +79,10 @@ pub trait TypecheckingCtx<'a> {
 
     /// Get key and value types of the map.
     /// This returns None if the map with such ID is not present in the storage.
-    fn big_map_get_type(&mut self, id: &BigMapId)
-        -> Result<Option<(Type, Type)>, LazyStorageError>;
+    fn big_map_get_type(
+        &mut self,
+        id: &BigMapId,
+    ) -> Result<Option<(Type, Type)>, LazyStorageError>;
 }
 
 /// Typechecking context used to typecheck pushable values during the
@@ -165,7 +167,10 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
         contract: &ContractKt1Hash,
         name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Result<Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>, LookupViewError>;
+    ) -> Result<
+        Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
+        LookupViewError,
+    >;
 
     /// Override the execution context for a view call.
     /// Sets `self_address`, `sender`, `amount`, and `balance`.
@@ -203,7 +208,8 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
         _input: &TypedValue<'a>,
         _return_type: &Type,
         _arena: &'a Arena<Micheline<'a>>,
-    ) -> Option<Result<Option<TypedValue<'a>>, crate::interpreter::InterpretError<'a>>> {
+    ) -> Option<Result<Option<TypedValue<'a>>, crate::interpreter::InterpretError<'a>>>
+    {
         None
     }
 }
@@ -294,7 +300,10 @@ impl<'a> Ctx<'a> {
 
     /// Set [Self::lookup_entrypoints] by providing something that can convert
     /// to [`HashMap<AddressHash, Entrypoints>`].
-    pub fn set_known_contracts(&mut self, v: impl Into<HashMap<AddressHash, Entrypoints>>) {
+    pub fn set_known_contracts(
+        &mut self,
+        v: impl Into<HashMap<AddressHash, Entrypoints>>,
+    ) {
         self.lookup_entrypoints = v.into();
     }
 
@@ -329,8 +338,10 @@ impl Default for Ctx<'_> {
             now: 0i32.into(),
             min_block_time: 1u32.into(),
             // the default chain id is NetXynUjJNZm7wi, which is also the default chain id of octez-client in mockup mode
-            chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![0xf3, 0xd4, 0x85, 0x54])
-                .unwrap(),
+            chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![
+                0xf3, 0xd4, 0x85, 0x54,
+            ])
+            .unwrap(),
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
@@ -445,10 +456,13 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         contract: &ContractKt1Hash,
         view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Result<Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>, LookupViewError>
-    {
+    ) -> Result<
+        Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
+        LookupViewError,
+    > {
         let addr = AddressHash::Kt1(contract.clone());
-        let Some(contract_view) = self.views.get(&addr).and_then(|m| m.get(view_name)) else {
+        let Some(contract_view) = self.views.get(&addr).and_then(|m| m.get(view_name))
+        else {
             return Ok(None);
         };
         let view = MichelineView {
@@ -463,7 +477,8 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         let Some((storage_ty, storage)) = self.storage.get(&addr) else {
             return Ok(None);
         };
-        let mich_storage_ty = storage_ty.into_micheline_optimized_legacy(arena, &mut self.gas)?;
+        let mich_storage_ty =
+            storage_ty.into_micheline_optimized_legacy(arena, &mut self.gas)?;
         let mich_storage = storage
             .clone()
             .into_micheline_optimized_legacy(arena, &mut self.gas)?;

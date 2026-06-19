@@ -186,7 +186,9 @@ mod tests {
         assert!(ast
             .interpret(&mut Ctx::default(), &temp, &mut istack)
             .is_ok());
-        assert!(istack.len() == 1 && istack.get(0).unwrap().as_ref() == &TypedValue::int(55));
+        assert!(
+            istack.len() == 1 && istack.get(0).unwrap().as_ref() == &TypedValue::int(55)
+        );
     }
 
     #[test]
@@ -293,7 +295,11 @@ mod tests {
     fn interpret_test_macro_if_some() {
         let ast = parse(MACRO_IF_SOME_SRC).unwrap();
         let ast = ast
-            .typecheck_instruction(&mut Gas::default(), None, &[parse("option nat").unwrap()])
+            .typecheck_instruction(
+                &mut Gas::default(),
+                None,
+                &[parse("option nat").unwrap()],
+            )
             .unwrap();
         let temp = Arena::new();
         let mut istack = stk![TypedValue::new_option(Some(TypedValue::nat(5)))];
@@ -340,7 +346,11 @@ mod tests {
     fn typecheck_out_of_gas() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         assert_eq!(
-            ast.typecheck_instruction(&mut Gas::new(1000), None, &[parse("nat").unwrap()]),
+            ast.typecheck_instruction(
+                &mut Gas::new(1000),
+                None,
+                &[parse("nat").unwrap()]
+            ),
             Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
         );
     }
@@ -350,7 +360,11 @@ mod tests {
         use typechecker::{NoMatchingOverloadReason, TcError};
         let ast = parse(FIBONACCI_ILLTYPED_SRC).unwrap();
         assert_eq!(
-            ast.typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()]),
+            ast.typecheck_instruction(
+                &mut Gas::default(),
+                None,
+                &[parse("nat").unwrap()]
+            ),
             Err(TcError::NoMatchingOverload {
                 instr: crate::lexer::Prim::DUP,
                 stack: stk![Type::Int, Type::Int, Type::Int],
@@ -404,7 +418,11 @@ mod tests {
         assert_eq!(
             parse(FIBONACCI_MALFORMED_SRC)
                 .unwrap()
-                .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()]),
+                .typecheck_instruction(
+                    &mut Gas::default(),
+                    None,
+                    &[parse("nat").unwrap()]
+                ),
             Err(typechecker::TcError::UnexpectedMicheline(format!(
                 "{:?}",
                 parse("DUP 4 GT").unwrap()
@@ -472,9 +490,14 @@ mod tests {
     ) {
         let ast = parse(instr).unwrap();
         let mut input_failing_type_stack = FailingTypeStack::Ok(input_type_stack);
-        let ast =
-            typecheck_instruction(&ast, ctx.gas(), None, &mut input_failing_type_stack, false)
-                .unwrap();
+        let ast = typecheck_instruction(
+            &ast,
+            ctx.gas(),
+            None,
+            &mut input_failing_type_stack,
+            false,
+        )
+        .unwrap();
         assert_eq!(
             input_failing_type_stack,
             FailingTypeStack::Ok(output_type_stack)
@@ -838,7 +861,8 @@ mod tests {
 
     #[test]
     fn source() {
-        let addr = PublicKeyHash::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
+        let addr =
+            PublicKeyHash::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
         run_e2e_test(
             &Arena::new(),
             "SOURCE",
@@ -898,7 +922,8 @@ mod tests {
 
     #[test]
     fn implicit_account() {
-        let key_hash = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash =
+            PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
         run_e2e_test(
             &Arena::new(),
             "IMPLICIT_ACCOUNT",
@@ -914,9 +939,12 @@ mod tests {
 
     #[test]
     fn voting_power() {
-        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
-        let key_hash_3 = PublicKeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
+        let key_hash_1 =
+            PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 =
+            PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_3 =
+            PublicKeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
         run_e2e_test(
             &Arena::new(),
             "VOTING_POWER",
@@ -943,7 +971,10 @@ mod tests {
             stk![TypedValue::nat(0)],
             {
                 let mut c = Ctx::default();
-                c.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
+                c.set_voting_powers([
+                    (key_hash_1, 30u32.into()),
+                    (key_hash_2, 50u32.into()),
+                ]);
                 c
             },
         );
@@ -951,8 +982,10 @@ mod tests {
 
     #[test]
     fn total_voting_power() {
-        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_1 =
+            PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 =
+            PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
         run_e2e_test(
             &Arena::new(),
             "TOTAL_VOTING_POWER",
@@ -962,7 +995,10 @@ mod tests {
             stk![TypedValue::nat(80)],
             {
                 let mut c = Ctx::default();
-                c.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
+                c.set_voting_powers([
+                    (key_hash_1, 30u32.into()),
+                    (key_hash_2, 50u32.into()),
+                ]);
                 c
             },
         );
@@ -1097,9 +1133,10 @@ mod tests {
     #[test]
     fn create_contract() {
         use tezos_crypto_rs::hash::OperationHash;
-        let cs_mich =
-            parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
-                .unwrap();
+        let cs_mich = parse(
+            "{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}",
+        )
+        .unwrap();
         let cs = cs_mich
             .split_script()
             .unwrap()
@@ -1234,7 +1271,8 @@ mod multisig_tests {
         let mut ctx = Ctx::default();
         ctx.self_address = "KT1BFATQpdP5xJGErJyk2vfL46dvFanWz87H".try_into().unwrap();
         ctx.chain_id =
-            tezos_crypto_rs::hash::ChainId::try_from(hex::decode("f3d48554").unwrap()).unwrap();
+            tezos_crypto_rs::hash::ChainId::try_from(hex::decode("f3d48554").unwrap())
+                .unwrap();
         ctx
     }
 
@@ -1297,198 +1335,198 @@ mod multisig_tests {
     #[test]
     fn multisig_transfer() {
         with_big_stack(|| {
-        let temp = Arena::new();
-        let mut ctx = make_ctx();
-        let threshold = BigUint::from(1u32);
+            let temp = Arena::new();
+            let mut ctx = make_ctx();
+            let threshold = BigUint::from(1u32);
 
-        /*
-            # Pack the parameter we will be sending to the multisig contract.
-            $ BYTES=$(octez-client --mode mockup hash data "
-                Pair
-                    (Pair $CHAIN_ID \"$SELF_ADDRESS\")
-                    $ANTI_REPLAY_COUNTER
-                    (Left (Pair 123 \"tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j\"))
-                " of type $PARAM_TYPE | sed -n 's/^Raw packed data: //p')
+            /*
+                # Pack the parameter we will be sending to the multisig contract.
+                $ BYTES=$(octez-client --mode mockup hash data "
+                    Pair
+                        (Pair $CHAIN_ID \"$SELF_ADDRESS\")
+                        $ANTI_REPLAY_COUNTER
+                        (Left (Pair 123 \"tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j\"))
+                    " of type $PARAM_TYPE | sed -n 's/^Raw packed data: //p')
 
-            # Sign the packed parameter.
-            $ octez-client --mode mockup sign bytes $BYTES for bob
-            Signature: edsigu1GCyS754UrkFLng9P5vG5T51Hs8TcgZoV7fPfj5qeXYzC1JKuUYzyowpfGghEEqUyPxpUdU7WRFrdxad5pnspQg9hwk6v
-        */
-        let transfer_amount = 123;
-        let transfer_destination = "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j";
-        let signature = "edsigu1GCyS754UrkFLng9P5vG5T51Hs8TcgZoV7fPfj5qeXYzC1JKuUYzyowpfGghEEqUyPxpUdU7WRFrdxad5pnspQg9hwk6v";
+                # Sign the packed parameter.
+                $ octez-client --mode mockup sign bytes $BYTES for bob
+                Signature: edsigu1GCyS754UrkFLng9P5vG5T51Hs8TcgZoV7fPfj5qeXYzC1JKuUYzyowpfGghEEqUyPxpUdU7WRFrdxad5pnspQg9hwk6v
+            */
+            let transfer_amount = 123;
+            let transfer_destination = "tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j";
+            let signature = "edsigu1GCyS754UrkFLng9P5vG5T51Hs8TcgZoV7fPfj5qeXYzC1JKuUYzyowpfGghEEqUyPxpUdU7WRFrdxad5pnspQg9hwk6v";
 
-        let interp_res = parse_contract_script(MULTISIG_SRC)
-            .unwrap()
-            .split_script()
-            .unwrap()
-            .typecheck_script(&mut Gas::default(), true, true)
-            .unwrap()
-            .interpret(
-                &mut ctx,
-                &temp,
-                pair(
-                    // :payload
+            let interp_res = parse_contract_script(MULTISIG_SRC)
+                .unwrap()
+                .split_script()
+                .unwrap()
+                .typecheck_script(&mut Gas::default(), true, true)
+                .unwrap()
+                .interpret(
+                    &mut ctx,
+                    &temp,
                     pair(
-                        anti_replay_counter(),
-                        left(
-                            // :transfer
-                            pair(transfer_amount as i128, transfer_destination),
+                        // :payload
+                        pair(
+                            anti_replay_counter(),
+                            left(
+                                // :transfer
+                                pair(transfer_amount as i128, transfer_destination),
+                            ),
                         ),
+                        // %sigs
+                        seq([some(signature)]),
                     ),
-                    // %sigs
-                    seq([some(signature)]),
-                ),
-                &Entrypoint::default(),
-                // make_initial_storage(),
-                &pair(
-                    anti_replay_counter(),
-                    pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
-                ),
-            );
+                    &Entrypoint::default(),
+                    // make_initial_storage(),
+                    &pair(
+                        anti_replay_counter(),
+                        pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
+                    ),
+                );
 
-        assert_eq!(
-            collect_ops(interp_res),
-            Ok((
-                vec![OperationInfo {
-                    operation: Operation::TransferTokens(TransferTokens {
-                        param: TV::Unit,
-                        destination_address: transfer_destination.try_into().unwrap(),
-                        amount: transfer_amount,
-                    }),
-                    counter: 1
-                }],
-                TV::new_pair(
-                    TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
+            assert_eq!(
+                collect_ops(interp_res),
+                Ok((
+                    vec![OperationInfo {
+                        operation: Operation::TransferTokens(TransferTokens {
+                            param: TV::Unit,
+                            destination_address: transfer_destination.try_into().unwrap(),
+                            amount: transfer_amount,
+                        }),
+                        counter: 1
+                    }],
                     TV::new_pair(
-                        TV::Nat(threshold),
-                        TV::List(MichelsonList::from(vec![TV::Key(
-                            PUBLIC_KEY.try_into().unwrap()
-                        )]))
+                        TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
+                        TV::new_pair(
+                            TV::Nat(threshold),
+                            TV::List(MichelsonList::from(vec![TV::Key(
+                                PUBLIC_KEY.try_into().unwrap()
+                            )]))
+                        )
                     )
-                )
-            ))
-        );
+                ))
+            );
         })
     }
 
     #[test]
     fn multisig_set_delegate() {
         with_big_stack(|| {
-        let temp = Arena::new();
-        let mut ctx = make_ctx();
-        let threshold = BigUint::from(1u32);
+            let temp = Arena::new();
+            let mut ctx = make_ctx();
+            let threshold = BigUint::from(1u32);
 
-        /*
-            # Pack the parameter we will be sending to the multisig contract.
-            $ BYTES=$(octez-client --mode mockup hash data "
-                Pair
-                    (Pair $CHAIN_ID \"$SELF_ADDRESS\")
-                    $ANTI_REPLAY_COUNTER
-                    (Right (Left (Some \"tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy\")))
-                " of type $PARAM_TYPE | sed -n 's/^Raw packed data: //p')
+            /*
+                # Pack the parameter we will be sending to the multisig contract.
+                $ BYTES=$(octez-client --mode mockup hash data "
+                    Pair
+                        (Pair $CHAIN_ID \"$SELF_ADDRESS\")
+                        $ANTI_REPLAY_COUNTER
+                        (Right (Left (Some \"tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy\")))
+                    " of type $PARAM_TYPE | sed -n 's/^Raw packed data: //p')
 
-            # Sign the packed parameter.
-            $ octez-client --mode mockup sign bytes $BYTES for bob
-            Signature: edsigtXyZmxgR3MDhDRdtAtopHNNE8rPsPRHgPXurkMacmRLvbLyBCTjtBFNFYHEcLTjx94jdvUf81Wd7uybJNGn5phJYaPAJST
-        */
-        let new_delegate = "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy";
-        let signature = "edsigtXyZmxgR3MDhDRdtAtopHNNE8rPsPRHgPXurkMacmRLvbLyBCTjtBFNFYHEcLTjx94jdvUf81Wd7uybJNGn5phJYaPAJST";
+                # Sign the packed parameter.
+                $ octez-client --mode mockup sign bytes $BYTES for bob
+                Signature: edsigtXyZmxgR3MDhDRdtAtopHNNE8rPsPRHgPXurkMacmRLvbLyBCTjtBFNFYHEcLTjx94jdvUf81Wd7uybJNGn5phJYaPAJST
+            */
+            let new_delegate = "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy";
+            let signature = "edsigtXyZmxgR3MDhDRdtAtopHNNE8rPsPRHgPXurkMacmRLvbLyBCTjtBFNFYHEcLTjx94jdvUf81Wd7uybJNGn5phJYaPAJST";
 
-        let interp_res = parse_contract_script(MULTISIG_SRC)
-            .unwrap()
-            .split_script()
-            .unwrap()
-            .typecheck_script(ctx.gas(), true, true)
-            .unwrap()
-            .interpret(
-                &mut ctx,
-                &temp,
-                pair(
-                    // :payload
+            let interp_res = parse_contract_script(MULTISIG_SRC)
+                .unwrap()
+                .split_script()
+                .unwrap()
+                .typecheck_script(ctx.gas(), true, true)
+                .unwrap()
+                .interpret(
+                    &mut ctx,
+                    &temp,
                     pair(
-                        anti_replay_counter(),
-                        right(left(
-                            // %delegate
-                            some(new_delegate),
-                        )),
+                        // :payload
+                        pair(
+                            anti_replay_counter(),
+                            right(left(
+                                // %delegate
+                                some(new_delegate),
+                            )),
+                        ),
+                        // %sigs
+                        seq([some(signature)]),
                     ),
-                    // %sigs
-                    seq([some(signature)]),
-                ),
-                &Entrypoint::default(),
-                &pair(
-                    anti_replay_counter(),
-                    pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
-                ),
-            );
+                    &Entrypoint::default(),
+                    &pair(
+                        anti_replay_counter(),
+                        pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
+                    ),
+                );
 
-        assert_eq!(
-            collect_ops(interp_res),
-            Ok((
-                vec![OperationInfo {
-                    operation: Operation::SetDelegate(SetDelegate(Some(
-                        new_delegate.try_into().unwrap()
-                    ))),
-                    counter: 1
-                }],
-                TV::new_pair(
-                    TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
+            assert_eq!(
+                collect_ops(interp_res),
+                Ok((
+                    vec![OperationInfo {
+                        operation: Operation::SetDelegate(SetDelegate(Some(
+                            new_delegate.try_into().unwrap()
+                        ))),
+                        counter: 1
+                    }],
                     TV::new_pair(
-                        TV::Nat(threshold),
-                        TV::List(MichelsonList::from(vec![TV::Key(
-                            PUBLIC_KEY.try_into().unwrap()
-                        )]))
+                        TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
+                        TV::new_pair(
+                            TV::Nat(threshold),
+                            TV::List(MichelsonList::from(vec![TV::Key(
+                                PUBLIC_KEY.try_into().unwrap()
+                            )]))
+                        )
                     )
-                )
-            ))
-        );
+                ))
+            );
         })
     }
 
     #[test]
     fn invalid_signature() {
         with_big_stack(|| {
-        let temp = Arena::new();
-        let mut ctx = make_ctx();
-        let threshold = 1;
-        let new_delegate = "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy";
-        let invalid_signature = "edsigtt6SusfFFqwKqJNDuZMbhP6Q8f6zu3c3q7W6vPbjYKpv84H3hfXhRyRvAXHzNYSwBNNqjmf5taXKd2ZW3Rbix78bhWjxg5";
+            let temp = Arena::new();
+            let mut ctx = make_ctx();
+            let threshold = 1;
+            let new_delegate = "tz1V8fDHpHzN8RrZqiYCHaJM9EocsYZch5Cy";
+            let invalid_signature = "edsigtt6SusfFFqwKqJNDuZMbhP6Q8f6zu3c3q7W6vPbjYKpv84H3hfXhRyRvAXHzNYSwBNNqjmf5taXKd2ZW3Rbix78bhWjxg5";
 
-        let interp_res = parse_contract_script(MULTISIG_SRC)
-            .unwrap()
-            .split_script()
-            .unwrap()
-            .typecheck_script(ctx.gas(), true, true)
-            .unwrap()
-            .interpret(
-                &mut ctx,
-                &temp,
-                pair(
-                    // :payload
+            let interp_res = parse_contract_script(MULTISIG_SRC)
+                .unwrap()
+                .split_script()
+                .unwrap()
+                .typecheck_script(ctx.gas(), true, true)
+                .unwrap()
+                .interpret(
+                    &mut ctx,
+                    &temp,
                     pair(
-                        anti_replay_counter(),
-                        right(left(
-                            // %delegate
-                            some(new_delegate),
-                        )),
+                        // :payload
+                        pair(
+                            anti_replay_counter(),
+                            right(left(
+                                // %delegate
+                                some(new_delegate),
+                            )),
+                        ),
+                        // %sigs
+                        seq([some(invalid_signature)]),
                     ),
-                    // %sigs
-                    seq([some(invalid_signature)]),
-                ),
-                &Entrypoint::default(),
-                &pair(
-                    anti_replay_counter(),
-                    pair(threshold, seq([PUBLIC_KEY.into()])),
-                ),
-            );
+                    &Entrypoint::default(),
+                    &pair(
+                        anti_replay_counter(),
+                        pair(threshold, seq([PUBLIC_KEY.into()])),
+                    ),
+                );
 
-        assert_eq!(
-            collect_ops(interp_res),
-            Err(ContractInterpretError::InterpretError(
-                InterpretError::FailedWith(T::Unit, TV::Unit)
-            ))
-        );
+            assert_eq!(
+                collect_ops(interp_res),
+                Err(ContractInterpretError::InterpretError(
+                    InterpretError::FailedWith(T::Unit, TV::Unit)
+                ))
+            );
         })
     }
 
@@ -1500,7 +1538,8 @@ mod multisig_tests {
             (impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>),
             ContractInterpretError<'a>,
         >,
-    ) -> Result<(Vec<OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>> {
+    ) -> Result<(Vec<OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
+    {
         result.map(|(ops, val)| (ops.collect(), val))
     }
 

@@ -28,15 +28,13 @@ mod test_typed_encode {
             .strip_prefix("0x")
             .expect("The `expected` argument must start from 0x");
 
-        let bytes = &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument");
+        let bytes =
+            &hex::decode(hex_bytes).expect("Bad hex string in `expected` argument");
 
         let arena = Arena::new();
         let mut gas = Gas::default();
         let micheline = v.into_micheline_optimized_legacy(&arena, &mut gas).unwrap();
-        assert_eq!(
-            &micheline.encode_for_pack().unwrap().unwrap(),
-            bytes,
-        );
+        assert_eq!(&micheline.encode_for_pack().unwrap().unwrap(), bytes,);
         assert_eq!(
             Micheline::decode_packed(&arena, bytes, &mut Gas::default()),
             Ok(Ok(micheline)),
@@ -47,7 +45,8 @@ mod test_typed_encode {
     fn test_address() {
         check(
             TypedValue::Address(
-                Address::from_base58_check("tz1NyAf1KeeFCCPPAZ9ard9YVshVGFibzVKa").unwrap(),
+                Address::from_base58_check("tz1NyAf1KeeFCCPPAZ9ard9YVshVGFibzVKa")
+                    .unwrap(),
             ),
             "0x050a0000001600002486eda3c7bbbe6be511b46d6deeb1594258a7fd",
         )
@@ -57,7 +56,8 @@ mod test_typed_encode {
     fn test_key_hash() {
         check(
             TypedValue::KeyHash(
-                PublicKeyHash::from_b58check("tz1NyAf1KeeFCCPPAZ9ard9YVshVGFibzVKa").unwrap(),
+                PublicKeyHash::from_b58check("tz1NyAf1KeeFCCPPAZ9ard9YVshVGFibzVKa")
+                    .unwrap(),
             ),
             "0x050a00000015002486eda3c7bbbe6be511b46d6deeb1594258a7fd",
         )

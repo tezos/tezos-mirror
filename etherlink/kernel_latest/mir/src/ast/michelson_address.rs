@@ -143,7 +143,10 @@ mod tests {
         // explicit default entrypoint is apparently forbidden in binary encoding
         assert!(matches!(
             Address::from_bytes(
-                &hex::decode("00007b09f782e0bcd67739510afa819d85976119d5ef64656661756c74").unwrap()
+                &hex::decode(
+                    "00007b09f782e0bcd67739510afa819d85976119d5ef64656661756c74"
+                )
+                .unwrap()
             ),
             Err(ByteReprError::WrongFormat(_)),
         ));
@@ -191,13 +194,15 @@ mod tests {
         assert_eq!(addr.entrypoint.as_str(), Some("!"));
 
         // Forbidden-as-first-char byte (".") used as first char.
-        let addr = Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%.foo")
-            .expect("L1 accepts %.foo, MIR must too");
+        let addr =
+            Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%.foo")
+                .expect("L1 accepts %.foo, MIR must too");
         assert_eq!(addr.entrypoint.as_str(), Some(".foo"));
 
         // Trailing non-charset byte ("foo!").
-        let addr = Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%foo!")
-            .expect("L1 accepts %foo!, MIR must too");
+        let addr =
+            Address::from_base58_check("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%foo!")
+                .expect("L1 accepts %foo!, MIR must too");
         assert_eq!(addr.entrypoint.as_str(), Some("foo!"));
 
         // -- Binary path (UNPACK address). --
@@ -216,7 +221,8 @@ mod tests {
         // address hash + ".foo".
         assert_eq!(
             Address::from_bytes(
-                &hex::decode("00007b09f782e0bcd67739510afa819d85976119d5ef2e666f6f").unwrap()
+                &hex::decode("00007b09f782e0bcd67739510afa819d85976119d5ef2e666f6f")
+                    .unwrap()
             )
             .expect("L1 accepts .foo as ep, MIR must too")
             .entrypoint
@@ -236,7 +242,8 @@ mod tests {
         assert_eq!(addr.entrypoint.as_str(), None);
 
         // Max-length (31) "weird" entrypoint round-trips on both paths.
-        let mut hex_with_bang = String::from("00007b09f782e0bcd67739510afa819d85976119d5ef");
+        let mut hex_with_bang =
+            String::from("00007b09f782e0bcd67739510afa819d85976119d5ef");
         for _ in 0..31 {
             hex_with_bang.push_str("21"); // '!' x 31
         }
@@ -253,11 +260,13 @@ mod tests {
         // shared length bound).
         assert!(matches!(
             Address::from_base58_check(
-                format!("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%{}", "q".repeat(32)).as_str()
+                format!("tz1WrbkDrzKVqcGXkjw4Qk4fXkjXpAJuNP1j%{}", "q".repeat(32))
+                    .as_str()
             ),
             Err(ByteReprError::WrongFormat(_))
         ));
-        let mut hex_too_long = String::from("00007b09f782e0bcd67739510afa819d85976119d5ef");
+        let mut hex_too_long =
+            String::from("00007b09f782e0bcd67739510afa819d85976119d5ef");
         for _ in 0..32 {
             hex_too_long.push_str("71");
         }
@@ -269,7 +278,10 @@ mod tests {
         // Explicit "default" remains forbidden on the binary path.
         assert!(matches!(
             Address::from_bytes(
-                &hex::decode("00007b09f782e0bcd67739510afa819d85976119d5ef64656661756c74").unwrap()
+                &hex::decode(
+                    "00007b09f782e0bcd67739510afa819d85976119d5ef64656661756c74"
+                )
+                .unwrap()
             ),
             Err(ByteReprError::WrongFormat(_))
         ));

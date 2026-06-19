@@ -555,10 +555,8 @@ pub mod interpret_cost {
 
     // corresponds to cost_N_IJoin_tickets in the Tezos protocol
     pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, CompareError> {
-        let w1 = Checked::from(std::cmp::max(
-            t1.amount.byte_size(),
-            t2.amount.byte_size(),
-        ));
+        let w1 =
+            Checked::from(std::cmp::max(t1.amount.byte_size(), t2.amount.byte_size()));
         let w2 = Checked::from(std::cmp::min(
             comparable_size(&t1.content)?,
             comparable_size(&t2.content)?,
@@ -567,7 +565,10 @@ pub mod interpret_cost {
     }
 
     // corresponds to cost_N_ISplit_ticket in the Tezos protocol
-    pub fn split_ticket(amount1: &BigUint, amount2: &BigUint) -> Result<u32, CostOverflow> {
+    pub fn split_ticket(
+        amount1: &BigUint,
+        amount2: &BigUint,
+    ) -> Result<u32, CostOverflow> {
         let w = Checked::from(std::cmp::max(amount1.byte_size(), amount2.byte_size()));
         ((w >> 2) + (w >> 7) + 475).as_gas_cost()
     }
@@ -584,11 +585,20 @@ pub mod interpret_cost {
         let w1 = Checked::from(w1);
         let w2 = Checked::from(w2);
         let w3 = Checked::from(w3);
-        ((w1 >> 1) + (w1 >> 2) + (w1 >> 4) + (w1 >> 5)
-            + (w2 >> 1) + (w2 >> 2) + (w2 >> 3) + (w2 >> 6)
-            + (w3 >> 1) + (w3 >> 2) + (w3 >> 4) + (w3 >> 6)
+        ((w1 >> 1)
+            + (w1 >> 2)
+            + (w1 >> 4)
+            + (w1 >> 5)
+            + (w2 >> 1)
+            + (w2 >> 2)
+            + (w2 >> 3)
+            + (w2 >> 6)
+            + (w3 >> 1)
+            + (w3 >> 2)
+            + (w3 >> 4)
+            + (w3 >> 6)
             + 10)
-        .as_gas_cost()
+            .as_gas_cost()
     }
 
     pub fn drop(mb_n: Option<u16>) -> Result<u32, CostOverflow> {
@@ -681,9 +691,13 @@ pub mod interpret_cost {
     }
 
     // corresponds to cost_N_IOr_nat in the Tezos protocol
-    pub fn or_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
+    pub fn or_num(
+        i1: &impl BigIntByteSize,
+        i2: &impl BigIntByteSize,
+    ) -> Result<u32, CostOverflow> {
         let w = Checked::from(Ord::max(i1.byte_size(), i2.byte_size()));
-        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 65).as_gas_cost()
+        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 65)
+            .as_gas_cost()
     }
 
     // corresponds to cost_N_IOr_bytes in the Tezos protocol
@@ -695,7 +709,8 @@ pub mod interpret_cost {
     // corresponds to cost_N_IXor_nat in the Tezos protocol
     pub fn xor_nat(i1: &BigUint, i2: &BigUint) -> Result<u32, CostOverflow> {
         let w = Checked::from(Ord::max(i1.byte_size(), i2.byte_size()));
-        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 70).as_gas_cost()
+        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 70)
+            .as_gas_cost()
     }
 
     // corresponds to cost_N_IXor_bytes in the Tezos protocol
@@ -726,10 +741,15 @@ pub mod interpret_cost {
     pub fn lsl_bytes(i1: &[u8], i2: &usize) -> Result<u32, CostOverflow> {
         let s1 = Checked::from(i1.len());
         let w1 = Checked::from(i2.saturating_sub(1));
-        ((w1 >> 8) + (w1 >> 10) + (w1 >> 12) + (w1 >> 13)
-            + (s1 >> 4) + (s1 >> 5) + s1
+        ((w1 >> 8)
+            + (w1 >> 10)
+            + (w1 >> 12)
+            + (w1 >> 13)
+            + (s1 >> 4)
+            + (s1 >> 5)
+            + s1
             + 120)
-        .as_gas_cost()
+            .as_gas_cost()
     }
 
     // corresponds to cost_N_ILsr_nat in the Tezos protocol
@@ -841,7 +861,9 @@ pub mod interpret_cost {
                 (V::Int(l), V::Int(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
                 (V::Int(_), _) => return Err(CompareError::Incomparable),
 
-                (V::Timestamp(l), V::Timestamp(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+                (V::Timestamp(l), V::Timestamp(r)) => {
+                    cmp_bytes(l.byte_size(), r.byte_size())?
+                }
                 (V::Timestamp(_), _) => return Err(CompareError::Incomparable),
 
                 (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1)?,
@@ -850,7 +872,9 @@ pub mod interpret_cost {
                 (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8)?,
                 (V::Mutez(_), _) => return Err(CompareError::Incomparable),
 
-                (V::String(l), V::String(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
+                (V::String(l), V::String(r)) => {
+                    cmp_bytes(l.len() as u64, r.len() as u64)?
+                }
                 (V::String(_), _) => return Err(CompareError::Incomparable),
 
                 (V::Unit, V::Unit) => CMP_NODE,
@@ -871,7 +895,9 @@ pub mod interpret_cost {
                 }
                 (V::Option(_), _) => return Err(CompareError::Incomparable),
 
-                (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE)?,
+                (V::Address(..), V::Address(..)) => {
+                    cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE)?
+                }
                 (V::Address(_), _) => return Err(CompareError::Incomparable),
 
                 (V::ChainId(..), V::ChainId(..)) => CMP_CHAIN_ID,
@@ -1016,7 +1042,10 @@ pub mod interpret_cost {
     fn lookup_var(k: &TypedValue, size: usize) -> Result<Checked<u64>, CompareError> {
         let s1 = comparable_size(k)?;
         // the protocol's log2 is 1 + numbits, i.e. ilog2 + 2
-        let log = (Checked::from(size as u64) + 1).ok_or(CostOverflow)?.ilog2() + 2;
+        let log = (Checked::from(size as u64) + 1)
+            .ok_or(CostOverflow)?
+            .ilog2()
+            + 2;
         Ok(Checked::from(s1) * (log as u64))
     }
 
@@ -1052,7 +1081,10 @@ pub mod interpret_cost {
     }
 
     // corresponds to cost_N_IMap_get_and_update in the Tezos protocol
-    pub fn map_get_and_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
+    pub fn map_get_and_update(
+        k: &TypedValue,
+        map_size: usize,
+    ) -> Result<u32, CompareError> {
         let w = lookup_var(k, map_size)?;
         Ok(((w * 4) + (w >> 2) + (w >> 3) + 80).as_gas_cost()?)
     }
@@ -1154,8 +1186,12 @@ pub mod interpret_cost {
                 .saturating_add(len >> 4)
                 .saturating_add(len >> 5)
                 .saturating_add(len),
-            PublicKey::Secp256k1(..) => 183_265_u32.saturating_add(len >> 3).saturating_add(len),
-            PublicKey::P256(..) => 487_855_u32.saturating_add(len >> 3).saturating_add(len),
+            PublicKey::Secp256k1(..) => {
+                183_265_u32.saturating_add(len >> 3).saturating_add(len)
+            }
+            PublicKey::P256(..) => {
+                487_855_u32.saturating_add(len >> 3).saturating_add(len)
+            }
             #[cfg(feature = "bls")]
             PublicKey::Bls(..) => 1_570_000_u32.saturating_add(len.saturating_mul(35)),
             #[cfg(not(feature = "bls"))]
@@ -1190,7 +1226,8 @@ pub mod interpret_cost {
     // corresponds to cost_N_IKeccak in the Tezos protocol
     pub fn keccak(msg: &[u8]) -> Result<u32, CostOverflow> {
         let size = Checked::from(msg.len());
-        ((size >> 1) + (size >> 2) + (size >> 3) + (size >> 4) + (size * 2) + 550).as_gas_cost()
+        ((size >> 1) + (size >> 2) + (size >> 3) + (size >> 4) + (size * 2) + 550)
+            .as_gas_cost()
     }
 
     // corresponds to cost_N_ISha256 in the Tezos protocol
@@ -1202,7 +1239,8 @@ pub mod interpret_cost {
     // corresponds to cost_N_ISha3 in the Tezos protocol
     pub fn sha3(msg: &[u8]) -> Result<u32, CostOverflow> {
         let size = Checked::from(msg.len());
-        ((size >> 1) + (size >> 2) + (size >> 3) + (size >> 4) + (size * 2) + 545).as_gas_cost()
+        ((size >> 1) + (size >> 2) + (size >> 3) + (size >> 4) + (size * 2) + 545)
+            .as_gas_cost()
     }
 
     // corresponds to cost_N_ISha512 in the Tezos protocol

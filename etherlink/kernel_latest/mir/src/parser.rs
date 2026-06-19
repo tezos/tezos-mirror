@@ -204,8 +204,16 @@ mod tests {
             Ok(Micheline::App(
                 Prim::pair,
                 &[
-                    Micheline::App(Prim::int, &[], [Annotation::Type("x_pos".into())].into()),
-                    Micheline::App(Prim::int, &[], [Annotation::Type("y_pos".into())].into()),
+                    Micheline::App(
+                        Prim::int,
+                        &[],
+                        [Annotation::Type("x_pos".into())].into()
+                    ),
+                    Micheline::App(
+                        Prim::int,
+                        &[],
+                        [Annotation::Type("y_pos".into())].into()
+                    ),
                 ],
                 [Annotation::Type("point".into())].into()
             ))
@@ -244,8 +252,16 @@ mod tests {
             Ok(Micheline::App(
                 Prim::pair,
                 &[
-                    Micheline::App(Prim::int, &[], [Annotation::Field("b".into())].into()),
-                    Micheline::App(Prim::int, &[], [Annotation::Field("c".into())].into()),
+                    Micheline::App(
+                        Prim::int,
+                        &[],
+                        [Annotation::Field("b".into())].into()
+                    ),
+                    Micheline::App(
+                        Prim::int,
+                        &[],
+                        [Annotation::Field("c".into())].into()
+                    ),
                 ],
                 [Annotation::Field("a".into())].into()
             ))
@@ -255,8 +271,16 @@ mod tests {
             Ok(Micheline::App(
                 Prim::or,
                 &[
-                    Micheline::App(Prim::int, &[], [Annotation::Field("b".into())].into()),
-                    Micheline::App(Prim::int, &[], [Annotation::Field("c".into())].into()),
+                    Micheline::App(
+                        Prim::int,
+                        &[],
+                        [Annotation::Field("b".into())].into()
+                    ),
+                    Micheline::App(
+                        Prim::int,
+                        &[],
+                        [Annotation::Field("c".into())].into()
+                    ),
                 ],
                 [Annotation::Field("a".into())].into()
             ))

@@ -307,7 +307,11 @@ pub trait LazyStorage<'a> {
     ///
     /// The specified big map id must point to a valid map in the lazy storage.
     /// Key type must match the type of key of the stored map.
-    fn big_map_mem(&mut self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError>;
+    fn big_map_mem(
+        &mut self,
+        id: &BigMapId,
+        key: &TypedValue,
+    ) -> Result<bool, LazyStorageError>;
 
     /// Add or remove a value in big map, accepts `Option` as value like in
     /// Michelson.
@@ -459,7 +463,10 @@ impl<'a> InMemoryLazyStorage<'a> {
             .ok_or_else(|| LazyStorageError::BigMapNotFound(id.clone()))
     }
 
-    fn access_big_map_mut(&mut self, id: &BigMapId) -> Result<&mut MapInfo<'a>, LazyStorageError> {
+    fn access_big_map_mut(
+        &mut self,
+        id: &BigMapId,
+    ) -> Result<&mut MapInfo<'a>, LazyStorageError> {
         self.big_maps
             .get_mut(id)
             .ok_or_else(|| LazyStorageError::BigMapNotFound(id.clone()))
@@ -477,7 +484,11 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         Ok(info.map.get(key).cloned())
     }
 
-    fn big_map_mem(&mut self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError> {
+    fn big_map_mem(
+        &mut self,
+        id: &BigMapId,
+        key: &TypedValue,
+    ) -> Result<bool, LazyStorageError> {
         let info = self.access_big_map(id)?;
         Ok(info.map.contains_key(key))
     }
@@ -585,8 +596,10 @@ mod test_big_map_operations {
     fn test_get_mem_in_memory() {
         let arena = &Arena::new();
         let storage = &mut InMemoryLazyStorage::new();
-        let content =
-            BigMapContent::InMemory(BTreeMap::from([(TypedValue::int(1), TypedValue::int(1))]));
+        let content = BigMapContent::InMemory(BTreeMap::from([(
+            TypedValue::int(1),
+            TypedValue::int(1),
+        )]));
         let map = BigMap {
             content,
             key_type: Type::Int,
@@ -714,12 +727,16 @@ impl<'a> TypedValue<'a> {
                 // Can contain only pushable values, thus no big maps
             }
             Operation(op) => match &mut op.as_mut().operation {
-                crate::ast::Operation::TransferTokens(t) => t.param.collect_big_maps(put_res),
+                crate::ast::Operation::TransferTokens(t) => {
+                    t.param.collect_big_maps(put_res)
+                }
                 crate::ast::Operation::SetDelegate(_) => {}
                 crate::ast::Operation::Emit(_) => {
                     // Can contain only pushable values, thus no big maps
                 }
-                crate::ast::Operation::CreateContract(cc) => cc.storage.collect_big_maps(put_res),
+                crate::ast::Operation::CreateContract(cc) => {
+                    cc.storage.collect_big_maps(put_res)
+                }
             },
         }
     }
@@ -825,7 +842,8 @@ pub fn dump_big_map_updates<'a>(
                     // permanent result: keep the id and defer the
                     // overlay write until later occurrences (if any)
                     // have completed their copies.
-                    deferred_in_place_updates.push((m.id.clone(), mem::take(&mut m.overlay)));
+                    deferred_in_place_updates
+                        .push((m.id.clone(), mem::take(&mut m.overlay)));
                 }
             }
             BigMapContent::InMemory(ref mut m) => {
@@ -833,7 +851,8 @@ pub fn dump_big_map_updates<'a>(
                 // fresh id and write the data straight away — there is
                 // no source for any later occurrence to read from, so
                 // no need to defer.
-                let id = storage.big_map_new(&map.key_type, &map.value_type, temporary)?;
+                let id =
+                    storage.big_map_new(&map.key_type, &map.value_type, temporary)?;
                 storage.big_map_bulk_update(
                     &id,
                     mem::take(m)
@@ -1051,7 +1070,8 @@ mod test_big_map_to_storage_update {
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        dump_big_map_updates(storage, &[map_id1, map_id2], &mut [&mut map1], false).unwrap();
+        dump_big_map_updates(storage, &[map_id1, map_id2], &mut [&mut map1], false)
+            .unwrap();
 
         assert_eq!(
             storage.big_maps,

@@ -44,7 +44,9 @@ impl From<tezos_data_encoding::nom::error::DecodeError<&[u8]>> for ByteReprError
 }
 
 impl From<entrypoint::ByteReprError> for ByteReprError {
-    fn from(entrypoint::ByteReprError::WrongFormat(err): entrypoint::ByteReprError) -> Self {
+    fn from(
+        entrypoint::ByteReprError::WrongFormat(err): entrypoint::ByteReprError,
+    ) -> Self {
         Self::WrongFormat(err)
     }
 }

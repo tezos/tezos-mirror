@@ -224,12 +224,13 @@ mod tests {
     fn compare_chain_ids() {
         // ordering was verified against octez-client
         let ordered_chain_ids = [
-            "00000000", "00000001", "00000002", "00000100", "00000200", "01020304", "a0b0c0d0",
-            "a1b2c3d4", "ffffffff",
+            "00000000", "00000001", "00000002", "00000100", "00000200", "01020304",
+            "a0b0c0d0", "a1b2c3d4", "ffffffff",
         ]
         .map(|x| {
             TypedValue::ChainId(
-                tezos_crypto_rs::hash::ChainId::try_from_bytes(&hex::decode(x).unwrap()).unwrap(),
+                tezos_crypto_rs::hash::ChainId::try_from_bytes(&hex::decode(x).unwrap())
+                    .unwrap(),
             )
         });
 
