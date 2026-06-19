@@ -11,7 +11,7 @@ use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{Signed, ToPrimitive, Zero};
 use std::cmp::min;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Shl, Shr};
 use std::rc::Rc;
 use tezos_crypto_rs::hash::OperationHash;
@@ -21,7 +21,9 @@ use tezos_crypto_rs::{
 };
 use typed_arena::Arena;
 
-use crate::ast::big_map::{dump_big_map_updates, BigMap, LazyStorageError};
+use crate::ast::big_map::{
+    dump_big_map_walk, remove_unreferenced_big_maps, BigMap, LazyStorageError,
+};
 use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
@@ -285,21 +287,47 @@ impl<'a> ContractScript<'a> {
         };
         let mut operation_list = TypedValue::unwrap_rc(operation_list);
         let mut storage = TypedValue::unwrap_rc(storage);
+        let lazy_storage = *ctx.lazy_storage();
+        // Dump the contract result in two walks that share a single
+        // removal decision. A big map can be moved out of the
+        // parent storage into an outgoing operation while the returned
+        // storage no longer references it: the returned-storage walk
+        // would then drop the started id, and the operation walk would
+        // fail trying to copy from the just-removed source. We therefore
+        // record reachability from the returned storage, run the
+        // operation walk (which copies any moved-out big map into the
+        // temporary range while the source still exists), and only then
+        // remove started ids no longer reachable from the returned
+        // storage.
+        let mut seen_in_storage = BTreeSet::new();
         // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
         let mut storage_big_maps = vec![];
         storage.view_big_maps_mut(&mut storage_big_maps);
-        let lazy_storage = *ctx.lazy_storage();
-        dump_big_map_updates(
+        dump_big_map_walk(
             lazy_storage,
-            &started_with_map_ids,
             &mut storage_big_maps,
             false,
+            &mut seen_in_storage,
         )?;
         // Handle big_maps that appears in the operation list, those big_maps are temporary and it depends to
         // the internal operation to determine what to do with it
+        let mut seen_in_operations = BTreeSet::new();
         let mut operations_big_maps = vec![];
         operation_list.view_big_maps_mut(&mut operations_big_maps);
-        dump_big_map_updates(lazy_storage, &[], &mut operations_big_maps, true)?;
+        dump_big_map_walk(
+            lazy_storage,
+            &mut operations_big_maps,
+            true,
+            &mut seen_in_operations,
+        )?;
+        // Remove started ids no longer owned by the returned storage. Run
+        // after the operation walk so a big map moved into an operation
+        // has already been copied out of its (about-to-be-removed) source.
+        remove_unreferenced_big_maps(
+            lazy_storage,
+            &started_with_map_ids,
+            &seen_in_storage,
+        )?;
 
         let vec = match operation_list {
             V::List(vec) => vec,

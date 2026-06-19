@@ -146,6 +146,13 @@
   address computed from the operation hash and the (renumbered) receipt nonce.
   Every originated KT1 (including inbound-CRAC child contracts) shifts by one
   index, so addresses on existing networks change. (L2-1642)
+- Fixed a spurious failure when a contract moves a persisted big map from
+  its parent storage into an outgoing operation (e.g. a `TRANSFER_TOKENS`
+  parameter) while replacing its storage with one that no longer
+  references that big map. The contract-result dump used to remove the
+  big map during the returned-storage pass and then fail copying it during
+  the operation-list pass; removal of no-longer-referenced big maps is now
+  deferred until after the operation list has been dumped. (!22220)
 - The Michelson storage-fees burn is now rendered on the CRAC-triggering
   operation: an Applied content that delegates storage cost to its
   callee carries the dual `(payer −V, storage fees +V)` balance-updates

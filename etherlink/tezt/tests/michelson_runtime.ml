@@ -4993,6 +4993,122 @@ let test_big_map_transfer =
   in
   unit
 
+(** Regression guard for the contract-result big-map dump ordering
+    (L2-1636). A contract moves a persisted [big_map] out of its storage
+    into an outgoing [TRANSFER_TOKENS] parameter while replacing its own
+    storage with a fresh [EMPTY_BIG_MAP] that no longer references it. On
+    L1 this is valid: the moved-out big map survives as temporary lazy
+    storage for the operation. The Michelson runtime used to remove the
+    big map during the returned-storage dump pass and then fail copying it
+    during the operation-list pass, so the call aborted and the receiver
+    never saw the data.
+
+    Unlike [test_big_map_transfer] (which captures receipts for the
+    copy/keep senders in the shared corpus), this exercises the full
+    interpreter dump path end-to-end and asserts the receiver actually
+    reads back the moved entries — an assertion that fails were the fix
+    reverted, because the call would not apply.
+
+    Runs on a standalone EVM-node sandbox (no rollup node or L1) so the
+    scenario exercises only the kernel's Michelson runtime. *)
+let test_big_map_moved_out () =
+  (* The receiver reads back keys ["a"] and ["b"] of the big map it is
+     passed and stores the looked-up values, so the result is directly
+     observable through [contract storage] (a stored big map would only
+     render as an opaque id). *)
+  let receiver_prg =
+    {|parameter (big_map string bytes) ;
+storage (pair (option bytes) (option bytes)) ;
+code { CAR ;
+       DUP ;
+       PUSH string "a" ;
+       GET ;
+       SWAP ;
+       PUSH string "b" ;
+       GET ;
+       SWAP ;
+       PAIR ;
+       NIL operation ;
+       PAIR }|}
+  in
+  (* The sender moves its stored big map into the operation (DIG 2 brings
+     the storage value below the amount and the destination contract, then
+     TRANSFER_TOKENS consumes it) and stores a fresh EMPTY_BIG_MAP, so the
+     returned storage no longer references the moved-out big map. *)
+  let sender_prg =
+    {|parameter (contract (big_map string bytes)) ;
+storage (big_map string bytes) ;
+code { UNPAIR ;
+       PUSH mutez 0 ;
+       DIG 2 ;
+       TRANSFER_TOKENS ;
+       NIL operation ;
+       SWAP ;
+       CONS ;
+       EMPTY_BIG_MAP string bytes ;
+       SWAP ;
+       PAIR }|}
+  in
+  register_sandbox
+    ~__FILE__
+    ~uses_client:true
+    ~kernel:Latest
+    ~title:"Test moving a persisted big_map out of storage into an operation"
+    ~tags:["tezlink"; "tezosx"; "big_map"; "operations"; "move"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun evm_node ->
+  let* client = tezlink_client_from_evm_node evm_node () in
+  (* Octez-client defaults to a 3_000_000 gas limit, which the node rejects
+     with [GasLimitSetError]; cap every Tezlink-targeted call at the
+     per-operation hard limit. *)
+  let gas_limit = 660_000 in
+  let* receiver =
+    Client.originate_contract
+      ~amount:Tez.zero
+      ~alias:"big_map_move_receiver"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"Pair None None"
+      ~prg:receiver_prg
+      ~gas_limit
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+  let* sender =
+    Client.originate_contract
+      ~amount:Tez.zero
+      ~alias:"big_map_move_sender"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"{ Elt \"a\" 0x01 ; Elt \"b\" 0x02 }"
+      ~prg:sender_prg
+      ~gas_limit
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+  (* Call the sender, passing the receiver as the [contract] destination. *)
+  let* () =
+    Client.transfer
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:sender
+      ~arg:(sf "%S" receiver)
+      ~gas_limit
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+  (* The moved-out big map reached the receiver intact: both entries are
+     readable. Before the fix the sender's dump aborted, the operation was
+     never applied, and this storage stayed [Pair None None]. *)
+  let* receiver_storage = Client.contract_storage receiver client in
+  Check.(
+    (String.trim receiver_storage = "Pair (Some 0x01) (Some 0x02)")
+      string
+      ~error_msg:"Expected receiver storage %R but got %L") ;
+  unit
+
 (** This tests the situation where the kernel has an upgrade and the
     sequencer upgrade by following the event of the kernel. *)
 let test_upgrade_kernel_auto_sync =
@@ -5565,6 +5681,7 @@ let () =
   test_delayed_deposit_is_included [Alpha] ;
   test_bridged_tez_transfer [Alpha] ;
   test_big_map_transfer [Alpha] ;
+  test_big_map_moved_out () ;
   test_upgrade_kernel_auto_sync [Alpha] ;
   test_entrypoints_originated [Alpha] ;
   test_entrypoints_normalize_types [Alpha] ;
