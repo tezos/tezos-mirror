@@ -14,10 +14,7 @@ use crate::{
     block::bip_from_blueprint,
     blueprint::Blueprint,
     blueprint_storage::read_current_blueprint_header,
-    chains::{
-        self, ChainConfigTrait, TezosXChainConfig,
-        TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-    },
+    chains::{self, ChainConfigTrait, TezosXChainConfig, TEZOS_ACCOUNTS_ROOT},
     configuration::fetch_tezosx_configuration,
     delayed_inbox::DelayedInbox,
     sub_block,
@@ -492,14 +489,13 @@ fn handle_query_entrypoints_to<Host, R>(
         }
     };
     // This entrypoint is only used in the context of the Tezos X Michelson runtime.
-    let context =
-        match TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH) {
-            Ok(c) => c,
-            Err(err) => {
-                log!(Error, "Tezos X entrypoints: context error: {:?}", err);
-                return;
-            }
-        };
+    let context = match TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT) {
+        Ok(c) => c,
+        Err(err) => {
+            log!(Error, "Tezos X entrypoints: context error: {:?}", err);
+            return;
+        }
+    };
     // RPC inspection path: no on-chain operation gas to bill against.
     // Gas::default() is the L1 max per op, but the L2 per-op cap depends
     // on the conversion coefficient and is currently larger, so default

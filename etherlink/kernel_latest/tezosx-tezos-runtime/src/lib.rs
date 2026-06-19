@@ -60,10 +60,10 @@ use tezos_smart_rollup_host::path::RefPath;
 /// Unified storage root for all Tezos account state — Michelson originated
 /// KT1 contracts (under `contracts/`), big_maps (under `big_map/`) and
 /// TezosX projected accounts (under `tezosx/`). Mirrors the kernel's
-/// `chains::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH` (the kernel and the
+/// `chains::TEZOS_ACCOUNTS_ROOT` (the kernel and the
 /// TezosX runtime live in separate crates so the constant is duplicated
 /// to avoid a circular dependency).
-pub(crate) const TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
+pub(crate) const TEZOS_ACCOUNTS_ROOT: RefPath =
     RefPath::assert_from(b"/tez/tez_accounts");
 
 /// Re-export the canonical null PKH from `tezos_execution` so the rest
@@ -726,8 +726,7 @@ where
         value,
     };
 
-    let context =
-        TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
+    let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
 
     // Verify the incoming CRAC ID matches the journal's (set by the
     // block builder).  This ensures consistency across runtime boundaries.
@@ -1206,8 +1205,7 @@ impl RuntimeInterface for TezosRuntime {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(&alias_info.native_address));
         let kt1_str = kt1.to_base58_check();
 
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
+        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
         let account = context.originated_from_kt1(&kt1)?;
         let account_path = account.path().clone();
 
@@ -1473,8 +1471,7 @@ impl RuntimeInterface for TezosRuntime {
             Contract::Implicit(pkh) => AddressHash::Implicit(pkh),
             Contract::Originated(kt1) => AddressHash::Kt1(kt1),
         };
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
+        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
         let origin = context.read_origin_for_address(host, &address_hash)?;
         Ok((Classification::from(origin), consumed))
     }
@@ -1519,8 +1516,7 @@ impl TezosRuntime {
         host: &impl StorageV1,
         kt1: &ContractKt1Hash,
     ) -> Result<U256, TezosXRuntimeError> {
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
+        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
         let originated_account = context.originated_from_kt1(kt1)?;
         let balance = originated_account.balance(host)?;
         narith_to_u256(&balance)
@@ -1866,9 +1862,7 @@ mod tests {
     fn test_host() -> MockKernelHost {
         use tezos_execution::account_storage::TezosImplicitAccountTrait;
         let mut host = MockKernelHost::default();
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
-                .unwrap();
+        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
         let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
         let account = context.implicit_from_public_key_hash(&null_pkh).unwrap();
         account.allocate(&mut host).unwrap();
@@ -1921,9 +1915,7 @@ mod tests {
             .expect("ensure_alias should succeed");
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
-                .unwrap();
+        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
 
         // L2-1529: a materialized alias carries no per-contract script —
@@ -1992,9 +1984,7 @@ mod tests {
             .expect("ensure_alias should succeed");
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
-                .unwrap();
+        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
 
         let storage = account.storage(&host).unwrap();
@@ -2175,9 +2165,7 @@ mod tests {
         // Locate the alias account and delete its origin path to
         // simulate a legacy account written before this work.
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
-                .unwrap();
+        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
         let origin_path = concat(account.path(), &ORIGIN_PATH).unwrap();
         host.store_delete(&origin_path).unwrap();
@@ -2219,9 +2207,7 @@ mod tests {
         let runtime = test_runtime();
         let evm_address = "0x5555555555555555555555555555555555555555";
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
-                .unwrap();
+        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
 
         set_origin_at(&mut host, &account.path().clone(), &Origin::Native).unwrap();
@@ -3257,10 +3243,8 @@ mod tests {
         let runtime = test_runtime();
         let registry = NotWiredRegistry;
 
-        let context = crate::context::TezosRuntimeContext::from_root(
-            &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-        )
-        .unwrap();
+        let context =
+            crate::context::TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap();
         let parser = mir::parser::Parser::new();
 
         // Receiver: accepts unit, emits nothing — so it contributes no
@@ -3415,10 +3399,9 @@ mod tests {
             let mut host = MockKernelHost::default();
             let runtime = test_runtime();
             let registry = NotWiredRegistry;
-            let context = crate::context::TezosRuntimeContext::from_root(
-                &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-            )
-            .unwrap();
+            let context =
+                crate::context::TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)
+                    .unwrap();
             let parser = mir::parser::Parser::new();
 
             let receiver_kt1 = ContractKt1Hash::from(digest_160(b"l2-1727-receiver"));
@@ -3538,7 +3521,7 @@ mod tests {
             Classification, Origin, RuntimeInterface, ALIAS_LOOKUP_MILLIGAS,
         };
 
-        use crate::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH;
+        use crate::TEZOS_ACCOUNTS_ROOT;
         use tezos_execution::account_storage::set_origin_at;
 
         fn test_runtime() -> TezosRuntime {
@@ -3582,10 +3565,9 @@ mod tests {
             let mut host = MockKernelHost::default();
             let runtime = test_runtime();
 
-            let context = crate::context::TezosRuntimeContext::from_root(
-                &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-            )
-            .unwrap();
+            let context =
+                crate::context::TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)
+                    .unwrap();
             // Use a real-looking KT1 derived from blake2b to avoid parse errors.
             let kt1 = ContractKt1Hash::from(tezos_crypto_rs::blake2b::digest_160(
                 b"test_kt1_seed",

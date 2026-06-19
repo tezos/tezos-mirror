@@ -14,6 +14,10 @@ use crate::account_storage::{
     TezosOriginatedAccount,
 };
 
+/// SafeStorage root for the Michelson account state. Re-exported as
+/// `chains::TEZOS_ACCOUNTS_ROOT`.
+pub const TEZOS_ACCOUNTS_ROOT: RefPath = RefPath::assert_from(b"/tez/tez_accounts");
+
 // TODO: https://gitlab.com/tezos/tezos/-/issues/7867: add the missing paths
 
 // Instead of using directly the paths, we construct a Context object that holds the

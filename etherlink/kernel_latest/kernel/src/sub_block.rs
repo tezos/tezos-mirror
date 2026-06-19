@@ -16,7 +16,7 @@ use crate::{
     chains::{
         ChainConfigTrait, TezlinkBlockConstants, TezosXBlockConstants, TezosXChainConfig,
         TezosXTransaction, TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-        TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        TEZOS_ACCOUNTS_ROOT,
     },
     configuration::{fetch_configuration, fetch_tezosx_configuration},
     error::{Error, StorageError},
@@ -170,9 +170,7 @@ where
         .collect();
     let michelson_runtime_block_constants = TezlinkBlockConstants {
         level: number.try_into()?,
-        context: TezosRuntimeContext::from_root(
-            &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-        )?,
+        context: TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?,
         da_fee_per_byte_mutez,
         michelson_to_evm_gas_multiplier,
         safe_roots,

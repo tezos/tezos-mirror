@@ -162,8 +162,7 @@ mod test {
     use super::*;
     use crate::block_in_progress::BlockInProgress;
     use crate::chains::{
-        TezlinkBlockConstants, TezosXBlockConstants,
-        TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        TezlinkBlockConstants, TezosXBlockConstants, TEZOS_ACCOUNTS_ROOT,
     };
     use primitive_types::H160;
     use proptest::prelude::*;
@@ -215,10 +214,7 @@ mod test {
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level: 0.into(),
-                context: TezosRuntimeContext::from_root(
-                    &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-                )
-                .unwrap(),
+                context: TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap(),
                 da_fee_per_byte_mutez: 0,
                 michelson_to_evm_gas_multiplier: 0,
                 safe_roots: vec![],

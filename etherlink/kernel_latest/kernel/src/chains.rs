@@ -80,9 +80,10 @@ pub const TEZ_BLOCKS_PATH: RefPath = RefPath::assert_from(b"/tez/world_state/tez
 
 /// Unified SafeStorage root for all Tezos account state. Holds Michelson
 /// contract / big_map state directly (ex `/tezlink/context/`) and TezosX
-/// projected accounts under `tezosx/`.
-pub const TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
-    RefPath::assert_from(b"/tez/tez_accounts");
+/// projected accounts under `tezosx/`. Re-exported from `tezos_execution` so
+/// the account path-builders and the SafeStorage root enumeration share a
+/// single source of truth.
+pub use tezos_execution::context::TEZOS_ACCOUNTS_ROOT;
 
 /// SafeStorage root for all EVM account state (balances, nonces, code, storage)
 /// and deduplicated bytecode.
@@ -95,7 +96,7 @@ pub const EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
 /// snapshot of every root in `full_roots` (one `store_copy` + `store_move`
 /// per root, twice — once for validation, once for application). Most
 /// operations only read or write account state under
-/// [TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH]; snapshotting the EVM roots and
+/// [TEZOS_ACCOUNTS_ROOT]; snapshotting the EVM roots and
 /// the Tez block/global-state root just to roll them back on failure is pure
 /// overhead. For batches that provably touch nothing else (see
 /// [Operation::touches_only_accounts]), narrow the snapshot to the accounts
@@ -107,9 +108,7 @@ fn operation_safe_roots(
     if operation.touches_only_accounts() {
         let narrowed: Vec<OwnedPath> = full_roots
             .iter()
-            .filter(|root| {
-                root.as_bytes() == TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH.as_bytes()
-            })
+            .filter(|root| root.as_bytes() == TEZOS_ACCOUNTS_ROOT.as_bytes())
             .cloned()
             .collect();
         // Fall back to the full set if the accounts root is unexpectedly
@@ -568,8 +567,7 @@ impl ChainConfigTrait for TezosXChainConfig {
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
         let level: BlockNumber = block_in_progress.number.try_into()?;
-        let context =
-            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
+        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
         let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
             .map_err(|_| crate::Error::InvalidConversion)?;
         let michelson_to_evm_gas_multiplier =
@@ -822,7 +820,7 @@ impl ChainConfigTrait for TezosXChainConfig {
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
                 TEZ_SAFE_STORAGE_ROOT_PATH,
-                TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+                TEZOS_ACCOUNTS_ROOT,
             ]
         } else {
             vec![

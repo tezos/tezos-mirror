@@ -53,7 +53,7 @@ use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 
-use crate::chains::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH;
+use crate::chains::TEZOS_ACCOUNTS_ROOT;
 
 /// Sentinel returned by `safe_store_get_hash` when the input path is absent.
 const EMPTY_STORE_HASH: [u8; STORE_HASH_SIZE] = [b'0'; STORE_HASH_SIZE];
@@ -125,11 +125,7 @@ pub fn tez_accounts_state_hash<Host: StorageV1>(
     host: &mut Host,
     blueprint_hash: &[u8; 32],
 ) -> Vec<u8> {
-    runtime_state_hash(
-        host,
-        &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-        blueprint_hash,
-    )
+    runtime_state_hash(host, &TEZOS_ACCOUNTS_ROOT, blueprint_hash)
 }
 
 #[cfg(test)]
@@ -201,8 +197,7 @@ mod tests {
         // subtree hashes differ. An empty subtree maps to the same
         // sentinel for both and would trivially match.
         host.store_write_all(&EVM_ACCOUNTS_PATH, b"evm").unwrap();
-        host.store_write_all(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH, b"tez")
-            .unwrap();
+        host.store_write_all(&TEZOS_ACCOUNTS_ROOT, b"tez").unwrap();
 
         let bh = blueprint_hash(&valid, &delayed, &michelson, ts);
         let evm = evm_state_hash(&mut host, &bh);

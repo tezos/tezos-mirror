@@ -200,10 +200,8 @@ mod tests {
         // Root at the production Michelson accounts path: aliases resolve under
         // `/tez/tez_accounts` (lib.rs:626) and the slot path is absolute, so this
         // pins the real composition rather than a mixed layout that never ships.
-        let context = TezosRuntimeContext::from_root(
-            &crate::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-        )
-        .unwrap();
+        let context =
+            TezosRuntimeContext::from_root(&crate::TEZOS_ACCOUNTS_ROOT).unwrap();
 
         // Seed the shared slot with the real forwarder code.
         write_alias_implementation(&mut host, &forwarder_code().unwrap()).unwrap();

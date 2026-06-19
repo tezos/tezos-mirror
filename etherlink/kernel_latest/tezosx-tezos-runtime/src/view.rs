@@ -44,8 +44,7 @@ use tezosx_journal::TezosXJournal;
 
 use crate::context::TezosRuntimeContext;
 use crate::{
-    headers, url, ExecuteRequestOutcome, RequestFailure, NULL_PKH,
-    TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+    headers, url, ExecuteRequestOutcome, RequestFailure, NULL_PKH, TEZOS_ACCOUNTS_ROOT,
 };
 
 /// Resource-exhaustion `TcError`s that must route to
@@ -200,8 +199,7 @@ where
     let destination_kt1 = parsed.destination;
     let view_name = parsed.view_name;
 
-    let context =
-        TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
+    let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT)?;
     let dest_account = context.originated_from_kt1(&destination_kt1).map_err(|e| {
         TezosXRuntimeError::NotFound(format!(
             "destination contract {destination_kt1:?} not found: {e:?}"

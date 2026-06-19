@@ -673,8 +673,7 @@ mod tests {
     use crate::chains::{
         ExperimentalFeatures, TezlinkBlockConstants, TezosXBlockConstants,
         TezosXChainConfig, TezosXTransaction, EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-        TEZ_BLOCKS_PATH, TEZ_SAFE_STORAGE_ROOT_PATH,
-        TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        TEZOS_ACCOUNTS_ROOT, TEZ_BLOCKS_PATH, TEZ_SAFE_STORAGE_ROOT_PATH,
     };
     use crate::configuration::fetch_evm_chain_id;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
@@ -930,7 +929,7 @@ mod tests {
             .expect("Write in durable storage should have succeeded");
         host.store_write_all(&TEZ_SAFE_STORAGE_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
-        host.store_write_all(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH, b"placeholder")
+        host.store_write_all(&TEZOS_ACCOUNTS_ROOT, b"placeholder")
             .expect("Write in durable storage should have succeeded");
     }
 
@@ -1196,7 +1195,7 @@ mod tests {
 
         // Store bootstrap2 in the tezlink context to ensure the
         // Tezlink context is not empty and can thus be backed up
-        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+        context::TezlinkContext::from_root(&TEZOS_ACCOUNTS_ROOT)
             .expect("TezlinkContext creation should have succeed")
             .implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
@@ -1262,7 +1261,7 @@ mod tests {
 
         // Store bootstrap2 in the tezlink context to ensure the
         // Tezlink context is not empty and can thus be backed up
-        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+        context::TezlinkContext::from_root(&TEZOS_ACCOUNTS_ROOT)
             .expect("TezlinkContext creation should have succeed")
             .implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
@@ -1405,8 +1404,8 @@ mod tests {
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
         // Allocate bootstrap2 in the Tezlink context so the SafeStorage
-        // backup of TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH succeeds.
-        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+        // backup of TEZOS_ACCOUNTS_ROOT succeeds.
+        context::TezlinkContext::from_root(&TEZOS_ACCOUNTS_ROOT)
             .expect("TezlinkContext creation should have succeeded")
             .implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
@@ -1492,9 +1491,9 @@ mod tests {
         let dst_pkh = bootstrap2.pkh.clone();
 
         // Allocate bootstrap2 in the Tezlink context so the SafeStorage
-        // backup of TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH succeeds.
+        // backup of TEZOS_ACCOUNTS_ROOT succeeds.
         // (bootstrap2's TezosX balance is established below.)
-        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+        context::TezlinkContext::from_root(&TEZOS_ACCOUNTS_ROOT)
             .expect("TezlinkContext creation should have succeeded")
             .implicit_from_public_key_hash(&dst_pkh)
             .expect("Account interface should be correct")
@@ -1616,8 +1615,8 @@ mod tests {
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
         // Allocate bootstrap2 in the Tezlink context so the SafeStorage
-        // backup of TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH succeeds.
-        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+        // backup of TEZOS_ACCOUNTS_ROOT succeeds.
+        context::TezlinkContext::from_root(&TEZOS_ACCOUNTS_ROOT)
             .expect("TezlinkContext creation should have succeeded")
             .implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
@@ -1725,9 +1724,8 @@ mod tests {
             "Pair {expected_level} (Pair {expected_timestamp} {expected_chain_id})"
         );
 
-        let context =
-            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
-                .expect("TezlinkContext creation should have succeeded");
+        let context = context::TezlinkContext::from_root(&TEZOS_ACCOUNTS_ROOT)
+            .expect("TezlinkContext creation should have succeeded");
         let stored = context
             .originated_from_contract(&generated_contract)
             .expect("originated account interface should be correct")
@@ -1781,7 +1779,7 @@ mod tests {
 
             // Allocate bootstrap2 so the SafeStorage backup of the Tezos
             // accounts root succeeds.
-            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+            context::TezlinkContext::from_root(&TEZOS_ACCOUNTS_ROOT)
                 .unwrap()
                 .implicit_from_public_key_hash(&bootstrap2().pkh)
                 .unwrap()
@@ -1866,7 +1864,7 @@ mod tests {
             let mut block_constants = first_block(&mut host);
             block_constants.michelson_runtime_block_constants.safe_roots = vec![
                 TEZ_SAFE_STORAGE_ROOT_PATH.into(),
-                TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH.into(),
+                TEZOS_ACCOUNTS_ROOT.into(),
             ];
 
             // Seed the block's prior internal-op count to `base`: a single
@@ -2283,10 +2281,7 @@ mod tests {
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level: (0.into()),
-                context: TezosRuntimeContext::from_root(
-                    &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-                )
-                .unwrap(),
+                context: TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_ROOT).unwrap(),
                 da_fee_per_byte_mutez: 0,
                 michelson_to_evm_gas_multiplier: DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
                 safe_roots: vec![],
@@ -2394,9 +2389,9 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         // Allocate bootstrap2 in Tezlink storage so the SafeStorage
-        // backup of TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH succeeds,
+        // backup of TEZOS_ACCOUNTS_ROOT succeeds,
         // mirroring `test_tezblock_stored_after_tezos_operation`.
-        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+        context::TezlinkContext::from_root(&TEZOS_ACCOUNTS_ROOT)
             .expect("TezlinkContext creation should have succeeded")
             .implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
@@ -2410,7 +2405,7 @@ mod tests {
         // `validate_and_apply_operation` operates on initialised paths.
         block_constants.michelson_runtime_block_constants.safe_roots = vec![
             TEZ_SAFE_STORAGE_ROOT_PATH.into(),
-            TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH.into(),
+            TEZOS_ACCOUNTS_ROOT.into(),
         ];
 
         // Allocate bootstrap1 in TezosX storage with enough balance to
