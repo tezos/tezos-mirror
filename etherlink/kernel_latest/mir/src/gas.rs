@@ -1463,6 +1463,27 @@ mod test {
     }
 
     #[test]
+    fn compare_shared_dag_is_gas_bounded() {
+        // L2-1654: a value whose in-memory DAG expands to a 2^n-node tree
+        // (shared sub-terms, as built by `DUP; PAIR`) must run out of gas
+        // mid-walk instead of walking the whole 2^n expansion before any gas is
+        // charged. 40 shared pair levels = 40 nodes in memory but 2^40 expanded
+        // leaves; with a small budget the metered COMPARE OOGs after ~budget
+        // nodes (so this test terminates) instead of hanging on 2^40 nodes.
+        use crate::ast::TypedValue as V;
+        use std::rc::Rc;
+        let mut shared = Rc::new(V::int(0));
+        for _ in 0..40 {
+            shared = Rc::new(V::new_pair_rc(shared.clone(), shared.clone()));
+        }
+        let mut gas = Gas::new(10_000);
+        assert_eq!(
+            interpret_cost::compare(&mut gas, shared.as_ref(), shared.as_ref()),
+            Err(CompareError::OutOfGas(OutOfGas))
+        );
+    }
+
+    #[test]
     fn log2i_test() {
         assert_eq!(1usize.log2i(), Ok(0));
         assert_eq!(2usize.log2i(), Ok(1));
