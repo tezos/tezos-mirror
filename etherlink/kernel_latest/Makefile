@@ -16,8 +16,9 @@ ifdef EXCLUDE_MEMBER
 	$(eval EXCLUDE := --workspace --exclude ${EXCLUDE_MEMBER})
 else
 # By default evm-evaluation and revm-evaluation are excluded as they're
-# isolated components of the EVM workspace.
-	$(eval EXCLUDE := --workspace --exclude evm-evaluation --exclude revm-evaluation)
+# isolated components of the EVM workspace, and mir as it is a host-only
+# crate (native binaries and BLS) that does not target wasm32.
+	$(eval EXCLUDE := --workspace --exclude evm-evaluation --exclude revm-evaluation --exclude mir)
 endif
 ifndef EVM_KERNEL_SKIP_BYTECODE
 	@make -C revm/contracts/predeployed bytecode
@@ -33,8 +34,9 @@ ifdef EXCLUDE_MEMBER
 	$(eval EXCLUDE := --workspace --exclude ${EXCLUDE_MEMBER})
 else
 # By default evm-evaluation is excluded as it's an isolated component
-# of the EVM workspace.
-	$(eval EXCLUDE := --workspace --exclude evm-evaluation)
+# of the EVM workspace, and mir as it is a host-only crate (native
+# binaries and BLS) that does not target wasm32.
+	$(eval EXCLUDE := --workspace --exclude evm-evaluation --exclude mir)
 endif
 	@cargo build --profile release-with-debug --target wasm32-unknown-unknown ${EXCLUDE} ${FEATURES}
 

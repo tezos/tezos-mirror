@@ -12,10 +12,10 @@ checked = "0.5"
 thiserror = "1.0"
 logos = "0.14.2"
 hex = "0.4"
-tezos_data_encoding = { path = "../../sdk/rust/encoding" }
-tezos_crypto_rs = { path = "../../sdk/rust/crypto", default-features = false}
-tezos-protocol = { path = "../../sdk/rust/protocol" }
-tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }
+tezos_data_encoding = { path = "../../../sdk/rust/encoding" }
+tezos_crypto_rs = { path = "../../../sdk/rust/crypto", default-features = false}
+tezos-protocol = { path = "../../../sdk/rust/protocol" }
+tezos-smart-rollup-host = { path = "../../../src/kernel_sdk/host" }
 typed-arena = "2"
 base58 = "0.2"
 cryptoxide = "0.4"

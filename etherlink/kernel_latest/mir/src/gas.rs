@@ -529,7 +529,7 @@ pub mod interpret_cost {
     /// Observable on receipts and `eth_estimateGas` for code with
     /// deeply-nested control flow or large `ITER`/`MAP` collections.
     /// Tracked separately for tuning; see
-    /// `contrib/mir/docs/frame_gas_calibration.md` (when present).
+    /// `etherlink/kernel_latest/mir/docs/frame_gas_calibration.md` (when present).
     pub const FRAME_PUSH: u32 = 100;
 
     /// Sibling charge for pushes onto the per-EXEC/per-VIEW substack

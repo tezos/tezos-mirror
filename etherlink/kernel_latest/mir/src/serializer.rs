@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn test_primitives_serialization_compatibility() {
         let alpha_primitive_list = read_file_to_string(&format!(
-            "{}/../../tezt/tests/expected/encoding.ml/Alpha- Michelson primitives regression.out",
+            "{}/../../../tezt/tests/expected/encoding.ml/Alpha- Michelson primitives regression.out",
             env!("CARGO_MANIFEST_DIR"),
         ));
 

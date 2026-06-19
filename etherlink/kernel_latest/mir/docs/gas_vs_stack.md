@@ -158,7 +158,7 @@ When adding a new walker over `Type`, `TypedValue`, `Instruction`, or
 - The original threat model and worklist conversion: see commit
   `c540d5b9a5b` (`MIR/encoder: convert encode_micheline to an iterative
    worklist`) and the rest of the "MIR: Explicit Stack Frames" stack.
-- `gas::interpret_cost::micheline_encoding` (`contrib/mir/src/gas.rs`)
+- `gas::interpret_cost::micheline_encoding` (`etherlink/kernel_latest/mir/src/gas.rs`)
   — encoder gas charge by node count.
 - `gas::interpret_cost::micheline_decoding_bytes` — decoder gas charge
   by byte count.

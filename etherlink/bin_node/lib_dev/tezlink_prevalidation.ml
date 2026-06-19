@@ -493,7 +493,7 @@ let validate_signature ~check_signature shell contents pk signature =
 
 (** [signature_cost pk op] unpacks [op] then returns the gas cost of the
     signature check. Mirrors the kernel's re-priced model (`check_signature`
-    in `contrib/mir/src/gas.rs`); the protocol's
+    in `etherlink/kernel_latest/mir/src/gas.rs`); the protocol's
     [Operation_costs.check_signature_cost] carries the pre-benchmark values
     and would make this floor reject operations the kernel accepts. *)
 let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =

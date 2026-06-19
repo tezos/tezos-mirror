@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-#![allow(dead_code, unused_imports)]
-#![allow(clippy::all)]
-#![cfg(not(tarpaulin_include))]
+// NB: lint allows and the `cfg(not(tarpaulin_include))` gate that used to live
+// here as inner attributes are now applied as outer attributes on the
+// `lalrpop_mod!(syntax)` declaration in lib.rs. Inner attributes are not
+// permitted in a file pulled in with `include!` (as lalrpop_mod! does).
 
 use crate::ast::*;
 use crate::ast::annotations::*;

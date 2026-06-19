@@ -513,10 +513,6 @@ oc.build_kernels:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - contrib/mir/**/*.lalrpop
-    - contrib/mir/**/*.rs
-    - contrib/mir/**/*.toml
-    - contrib/mir/**/Cargo.lock
     - data-encoding/**/*
     - dune
     - dune-project
@@ -3057,12 +3053,12 @@ etherlink.test_kernel:
   - gcp
   rules:
   - changes:
-    - contrib/mir/**/*.lalrpop
-    - contrib/mir/**/*.rs
-    - contrib/mir/**/*.toml
-    - contrib/mir/**/Cargo.lock
     - etherlink.mk
     - etherlink/**/*.rs
+    - etherlink/kernel_latest/mir/**/*.lalrpop
+    - etherlink/kernel_latest/mir/**/*.rs
+    - etherlink/kernel_latest/mir/**/*.toml
+    - etherlink/kernel_latest/mir/**/Cargo.lock
     - sdk/rust/**/*
     - src/kernel_sdk/**/*
     when: on_success
@@ -3197,43 +3193,6 @@ etherlink.test_revm_compatibility:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
 
-etherlink.mir_unit:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - contrib/mir/**/*.lalrpop
-    - contrib/mir/**/*.rs
-    - contrib/mir/**/*.toml
-    - contrib/mir/**/Cargo.lock
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: true
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - cargo test --manifest-path contrib/mir/Cargo.toml
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    CARGO_NET_OFFLINE: "false"
-
 etherlink.mir_tzt:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
@@ -3241,10 +3200,10 @@ etherlink.mir_tzt:
   - gcp
   rules:
   - changes:
-    - contrib/mir/**/*.lalrpop
-    - contrib/mir/**/*.rs
-    - contrib/mir/**/*.toml
-    - contrib/mir/**/Cargo.lock
+    - etherlink/kernel_latest/mir/**/*.lalrpop
+    - etherlink/kernel_latest/mir/**/*.rs
+    - etherlink/kernel_latest/mir/**/*.toml
+    - etherlink/kernel_latest/mir/**/Cargo.lock
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -3265,7 +3224,8 @@ etherlink.mir_tzt:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner tzt_reference_test_suite/*.tzt
+  - cargo run --manifest-path etherlink/kernel_latest/mir/Cargo.toml --bin tzt_runner
+    tzt_reference_test_suite/*.tzt
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

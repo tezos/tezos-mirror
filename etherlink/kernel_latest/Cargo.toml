@@ -18,6 +18,7 @@ members = [
   "logging",
   "storage",
   "michelson-types",
+  "mir",
   "evm-types",
   "tezosx-journal",
   "revm",
@@ -134,7 +135,7 @@ alloy-primitives = { version = "1.5.0", default-features = false }
 alloy-consensus = { version = "1.0.32", default-features = false }
 
 # mir without bls nor transfer of big maps
-mir = { path = "../../contrib/mir", default-features = false, features = ["allow_lazy_storage_transfer"] }
+mir = { path = "mir", default-features = false, features = ["allow_lazy_storage_transfer"] }
 typed-arena = "2"
 
 # http

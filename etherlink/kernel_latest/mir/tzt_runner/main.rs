@@ -70,11 +70,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         total_tests
     );
 
-    // Construct the output file path
+    // Construct the output file path, relative to the built executable. As a
+    // member of the kernel_latest workspace the binary lives in the shared
+    // `<workspace>/target/<profile>/`, so reach back into the crate directory.
     let executable_path = env::args()
         .next()
         .ok_or("Failed to get the executable path")?;
-    let file_path_str = executable_path.replace("tzt_runner", "../../MIR- Run TZT.out");
+    let file_path_str =
+        executable_path.replace("tzt_runner", "../../mir/MIR- Run TZT.out");
     let current_dir = env::current_dir()?;
     let file_path = current_dir.join(&file_path_str);
 
