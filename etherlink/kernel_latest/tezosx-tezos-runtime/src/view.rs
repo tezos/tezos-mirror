@@ -65,6 +65,7 @@ fn tc_error_is_oog(e: &TcError) -> bool {
         TcError::OutOfGas(_)
             | TcError::CostOverflow(_)
             | TcError::CompareError(CompareError::Cost(_))
+            | TcError::CompareError(CompareError::OutOfGas(_))
     )
 }
 
@@ -121,7 +122,8 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
         // deterministic type failure) falls through to BadRequest.
         InterpretError::OutOfGas
         | InterpretError::CostOverflow(_)
-        | InterpretError::CompareError(CompareError::Cost(_)) => {
+        | InterpretError::CompareError(CompareError::Cost(_))
+        | InterpretError::CompareError(CompareError::OutOfGas(_)) => {
             TezosXRuntimeError::OutOfGas
         }
         InterpretError::TcError(tc) if tc_error_is_oog(tc) => {
@@ -481,6 +483,14 @@ mod tests {
             classify_tc_error(TcError::CompareError(CompareError::Cost(CostOverflow))),
             TezosXRuntimeError::OutOfGas
         ));
+        // A COMPARE that exhausts the budget mid-walk surfaces as
+        // CompareError::OutOfGas and must route to OutOfGas, not BadRequest.
+        assert!(matches!(
+            classify_tc_error(TcError::CompareError(CompareError::OutOfGas(
+                mir::gas::OutOfGas
+            ))),
+            TezosXRuntimeError::OutOfGas
+        ));
     }
 
     #[test]
@@ -503,6 +513,12 @@ mod tests {
             classify_interpret_error(InterpretError::CompareError(CompareError::Cost(
                 CostOverflow
             ))),
+            TezosXRuntimeError::OutOfGas
+        ));
+        assert!(matches!(
+            classify_interpret_error(InterpretError::CompareError(
+                CompareError::OutOfGas(mir::gas::OutOfGas)
+            )),
             TezosXRuntimeError::OutOfGas
         ));
         // Nested TcError OOG goes through the shared `tc_error_is_oog`.

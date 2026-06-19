@@ -4191,8 +4191,7 @@ fn set_ordering_check<'a>(
     next: &TypedValue<'a>,
 ) -> Result<(), TcError> {
     if let Some(prev) = prev {
-        ctx.gas()
-            .consume(gas::interpret_cost::compare(prev, next)?)?;
+        gas::interpret_cost::compare(ctx.gas(), prev, next)?;
         match prev.cmp(next) {
             std::cmp::Ordering::Less => Ok(()),
             std::cmp::Ordering::Equal => Err(TcError::DuplicateElements(set_ty.clone())),
@@ -4213,8 +4212,7 @@ fn map_key_ordering_check<'a>(
     next_key: &TypedValue<'a>,
 ) -> Result<(), TcError> {
     if let Some(prev) = prev_key {
-        ctx.gas()
-            .consume(gas::interpret_cost::compare(prev, next_key)?)?;
+        gas::interpret_cost::compare(ctx.gas(), prev, next_key)?;
         match prev.cmp(next_key) {
             std::cmp::Ordering::Less => Ok(()),
             std::cmp::Ordering::Equal => Err(TcError::DuplicateElements(map_ty.clone())),

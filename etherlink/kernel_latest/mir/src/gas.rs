@@ -40,16 +40,20 @@ pub struct CostOverflow;
 /// Error when computing comparison cost.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum CompareError {
-    /// Cost arithmetic overflowed while sizing the comparison. The
+    /// Cost arithmetic overflowed while sizing the comparison. Most
     /// cost-helper functions in [`tc_cost`] / [`interpret_cost`] do not
     /// charge gas (that happens at the call site via [`Gas::consume`]),
-    /// they only do cost arithmetic, so [`CostOverflow`] is their only
-    /// failure mode.
+    /// they only do cost arithmetic. [`interpret_cost::compare`] is the
+    /// exception: it meters incrementally (charging each node as it
+    /// walks), so it can also fail with [`CompareError::OutOfGas`].
     #[error(transparent)]
     Cost(#[from] CostOverflow),
     /// Attempted to compare incomparable values.
     #[error("comparison of incomparable values")]
     Incomparable,
+    /// Gas was exhausted while metering the comparison incrementally.
+    #[error(transparent)]
+    OutOfGas(#[from] OutOfGas),
 }
 
 /// Default gas limit per transaction, according to
@@ -344,7 +348,7 @@ pub mod interpret_cost {
     use tezos_crypto_rs::CryptoError;
     use thiserror::Error;
 
-    use super::{AsGasCost, BigIntByteSize, CompareError, CostOverflow, OutOfGas};
+    use super::{AsGasCost, BigIntByteSize, CompareError, CostOverflow, Gas, OutOfGas};
     use crate::ast::{Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
@@ -832,7 +836,11 @@ pub mod interpret_cost {
             .as_gas_cost()
     }
 
-    pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, CompareError> {
+    pub fn compare(
+        gas: &mut Gas,
+        v1: &TypedValue,
+        v2: &TypedValue,
+    ) -> Result<(), CompareError> {
         use TypedValue as V;
         let cmp_bytes = |s1: u64, s2: u64| -> Result<u32, CompareError> {
             // corresponds to cost_N_ICompare in the Tezos protocol
@@ -845,13 +853,15 @@ pub mod interpret_cost {
         const CMP_SIGNATURE: u32 = 92; // hard-coded in the protocol
         const CMP_NODE: u32 = 10; // per Pair / Option / Or node
 
-        // The COMPARE cost is an order-independent sum of per-node costs, so an
-        // explicit-stack walk with a single accumulator is bit-identical to the
-        // previous recursive sum while no longer recursing on deep
-        // `pair`/`option`/`or` values -- which would overflow the kernel's ~1 MiB
-        // Rust stack here, *before* any gas is charged, where gas can never gate
-        // it. See L2-1449.
-        let mut total = Checked::from(0u32);
+        // The COMPARE cost is an order-independent sum of per-node costs.
+        // Consume each node's cost as the explicit-stack walk visits it, so a
+        // value whose in-memory DAG expands to a 2^n-node tree (shared
+        // sub-terms built via `DUP; PAIR`) runs out of gas mid-walk instead of
+        // walking the whole expansion before any gas is charged. The total
+        // charged is identical to summing then consuming once. The walk is also
+        // explicit-stack (not recursive) to avoid overflowing the kernel's
+        // ~1 MiB Rust stack on deep `pair`/`option`/`or` values. See L2-1449,
+        // L2-1654.
         let mut stack: Vec<(&TypedValue, &TypedValue)> = vec![(v1, v2)];
         while let Some((v1, v2)) = stack.pop() {
             let node: u32 = match (v1, v2) {
@@ -943,9 +953,9 @@ pub mod interpret_cost {
                     _,
                 ) => return Err(CompareError::Incomparable),
             };
-            total += node;
+            gas.consume(node)?;
         }
-        Ok(total.as_gas_cost()?)
+        Ok(())
     }
 
     /// Cost charged for computing total entries size (needed for the subsequent
@@ -1436,7 +1446,10 @@ mod test {
                 };
                 let a = deep();
                 let b = deep();
-                let cost = interpret_cost::compare(&a, &b).expect("comparable");
+                let mut cost_gas = Gas::default();
+                interpret_cost::compare(&mut cost_gas, &a, &b).expect("comparable");
+                let cost =
+                    Gas::default().milligas().unwrap() - cost_gas.milligas().unwrap();
                 // 10 per pair node (DEPTH nodes) plus the per-leaf costs; mainly
                 // we assert the walk completed without overflowing.
                 assert!(cost >= 10 * DEPTH as u32);
