@@ -827,9 +827,9 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     ?variables ?(rules : Gitlab_ci.Types.job_rule list option)
     ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
     ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
-    ?interruptible_runner ?git_strategy ?retry ?parallel ?description
-    ?(dev_infra = false) ~__POS__ ?image ?template ?(datadog = true) ~stage
-    ~name script : tezos_job =
+    ?interruptible_runner ?git_strategy ?retry ?parallel ?environment
+    ?description ?(dev_infra = false) ~__POS__ ?image ?template
+    ?(datadog = true) ~stage ~name script : tezos_job =
   declared_jobs := String_map.add name __POS__ !declared_jobs ;
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag : Runner.Tag.t =
@@ -1048,6 +1048,7 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
       coverage = None;
       retry;
       parallel;
+      environment;
     }
   in
   {
@@ -1476,8 +1477,8 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
 let job_docker_authenticated ?(skip_docker_initialization = false)
     ?ci_docker_hub ?artifacts ?(variables = []) ?rules
     ?(dependencies = Staged []) ?image_dependencies ?arch ?storage ?tag
-    ?allow_failure ?parallel ?timeout ?retry ?description ?dev_infra ~__POS__
-    ~stage ~name script : tezos_job =
+    ?allow_failure ?parallel ?environment ?timeout ?retry ?description
+    ?dev_infra ~__POS__ ~stage ~name script : tezos_job =
   let docker_version = "24.0.7" in
   job
     ?rules
@@ -1489,6 +1490,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ?tag
     ?allow_failure
     ?parallel
+    ?environment
     ?timeout
     ?retry
     ?description
