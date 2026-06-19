@@ -109,6 +109,11 @@
   the Michelson runtime then accepted a `set signature` that L1 rejects as
   a duplicate, with divergence on `COMPARE`, set/map validation and storage
   round-trips. (!22244)
+- A failing `UNPACK` of a packed (`0x05`) payload now charges the
+  size-dependent `unpack_failed` gas penalty before pushing `None`, like L1.
+  Previously the failure paths (binary decode or typechecking) returned
+  `None` without the penalty, undercharging large failing payloads.
+  (L2-1656)
 - The `VIEW` instruction now gates execution on two type-equality checks,
   matching L1: the callee view's declared output type must equal the
   caller-requested return type, and the caller's argument type must equal
