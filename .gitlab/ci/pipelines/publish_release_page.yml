@@ -55,7 +55,7 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-publish:release-page:
+release_page.publish:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:

@@ -550,7 +550,7 @@ docker:container_scanning:
       container_scanning: gl-container-scanning-report.json
   retry: 0
 
-publish:release-page:
+release_page.deploy-assets:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
@@ -566,6 +566,36 @@ publish:release-page:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - ./scripts/releases/deploy-release-page-assets.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    S3_BUCKET: release-page-test.nomadic-labs.com
+    DISTRIBUTION_ID: E19JF46UG3Z747
+  environment:
+    name: release-page
+    action: access
+  retry: 0
+
+release_page.publish:
+  image: ${ci_image_name}/release-page:${ci_image_tag}
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - oc.docker:ci:amd64
+  - release_page.deploy-assets
+  dependencies:
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:
