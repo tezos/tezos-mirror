@@ -176,7 +176,11 @@ for release in $RELEASES; do             # unstable, 22_04, 24_04 ...
     echo "Create the Packages file $TARGETDIR/${target}/Packages"
     apt-ftparchive packages "dists/${release}" > \
       "${target}/Packages"
-    gzip -k -f "${target}/Packages"
+    # -n: omit the mtime/name from the gzip header so an unchanged Packages
+    # produces a byte-identical Packages.gz across publishes. This keeps the
+    # index hash (and thus its by-hash path) stable when the content is
+    # unchanged, avoiding spurious in-place rewrites and extra by-hash blobs.
+    gzip -n -k -f "${target}/Packages"
     cd -
 
   done
