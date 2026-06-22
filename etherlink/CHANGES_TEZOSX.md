@@ -96,6 +96,11 @@
 
 ### Michelson Runtime
 
+- Integer `MUL` is now priced on the product of operand sizes (`~ s1*s2`)
+  instead of L1's FFT-shaped `a*log(a)`. The Michelson runtime multiplies with
+  num-bigint, which has no FFT (schoolbook/Karatsuba/Toom-3), so the L1 formula
+  under-charged large multiplications super-linearly; charged gas now
+  upper-bounds the real multiply work at every operand size. (!22289)
 - `COMPARE` (and `set`/`map` literal key-ordering checks at typechecking) now
   charge their gas incrementally while walking the value, so a comparison over
   a maximally-shared value (an O(n) in-memory DAG that expands to 2^n nodes)
