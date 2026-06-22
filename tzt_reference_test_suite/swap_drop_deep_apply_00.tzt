@@ -1,0 +1,3 @@
+code { LAMBDA unit unit { } ; PUSH int 500000 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { LAMBDA (pair (lambda unit unit) unit) unit { CDR } ; SWAP ; APPLY } ; DUP ; GT } ; DROP ; PUSH int 1 ; SWAP ; DROP } ;
+input { } ;
+output (StaticError _)
