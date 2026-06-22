@@ -1491,6 +1491,25 @@ mod test {
     }
 
     #[test]
+    fn mul_gas_grows_quadratically_l2_1691() {
+        // L2-1691: MUL gas must grow ~quadratically in operand size (product
+        // of sizes), not ~linearly (the old a*log(a) FFT formula), so it
+        // upper-bounds num-bigint's no-FFT (schoolbook/Karatsuba/Toom-3) work
+        // and the DUP;MUL squaring witness OOGs while real CPU is still bounded.
+        use num_bigint::BigUint;
+        let big = |bytes: usize| BigUint::from_bytes_le(&vec![0xffu8; bytes]);
+        let g = |s| interpret_cost::mul_nat(&big(s), &big(s)).unwrap();
+        let g1 = g(4096);
+        let g2 = g(8192);
+        // Doubling each operand quadruples the cost (~4x); the old a*log(a)
+        // formula only ~doubled it. >= 3.5x pins the quadratic shape.
+        assert!(
+            g2 >= g1 * 7 / 2,
+            "doubling operand size should ~4x MUL gas: g(4096)={g1} g(8192)={g2}"
+        );
+    }
+
+    #[test]
     fn log2i_test() {
         assert_eq!(1usize.log2i(), Ok(0));
         assert_eq!(2usize.log2i(), Ok(1));
