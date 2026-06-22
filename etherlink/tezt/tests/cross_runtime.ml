@@ -8472,9 +8472,11 @@ let test_crac_receipt_tez_gateway_direct_evm_tez_revert () =
      markers and alias carry backtracked/failed statuses:
        #0: Event "cross_runtime_call" (begin marker) -- backtracked
        #1: origination alias(evm_bridge) -- backtracked
-       #2: alias(evm_bridge) -> tez_reverter (%run) -- failed
+       #2: alias(evm_bridge) -> tez_reverter (%run) -- backtracked
        #3: tez_reverter -> tez_reverter (%_revert) -- failed
        #4: Event "cross_runtime_call_end" (end marker) -- backtracked
+     The %run target succeeds; it is backtracked because a deeper op
+     (#3 %_revert) fails, which carries the error.
      The alias materialization is backtracked (applied then rolled back
      when the leg reverts); the top-level gateway op fails. *)
   Check.(
@@ -8502,7 +8504,7 @@ let test_crac_receipt_tez_gateway_direct_evm_tez_revert () =
     ~expected_source:evm_bridge_alias
     ~expected_destination:tez_reverter_kt1
     ~expected_entrypoint:"run"
-    ~expected_status:"failed"
+    ~expected_status:"backtracked"
     (List.nth internals 2) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#3")
@@ -8765,10 +8767,12 @@ let test_crac_receipt_evm_to_tez_revert () =
      (sender + source) + alias→reverter call + reverter's
      internal _revert call + CRAC end event. The aliases were
      materialized successfully in storage BEFORE the body failed;
-     their receipt status is "applied" because they did succeed,
-     while the downstream synthetic transfer and its sub-call are
-     "failed". The begin/end markers are "backtracked" to match the
-     failed parent frame. *)
+     their receipt status is "applied" because they did succeed. The
+     alias→reverter (%run) call is "backtracked": it is the
+     directly-called target and succeeds, but a deeper internal op
+     fails, so the error is carried once on that descendant (%_revert,
+     "failed") while its ancestors are backtracked. The begin/end
+     markers are "backtracked" to match the failed parent frame. *)
   Check.(
     (List.length internals = 6)
       int
@@ -8793,14 +8797,16 @@ let test_crac_receipt_evm_to_tez_revert () =
     ~expected_alias_kt1:sender_alias
     ~expected_status:"applied"
     (List.nth internals 2) ;
-  (* ── Internal #3: alias(E_bridge) → tez_reverter (%run) — failed *)
+  (* ── Internal #3: alias(E_bridge) → tez_reverter (%run) — backtracked
+     The directly-called target succeeds; it is backtracked because a
+     deeper internal op (#4) fails. *)
   check_crac_internal_transaction
     ~prefix
     ~expected_nonce:3
     ~expected_source:evm_bridge_alias
     ~expected_destination:tez_reverter_kt1
     ~expected_entrypoint:"run"
-    ~expected_status:"failed"
+    ~expected_status:"backtracked"
     (List.nth internals 3) ;
   (* ── Internal #4: tez_reverter → tez_reverter (%_revert) — failed
      The reverter contract's internal call that triggers the failure. *)
@@ -8924,14 +8930,15 @@ let test_crac_receipt_two_failed_independent () =
     ~expected_alias_kt1:sender_alias
     ~expected_status:"applied"
     (List.nth internals 2) ;
-  (* ── Internal #3: alias(bridge_1) → tez_reverter_1 (%run) — failed *)
+  (* ── Internal #3: alias(bridge_1) → tez_reverter_1 (%run) — backtracked
+     (target succeeds; deeper #4 %_revert fails and carries the error) *)
   check_crac_internal_transaction
     ~prefix
     ~expected_nonce:3
     ~expected_source:bridge_1_alias
     ~expected_destination:tez_reverter_1_kt1
     ~expected_entrypoint:"run"
-    ~expected_status:"failed"
+    ~expected_status:"backtracked"
     (List.nth internals 3) ;
   (* ── Internal #4: tez_reverter_1 → tez_reverter_1 (%_revert) — failed *)
   check_crac_internal_transaction
@@ -8975,14 +8982,15 @@ let test_crac_receipt_two_failed_independent () =
     ~expected_alias_kt1:sender_alias
     ~expected_status:"applied"
     (List.nth internals 8) ;
-  (* ── Internal #9: alias(bridge_2) → tez_reverter_2 (%run) — failed *)
+  (* ── Internal #9: alias(bridge_2) → tez_reverter_2 (%run) — backtracked
+     (target succeeds; deeper #10 %_revert fails and carries the error) *)
   check_crac_internal_transaction
     ~prefix
     ~expected_nonce:9
     ~expected_source:bridge_2_alias
     ~expected_destination:tez_reverter_2_kt1
     ~expected_entrypoint:"run"
-    ~expected_status:"failed"
+    ~expected_status:"backtracked"
     (List.nth internals 9) ;
   (* ── Internal #10: tez_reverter_2 → tez_reverter_2 (%_revert) — failed *)
   check_crac_internal_transaction
@@ -9167,11 +9175,13 @@ let test_crac_receipt_interleaved_failed_pending () =
   in
   let f_pair_txs =
     [
+      (* The %run target succeeds; it is backtracked because the deeper
+         %_revert fails and carries the error. *)
       tx_key
         ~src:bridge_fail_alias
         ~dst:tez_reverter_kt1
         ~ep:"run"
-        ~status:"failed";
+        ~status:"backtracked";
       tx_key
         ~src:tez_reverter_kt1
         ~dst:tez_reverter_kt1
@@ -14710,7 +14720,8 @@ let test_crac_receipt_failed_frame_markers () =
           |> Option.fold ~none:"-" ~some:as_string))
     internals ;
   (* 6 internal ops: begin + alias(bridge) + alias(sender) + bridge->reverter
-     (failed) + reverter->reverter %_revert (failed) + end. *)
+     (backtracked — deep failure: reverter's %run body succeeded, the %_revert
+     internal op is what failed) + reverter->reverter %_revert (failed) + end. *)
   Check.(
     (List.length internals = 6)
       int
@@ -14733,13 +14744,16 @@ let test_crac_receipt_failed_frame_markers () =
     ~expected_alias_kt1:sender_alias
     ~expected_status:"applied"
     (List.nth internals 2) ;
+  (* alias→target is backtracked: the reverter's %run body completed
+     (it built the op list), but the emitted %_revert internal op
+     failed.  The error lives on the deeper %_revert, not here. *)
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#3")
     ~expected_nonce:3
     ~expected_source:bridge_alias
     ~expected_destination:tez_reverter_kt1
     ~expected_entrypoint:"run"
-    ~expected_status:"failed"
+    ~expected_status:"backtracked"
     (List.nth internals 3) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#4")
