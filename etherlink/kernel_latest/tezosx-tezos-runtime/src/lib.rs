@@ -395,11 +395,25 @@ fn build_crac_receipt(
 ///
 /// When `cross_runtime_transfer` fails, we still need a receipt in the
 /// Michelson block so indexers see the failed CRAC.  The top-level
-/// operation has `status: failed` with an empty error vector (use
-/// [`crac_top_level_failed_result`]); the full error is carried exactly
-/// once on the synthetic `alias(E_1)→target` failed-transfer internal
-/// op so indexers can see which contract call was attempted and why it
-/// failed.
+/// operation has `status: failed` with an empty error vector (see
+/// [`crac_top_level_failed_result`]).
+///
+/// The `alias(E_1)→target` synthetic internal transfer op is marked
+/// according to how the failure occurred:
+///
+/// * **Immediate failure** (`deep_failure = false`): the target's own
+///   call failed.  `alias→target` is `Failed(error)`, carrying the
+///   error exactly once so indexers see which contract was attempted
+///   and why it failed.
+///
+/// * **Deep failure** (`deep_failure = true`): the target's call
+///   returned successfully, but one of its internal operations
+///   subsequently failed.  The real error is already present as a
+///   `Failed` entry in `internal_receipts`; marking `alias→target` as
+///   `Failed` again would duplicate it.  Instead `alias→target` is
+///   `BackTracked(None)`, matching native Tezos L1 semantics where
+///   ancestor ops are backtracked and the error lives once on the
+///   actually-failing descendant.
 #[allow(clippy::too_many_arguments)]
 fn build_failed_crac_receipt(
     null_pkh: &PublicKeyHash,
@@ -413,6 +427,7 @@ fn build_failed_crac_receipt(
     internal_receipts: Vec<InternalOperationSum>,
     crac_id: &str,
     base_nonce: u16,
+    deep_failure: bool,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
     // The CRAC begin event is always first, even on failure.
     // Since the downstream transfer failed, the event is backtracked
@@ -440,10 +455,26 @@ fn build_failed_crac_receipt(
 
     all_internal.extend(pre_transfer_internals);
 
-    // Include the failed transfer (alias(E_1) → target) so
-    // indexers can see which contract call was attempted.
+    // Include the alias(E_1)→target internal transfer so indexers see
+    // which contract call was attempted.  The result depends on whether
+    // the failure was immediate (the target itself failed) or deep (the
+    // target succeeded but one of its internal ops failed):
+    //
+    // - Immediate: alias→target carries the error as Failed(error).
+    // - Deep: alias→target is BackTracked(None); the real error is
+    //   already on the deeper Failed entry in internal_receipts.
     let transfer_nonce = next_nonce;
     next_nonce = next_nonce.saturating_add(1);
+    let alias_target_result = if deep_failure {
+        ContentResult::BackTracked(BacktrackedResult {
+            errors: None,
+            result: TransferTarget::ToContrat(TransferSuccess::default()),
+        })
+    } else {
+        ContentResult::Failed(ApplyOperationErrors::from(ApplyOperationError::Transfer(
+            error,
+        )))
+    };
     all_internal.push(InternalOperationSum::Transfer(
         InternalContentWithMetadata {
             sender: sender_contract.clone(),
@@ -453,9 +484,7 @@ fn build_failed_crac_receipt(
                 destination: destination.clone(),
                 parameters: parameters.clone(),
             },
-            result: ContentResult::Failed(ApplyOperationErrors::from(
-                ApplyOperationError::Transfer(error),
-            )),
+            result: alias_target_result,
         },
     ));
 
@@ -878,6 +907,7 @@ where
         Err(CracTransferError {
             error,
             internal_receipts,
+            deep_failure,
         }) => {
             // Map CracError to its TezosXRuntimeError HTTP-status equivalent.
             // OutOfGas → 429 (catchable revert); user-facing TransferError
@@ -926,6 +956,7 @@ where
                         internal_receipts,
                         &crac_id_str,
                         base_nonce,
+                        deep_failure,
                     ) {
                         Ok(receipt) => {
                             #[cfg(debug_assertions)]
@@ -2480,6 +2511,7 @@ mod tests {
             vec![],
             "1-0",
             0,
+            false, // immediate failure: alias→target must be Failed
         )
         .expect("build_failed_crac_receipt should succeed");
 
@@ -2509,7 +2541,7 @@ mod tests {
             "CRAC begin event must be backtracked when downstream transfer fails"
         );
 
-        // Internal op #1: transfer must be failed
+        // Internal op #1: transfer must be failed (immediate failure, deep_failure=false)
         let InternalOperationSum::Transfer(ref transfer) =
             result.internal_operation_results[1]
         else {
@@ -2589,6 +2621,7 @@ mod tests {
             vec![],
             "1-0",
             0,
+            false, // immediate failure: error lives on alias→target
         )
         .expect("build_failed_crac_receipt should succeed");
 
@@ -2626,6 +2659,150 @@ mod tests {
             occurrences, 1,
             "error payload must appear exactly once (alias→target internal op only); \
              charge_persisted_error prices 1× on this"
+        );
+    }
+
+    /// When `deep_failure = true` (the target's own call succeeded but one
+    /// of its internal operations failed), the `alias→target` synthetic op
+    /// must be `BackTracked(None)` — not `Failed`.  The real error lives
+    /// exactly once on the deeper `Failed` entry already present in
+    /// `internal_receipts`.
+    ///
+    /// Without `deep_failure`, `build_failed_crac_receipt` would produce
+    /// `Failed(error)` on `alias→target` unconditionally, duplicating the
+    /// error that already lives on the deeper `Failed` entry.
+    #[test]
+    fn build_failed_crac_receipt_deep_failure_backtracks_alias_target() {
+        use tezos_tezlink::operation_result::{
+            OperationDataAndMetadata, OperationResultSum,
+        };
+
+        let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
+        let source_contract = Contract::Originated(
+            ContractKt1Hash::from_b58check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+                .unwrap(),
+        );
+        let sender_contract = Contract::Originated(
+            ContractKt1Hash::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2")
+                .unwrap(),
+        );
+        let destination = Contract::Originated(
+            ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .unwrap(),
+        );
+        let amount = Narith(0u64.into());
+        let parameters = Parameters::default();
+
+        // The wrapper error passed to the builder — present because the
+        // internal-op path still requires a TransferError.  With
+        // deep_failure=true the builder must NOT put this on alias→target.
+        let wrapper_error = TransferError::FailedToExecuteInternalOperation(
+            "internal operation failed during cross-runtime call".into(),
+        );
+
+        // Build a synthetic internal_receipts vec containing a deeper
+        // Failed entry (the contract that actually FAILWITHed) and a
+        // Backtracked sibling — mirroring what cross_runtime_transfer
+        // produces on the deep-failure path.
+        // Use a distinct KT1 (different from `destination`) to identify
+        // the deeply failing contract in assertions.
+        let deep_kt1 = Contract::Originated(
+            ContractKt1Hash::from_b58check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .unwrap(),
+        );
+        let deeper_error_payload = "DEEP_FAILWITH_MARKER";
+        let deeper_failed_iop =
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                sender: destination.clone(),
+                nonce: 5,
+                content: TransferContent {
+                    amount: Narith(0u64.into()),
+                    destination: deep_kt1.clone(),
+                    parameters: Parameters::default(),
+                },
+                result: ContentResult::Failed(ApplyOperationErrors::from(
+                    ApplyOperationError::Transfer(
+                        TransferError::FailedToExecuteInternalOperation(
+                            deeper_error_payload.into(),
+                        ),
+                    ),
+                )),
+            });
+        let internal_receipts = vec![deeper_failed_iop];
+
+        let applied = build_failed_crac_receipt(
+            &null_pkh,
+            &source_contract,
+            &sender_contract,
+            &amount,
+            &destination,
+            &parameters,
+            wrapper_error,
+            vec![],
+            internal_receipts,
+            "1-0",
+            0,
+            true, // deep failure: alias→target must be BackTracked
+        )
+        .expect("build_failed_crac_receipt should succeed");
+
+        let OperationDataAndMetadata::OperationWithMetadata(batch) =
+            &applied.op_and_receipt;
+        let op = &batch.operations[0];
+        let OperationResultSum::Transfer(ref result) = op.receipt else {
+            panic!("expected Transfer receipt");
+        };
+
+        // Top-level is still Failed (the whole CRAC failed).
+        assert!(result.result.is_failed(), "top-level result must be Failed");
+
+        // Receipt layout: [begin_event, alias→destination, deeper_failed_iop, end_event]
+        assert_eq!(
+            result.internal_operation_results.len(),
+            4,
+            "expected 4 internal ops: begin + alias→target + deeper failed + end"
+        );
+
+        // Internal op #1: alias→destination must be BackTracked(None),
+        // NOT Failed.  The wrapper error must not appear here.
+        let InternalOperationSum::Transfer(ref alias_target) =
+            result.internal_operation_results[1]
+        else {
+            panic!(
+                "expected Transfer at index 1, got {:?}",
+                result.internal_operation_results[1]
+            );
+        };
+        assert!(
+            matches!(
+                alias_target.result,
+                ContentResult::BackTracked(BacktrackedResult { errors: None, .. })
+            ),
+            "alias→target must be BackTracked(None) on deep failure; without the \
+             fix it would be Failed. Got: {:?}",
+            alias_target.result
+        );
+        assert_eq!(
+            alias_target.content.destination, destination,
+            "alias→target destination must be the CRAC target"
+        );
+
+        // Internal op #2: the deeper Failed entry must be preserved intact.
+        let InternalOperationSum::Transfer(ref deeper) =
+            result.internal_operation_results[2]
+        else {
+            panic!(
+                "expected Transfer at index 2, got {:?}",
+                result.internal_operation_results[2]
+            );
+        };
+        assert!(
+            deeper.result.is_failed(),
+            "deeper internal op must stay Failed"
+        );
+        assert_eq!(
+            deeper.content.destination, deep_kt1,
+            "deeper internal op destination must be the deeply failing contract"
         );
     }
 

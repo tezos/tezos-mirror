@@ -144,6 +144,11 @@
 - Failed cross-runtime call receipts now persist the failing error once
   (on the `alias→target` internal op that indexers read) instead of twice.
   The per-byte gas charge for the persisted error body is halved accordingly. (!22257)
+- When a cross-runtime call fails because a deeper internal operation
+  FAILWITHs (the directly-called target itself succeeds), the synthetic
+  `alias→target` internal op is now marked `backtracked` instead of `failed`,
+  matching native Tezos L1 semantics where ancestor ops are backtracked and the
+  error lives once on the actually-failing descendant. (!22259)
 - The `TICKET` instruction now rejects a non-comparable ticket content
   (e.g. `ticket (ticket string)`) during typechecking, matching L1,
   which requires ticket content to be comparable. Previously the

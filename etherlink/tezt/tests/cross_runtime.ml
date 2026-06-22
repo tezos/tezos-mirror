@@ -8472,9 +8472,11 @@ let test_crac_receipt_tez_gateway_direct_evm_tez_revert () =
      markers and alias carry backtracked/failed statuses:
        #0: Event "cross_runtime_call" (begin marker) -- backtracked
        #1: origination alias(evm_bridge) -- backtracked
-       #2: alias(evm_bridge) -> tez_reverter (%run) -- failed
+       #2: alias(evm_bridge) -> tez_reverter (%run) -- backtracked
        #3: tez_reverter -> tez_reverter (%_revert) -- failed
        #4: Event "cross_runtime_call_end" (end marker) -- backtracked
+     The %run target succeeds; it is backtracked because a deeper op
+     (#3 %_revert) fails, which carries the error.
      The alias materialization is backtracked (applied then rolled back
      when the leg reverts); the top-level gateway op fails. *)
   Check.(
@@ -8502,7 +8504,7 @@ let test_crac_receipt_tez_gateway_direct_evm_tez_revert () =
     ~expected_source:evm_bridge_alias
     ~expected_destination:tez_reverter_kt1
     ~expected_entrypoint:"run"
-    ~expected_status:"failed"
+    ~expected_status:"backtracked"
     (List.nth internals 2) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#3")
@@ -8765,10 +8767,12 @@ let test_crac_receipt_evm_to_tez_revert () =
      (sender + source) + alias→reverter call + reverter's
      internal _revert call + CRAC end event. The aliases were
      materialized successfully in storage BEFORE the body failed;
-     their receipt status is "applied" because they did succeed,
-     while the downstream synthetic transfer and its sub-call are
-     "failed". The begin/end markers are "backtracked" to match the
-     failed parent frame. *)
+     their receipt status is "applied" because they did succeed. The
+     alias→reverter (%run) call is "backtracked": it is the
+     directly-called target and succeeds, but a deeper internal op
+     fails, so the error is carried once on that descendant (%_revert,
+     "failed") while its ancestors are backtracked. The begin/end
+     markers are "backtracked" to match the failed parent frame. *)
   Check.(
     (List.length internals = 6)
       int
@@ -8793,14 +8797,16 @@ let test_crac_receipt_evm_to_tez_revert () =
     ~expected_alias_kt1:sender_alias
     ~expected_status:"applied"
     (List.nth internals 2) ;
-  (* ── Internal #3: alias(E_bridge) → tez_reverter (%run) — failed *)
+  (* ── Internal #3: alias(E_bridge) → tez_reverter (%run) — backtracked
+     The directly-called target succeeds; it is backtracked because a
+     deeper internal op (#4) fails. *)
   check_crac_internal_transaction
     ~prefix
     ~expected_nonce:3
     ~expected_source:evm_bridge_alias
     ~expected_destination:tez_reverter_kt1
     ~expected_entrypoint:"run"
-    ~expected_status:"failed"
+    ~expected_status:"backtracked"
     (List.nth internals 3) ;
   (* ── Internal #4: tez_reverter → tez_reverter (%_revert) — failed
      The reverter contract's internal call that triggers the failure. *)
@@ -8924,14 +8930,15 @@ let test_crac_receipt_two_failed_independent () =
     ~expected_alias_kt1:sender_alias
     ~expected_status:"applied"
     (List.nth internals 2) ;
-  (* ── Internal #3: alias(bridge_1) → tez_reverter_1 (%run) — failed *)
+  (* ── Internal #3: alias(bridge_1) → tez_reverter_1 (%run) — backtracked
+     (target succeeds; deeper #4 %_revert fails and carries the error) *)
   check_crac_internal_transaction
     ~prefix
     ~expected_nonce:3
     ~expected_source:bridge_1_alias
     ~expected_destination:tez_reverter_1_kt1
     ~expected_entrypoint:"run"
-    ~expected_status:"failed"
+    ~expected_status:"backtracked"
     (List.nth internals 3) ;
   (* ── Internal #4: tez_reverter_1 → tez_reverter_1 (%_revert) — failed *)
   check_crac_internal_transaction
@@ -8975,14 +8982,15 @@ let test_crac_receipt_two_failed_independent () =
     ~expected_alias_kt1:sender_alias
     ~expected_status:"applied"
     (List.nth internals 8) ;
-  (* ── Internal #9: alias(bridge_2) → tez_reverter_2 (%run) — failed *)
+  (* ── Internal #9: alias(bridge_2) → tez_reverter_2 (%run) — backtracked
+     (target succeeds; deeper #10 %_revert fails and carries the error) *)
   check_crac_internal_transaction
     ~prefix
     ~expected_nonce:9
     ~expected_source:bridge_2_alias
     ~expected_destination:tez_reverter_2_kt1
     ~expected_entrypoint:"run"
-    ~expected_status:"failed"
+    ~expected_status:"backtracked"
     (List.nth internals 9) ;
   (* ── Internal #10: tez_reverter_2 → tez_reverter_2 (%_revert) — failed *)
   check_crac_internal_transaction
@@ -9167,11 +9175,13 @@ let test_crac_receipt_interleaved_failed_pending () =
   in
   let f_pair_txs =
     [
+      (* The %run target succeeds; it is backtracked because the deeper
+         %_revert fails and carries the error. *)
       tx_key
         ~src:bridge_fail_alias
         ~dst:tez_reverter_kt1
         ~ep:"run"
-        ~status:"failed";
+        ~status:"backtracked";
       tx_key
         ~src:tez_reverter_kt1
         ~dst:tez_reverter_kt1
@@ -14710,7 +14720,8 @@ let test_crac_receipt_failed_frame_markers () =
           |> Option.fold ~none:"-" ~some:as_string))
     internals ;
   (* 6 internal ops: begin + alias(bridge) + alias(sender) + bridge->reverter
-     (failed) + reverter->reverter %_revert (failed) + end. *)
+     (backtracked — deep failure: reverter's %run body succeeded, the %_revert
+     internal op is what failed) + reverter->reverter %_revert (failed) + end. *)
   Check.(
     (List.length internals = 6)
       int
@@ -14733,13 +14744,16 @@ let test_crac_receipt_failed_frame_markers () =
     ~expected_alias_kt1:sender_alias
     ~expected_status:"applied"
     (List.nth internals 2) ;
+  (* alias→target is backtracked: the reverter's %run body completed
+     (it built the op list), but the emitted %_revert internal op
+     failed.  The error lives on the deeper %_revert, not here. *)
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#3")
     ~expected_nonce:3
     ~expected_source:bridge_alias
     ~expected_destination:tez_reverter_kt1
     ~expected_entrypoint:"run"
-    ~expected_status:"failed"
+    ~expected_status:"backtracked"
     (List.nth internals 3) ;
   check_crac_internal_transaction
     ~prefix:(prefix ^ "#4")
@@ -14757,6 +14771,141 @@ let test_crac_receipt_failed_frame_markers () =
     ~expected_status:"backtracked"
     (List.nth internals 5) ;
   (* Bracket walk succeeds without status filtering. *)
+  check_crac_brackets ~prefix internals ;
+  unit
+
+(** A CRAC whose target itself succeeds but one of its internal
+    operations FAILWITHs (deep failure).  The synthetic
+    [alias→target] internal op must be [backtracked] — not [failed];
+    the error lives exactly once on the deeper failing descendant.
+
+    Scenario: EVM → (CRAC) → C1 (multi_run_caller with callees=[C2])
+    → C2 (TezFailwithString with a distinctive marker).  C1's [%run]
+    completes normally (builds and emits the op list); the emitted
+    TRANSFER_TOKENS to C2 then FAILWITHs.
+
+    [alias→C1] must be [backtracked]; marking it [failed] would duplicate
+    the error already present on the deeper [failed] entry. *)
+let test_crac_deep_failure_backtracks_alias_target () =
+  register_crac_runner_test
+    ~title:"CRAC: deep failure marks alias→target backtracked (not failed)"
+    ~tags:["crac_receipt"; "deep_failure"; "backtracked"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-DEEP-BT" in
+  let payload_length = 50 in
+  Log.debug ~prefix "Originate C2 (TezFailwithString — deeply failing callee)" ;
+  (* C2: FAILWITHs with a distinctive string on %run. *)
+  let* c2 = TezFailwithString.originate ~payload_length () in
+  let (`Tez_runner (_, c2_kt1)) = c2 in
+  Log.debug ~prefix "Originate C1 (TezMultiRunCaller with callee C2)" ;
+  (* C1: calls C2 via TRANSFER_TOKENS when %run is invoked.
+     Its own %run body completes successfully; C2's FAILWITH is the
+     deeper failure. *)
+  let* c1 = TezMultiRunCaller.originate ~callees:[c2] () in
+  let (`Tez_runner (_, c1_kt1)) = c1 in
+  Log.debug ~prefix "Deploy EVM bridge pointing at C1" ;
+  let* bridge = EvmCrossRuntimeRunnerTez.deploy_and_init c1 in
+  let (`Evm_runner bridge_addr) = bridge in
+  (* doCatch=true: EVM absorbs the CRAC failure so the EVM tx succeeds. *)
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(bridge, true)] ()
+  in
+  let*@ bridge_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_addr sequencer
+  in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  Log.debug ~prefix "Run EVM main — CRAC reaches C1, C2 FAILWITHs" ;
+  (* EVM tx succeeds (catch=true), Michelson C2 FAILWITHed. *)
+  let* _ = EvmRunner.call_run evm_main in
+  Log.debug ~prefix "Read Michelson operation from the chain" ;
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:"Expected 1 Michelson manager op, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  Log.debug ~prefix "Assert top-level: status=failed, empty errors" ;
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"failed"
+      ~expect_empty_errors:true
+      top
+  in
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  (* Primary assertion: alias→C1 must be [backtracked], NOT [failed].
+     The error lives on C2's entry deeper in the receipt. *)
+  let alias_to_c1_ops =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "transaction"
+        && JSON.(iop |-> "source" |> as_string) = bridge_alias
+        && JSON.(iop |-> "destination" |> as_string) = c1_kt1)
+      internals
+  in
+  Check.(
+    (List.length alias_to_c1_ops = 1)
+      int
+      ~error_msg:
+        (sf
+           "%s: expected exactly 1 alias→C1 internal transaction, got %%L"
+           prefix)) ;
+  let alias_to_c1_status =
+    JSON.(List.hd alias_to_c1_ops |-> "result" |-> "status" |> as_string)
+  in
+  Log.info "%s: alias→C1 status = %s" prefix alias_to_c1_status ;
+  Check.(
+    (alias_to_c1_status = "backtracked")
+      string
+      ~error_msg:
+        "alias→C1 must be backtracked: deep failure — C1's own call succeeded, \
+         C2's FAILWITH is the actual error; the error lives once on the deeper \
+         failed entry, not on alias→C1") ;
+  (* The deeper failing op (C1→C2 %run) must be present with status
+     [failed], carrying the FAILWITH payload. *)
+  let c1_to_c2_ops =
+    List.filter
+      (fun iop ->
+        JSON.(iop |-> "kind" |> as_string) = "transaction"
+        && JSON.(iop |-> "destination" |> as_string) = c2_kt1
+        && JSON.(iop |-> "result" |-> "status" |> as_string) = "failed")
+      internals
+  in
+  Check.(
+    (List.length c1_to_c2_ops >= 1)
+      int
+      ~error_msg:
+        (sf
+           "%s: expected at least one failed C1→C2 internal op carrying C2's \
+            FAILWITH payload (the error lives on this deeper entry, not on \
+            alias→C1). Got %%L"
+           prefix)) ;
+  let c1_to_c2_error =
+    JSON.(
+      List.hd c1_to_c2_ops |-> "result" |-> "errors" |=> 0 |-> "error_message"
+      |> as_string)
+  in
+  Log.info "%s: C1→C2 error_message = %S" prefix c1_to_c2_error ;
+  let payload_run = String.make payload_length 'x' in
+  Check.(
+    (String.length c1_to_c2_error > 0)
+      int
+      ~error_msg:
+        "C1→C2 error_message must be non-empty (carries the FAILWITH payload)") ;
+  (* The receipt carries the faithful wrapped Michelson error
+     ([Transfer(MichelsonContractInterpretError("... String(\"xxx...\") ..."))]),
+     so the FAILWITH marker is embedded rather than the whole message. *)
+  if not (c1_to_c2_error =~ rex payload_run) then
+    Test.fail
+      "%s: C1→C2 error_message must embed the FAILWITH marker (%s), got %s"
+      prefix
+      payload_run
+      c1_to_c2_error ;
   check_crac_brackets ~prefix internals ;
   unit
 
@@ -14843,6 +14992,7 @@ let () =
   test_crac_receipt_frames_nested_and_sibling () ;
   test_crac_receipt_tez_origin_reentry_trailing_op () ;
   test_crac_receipt_failed_frame_markers () ;
+  test_crac_deep_failure_backtracks_alias_target () ;
   test_crac_http_call_success () ;
   test_crac_http_call_catch_revert () ;
   test_crac_http_call_catch_oog () ;

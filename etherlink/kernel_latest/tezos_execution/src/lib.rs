@@ -1438,6 +1438,14 @@ pub struct CrossRuntimeTransferResult {
 pub struct CracTransferError {
     pub error: CracError,
     pub internal_receipts: Vec<InternalOperationSum>,
+    /// `true` when the target's own call succeeded but one of its
+    /// internal operations subsequently failed (a "deep failure").
+    /// In that case the real error is already present as a `Failed`
+    /// entry in `internal_receipts`, so the `alias→target` synthetic
+    /// op should be marked `BackTracked` rather than `Failed`.
+    /// `false` for every other error path (decode/checkpoint errors,
+    /// direct target failure, structural failures).
+    pub deep_failure: bool,
 }
 
 impl From<CracError> for CracTransferError {
@@ -1445,6 +1453,7 @@ impl From<CracError> for CracTransferError {
         Self {
             error,
             internal_receipts: vec![],
+            deep_failure: false,
         }
     }
 }
@@ -1560,8 +1569,11 @@ where
                     &mut internal_receipts,
                 );
                 // Return the internal receipts so the failed CRAC
-                // receipt can include backtracked/failed/skipped ops
-                // (RFC Example 4).
+                // receipt can include backtracked/failed/skipped ops.
+                // deep_failure=true: the target's own call returned Ok
+                // but one of its internal ops recorded a Failed receipt.
+                // The real error is already present in internal_receipts;
+                // the alias→target synthetic op should be BackTracked.
                 Err(CracTransferError {
                     error: CracError::Operation(
                         TransferError::FailedToExecuteInternalOperation(
@@ -1569,6 +1581,7 @@ where
                         ),
                     ),
                     internal_receipts,
+                    deep_failure: true,
                 })
             }
         }
@@ -1597,6 +1610,7 @@ where
             Err(CracTransferError {
                 error: metered_error,
                 internal_receipts,
+                deep_failure: false,
             })
         }
     }
