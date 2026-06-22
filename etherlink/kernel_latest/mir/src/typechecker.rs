@@ -62,12 +62,11 @@ pub enum TcError {
     /// Encountered FAIL instruction not in tail position.
     #[error("FAIL instruction is not in tail position")]
     FailNotInTail,
-    /// Typechecking would recurse beyond the protocol-defined depth limit
-    /// (10000). Mirrors L1's `Typechecking_too_many_recursive_calls` in
-    /// `src/proto_alpha/lib_protocol/script_ir_translator.ml:571`. Currently
-    /// guards the value-level Lambda recursion (`step_typecheck_value` →
-    /// `typecheck_lambda` → `typecheck`); the instruction-level LAMBDA path
-    /// is iterative and unbounded by gas.
+    /// Typechecking would recurse beyond the protocol depth limit (10000).
+    /// Mirrors L1's `Typechecking_too_many_recursive_calls`
+    /// (`script_ir_translator.ml:571`). Shared, like L1's single `stack_depth`,
+    /// by the value-level Lambda recursion and the embedded `CREATE_CONTRACT`
+    /// child-script nesting.
     #[error("too many recursive calls during typechecking")]
     TypecheckingTooManyRecursiveCalls,
     /// Failed to interpret a number as a value of some type due to a numeric
@@ -275,7 +274,9 @@ pub enum TcInvariant {
 }
 
 /// L1 parity: mirrors `Typechecking_too_many_recursive_calls` (returned
-/// when `stack_depth > 10000` in `script_ir_translator.ml:571`).
+/// when `stack_depth > 10000` in `script_ir_translator.ml:571`). Shared by
+/// the value-level Lambda recursion and the embedded `CREATE_CONTRACT`
+/// child-script nesting, like L1's single `stack_depth`.
 ///
 /// Implementation rationale (vs. plumbing through `TypecheckingCtx`):
 /// the kernel runs in a single thread, so a thread-local + RAII guard
@@ -287,44 +288,41 @@ pub enum TcInvariant {
 /// the thread-local, so counter pollution across operations is moot.
 /// Under `panic = "unwind"` (native embedders, debug tooling) `Drop`
 /// fires on the unwind path and the counter balances normally.
-const MAX_LAMBDA_TYPECHECK_DEPTH: u16 = 10_000;
+const MAX_TYPECHECK_RECURSION_DEPTH: u16 = 10_000;
 
 std::thread_local! {
-    static LAMBDA_TYPECHECK_DEPTH: std::cell::Cell<u16> = const { std::cell::Cell::new(0) };
+    static TYPECHECK_RECURSION_DEPTH: std::cell::Cell<u16> = const { std::cell::Cell::new(0) };
 }
 
-struct LambdaTypecheckDepthGuard;
+struct TypecheckDepthGuard;
 
-impl LambdaTypecheckDepthGuard {
+impl TypecheckDepthGuard {
     fn enter() -> Result<Self, TcError> {
-        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+        TYPECHECK_RECURSION_DEPTH.with(|d| {
             let cur = d.get();
             // L1 admits the call when `stack_depth <= 10000` (rejects on
             // `stack_depth > 10000`); the depth counter is incremented
             // *before* the recursive call, so the first 10001 entries
             // succeed (`stack_depth` 0..=10000). MIR's counter is also
             // pre-increment here — match the admit threshold exactly.
-            if cur > MAX_LAMBDA_TYPECHECK_DEPTH {
+            if cur > MAX_TYPECHECK_RECURSION_DEPTH {
                 return Err(TcError::TypecheckingTooManyRecursiveCalls);
             }
             d.set(cur + 1);
-            Ok(LambdaTypecheckDepthGuard)
+            Ok(TypecheckDepthGuard)
         })
     }
 }
 
-impl Drop for LambdaTypecheckDepthGuard {
+impl Drop for TypecheckDepthGuard {
     fn drop(&mut self) {
-        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+        TYPECHECK_RECURSION_DEPTH.with(|d| {
             let cur = d.get();
             // Defense-in-depth: paired enter/Drop should never put the
             // counter at 0 here. A debug-build trip surfaces an
             // invariant violation that `saturating_sub` would silently
             // mask in release.
-            debug_assert!(
-                cur > 0,
-                "LambdaTypecheckDepthGuard::Drop fired with counter at 0",
-            );
+            debug_assert!(cur > 0, "TypecheckDepthGuard::Drop fired with counter at 0",);
             d.set(cur.saturating_sub(1));
         });
     }
@@ -451,6 +449,92 @@ pub struct MichelineContractScript<A> {
     pub views: HashMap<String, MichelineView<A>>,
 }
 
+/// A child-script view whose body still has to be typechecked (origination
+/// only). Its initial stack is `[input_pair]` (= `pair input storage`) and it
+/// must end on `[output_ty]`.
+struct ViewToValidate<'a> {
+    input_pair: Type,
+    output_ty: Type,
+    body: &'a [Micheline<'a>],
+}
+
+/// The parsed-but-not-code-typechecked pieces of a contract script, shared by
+/// `typecheck_script` and the embedded `CREATE_CONTRACT` step. The caller
+/// validates `views_to_validate` either synchronously (`typecheck_script`) or on
+/// the worklist (`CREATE_CONTRACT`, so nested originations through a view →
+/// pushed-lambda → `CREATE_CONTRACT` chain don't grow the native stack, L2-1702).
+struct ScriptPrefix<'a> {
+    entrypoints: Entrypoints,
+    parameter: Type,
+    storage: Type,
+    annotations: HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+    views: HashMap<String, View<'a>>,
+    views_to_validate: Vec<ViewToValidate<'a>>,
+}
+
+/// Parse a script's parameter / storage / view types and check their type
+/// properties, without typechecking any code body. View bodies are collected in
+/// `views_to_validate` (only when `typecheck_views` is enabled) for the caller
+/// to typecheck.
+fn parse_script_prefix<'x, 'a>(
+    gas: &mut Gas,
+    parameter_ty: &'x Micheline<'a>,
+    storage_ty: &'x Micheline<'a>,
+    mich_views: HashMap<String, MichelineView<&'x Micheline<'a>>>,
+    allow_lazy_storage_in_storage: bool,
+    typecheck_views: TypecheckViews,
+) -> Result<ScriptPrefix<'a>, TcError> {
+    let (entrypoints, annotations, parameter) =
+        parse_parameter_ty_with_entrypoints(gas, parameter_ty)?;
+    let storage = storage_ty.parse_ty(gas)?;
+    let mut views = HashMap::new();
+    let mut views_to_validate = Vec::new();
+    for (name, mich_view) in mich_views {
+        let input_type = mich_view.input_type.parse_ty(gas)?;
+        let output_type = mich_view.output_type.parse_ty(gas)?;
+        if typecheck_views.enabled() {
+            input_type.ensure_prop(gas, TypeProperty::ViewInput)?;
+            output_type.ensure_prop(gas, TypeProperty::ViewOutput)?;
+            match mich_view.code {
+                Micheline::Seq(instrs) => views_to_validate.push(ViewToValidate {
+                    input_pair: Type::Pair(PairBox::new(
+                        input_type.clone(),
+                        storage.clone(),
+                    )),
+                    output_ty: output_type.clone(),
+                    body: instrs,
+                }),
+                _ => return Err(TcError::NonSeqViewInstrs(name)),
+            }
+        }
+        views.insert(
+            name,
+            View {
+                input_type,
+                output_type,
+                code: mich_view.code.clone(),
+            },
+        );
+    }
+    parameter.ensure_prop(gas, TypeProperty::Passable)?;
+    storage.ensure_prop(
+        gas,
+        if allow_lazy_storage_in_storage {
+            TypeProperty::Storable
+        } else {
+            TypeProperty::BigMapValue
+        },
+    )?;
+    Ok(ScriptPrefix {
+        entrypoints,
+        parameter,
+        storage,
+        annotations,
+        views,
+        views_to_validate,
+    })
+}
+
 impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
     /// Typecheck the contract script. Validates the script's types, then
     /// typechecks the code and checks the result stack is as expected. Returns
@@ -467,10 +551,6 @@ impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
             code,
             views: mich_views,
         } = self;
-        let (entrypoints, anns, parameter) =
-            parse_parameter_ty_with_entrypoints(gas, parameter_ty)?;
-        let storage = storage_ty.parse_ty(gas)?;
-        let mut views = HashMap::new();
         // `typecheck_views` stays a bool here: it is a pre-existing public
         // parameter shared with the frozen kernels. Convert once at this
         // boundary to the swap-safe internal flag.
@@ -479,46 +559,34 @@ impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
         } else {
             TypecheckViews::Disabled
         };
-        for (name, view) in mich_views {
-            let input_type = view.input_type.parse_ty(gas)?;
-            let output_type = view.output_type.parse_ty(gas)?;
-            if typecheck_views {
-                input_type.ensure_prop(gas, TypeProperty::ViewInput)?;
-                output_type.ensure_prop(gas, TypeProperty::ViewOutput)?;
-                match view.code {
-                    Micheline::Seq(instrs) => {
-                        typecheck_view_with_views(
-                            instrs,
-                            gas,
-                            Type::Pair(PairBox::new(input_type.clone(), storage.clone())),
-                            output_type.clone(),
-                            tc_views,
-                        )?;
-                    }
-                    _ => return Err(TcError::NonSeqViewInstrs(name)),
-                }
-            }
-            views.insert(
-                name,
-                View {
-                    input_type,
-                    output_type,
-                    code: view.code.clone(),
-                },
-            );
-        }
-        parameter.ensure_prop(gas, TypeProperty::Passable)?;
-        storage.ensure_prop(
+        let ScriptPrefix {
+            entrypoints,
+            parameter,
+            storage,
+            annotations,
+            views,
+            views_to_validate,
+        } = parse_script_prefix(
             gas,
-            if allow_lazy_storage_in_storage {
-                TypeProperty::Storable
-            } else {
-                // Note: the only difference between BigMapValue and
-                // Storable is that the former always forbids lazy
-                // storage type (big maps and sapling states)
-                TypeProperty::BigMapValue
-            },
+            parameter_ty,
+            storage_ty,
+            mich_views,
+            allow_lazy_storage_in_storage,
+            tc_views,
         )?;
+        // Top-level views are validated synchronously: this spawns a single
+        // nested `typecheck` driver, and any deeper origination it reaches via a
+        // `CREATE_CONTRACT` stays on that driver's worklist (see the step's
+        // `OpenChildScript`), so the native stack does not grow with nesting.
+        for view in views_to_validate {
+            typecheck_view_with_views(
+                view.body,
+                gas,
+                view.input_pair,
+                view.output_ty,
+                tc_views,
+            )?;
+        }
         let mut stack = tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
         let code = typecheck_instruction_with_views(
             code,
@@ -540,7 +608,7 @@ impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
             code,
             parameter,
             storage,
-            annotations: anns,
+            annotations,
             views,
         })
     }
@@ -1353,7 +1421,7 @@ enum StepResult<'a, 'b> {
     /// it emits `Instruction::Lambda(...)` and the outer stack must already
     /// carry the lambda type (set at instruction-step time).
     ///
-    /// `depth_guard` carries the `LambdaTypecheckDepthGuard` for the PUSH
+    /// `depth_guard` carries the `TypecheckDepthGuard` for the PUSH
     /// path (Some) and is None for the instruction-level path. Threading it
     /// through the worklist preserves the RAII invariant: the guard's Drop
     /// fires whether the AfterLambda frame is consumed normally or the
@@ -1365,7 +1433,7 @@ enum StepResult<'a, 'b> {
         recursive: bool,
         micheline_code: Micheline<'a>,
         for_push: bool,
-        depth_guard: Option<LambdaTypecheckDepthGuard>,
+        depth_guard: Option<TypecheckDepthGuard>,
     },
     /// MAP block on a List / Option / Map. The body runs on a clone of the
     /// outer stack plus `inner_ty` pushed on top (the element / pair type).
@@ -1374,6 +1442,31 @@ enum StepResult<'a, 'b> {
         body: &'b [Micheline<'a>],
         inner_ty: Type,
         kind: MapKind,
+    },
+    /// Embedded `CREATE_CONTRACT`: typecheck the child code body (and view
+    /// bodies) on the outer worklist rather than recursing into
+    /// `typecheck_script` / `typecheck_view_with_views`, which would re-enter the
+    /// giant per-instruction step on the native stack once per nesting level
+    /// (L2-1702). Parameter / storage / view types are parsed at step time
+    /// (stack-safe); `AfterChildScript` reassembles the `ContractScript` and
+    /// finalizes the outer stack.
+    OpenChildScript {
+        /// Child code body, run on a fresh `[pair parameter storage]` stack.
+        body: &'b [Micheline<'a>],
+        /// Child entrypoints (for `SELF`); owned so they outlive the body.
+        entrypoints: Rc<Entrypoints>,
+        parameter: Type,
+        storage: Type,
+        annotations: HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+        views: HashMap<String, View<'a>>,
+        /// Child view bodies to validate at origination, deferred to the
+        /// worklist (`OpenView`); empty when `typecheck_views` is disabled.
+        views_to_validate: Vec<ViewToValidate<'a>>,
+        micheline_cs: &'a Micheline<'a>,
+        /// Declared storage from the outer stack, checked against the child's.
+        new_storage: Type,
+        /// Depth guard, balanced by `AfterChildScript` on Ok and Err paths.
+        depth_guard: TypecheckDepthGuard,
     },
 }
 
@@ -1453,7 +1546,7 @@ enum TcIFrame<'a, 'b> {
         recursive: bool,
         micheline_code: Micheline<'a>,
         saved_outer_stack: FailingTypeStack,
-        saved_self_entrypoints: Option<&'b Entrypoints>,
+        saved_self_entrypoints: DriverSelfEp<'b>,
         saved_in_view: bool,
         /// `true` when the lambda came from a `PUSH (lambda …) <body>` value:
         /// finalize as `Instruction::Push(Rc::new(TypedValue::Lambda(...)))`
@@ -1461,7 +1554,7 @@ enum TcIFrame<'a, 'b> {
         /// for the bare `LAMBDA`/`LAMBDA_REC` instruction, where the type was
         /// already pushed onto the outer stack at step time.
         for_push: bool,
-        /// `LambdaTypecheckDepthGuard` for the PUSH path, taken at the PUSH
+        /// `TypecheckDepthGuard` for the PUSH path, taken at the PUSH
         /// step and dropped here -- either on the finalize Ok/Err path of
         /// this match arm (the local binding falls out of scope) or on the
         /// driver Err exit, when `frames: Vec<TcIFrame>` is torn down. Either
@@ -1469,7 +1562,7 @@ enum TcIFrame<'a, 'b> {
         /// increment, preserving L1 parity across `?`-propagated Errs. None
         /// for the instruction-level LAMBDA path (it does not touch the
         /// counter, matching pre-fix behavior).
-        depth_guard: Option<LambdaTypecheckDepthGuard>,
+        depth_guard: Option<TypecheckDepthGuard>,
     },
     /// Finalize a `MAP` block. Pops the body's instructions, pops the
     /// inner-result type off the body's stack, restores the outer stack,
@@ -1478,6 +1571,36 @@ enum TcIFrame<'a, 'b> {
     AfterMapBlock {
         kind: MapKind,
         saved_outer_stack: FailingTypeStack,
+    },
+    /// Finalize an embedded `CREATE_CONTRACT` (see `OpenChildScript`).
+    AfterChildScript {
+        saved_outer_stack: FailingTypeStack,
+        saved_self_entrypoints: DriverSelfEp<'b>,
+        saved_in_view: bool,
+        parameter: Type,
+        storage: Type,
+        annotations: HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+        views: HashMap<String, View<'a>>,
+        micheline_cs: &'a Micheline<'a>,
+        new_storage: Type,
+        depth_guard: TypecheckDepthGuard,
+    },
+    /// Validate a child-script view body on the worklist (origination), in a
+    /// fresh `[input_pair]` stack with `self_entrypoints = None`, `in_view =
+    /// true`. Pushed by `OpenChildScript` so a view → pushed-lambda →
+    /// `CREATE_CONTRACT` chain does not grow the native stack (L2-1702).
+    OpenView {
+        body: &'b [Micheline<'a>],
+        input_pair: Type,
+        output_ty: Type,
+    },
+    /// Finalize an `OpenView`: unify the body's stack with `[output_ty]`,
+    /// discard the typechecked body (only validation matters), restore scope.
+    AfterView {
+        output_ty: Type,
+        saved_outer_stack: FailingTypeStack,
+        saved_self_entrypoints: DriverSelfEp<'b>,
+        saved_in_view: bool,
     },
 }
 
@@ -1499,6 +1622,26 @@ impl TypecheckViews {
     }
 }
 
+/// `self_entrypoints` carried by the iterative driver. A top-level script
+/// borrows the caller's entrypoints (`Borrowed`); an embedded `CREATE_CONTRACT`
+/// child owns its own (`Owned`, so they outlive the body's iterative
+/// processing); LAMBDA bodies forbid `SELF` (`None`).
+enum DriverSelfEp<'b> {
+    None,
+    Borrowed(&'b Entrypoints),
+    Owned(Rc<Entrypoints>),
+}
+
+impl DriverSelfEp<'_> {
+    fn as_opt(&self) -> Option<&Entrypoints> {
+        match self {
+            DriverSelfEp::None => None,
+            DriverSelfEp::Borrowed(e) => Some(e),
+            DriverSelfEp::Owned(rc) => Some(rc),
+        }
+    }
+}
+
 /// Iterative driver: typechecks every nested block from one explicit
 /// worklist instead of recursing through `typecheck` / `typecheck_instruction`.
 fn typecheck<'a, 'b>(
@@ -1516,12 +1659,17 @@ fn typecheck<'a, 'b>(
     let mut block_results: Vec<Vec<Instruction<'a>>> = vec![Vec::new()];
     // Mutable state across the driver: switched by Open/After Lambda frames
     // when a LAMBDA / LAMBDA_REC body is entered (fresh scope with
-    // self_entrypoints=None, in_view=false). MAP_BLOCK does NOT switch
-    // these — it inherits the outer context.
+    // self_entrypoints=None, in_view=false), and by Open/After CreateContract
+    // frames when an embedded child script's code body is entered (fresh scope
+    // with the child's own entrypoints). MAP_BLOCK does NOT switch these — it
+    // inherits the outer context.
     // `typecheck_views` is intentionally NOT in this set (unlike in_view): it
     // is an origination-wide constant, so a CREATE_CONTRACT in a lambda body
     // stays origination-validated. Resetting it here would reopen L2-1635.
-    let mut cur_self_entrypoints = self_entrypoints;
+    let mut cur_self_entrypoints = match self_entrypoints {
+        Some(e) => DriverSelfEp::Borrowed(e),
+        None => DriverSelfEp::None,
+    };
     let mut cur_in_view = in_view;
     while let Some(frame) = frames.pop() {
         match frame {
@@ -1542,7 +1690,7 @@ fn typecheck<'a, 'b>(
                 let step = typecheck_instruction_step(
                     instr,
                     gas,
-                    cur_self_entrypoints,
+                    cur_self_entrypoints.as_opt(),
                     opt_stack,
                     cur_in_view,
                     typecheck_views,
@@ -1725,8 +1873,12 @@ fn typecheck<'a, 'b>(
                         for_push,
                         depth_guard,
                     } => {
-                        // Save outer state.
-                        let saved_self_entrypoints = cur_self_entrypoints;
+                        // Save outer state. SELF is forbidden in a lambda
+                        // body, so the body runs with `DriverSelfEp::None`.
+                        let saved_self_entrypoints = std::mem::replace(
+                            &mut cur_self_entrypoints,
+                            DriverSelfEp::None,
+                        );
                         let saved_in_view = cur_in_view;
                         // Build the body's initial stack: [in_ty] for plain
                         // LAMBDA, [self_ty, in_ty] for LAMBDA_REC (self_ty on
@@ -1739,7 +1891,6 @@ fn typecheck<'a, 'b>(
                         };
                         let saved_outer_stack =
                             std::mem::replace(opt_stack, body_initial);
-                        cur_self_entrypoints = None;
                         cur_in_view = false;
                         // Continue the outer block after the lambda
                         // resolves.
@@ -1796,6 +1947,59 @@ fn typecheck<'a, 'b>(
                             block: body,
                             idx: 0,
                         });
+                    }
+                    StepResult::OpenChildScript {
+                        body,
+                        entrypoints,
+                        parameter,
+                        storage,
+                        annotations,
+                        views,
+                        views_to_validate,
+                        micheline_cs,
+                        new_storage,
+                        depth_guard,
+                    } => {
+                        // Enter the child scope (fresh `[pair parameter storage]`
+                        // stack, child entrypoints, `in_view = false`), mirroring
+                        // the OpenLambda handler.
+                        let saved_self_entrypoints = std::mem::replace(
+                            &mut cur_self_entrypoints,
+                            DriverSelfEp::Owned(entrypoints),
+                        );
+                        let saved_in_view = cur_in_view;
+                        let body_initial =
+                            tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
+                        let saved_outer_stack =
+                            std::mem::replace(opt_stack, body_initial);
+                        cur_in_view = false;
+                        frames.push(parent);
+                        frames.push(TcIFrame::AfterChildScript {
+                            saved_outer_stack,
+                            saved_self_entrypoints,
+                            saved_in_view,
+                            parameter,
+                            storage,
+                            annotations,
+                            views,
+                            micheline_cs,
+                            new_storage,
+                            depth_guard,
+                        });
+                        block_results.push(Vec::new());
+                        frames.push(TcIFrame::NextInstr {
+                            block: body,
+                            idx: 0,
+                        });
+                        // Defer child-view validation to this same worklist
+                        // (each runs in its own scope via OpenView/AfterView).
+                        for view in views_to_validate {
+                            frames.push(TcIFrame::OpenView {
+                                body: view.body,
+                                input_pair: view.input_pair,
+                                output_ty: view.output_ty,
+                            });
+                        }
                     }
                 }
             }
@@ -2030,7 +2234,7 @@ fn typecheck<'a, 'b>(
             } => {
                 // Bind the guard locally so it drops on every match-arm exit
                 // (Ok finalize OR `?`-propagated Err below). Decrement is
-                // implicit via `Drop for LambdaTypecheckDepthGuard`. None for
+                // implicit via `Drop for TypecheckDepthGuard`. None for
                 // the instruction-level path is a no-op drop.
                 let _depth_guard = depth_guard;
                 let body_instrs = block_results.pop().ok_or(TcError::InternalError(
@@ -2170,6 +2374,110 @@ fn typecheck<'a, 'b>(
                         expected: "map parent",
                     }))?
                     .push(instr);
+            }
+            TcIFrame::AfterChildScript {
+                saved_outer_stack,
+                saved_self_entrypoints,
+                saved_in_view,
+                parameter,
+                storage,
+                annotations,
+                views,
+                micheline_cs,
+                new_storage,
+                depth_guard,
+            } => {
+                // Drop balances the recursion counter on Ok or `?`-Err, like
+                // `AfterLambda`.
+                let _depth_guard = depth_guard;
+                let mut body_instrs = block_results.pop().ok_or(
+                    TcError::InternalError(TcInvariant::EmptyResultStack {
+                        expected: "create_contract body",
+                    }),
+                )?;
+                // Restore the outer stack and unify the body result with
+                // `[pair (list operation) storage]`, as `typecheck_script` does.
+                let body_stack = std::mem::replace(opt_stack, saved_outer_stack);
+                unify_stacks(
+                    gas,
+                    &mut tc_stk![Type::new_pair(
+                        Type::new_list(Type::Operation),
+                        storage.clone()
+                    )],
+                    body_stack,
+                )?;
+                cur_self_entrypoints = saved_self_entrypoints;
+                cur_in_view = saved_in_view;
+                let code = body_instrs.pop().ok_or(TcError::InternalError(
+                    TcInvariant::EmptyResultStack {
+                        expected: "create_contract code",
+                    },
+                ))?;
+                let contract_script = ContractScript {
+                    code,
+                    parameter,
+                    storage,
+                    annotations,
+                    views,
+                };
+                ensure_ty_eq(gas, &contract_script.storage, &new_storage)?;
+                // Drop the 3 inputs from the restored outer stack, push results.
+                let stack = opt_stack.access_mut(TcError::FailNotInTail)?;
+                stack.drop_top(3)?;
+                stack.push(Type::Address);
+                stack.push(Type::Operation);
+                block_results
+                    .last_mut()
+                    .ok_or(TcError::InternalError(TcInvariant::EmptyResultStack {
+                        expected: "create_contract parent",
+                    }))?
+                    .push(Instruction::CreateContract(
+                        Rc::new(contract_script),
+                        micheline_cs,
+                    ));
+            }
+            TcIFrame::OpenView {
+                body,
+                input_pair,
+                output_ty,
+            } => {
+                // Validate a child view in its own scope: fresh `[input_pair]`
+                // stack, `self_entrypoints = None`, `in_view = true`. Mirrors
+                // `typecheck_view_with_views` but on the worklist.
+                let saved_self_entrypoints =
+                    std::mem::replace(&mut cur_self_entrypoints, DriverSelfEp::None);
+                let saved_in_view = cur_in_view;
+                let saved_outer_stack = std::mem::replace(opt_stack, tc_stk![input_pair]);
+                cur_in_view = true;
+                frames.push(TcIFrame::AfterView {
+                    output_ty,
+                    saved_outer_stack,
+                    saved_self_entrypoints,
+                    saved_in_view,
+                });
+                block_results.push(Vec::new());
+                frames.push(TcIFrame::NextInstr {
+                    block: body,
+                    idx: 0,
+                });
+            }
+            TcIFrame::AfterView {
+                output_ty,
+                saved_outer_stack,
+                saved_self_entrypoints,
+                saved_in_view,
+            } => {
+                // Discard the typechecked view body (only validation matters),
+                // unify with `[output_ty]`, restore scope.
+                let _discard = block_results.pop().ok_or(TcError::InternalError(
+                    TcInvariant::EmptyResultStack {
+                        expected: "create_contract view body",
+                    },
+                ))?;
+                let body_stack = std::mem::replace(opt_stack, saved_outer_stack);
+                unify_stacks(gas, &mut tc_stk![output_ty], body_stack)?;
+                cur_self_entrypoints = saved_self_entrypoints;
+                cur_in_view = saved_in_view;
             }
         }
     }
@@ -3098,7 +3406,7 @@ fn typecheck_instruction_step<'a, 'b>(
                     // sub-instruction, OOG) would leak the increment to
                     // subsequent operations on the same kernel thread, mis-
                     // tripping `TypecheckingTooManyRecursiveCalls`.
-                    let depth_guard = LambdaTypecheckDepthGuard::enter()?;
+                    let depth_guard = TypecheckDepthGuard::enter()?;
                     let recursive = matches!(raw, App(Prim::Lambda_rec, ..));
                     let micheline_code = Micheline::Seq(instrs);
                     let in_ty = in_ty.clone();
@@ -3958,18 +4266,53 @@ fn typecheck_instruction_step<'a, 'b>(
             let allow_lazy_storage_in_storage = true;
             #[cfg(not(feature = "allow_lazy_storage_transfer"))]
             let allow_lazy_storage_in_storage = false;
-            // Validate the child script's views like L1 (parse_views), but
-            // only at origination (re-typecheck/runtime pass typecheck_views=false).
-            let contract_script = cs.split_script()?.typecheck_script(
+            // L1-parity nesting bound (`stack_depth > 10000`), before any work.
+            // The guard moves into `OpenChildScript` and is dropped by
+            // `AfterChildScript` / driver teardown, balanced across the `?`
+            // below like the lambda path.
+            let depth_guard = TypecheckDepthGuard::enter()?;
+            // Deref before `clone`: clone the `Type`, not the `&Type`.
+            let new_storage: Type = (*new_storage).clone();
+            // `code` is an in-scope lowercase `Prim` variant, so bind it to
+            // `child_code`.
+            let MichelineContractScript {
+                parameter_ty,
+                storage_ty,
+                code: child_code,
+                views: mich_views,
+            } = cs.split_script()?;
+            // Parse types and view types now (stack-safe); the code body and the
+            // view bodies are deferred to the worklist so a nested origination
+            // through a view does not grow the native stack (L2-1702).
+            // `parameter` / `storage` / `views` are in-scope `Prim` variants, so
+            // bind the prefix fields to `child_*`.
+            let ScriptPrefix {
+                entrypoints: child_entrypoints,
+                parameter: child_parameter,
+                storage: child_storage,
+                annotations: child_annotations,
+                views: child_views,
+                views_to_validate,
+            } = parse_script_prefix(
                 gas,
+                parameter_ty,
+                storage_ty,
+                mich_views,
                 allow_lazy_storage_in_storage,
-                typecheck_views.enabled(),
+                typecheck_views,
             )?;
-            ensure_ty_eq(gas, &contract_script.storage, new_storage)?;
-            stack.drop_top(3)?;
-            stack.push(Type::Address);
-            stack.push(Type::Operation);
-            I::CreateContract(Rc::new(contract_script), cs)
+            return Ok(StepResult::OpenChildScript {
+                body: std::slice::from_ref(child_code),
+                entrypoints: Rc::new(child_entrypoints),
+                parameter: child_parameter,
+                storage: child_storage,
+                annotations: child_annotations,
+                views: child_views,
+                views_to_validate,
+                micheline_cs: cs,
+                new_storage,
+                depth_guard,
+            });
         }
         (App(CREATE_CONTRACT, [_], _), [.., _, _, _]) => {
             no_overload!(CREATE_CONTRACT)
@@ -5104,7 +5447,7 @@ fn visit_value<'a, 'b>(
             // `script_ir_translator.ml:571` for the `stack_depth > 10000`
             // check that returns `Typechecking_too_many_recursive_calls`.
             // RAII guard ensures depth balance even on Err propagation.
-            let _depth_guard = LambdaTypecheckDepthGuard::enter()?;
+            let _depth_guard = TypecheckDepthGuard::enter()?;
             results.push(TV::Lambda(Closure::Lambda(typecheck_lambda(
                 instrs,
                 ctx.gas(),
@@ -11376,7 +11719,7 @@ mod typecheck_tests {
         let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
         typecheck_nested_push_lambda(&arena, 1)
             .expect("below the L1 depth cap, typecheck must succeed");
-        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+        TYPECHECK_RECURSION_DEPTH.with(|d| {
             assert_eq!(d.get(), 0, "depth counter must return to 0 after Ok");
         });
     }
@@ -11384,7 +11727,7 @@ mod typecheck_tests {
     /// L1-parity guard at the recursion limit. Mirrors
     /// `script_ir_translator.ml:571` (`stack_depth > 10000` →
     /// `Typechecking_too_many_recursive_calls`). Pre-load the counter
-    /// to `MAX_LAMBDA_TYPECHECK_DEPTH` so the next entry trips the
+    /// to `MAX_TYPECHECK_RECURSION_DEPTH` so the next entry trips the
     /// guard — verifies the check fires *without* needing to recurse
     /// 10000 times (which would overflow any test thread's stack on
     /// debug builds at ~160 KB/layer).
@@ -11394,7 +11737,7 @@ mod typecheck_tests {
         // `stack_depth > 10000`, MIR rejects on `cur > 10000` after
         // increment. Pre-loading to 10001 makes the next `enter()`
         // trip exactly as L1 would on stack_depth=10001.
-        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(MAX_LAMBDA_TYPECHECK_DEPTH + 1));
+        TYPECHECK_RECURSION_DEPTH.with(|d| d.set(MAX_TYPECHECK_RECURSION_DEPTH + 1));
         // Hand-construct a single PUSH-lambda value and typecheck it.
         // The very first DepthGuard::enter() must trip on the
         // pre-loaded counter and return a clean Err.
@@ -11403,7 +11746,7 @@ mod typecheck_tests {
         // Restore the counter immediately so a leak doesn't bias the
         // next test (the guard's Drop already decremented from its
         // failed enter() — but defensive reset is cheap).
-        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(0));
+        TYPECHECK_RECURSION_DEPTH.with(|d| d.set(0));
         match result {
             Err(TcError::TypecheckingTooManyRecursiveCalls) => {}
             other => panic!(
@@ -11423,25 +11766,25 @@ mod typecheck_tests {
 
         // Ok path: counter starts at K, increments to K+1 during typecheck,
         // Drop fires on Ok scope exit, ends at K.
-        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(K));
+        TYPECHECK_RECURSION_DEPTH.with(|d| d.set(K));
         typecheck_nested_push_lambda(&arena, 1).expect("Ok path");
-        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+        TYPECHECK_RECURSION_DEPTH.with(|d| {
             assert_eq!(d.get(), K, "guard must restore counter on Ok");
         });
 
         // Err path: pre-load above the cap; enter() returns Err *before*
         // constructing the guard, so Drop never runs for the failed
         // entry. The counter therefore stays at the pre-loaded value.
-        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(MAX_LAMBDA_TYPECHECK_DEPTH + 1));
+        TYPECHECK_RECURSION_DEPTH.with(|d| d.set(MAX_TYPECHECK_RECURSION_DEPTH + 1));
         let err = typecheck_nested_push_lambda(&arena, 1).unwrap_err();
         assert!(
             matches!(err, TcError::TypecheckingTooManyRecursiveCalls),
             "Err path must return TypecheckingTooManyRecursiveCalls; got {err:?}",
         );
-        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+        TYPECHECK_RECURSION_DEPTH.with(|d| {
             assert_eq!(
                 d.get(),
-                MAX_LAMBDA_TYPECHECK_DEPTH + 1,
+                MAX_TYPECHECK_RECURSION_DEPTH + 1,
                 "counter must be unchanged after Err — Drop must not fire on a failed enter()",
             );
             // Restore so subsequent tests aren't biased by the residual.
@@ -11450,7 +11793,7 @@ mod typecheck_tests {
     }
 
     /// Regression: when a `PUSH (lambda T1 T2) <body>` typecheck fails after
-    /// `LAMBDA_TYPECHECK_DEPTH` was bumped at PUSH step time -- whether the
+    /// `TYPECHECK_RECURSION_DEPTH` was bumped at PUSH step time -- whether the
     /// failure originates in the body (e.g. `unify_stacks` Err on the lambda
     /// output type, or an ill-typed instruction inside the body) -- the
     /// counter must still return to 0 by the time the outer typecheck call
@@ -11463,7 +11806,7 @@ mod typecheck_tests {
     fn lambda_typecheck_depth_counter_balances_on_push_lambda_body_err() {
         // Defensive: reset thread-local in case a prior test on the same
         // pool worker left it nonzero.
-        LAMBDA_TYPECHECK_DEPTH.with(|d| d.set(0));
+        TYPECHECK_RECURSION_DEPTH.with(|d| d.set(0));
         // `PUSH (lambda unit int) { DROP ; UNIT }`: body produces Unit, the
         // declared output is Int -> unify_stacks at AfterLambda finalize
         // returns StacksNotEqual. Pre-fix this leaked one increment because
@@ -11478,7 +11821,7 @@ mod typecheck_tests {
             matches!(err, TcError::StacksNotEqual(..)),
             "expected unify failure, got {err:?}",
         );
-        LAMBDA_TYPECHECK_DEPTH.with(|d| {
+        TYPECHECK_RECURSION_DEPTH.with(|d| {
             assert_eq!(
                 d.get(),
                 0,
@@ -11510,7 +11853,7 @@ mod typecheck_tests {
                 let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
                 typecheck_nested_push_lambda(&arena, DEPTH)
                     .expect("PUSH-lambda chain must typecheck iteratively");
-                LAMBDA_TYPECHECK_DEPTH.with(|d| {
+                TYPECHECK_RECURSION_DEPTH.with(|d| {
                     assert_eq!(
                         d.get(),
                         0,
@@ -11571,6 +11914,319 @@ mod typecheck_tests {
                 std::mem::forget(std::mem::replace(stk, tc_stk![]));
                 let body = result.expect("deep lambda nesting must typecheck");
                 std::mem::forget(body);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// Build a `depth`-deep nested `CREATE_CONTRACT` contract script (the
+    /// L2-1702 generator shape) iteratively in `arena`; each level originates
+    /// the next, the innermost being `code { CDR ; NIL operation ; PAIR }`.
+    fn nested_create_contract_script<'a>(
+        arena: &'a typed_arena::Arena<Micheline<'a>>,
+        depth: usize,
+    ) -> Micheline<'a> {
+        let app0 = |p: Prim| Micheline::App(p, &[], NO_ANNS);
+        let base_instrs = arena.alloc_extend([
+            app0(Prim::CDR),
+            Micheline::App(
+                Prim::NIL,
+                arena.alloc_extend([app0(Prim::operation)]),
+                NO_ANNS,
+            ),
+            app0(Prim::PAIR),
+        ]);
+        let base_code = Micheline::App(
+            Prim::code,
+            arena.alloc_extend([Micheline::Seq(base_instrs)]),
+            NO_ANNS,
+        );
+        let mut current = Micheline::Seq(arena.alloc_extend([
+            Micheline::App(
+                Prim::parameter,
+                arena.alloc_extend([app0(Prim::unit)]),
+                NO_ANNS,
+            ),
+            Micheline::App(
+                Prim::storage,
+                arena.alloc_extend([app0(Prim::unit)]),
+                NO_ANNS,
+            ),
+            base_code,
+        ]));
+        for _ in 0..depth {
+            // `code { DROP ; PUSH unit Unit ; PUSH mutez 0 ; NONE key_hash ;
+            //         CREATE_CONTRACT <current> ; DROP ; DROP ; UNIT ;
+            //         NIL operation ; PAIR }`
+            let create_contract = Micheline::App(
+                Prim::CREATE_CONTRACT,
+                arena.alloc_extend([current]),
+                NO_ANNS,
+            );
+            let instrs = arena.alloc_extend([
+                app0(Prim::DROP),
+                Micheline::App(
+                    Prim::PUSH,
+                    arena.alloc_extend([app0(Prim::unit), app0(Prim::Unit)]),
+                    NO_ANNS,
+                ),
+                Micheline::App(
+                    Prim::PUSH,
+                    arena.alloc_extend([app0(Prim::mutez), Micheline::Int(0.into())]),
+                    NO_ANNS,
+                ),
+                Micheline::App(
+                    Prim::NONE,
+                    arena.alloc_extend([app0(Prim::key_hash)]),
+                    NO_ANNS,
+                ),
+                create_contract,
+                app0(Prim::DROP),
+                app0(Prim::DROP),
+                app0(Prim::UNIT),
+                Micheline::App(
+                    Prim::NIL,
+                    arena.alloc_extend([app0(Prim::operation)]),
+                    NO_ANNS,
+                ),
+                app0(Prim::PAIR),
+            ]);
+            let code = Micheline::App(
+                Prim::code,
+                arena.alloc_extend([Micheline::Seq(instrs)]),
+                NO_ANNS,
+            );
+            current = Micheline::Seq(arena.alloc_extend([
+                Micheline::App(
+                    Prim::parameter,
+                    arena.alloc_extend([app0(Prim::unit)]),
+                    NO_ANNS,
+                ),
+                Micheline::App(
+                    Prim::storage,
+                    arena.alloc_extend([app0(Prim::unit)]),
+                    NO_ANNS,
+                ),
+                code,
+            ]));
+        }
+        current
+    }
+
+    /// Regression for L2-1702: a deep nested `CREATE_CONTRACT` chain
+    /// typechecks on a 1 MiB worker thread (the kernel budget). Pre-fix this
+    /// recursed into `typecheck_script` per level and overflowed at ~5 levels;
+    /// the depth is below the 10000 L1-parity cap.
+    #[test]
+    fn nested_create_contract_typechecks_without_stack_overflow() {
+        use std::thread;
+        const DEPTH: usize = 2_000;
+        thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+                let script = nested_create_contract_script(&arena, DEPTH);
+                let mut gas = Gas::unmetered();
+                let result = script
+                    .split_script()
+                    .expect("nested script splits")
+                    .typecheck_script(&mut gas, true, true);
+                let ts =
+                    result.expect("nested CREATE_CONTRACT must typecheck iteratively");
+                // Skip the recursive Drop on the deep result, like the lambda test.
+                std::mem::forget(ts);
+                TYPECHECK_RECURSION_DEPTH.with(|d| {
+                    assert_eq!(
+                        d.get(),
+                        0,
+                        "recursion counter must return to 0 after the iterative chain",
+                    );
+                });
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
+    }
+
+    /// L1-parity guard: pre-load the counter past the cap so the first
+    /// `CREATE_CONTRACT` trips `TypecheckingTooManyRecursiveCalls`, without
+    /// nesting 10000 levels for real.
+    #[test]
+    fn nested_create_contract_at_depth_limit_returns_clean_error() {
+        TYPECHECK_RECURSION_DEPTH.with(|d| d.set(MAX_TYPECHECK_RECURSION_DEPTH + 1));
+        let stk = &mut tc_stk![Type::Unit, Type::Mutez, Type::new_option(Type::KeyHash)];
+        let result = typecheck_instruction(
+            &parse(
+                "CREATE_CONTRACT { parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR } }",
+            )
+            .unwrap(),
+            &mut Gas::default(),
+            stk,
+        );
+        // Restore so a leak cannot bias the next test.
+        TYPECHECK_RECURSION_DEPTH.with(|d| d.set(0));
+        match result {
+            Err(TcError::TypecheckingTooManyRecursiveCalls) => {}
+            other => panic!(
+                "expected TypecheckingTooManyRecursiveCalls at the depth cap; got {other:?}",
+            ),
+        }
+    }
+
+    /// Functional check: a two-level nested `CREATE_CONTRACT` typechecks to the
+    /// expected structure (mirrors the single-level `create_contract` test).
+    #[test]
+    fn nested_create_contract_two_levels() {
+        let child_src = concat!(
+            "{ parameter unit ; storage unit ; code { DROP ; PUSH unit Unit ; ",
+            "PUSH mutez 0 ; NONE key_hash ; ",
+            "CREATE_CONTRACT { parameter unit ; storage unit ; ",
+            "code { CDR ; NIL operation ; PAIR } } ; ",
+            "DROP ; DROP ; UNIT ; NIL operation ; PAIR } }"
+        );
+        let outer_src = format!("CREATE_CONTRACT {child_src}");
+        let child_mich = parse(child_src).unwrap();
+        let child_cs = child_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)
+            .unwrap();
+        let stk = &mut tc_stk![Type::Unit, Type::Mutez, Type::new_option(Type::KeyHash)];
+        assert_eq!(
+            typecheck_instruction(&parse(&outer_src).unwrap(), &mut Gas::default(), stk),
+            Ok(CreateContract(Rc::new(child_cs), &child_mich))
+        );
+        assert_eq!(stk, &tc_stk![Type::Address, Type::Operation]);
+    }
+
+    /// Build a `depth`-deep chain where each level's contract has a *view* that
+    /// `PUSH`es a lambda which `CREATE_CONTRACT`s the next level (the indirect
+    /// path spalmer25 raised on !22282: a view forbids `CREATE_CONTRACT`
+    /// directly, but a pushed lambda body has `in_view = false`). Built
+    /// iteratively in `arena`.
+    fn nested_view_create_contract_script<'a>(
+        arena: &'a typed_arena::Arena<Micheline<'a>>,
+        depth: usize,
+    ) -> Micheline<'a> {
+        let app0 = |p: Prim| Micheline::App(p, &[], NO_ANNS);
+        let trivial_code = |arena: &'a typed_arena::Arena<Micheline<'a>>| {
+            Micheline::App(
+                Prim::code,
+                arena.alloc_extend([Micheline::Seq(arena.alloc_extend([
+                    app0(Prim::CDR),
+                    Micheline::App(
+                        Prim::NIL,
+                        arena.alloc_extend([app0(Prim::operation)]),
+                        NO_ANNS,
+                    ),
+                    app0(Prim::PAIR),
+                ]))]),
+                NO_ANNS,
+            )
+        };
+        let param_storage = |arena: &'a typed_arena::Arena<Micheline<'a>>| {
+            [
+                Micheline::App(
+                    Prim::parameter,
+                    arena.alloc_extend([app0(Prim::unit)]),
+                    NO_ANNS,
+                ),
+                Micheline::App(
+                    Prim::storage,
+                    arena.alloc_extend([app0(Prim::unit)]),
+                    NO_ANNS,
+                ),
+            ]
+        };
+        let [p, s] = param_storage(arena);
+        let mut current = Micheline::Seq(arena.alloc_extend([p, s, trivial_code(arena)]));
+        for _ in 0..depth {
+            let create_contract = Micheline::App(
+                Prim::CREATE_CONTRACT,
+                arena.alloc_extend([current]),
+                NO_ANNS,
+            );
+            let lambda_body = arena.alloc_extend([
+                app0(Prim::DROP),
+                Micheline::App(
+                    Prim::PUSH,
+                    arena.alloc_extend([app0(Prim::unit), app0(Prim::Unit)]),
+                    NO_ANNS,
+                ),
+                Micheline::App(
+                    Prim::PUSH,
+                    arena.alloc_extend([app0(Prim::mutez), Micheline::Int(0.into())]),
+                    NO_ANNS,
+                ),
+                Micheline::App(
+                    Prim::NONE,
+                    arena.alloc_extend([app0(Prim::key_hash)]),
+                    NO_ANNS,
+                ),
+                create_contract,
+                app0(Prim::DROP),
+                app0(Prim::DROP),
+                app0(Prim::UNIT),
+            ]);
+            let push_lambda = Micheline::App(
+                Prim::PUSH,
+                arena.alloc_extend([
+                    Micheline::App(
+                        Prim::lambda,
+                        arena.alloc_extend([app0(Prim::unit), app0(Prim::unit)]),
+                        NO_ANNS,
+                    ),
+                    Micheline::Seq(lambda_body),
+                ]),
+                NO_ANNS,
+            );
+            let view_body = arena.alloc_extend([
+                app0(Prim::DROP),
+                push_lambda,
+                app0(Prim::DROP),
+                app0(Prim::UNIT),
+            ]);
+            let view = Micheline::App(
+                Prim::view,
+                arena.alloc_extend([
+                    Micheline::String("v".to_string()),
+                    app0(Prim::unit),
+                    app0(Prim::unit),
+                    Micheline::Seq(view_body),
+                ]),
+                NO_ANNS,
+            );
+            let [p, s] = param_storage(arena);
+            current =
+                Micheline::Seq(arena.alloc_extend([p, s, view, trivial_code(arena)]));
+        }
+        current
+    }
+
+    /// Regression for the view → pushed-lambda → `CREATE_CONTRACT` recursion
+    /// (spalmer25, !22282): child-view validation is deferred to the worklist
+    /// (`OpenView`), so this chain typechecks on a 1 MiB worker thread instead
+    /// of overflowing. Origination (`typecheck_views = true`) so views are
+    /// validated.
+    #[test]
+    fn nested_view_create_contract_typechecks_without_stack_overflow() {
+        use std::thread;
+        const DEPTH: usize = 1_000;
+        thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+                let script = nested_view_create_contract_script(&arena, DEPTH);
+                let mut gas = Gas::unmetered();
+                let ts = script
+                    .split_script()
+                    .expect("splits")
+                    .typecheck_script(&mut gas, true, true)
+                    .expect("view-nested CREATE_CONTRACT must typecheck iteratively");
+                std::mem::forget(ts);
+                TYPECHECK_RECURSION_DEPTH
+                    .with(|d| assert_eq!(d.get(), 0, "counter balanced"));
             })
             .unwrap()
             .join()
