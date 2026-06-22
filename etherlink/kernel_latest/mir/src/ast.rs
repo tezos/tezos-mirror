@@ -65,6 +65,19 @@ pub struct Ticket<'a> {
     pub amount: BigUint,
 }
 
+/// Cheap placeholder ticket (default ticketer/type, `Unit` content, zero
+/// amount), used when moving a `Ticket` out of a `&mut` field without cloning.
+impl Default for Ticket<'_> {
+    fn default() -> Self {
+        Ticket {
+            ticketer: AddressHash::default(),
+            content_type: Type::Unit,
+            content: TypedValue::Unit,
+            amount: BigUint::default(),
+        }
+    }
+}
+
 /// Representation for a Michelson type. Used primarily in the typechecker. Note
 /// this representation doesn't store annotations, as annotations are mostly
 /// deprecated and ingored. For entrypoints, see
@@ -414,6 +427,14 @@ fn drain_iteratively<T>(root: &mut T, mut extract: impl FnMut(&mut T, &mut Vec<T
 impl Drop for Type {
     fn drop(&mut self) {
         drain_iteratively(self, extract_type_children);
+    }
+}
+
+/// Trivial leaf default, used as a cheap placeholder when moving a [`Type`] out
+/// of a `&mut` field; the drained-out parent then drops without recursing.
+impl Default for Type {
+    fn default() -> Self {
+        Type::Unit
     }
 }
 
@@ -771,6 +792,15 @@ pub enum TypedValue<'a> {
     Bls12381G2(Box<bls::G2>),
 }
 
+/// Trivial leaf default (`Unit`), used as a cheap placeholder when moving a
+/// payload out of a `&mut TypedValue` field; the drained-out parent then drops
+/// without recursing.
+impl Default for TypedValue<'_> {
+    fn default() -> Self {
+        TypedValue::Unit
+    }
+}
+
 /// Iterative `Debug` so deeply nested values do not blow the WASM call
 /// stack when formatted for error output. `InterpretError::FailedWith`
 /// embeds a `TypedValue` via `{1:?}` and the kernel formats those errors
@@ -1092,25 +1122,33 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
         while let Some(frame) = frames.pop() {
             match frame {
                 TvImFrame::Leaf(m) => results.push(m),
-                TvImFrame::Visit(v) => match v {
-                    TV::Int(i) => results.push(V::int(i, gas)?),
-                    TV::Nat(u) => results.push(V::int(u.into(), gas)?),
-                    TV::Mutez(u) => results.push(V::int(u.into(), gas)?),
+                // `v` is matched by `&mut` (not by move): `TypedValue`'s
+                // iterative `Drop` forbids moving payloads out by pattern
+                // (E0509). Each arm moves the payload it needs out with
+                // `std::mem::take` (leaf crypto payloads, which have no
+                // `Default`, are cloned), leaving `v` shallow to drop trivially.
+                TvImFrame::Visit(mut v) => match &mut v {
+                    TV::Int(i) => results.push(V::int(std::mem::take(i), gas)?),
+                    TV::Nat(u) => results.push(V::int(std::mem::take(u).into(), gas)?),
+                    TV::Mutez(u) => results.push(V::int((*u).into(), gas)?),
                     TV::Bool(true) => results.push(V::prim0(Prim::True, gas)?),
                     TV::Bool(false) => results.push(V::prim0(Prim::False, gas)?),
-                    TV::String(s) => results.push(V::string(s, gas)?),
+                    TV::String(s) => results.push(V::string(std::mem::take(s), gas)?),
                     TV::Unit => results.push(V::prim0(Prim::Unit, gas)?),
                     TV::Address(x) => results.push(V::bytes(x.to_bytes_vec(), gas)?),
-                    TV::ChainId(x) => results.push(V::bytes(x.into(), gas)?),
-                    TV::Bytes(x) => results.push(V::bytes(x, gas)?),
+                    TV::ChainId(x) => {
+                        results.push(V::bytes(std::mem::take(x).into(), gas)?)
+                    }
+                    TV::Bytes(x) => results.push(V::bytes(std::mem::take(x), gas)?),
                     // to_bytes() cannot fail for a well-formed key.
                     TV::Key(k) => results.push(V::bytes(k.to_bytes().unwrap(), gas)?),
-                    TV::Signature(s) => results.push(V::bytes(s.into(), gas)?),
+                    TV::Signature(s) => results.push(V::bytes(s.clone().into(), gas)?),
                     // to_bytes() cannot fail for a well-formed key hash.
                     TV::KeyHash(s) => results.push(V::bytes(s.to_bytes().unwrap(), gas)?),
-                    TV::Timestamp(s) => results.push(V::int(s, gas)?),
+                    TV::Timestamp(s) => results.push(V::int(std::mem::take(s), gas)?),
                     TV::Contract(x) => results.push(V::bytes(x.to_bytes_vec(), gas)?),
                     TV::Lambda(closure) => {
+                        let closure = std::mem::take(closure);
                         // Flatten the closure onto this worklist: a captured
                         // `APPLY` arg (`Closure::Apply.arg_val`) may itself be a
                         // deep lambda, so unparsing it via a recursive
@@ -1214,15 +1252,21 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     // an untyped representation that is the shortest.
                     TV::Pair(l, r) => {
                         frames.push(TvImFrame::BuildPrim2(Prim::Pair));
-                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(r)));
-                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(l)));
+                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                            std::mem::take(r),
+                        )));
+                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                            std::mem::take(l),
+                        )));
                     }
                     TV::Option(None) => results.push(V::prim0(Prim::None, gas)?),
                     TV::Option(Some(rc)) => {
                         frames.push(TvImFrame::BuildPrim1(Prim::Some));
-                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(rc)));
+                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                            std::mem::take(rc),
+                        )));
                     }
-                    TV::Or(or) => match or {
+                    TV::Or(or) => match std::mem::take(or) {
                         Or::Left(x) => {
                             frames.push(TvImFrame::BuildPrim1(Prim::Left));
                             frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(x)));
@@ -1233,16 +1277,20 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         }
                     },
                     TV::List(l) => {
-                        let mut elems: Vec<TypedValue<'a>> =
-                            l.into_iter().map(TypedValue::unwrap_rc).collect();
+                        let mut elems: Vec<TypedValue<'a>> = std::mem::take(l)
+                            .into_iter()
+                            .map(TypedValue::unwrap_rc)
+                            .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
                             frames.push(TvImFrame::Visit(elem));
                         }
                     }
                     TV::Set(s) => {
-                        let mut elems: Vec<TypedValue<'a>> =
-                            s.into_iter().map(TypedValue::unwrap_rc).collect();
+                        let mut elems: Vec<TypedValue<'a>> = std::mem::take(s)
+                            .into_iter()
+                            .map(TypedValue::unwrap_rc)
+                            .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
                             frames.push(TvImFrame::Visit(elem));
@@ -1250,7 +1298,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     }
                     TV::Map(m) => {
                         let mut entries: Vec<(Rc<Self>, Rc<Self>)> =
-                            m.into_iter().collect();
+                            std::mem::take(m).into_iter().collect();
                         frames.push(TvImFrame::BuildSeqOf {
                             count: entries.len(),
                         });
@@ -1260,7 +1308,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                             frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
                         }
                     }
-                    TV::BigMap(m) => match m.content {
+                    TV::BigMap(m) => match std::mem::take(&mut m.content) {
                         big_map::BigMapContent::InMemory(m) => {
                             let mut entries: Vec<(Self, Self)> = m.into_iter().collect();
                             frames.push(TvImFrame::BuildSeqOf {
@@ -1305,75 +1353,78 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     },
                     TV::Ticket(t) => {
                         // unwrap_ticket builds a (small) Pair chain; let it flow through Visit.
-                        frames.push(TvImFrame::Visit(unwrap_ticket(t.as_ref().clone())));
+                        // Move the ticket out (it is about to be dropped) rather
+                        // than cloning its (possibly deep) content.
+                        frames.push(TvImFrame::Visit(unwrap_ticket(*std::mem::take(t))));
                     }
-                    TV::Operation(operation_info) => match operation_info.operation {
-                        Operation::TransferTokens(tt) => {
-                            frames.push(TvImFrame::BuildTransferTokens);
-                            frames.push(TvImFrame::Visit(TV::Mutez(tt.amount)));
-                            frames.push(TvImFrame::Visit(TV::Address(
-                                tt.destination_address,
-                            )));
-                            frames.push(TvImFrame::Visit(tt.param));
-                        }
-                        Operation::SetDelegate(sd) => {
-                            // Inner value is a leaf (`Some(KeyHash)` or `None`) so this
-                            // is fully eager; no Visit needed.
-                            let inner = match sd.0 {
-                                Some(kh) => V::prim1(
-                                    arena,
-                                    Prim::Some,
-                                    V::bytes(kh.to_bytes().unwrap(), gas)?,
-                                    gas,
-                                )?,
-                                None => V::prim0(Prim::None, gas)?,
-                            };
-                            results.push(V::prim1(
-                                arena,
-                                Prim::Set_delegate,
-                                inner,
-                                gas,
-                            )?);
-                        }
-                        Operation::Emit(em) => {
-                            let arg_ty_mich = match em.arg_ty {
-                                Or::Right(mich) => mich,
-                                Or::Left(typ) => {
-                                    (&typ).into_micheline_optimized_legacy(arena, gas)?
-                                }
-                            };
-                            frames.push(TvImFrame::BuildEmit {
-                                arg_ty_mich,
-                                tag: em.tag,
-                            });
-                            frames.push(TvImFrame::Visit(em.value));
-                        }
-                        Operation::CreateContract(cc) => {
-                            let delegate_mich = match cc.delegate {
-                                Some(kh) => {
-                                    let addr = Address {
-                                        hash: AddressHash::from(kh),
-                                        entrypoint: Entrypoint::default(),
-                                    };
-                                    V::prim1(
+                    TV::Operation(operation_info) => {
+                        match std::mem::take(operation_info).operation {
+                            Operation::TransferTokens(tt) => {
+                                frames.push(TvImFrame::BuildTransferTokens);
+                                frames.push(TvImFrame::Visit(TV::Mutez(tt.amount)));
+                                frames.push(TvImFrame::Visit(TV::Address(
+                                    tt.destination_address,
+                                )));
+                                frames.push(TvImFrame::Visit(tt.param));
+                            }
+                            Operation::SetDelegate(sd) => {
+                                // Inner value is a leaf (`Some(KeyHash)` or `None`) so this
+                                // is fully eager; no Visit needed.
+                                let inner = match sd.0 {
+                                    Some(kh) => V::prim1(
                                         arena,
                                         Prim::Some,
-                                        V::bytes(addr.to_bytes_vec(), gas)?,
+                                        V::bytes(kh.to_bytes().unwrap(), gas)?,
                                         gas,
-                                    )?
-                                }
-                                None => V::prim0(Prim::None, gas)?,
-                            };
-                            let mutez_mich = V::int(cc.amount.into(), gas)?;
-                            let code_mich = cc.micheline_code.clone();
-                            frames.push(TvImFrame::BuildCreateContract {
-                                code_mich,
-                                delegate_mich,
-                                mutez_mich,
-                            });
-                            frames.push(TvImFrame::Visit(cc.storage));
+                                    )?,
+                                    None => V::prim0(Prim::None, gas)?,
+                                };
+                                results.push(V::prim1(
+                                    arena,
+                                    Prim::Set_delegate,
+                                    inner,
+                                    gas,
+                                )?);
+                            }
+                            Operation::Emit(em) => {
+                                let arg_ty_mich = match em.arg_ty {
+                                    Or::Right(mich) => mich,
+                                    Or::Left(typ) => (&typ)
+                                        .into_micheline_optimized_legacy(arena, gas)?,
+                                };
+                                frames.push(TvImFrame::BuildEmit {
+                                    arg_ty_mich,
+                                    tag: em.tag,
+                                });
+                                frames.push(TvImFrame::Visit(em.value));
+                            }
+                            Operation::CreateContract(cc) => {
+                                let delegate_mich = match cc.delegate {
+                                    Some(kh) => {
+                                        let addr = Address {
+                                            hash: AddressHash::from(kh),
+                                            entrypoint: Entrypoint::default(),
+                                        };
+                                        V::prim1(
+                                            arena,
+                                            Prim::Some,
+                                            V::bytes(addr.to_bytes_vec(), gas)?,
+                                            gas,
+                                        )?
+                                    }
+                                    None => V::prim0(Prim::None, gas)?,
+                                };
+                                let mutez_mich = V::int(cc.amount.into(), gas)?;
+                                let code_mich = cc.micheline_code.clone();
+                                frames.push(TvImFrame::BuildCreateContract {
+                                    code_mich,
+                                    delegate_mich,
+                                    mutez_mich,
+                                });
+                                frames.push(TvImFrame::Visit(cc.storage));
+                            }
                         }
-                    },
+                    }
                 },
 
                 TvImFrame::BuildPrim1(prim) => {
@@ -1570,21 +1621,15 @@ impl<'a> TypedValue<'a> {
     }
 }
 
-/// Drains nested `Rc<TypedValue>` children iteratively when dropping a
-/// potentially deep value (e.g. a comb of `Pair (Pair (... (Pair Int Int)))`),
-/// so the recursive `Rc<TypedValue>` destructor chain does not blow the
-/// WASM stack.
+/// Drains nested `Rc<TypedValue>` children iteratively, so the recursive
+/// `Rc<TypedValue>` destructor chain of a potentially deep value (e.g. a comb
+/// of `Pair (Pair (... (Pair Int Int)))`) does not blow the WASM stack.
 ///
-/// Not an `impl Drop` on [`TypedValue`] because that would forbid every
-/// by move destructure of its variants throughout the codebase. Called from
-/// [`Instruction`]'s `Drop` (for `PUSH` constants) and by callers that build
-/// deep values explicitly before drop.
-///
-/// Note: runtime-built deep values (a `PAIR`/`CONS` comb on the value stack,
-/// values popped/returned or left on the stack at interpreter teardown) are
-/// not yet drained by any production site, so they still recurse on the
-/// default destructor. Closing that gap — wiring this in at the release sites
-/// or giving `TypedValue` an iterative `Drop` — is tracked in Linear L2-1446.
+/// Since L2-1672, [`TypedValue`] has an `impl Drop` that runs exactly this
+/// drain, so *any* drop of a deep value is already safe and this function is
+/// no longer required for stack safety. It is retained for callers that want
+/// to drain a value early (while it is still borrowed), rather than waiting
+/// for it to fall out of scope.
 ///
 /// `pub(crate)`: the sentinel `replace` it performs assumes the caller is
 /// about to drop `v`, so it must not be exposed to callers that might hold the
@@ -1592,6 +1637,117 @@ impl<'a> TypedValue<'a> {
 pub(crate) fn drain_deep_typed_value(v: &mut TypedValue<'_>) {
     drain_iteratively(v, extract_tv_children);
 }
+
+/// Iterative `Drop` so dropping a deeply nested value (a comb of
+/// `Pair`/`Or`/`Option`, a long `List`/`Set`/`Map`, an `APPLY` closure spine, a
+/// ticket/operation payload, …) walks an explicit heap worklist instead of
+/// recursing through the derived destructor and overflowing the WASM/PVM call
+/// stack. This makes *every* release site safe — including `DROP`/`DIP n`
+/// (`Stack::drop_top` → `Vec::truncate`) and stack teardown — without each one
+/// having to remember to call [`drain_deep_typed_value`] first (L2-1672,
+/// closing the gap left by L2-1446).
+///
+/// Because of this impl, `TypedValue` can no longer be destructured by move
+/// with a plain `match` (Rust forbids moving fields out of a `Drop` type,
+/// `E0509`). Code that needs to consume a value's payload borrows the field
+/// mutably and moves it out with `std::mem::take` (or [`TakeOut::take_out`] in
+/// the generic `pop!` macros).
+impl Drop for TypedValue<'_> {
+    fn drop(&mut self) {
+        drain_iteratively(self, extract_tv_children);
+    }
+}
+
+/// Moves a payload out of a `&mut` field of a value that implements [`Drop`]
+/// (which forbids moving fields out by pattern match, `E0509`). The caller
+/// borrows the field mutably and calls [`TakeOut::take_out`]; the field is left
+/// holding a cheap placeholder so the parent's `Drop` stays shallow.
+///
+/// Almost every payload now has a [`Default`] placeholder (see the `Default`
+/// impls on `TypedValue` and its owned payloads), so `take_out` is just
+/// `std::mem::take` — no cloning, and recursive spines are moved, not copied.
+/// The only exceptions are the leaf crypto/BLS payloads (`PublicKey`,
+/// `Signature`, `PublicKeyHash`, BLS points), which have no `Default`; they are
+/// cheaply cloned (non-recursive, so this neither deep-copies nor recurses).
+///
+/// This trait exists for the generic `pop!`/`pop_v!` macros, which dispatch on
+/// an arbitrary variant path; code that knows the concrete payload type uses
+/// `std::mem::take` directly instead.
+pub(crate) trait TakeOut {
+    /// Returns the owned payload, leaving a cheap placeholder in `*self`.
+    fn take_out(&mut self) -> Self;
+}
+
+/// `take_out` by swapping in `Default::default()`.
+macro_rules! take_out_via_default {
+    ($($t:ty),* $(,)?) => {
+        $(impl TakeOut for $t {
+            fn take_out(&mut self) -> Self {
+                std::mem::take(self)
+            }
+        })*
+    };
+}
+
+/// `take_out` by cloning. Only used for non-recursive leaf payloads that have
+/// no `Default`, so the clone is shallow and the leftover original drops
+/// trivially.
+macro_rules! take_out_via_clone {
+    ($($(#[$meta:meta])* $t:ty),* $(,)?) => {
+        $($(#[$meta])* impl TakeOut for $t {
+            fn take_out(&mut self) -> Self {
+                self.clone()
+            }
+        })*
+    };
+}
+
+take_out_via_default!(
+    BigInt,
+    BigUint,
+    i64,
+    bool,
+    String,
+    Vec<u8>,
+    ChainId,
+    Address
+);
+take_out_via_clone!(
+    PublicKey,
+    Signature,
+    PublicKeyHash,
+    #[cfg(feature = "bls")]
+    bls::Fr,
+    #[cfg(feature = "bls")]
+    Box<bls::G1>,
+    #[cfg(feature = "bls")]
+    Box<bls::G2>,
+);
+
+/// Recursive payloads. Their `Default` placeholders are cheap (a `Unit`
+/// sentinel / empty collection / empty lambda), so `take_out` moves the
+/// (possibly deep) value out without copying it.
+macro_rules! take_out_via_default_generic {
+    ($($t:ty),* $(,)?) => {
+        $(impl<'a> TakeOut for $t {
+            fn take_out(&mut self) -> Self {
+                std::mem::take(self)
+            }
+        })*
+    };
+}
+
+take_out_via_default_generic!(
+    Rc<TypedValue<'a>>,
+    Option<Rc<TypedValue<'a>>>,
+    MichelsonList<Rc<TypedValue<'a>>>,
+    BTreeSet<Rc<TypedValue<'a>>>,
+    BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+    Or<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+    Closure<'a>,
+    Box<Ticket<'a>>,
+    Box<OperationInfo<'a>>,
+);
 
 fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue<'a>>) {
     use std::mem::{replace, take};

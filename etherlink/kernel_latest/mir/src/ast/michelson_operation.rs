@@ -86,3 +86,23 @@ pub struct OperationInfo<'a> {
     /// Nonce.
     pub counter: u128,
 }
+
+/// Defaults to a delegation-removal (`SetDelegate(None)`) — the only operation
+/// with no owned payload. Used as a cheap placeholder when moving an
+/// `Operation` out of a `&mut` field without cloning.
+impl Default for Operation<'_> {
+    fn default() -> Self {
+        Operation::SetDelegate(SetDelegate(None))
+    }
+}
+
+/// Cheap placeholder operation info, used when moving an `OperationInfo` out of
+/// a `&mut` field without cloning.
+impl Default for OperationInfo<'_> {
+    fn default() -> Self {
+        OperationInfo {
+            operation: Operation::default(),
+            counter: 0,
+        }
+    }
+}

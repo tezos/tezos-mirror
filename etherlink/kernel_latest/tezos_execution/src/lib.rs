@@ -8067,11 +8067,11 @@ mod tests {
                     .expect("Coudln't decode storage.");
             let big_map_id = typecheck_value(&mich_storage, &mut ctx, &Type::Int)
                 .expect("Storage has unexpected type");
-            match big_map_id {
+            match &big_map_id {
                 TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                     &mut ctx,
                     &parser.arena,
-                    &id.into(),
+                    &id.clone().into(),
                     Type::String,
                     Type::Bytes,
                     expected_sender_big_map,
@@ -8395,11 +8395,11 @@ mod tests {
         let big_map_id_originator =
             typecheck_value(&mich_storage_originator, &mut ctx, &Type::Int)
                 .expect("Storage has unexpected type");
-        match big_map_id_originator {
+        match &big_map_id_originator {
             TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                 &mut ctx,
                 &parser.arena,
-                &id.into(),
+                &id.clone().into(),
                 Type::String,
                 Type::Bytes,
                 BTreeMap::from([
@@ -8421,11 +8421,11 @@ mod tests {
                 .expect("Couldn't decode storage.");
         let big_map_id_0 = typecheck_value(&mich_storage_0, &mut ctx, &Type::Int)
             .expect("Storage has unexpected type");
-        match big_map_id_0 {
+        match &big_map_id_0 {
             TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                 &mut ctx,
                 &parser.arena,
-                &id.into(),
+                &id.clone().into(),
                 Type::String,
                 Type::Bytes,
                 BTreeMap::from([(
@@ -8447,11 +8447,11 @@ mod tests {
                 .expect("Coudln't decode storage.");
         let big_map_id_1 = typecheck_value(&mich_storage_1, &mut ctx, &Type::Int)
             .expect("Storage has unexpected type");
-        match big_map_id_1 {
+        match &big_map_id_1 {
             TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                 &mut ctx,
                 &parser.arena,
-                &id.into(),
+                &id.clone().into(),
                 Type::String,
                 Type::Bytes,
                 BTreeMap::from([
@@ -8473,11 +8473,11 @@ mod tests {
                 .expect("Coudln't decode storage.");
         let big_map_id_2 = typecheck_value(&mich_storage_2, &mut ctx, &Type::Int)
             .expect("Storage has unexpected type");
-        match big_map_id_2 {
+        match &big_map_id_2 {
             TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                 &mut ctx,
                 &parser.arena,
-                &id.into(),
+                &id.clone().into(),
                 Type::String,
                 Type::Bytes,
                 BTreeMap::from([

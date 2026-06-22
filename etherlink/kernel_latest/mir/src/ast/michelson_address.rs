@@ -23,6 +23,17 @@ pub struct Address {
     pub entrypoint: Entrypoint,
 }
 
+/// Cheap placeholder address (default hash, default entrypoint), used when
+/// moving an `Address` out of a `&mut` field without cloning.
+impl Default for Address {
+    fn default() -> Self {
+        Address {
+            hash: AddressHash::default(),
+            entrypoint: Entrypoint::default(),
+        }
+    }
+}
+
 impl Address {
     /// Returns `true` if the address uses the default entrypoint. Note that
     /// addresses that don't explicitly specify the entrypoint, e.g.

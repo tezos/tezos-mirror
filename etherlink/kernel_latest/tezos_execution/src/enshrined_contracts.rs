@@ -179,6 +179,22 @@ fn unwrap_rc(rc: Rc<TypedValue<'_>>) -> TypedValue<'_> {
     Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
 }
 
+/// Destructure an owned [`TypedValue`] by moving its payload(s) out.
+///
+/// [`TypedValue`] implements an iterative `Drop` (see `mir::ast`), so its
+/// payloads can no longer be moved out by pattern match (`E0509`). This binds
+/// the scrutinee to a temporary, matches it by `&mut`, and moves the payload(s)
+/// out with [`std::mem::take`], leaving the cheap `Default` placeholder behind
+/// for the temporary's drop. On a variant mismatch it evaluates `$err`, which
+/// is an early `return Err(..)` at every call site.
+macro_rules! take_payload {
+    ($scrut:expr, $($variant:ident)::+ ( $($field:ident),+ ), $err:expr $(,)?) => {{
+        let mut tv = $scrut;
+        let $($variant)::+($($field),+) = &mut tv else { $err };
+        ($(::std::mem::take($field)),+)
+    }};
+}
+
 /// Typecheck a Micheline value against the expected type for the given
 /// enshrined contract entrypoint. Returns the typed value, or an error
 /// if the entrypoint is unknown or the value doesn't match the type.
@@ -272,12 +288,14 @@ where
                     )
                     .into());
                 }
-                let TypedValue::Bytes(payload) = typed else {
+                let payload = take_payload!(
+                    typed,
+                    TypedValue::Bytes(payload),
                     return Err(TransferError::GatewayError(
                         "Expected bytes for collect_result entrypoint".into(),
                     )
-                    .into());
-                };
+                    .into())
+                );
                 // Pre-charge store + result surfacing + forward. Result
                 // surfacing and forward happen after `TezlinkOperationGas`
                 // has already reported its consumption, so they must be
@@ -549,13 +567,17 @@ fn extract_callback(
     typed: TypedValue<'_>,
     entrypoint_name: &str,
 ) -> Result<Option<Address>, TransferError> {
-    match typed {
+    let mut typed = typed;
+    match &mut typed {
         TypedValue::Option(Some(rc)) => {
-            let TypedValue::Contract(addr) = unwrap_rc(rc) else {
+            let rc = std::mem::take(rc);
+            let addr = take_payload!(
+                unwrap_rc(rc),
+                TypedValue::Contract(addr),
                 return Err(TransferError::GatewayError(format!(
                     "{entrypoint_name}: expected contract in callback option"
-                )));
-            };
+                )))
+            );
             Ok(Some(addr))
         }
         TypedValue::Option(None) => Ok(None),
@@ -692,37 +714,49 @@ pub(crate) fn drain_reentrant_crac_ops(
 fn extract_call_params(
     typed: TypedValue<'_>,
 ) -> Result<(String, String, Vec<u8>, Option<Address>), TransferError> {
-    let TypedValue::Pair(dest_rc, inner_rc) = typed else {
+    let (dest_rc, inner_rc) = take_payload!(
+        typed,
+        TypedValue::Pair(dest_rc, inner_rc),
         return Err(TransferError::GatewayError(
             "call: expected pair (destination, (method_sig, (abi_params, callback)))"
                 .into(),
-        ));
-    };
-    let TypedValue::String(dest) = unwrap_rc(dest_rc) else {
+        ))
+    );
+    let dest = take_payload!(
+        unwrap_rc(dest_rc),
+        TypedValue::String(dest),
         return Err(TransferError::GatewayError(
             "call: expected string for destination".into(),
-        ));
-    };
-    let TypedValue::Pair(sig_rc, inner2_rc) = unwrap_rc(inner_rc) else {
+        ))
+    );
+    let (sig_rc, inner2_rc) = take_payload!(
+        unwrap_rc(inner_rc),
+        TypedValue::Pair(sig_rc, inner2_rc),
         return Err(TransferError::GatewayError(
             "call: expected pair (method_sig, (abi_params, callback))".into(),
-        ));
-    };
-    let TypedValue::String(method_sig) = unwrap_rc(sig_rc) else {
+        ))
+    );
+    let method_sig = take_payload!(
+        unwrap_rc(sig_rc),
+        TypedValue::String(method_sig),
         return Err(TransferError::GatewayError(
             "call: expected string for method signature".into(),
-        ));
-    };
-    let TypedValue::Pair(params_rc, callback_rc) = unwrap_rc(inner2_rc) else {
+        ))
+    );
+    let (params_rc, callback_rc) = take_payload!(
+        unwrap_rc(inner2_rc),
+        TypedValue::Pair(params_rc, callback_rc),
         return Err(TransferError::GatewayError(
             "call: expected pair (abi_params, callback)".into(),
-        ));
-    };
-    let TypedValue::Bytes(abi_params) = unwrap_rc(params_rc) else {
+        ))
+    );
+    let abi_params = take_payload!(
+        unwrap_rc(params_rc),
+        TypedValue::Bytes(abi_params),
         return Err(TransferError::GatewayError(
             "call: expected bytes for ABI parameters".into(),
-        ));
-    };
+        ))
+    );
     let callback = extract_callback(unwrap_rc(callback_rc), "call_evm")?;
     Ok((dest, method_sig, abi_params, callback))
 }
@@ -734,68 +768,90 @@ fn extract_call_params(
 fn extract_http_call_request(
     typed: TypedValue<'_>,
 ) -> Result<(http::Request<Vec<u8>>, Option<Address>), TransferError> {
-    let TypedValue::Pair(url_rc, inner_rc) = typed else {
+    let (url_rc, inner_rc) = take_payload!(
+        typed,
+        TypedValue::Pair(url_rc, inner_rc),
         return Err(TransferError::GatewayError(
             "http_call: expected pair (url, (headers, (body, (method, callback))))"
                 .into(),
-        ));
-    };
-    let TypedValue::String(url) = unwrap_rc(url_rc) else {
+        ))
+    );
+    let url = take_payload!(
+        unwrap_rc(url_rc),
+        TypedValue::String(url),
         return Err(TransferError::GatewayError(
             "http_call: expected string for URL".into(),
-        ));
-    };
-    let TypedValue::Pair(headers_rc, body_method_rc) = unwrap_rc(inner_rc) else {
+        ))
+    );
+    let (headers_rc, body_method_rc) = take_payload!(
+        unwrap_rc(inner_rc),
+        TypedValue::Pair(headers_rc, body_method_rc),
         return Err(TransferError::GatewayError(
             "http_call: expected pair (headers, (body, (method, callback)))".into(),
-        ));
-    };
-    let TypedValue::List(headers_list) = unwrap_rc(headers_rc) else {
+        ))
+    );
+    let headers_list = take_payload!(
+        unwrap_rc(headers_rc),
+        TypedValue::List(headers_list),
         return Err(TransferError::GatewayError(
             "http_call: expected list for headers".into(),
-        ));
-    };
+        ))
+    );
     let headers: Vec<(String, String)> = headers_list
         .into_iter()
         .map(|item| {
-            let TypedValue::Pair(name_rc, val_rc) = unwrap_rc(item) else {
+            let (name_rc, val_rc) = take_payload!(
+                unwrap_rc(item),
+                TypedValue::Pair(name_rc, val_rc),
                 return Err(TransferError::GatewayError(
                     "http_call: expected pair (name, value) in headers list".into(),
-                ));
-            };
-            let TypedValue::String(name) = unwrap_rc(name_rc) else {
+                ))
+            );
+            let name = take_payload!(
+                unwrap_rc(name_rc),
+                TypedValue::String(name),
                 return Err(TransferError::GatewayError(
                     "http_call: expected string for header name".into(),
-                ));
-            };
-            let TypedValue::String(val) = unwrap_rc(val_rc) else {
+                ))
+            );
+            let val = take_payload!(
+                unwrap_rc(val_rc),
+                TypedValue::String(val),
                 return Err(TransferError::GatewayError(
                     "http_call: expected string for header value".into(),
-                ));
-            };
+                ))
+            );
             Ok((name, val))
         })
         .collect::<Result<_, _>>()?;
-    let TypedValue::Pair(body_rc, method_callback_rc) = unwrap_rc(body_method_rc) else {
+    let (body_rc, method_callback_rc) = take_payload!(
+        unwrap_rc(body_method_rc),
+        TypedValue::Pair(body_rc, method_callback_rc),
         return Err(TransferError::GatewayError(
             "http_call: expected pair (body, (method, callback))".into(),
-        ));
-    };
-    let TypedValue::Bytes(body) = unwrap_rc(body_rc) else {
+        ))
+    );
+    let body = take_payload!(
+        unwrap_rc(body_rc),
+        TypedValue::Bytes(body),
         return Err(TransferError::GatewayError(
             "http_call: expected bytes for body".into(),
-        ));
-    };
-    let TypedValue::Pair(method_rc, callback_rc) = unwrap_rc(method_callback_rc) else {
+        ))
+    );
+    let (method_rc, callback_rc) = take_payload!(
+        unwrap_rc(method_callback_rc),
+        TypedValue::Pair(method_rc, callback_rc),
         return Err(TransferError::GatewayError(
             "http_call: expected pair (method, callback)".into(),
-        ));
-    };
-    let TypedValue::Nat(method) = unwrap_rc(method_rc) else {
+        ))
+    );
+    let method = take_payload!(
+        unwrap_rc(method_rc),
+        TypedValue::Nat(method),
         return Err(TransferError::GatewayError(
             "http_call: expected nat for method".into(),
-        ));
-    };
+        ))
+    );
     let callback = extract_callback(unwrap_rc(callback_rc), "call")?;
     let request = build_http_request(&url, &headers, &body, method)?;
     Ok((request, callback))
@@ -1167,31 +1223,41 @@ fn tezosx_resolve_source_alias_readonly(
 fn extract_erc20_address_uint256_params(
     typed: TypedValue<'_>,
 ) -> Result<(String, Vec<u8>, BigInt), TransferError> {
-    let TypedValue::Pair(contract_rc, inner_rc) = typed else {
+    let (contract_rc, inner_rc) = take_payload!(
+        typed,
+        TypedValue::Pair(contract_rc, inner_rc),
         return Err(TransferError::GatewayError(
             "ERC-20: expected pair (contract, (address, amount))".into(),
-        ));
-    };
-    let TypedValue::String(evm_contract) = unwrap_rc(contract_rc) else {
+        ))
+    );
+    let evm_contract = take_payload!(
+        unwrap_rc(contract_rc),
+        TypedValue::String(evm_contract),
         return Err(TransferError::GatewayError(
             "ERC-20: expected string for EVM contract address".into(),
-        ));
-    };
-    let TypedValue::Pair(addr_rc, amount_rc) = unwrap_rc(inner_rc) else {
+        ))
+    );
+    let (addr_rc, amount_rc) = take_payload!(
+        unwrap_rc(inner_rc),
+        TypedValue::Pair(addr_rc, amount_rc),
         return Err(TransferError::GatewayError(
             "ERC-20: expected pair (address, amount)".into(),
-        ));
-    };
-    let TypedValue::Bytes(addr_bytes) = unwrap_rc(addr_rc) else {
+        ))
+    );
+    let addr_bytes = take_payload!(
+        unwrap_rc(addr_rc),
+        TypedValue::Bytes(addr_bytes),
         return Err(TransferError::GatewayError(
             "ERC-20: expected bytes for EVM address".into(),
-        ));
-    };
-    let TypedValue::Int(amount) = unwrap_rc(amount_rc) else {
+        ))
+    );
+    let amount = take_payload!(
+        unwrap_rc(amount_rc),
+        TypedValue::Int(amount),
         return Err(TransferError::GatewayError(
             "ERC-20: expected int for token amount".into(),
-        ));
-    };
+        ))
+    );
     Ok((evm_contract, addr_bytes, amount))
 }
 

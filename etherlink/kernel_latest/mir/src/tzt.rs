@@ -244,8 +244,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let self_addr = match m_self {
             Some(s) => {
                 let typed = typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
-                let address = match typed {
-                    TypedValue::Address(addr) => addr,
+                let address = match &mut { typed } {
+                    TypedValue::Address(addr) => std::mem::take(addr),
                     other => {
                         return Err(format!(
                             "invalid `self` field: expected address, got {other:?}"
@@ -266,8 +266,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let source = match m_source {
             Some(s) => {
                 let typed = typecheck_value(&s, &mut Ctx::default(), &Type::KeyHash)?;
-                match typed {
-                    TypedValue::KeyHash(kh) => Some(kh),
+                match &mut { typed } {
+                    TypedValue::KeyHash(kh) => Some(kh.take_out()),
                     other => {
                         return Err(format!(
                             "invalid `source` field: expected key_hash, got {other:?}"
@@ -282,8 +282,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let sender = match m_sender {
             Some(s) => {
                 let typed = typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
-                let address = match typed {
-                    TypedValue::Address(addr) => addr,
+                let address = match &mut { typed } {
+                    TypedValue::Address(addr) => std::mem::take(addr),
                     other => {
                         return Err(format!(
                             "invalid `sender` field: expected address, got {other:?}"
@@ -302,8 +302,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 for (ahm, ctm) in oc {
                     let typed_address =
                         typecheck_value(&ahm, &mut Ctx::default(), &Type::Address)?;
-                    let address_hash = match typed_address {
-                        TypedValue::Address(Address { hash, entrypoint: _ }) => hash,
+                    let address_hash = match &mut { typed_address } {
+                        TypedValue::Address(addr) => std::mem::take(addr).hash,
                         other => {
                             return Err(format!(
                                 "invalid address in `other_contracts`: expected address, got {other:?}"
@@ -334,8 +334,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 for (idx, key_ty, val_ty, elts) in bm {
                     let typed_idx =
                         typecheck_value(&idx, &mut Ctx::default(), &Type::Int)?;
-                    let idx: BigMapId = match typed_idx {
-                        TypedValue::Int(i) => i.into(),
+                    let idx: BigMapId = match &mut { typed_idx } {
+                        TypedValue::Int(i) => std::mem::take(i).into(),
                         other => {
                             return Err(format!(
                                 "invalid big map index: expected int, got {other:?}"
@@ -425,11 +425,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                             &storage_type,
                         )?;
 
-                        let address = match typed_address {
-                            TypedValue::Address(Address {
-                                hash,
-                                entrypoint: _,
-                            }) => hash,
+                        let address = match &mut { typed_address } {
+                            TypedValue::Address(addr) => std::mem::take(addr).hash,
                             _ => return Err("Invalid address for storage".into()),
                         };
 
@@ -479,11 +476,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                             })
                             .collect::<Result<HashMap<_, _>, Self::Error>>()?;
 
-                        let address = match typed_address {
-                            TypedValue::Address(Address {
-                                hash,
-                                entrypoint: _,
-                            }) => hash,
+                        let address = match &mut { typed_address } {
+                            TypedValue::Address(addr) => std::mem::take(addr).hash,
                             _ => return Err("Invalid address for view".into()),
                         };
 
@@ -519,8 +513,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             chain_id: m_chain_id
                 .map(|v| -> Result<crate::ast::ChainId, Box<dyn Error>> {
                     let typed = typecheck_value(&v, &mut Ctx::default(), &Type::ChainId)?;
-                    match typed {
-                        TypedValue::ChainId(id) => Ok(id),
+                    match &mut { typed } {
+                        TypedValue::ChainId(id) => Ok(std::mem::take(id)),
                         other => Err(format!(
                             "invalid `chain_id` field: expected chain_id, got {other:?}"
                         )

@@ -71,6 +71,18 @@ pub enum Closure<'a> {
     },
 }
 
+/// A trivial empty lambda, used as a cheap placeholder when moving a `Closure`
+/// out of a `&mut` field without cloning (cloning could recurse through a deep
+/// `Apply` spine).
+impl Default for Closure<'_> {
+    fn default() -> Self {
+        Closure::Lambda(Lambda::Lambda {
+            micheline_code: Micheline::Seq(&[]),
+            code: Vec::new().into(),
+        })
+    }
+}
+
 /// Debug seeds the shared `TypedValue`/`Closure` walker so the alternating
 /// `Closure::Apply { arg_val: TypedValue, .. }` /
 /// `TypedValue::Lambda(Closure)` cycle (reachable via repeated `APPLY` of
@@ -109,7 +121,6 @@ mod tests {
         },
         context::Ctx,
         gas::Gas,
-        irrefutable_match::irrefutable_match,
         parser::Parser,
         stack::Stack,
     };
@@ -235,14 +246,14 @@ mod tests {
         let mut stack = Stack::new();
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
             .unwrap();
-        let closure = irrefutable_match!(
-            TypedValue::unwrap_rc(stack.pop().unwrap());
-            TypedValue::Lambda
-        );
+        // The value is the lambda produced above; `TypedValue` itself
+        // implements `IntoMicheline` (delegating to its `Closure`), so the
+        // `Closure` need not be moved out of it.
+        let value = TypedValue::unwrap_rc(stack.pop().unwrap());
         let arena = Arena::new();
         let mut gas = Gas::default();
         assert_eq!(
-            closure
+            value
                 .into_micheline_optimized_legacy(&arena, &mut gas)
                 .unwrap(),
             // checked against octez-client
@@ -273,14 +284,14 @@ mod tests {
         let mut stack = Stack::new();
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
             .unwrap();
-        let closure = irrefutable_match!(
-            TypedValue::unwrap_rc(stack.pop().unwrap());
-            TypedValue::Lambda
-        );
+        // The value is the lambda produced above; `TypedValue` itself
+        // implements `IntoMicheline` (delegating to its `Closure`), so the
+        // `Closure` need not be moved out of it.
+        let value = TypedValue::unwrap_rc(stack.pop().unwrap());
         let arena = Arena::new();
         let mut gas = Gas::default();
         assert_eq!(
-            closure
+            value
                 .into_micheline_optimized_legacy(&arena, &mut gas)
                 .unwrap(),
             // checked against octez-client
@@ -332,14 +343,14 @@ mod tests {
         let mut stack = Stack::new();
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
             .unwrap();
-        let closure = irrefutable_match!(
-            TypedValue::unwrap_rc(stack.pop().unwrap());
-            TypedValue::Lambda
-        );
+        // The value is the lambda produced above; `TypedValue` itself
+        // implements `IntoMicheline` (delegating to its `Closure`), so the
+        // `Closure` need not be moved out of it.
+        let value = TypedValue::unwrap_rc(stack.pop().unwrap());
         let arena = Arena::new();
         let mut gas = Gas::default();
         assert_eq!(
-            closure
+            value
                 .into_micheline_optimized_legacy(&arena, &mut gas)
                 .unwrap(),
             // checked against octez-client's PACK behaviour.

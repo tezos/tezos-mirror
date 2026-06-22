@@ -15,6 +15,14 @@ pub enum Or<L, R> {
     Right(R),
 }
 
+/// Defaults to `Left` of the left type's default. Used as a cheap placeholder
+/// when moving an `Or` out of a `&mut` field without cloning.
+impl<L: Default, R> Default for Or<L, R> {
+    fn default() -> Self {
+        Or::Left(L::default())
+    }
+}
+
 impl<T> Or<T, T> {
     /// For an [Or] that has the same type in both branches, transform a value
     /// inside the [Or] using a supplied function.

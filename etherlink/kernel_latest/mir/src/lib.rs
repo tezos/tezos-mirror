@@ -478,7 +478,7 @@ mod tests {
                 ),
             );
         use TypedValue as TV;
-        match interp_res.unwrap() {
+        match &interp_res.unwrap() {
             (_, TV::Map(m)) => {
                 assert_eq!(
                     m.get(&TV::String("foo".to_owned())).unwrap().as_ref(),
