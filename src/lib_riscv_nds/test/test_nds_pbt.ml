@@ -602,6 +602,208 @@ let test_verify_rejects_unproven_read (module B : VERIFY_LIFECYCLE_BACKEND) () =
       "reading data absent from the proof should raise Verification_failed" ;
   unit
 
+(** Populate every database of a fresh n-database Normal-mode registry with
+    one distinct key/value pair. *)
+let build_registry_distinct_db (type a)
+    (module B : VERIFY_LIFECYCLE_BACKEND with type Normal.Registry.t = a) n =
+  let normal = B.create_normal_with_dbs n in
+  for i = 0 to n - 1 do
+    let key = Bytes.of_string (Printf.sprintf "key-%d" i) in
+    let value = Bytes.of_string (Printf.sprintf "value-%d" i) in
+    let^? () =
+      B.Normal.Database.set normal ~db_index:(Int64.of_int i) ~key ~value
+    in
+    ()
+  done ;
+  normal
+
+(** A proof that records no operations leaves the whole registry blinded:
+    a single blind leaf carrying its root hash.  Hashing such a fully-blinded
+    registry in verify mode must reproduce the original root hash. *)
+let test_verify_hashes_fully_blinded_registry
+    (module B : VERIFY_LIFECYCLE_BACKEND) () =
+  let normal = build_registry_distinct_db (module B) 5 in
+  let start_hash = B.Normal.Registry.hash normal in
+  (* Record nothing: the step touches no database, so the whole registry
+     collapses to a single blind leaf carrying its root hash. *)
+  let prove = B.Prove.start_proof normal in
+  let proof = B.Prove.produce_proof prove in
+  let proof_bytes = B.Prove.Proof.serialise proof in
+  let proof =
+    match B.Prove.Proof.deserialise proof_bytes with
+    | Ok proof -> proof
+    | Error err ->
+        Test.fail
+          "proof deserialisation failed: %a"
+          Error_monad.pp_print_trace
+          err
+  in
+  let verify = B.Verify.start_verify proof in
+  Check.(
+    (Bytes.to_string (B.Verify.Registry.hash verify)
+    = Bytes.to_string start_hash)
+      string)
+    ~error_msg:
+      "verify hash of fully-blinded registry %L does not match original root \
+       hash %R" ;
+  unit
+
+(** When only one of many databases is touched, the proof reveals that one
+    database and absorbs the others into blinded ancestors — a partially-blinded
+    registry. *)
+let test_verify_partially_blinded_registry (module B : VERIFY_LIFECYCLE_BACKEND)
+    () =
+  (* The choice of 16 is specifically to ensure that all databases have an
+     intermediate parent hash, before the root hash of the registry - as
+     the registry has MERKLE_ARITY = 4 in proofs. *)
+  let num_dbs = 16 in
+  let normal = build_registry_distinct_db (module B) num_dbs in
+  let start_hash = B.Normal.Registry.hash normal in
+
+  for i = 0 to num_dbs - 1 do
+    let prove = B.Prove.start_proof normal in
+    (* Touch a single database, leaving the other 15 blinded. *)
+    let^? (_ : bytes) =
+      B.Prove.Database.read
+        prove
+        ~db_index:(Int64.of_int i)
+        ~key:(Bytes.of_string (Printf.sprintf "key-%d" i))
+        ~offset:0L
+        ~len:100L
+    in
+    let proof = B.Prove.produce_proof prove in
+    let proof_bytes = B.Prove.Proof.serialise proof in
+    let proof =
+      match B.Prove.Proof.deserialise proof_bytes with
+      | Ok proof -> proof
+      | Error err ->
+          Test.fail
+            "proof deserialisation failed: %a"
+            Error_monad.pp_print_trace
+            err
+    in
+    let verify = B.Verify.start_verify proof in
+    let^? value =
+      B.Verify.Database.read
+        verify
+        ~db_index:(Int64.of_int i)
+        ~key:(Bytes.of_string (Printf.sprintf "key-%d" i))
+        ~offset:0L
+        ~len:100L
+    in
+    Check.((Bytes.to_string value = Printf.sprintf "value-%d" i) string)
+      ~error_msg:"verify read produced incorrect value %L, expected %R" ;
+    Check.(
+      (Bytes.to_string (B.Verify.Registry.hash verify)
+      = Bytes.to_string start_hash)
+        string)
+      ~error_msg:
+        "verify hash of partially-blinded registry %L does not match original \
+         root hash %R"
+  done ;
+  unit
+
+(** Verify lifecycle (property-based): from an arbitrary initial state,
+    recording a single operation in prove mode yields a proof that verifies.
+
+    For a random setup sequence (applied in Normal mode) and one further random
+    operation (recorded in Prove mode), the produced proof must:
+    - attest to the Normal start state and the Prove stop state
+      ([start_state]/[stop_state]);
+    - once round-tripped through its serialisation, drive a Verify-mode registry
+      that starts at the same hash, replays that one operation to the same
+      result as prove mode, and reaches the same stop hash — without diverging
+      with {!Nds_errors.Verification_failed}. *)
+let test_verify_lifecycle_single_op ?long_factor
+    (module B : VERIFY_LIFECYCLE_BACKEND) =
+  (* [BACKEND] views over each mode's registry, so the shared [apply_op]/
+     [apply_ops] drivers can run a generated operation against them. *)
+  let module NormalB : BACKEND with type Registry.t = B.Normal.Registry.t =
+  struct
+    let name = B.name
+
+    module Registry = B.Normal.Registry
+    module Database = B.Normal.Database
+
+    let create_registry_with_dbs _ = assert false
+  end in
+  let module ProveB : BACKEND with type Registry.t = B.Prove.Registry.t = struct
+    let name = B.name
+
+    module Registry = B.Prove.Registry
+    module Database = B.Prove.Database
+
+    let create_registry_with_dbs _ = assert false
+  end in
+  let module VerifyB : BACKEND with type Registry.t = B.Verify.Registry.t =
+  struct
+    let name = B.name
+
+    module Registry = B.Verify.Registry
+    module Database = B.Verify.Database
+
+    let create_registry_with_dbs _ = assert false
+  end in
+  let gen =
+    let open QCheck2.Gen in
+    let* num_dbs = gen_small_pos ~max:3 in
+    let* num_keys = gen_small_pos ~max:4 in
+    let* keys =
+      list_repeat
+        num_keys
+        (map
+           Bytes.of_string
+           (string_size (frequency [(3, 1 -- 8); (1, pure 0)])))
+    in
+    let* setup = list_size (gen_small_pos ~max:20) (gen_op ~num_dbs ~keys) in
+    let* op = gen_op ~num_dbs ~keys in
+    return (num_dbs, setup, op)
+  in
+  QCheck2.Test.make
+    ?long_factor
+    ~name:(B.name ^ ": one prove-mode op verifies after arbitrary state")
+    ~print:(fun (num_dbs, setup, op) ->
+      Format.asprintf
+        "num_dbs=%d@\nsetup:@\n%a@\nop: %a"
+        num_dbs
+        pp_ops
+        setup
+        pp_op
+        op)
+    gen
+  @@ fun (num_dbs, setup, Any op) ->
+  (* Arbitrary initial state, built in Normal mode. *)
+  let normal = B.create_normal_with_dbs num_dbs in
+  apply_ops (module NormalB) normal setup ;
+  let start_hash = B.Normal.Registry.hash normal in
+  (* Record exactly one operation in Prove mode. *)
+  let prove = B.Prove.start_proof normal in
+  let prove_res = apply_op (module ProveB) prove op in
+  let stop_hash = B.Prove.Registry.hash prove in
+  let proof = B.Prove.produce_proof prove in
+  (* Round-trip the proof through its byte serialisation. *)
+  let proof =
+    match B.Prove.Proof.deserialise (B.Prove.Proof.serialise proof) with
+    | Ok proof -> proof
+    | Error err ->
+        Test.fail
+          "proof deserialisation failed: %a"
+          Error_monad.pp_print_trace
+          err
+  in
+  (* The proof attests to the Normal start state and the Prove stop state. *)
+  let proof_anchors =
+    Bytes.equal (B.Prove.Proof.start_state proof) start_hash
+    && Bytes.equal (B.Prove.Proof.stop_state proof) stop_hash
+  in
+  (* Replay the single operation in Verify mode against the proof. *)
+  let verify = B.Verify.start_verify proof in
+  let verify_start = Bytes.equal (B.Verify.Registry.hash verify) start_hash in
+  let verify_res = apply_op (module VerifyB) verify op in
+  let results_match = prove_res = verify_res in
+  let verify_stop = Bytes.equal (B.Verify.Registry.hash verify) stop_hash in
+  proof_anchors && verify_start && results_match && verify_stop
+
 (** {2 Model-based (stateful) properties} *)
 
 (** Bisimulation: a random sequence of operations on the NDS must produce
@@ -722,10 +924,28 @@ let register_verify_tests (module B : VERIFY_LIFECYCLE_BACKEND) =
       ~tags:["unit"; "nds"; "verify"; B.name]
       body
   in
-  register "verify replays a proof" (fun () ->
-      test_verify_replays_proof (module B) ()) ;
-  register "verify rejects a read absent from the proof" (fun () ->
-      test_verify_rejects_unproven_read (module B) ())
+  register "verify replays a proof" @@ test_verify_replays_proof (module B) ;
+  register "verify rejects a read absent from the proof"
+  @@ test_verify_rejects_unproven_read (module B) ;
+  register "verify hashes a fully-blinded registry"
+  @@ test_verify_hashes_fully_blinded_registry (module B) ;
+  register "verify works over a partially-blinded registry"
+  @@ test_verify_partially_blinded_registry (module B)
+
+(** Register the verify-lifecycle PBT for a {!VERIFY_LIFECYCLE_BACKEND}, wrapping
+    the disk backend's iterations with the file-handle GC. *)
+let register_verify_lifecycle_pbt ?long_factor
+    (module B : VERIFY_LIFECYCLE_BACKEND) =
+  let register =
+    if String.starts_with ~prefix:"disk" B.name then register_pbt_with_disk_gc
+    else Qcheck_tezt.register
+  in
+  register
+    ~__FILE__
+    ~seed:Random
+    ~long:true
+    ~tags:["nds"; "verify"; B.name; "long"]
+    (test_verify_lifecycle_single_op ?long_factor (module B))
 
 let register_with_backend (backend : (module BACKEND)) =
   (* Unit tests *)
@@ -810,4 +1030,6 @@ let () =
   register_proof_tests (module Disk_proof_lifecycle) ;
   (* Verify API: the genuine replay-of-prior-state and divergence paths. *)
   register_verify_tests (module Memory_verify_lifecycle) ;
-  register_verify_tests (module Disk_verify_lifecycle)
+  register_verify_tests (module Disk_verify_lifecycle) ;
+  register_verify_lifecycle_pbt ~long_factor:50 (module Memory_verify_lifecycle) ;
+  register_verify_lifecycle_pbt ~long_factor:10 (module Disk_verify_lifecycle)
