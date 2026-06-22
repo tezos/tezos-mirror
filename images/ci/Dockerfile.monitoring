@@ -1,10 +1,10 @@
 # runtime + datadog client + basic utils
 
 ARG GCLOUD_VERSION=${GCLOUD_VERSION:-null}
-FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:$GCLOUD_VERSION-alpine as gcloud
+FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:$GCLOUD_VERSION-alpine AS gcloud
 
 # hadolint ignore=DL3006
-FROM runtime as monitoring
+FROM runtime AS monitoring
 
 LABEL org.opencontainers.image.title="monitoring"
 
