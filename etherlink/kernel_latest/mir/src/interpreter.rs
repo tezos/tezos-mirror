@@ -2713,7 +2713,7 @@ fn interpret_one<'a>(
         I::Compare => {
             let l = pop_rc!();
             let r = pop_rc!();
-            ctx.gas().consume(interpret_cost::compare(&l, &r)?)?;
+            interpret_cost::compare(ctx.gas(), &l, &r)?;
             let cmp = l
                 .partial_cmp(&r)
                 .ok_or(InterpretError::CompareError(CompareError::Incomparable))?
@@ -5667,8 +5667,11 @@ mod interpreter_tests {
         macro_rules! test {
             ($expr:tt, $res:tt) => {
                 let mut stack: IStack<'_> = stk!$expr;
-                let expected_cost = interpret_cost::compare(stack.get(0).unwrap().as_ref(), stack.get(1).unwrap().as_ref())
-                    .unwrap()
+                let mut cost_gas = Gas::default();
+                interpret_cost::compare(&mut cost_gas, stack.get(0).unwrap().as_ref(), stack.get(1).unwrap().as_ref())
+                    .unwrap();
+                let expected_cost = (Gas::default().milligas().unwrap()
+                    - cost_gas.milligas().unwrap())
                     + interpret_cost::INTERPRET_RET;
                 let mut ctx = Ctx::default();
                 assert!(interpret(&[Compare], &mut ctx, &mut stack).is_ok());

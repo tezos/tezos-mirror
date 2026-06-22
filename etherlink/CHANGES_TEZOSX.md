@@ -96,6 +96,11 @@
 
 ### Michelson Runtime
 
+- `COMPARE` (and `set`/`map` literal key-ordering checks at typechecking) now
+  charge their gas incrementally while walking the value, so a comparison over
+  a maximally-shared value (an O(n) in-memory DAG that expands to 2^n nodes)
+  runs out of gas mid-walk instead of doing the full walk before charging. The
+  total gas charged is unchanged. (L2-1654)
 - The `APPLY` instruction now rejects a non-packable captured value
   (e.g. `big_map` or `ticket`) during typechecking, matching L1, which
   requires the captured type to be packable with contracts disallowed.

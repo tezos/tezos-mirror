@@ -20,6 +20,7 @@ fn tc_is_resource_exhaustion(e: &TcError) -> bool {
         TcError::OutOfGas(_)
             | TcError::CostOverflow(_)
             | TcError::CompareError(CompareError::Cost(_))
+            | TcError::CompareError(CompareError::OutOfGas(_))
     )
 }
 
@@ -119,9 +120,11 @@ fn unify_interpreter_error<'a>(
             InterpretError::OutOfGas
             | InterpretError::CostOverflow(_)
             | InterpretError::CompareError(CompareError::Cost(_))
+            | InterpretError::CompareError(CompareError::OutOfGas(_))
             | InterpretError::TcError(TcError::OutOfGas(_))
             | InterpretError::TcError(TcError::CostOverflow(_))
-            | InterpretError::TcError(TcError::CompareError(CompareError::Cost(_))),
+            | InterpretError::TcError(TcError::CompareError(CompareError::Cost(_)))
+            | InterpretError::TcError(TcError::CompareError(CompareError::OutOfGas(_))),
         ) => true,
         (_, _) => false, //Some error that we didn't expect happened.
     }
