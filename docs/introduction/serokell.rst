@@ -28,8 +28,6 @@ Uninstall Serokell packages while preserving data::
 
     sudo apt autoremove tezos-client tezos-node tezos-baking
 
-If you were using RPM packages, use ``dnf`` instead of ``apt``.
-
 3. Add NL Repository
 --------------------
 **If using Debian** (see other :ref:`supported platforms <installing_deb>`), add the NL package repository and install the ``octez-node`` package:
@@ -56,8 +54,6 @@ If you were using RPM packages, use ``dnf`` instead of ``apt``.
 When prompted, answer **Yes** to skip automatic configuration.
 
 If needed, install the Dialog interface with ``sudo apt install dialog``.
-
-**If using RPM packages** rather then Debian ones, refer to :ref:`installing_rpm`.
 
 5. Relocate Data
 ----------------
@@ -107,8 +103,6 @@ Install the baker::
     sudo apt install octez-baker
 
 During installation, depending on the interaction settings, the configuration dialog may offer you the choice between running the unique baker executable or several protocol-suffixed executables.
-
-If you want to install RPM packages rather then Debian ones, refer to :ref:`installing_rpm`.
 
 Then enable and start the baking service::
 
