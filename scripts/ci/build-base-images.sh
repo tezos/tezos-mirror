@@ -80,6 +80,7 @@ docker buildx build --push \
   --build-arg IMAGE="$IMAGE_PATH" \
   --build-arg APT_PROXY="${APT_PROXY_DEB:-}" \
   --build-arg DOCKER_VERSION="${DOCKER_VERSION:-}" \
+  --build-arg DOCKER_DIGEST="${DOCKER_DIGEST:-}" \
   --build-arg GCLOUD_VERSION="${GCLOUD_VERSION:-}" \
   --build-arg HADOLINT_VERSION="${HADOLINT_VERSION:-}" \
   --build-arg REGCTL_VERSION="${REGCTL_VERSION:-}" \
