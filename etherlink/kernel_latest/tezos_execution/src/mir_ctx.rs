@@ -1021,6 +1021,7 @@ impl<Host: StorageV1, C: Context> TcCtx<'_, Host, C> {
 fn remove_big_map<Host: StorageV1, C: Context>(
     host: &mut Host,
     context: &C,
+    operation_gas: Option<&mut crate::gas::TezlinkOperationGas>,
     id: &BigMapId,
 ) -> Result<(), LazyStorageError> {
     // Remove the key type of the big_map
@@ -1032,7 +1033,7 @@ fn remove_big_map<Host: StorageV1, C: Context>(
     host.store_delete(&value_type_path)?;
 
     // Removing the content of the big_map
-    BigMapKeys::remove_keys_in_storage(host, context, id)?;
+    BigMapKeys::remove_keys_in_storage(host, context, operation_gas, id)?;
 
     let total_bytes_path = total_bytes_path(context, id)?;
     host.store_delete_value(&total_bytes_path)?;
@@ -1049,7 +1050,7 @@ pub fn clear_temporary_big_maps<Host: StorageV1, C: Context>(
     next_temp_id: &mut BigMapId,
 ) -> Result<(), LazyStorageError> {
     while next_temp_id.dec() {
-        remove_big_map(host, context, next_temp_id)?;
+        remove_big_map(host, context, None, next_temp_id)?;
     }
     Ok(())
 }
@@ -1173,6 +1174,7 @@ impl BigMapKeys {
     fn remove_keys_in_storage<C: Context>(
         host: &mut impl StorageV1,
         context: &C,
+        mut operation_gas: Option<&mut crate::gas::TezlinkOperationGas>,
         id: &BigMapId,
     ) -> Result<(), LazyStorageError> {
         let path = keys_of_big_map(context, id)?;
@@ -1188,6 +1190,13 @@ impl BigMapKeys {
         };
         for key in big_map_keys.keys {
             let value_path = value_path(context, id, &key)?;
+            // Each entry value is L1's carbonated `Big_map.Contents`; charge
+            // its removal as one durable write. The `0` is the payload byte
+            // count: a delete writes no new bytes, so only the per-write base
+            // is charged (same pattern as `big_map_update`'s delete branch).
+            if let Some(operation_gas) = operation_gas.as_deref_mut() {
+                consume_storage_write_milligas(operation_gas, 1, 0)?;
+            }
             host.store_delete(&value_path)?;
         }
 
@@ -1200,6 +1209,7 @@ impl BigMapKeys {
     fn copy_keys_in_storage<C: Context>(
         host: &mut impl StorageV1,
         context: &C,
+        operation_gas: &mut crate::gas::TezlinkOperationGas,
         source: &BigMapId,
         dest: &BigMapId,
     ) -> Result<(), LazyStorageError> {
@@ -1219,8 +1229,10 @@ impl BigMapKeys {
             let source_value_path = value_path(context, source, key)?;
             let dest_value_path = value_path(context, dest, key)?;
 
-            // Copy the value at from source path to dest path
+            let size = host.store_value_size(&source_value_path)? as u64;
+            consume_storage_read_milligas(operation_gas, 1, size)?;
             let value = host.store_read_all(&source_value_path)?;
+            consume_storage_write_milligas(operation_gas, 1, size)?;
             host.store_write_all(&dest_value_path, &value)?;
         }
 
@@ -1482,7 +1494,13 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
             .store_write_all(&dest_value_type_path, &value_type)?;
 
         // Copy the content of the big_map
-        BigMapKeys::copy_keys_in_storage(self.host, self.context, id, &dest_id)?;
+        BigMapKeys::copy_keys_in_storage(
+            self.host,
+            self.context,
+            self.operation_gas,
+            id,
+            &dest_id,
+        )?;
 
         let source_total_bytes = total_bytes(self.host, self.context, id)?;
         set_total_bytes(self.host, self.context, &dest_id, &source_total_bytes)?;
@@ -1502,7 +1520,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
             id,
             &Zarith(-(BigInt::from(BYTES_SIZE_FOR_EMPTY) + total.0)),
         );
-        remove_big_map(self.host, self.context, id)?;
+        remove_big_map(self.host, self.context, Some(self.operation_gas), id)?;
 
         // Write in the diff that there was a remove
         self.big_map_diff_remove(id.value.clone());
@@ -2342,6 +2360,69 @@ pub mod tests {
             total_bytes(ctx.host, ctx.context, &dest).unwrap(),
             src_total
         );
+    }
+
+    #[test]
+    fn big_map_copy_charges_gas_per_persisted_entry() {
+        fn copy_gas(entries: usize, value: &str) -> u64 {
+            let mut host = MockKernelHost::default();
+            let context = TezlinkContext::init_context();
+            make_default_ctx!(ctx, &mut host, &context);
+            let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+            for i in 0..entries {
+                ctx.big_map_update(
+                    &src,
+                    TypedValue::int(i as i64),
+                    Some(TypedValue::String(value.into())),
+                )
+                .unwrap();
+            }
+            let before = ctx.operation_gas.total_milligas_consumed();
+            ctx.big_map_copy(&src, false).unwrap();
+            (ctx.operation_gas.total_milligas_consumed() - before) as u64
+        }
+
+        let value = "a fixed-size value";
+        let value_size = encoded_size(&TypedValue::String(value.into()));
+        let per_entry = crate::storage_read_cost_milligas(1, value_size)
+            + crate::storage_write_cost_milligas(1, value_size);
+
+        let small = copy_gas(2, value);
+        let large = copy_gas(20, value);
+
+        assert_eq!(small, 2 * per_entry);
+        assert_eq!(large, 20 * per_entry);
+        assert_eq!(large - small, 18 * per_entry);
+    }
+
+    #[test]
+    fn big_map_remove_charges_gas_per_persisted_entry() {
+        fn remove_gas(entries: usize) -> u64 {
+            let mut host = MockKernelHost::default();
+            let context = TezlinkContext::init_context();
+            make_default_ctx!(ctx, &mut host, &context);
+            let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+            for i in 0..entries {
+                ctx.big_map_update(
+                    &id,
+                    TypedValue::int(i as i64),
+                    Some(TypedValue::String("v".into())),
+                )
+                .unwrap();
+            }
+            let before = ctx.operation_gas.total_milligas_consumed();
+            ctx.big_map_remove(&id).unwrap();
+            (ctx.operation_gas.total_milligas_consumed() - before) as u64
+        }
+
+        let per_entry = crate::storage_write_cost_milligas(1, 0);
+
+        let small = remove_gas(2);
+        let large = remove_gas(20);
+
+        assert_eq!(small, 2 * per_entry);
+        assert_eq!(large, 20 * per_entry);
+        assert_eq!(large - small, 18 * per_entry);
     }
 
     #[test]

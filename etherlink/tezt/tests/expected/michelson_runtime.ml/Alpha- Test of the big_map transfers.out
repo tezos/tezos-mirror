@@ -50,7 +50,7 @@ Test transferring big map from "sender_fresh" to "receiver_store"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2482.677 units (will add 100 for safety)
+Estimated gas: 2882.707 units (will add 100 for safety)
 Estimated storage: 70 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -59,13 +59,13 @@ Operation found in block: [BLOCK_HASH] (pass: 3, offset: 0)
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000217
+    Fee to the baker: ꜩ0.000235
     Expected counter: 6
-    Gas limit: 2583
+    Gas limit: 2983
     Storage limit: 90 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000217
-      payload fees(the block proposer) ....... +ꜩ0.000217
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000235
+      payload fees(the block proposer) ....... +ꜩ0.000235
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -91,7 +91,7 @@ This sequence of operations was run:
             Clear map(0)
           Storage size: 141 bytes
           Paid storage size diff: 70 bytes
-          Consumed gas: 1105.985
+          Consumed gas: 1506.015
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.00007
             storage fees ........................... +ꜩ0.00007
@@ -105,7 +105,7 @@ Test transferring big map from "sender_fresh" to "receiver_store_updated"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2899.623 units (will add 100 for safety)
+Estimated gas: 3299.653 units (will add 100 for safety)
 Estimated storage: 72 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -114,13 +114,13 @@ Operation found in block: [BLOCK_HASH] (pass: 3, offset: 0)
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000235
+    Fee to the baker: ꜩ0.000253
     Expected counter: 9
-    Gas limit: 3000
+    Gas limit: 3400
     Storage limit: 92 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000235
-      payload fees(the block proposer) ....... +ꜩ0.000235
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000253
+      payload fees(the block proposer) ....... +ꜩ0.000253
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -148,7 +148,7 @@ This sequence of operations was run:
             Clear map(2)
           Storage size: 190 bytes
           Paid storage size diff: 72 bytes
-          Consumed gas: 1512.851
+          Consumed gas: 1912.881
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.000072
             storage fees ........................... +ꜩ0.000072
@@ -162,7 +162,7 @@ Test transferring big map from "sender_stored" to "receiver_drop"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2278.161 units (will add 100 for safety)
+Estimated gas: 2678.191 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -171,13 +171,13 @@ Operation found in block: [BLOCK_HASH] (pass: 3, offset: 0)
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000208
+    Fee to the baker: ꜩ0.000226
     Expected counter: 12
-    Gas limit: 2379
+    Gas limit: 2779
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000208
-      payload fees(the block proposer) ....... +ꜩ0.000208
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000226
+      payload fees(the block proposer) ....... +ꜩ0.000226
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -188,7 +188,7 @@ This sequence of operations was run:
       Updated big_maps:
         Copy map(4) to temp(1)
       Storage size: 159 bytes
-      Consumed gas: 1173.059
+      Consumed gas: 1573.089
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -209,7 +209,7 @@ Test transferring big map from "sender_stored" to "receiver_store"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2280.046 units (will add 100 for safety)
+Estimated gas: 3080.106 units (will add 100 for safety)
 Estimated storage: 70 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -218,13 +218,13 @@ Operation found in block: [BLOCK_HASH] (pass: 3, offset: 0)
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000208
+    Fee to the baker: ꜩ0.000244
     Expected counter: 15
-    Gas limit: 2381
+    Gas limit: 3181
     Storage limit: 90 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000208
-      payload fees(the block proposer) ....... +ꜩ0.000208
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000244
+      payload fees(the block proposer) ....... +ꜩ0.000244
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -235,7 +235,7 @@ This sequence of operations was run:
       Updated big_maps:
         Copy map(6) to temp(1)
       Storage size: 159 bytes
-      Consumed gas: 1174.059
+      Consumed gas: 1574.089
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -249,7 +249,7 @@ This sequence of operations was run:
             Clear map(5)
           Storage size: 141 bytes
           Paid storage size diff: 70 bytes
-          Consumed gas: 1105.985
+          Consumed gas: 1506.015
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.00007
             storage fees ........................... +ꜩ0.00007
@@ -263,7 +263,7 @@ Test transferring big map from "sender_stored" to "receiver_store_updated"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2696.992 units (will add 100 for safety)
+Estimated gas: 3497.052 units (will add 100 for safety)
 Estimated storage: 72 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -272,13 +272,13 @@ Operation found in block: [BLOCK_HASH] (pass: 3, offset: 0)
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000226
+    Fee to the baker: ꜩ0.000262
     Expected counter: 18
-    Gas limit: 2797
+    Gas limit: 3598
     Storage limit: 92 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000226
-      payload fees(the block proposer) ....... +ꜩ0.000226
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000262
+      payload fees(the block proposer) ....... +ꜩ0.000262
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -289,7 +289,7 @@ This sequence of operations was run:
       Updated big_maps:
         Copy map(9) to temp(1)
       Storage size: 159 bytes
-      Consumed gas: 1184.139
+      Consumed gas: 1584.169
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -305,7 +305,7 @@ This sequence of operations was run:
             Clear map(8)
           Storage size: 190 bytes
           Paid storage size diff: 72 bytes
-          Consumed gas: 1512.851
+          Consumed gas: 1912.881
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.000072
             storage fees ........................... +ꜩ0.000072
@@ -319,7 +319,7 @@ Test transferring big map from "sender_stored_updated" to "receiver_drop"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2685.027 units (will add 100 for safety)
+Estimated gas: 3485.087 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -328,13 +328,13 @@ Operation found in block: [BLOCK_HASH] (pass: 3, offset: 0)
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000226
+    Fee to the baker: ꜩ0.000262
     Expected counter: 21
-    Gas limit: 2786
+    Gas limit: 3586
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000226
-      payload fees(the block proposer) ....... +ꜩ0.000226
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000262
+      payload fees(the block proposer) ....... +ꜩ0.000262
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -347,7 +347,7 @@ This sequence of operations was run:
         Unset temp(1)["b"]
         Set temp(1)["a"] to 0x0010
       Storage size: 276 bytes
-      Consumed gas: 1579.925
+      Consumed gas: 2379.985
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -368,7 +368,7 @@ Test transferring big map from "sender_stored_updated" to "receiver_store"
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2686.912 units (will add 100 for safety)
+Estimated gas: 4287.044 units (will add 100 for safety)
 Estimated storage: 142 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -377,13 +377,13 @@ Operation found in block: [BLOCK_HASH] (pass: 3, offset: 0)
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000226
+    Fee to the baker: ꜩ0.000298
     Expected counter: 24
-    Gas limit: 2787
+    Gas limit: 4388
     Storage limit: 162 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000226
-      payload fees(the block proposer) ....... +ꜩ0.000226
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000298
+      payload fees(the block proposer) ....... +ꜩ0.000298
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -396,7 +396,7 @@ This sequence of operations was run:
         Unset temp(1)["b"]
         Set temp(1)["a"] to 0x0010
       Storage size: 276 bytes
-      Consumed gas: 1580.926
+      Consumed gas: 2380.986
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -410,7 +410,7 @@ This sequence of operations was run:
             Clear map(12)
           Storage size: 213 bytes
           Paid storage size diff: 142 bytes
-          Consumed gas: 1105.985
+          Consumed gas: 1906.057
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.000142
             storage fees ........................... +ꜩ0.000142
@@ -424,7 +424,7 @@ Test transferring big map from "sender_stored_updated" to "receiver_store_update
 
 ./octez-client --wait 0 transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3103.858 units (will add 100 for safety)
+Estimated gas: 4703.990 units (will add 100 for safety)
 Estimated storage: 144 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -433,13 +433,13 @@ Operation found in block: [BLOCK_HASH] (pass: 3, offset: 0)
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000245
+    Fee to the baker: ꜩ0.000317
     Expected counter: 27
-    Gas limit: 3204
+    Gas limit: 4804
     Storage limit: 164 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000245
-      payload fees(the block proposer) ....... +ꜩ0.000245
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000317
+      payload fees(the block proposer) ....... +ꜩ0.000317
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -452,7 +452,7 @@ This sequence of operations was run:
         Unset temp(1)["b"]
         Set temp(1)["a"] to 0x0010
       Storage size: 276 bytes
-      Consumed gas: 1591.006
+      Consumed gas: 2391.066
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -468,7 +468,7 @@ This sequence of operations was run:
             Clear map(15)
           Storage size: 262 bytes
           Paid storage size diff: 144 bytes
-          Consumed gas: 1512.851
+          Consumed gas: 2312.923
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.000144
             storage fees ........................... +ꜩ0.000144
