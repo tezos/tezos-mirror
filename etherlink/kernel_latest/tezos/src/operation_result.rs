@@ -270,6 +270,15 @@ pub enum ApplyOperationError {
     CannotPayStorageFee(BalanceTooLow),
     #[error("Operation quota exceeded")]
     OperationQuotaExceeded,
+    /// Two internal operations within the same top-level operation
+    /// carried the same MIR operation counter — the identity used to
+    /// enforce internal-operation linearity. `operation` is
+    /// `Duplicable` at the type level, so `DUP` over an `operation`
+    /// value is well-typed, but L1 rejects the duplicated internal
+    /// operation at application time with `Internal_operation_replay`,
+    /// and so do we (L2-1637).
+    #[error("Internal operation replay attempt")]
+    InternalOperationReplay,
     // This error variant is used to encapsulate errors that were generated in the past and encoded as bson.
     // It should not be used for new errors, which should be added as new variants to this enum.
     // This is a temporary solution while waiting for better error support.

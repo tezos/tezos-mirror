@@ -22,7 +22,7 @@ use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
 use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
@@ -587,6 +587,26 @@ fn burn_tez(
     Ok(new_balance)
 }
 
+/// How a queued internal operation should be turned into a receipt.
+///
+/// The decision is the same for every operation kind, so it is taken
+/// once per operation — before the per-kind `match` — rather than
+/// re-derived inside each arm:
+/// - [`Disposition::Skip`]: a previous internal operation in the same
+///   top-level operation already failed, so this one is not executed
+///   and is reported as `Skipped`.
+/// - [`Disposition::Replay`]: this operation shares its MIR counter
+///   with an already-applied one (a `DUP`ed `operation` value); it is
+///   rejected as an internal-operation replay (matching L1's
+///   `Internal_operation_replay`) instead of being applied again.
+/// - [`Disposition::Apply`]: execute the operation normally.
+#[derive(Clone, Copy)]
+enum Disposition {
+    Skip,
+    Replay,
+    Apply,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn execute_internal_operations<'a, Host, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
@@ -618,6 +638,15 @@ where
         // assigned at block finalization by renumber_nonces().
         let nonce = *nonce_counter;
         *nonce_counter = nonce_counter.saturating_add(1);
+        // Internal-operation replay detection (L2-1637). `operation` is
+        // `Duplicable`, so a contract may `DUP` an `operation` value and
+        // emit both copies. They share the MIR `counter`, the identity
+        // L1 uses to enforce internal-operation linearity. Record each
+        // counter as it is dequeued; a counter already seen within this
+        // top-level operation is a replay, and the duplicated operation
+        // is rejected (matching L1 `Internal_operation_replay`) instead
+        // of being applied a second time under a fresh display nonce.
+        let is_replay = !operation_ctx.applied_counters.insert(counter);
         let receipts_before = all_internal_receipts.len();
         // Watermarks for `drain_reentrant_crac_ops`: any CRAC receipt
         // pushed during this internal operation's execution — to any
@@ -629,6 +658,18 @@ where
         let failed_crac_receipts_before = journal.michelson.failed_crac_receipts.len();
         let backtracked_crac_receipts_before =
             journal.michelson.backtracked_crac_receipts.len();
+        // Resolve the disposition once: a prior failure short-circuits
+        // every kind to `Skip`, a replayed counter to `Replay`, and a
+        // replay also fails the enclosing operation. Only `Apply` needs
+        // the per-kind logic below.
+        let disposition = if failed.is_some() {
+            Disposition::Skip
+        } else if is_replay {
+            failed = Some(index);
+            Disposition::Replay
+        } else {
+            Disposition::Apply
+        };
         let (internal_receipt, delegated_storage_cost_delta) = match operation {
             mir::ast::Operation::TransferTokens(TransferTokens {
                 param,
@@ -654,71 +695,73 @@ where
                         value: encoded_value,
                     },
                 };
-                if failed.is_some() {
-                    (
-                        InternalOperationSum::Transfer(InternalContentWithMetadata {
-                            content,
-                            sender: sender_account.contract(),
-                            nonce,
-                            result: ContentResult::Skipped,
-                        }),
+                let (result, delegated_storage_cost_delta) = match disposition {
+                    Disposition::Skip => (ContentResult::Skipped, 0),
+                    Disposition::Replay => (
+                        ContentResult::Failed(
+                            ApplyOperationError::InternalOperationReplay.into(),
+                        ),
                         0,
-                    )
-                } else {
-                    let receipt = transfer(
-                        tc_ctx,
-                        operation_ctx,
-                        registry,
-                        journal,
-                        sender_account,
-                        &content.amount,
-                        &content.destination,
-                        &content.parameters.entrypoint,
-                        value,
-                        parser,
-                        all_internal_receipts,
-                        false,
-                        nonce_counter,
-                    );
-                    let delegated_storage_cost_delta = match &receipt {
-                        Ok((_, delta)) => *delta,
-                        Err(_) => 0,
-                    };
-                    let internal_op =
-                        InternalOperationSum::Transfer(InternalContentWithMetadata {
-                            content,
-                            sender: sender_account.contract(),
-                            nonce,
-                            result: match receipt {
-                                Ok((success, _)) => {
-                                    let sub_ops_succeeded = all_internal_receipts
-                                        .get(receipts_before..)
-                                        .and_then(|s| s.last())
-                                        .is_none_or(|t| t.op.is_applied());
-                                    if sub_ops_succeeded {
-                                        ContentResult::Applied(success.into())
-                                    } else {
-                                        failed = Some(index);
-                                        ContentResult::BackTracked(BacktrackedResult {
-                                            errors: None,
-                                            result: success.into(),
-                                        })
-                                    }
-                                }
-                                Err(CracError::BlockAbort(msg)) => {
-                                    return Err(ApplyOperationError::BlockAbort(msg));
-                                }
-                                Err(CracError::Operation(err)) => {
+                    ),
+                    Disposition::Apply => {
+                        let receipt = transfer(
+                            tc_ctx,
+                            operation_ctx,
+                            registry,
+                            journal,
+                            sender_account,
+                            &content.amount,
+                            &content.destination,
+                            &content.parameters.entrypoint,
+                            value,
+                            parser,
+                            all_internal_receipts,
+                            false,
+                            nonce_counter,
+                        );
+                        let delegated_storage_cost_delta = match &receipt {
+                            Ok((_, delta)) => *delta,
+                            Err(_) => 0,
+                        };
+                        let result = match receipt {
+                            Ok((success, _)) => {
+                                let sub_ops_succeeded = all_internal_receipts
+                                    .get(receipts_before..)
+                                    .and_then(|s| s.last())
+                                    .is_none_or(|t| t.op.is_applied());
+                                if sub_ops_succeeded {
+                                    ContentResult::Applied(success.into())
+                                } else {
                                     failed = Some(index);
-                                    log!(Error, "Internal transfer failed: {err:?}");
-                                    ContentResult::Failed(
-                                        ApplyOperationError::from(err).into(),
-                                    )
+                                    ContentResult::BackTracked(BacktrackedResult {
+                                        errors: None,
+                                        result: success.into(),
+                                    })
                                 }
-                            },
-                        });
-                    (internal_op, delegated_storage_cost_delta)
-                }
+                            }
+                            Err(CracError::BlockAbort(msg)) => {
+                                return Err(ApplyOperationError::BlockAbort(msg));
+                            }
+                            Err(CracError::Operation(err)) => {
+                                failed = Some(index);
+                                log!(Error, "Internal transfer failed: {err:?}");
+                                ContentResult::Failed(
+                                    ApplyOperationError::from(err).into(),
+                                )
+                            }
+                        };
+                        (result, delegated_storage_cost_delta)
+                    }
+                };
+                (
+                    InternalOperationSum::Transfer(InternalContentWithMetadata {
+                        content,
+                        sender: sender_account.contract(),
+                        nonce,
+                        result,
+                    }),
+                    delegated_storage_cost_delta,
+                )
             }
             mir::ast::Operation::CreateContract(mir::ast::CreateContract {
                 delegate,
@@ -742,53 +785,46 @@ where
                         .encode(tc_ctx.gas())?
                         .map_err(encode_err)?,
                 };
-                if failed.is_some() {
-                    (
-                        InternalOperationSum::Origination(InternalContentWithMetadata {
-                            content: OriginationContent {
-                                balance: amount,
-                                delegate,
-                                script,
-                            },
-                            sender: sender_account.contract(),
-                            nonce,
-                            result: ContentResult::Skipped,
-                        }),
-                        0,
-                    )
-                } else {
-                    let receipt = originate_contract(
-                        tc_ctx,
-                        address,
-                        sender_account,
-                        &amount,
-                        Some(&script.code),
-                        storage,
-                        &Origin::Native,
-                    );
-                    (
-                        InternalOperationSum::Origination(InternalContentWithMetadata {
-                            content: OriginationContent {
-                                balance: amount,
-                                delegate,
-                                script,
-                            },
-                            sender: sender_account.contract(),
-                            nonce,
-                            result: match receipt {
-                                Ok(success) => ContentResult::Applied(success),
-                                Err(err) => {
-                                    failed = Some(index);
-                                    log!(Error, "Internal origination failed: {err:?}");
-                                    ContentResult::Failed(
-                                        ApplyOperationError::from(err).into(),
-                                    )
-                                }
-                            },
-                        }),
-                        0,
-                    )
-                }
+                let result = match disposition {
+                    Disposition::Skip => ContentResult::Skipped,
+                    Disposition::Replay => ContentResult::Failed(
+                        ApplyOperationError::InternalOperationReplay.into(),
+                    ),
+                    Disposition::Apply => {
+                        let receipt = originate_contract(
+                            tc_ctx,
+                            address,
+                            sender_account,
+                            &amount,
+                            Some(&script.code),
+                            storage,
+                            &Origin::Native,
+                        );
+                        match receipt {
+                            Ok(success) => ContentResult::Applied(success),
+                            Err(err) => {
+                                failed = Some(index);
+                                log!(Error, "Internal origination failed: {err:?}");
+                                ContentResult::Failed(
+                                    ApplyOperationError::from(err).into(),
+                                )
+                            }
+                        }
+                    }
+                };
+                (
+                    InternalOperationSum::Origination(InternalContentWithMetadata {
+                        content: OriginationContent {
+                            balance: amount,
+                            delegate,
+                            script,
+                        },
+                        sender: sender_account.contract(),
+                        nonce,
+                        result,
+                    }),
+                    0,
+                )
             }
             mir::ast::Operation::SetDelegate(set_delegate) => {
                 return Err(ApplyOperationError::UnSupportedSetDelegate(format!(
@@ -826,16 +862,20 @@ where
                     }
                 }
                 .into();
-                let result = if failed.is_some() {
-                    ContentResult::Skipped
-                } else {
-                    // Same semantics as OCaml:
-                    // Gas.consumed ~since:ctxt_before_op ~until:ctxt
-                    let consumed_milligas = tc_ctx
-                        .operation_gas
-                        .get_and_reset_milligas_consumed()
-                        .map_err(TransferError::OutOfGas)?;
-                    ContentResult::Applied(EventSuccess { consumed_milligas })
+                let result = match disposition {
+                    Disposition::Skip => ContentResult::Skipped,
+                    Disposition::Replay => ContentResult::Failed(
+                        ApplyOperationError::InternalOperationReplay.into(),
+                    ),
+                    Disposition::Apply => {
+                        // Same semantics as OCaml:
+                        // Gas.consumed ~since:ctxt_before_op ~until:ctxt
+                        let consumed_milligas = tc_ctx
+                            .operation_gas
+                            .get_and_reset_milligas_consumed()
+                            .map_err(TransferError::OutOfGas)?;
+                        ContentResult::Applied(EventSuccess { consumed_milligas })
+                    }
                 };
                 (
                     InternalOperationSum::Event(InternalContentWithMetadata {
@@ -2194,6 +2234,7 @@ where
             let mut operation_ctx = OperationCtx {
                 source: source_account,
                 counter: &mut counter,
+                applied_counters: BTreeSet::new(),
                 origination_nonce,
                 level: block_ctx.level,
                 now: block_ctx.now,
@@ -5566,6 +5607,397 @@ mod tests {
             }
         } else {
             panic!("Second receipt is not a Transfer with Internal Operations");
+        }
+    }
+
+    /// L2-1637: a contract `DUP`s an `operation` value and emits both
+    /// copies. `operation` is `Duplicable`, so this typechecks, but the
+    /// two copies share one MIR counter — the identity L1 uses to
+    /// enforce internal-operation linearity. The kernel must reject the
+    /// second copy as an internal-operation replay instead of applying
+    /// it a second time under a fresh display nonce; otherwise the
+    /// carried side effect (here a plain transfer, but equally a
+    /// ticket-carrying transfer) would run twice while L1 backtracks.
+    #[test]
+    fn test_internal_transfer_replay_is_rejected() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 100000);
+        reveal_account(&mut host, &src);
+
+        // Parent: build one internal transfer, DUP the resulting
+        // `operation`, and emit both copies in the returned list.
+        static DUP_TRANSFER_SCRIPT: &str = r#"
+            parameter address;
+            storage unit;
+            code {
+                CAR;
+                CONTRACT unit;
+                IF_NONE { PUSH string "Invalid contract address"; FAILWITH } {};
+                PUSH mutez 0;
+                PUSH unit Unit;
+                TRANSFER_TOKENS;
+                DUP;
+                NIL operation;
+                SWAP; CONS;
+                SWAP; CONS;
+                PUSH unit Unit;
+                SWAP;
+                PAIR
+            }"#;
+
+        let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &parent_hash,
+            DUP_TRANSFER_SCRIPT,
+            &Micheline::from(()),
+            &100_u64.into(),
+        );
+
+        let receiver_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &receiver_hash,
+            UNIT_SCRIPT,
+            &Micheline::from(()),
+            &100_u64.into(),
+        );
+
+        let receiver_address =
+            Micheline::Bytes(Contract::Originated(receiver_hash).to_bytes().unwrap());
+
+        let operation = make_transfer_operation(
+            10,
+            1,
+            30000,
+            0,
+            src.clone(),
+            0.into(),
+            Contract::Originated(parent_hash),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: receiver_address
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+            },
+        );
+
+        let context = context::TezlinkContext::init_context();
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        assert_eq!(receipts.len(), 1, "There should be one transfer receipt");
+        assert!(
+            matches!(
+                &receipts[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "The duplicated internal operation must make the whole operation backtrack, but receipt is {:?}",
+            receipts[0].receipt
+        );
+
+        let internal_receipts = get_internal_receipts(&receipts[0].receipt);
+        assert_eq!(
+            internal_receipts.len(),
+            2,
+            "Both copies of the duplicated operation must appear in the receipt"
+        );
+        // The first copy applied, then was demoted to BackTracked when
+        // the operation failed on the replay.
+        assert!(
+            matches!(
+                &internal_receipts[0],
+                InternalOperationSum::Transfer(InternalContentWithMetadata {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "First copy should be BackTracked but is {:?}",
+            internal_receipts[0]
+        );
+        // The second copy is rejected as an internal-operation replay.
+        match &internal_receipts[1] {
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                result: ContentResult::Failed(errors),
+                ..
+            }) => assert_eq!(
+                errors.errors,
+                vec![ApplyOperationError::InternalOperationReplay],
+                "Second copy must be rejected as an internal-operation replay"
+            ),
+            other => {
+                panic!("Second copy should be a Failed transfer but is {other:?}")
+            }
+        }
+    }
+
+    /// L2-1637, origination variant: a contract `DUP`s an internal
+    /// `CREATE_CONTRACT` `operation` and emits both copies. Both carry
+    /// the same MIR counter (and the same pre-computed KT1), so the
+    /// second must be rejected as a replay rather than originating the
+    /// same contract twice.
+    #[test]
+    fn test_internal_origination_replay_is_rejected() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 100000);
+        reveal_account(&mut host, &src);
+
+        // Parent: one internal origination, DUP the `operation`, emit
+        // both copies; store the (single) child address.
+        static DUP_ORIGINATION_SCRIPT: &str = r#"
+            parameter unit;
+            storage (option address);
+            code {
+                DROP;
+                UNIT;
+                PUSH mutez 0;
+                NONE key_hash;
+                CREATE_CONTRACT { parameter unit; storage unit; code { CDR; NIL operation; PAIR } };
+                DIP { SOME };
+                DUP;
+                NIL operation;
+                SWAP; CONS;
+                SWAP; CONS;
+                PAIR
+            }"#;
+
+        let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &parent_hash,
+            DUP_ORIGINATION_SCRIPT,
+            &Micheline::prim0(mir::lexer::Prim::None, &mut Gas::default()).unwrap(),
+            &1000000_u64.into(),
+        );
+
+        let operation = make_transfer_operation(
+            10,
+            1,
+            50000,
+            10000,
+            src.clone(),
+            0.into(),
+            Contract::Originated(parent_hash),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+            },
+        );
+
+        let context = context::TezlinkContext::init_context();
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        assert_eq!(receipts.len(), 1, "There should be one transfer receipt");
+        assert!(
+            matches!(
+                &receipts[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "The duplicated internal origination must make the whole operation backtrack, but receipt is {:?}",
+            receipts[0].receipt
+        );
+
+        let internal_receipts = get_internal_receipts(&receipts[0].receipt);
+        assert_eq!(
+            internal_receipts.len(),
+            2,
+            "Both copies of the duplicated origination must appear in the receipt"
+        );
+        assert!(
+            matches!(
+                &internal_receipts[0],
+                InternalOperationSum::Origination(InternalContentWithMetadata {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "First copy should be BackTracked but is {:?}",
+            internal_receipts[0]
+        );
+        match &internal_receipts[1] {
+            InternalOperationSum::Origination(InternalContentWithMetadata {
+                result: ContentResult::Failed(errors),
+                ..
+            }) => assert_eq!(
+                errors.errors,
+                vec![ApplyOperationError::InternalOperationReplay],
+                "Second copy must be rejected as an internal-operation replay"
+            ),
+            other => {
+                panic!("Second copy should be a Failed origination but is {other:?}")
+            }
+        }
+    }
+
+    /// L2-1637, event variant: a contract `DUP`s an internal `EMIT`
+    /// `operation` and returns both copies. They share one MIR counter,
+    /// so the second must be rejected as a replay rather than emitting
+    /// the same event twice — exercising the `Emit` arm's replay path.
+    #[test]
+    fn test_internal_emit_replay_is_rejected() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 100000);
+        reveal_account(&mut host, &src);
+
+        // Parent: build one internal EMIT operation, DUP the resulting
+        // `operation`, and return both copies in the operation list.
+        static DUP_EMIT_SCRIPT: &str = r#"
+            parameter unit;
+            storage unit;
+            code {
+                DROP;
+                PUSH nat 42;
+                EMIT %foo nat;
+                DUP;
+                NIL operation;
+                SWAP; CONS;
+                SWAP; CONS;
+                PUSH unit Unit;
+                SWAP;
+                PAIR
+            }"#;
+
+        let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &parent_hash,
+            DUP_EMIT_SCRIPT,
+            &Micheline::from(()),
+            &100_u64.into(),
+        );
+
+        let operation = make_transfer_operation(
+            10,
+            1,
+            30000,
+            0,
+            src.clone(),
+            0.into(),
+            Contract::Originated(parent_hash),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+            },
+        );
+
+        let context = context::TezlinkContext::init_context();
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        assert_eq!(receipts.len(), 1, "There should be one transfer receipt");
+        assert!(
+            matches!(
+                &receipts[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "The duplicated internal event must make the whole operation backtrack, but receipt is {:?}",
+            receipts[0].receipt
+        );
+
+        let internal_receipts = get_internal_receipts(&receipts[0].receipt);
+        assert_eq!(
+            internal_receipts.len(),
+            2,
+            "Both copies of the duplicated event must appear in the receipt"
+        );
+        // The first copy applied, then was demoted to BackTracked when
+        // the operation failed on the replay.
+        assert!(
+            matches!(
+                &internal_receipts[0],
+                InternalOperationSum::Event(InternalContentWithMetadata {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "First copy should be BackTracked but is {:?}",
+            internal_receipts[0]
+        );
+        // The second copy is rejected as an internal-operation replay.
+        match &internal_receipts[1] {
+            InternalOperationSum::Event(InternalContentWithMetadata {
+                result: ContentResult::Failed(errors),
+                ..
+            }) => assert_eq!(
+                errors.errors,
+                vec![ApplyOperationError::InternalOperationReplay],
+                "Second copy must be rejected as an internal-operation replay"
+            ),
+            other => {
+                panic!("Second copy should be a Failed event but is {other:?}")
+            }
         }
     }
 
@@ -9154,6 +9586,7 @@ mod tests {
             crac_chain_depth: 0,
             crac_origin: None,
             delegated_storage_cost: 0,
+            applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let mut nonce_counter: u16 = 0;
@@ -9387,6 +9820,7 @@ mod tests {
             crac_chain_depth: 0,
             crac_origin: None,
             delegated_storage_cost: 0,
+            applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let mut nonce_counter: u16 = 0;

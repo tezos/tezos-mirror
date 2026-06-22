@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::account_storage::{
     Code, TezlinkAccount, TezlinkOriginatedAccount, TezosImplicitAccount,
@@ -87,7 +87,25 @@ pub struct OperationCtx<'operation, A: TezosImplicitAccount> {
     // However, it could be misleading in terms of comprehension
     pub source: &'operation A,
     pub origination_nonce: &'operation mut OriginationNonce,
+    /// MIR internal-operation counter — the replay identity L1 enforces
+    /// for internal operations. Incremented by `operation_counter()`
+    /// each time the contract emits an operation. In the native L1 path
+    /// it starts at 0 per top-level operation; in the cross-runtime path
+    /// it is resumed from (and written back to) the Michelson journal so
+    /// it stays monotonic across reentrant inbound Michelson frames,
+    /// matching L1's single internal-nonce namespace for the manager
+    /// operation's internal-op tree (L2-1676).
     pub counter: &'operation mut u128,
+    /// MIR operation counters of the internal operations already
+    /// applied within this Michelson frame. `counter` is the replay
+    /// identity L1 enforces: `operation` is `Duplicable`, so a contract
+    /// may `DUP` an `operation` value and emit both copies (same
+    /// counter). They must not both apply — the second is rejected as an
+    /// internal-operation replay (L2-1637). This set is per-frame; it
+    /// catches `DUP` within one Michelson execution, while the monotonic
+    /// `counter` (threaded through the journal, L2-1676) is what keeps
+    /// distinct reentrant frames from ever colliding on an identity.
+    pub applied_counters: BTreeSet<u128>,
     // 'level', 'now' and 'chain_id' should outlive operation in reality
     // So having them downcast to 'operation is not a problem
     pub level: &'operation BlockNumber,
@@ -2114,6 +2132,7 @@ pub mod tests {
             source: &source,
             origination_nonce: &mut origination_nonce,
             counter: &mut counter,
+            applied_counters: std::collections::BTreeSet::new(),
             level: &level,
             now: &now,
             chain_id: &chain_id,
@@ -2672,6 +2691,7 @@ pub mod tests {
             source: &source,
             origination_nonce: &mut origination_nonce,
             counter: &mut counter,
+            applied_counters: std::collections::BTreeSet::new(),
             level: &level,
             now: &now,
             chain_id: &chain_id,
