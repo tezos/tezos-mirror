@@ -13,7 +13,7 @@ use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
 use crate::{consume_storage_read_milligas, consume_storage_write_milligas};
 use mir::parser::Parser;
-use mir::typechecker::{MichelineContractScript, MichelineView};
+use mir::typechecker::{typecheck_value, MichelineContractScript, MichelineView};
 use mir::{
     ast::{
         big_map::{BigMapId, LazyStorage, LazyStorageError},
@@ -1074,26 +1074,19 @@ fn storage_error_to_lazy(e: tezos_storage::error::Error) -> LazyStorageError {
     ))
 }
 
-/// Charge for and read a big_map entry value, returning `None` (and charging
-/// the base lookup) when absent. Mirrors L1's carbonated
-/// `Big_map.Contents.find` (read_access: base on a miss, base + bytes when
-/// present). The key_type / value_type / total_bytes / keys-list auxiliary
-/// structures are L1's non-carbonated `Indexed_context.Make_map` and stay
-/// uncharged.
+/// Charge for and read a big_map entry value, returning `None` when absent.
 fn read_big_map_value_metered(
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     host: &impl StorageV1,
     path: &impl tezos_smart_rollup_host::path::Path,
 ) -> Result<Option<Vec<u8>>, LazyStorageError> {
+    consume_storage_read_milligas(operation_gas, 1, 0)?; // mem
     match host.store_value_size(path) {
         Ok(size) => {
-            consume_storage_read_milligas(operation_gas, 1, size as u64)?;
+            consume_storage_read_milligas(operation_gas, 1, size as u64)?; // get
             Ok(Some(host.store_read_all(path)?))
         }
-        Err(RuntimeError::PathNotFound) => {
-            consume_storage_read_milligas(operation_gas, 1, 0)?;
-            Ok(None)
-        }
+        Err(RuntimeError::PathNotFound) => Ok(None),
         Err(e) => Err(e.into()),
     }
 }
@@ -1297,32 +1290,22 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key: &TypedValue,
+        value_type: &Type,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
         let value_path =
             value_path(self.context, id, &hash_key(key.clone(), self.gas())?)?;
-        // The entry value is L1's carbonated `Big_map.Contents`; charge its
-        // read. The value_type below is L1's non-carbonated `Value_type`, read
-        // without charging.
         let Some(encoded_value) =
             read_big_map_value_metered(self.operation_gas, self.host, &value_path)?
         else {
             return Ok(None);
         };
 
-        let value_type_path = value_type_path(self.context, id)?;
-        let encoded_value_type = self.host.store_read_all(&value_type_path)?;
-        let value_type = Micheline::decode_raw(
-            arena,
-            &encoded_value_type,
-            &mut self.operation_gas.remaining,
-        )??;
-
         let value = Micheline::decode_raw(
             arena,
             &encoded_value,
             &mut self.operation_gas.remaining,
         )??;
-        Ok(Some(value.typecheck_value(self, &value_type)?))
+        Ok(Some(typecheck_value(&value, self, value_type)?))
     }
 
     fn big_map_mem(
@@ -1353,6 +1336,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let value_path = value_path(self.context, id, &key_hashed)?;
         match value {
             None => {
+                consume_storage_write_milligas(self.operation_gas, 1, 0)?;
                 if self.host.store_has(&value_path)?.is_some() {
                     let previous_value_size: BigInt =
                         self.host.store_value_size(&value_path)?.into();
@@ -1364,10 +1348,6 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                     // twice. (Once the counter exists this is a plain read, so the
                     // order only matters on the lazy-migration path.)
                     let current = total_bytes(self.host, self.context, id)?;
-                    // The entry value is L1's carbonated `Big_map.Contents`;
-                    // charge its removal. The keys-list and total_bytes updated
-                    // below are L1's non-carbonated auxiliary structures.
-                    consume_storage_write_milligas(self.operation_gas, 1, 0)?;
                     self.host.store_delete(&value_path)?;
                     BigMapKeys::remove_key(self.host, self.context, id, &key_hashed)?;
 
@@ -1576,7 +1556,7 @@ pub mod tests {
 
         for (key, value) in &content {
             let stored_value = ctx
-                .big_map_get(arena, id, key)
+                .big_map_get(arena, id, key, &value_type)
                 .expect("Failed to read value from storage")
                 .expect("Key should be present in storage");
             assert_eq!(&stored_value, value);
