@@ -9705,8 +9705,8 @@ mod tests {
     /// 1. Storage code read (`STORAGE_READ_PER_BYTE_MILLIGAS` per code byte)
     /// 2. Micheline decode (`interpret_cost::micheline_decoding_bytes` per code byte)
     /// 3. `charge_persisted_error` (`TEZOSX_GATEWAY_PER_BYTE_MILLIGAS` per
-    ///    rendered Debug byte, charged on the two persisted copies of the
-    ///    error — top-level result + synthetic failed-transfer entry)
+    ///    rendered Debug byte, charged on the one persisted copy of the
+    ///    error — synthetic alias(E_1)→target failed-transfer internal op)
     ///
     /// The two scripts differ by exactly `N_LONG - N_SHORT = 190` bytes in
     /// both binary encoding and rendered error length.
@@ -9772,11 +9772,11 @@ mod tests {
             CracError::Operation(te) => format!("{te:?}").len() as u64,
             other => panic!("expected Operation error (long), got: {other:?}"),
         };
-        // The error is persisted twice (top-level result + synthetic
-        // failed-transfer entry), so the per-byte charge applies to 2× the
-        // rendered length delta.
+        // The error is persisted once (synthetic alias(E_1)→target
+        // failed-transfer entry only), so the per-byte charge applies to 1×
+        // the rendered length delta.
         let metering_delta =
-            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * (long_rendered - short_rendered);
+            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * (long_rendered - short_rendered);
 
         assert_eq!(
             gas_long - gas_short,

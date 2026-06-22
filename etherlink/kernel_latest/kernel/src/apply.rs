@@ -50,8 +50,8 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::operation_result::{
-    ApplyOperationErrors, ContentResult, OperationBatchWithMetadata,
-    OperationDataAndMetadata, OperationError, OperationResultSum,
+    ContentResult, OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
+    OperationResultSum,
 };
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::{Registry, RuntimeId};
@@ -420,10 +420,9 @@ fn force_top_level_applied(receipt: &mut AppliedOperation) {
 /// inherited Backtracked top-level would understate the EVM tx's
 /// actual outcome (a CRAC failure surfaced).
 ///
-/// The synthesized error vector is intentionally empty: indexers
-/// already see the original Failed sibling's errors on its body
-/// internals (which are merged in unchanged), so the top-level
-/// merely needs to advertise `status: failed`.
+/// The failed shape is shared with `build_failed_crac_receipt` via
+/// `tezosx_tezos_runtime::crac_top_level_failed_result` so the two
+/// producers cannot drift.
 fn force_top_level_failed(receipt: &mut AppliedOperation) {
     let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
         receipt.op_and_receipt;
@@ -431,8 +430,7 @@ fn force_top_level_failed(receipt: &mut AppliedOperation) {
     if let Some(op) = batch.operations.first_mut() {
         if let OperationResultSum::Transfer(ref mut result) = op.receipt {
             if !matches!(result.result, ContentResult::Failed(_)) {
-                result.result =
-                    ContentResult::Failed(ApplyOperationErrors { errors: vec![] });
+                result.result = tezosx_tezos_runtime::crac_top_level_failed_result();
             }
         }
     }

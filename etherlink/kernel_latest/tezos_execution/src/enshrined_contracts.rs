@@ -431,20 +431,17 @@ fn charge_gateway_payload_gas(
 /// budget and return a [`CracError`] suitable for building a failed CRAC
 /// receipt.
 ///
-/// The top-level error of a failed CRAC is persisted **twice** in the receipt
-/// `build_failed_crac_receipt` produces:
-///   - as the top-level operation result (`status: failed`), and
-///   - as the synthetic alias(E_1)→target failed-transfer internal op, which
-///     the failed-receipt structure records so indexers see the attempted
-///     call.
+/// The error is persisted **once** in the receipt `build_failed_crac_receipt`
+/// produces, on the synthetic alias(E_1)→target failed-transfer internal op
+/// so indexers see the attempted call.  The top-level operation result carries
+/// an empty error vector (`status: failed`, no payload).
 ///
-/// The BSON sink renders each copy as
+/// The BSON sink renders the persisted copy as
 /// `format!("{:?}", ApplyOperationError::Transfer(&error))` — i.e. the Debug
 /// form of the *wrapping* `ApplyOperationError::Transfer(...)` variant, not the
 /// bare `TransferError`.  The wrapped form is `"Transfer(" + bare_debug + ")"`,
 /// so its byte length equals the bare Debug length plus the 10-byte constant
-/// wrapper (`"Transfer("` = 9 bytes, `")"` = 1 byte).  The durable receipt thus
-/// holds `2 * wrapped_len` bytes for this error, and this helper charges
+/// wrapper (`"Transfer("` = 9 bytes, `")"` = 1 byte).  This helper charges
 /// `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS` per persisted byte — the same rate
 /// [`charge_gateway_payload`] uses for the `GatewayError` response body — so
 /// the gas bound tracks the size actually persisted.
@@ -458,24 +455,19 @@ fn charge_gateway_payload_gas(
 /// [`TransferError::OutOfGas`] — the failed CRAC receipt is still
 /// produced (small), preserving the invariant that a failed CRAC receipt is
 /// always produced with a bounded body.
-//
-// TODO: https://linear.app/tezos/issue/L2-1623
-// The double-store is a receipt-shape artifact, not a deliberate design; if
-// the receipt is de-duplicated to carry the error once, drop the `2 *` factor.
 pub(crate) fn charge_persisted_error(
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     error: TransferError,
 ) -> CracError {
-    // The failed CRAC receipt persists this error twice (top-level result +
-    // synthetic alias(E_1)→target failed-transfer entry), each rendered by
-    // the BSON sink as
+    // The failed CRAC receipt persists this error once, on the synthetic
+    // alias(E_1)→target failed-transfer entry, rendered by the BSON sink as
     //   format!("{:?}", ApplyOperationError::Transfer(&error))
     //   = "Transfer(" + format!("{error:?}") + ")"
     // Derive the wrapped length from the bare Debug length to avoid an
     // O(N) clone of the (potentially attacker-sized) error string.
     let bare_len = format!("{error:?}").len();
     let wrapped_len = bare_len + "Transfer(".len() + ")".len();
-    let persisted_len = 2 * wrapped_len;
+    let persisted_len = wrapped_len;
     match charge_gateway_payload_gas(operation_gas, persisted_len) {
         Ok(()) => CracError::Operation(error),
         Err(_oog) => CracError::Operation(TransferError::OutOfGas(mir::gas::OutOfGas)),
@@ -5567,9 +5559,9 @@ pub(crate) mod tests {
 
     /// A `MichelsonContractInterpretError` body is charged at the per-byte
     /// rate, against the size *actually persisted*.  The failed CRAC receipt
-    /// stores the error twice (top-level result + synthetic failed-transfer
-    /// internal op), so the charge equals
-    /// `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * len` where `len` is the
+    /// stores the error once (on the synthetic alias(E_1)→target
+    /// failed-transfer internal op), so the charge equals
+    /// `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * len` where `len` is the
     /// Debug-rendered length of `ApplyOperationError::Transfer(error)` (the
     /// wrapping variant stored by the BSON sink), i.e. bare Debug length + 10.
     #[test]
@@ -5577,9 +5569,9 @@ pub(crate) mod tests {
         let msg = "x".repeat(10);
         let err = TransferError::MichelsonContractInterpretError(msg.clone());
         // The BSON sink stores the wrapped form: "Transfer(" + bare_debug + ")",
-        // persisted twice in the receipt.
+        // persisted once in the receipt (alias→target internal op only).
         let wrapped_len = format!("{err:?}").len() + "Transfer(".len() + ")".len();
-        let expected_cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * wrapped_len as u64;
+        let expected_cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * wrapped_len as u64;
 
         let ample = expected_cost + 1_000_000;
         let mut gas = make_operation_gas(ample);
@@ -5608,7 +5600,7 @@ pub(crate) mod tests {
         let long_err = TransferError::MichelsonContractInterpretError(long_msg.clone());
 
         // Wrapped lengths: "Transfer(" + bare_debug + ")" = bare + 10,
-        // persisted twice in the receipt.
+        // persisted once in the receipt (alias→target internal op only).
         let wrapper_overhead = "Transfer(".len() + ")".len();
         let short_len = format!("{short_err:?}").len() + wrapper_overhead;
         let long_len = format!("{long_err:?}").len() + wrapper_overhead;
@@ -5624,11 +5616,11 @@ pub(crate) mod tests {
         let cost_long = u64::from(gas_long.total_milligas_consumed());
         assert_eq!(
             cost_short,
-            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * short_len as u64
+            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * short_len as u64
         );
         assert_eq!(
             cost_long,
-            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * long_len as u64
+            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * long_len as u64
         );
         assert!(
             cost_long > cost_short,
@@ -5643,9 +5635,9 @@ pub(crate) mod tests {
         let msg = "x".repeat(100);
         let err = TransferError::MichelsonContractInterpretError(msg);
         // Wrapped length: "Transfer(" + bare_debug + ")" = bare + 10,
-        // persisted twice in the receipt.
+        // persisted once in the receipt (alias→target internal op only).
         let wrapped_len = format!("{err:?}").len() + "Transfer(".len() + ")".len();
-        let cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * 2 * wrapped_len as u64;
+        let cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * wrapped_len as u64;
 
         // Budget is strictly less than the required cost.
         let mut gas = make_operation_gas(cost - 1);

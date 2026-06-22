@@ -141,6 +141,9 @@
   now rejected instead of being silently originated. Re-typechecking an
   already-stored contract (entrypoint extraction, execution) is unchanged,
   so already-originated contracts keep executing. (!22235)
+- Failed cross-runtime call receipts now persist the failing error once
+  (on the `alias→target` internal op that indexers read) instead of twice.
+  The per-byte gas charge for the persisted error body is halved accordingly. (!22257)
 - The `TICKET` instruction now rejects a non-comparable ticket content
   (e.g. `ticket (ticket string)`) during typechecking, matching L1,
   which requires ticket content to be comparable. Previously the
