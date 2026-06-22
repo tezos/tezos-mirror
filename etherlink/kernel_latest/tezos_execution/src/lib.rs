@@ -2208,7 +2208,12 @@ where
         next_temporary_id,
     };
     let parser = Parser::new();
-    let mut counter = 0u128;
+    // Block-cumulative internal-operation counter: the block's prior count
+    // (`internal_operations_base`) plus what this batch already produced
+    // (`nonce_counter`). The MIR cap fires at L1's 65,535 limit against this.
+    let mut counter = block_ctx
+        .internal_operations_base
+        .saturating_add(u128::from(*nonce_counter));
     let storage_limit = &validated_operation.content.storage_limit;
     let balance_updates = validated_operation.balance_updates;
     let receipt = match &validated_operation.content.operation {
@@ -2447,6 +2452,7 @@ mod tests {
                 level: &0u32.into(),
                 now: &0i64.into(),
                 chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+                internal_operations_base: 0,
             }
         };
     }
@@ -6586,6 +6592,86 @@ mod tests {
             1000u64.into(),
             "Originated contract balance should be correct"
         );
+    }
+
+    #[test]
+    fn internal_operation_cap_is_block_cumulative() {
+        // L2-1644: the 65535 internal-operation cap (L1's
+        // Too_many_internal_operations) is cumulative across the block,
+        // threaded via BlockCtx::internal_operations_base. An operation whose
+        // internal op would allocate nonce 65535 fails IN ISOLATION (the block
+        // is not aborted), like L1 backtracking the offending operation.
+        let run = |base: u128| {
+            let mut host = MockKernelHost::default();
+            let src = bootstrap1();
+            init_account(&mut host, &src.pkh, 100000);
+            reveal_account(&mut host, &src);
+            let context = context::TezlinkContext::init_context();
+            let mut gas = Gas::default();
+            let originated_script =
+                make_create_contract_block("unit", "unit", "CDR; NIL operation; PAIR;");
+            let init_script =
+                make_script_emitting_internal_origination(&originated_script);
+            let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
+            init_contract(
+                &mut host,
+                &contract_hash,
+                &init_script,
+                &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
+                &1000000_u64.into(),
+            );
+            let operation = make_operation(
+                10,
+                1,
+                22100,
+                500,
+                src.clone(),
+                vec![OperationContent::Transfer(TransferContent {
+                    amount: 1000.into(),
+                    destination: Contract::Originated(contract_hash),
+                    parameters: Parameters {
+                        entrypoint: mir::ast::Entrypoint::default(),
+                        value: Micheline::from(())
+                            .encode(&mut Gas::default())
+                            .unwrap()
+                            .unwrap(),
+                    },
+                })],
+            );
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &context,
+                OperationHash::default(),
+                operation,
+                &BlockCtx {
+                    level: &0u32.into(),
+                    now: &0i64.into(),
+                    chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+                    internal_operations_base: base,
+                },
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+        };
+        let applied = |result| {
+            matches!(
+                &ProcessedOperation::into_receipts(result)[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            )
+        };
+        // Just below the cap: the internal origination takes nonce 65534 and
+        // is applied.
+        assert!(applied(run(65_534).expect("no kernel error")));
+        // At the cap: producing the internal op would allocate nonce 65535, so
+        // the operation fails in isolation and the block is not aborted.
+        assert!(!applied(run(65_535).expect("block must not abort")));
     }
 
     /// Regression for L2-1642: the KT1 returned by CREATE_CONTRACT, stored

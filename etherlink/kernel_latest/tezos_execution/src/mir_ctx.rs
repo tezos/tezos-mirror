@@ -153,6 +153,9 @@ pub struct BlockCtx<'block> {
     pub level: &'block BlockNumber,
     pub now: &'block Timestamp,
     pub chain_id: &'block ChainId,
+    /// Internal operations already recorded in the block, used as the
+    /// cumulative base for L1's per-block internal-operation cap.
+    pub internal_operations_base: u128,
 }
 
 fn address_from_contract(contract: Contract) -> AddressHash {
@@ -335,8 +338,9 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
 
     fn operation_counter(&mut self) -> u128 {
         let c: &mut u128 = self.operation_ctx.counter;
+        let current = *c;
         *c += 1;
-        *c
+        current
     }
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {
@@ -3234,8 +3238,9 @@ pub(crate) mod mock {
         }
 
         fn operation_counter(&mut self) -> u128 {
+            let current = self.operation_counter;
             self.operation_counter += 1;
-            self.operation_counter
+            current
         }
 
         fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {

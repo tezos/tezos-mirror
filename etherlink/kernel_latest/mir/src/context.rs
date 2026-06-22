@@ -443,8 +443,9 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
     }
 
     fn operation_counter(&mut self) -> u128 {
+        let current = self.operation_counter;
         self.operation_counter += 1;
-        self.operation_counter
+        current
     }
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {

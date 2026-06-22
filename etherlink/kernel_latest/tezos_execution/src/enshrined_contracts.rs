@@ -4358,8 +4358,9 @@ pub(crate) mod tests {
         assert_eq!(ops.len(), 1);
         let op = &ops[0];
         assert_eq!(
-            op.counter, 1,
-            "counter should come from operation_counter(), expecting 1 operation but got {}", op.counter
+            op.counter, 0,
+            "counter should come from operation_counter(), expecting nonce 0 but got {}",
+            op.counter
         );
         match &op.operation {
             Operation::TransferTokens(tt) => {
@@ -4412,12 +4413,12 @@ pub(crate) mod tests {
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         // Simulate prior internal operations having consumed counters
+        let _ = ctx.operation_counter(); // 0
         let _ = ctx.operation_counter(); // 1
-        let _ = ctx.operation_counter(); // 2
         let destination = make_test_address();
         let ops = dispatch_callback(&mut ctx, Some(destination), vec![]).unwrap();
         assert_eq!(
-            ops[0].counter, 3,
+            ops[0].counter, 2,
             "counter should follow previously consumed values"
         );
     }

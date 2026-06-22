@@ -114,6 +114,13 @@
   Previously the failure paths (binary decode or typechecking) returned
   `None` without the penalty, undercharging large failing payloads.
   (!22263)
+- Internal operations are now capped at L1's limit of 65,535
+  (`Too_many_internal_operations`): the producing instructions
+  (`TRANSFER_TOKENS`, `SET_DELEGATE`, `EMIT`, `CREATE_CONTRACT`) fail once
+  nonce 65,535 would be allocated. On the operation path the count is
+  cumulative across the block like L1's `internal_nonce`; the offending
+  operation fails in isolation (the block is not aborted) and internal
+  operation nonces are now 0-based, matching L1. (L2-1644)
 - The `VIEW` instruction now gates execution on two type-equality checks,
   matching L1: the callee view's declared output type must equal the
   caller-requested return type, and the caller's argument type must equal

@@ -1029,7 +1029,7 @@ mod tests {
                     value: TypedValue::nat(10),
                     arg_ty: Or::Right(parse("nat").unwrap())
                 }),
-                101
+                100
             )],
             {
                 let mut ctx = Ctx::default();
@@ -1050,7 +1050,7 @@ mod tests {
                     value: TypedValue::nat(10),
                     arg_ty: Or::Right(parse("nat").unwrap())
                 }),
-                101
+                100
             )],
             {
                 let mut ctx = Ctx::default();
@@ -1071,7 +1071,7 @@ mod tests {
                     value: TypedValue::nat(10),
                     arg_ty: Or::Left(Type::Nat)
                 }),
-                101
+                100
             )],
             {
                 let mut ctx = Ctx::default();
@@ -1163,7 +1163,7 @@ mod tests {
                 micheline_code: &cs_mich,
                 address: ContractKt1Hash::try_from(expected_addr).unwrap(),
             }),
-            101,
+            100,
         );
         run_e2e_test(
             &Arena::new(),
@@ -1405,7 +1405,7 @@ mod multisig_tests {
                             destination_address: transfer_destination.try_into().unwrap(),
                             amount: transfer_amount,
                         }),
-                        counter: 1
+                        counter: 0
                     }],
                     TV::new_pair(
                         TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
@@ -1479,7 +1479,7 @@ mod multisig_tests {
                         operation: Operation::SetDelegate(SetDelegate(Some(
                             new_delegate.try_into().unwrap()
                         ))),
-                        counter: 1
+                        counter: 0
                     }],
                     TV::new_pair(
                         TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
