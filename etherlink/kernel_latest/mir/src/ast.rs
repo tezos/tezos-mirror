@@ -2372,7 +2372,11 @@ mod test_untypers {
     use proptest::prelude::*;
 
     use super::*;
-    use crate::{ast::test_strategies as TS, context::Ctx, typechecker::typecheck_value};
+    use crate::{
+        ast::test_strategies as TS,
+        context::Ctx,
+        typechecker::{typecheck_value, AllowForgedLazyStorageId},
+    };
 
     proptest! {
         #[test]
@@ -2380,7 +2384,10 @@ mod test_untypers {
             let arena = Arena::new();
             let mut ctx = Ctx::default();
             let untyped = typed.val.clone().into_micheline_optimized_legacy(&arena, &mut ctx.gas).unwrap();
-            let typed_ = typecheck_value(&untyped, &mut ctx, &typed.ty);
+            // The generator produces trusted values that may include forged
+            // big_map ids, so allow them when round-tripping.
+            let typed_ =
+                typecheck_value(&untyped, &mut ctx, &typed.ty, AllowForgedLazyStorageId::Yes);
             assert_eq!(typed_, Ok(typed.val))
         }
     }

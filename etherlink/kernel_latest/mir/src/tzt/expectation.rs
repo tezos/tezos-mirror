@@ -93,8 +93,9 @@ fn unify_interpreter_error<'a>(
     match (exp, err) {
         (FailedWith(value), InterpretError::FailedWith(typ, failed_typed_value)) => {
             // Here we typecheck the untyped value from the expectation using the
-            // typed of the failed value we get from the interpreter.
-            match typecheck_value(value, ctx, typ) {
+            // typed of the failed value we get from the interpreter. The
+            // expectation may reference a big_map from the test environment.
+            match typecheck_value(value, ctx, typ, AllowForgedLazyStorageId::Yes) {
                 Ok(exp_typed_val) => {
                     compare_typed_values(exp_typed_val, failed_typed_value.clone())
                 }

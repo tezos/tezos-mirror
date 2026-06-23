@@ -174,6 +174,17 @@ pub enum TcError {
     /// `big_map` with the supplied identifier not found in the storage.
     #[error("big map with ID {0} not found in the lazy storage")]
     BigMapNotFound(BigInt),
+    /// A forged lazy-storage id (a bare `big_map` id) was encountered in a
+    /// position where it is not allowed, typically a user-supplied operation
+    /// parameter. Mirrors L1's `Unexpected_forged_value`
+    /// (`src/proto_*/lib_protocol/script_ir_translator.ml`): a contract may
+    /// only reference a `big_map` by id from its own storage or from an
+    /// internal call, never from an externally-injected parameter.
+    #[error(
+        "unexpected forged lazy storage id {0}: referencing a big_map by id is \
+         not allowed here"
+    )]
+    UnexpectedForgedValue(BigInt),
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0:?}")]
     LazyStorageError(String),
@@ -616,14 +627,16 @@ impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
 
 impl<'a> Micheline<'a> {
     /// Typechecks `Micheline` as a value, given its type (also as `Micheline`).
-    /// Validates the type.
+    /// Validates the type. `allow_forged_lazy_storage_id` decides whether a
+    /// forged lazy-storage id is accepted; see [AllowForgedLazyStorageId].
     pub fn typecheck_value(
         &self,
         ctx: &mut impl TypecheckingCtx<'a>,
         value_type: &Micheline<'a>,
+        allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     ) -> Result<TypedValue<'a>, TcError> {
         let ty = parse_ty(ctx.gas(), value_type)?;
-        typecheck_value(self, ctx, &ty)
+        typecheck_value(self, ctx, &ty, allow_forged_lazy_storage_id)
     }
 
     /// Typechecks `Micheline` as an instruction (or a sequence of instruction),
@@ -3422,9 +3435,16 @@ fn typecheck_instruction_step<'a, 'b>(
                     });
                 }
                 _ => {
-                    // contracts and big maps are not pushable so it's OK to typecheck values using default
+                    // contracts and big maps are not pushable so the forged-id
+                    // policy is irrelevant here
                     let mut ctx = crate::context::PushableTypecheckingContext { gas };
-                    let v = typecheck_value_with_views(v, &mut ctx, &t, typecheck_views)?;
+                    let v = typecheck_value_with_views(
+                        v,
+                        &mut ctx,
+                        &t,
+                        typecheck_views,
+                        AllowForgedLazyStorageId::No,
+                    )?;
                     stack.push(t);
                     I::Push(Rc::new(v))
                 }
@@ -4588,14 +4608,42 @@ fn expect_elt<'a, 'b>(
     }
 }
 
+/// Whether [typecheck_value] accepts a forged lazy-storage id (a bare
+/// `big_map` id, i.e. `Micheline::Int`, or an id-plus-diff `Pair <id> { ... }`).
+///
+/// Mirrors L1's `allow_forged_lazy_storage_id` flag (see
+/// `src/proto_*/lib_protocol/script_ir_translator.ml`): use [No] for values
+/// originating from outside the contract's own state — most importantly
+/// user-supplied operation parameters — and [Yes] for the contract's committed
+/// storage and internal-call parameters, which may legitimately reference
+/// big_maps the contract owns.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AllowForgedLazyStorageId {
+    /// Accept forged lazy-storage ids (committed storage, internal-call params).
+    Yes,
+    /// Reject forged lazy-storage ids (user-supplied operation params).
+    No,
+}
+
 /// Typecheck a value. Assumes the passed type is valid, i.e. does not contain
 /// illegal types like `set operation` or `contract operation`.
+///
+/// `allow_forged_lazy_storage_id` decides whether a forged lazy-storage id is
+/// accepted; see [AllowForgedLazyStorageId]. Pass [AllowForgedLazyStorageId::No]
+/// for values originating from outside the contract's own state.
 pub fn typecheck_value<'a, 'b>(
     v: &'b Micheline<'a>,
     ctx: &mut impl TypecheckingCtx<'a>,
     t: &Type,
+    allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
 ) -> Result<TypedValue<'a>, TcError> {
-    typecheck_value_with_views(v, ctx, t, TypecheckViews::Disabled)
+    typecheck_value_with_views(
+        v,
+        ctx,
+        t,
+        TypecheckViews::Disabled,
+        allow_forged_lazy_storage_id,
+    )
 }
 
 /// [typecheck_value] threading `typecheck_views`: validates a `CREATE_CONTRACT`
@@ -4606,12 +4654,20 @@ pub(crate) fn typecheck_value_with_views<'a, 'b>(
     ctx: &mut impl TypecheckingCtx<'a>,
     t: &Type,
     typecheck_views: TypecheckViews,
+    allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
 ) -> Result<TypedValue<'a>, TcError> {
     let mut frames: Vec<TvFrame<'a, 'b>> = vec![TvFrame::Visit { v, t: t.clone() }];
     let mut results: Vec<TypedValue<'a>> = Vec::new();
 
     while let Some(frame) = frames.pop() {
-        step_typecheck_value(frame, ctx, &mut frames, &mut results, typecheck_views)?;
+        step_typecheck_value(
+            frame,
+            ctx,
+            &mut frames,
+            &mut results,
+            typecheck_views,
+            allow_forged_lazy_storage_id,
+        )?;
     }
     results
         .pop()
@@ -4626,15 +4682,22 @@ fn step_typecheck_value<'a, 'b>(
     frames: &mut Vec<TvFrame<'a, 'b>>,
     results: &mut Vec<TypedValue<'a>>,
     typecheck_views: TypecheckViews,
+    allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
 ) -> Result<(), TcError> {
     use Micheline as V;
     use Type as T;
     use TypedValue as TV;
 
     match frame {
-        TvFrame::Visit { v, t } => {
-            visit_value(v, t, ctx, frames, results, typecheck_views)
-        }
+        TvFrame::Visit { v, t } => visit_value(
+            v,
+            t,
+            ctx,
+            frames,
+            results,
+            typecheck_views,
+            allow_forged_lazy_storage_id,
+        ),
         TvFrame::VisitPairTail { vs, t } => {
             // Implements the recursive code's
             // `typecheck_value(&V::App(Pair, vrs, NO_ANNS), ctx, tr)` step
@@ -5098,6 +5161,7 @@ fn visit_value<'a, 'b>(
     frames: &mut Vec<TvFrame<'a, 'b>>,
     results: &mut Vec<TypedValue<'a>>,
     typecheck_views: TypecheckViews,
+    allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
 ) -> Result<(), TcError> {
     use Micheline as V;
     use Type as T;
@@ -5248,6 +5312,9 @@ fn visit_value<'a, 'b>(
                 V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (i, Some(vs), true),
                 _ => return Err(invalid()),
             };
+            if allow_forged_lazy_storage_id == AllowForgedLazyStorageId::No {
+                return Err(TcError::UnexpectedForgedValue(id.clone()));
+            }
             let (tk, tv) = m.as_ref();
             let big_map_id: BigMapId = id.clone().into();
             let (key_type, value_type) = ctx
@@ -5491,8 +5558,14 @@ fn visit_value<'a, 'b>(
             // against the ticket type, matching the recursive form's
             // outer `_ => Err(invalid())` arm. Pushing BuildTicketLegacy
             // afterwards keeps the deconstruction in the worklist.
-            let pair = typecheck_value_with_views(m, ctx, &pair_t, typecheck_views)
-                .map_err(|_| invalid())?;
+            let pair = typecheck_value_with_views(
+                m,
+                ctx,
+                &pair_t,
+                typecheck_views,
+                allow_forged_lazy_storage_id,
+            )
+            .map_err(|_| invalid())?;
             results.push(pair);
             frames.push(TvFrame::BuildTicketLegacy { content_type });
         }
@@ -5840,8 +5913,9 @@ mod typecheck_tests {
         }
         let mut ctx = Ctx::default();
         ctx.gas = Gas::new(u32::MAX);
-        let mut tv = typecheck_value(&v_node, &mut ctx, &parsed_ty)
-            .expect("deep pair value typechecks");
+        let mut tv =
+            typecheck_value(&v_node, &mut ctx, &parsed_ty, AllowForgedLazyStorageId::No)
+                .expect("deep pair value typechecks");
         crate::ast::drain_deep_typed_value(&mut tv);
     }
 
@@ -6939,7 +7013,12 @@ mod typecheck_tests {
     #[test]
     fn string_values() {
         assert_eq!(
-            typecheck_value(&"foo".into(), &mut Ctx::default(), &Type::String),
+            typecheck_value(
+                &"foo".into(),
+                &mut Ctx::default(),
+                &Type::String,
+                AllowForgedLazyStorageId::No
+            ),
             Ok(TypedValue::String("foo".to_owned()))
         )
     }
@@ -9573,8 +9652,11 @@ mod typecheck_tests {
     fn test_invalid_map_value() {
         let mut ctx = Ctx::default();
         assert_eq!(
-            Micheline::Seq(&[])
-                .typecheck_value(&mut ctx, &parse("map (list unit) unit").unwrap()),
+            Micheline::Seq(&[]).typecheck_value(
+                &mut ctx,
+                &parse("map (list unit) unit").unwrap(),
+                AllowForgedLazyStorageId::No
+            ),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -9651,8 +9733,11 @@ mod typecheck_tests {
     fn test_invalid_big_map_value() {
         let mut ctx = Ctx::default();
         assert_eq!(
-            Micheline::Seq(&[])
-                .typecheck_value(&mut ctx, &parse("big_map (list unit) unit").unwrap()),
+            Micheline::Seq(&[]).typecheck_value(
+                &mut ctx,
+                &parse("big_map (list unit) unit").unwrap(),
+                AllowForgedLazyStorageId::No,
+            ),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -9674,7 +9759,8 @@ mod typecheck_tests {
             typecheck_value(
                 &Micheline::Int(0.into()),
                 &mut ctx,
-                &Type::new_big_map(Type::Int, Type::Int)
+                &Type::new_big_map(Type::Int, Type::Int),
+                crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Ok(TypedValue::BigMap(BigMap {
                 content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
@@ -9691,7 +9777,8 @@ mod typecheck_tests {
             typecheck_value(
                 &Micheline::Int(5.into()),
                 &mut ctx,
-                &Type::new_big_map(Type::Int, Type::Int)
+                &Type::new_big_map(Type::Int, Type::Int),
+                crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Err(TcError::BigMapNotFound(5.into()))
         );
@@ -9703,7 +9790,8 @@ mod typecheck_tests {
             typecheck_value(
                 &Micheline::Int(0.into()),
                 &mut ctx,
-                &Type::new_big_map(Type::Nat, Type::Int)
+                &Type::new_big_map(Type::Nat, Type::Int),
+                crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Err(TcError::TypesNotEqual(TypesNotEqual(Type::Int, Type::Nat)))
         );
@@ -9713,7 +9801,8 @@ mod typecheck_tests {
             typecheck_value(
                 &Micheline::Int(0.into()),
                 &mut ctx,
-                &Type::new_big_map(Type::Int, Type::Nat)
+                &Type::new_big_map(Type::Int, Type::Nat),
+                crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Err(TcError::TypesNotEqual(TypesNotEqual(Type::Int, Type::Nat)))
         );
@@ -9723,7 +9812,8 @@ mod typecheck_tests {
             typecheck_value(
                 &parse("{Elt 7 8}").unwrap(),
                 &mut ctx,
-                &Type::new_big_map(Type::Int, Type::Int)
+                &Type::new_big_map(Type::Int, Type::Int),
+                crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Ok(TypedValue::BigMap(BigMap {
                 content: big_map::BigMapContent::InMemory(BTreeMap::from([(
@@ -9740,7 +9830,8 @@ mod typecheck_tests {
             typecheck_value(
                 &parse("{Elt \"a\" 8}").unwrap(),
                 &mut ctx,
-                &Type::new_big_map(Type::Int, Type::Int)
+                &Type::new_big_map(Type::Int, Type::Int),
+                crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Err(TcError::InvalidValueForType(
                 "String(\"a\")".into(),
@@ -9753,7 +9844,8 @@ mod typecheck_tests {
             typecheck_value(
                 &parse("Pair 0 {Elt 7 8}").unwrap(),
                 &mut ctx,
-                &Type::new_big_map(Type::Int, Type::Int)
+                &Type::new_big_map(Type::Int, Type::Int),
+                crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Err(TcError::InvalidEltForMap(
                 "Int(8)".into(),
@@ -9766,7 +9858,8 @@ mod typecheck_tests {
             typecheck_value(
                 &parse("Pair 0 {Elt 7 (Some 8)}").unwrap(),
                 &mut ctx,
-                &Type::new_big_map(Type::Int, Type::Int)
+                &Type::new_big_map(Type::Int, Type::Int),
+                crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Ok(TypedValue::BigMap(BigMap {
                 content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
@@ -9786,7 +9879,8 @@ mod typecheck_tests {
             typecheck_value(
                 &parse("Pair 0 {Elt 7 None}").unwrap(),
                 &mut ctx,
-                &Type::new_big_map(Type::Int, Type::Int)
+                &Type::new_big_map(Type::Int, Type::Int),
+                crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Ok(TypedValue::BigMap(BigMap {
                 content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
@@ -11616,7 +11710,8 @@ mod typecheck_tests {
                 &parse("Pair \"tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h\" (Pair Unit 5)")
                     .unwrap(),
                 &mut ctx,
-                &Type::new_ticket(Type::Unit)
+                &Type::new_ticket(Type::Unit),
+                AllowForgedLazyStorageId::No
             ),
             Ok(TypedValue::new_ticket(ticket))
         );
@@ -11629,7 +11724,8 @@ mod typecheck_tests {
             typecheck_value(
                 &parse("\"tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h\"").unwrap(),
                 &mut ctx,
-                &Type::new_contract(Type::Unit)
+                &Type::new_contract(Type::Unit),
+                AllowForgedLazyStorageId::No
             ),
             Ok(TypedValue::Contract(
                 addr::Address::try_from("tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h").unwrap()
@@ -11640,7 +11736,8 @@ mod typecheck_tests {
             typecheck_value(
                 &parse("\"tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h\"").unwrap(),
                 &mut ctx,
-                &Type::new_contract(Type::new_ticket(Type::Unit))
+                &Type::new_contract(Type::new_ticket(Type::Unit)),
+                AllowForgedLazyStorageId::No
             ),
             Ok(TypedValue::Contract(
                 addr::Address::try_from("tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h").unwrap()
@@ -11651,7 +11748,8 @@ mod typecheck_tests {
             typecheck_value(
                 &parse("\"tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h\"").unwrap(),
                 &mut ctx,
-                &Type::new_contract(Type::Int)
+                &Type::new_contract(Type::Int),
+                AllowForgedLazyStorageId::No
             ),
             Err(TcError::UnexpectedImplicitAccountType(Type::Int))
         );
@@ -12312,6 +12410,7 @@ code { DROP ;
             &parse("\"not_a_pair\"").unwrap(),
             &mut ctx,
             &Type::new_ticket(Type::Int),
+            AllowForgedLazyStorageId::No,
         );
         match result {
             Err(TcError::InvalidValueForType(_, t)) => {
@@ -12337,6 +12436,7 @@ code { DROP ;
             &parse("Pair 1 2 3").unwrap(),
             &mut ctx,
             &Type::new_pair(Type::Int, Type::Int),
+            AllowForgedLazyStorageId::No,
         );
         // Three values for a 2-tuple: the third value (3) hits the
         // VisitPairTail fallback against the inner Type::Int.

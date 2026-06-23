@@ -16,7 +16,7 @@ use mir::{
     context::CtxTrait,
     gas::{Gas, OutOfGas},
     parser::Parser,
-    typechecker::TypecheckViews,
+    typechecker::{AllowForgedLazyStorageId, TypecheckViews},
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
@@ -704,6 +704,11 @@ where
                         0,
                     ),
                     Disposition::Apply => {
+                        // Internal-operation parameters were produced and
+                        // validated by the emitting contract during its own
+                        // execution, so they may legitimately reference
+                        // big_maps it owns.
+                        let allow_forged_lazy_storage_id = AllowForgedLazyStorageId::Yes;
                         let receipt = transfer(
                             tc_ctx,
                             operation_ctx,
@@ -717,6 +722,7 @@ where
                             parser,
                             all_internal_receipts,
                             false,
+                            allow_forged_lazy_storage_id,
                             nonce_counter,
                         );
                         let delegated_storage_cost_delta = match &receipt {
@@ -933,6 +939,9 @@ fn transfer<'a, Host, C: Context>(
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     skip_sender_debit: bool,
+    // Whether a forged big_map id (a bare lazy-storage reference) is allowed in
+    // `param`. See [`mir::typechecker::AllowForgedLazyStorageId`].
+    allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     nonce_counter: &mut u16,
 ) -> Result<(TransferSuccess, u64), CracError>
 where
@@ -1044,7 +1053,13 @@ where
                 let result = match code {
                     Code::Code(code_bytes) => {
                         let (iter, new_storage) = execute_smart_contract_originated(
-                            code_bytes, storage, entrypoint, param, parser, &mut ctx,
+                            code_bytes,
+                            storage,
+                            entrypoint,
+                            param,
+                            parser,
+                            &mut ctx,
+                            allow_forged_lazy_storage_id,
                         )?;
                         (iter.collect::<Vec<_>>(), new_storage)
                     }
@@ -1407,6 +1422,8 @@ where
         parser,
         all_internal_receipts,
         false, // external operations always debit the sender
+        // external operations are not allowed to forge big_map ids
+        AllowForgedLazyStorageId::No,
         nonce_counter,
     )
     .map(|(success, delegated)| (success.into(), delegated))
@@ -1512,6 +1529,8 @@ where
         parser,
         &mut internal_receipts,
         true, // skip_sender_debit: the calling runtime already debited the sender
+        // big maps cannot be sent across runtimes
+        AllowForgedLazyStorageId::No,
         nonce_counter,
     ) {
         Ok((success, _)) => {
@@ -1874,6 +1893,7 @@ fn execute_smart_contract_originated<'a>(
     value: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut impl CtxTrait<'a>,
+    allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
     // Parse and typecheck the contract
     let contract_micheline = Micheline::decode_raw(&parser.arena, &code, ctx.gas())??;
@@ -1890,6 +1910,7 @@ fn execute_smart_contract_originated<'a>(
         value,
         entrypoint,
         &storage_micheline,
+        allow_forged_lazy_storage_id,
     )?;
 
     // Encode the new storage
@@ -2410,7 +2431,7 @@ mod tests {
     use mir::context::TypecheckingCtx;
     use mir::gas::{self, Gas};
     use mir::parser::Parser;
-    use mir::typechecker::typecheck_value;
+    use mir::typechecker::{typecheck_value, AllowForgedLazyStorageId};
     use num_traits::ops::checked::CheckedSub;
     use num_traits::ToPrimitive;
     use pretty_assertions::assert_eq;
@@ -8093,8 +8114,13 @@ mod tests {
                 Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
                     .unwrap()
                     .expect("Coudln't decode storage.");
-            let big_map_id = typecheck_value(&mich_storage, &mut ctx, &Type::Int)
-                .expect("Storage has unexpected type");
+            let big_map_id = typecheck_value(
+                &mich_storage,
+                &mut ctx,
+                &Type::Int,
+                AllowForgedLazyStorageId::No,
+            )
+            .expect("Storage has unexpected type");
             match &big_map_id {
                 TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                     &mut ctx,
@@ -8420,9 +8446,13 @@ mod tests {
         )
         .unwrap()
         .expect("Couldn't decode storage.");
-        let big_map_id_originator =
-            typecheck_value(&mich_storage_originator, &mut ctx, &Type::Int)
-                .expect("Storage has unexpected type");
+        let big_map_id_originator = typecheck_value(
+            &mich_storage_originator,
+            &mut ctx,
+            &Type::Int,
+            AllowForgedLazyStorageId::No,
+        )
+        .expect("Storage has unexpected type");
         match &big_map_id_originator {
             TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                 &mut ctx,
@@ -8447,8 +8477,13 @@ mod tests {
             Micheline::decode_raw(&parser.arena, &storage_0, &mut Gas::default())
                 .unwrap()
                 .expect("Couldn't decode storage.");
-        let big_map_id_0 = typecheck_value(&mich_storage_0, &mut ctx, &Type::Int)
-            .expect("Storage has unexpected type");
+        let big_map_id_0 = typecheck_value(
+            &mich_storage_0,
+            &mut ctx,
+            &Type::Int,
+            AllowForgedLazyStorageId::No,
+        )
+        .expect("Storage has unexpected type");
         match &big_map_id_0 {
             TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                 &mut ctx,
@@ -8473,8 +8508,13 @@ mod tests {
             Micheline::decode_raw(&parser.arena, &storage_1, &mut Gas::default())
                 .unwrap()
                 .expect("Coudln't decode storage.");
-        let big_map_id_1 = typecheck_value(&mich_storage_1, &mut ctx, &Type::Int)
-            .expect("Storage has unexpected type");
+        let big_map_id_1 = typecheck_value(
+            &mich_storage_1,
+            &mut ctx,
+            &Type::Int,
+            AllowForgedLazyStorageId::No,
+        )
+        .expect("Storage has unexpected type");
         match &big_map_id_1 {
             TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                 &mut ctx,
@@ -8499,8 +8539,13 @@ mod tests {
             Micheline::decode_raw(&parser.arena, &storage_2, &mut Gas::default())
                 .unwrap()
                 .expect("Coudln't decode storage.");
-        let big_map_id_2 = typecheck_value(&mich_storage_2, &mut ctx, &Type::Int)
-            .expect("Storage has unexpected type");
+        let big_map_id_2 = typecheck_value(
+            &mich_storage_2,
+            &mut ctx,
+            &Type::Int,
+            AllowForgedLazyStorageId::No,
+        )
+        .expect("Storage has unexpected type");
         match &big_map_id_2 {
             TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
                 &mut ctx,
@@ -8520,6 +8565,121 @@ mod tests {
         }
 
         println!("Created_2 OK");
+    }
+
+    // Regression test for the forged-`big_map`-id vulnerability: an external
+    // operation must not be able to reference another contract's `big_map` by
+    // passing its bare id as a parameter. Before the fix, a writer contract
+    // could overwrite a victim's `big_map` this way (and a reader could read
+    // it). The parameter is now rejected and the victim's storage is left
+    // untouched. Mirrors L1's `allow_forged_lazy_storage_id:false` gate on
+    // operation parameters.
+    #[test]
+    fn forged_big_map_id_in_external_parameter_is_rejected() {
+        use mir::ast::big_map::LazyStorage;
+
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+
+        let tz1 = bootstrap1();
+        init_account(ctx.host, &tz1.pkh, 10_000_000);
+        reveal_account(ctx.host, &tz1);
+
+        // Victim: a contract owning a `big_map nat string` initialised with
+        // `0 -> "genesis-42"`. We allocate the big_map directly in the lazy
+        // storage (as origination would) and point the victim's storage at
+        // its bare id.
+        let victim_id = ctx
+            .big_map_new(&Type::Nat, &Type::String, false)
+            .expect("big_map allocation should succeed");
+        ctx.big_map_update(
+            &victim_id,
+            TypedValue::nat(0),
+            Some(TypedValue::String("genesis-42".into())),
+        )
+        .expect("big_map update should succeed");
+
+        let victim_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeeded");
+        let _victim = init_contract(
+            ctx.host,
+            &victim_addr,
+            "parameter unit ; storage (big_map nat string) ; \
+             code { CDR ; NIL operation ; PAIR }",
+            &Micheline::Int(victim_id.value.0.clone()),
+            &0.into(),
+        );
+
+        // Attacker: a writer taking a `big_map nat string` parameter, writing
+        // "Hacked-by-mi" at key 0 and storing it.
+        let parser = Parser::new();
+        let writer_addr = ContractKt1Hash::from_base58_check(CONTRACT_2)
+            .expect("ContractKt1Hash b58 conversion should have succeeded");
+        let _writer = init_contract(
+            ctx.host,
+            &writer_addr,
+            "parameter (big_map nat string) ; storage (big_map nat string) ; \
+             code { CAR ; PUSH string \"Hacked-by-mi\" ; SOME ; PUSH nat 0 ; \
+             UPDATE ; NIL operation ; PAIR }",
+            &parser.parse("{}").expect("Failed to parse writer storage"),
+            &0.into(),
+        );
+
+        // Forge the victim's `big_map` id as the writer's parameter.
+        let forged_param = Micheline::Int(victim_id.value.0.clone());
+        let operation = make_transfer_operation(
+            15,
+            1,
+            21040,
+            60_000,
+            tz1.clone(),
+            10.into(),
+            Contract::Originated(writer_addr.clone()),
+            Parameters {
+                entrypoint: Entrypoint::default(),
+                value: forged_param.encode(&mut Gas::default()).unwrap().unwrap(),
+            },
+        );
+
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                ctx.host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                ctx.context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        // The forged-id parameter must be rejected: the operation is not
+        // applied.
+        assert!(
+            receipts.iter().all(|r| !r.receipt.is_applied()),
+            "forged big_map id parameter should have been rejected, got: {receipts:?}"
+        );
+
+        // And the victim's `big_map` must be left untouched.
+        crate::mir_ctx::tests::assert_big_map_eq(
+            &mut ctx,
+            &Arena::new(),
+            &victim_id,
+            Type::Nat,
+            Type::String,
+            BTreeMap::from([(
+                TypedValue::nat(0),
+                TypedValue::String("genesis-42".into()),
+            )]),
+        );
     }
 
     #[test]
@@ -8565,8 +8725,13 @@ mod tests {
         let storage = Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
             .unwrap()
             .expect("Micheline should be decodable");
-        let typed_storage = typecheck_value(&storage, &mut ctx, &Type::Bool)
-            .expect("Typecheck value should succeed");
+        let typed_storage = typecheck_value(
+            &storage,
+            &mut ctx,
+            &Type::Bool,
+            AllowForgedLazyStorageId::No,
+        )
+        .expect("Typecheck value should succeed");
         assert_eq!(typed_storage, TypedValue::Bool(true));
 
         // We redeploy a second contract sender, that will send a different big_map
@@ -8633,8 +8798,13 @@ mod tests {
         let storage = Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
             .unwrap()
             .expect("Micheline should be decodable");
-        let typed_storage = typecheck_value(&storage, &mut ctx, &Type::Bool)
-            .expect("Typecheck value should succeed");
+        let typed_storage = typecheck_value(
+            &storage,
+            &mut ctx,
+            &Type::Bool,
+            AllowForgedLazyStorageId::No,
+        )
+        .expect("Typecheck value should succeed");
         assert_eq!(typed_storage, TypedValue::Bool(false));
     }
 

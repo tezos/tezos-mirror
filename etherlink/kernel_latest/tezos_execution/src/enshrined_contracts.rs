@@ -7,7 +7,7 @@ use mir::ast::{
     TransferTokens, TypedValue,
 };
 use mir::ast::{PublicKeyHash, Type};
-use mir::typechecker::typecheck_value;
+use mir::typechecker::{typecheck_value, AllowForgedLazyStorageId};
 use mir::{
     ast::{Entrypoint, Micheline},
     context::CtxTrait,
@@ -210,7 +210,9 @@ fn typecheck_entrypoint_value<'a>(
     let ty = entrypoints.get(entrypoint).ok_or_else(|| {
         TransferError::GatewayError(format!("Unknown entrypoint: {entrypoint}"))
     })?;
-    typecheck_value(value, ctx, ty)
+    // Enshrined-contract parameters are externally supplied, so forged
+    // lazy-storage ids must be rejected.
+    typecheck_value(value, ctx, ty, AllowForgedLazyStorageId::No)
         .map_err(|e| TransferError::GatewayError(format!("Invalid parameters: {e}")))
 }
 

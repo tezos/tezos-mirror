@@ -13,7 +13,9 @@ use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
 use crate::{consume_storage_read_milligas, consume_storage_write_milligas};
 use mir::parser::Parser;
-use mir::typechecker::{typecheck_value, MichelineContractScript, MichelineView};
+use mir::typechecker::{
+    typecheck_value, AllowForgedLazyStorageId, MichelineContractScript, MichelineView,
+};
 use mir::{
     ast::{
         big_map::{BigMapId, LazyStorage, LazyStorageError},
@@ -1313,7 +1315,14 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
             &encoded_value,
             &mut self.operation_gas.remaining,
         )??;
-        Ok(Some(typecheck_value(&value, self, value_type)?))
+        // The value comes from the contract's own committed big_map, so it may
+        // legitimately reference lazy-storage ids it owns.
+        Ok(Some(typecheck_value(
+            &value,
+            self,
+            value_type,
+            AllowForgedLazyStorageId::Yes,
+        )?))
     }
 
     fn big_map_mem(
