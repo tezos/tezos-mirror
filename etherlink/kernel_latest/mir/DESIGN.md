@@ -143,3 +143,12 @@ the WASM heap into its 4 GiB ceiling. `PACK` no longer post-charges
 This also allows to not charge any gas when Micheline trees are reused
 without being re-allocated; in particular for lambda bodies, and
 CREATE_CONTRACT scripts.
+
+### Known differences between MIR and L1 (OCaml implementation)
+
+#### `CHECK_SIGNATURE`
+
+The L1 version is more permissive than MIR for the Ed25519 scheme: the former accepts some small order / mixed order points (RFC-8032), while the latter rejects them (_dalek_). Here is an example where the two implementations differ:
+* `0x00ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f` for the key;
+* `0x776f726c64` for the data;
+* `0xecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000` for the signature.
