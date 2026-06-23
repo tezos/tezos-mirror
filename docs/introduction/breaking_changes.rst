@@ -68,9 +68,10 @@ file. Both have been deprecated in Octez v24. This per-block vote was
 meant to decide the activation of the Adaptive Issuance feature, and
 has had no effects since the Paris protocol has been voted in.
 
+.. _v25_dal_breaking:
 
 DAL node configuration commands
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``octez-dal-node config init`` now fails if a configuration file already
 exists. The new command ``octez-dal-node config reset`` should be used
@@ -78,6 +79,15 @@ instead to overwrite an existing configuration file.
 
 ``octez-dal-node config update`` now fails if no configuration file
 exists. Run ``octez-dal-node config init`` first.
+
+
+Default RPC server of DAL node
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The DAL node RPC server now binds to ``127.0.0.1:10732`` by default instead of ``0.0.0.0:10732``.
+Operators who need to expose the RPC interface publicly must explicitly pass ``--rpc-addr 0.0.0.0:10732`` (or ``[::]:10732``).
+When bound to a non-loopback address, a warning is emitted and a restrictive ACL is applied (only safe/read-only endpoints are accessible).
+The ACL can be overridden per-bind-address via the new ``acl`` field in ``config.json``, using the same policy syntax as the L1 node's ``rpc.acl``.
 
 
 .. _v24_breaking_changes:

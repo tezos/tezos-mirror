@@ -51,6 +51,12 @@ Issuance.
    Remove that field before upgrading to v25. Only ``liquidity_baking_vote``
    is accepted.
 
+DAL node: interface changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The CLI of the DAL node has been slightly modified to get a more consistent experience with respect to other Octez tools, and to improve behavior with default parameters.
+This introduced some minor :ref:`breaking changes <v25_dal_breaking>`.
+
 Minimal hardware specifications
 --------------------------------
 
