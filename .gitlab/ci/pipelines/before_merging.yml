@@ -2030,7 +2030,6 @@ oc.build-data_packages:
   - $TAGS
   rules:
   - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - docs/introduction/install-bin-deb.sh
     - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
@@ -2075,7 +2074,6 @@ oc.build-keyring_package:
   - $TAGS
   rules:
   - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - docs/introduction/install-bin-deb.sh
     - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
@@ -2123,7 +2121,6 @@ oc.build-debian:
   - $TAGS
   rules:
   - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - docs/introduction/install-bin-deb.sh
     - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
@@ -2181,7 +2178,6 @@ apt_repo_debian:
   - gcp_not_interruptible
   rules:
   - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - docs/introduction/install-bin-deb.sh
     - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
@@ -2234,7 +2230,6 @@ oc.test_keyring_debian_bookworm:
   - gcp
   rules:
   - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - docs/introduction/install-bin-deb.sh
     - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
@@ -2282,7 +2277,6 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - gcp
   rules:
   - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - docs/introduction/install-bin-deb.sh
     - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
@@ -2330,7 +2324,6 @@ oc.install_bin_debian_bookworm_systemd:
   - gcp
   rules:
   - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - docs/introduction/install-bin-deb.sh
     - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
@@ -2378,7 +2371,6 @@ oc.install_bin_debian_bookworm:
   - gcp
   rules:
   - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - docs/introduction/install-bin-deb.sh
     - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
@@ -2418,7 +2410,6 @@ oc.lintian_debian:
   - gcp
   rules:
   - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - docs/introduction/install-bin-deb.sh
     - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
