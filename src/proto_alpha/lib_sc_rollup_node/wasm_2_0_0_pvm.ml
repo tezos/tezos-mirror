@@ -26,58 +26,6 @@
 open Protocol
 open Alpha_context
 
-module type TreeS =
-  Tezos_context_sigs.Context.TREE
-    with type key = string list
-     and type value = bytes
-     and type t := unit
-
-module Make_wrapped_tree (Tree : TreeS) :
-  Tezos_tree_encoding.TREE with type tree = Tree.tree = struct
-  type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
-
-  include Tree
-
-  let select = function
-    | PVM_tree t -> t
-    | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
-
-  let wrap t = PVM_tree t
-end
-
-(** This module manifests the proof format used by the Wasm PVM as defined by
-    the Layer 1 implementation for it.
-
-    It is imperative that this is aligned with the protocol's implementation.
-*)
-module Wasm_2_0_0_proof_format = struct
-  include
-    Irmin_context.Proof
-      (struct
-        include Sc_rollup.State_hash
-
-        let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
-      end)
-      (struct
-        let proof_encoding =
-          Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
-          .tree_proof_encoding
-      end)
-
-  type context = Irmin_context.rw_index
-
-  let proof_start_state = proof_before
-
-  let proof_stop_state = proof_after
-
-  module Wrapped_tree = Make_wrapped_tree (Irmin_context.Tree)
-  include Tezos_scoru_wasm.Tree_state.Make (Wrapped_tree)
-
-  let empty_state () = Irmin_context.Tree.empty ()
-
-  let state_hash tree = hash_tree tree |> Lwt.return
-end
-
 (** Durable part of the storage of this PVM. *)
 module type Durable_state = sig
   type state
@@ -134,7 +82,7 @@ module Make_durable_state
     Tezos_scoru_wasm.Durable.list durable key
 end
 
-module Durable_state = Make_durable_state (Wasm_2_0_0_proof_format.Wrapped_tree)
+module Durable_state = Make_durable_state (Wasm_2_0_0_irmin_state.Wrapped_tree)
 
 type unsafe_patch =
   | Increase_max_nb_ticks of int64
@@ -146,20 +94,10 @@ type unsafe_patch =
    config leaves the [Nds_host_functions] gate closed, so NDS never
    activates. *)
 module Fast_pvm_params = Tezos_scoru_wasm_fast.Pvm.Default_params
+module Wasm_fast_pvm_machine =
+  Tezos_scoru_wasm_fast.Pvm.Make_pvm (Fast_pvm_params) (Wasm_2_0_0_irmin_state)
 
-module Wasm_fast_pvm_machine :
-  Tezos_scoru_wasm.Wasm_pvm_sig.S
-    with type context = Wasm_2_0_0_proof_format.context
-     and type state = Wasm_2_0_0_proof_format.state
-     and type proof = Wasm_2_0_0_proof_format.proof =
-  Tezos_scoru_wasm_fast.Pvm.Make_pvm (Fast_pvm_params) (Wasm_2_0_0_proof_format)
-
-module Wasm_pvm_on_disk :
-  Sc_rollup.Wasm_2_0_0PVM.S
-    with type context = Wasm_2_0_0_proof_format.context
-     and type state = Wasm_2_0_0_proof_format.state
-     and type proof = Wasm_2_0_0_proof_format.proof =
-Sc_rollup.Wasm_2_0_0PVM.Make_pvm (struct
+module Wasm_pvm_on_disk = Sc_rollup.Wasm_2_0_0PVM.Make_pvm (struct
   include Wasm_fast_pvm_machine
 
   let compute_step =
@@ -168,10 +106,9 @@ end)
 
 module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
   include Wasm_pvm_on_disk
-
-  type repo = Irmin_context.repo
-
   module Ctxt_wrapper = Context_wrapper.Irmin
+
+  type repo = Ctxt_wrapper.repo
 
   let kind = Sc_rollup.Kind.Wasm_2_0_0
 
@@ -225,7 +162,7 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
 
     type hash = Sc_rollup.State_hash.t
 
-    type repo = Irmin_context.repo
+    type repo = Ctxt_wrapper.repo
 
     type nonrec status = status
 
