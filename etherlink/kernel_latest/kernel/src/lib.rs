@@ -14,6 +14,7 @@ use crate::migration::storage_migration;
 use crate::stage_one::fetch_blueprints;
 use crate::storage::{read_sequencer_pool_address, PRIVATE_FLAG_PATH};
 use anyhow::Context;
+use block::health_check;
 use chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use delayed_inbox::DelayedInbox;
 use fallback_upgrade::fallback_backup_kernel;
@@ -283,6 +284,12 @@ where
     let chain_configuration = fetch_tezosx_configuration(host);
     let mut configuration = fetch_configuration(host);
     let sequencer_pool_address = read_sequencer_pool_address(host);
+
+    // Performing health check to recover from a potentially corrupted durable storage. We do it
+    // before the stage one because stage one reboots and would clear the flag.
+    if !host.is_evm_node() {
+        health_check::<Host>(host)?;
+    }
 
     // Initialize custom precompile
     let tezosx_enabled = chain_configuration.tezos_runtime_feature_flag();

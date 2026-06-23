@@ -13,14 +13,17 @@ use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
     store_current_block_header, BlockHeader, ChainHeader,
 };
-use crate::chains::{ChainConfigTrait, ChainHeaderTrait, EvmLimits, TransactionTrait};
+use crate::chains::{
+    ChainConfigTrait, ChainHeaderTrait, EvmLimits, TezosXChainConfig, TransactionTrait,
+};
 use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
-use crate::storage;
+use crate::migration::allow_path_not_found;
 use crate::storage::read_block_in_progress;
+use crate::storage::{self, EVM_BLOCK_IN_PROGRESS};
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
@@ -32,7 +35,7 @@ use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::IsEvmNode;
-use tezos_evm_runtime::safe_storage::SafeStorage;
+use tezos_evm_runtime::safe_storage::{SafeStorage, TMP_PATH};
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{OwnedPath, Path};
@@ -409,6 +412,30 @@ where
     );
     safe_host.revert()?;
     drop_blueprint(safe_host.host, number)?;
+    Ok(())
+}
+
+pub fn health_check<Host>(host: &mut Host) -> Result<(), anyhow::Error>
+where
+    Host: StorageV1 + WasmHost,
+{
+    if host.last_run_aborted()? {
+        log!(Error, "Something went wrong during previous kernel_run");
+
+        // Something went wrong during the last kernel run. We assume it was while executing the
+        // next blueprint, so we clean up the state to recover. This means getting rid of the
+        // (corrupted) safe storage, the potential blueprint in progress (it could be in the durable
+        // storage if said blueprint required more than one reboot to be executed), and the culprit
+        // blueprint itself. This is enough for the rollup to recover a runtime error.
+        allow_path_not_found(host.store_delete(&TMP_PATH))?;
+        allow_path_not_found(host.store_delete(&EVM_BLOCK_IN_PROGRESS))?;
+
+        let (next_bip_number, _, _) = get_next_bip_info::<Host, TezosXChainConfig>(host);
+        drop_blueprint(host, next_bip_number)?;
+
+        return Ok(());
+    }
+
     Ok(())
 }
 

@@ -238,7 +238,7 @@ impl InMemoryStore {
     }
 
     pub(crate) fn handle_store_has(&self, raw_path: &[u8]) -> Result<i32, Error> {
-        let path = validate_path(raw_path)?;
+        let path = validate_path_maybe_readonly(raw_path)?;
 
         let has_value = self.0.borrow().has_entry(&path);
         let has_subvalue = self.handle_store_list_size(raw_path).unwrap_or_default()

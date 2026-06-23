@@ -248,9 +248,7 @@ impl<R: WasmHost, Host: BorrowMut<R> + Borrow<R>> WasmHost for KernelHost<R, Hos
 
     #[inline(always)]
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
-        // This function is never used by the kernel. Be aware that if you need to use it, you also
-        // need to modify the WASM Runtime.
-        unimplemented!()
+        self.host.borrow().last_run_aborted()
     }
 
     #[inline(always)]
