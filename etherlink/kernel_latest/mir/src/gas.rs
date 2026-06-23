@@ -768,28 +768,35 @@ pub mod interpret_cost {
         (w1 + (w1 >> 4) + 90).as_gas_cost()
     }
 
-    // corresponds to cost_N_IMul_int in the Tezos protocol
+    // L2-1691: num-bigint has no FFT (schoolbook / Karatsuba / Toom-3), so the
+    // real MUL work is super-(n log n); L1's FFT-shaped `a*log(a)` cost
+    // (`cost_N_IMul_*`, calibrated for GMP and re-fitted to the same shape by
+    // the MIR snoop) under-prices large multiplications. We price MUL on the
+    // product of operand sizes instead -- the schoolbook bound num-bigint never
+    // exceeds (its sub-quadratic paths only do less). The per-product
+    // coefficient is taken from `ediv_*`'s product term, which the
+    // sequencer-machine snoop calibrated for the equivalent O(size1*size2)
+    // num-bigint schoolbook work (`cost_N_IEdiv_int ~ 0.0203*q*size2`).
+    // TODO(https://linear.app/tezos/issue/L2-1691): confirm/refine with a
+    // dedicated MUL micro-benchmark (product-of-sizes model) on the sequencer
+    // machine.
+    fn mul_cost(s1: u64, s2: u64) -> Result<u32, CostOverflow> {
+        let p = Checked::from(s1) * Checked::from(s2);
+        ((p >> 6) + (p >> 8) + (p >> 10) + 85).as_gas_cost()
+    }
+
     pub fn mul_int(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
     ) -> Result<u32, CostOverflow> {
-        let a = Checked::from(i1.byte_size()) + Checked::from(i2.byte_size());
-        // the protocol's log2 is 1 + numbits, i.e. ilog2 + 2
-        let log = (a + 1).ok_or(CostOverflow)?.ilog2() + 2;
-        let v0 = a * (log as u64);
-        ((v0 * 5) + 85).as_gas_cost()
+        mul_cost(i1.byte_size(), i2.byte_size())
     }
 
-    // corresponds to cost_N_IMul_nat in the Tezos protocol
     pub fn mul_nat(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
     ) -> Result<u32, CostOverflow> {
-        let a = Checked::from(i1.byte_size()) + Checked::from(i2.byte_size());
-        // the protocol's log2 is 1 + numbits, i.e. ilog2 + 2
-        let log = (a + 1).ok_or(CostOverflow)?.ilog2() + 2;
-        let v0 = a * (log as u64);
-        ((v0 * 4) + (v0 >> 1) + (v0 >> 2) + (v0 >> 3) + 85).as_gas_cost()
+        mul_cost(i1.byte_size(), i2.byte_size())
     }
 
     // corresponds to cost_N_IEdiv_int in the Tezos protocol
@@ -1480,6 +1487,25 @@ mod test {
         assert_eq!(
             interpret_cost::compare(&mut gas, shared.as_ref(), shared.as_ref()),
             Err(CompareError::OutOfGas(OutOfGas))
+        );
+    }
+
+    #[test]
+    fn mul_gas_grows_quadratically_l2_1691() {
+        // L2-1691: MUL gas must grow ~quadratically in operand size (product
+        // of sizes), not ~linearly (the old a*log(a) FFT formula), so it
+        // upper-bounds num-bigint's no-FFT (schoolbook/Karatsuba/Toom-3) work
+        // and the DUP;MUL squaring witness OOGs while real CPU is still bounded.
+        use num_bigint::BigUint;
+        let big = |bytes: usize| BigUint::from_bytes_le(&vec![0xffu8; bytes]);
+        let g = |s| interpret_cost::mul_nat(&big(s), &big(s)).unwrap();
+        let g1 = g(4096);
+        let g2 = g(8192);
+        // Doubling each operand quadruples the cost (~4x); the old a*log(a)
+        // formula only ~doubled it. >= 3.5x pins the quadratic shape.
+        assert!(
+            g2 >= g1 * 7 / 2,
+            "doubling operand size should ~4x MUL gas: g(4096)={g1} g(8192)={g2}"
         );
     }
 
