@@ -463,7 +463,6 @@ type global_pipeline =
   | Octez_latest_release
   | Octez_latest_release_test
   (* Debian packaging pipelines *)
-  | Debian_partial
   | Debian_daily
   (* Security scan pipelines *)
   | Schedule_security_scans

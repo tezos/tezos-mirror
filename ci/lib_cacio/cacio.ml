@@ -874,7 +874,6 @@ type global_pipeline =
   | Octez_latest_release
   | Octez_latest_release_test
   (* Debian packaging pipelines *)
-  | Debian_partial
   | Debian_daily
   (* Security scan pipelines *)
   | Schedule_security_scans
@@ -920,8 +919,6 @@ let get_jobs pipeline =
   | Master ->
       convert_jobs ~interruptible_publish:true ~with_condition:false jobs
   | Packaging_revision_test ->
-      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
-  | Debian_partial ->
       convert_jobs ~interruptible_publish:true ~with_condition:false jobs
   | Base_images_daily ->
       convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
