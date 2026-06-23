@@ -212,10 +212,6 @@ let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
 module Wasm_2_0_0 = struct
   let decode_durable_state =
     Wasm_2_0_0_pvm.Durable_state.Tree_encoding_runner.decode
-
-  let proof_mem_tree = Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.mem_tree
-
-  let proof_fold_tree = Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.fold
 end
 
 module Unsafe = struct

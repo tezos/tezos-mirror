@@ -156,6 +156,34 @@ let list tree key =
   List.rev
   @@ List.rev_map (fun (name, _) -> if name = "@" then "" else name) subtrees
 
+let fold tree ~init ~f =
+  let open Lwt.Syntax in
+  (* Tail-recursive traversal: rather than recursing through the OCaml stack
+     for every level of the tree, we keep an explicit stack of subtrees left to
+     visit. The OCaml stack therefore stays bounded regardless of the depth of
+     [tree]. The traversal order is unspecified, so the order in which subtrees
+     are pushed onto and popped from [stack] is irrelevant. *)
+  let rec loop acc stack =
+    match stack with
+    | [] -> Lwt.return acc
+    | (path, subtree) :: stack ->
+        let* children = T.list subtree [] in
+        let* acc, stack =
+          List.fold_left_s
+            (fun (acc, stack) (name, child) ->
+              if Compare.String.(name = value_marker) then
+                (* [subtree] holds a value at [path]: [child] is its encoding. *)
+                let* value = Runner.decode Chunked_byte_vector.encoding child in
+                let+ acc = f (List.rev path) value acc in
+                (acc, stack)
+              else Lwt.return (acc, (name :: path, child) :: stack))
+            (acc, stack)
+            children
+        in
+        (loop [@tailcall]) acc stack
+  in
+  loop init [([], tree)]
+
 let delete ?(edit_readonly = false) ~kind tree key =
   if not edit_readonly then assert_key_writeable key ;
   match kind with

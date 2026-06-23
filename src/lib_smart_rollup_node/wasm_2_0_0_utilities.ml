@@ -31,65 +31,50 @@ let get_wasm_pvm_state context block_hash context_hash =
       | None ->
           failwith "No PVM state found for block %a" Block_hash.pp block_hash)
 
-(** [decode_value tree] decodes a durable storage value from the given tree. *)
-let decode_value ~(pvm : (module Pvm_plugin_sig.S)) tree =
+(** Whether the value at [key] should be part of the dump. The /readonly
+    subpath is reserved to the PVM and /kernel/boot.wasm is rewritten by the
+    installer, so neither is dumped. *)
+let check_dumpable_path = function
+  | "readonly" :: _ | "kernel" :: "boot.wasm" :: _ -> false
+  | _ -> true
+
+(** [set_value_instr key value] is the installer instruction writing the
+    durable [value] at path [key]. *)
+let set_value_instr key value =
   let open Lwt_syntax in
-  let module Pvm : Pvm_plugin_sig.S = (val pvm) in
-  let* cbv =
-    Pvm.Wasm_2_0_0.decode_durable_state
-      Tezos_lazy_containers.Chunked_byte_vector.encoding
-      tree
-  in
-  Tezos_lazy_containers.Chunked_byte_vector.to_string cbv
+  let+ value = Tezos_lazy_containers.Chunked_byte_vector.to_string value in
+  Installer_config.Set {value; to_ = String.concat "/" ("" :: key)}
 
-(** Returns whether the value under the current key should be dumped. *)
-let check_dumpable_path key =
-  match key with
-  (* The /readonly subpath cannot be set by the user and is reserved to the PVM.
-     The kernel code is rewritten by the installer or the debugger, as such it
-     doesn't need to be part of the dump. Any value under these two won't be
-     part of the dump. *)
-  | "readonly" :: _ | "kernel" :: "boot.wasm" :: _ -> `Nothing
-  | l -> (
-      match List.rev l with
-      | "@" :: path -> `Value (List.rev path)
-      | _ -> `Nothing)
+(* [generate_durable_storage ~plugin state] folds over the values in the
+   durable storage and turns each into an installer instruction. The order is
+   unspecified.
 
-(** [print_set_value] dumps a value in the YAML format of the installer. *)
-let set_value_instr ~(pvm : (module Pvm_plugin_sig.S)) key tree =
-  let open Lwt_syntax in
-  let full_key = String.concat "/" key in
-  let+ value = decode_value ~pvm tree in
-  Installer_config.Set {value; to_ = "/" ^ full_key}
+   This decodes the durable storage from the tree and folds over the decoded
+   representation, so it no longer needs to first check that a "durable"
+   subtree exists in the raw tree (as the previous tree-based implementation
+   did): an absent or empty durable storage simply yields no instruction.
 
-(* [generate_durable_storage tree] folds on the keys in the durable storage and
-   their values and generates as set of instructions out of it. The order is not
-   specified. *)
+   TODO: https://linear.app/tezos/issue/L2-1681/rollup-node-stream-generate-durable-storage-via-a-continuation-instead
+   This accumulates every instruction in memory. It could instead take a
+   continuation (e.g. dumping each instruction as it is produced) to avoid
+   holding the whole state at once, as was already the case before. *)
 let generate_durable_storage ~(plugin : (module Protocol_plugin_sig.S)) state =
   let open Lwt_syntax in
+  let module Plugin = (val plugin) in
   let tree = !(Context_wrapper.Irmin.of_node_pvmstate state) in
-  let durable_path = "durable" :: [] in
-  let module Plugin : Protocol_plugin_sig.S = (val plugin) in
-  let* path_exists = Plugin.Pvm.Wasm_2_0_0.proof_mem_tree tree durable_path in
-  if path_exists then
-    (* This fold on the tree rather than on the durable storage representation
-       directly. It would probably be safer but the durable storage does not
-       implement a folding function yet. *)
-    let* instrs =
-      Plugin.Pvm.Wasm_2_0_0.proof_fold_tree
-        tree
-        durable_path
-        ~order:`Undefined
-        ~init:[]
-        ~f:(fun key tree acc ->
-          match check_dumpable_path key with
-          | `Nothing -> return acc
-          | `Value key ->
-              let+ instr = set_value_instr ~pvm:(module Plugin.Pvm) key tree in
-              instr :: acc)
-    in
-    return_ok instrs
-  else failwith "The durable storage is not available in the tree\n%!"
+  let* durable =
+    Plugin.Pvm.Wasm_2_0_0.decode_durable_state
+      Tezos_scoru_wasm.Tree_state.durable_storage_encoding
+      tree
+  in
+  let* instrs =
+    Tezos_scoru_wasm.Durable.fold durable ~init:[] ~f:(fun key value acc ->
+        if check_dumpable_path key then
+          let+ instr = set_value_instr key value in
+          instr :: acc
+        else return acc)
+  in
+  return_ok instrs
 
 let dump_durable_storage ~block ~data_dir ~file =
   let open Lwt_result_syntax in

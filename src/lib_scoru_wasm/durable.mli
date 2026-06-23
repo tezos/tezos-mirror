@@ -119,6 +119,23 @@ val move_tree_exn : t -> key -> key -> t Lwt.t
 (** [list durable key] returns the subkeys under [key]. *)
 val list : t -> key -> string list Lwt.t
 
+(** [fold durable ~init ~f] folds [f] over every value stored in [durable],
+    passing each value's key and its content. The traversal order is
+    unspecified.
+
+    Values are decoded and handed to [f] one at a time, so [fold] does not read
+    the whole durable state into memory: the only memory it retains is whatever
+    [f] accumulates into its result. *)
+val fold :
+  t ->
+  init:'a ->
+  f:
+    (string list ->
+    Tezos_lazy_containers.Chunked_byte_vector.t ->
+    'a ->
+    'a Lwt.t) ->
+  'a Lwt.t
+
 (** [count_subtrees durable key] returns the number of subtrees under [key]. *)
 val count_subtrees : t -> key -> int Lwt.t
 
