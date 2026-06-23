@@ -544,16 +544,6 @@ let () =
   (* In merge pipelines we tests only Debian.
      Ubuntu packages are built and tested in the scheduled pipelines. *)
   Cacio.register_jobs
-    Debian_partial
-    [
-      (Auto, job_apt_repo_debian Partial);
-      (Auto, job_lintian_debian Partial);
-      (Auto, job_install_bin_debian_trixie Partial);
-      (Auto, job_install_bin_debian_trixie_systemd Partial);
-      (Auto, job_upgrade_bin_debian_trixie_systemd Partial);
-      (Auto, job_test_keyring_debian_trixie Partial);
-    ] ;
-  Cacio.register_jobs
     Debian_daily
     [
       (Auto, job_apt_repo_debian Full);
@@ -582,33 +572,3 @@ let () =
       (Auto, job_test_keyring_ubuntu_26_04 Full);
     ] ;
   ()
-
-let register ~auto ~description pipeline_type =
-  let pipeline_name =
-    match (pipeline_type, auto) with
-    | Partial, false -> "debian_repository_partial"
-    | Partial, true -> "debian_repository_partial_auto"
-    | Full, _ -> "debian_repository_full"
-    | Release, _ -> "debian_repository_release"
-  in
-  Pipeline.register_child
-    pipeline_name
-    ~description
-    ~jobs:(job_datadog_pipeline_trace :: Cacio.get_jobs Debian_partial)
-
-let child_pipeline_partial =
-  register
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       Debian stable .deb packages."
-    ~auto:false
-    Partial
-
-let child_pipeline_partial_auto =
-  register
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       Debian stable .deb packages. Starts automatically on certain \
-       conditions."
-    ~auto:true
-    Partial
