@@ -236,15 +236,6 @@ let jobs pipeline_type =
         ~stage:Stages.manual
         Homebrew.child_pipeline_full
     in
-    let job_base_images_trigger =
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:Yes ())
-        ~stage:Stages.manual
-        ~variables:[("DOCKER_FORCE_BUILD", "true")]
-        ~dependencies:(Dependent [])
-        Base_images.child_pipeline
-    in
     match pipeline_type with
     | Before_merging ->
         (* Note: manual jobs in stage [manual] (which is the final
@@ -255,11 +246,7 @@ let jobs pipeline_type =
              already manual, and what's more, puts the pipeline in a
              confusing "pending state" with a yellow "pause" icon on the
              [manual] stage. *)
-        [
-          job_homebrew_repository_trigger;
-          job_debian_repository_trigger_partial;
-          job_base_images_trigger;
-        ]
+        [job_homebrew_repository_trigger; job_debian_repository_trigger_partial]
     (* No manual jobs on the scheduled pipeline *)
     | Merge_train | Schedule_extended_test -> []
   in
