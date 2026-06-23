@@ -279,6 +279,7 @@ let job_docker_ci_based_images =
         ("GCLOUD_VERSION", "543.0.0");
         ("HADOLINT_VERSION", "2.10.0");
         ("DOCKER_VERSION", docker_version);
+        ("DOCKER_DIGEST", Images.Base_images.docker_digest);
         ("REGCTL_VERSION", "v0.4.3");
         ("PLATFORM", "linux/amd64,linux/arm64");
         ("CI_DOCKER_HUB", "false");

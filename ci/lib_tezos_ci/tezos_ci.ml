@@ -1386,7 +1386,13 @@ end
    https://hub.docker.com/layers/library/docker/28.5.1-dind/images/sha256-bfb73322f4302ed5d380fcba01957ba871458a32245d0862758b08e0fe7916d4 *)
 let docker_version = "28.5.1"
 
-let dind_digest =
+(* Index digest of the upstream [docker:<docker_version>] image. The
+   [docker:<v>] (CLI) and [docker:<v>-dind] (daemon) tags share the same
+   index digest, so this is used to pin both: the [docker:<v>-dind] service,
+   the [docker:<v>] builder image ([upstream_docker]), and the
+   [FROM docker:<v>] base of the alpine-docker-ci image. Update together with
+   [docker_version]. *)
+let docker_digest =
   "sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd"
 
 (* Register external images.
@@ -1402,9 +1408,10 @@ module Images_external = struct
 
   (* Upstream Docker image from Docker Hub, used as the builder image
      for the [alpine-docker-ci] base image job in [base_images.ml].
-     Version and digest are defined alongside [dind_digest] above. *)
+     Version and digest are defined alongside [docker_digest] above. *)
   let upstream_docker =
-    Image.mk_external ~image_path:(sf "docker:%s@%s" docker_version dind_digest)
+    Image.mk_external
+      ~image_path:(sf "docker:%s@%s" docker_version docker_digest)
 
   (* Image used in initial pipeline job that sends to Datadog useful
      info for CI visibility.
@@ -1537,7 +1544,9 @@ module Base_images = struct
 
   let docker_version = docker_version
 
-  let dind_service = sf "docker:%s-dind@%s" docker_version dind_digest
+  let docker_digest = docker_digest
+
+  let dind_service = sf "docker:%s-dind@%s" docker_version docker_digest
 
   let alpine_docker_ci =
     make_img (sf "alpine-docker-ci:%s" docker_version) "master-be43e621"

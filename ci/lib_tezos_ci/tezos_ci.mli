@@ -644,6 +644,11 @@ module Images : sig
         (e.g. ["28.5.1"]). *)
     val docker_version : string
 
+    (** Index digest of the upstream [docker:<docker_version>] image, shared by
+        the [docker:<v>] and [docker:<v>-dind] tags. Used to pin the docker base
+        image (e.g. the [FROM docker:<v>] of alpine-docker-ci). *)
+    val docker_digest : string
+
     (** The fully pinned [docker:<version>-dind@sha256:...] service
         image reference for Docker-in-Docker CI jobs. *)
     val dind_service : string

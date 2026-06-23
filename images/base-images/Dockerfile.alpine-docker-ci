@@ -1,4 +1,5 @@
 ARG DOCKER_VERSION=null
+ARG DOCKER_DIGEST=null
 ARG HADOLINT_VERSION=null
 ARG GCLOUD_VERSION=null
 ARG REGCTL_VERSION=null
@@ -7,7 +8,12 @@ FROM hadolint/hadolint:${HADOLINT_VERSION}-alpine AS hadolint
 FROM ghcr.io/regclient/regctl:${REGCTL_VERSION} AS regctl
 
 ARG DOCKER_VERSION=null
-FROM docker:${DOCKER_VERSION}
+ARG DOCKER_DIGEST=null
+# Pin the upstream docker image by digest (passed from Tezos_ci.docker_digest)
+# so the bundled docker CLI + buildx plugin are reproducible across rebuilds.
+# The docker:<v> tag is otherwise republished over time with newer plugins,
+# which made buildx behaviour drift (e.g. the bake fs.read entitlement check).
+FROM docker:${DOCKER_VERSION}@${DOCKER_DIGEST}
 
 SHELL ["/bin/sh", "-eu", "-c"]
 
