@@ -123,8 +123,33 @@ let compute ?(wasm_entrypoint = Constants.wasm_entrypoint) ~hooks ~version
 
   main_mem := Some (fun () -> Wasmer.Exports.mem0 exports) ;
 
-  let* () =
-    Lwt.finalize kernel_run (fun () ->
+  let* success =
+    Lwt.finalize
+      (fun () ->
+        Lwt.catch
+          (fun () ->
+            let* () = kernel_run () in
+            Lwt.return_true)
+          (function
+            | Tezos_wasmer.Trap rust_str as exn -> (
+                (* [String.split_on_char] never returns [] so using
+                   [Stdlib.List.hd] is safe. *)
+                let str =
+                  Stdlib.List.hd (String.split_on_char '\000' rust_str)
+                in
+                match str with
+                | "unreachable" | "out of bounds memory access"
+                | "integer divide by zero" | "indirect call type mismatch" ->
+                    let* () =
+                      Option.value
+                        ~default:(Fun.const Lwt.return_unit)
+                        hooks.fast_exec.wasm_trap
+                        str
+                    in
+                    Lwt.return_false
+                | _ -> Lwt.reraise exn)
+            | exn -> Lwt.reraise exn))
+      (fun () ->
         (* Make sure that the instance is deleted regardless of whether
            [kernel_run] succeeds or not. *)
         main_mem := None ;
@@ -133,7 +158,10 @@ let compute ?(wasm_entrypoint = Constants.wasm_entrypoint) ~hooks ~version
         Lwt.return_unit)
   in
 
-  let* durable = Wasm_vm.patch_flags_on_eval_successful host_state.durable in
+  let* durable =
+    if success then Wasm_vm.patch_flags_on_eval_successful host_state.durable
+    else Wasm_vm.patch_flags_on_eval_trapped host_state.durable
+  in
   (* TODO: #4283
      The module is cached, but the cash is never cleaned.
      This is the point where it was scrubed before.*)

@@ -37,6 +37,13 @@ module type S = sig
       succeeded, these can be safely deleted. *)
   val patch_flags_on_eval_successful : Durable.t -> Durable.t Lwt.t
 
+  (** [patch_flags_on_eval_successful durable] sets the badly name stuck flag
+      in the read-only directory of the durable storage.
+
+      This flag lets the kernel know something went wrong during its previous
+      run. *)
+  val patch_flags_on_eval_trapped : Durable.t -> Durable.t Lwt.t
+
   (** [should_compute pvm_state] probes whether it is possible to continue
       with more computational steps. *)
   val should_compute : ?reveal_builtins:Builtins.reveals -> pvm_state -> bool
