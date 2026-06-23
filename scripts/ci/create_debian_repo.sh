@@ -176,7 +176,11 @@ for release in $RELEASES; do             # unstable, 22_04, 24_04 ...
     echo "Create the Packages file $TARGETDIR/${target}/Packages"
     apt-ftparchive packages "dists/${release}" > \
       "${target}/Packages"
-    gzip -k -f "${target}/Packages"
+    # -n: omit the mtime/name from the gzip header so an unchanged Packages
+    # produces a byte-identical Packages.gz across publishes. This keeps the
+    # index hash (and thus its by-hash path) stable when the content is
+    # unchanged, avoiding spurious in-place rewrites and extra by-hash blobs.
+    gzip -n -k -f "${target}/Packages"
     cd -
 
   done
@@ -197,6 +201,30 @@ for release in $RELEASES; do             # unstable, 22_04, 24_04 ...
   # Detached signatures (e.g. Release.gpg) require both the sig file and the data file.
   ./scripts/ci/verify_gpg_signature.sh "$TARGETDIR/dists/${release}/Release.gpg" "$TARGETDIR/dists/${release}/Release" "$TARGETDIR/octez.asc" "Release.gpg signature"
 
+  # Publish indices under by-hash/ (content-addressed) so clients fetch them
+  # via immutable paths. Done after Release so by-hash is not listed in it.
+  for architecture in $ARCHITECTURES; do
+    byhash_target="dists/${release}/main/binary-${architecture}"
+    for index in Packages Packages.gz; do
+      index_path="$TARGETDIR/${byhash_target}/${index}"
+      # Skip if this index was not produced (e.g. no packages for this arch).
+      [ -f "$index_path" ] || continue
+      # Each "spec" packs two values "<DIR>:<command>"; apt's by-hash layout
+      # uses an upper-case dir name (SHA256/SHA512) while the matching tool is
+      # lower-case (sha256sum/sha512sum). "${spec%%:*}" keeps the part before
+      # the ":" (the dir), "${spec#*:}" keeps the part after it (the command).
+      for spec in SHA256:sha256sum SHA512:sha512sum; do
+        field="${spec%%:*}"
+        # Run the checksum tool and keep only the hash (cut drops the filename
+        # that *sum prints as the second space-separated column).
+        sum=$("${spec#*:}" "$index_path" | cut -d' ' -f1)
+        # The blob's name *is* its hash, so its path never changes once written.
+        mkdir -p "$TARGETDIR/${byhash_target}/by-hash/${field}"
+        cp "$index_path" "$TARGETDIR/${byhash_target}/by-hash/${field}/${sum}"
+      done
+    done
+  done
+
   # back to base
   cd "$oldPWD"
 done
@@ -207,4 +235,19 @@ export GOOGLE_OAUTH_ACCESS_TOKEN
 
 echo "Push to $BUCKET"
 
-gsutil -m cp -r public/* gs://"${BUCKET}"
+# Upload content first, then the signed Release files last, so a client never
+# sees a new Release before the indices it references. No -d: keep old blobs.
+#
+# Phase 1: mirror everything EXCEPT the signed Release files. "-x" excludes
+# paths matching the regex (the indices and packages are uploaded here).
+gsutil -m rsync -r -x '.*/(InRelease|Release|Release\.gpg)$' public "gs://${BUCKET}"
+
+# Phase 2: upload the signed Release files that were excluded above.
+# "find ... -exec sh -c '...' sh <args> {} +" runs one shell with the matched
+# files appended as arguments; inside it, $1 is "$BUCKET" (saved to "bucket",
+# then dropped with "shift") and the remaining "$@" are the files. For each
+# file, "${f#public/}" strips the local "public/" prefix to get its path
+# inside the bucket.
+find public -type f \( -name InRelease -o -name Release -o -name Release.gpg \) \
+  -exec sh -c 'bucket=$1; shift; for f do gsutil cp "$f" "gs://${bucket}/${f#public/}"; done' \
+  sh "$BUCKET" {} +
