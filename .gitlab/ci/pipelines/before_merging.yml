@@ -157,19 +157,6 @@ trigger:homebrew:
     include: .gitlab/ci/pipelines/homebrew.yml
     strategy: depend
 
-trigger:debian_repository_partial:
-  stage: manual
-  variables:
-    PIPELINE_TYPE: before_merging-debian_repository_partial
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - when: manual
-    allow_failure: true
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/debian_repository_partial.yml
-    strategy: depend
-
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build
