@@ -8,8 +8,6 @@
 open Tezos_ci
 open Tezos_ci.Cache
 
-type homebrew_pipeline = Full | Release
-
 let image = Images.Base_images.debian_homebrew_trixie
 
 let stage = Stages.build
@@ -86,31 +84,10 @@ let job_build_homebrew_formula_macosx : tezos_job =
     ~create_job:job_create_homebrew_formula
     ()
 
-let jobs pipeline_type : tezos_job list =
-  match pipeline_type with
-  | Release -> [job_create_homebrew_formula]
-  | Full ->
-      [
-        job_build_homebrew_formula;
-        job_create_homebrew_formula;
-        job_build_homebrew_formula_macosx;
-      ]
-
-let jobs pipeline_type = job_datadog_pipeline_trace :: jobs pipeline_type
-
-let child_pipeline_full =
-  Pipeline.register_child
-    "homebrew"
-    ~description:
-      "A child pipeline of 'before_merging' building and testing the homebrew \
-       packaging. Manually triggered."
-    ~jobs:(jobs Full)
-
-let child_pipeline_full_auto =
-  Pipeline.register_child
-    "homebrew_auto"
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       and testing the homebrew packaging. Starts automatically on certain \
-       conditions."
-    ~jobs:(jobs Full)
+let jobs =
+  [
+    Tezos_ci.job_datadog_pipeline_trace;
+    job_build_homebrew_formula;
+    job_create_homebrew_formula;
+    job_build_homebrew_formula_macosx;
+  ]
