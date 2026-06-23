@@ -11,6 +11,11 @@
   host-call count. (!22126)
 - The standalone Michelson chain family is no longer supported: the
   Michelson runtime is only available embedded in the Tezos X chain. (!22204)
+- Michelson runtime: typechecking a deeply nested `CREATE_CONTRACT` no longer
+  overflows the native stack. The embedded child script is now typechecked on
+  the iterative worklist instead of recursing, so an adversarial origination
+  chain is rejected with a bounded error (or its gas/recursion cap) rather than
+  aborting the kernel (!22282).
 
 ## Version 6 (Farfadet)
 
