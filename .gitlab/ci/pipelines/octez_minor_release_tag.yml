@@ -430,6 +430,9 @@ dispatch-call:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  environment:
+    name: tezcapital-dispatch
+    action: access
   retry: 0
 
 oc.build-ubuntu:
