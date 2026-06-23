@@ -79,7 +79,6 @@ let changeset_homebrew =
   Changeset.(
     make
       [
-        ".gitlab/ci/pipelines/homebrew_auto.yml";
         "scripts/packaging/test_homebrew_install.sh";
         "scripts/packaging/homebrew_release.sh";
         "images/scripts/install-gcloud.sh";

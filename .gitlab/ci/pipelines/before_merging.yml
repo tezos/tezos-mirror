@@ -128,7 +128,6 @@ oc.create-homebrew-formula:
   - gcp
   rules:
   - changes:
-    - .gitlab/ci/pipelines/homebrew_auto.yml
     - images/scripts/install-gcloud.sh
     - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
@@ -158,7 +157,6 @@ oc.build-homebrew-formula:
   - gcp_very_high_cpu
   rules:
   - changes:
-    - .gitlab/ci/pipelines/homebrew_auto.yml
     - images/scripts/install-gcloud.sh
     - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
@@ -195,7 +193,6 @@ oc.build-homebrew-formula-macosx:
   - $TAGS
   rules:
   - changes:
-    - .gitlab/ci/pipelines/homebrew_auto.yml
     - images/scripts/install-gcloud.sh
     - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
