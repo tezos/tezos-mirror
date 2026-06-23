@@ -180,9 +180,27 @@ let jobs pipeline_type =
         ~dependencies:dependencies_needs_start
         Homebrew.child_pipeline_full_auto
     in
-
+    let create_job =
+      Homebrew.make_job_create_homebrew_formula
+        ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
+        ~dependencies:dependencies_needs_start
+        ()
+    in
+    let build_job =
+      Homebrew.make_job_build_homebrew_formula
+        ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
+        ~create_job
+        ()
+    in
+    let macos_job =
+      Homebrew.make_job_build_homebrew_formula_macosx
+        ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
+        ~create_job
+        ()
+    in
     match pipeline_type with
-    | Before_merging | Merge_train -> [job_homebrew_trigger_auto]
+    | Before_merging | Merge_train ->
+        [job_homebrew_trigger_auto; create_job; build_job; macos_job]
     | Schedule_extended_test -> []
   in
 

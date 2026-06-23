@@ -16,18 +16,24 @@ let stage = Stages.build
 
 (* this job creates a formula from a template
      using the homebrew_release.sh script *)
-let job_create_homebrew_formula : tezos_job =
+let make_job_create_homebrew_formula ?rules ?(dependencies = Dependent []) () :
+    tezos_job =
   job
     ~__POS__
     ~name:"oc.create-homebrew-formula"
     ~arch:Amd64
     ~image
     ~stage
+    ?rules
+    ~dependencies
     ["./scripts/packaging/homebrew_release.sh"]
+
+let job_create_homebrew_formula : tezos_job =
+  make_job_create_homebrew_formula ()
 
 (* this job tests if the formula created by job_create_homebrew_formula
      can be compiled and installed *)
-let job_build_homebrew_formula : tezos_job =
+let make_job_build_homebrew_formula ?rules ~create_job () : tezos_job =
   job
     ~__POS__
     ~name:"oc.build-homebrew-formula"
@@ -36,7 +42,8 @@ let job_build_homebrew_formula : tezos_job =
     ~allow_failure:No
     ~image
     ~stage
-    ~dependencies:(Dependent [Job job_create_homebrew_formula])
+    ?rules
+    ~dependencies:(Dependent [Job create_job])
     ~variables:
       [
         ("DUNE_BUILD_JOBS", "-j 12");
@@ -51,7 +58,10 @@ let job_build_homebrew_formula : tezos_job =
     ]
   |> enable_networked_cargo
 
-let job_build_homebrew_formula_macosx : tezos_job =
+let job_build_homebrew_formula : tezos_job =
+  make_job_build_homebrew_formula ~create_job:job_create_homebrew_formula ()
+
+let make_job_build_homebrew_formula_macosx ?rules ~create_job () : tezos_job =
   job
     ~__POS__
     ~name:"oc.build-homebrew-formula-macosx"
@@ -59,16 +69,22 @@ let job_build_homebrew_formula_macosx : tezos_job =
     ~variables:[("TAGS", "saas-macos-large-m2pro")]
     ~parallel:
       (Matrix [[("MACOS_IMAGE", ["macos-15-xcode-16"; "macos-26-xcode-26"])]])
-    ~dependencies:(Dependent [Job job_create_homebrew_formula])
+    ~dependencies:(Dependent [Job create_job])
     ~stage
     ~description:"Run the homebrew installation on MacOSX"
     ~allow_failure:Yes
+    ?rules
     ~tag:Dynamic
     [
       "./scripts/packaging/homebrew_install.sh";
       "eval $(/opt/homebrew/bin/brew shellenv)";
       "./scripts/packaging/test_homebrew_install.sh";
     ]
+
+let job_build_homebrew_formula_macosx : tezos_job =
+  make_job_build_homebrew_formula_macosx
+    ~create_job:job_create_homebrew_formula
+    ()
 
 let jobs pipeline_type : tezos_job list =
   match pipeline_type with
