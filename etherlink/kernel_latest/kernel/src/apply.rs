@@ -1361,6 +1361,10 @@ where
                     // CRAC/delayed sub-operation: its internal ops are bounded
                     // by EVM gas; the per-execution cap from base 0 applies.
                     internal_operations_base: 0,
+                    // Delayed-inbox path: preserve the existing always-promote
+                    // trace behavior (not on the block-production hot path).
+                    tracing_enabled: true,
+                    http_trace_enabled: true,
                 },
                 skip_signature_check,
                 None,

@@ -336,6 +336,12 @@ where
                 Some(&block_constants.evm_runtime_block_constants),
                 &mut trace_journal,
                 enable_gas_refund,
+                // Off the block-production hot path (simulation / pre-application):
+                // conservatively preserve the prior always-promote behavior. The
+                // per-op store_has probe this patch removes is only taken on the
+                // block-production path.
+                true,
+                true,
             )
         }
         _ => chain_config.apply_transaction(
