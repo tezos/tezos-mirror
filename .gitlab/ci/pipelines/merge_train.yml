@@ -7,6 +7,8 @@ stages:
 - sanity
 - build
 - test
+- publish
+- publishing_tests
 
 oc.docker:ci:amd64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -1950,6 +1952,428 @@ nix:
     paths:
     - flake.lock
     when: on_failure
+
+oc.build-data_packages:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  stage: build
+  tags:
+  - $TAGS
+  rules:
+  - changes:
+    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+    - docs/introduction/install-bin-deb.sh
+    - manifest/**/*.ml*
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/build-keyring-deb.sh
+    - scripts/ci/create_debian_repo.sh
+    - scripts/ci/prepare-apt-repo.sh
+    - scripts/packaging/Release.conf
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez-archive-keyring/**/*
+    - scripts/packaging/octez/debian/*
+    - scripts/packaging/tests/deb/test-keyring*
+    - scripts/version.sh
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh zcash
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DISTRIBUTION: debian
+    RELEASE: trixie
+    TAGS: gcp
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+
+oc.build-keyring_package:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  stage: build
+  tags:
+  - $TAGS
+  rules:
+  - changes:
+    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+    - docs/introduction/install-bin-deb.sh
+    - manifest/**/*.ml*
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/build-keyring-deb.sh
+    - scripts/ci/create_debian_repo.sh
+    - scripts/ci/prepare-apt-repo.sh
+    - scripts/packaging/Release.conf
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez-archive-keyring/**/*
+    - scripts/packaging/octez/debian/*
+    - scripts/packaging/tests/deb/test-keyring*
+    - scripts/version.sh
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh keyring
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DISTRIBUTION: debian
+    RELEASE: trixie
+    TAGS: gcp
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
+
+oc.build-debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  stage: build
+  tags:
+  - $TAGS
+  rules:
+  - changes:
+    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+    - docs/introduction/install-bin-deb.sh
+    - manifest/**/*.ml*
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/build-keyring-deb.sh
+    - scripts/ci/create_debian_repo.sh
+    - scripts/ci/prepare-apt-repo.sh
+    - scripts/packaging/Release.conf
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez-archive-keyring/**/*
+    - scripts/packaging/octez/debian/*
+    - scripts/packaging/tests/deb/test-keyring*
+    - scripts/version.sh
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh binaries
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    DISTRIBUTION: debian
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
+      TAGS:
+      - gcp_very_high_cpu_ramfs
+
+apt_repo_debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  rules:
+  - changes:
+    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+    - docs/introduction/install-bin-deb.sh
+    - manifest/**/*.ml*
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/build-keyring-deb.sh
+    - scripts/ci/create_debian_repo.sh
+    - scripts/ci/prepare-apt-repo.sh
+    - scripts/packaging/Release.conf
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez-archive-keyring/**/*
+    - scripts/packaging/octez/debian/*
+    - scripts/packaging/tests/deb/test-keyring*
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - oc.build-data_packages
+  - oc.build-keyring_package
+  - oc.build-debian
+  dependencies:
+  - oc.build-data_packages
+  - oc.build-keyring_package
+  - oc.build-debian
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - apt-get install -y --update apt-utils debsigs
+  - ./scripts/ci/create_debian_repo.sh debian trixie
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    ARCHITECTURES: amd64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: ""
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
+  retry: 0
+
+oc.test_keyring_debian_bookworm:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+    - docs/introduction/install-bin-deb.sh
+    - manifest/**/*.ml*
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/build-keyring-deb.sh
+    - scripts/ci/create_debian_repo.sh
+    - scripts/ci/prepare-apt-repo.sh
+    - scripts/packaging/Release.conf
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez-archive-keyring/**/*
+    - scripts/packaging/octez/debian/*
+    - scripts/packaging/tests/deb/test-keyring*
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    PREFIX: ""
+    DISTRIBUTION: debian
+    RELEASE: bookworm
+
+oc.upgrade_bin_debian_bookworm-systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+    - docs/introduction/install-bin-deb.sh
+    - manifest/**/*.ml*
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/build-keyring-deb.sh
+    - scripts/ci/create_debian_repo.sh
+    - scripts/ci/prepare-apt-repo.sh
+    - scripts/packaging/Release.conf
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez-archive-keyring/**/*
+    - scripts/packaging/octez/debian/*
+    - scripts/packaging/tests/deb/test-keyring*
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    PREFIX: ""
+    DISTRIBUTION: debian
+    RELEASE: bookworm
+
+oc.install_bin_debian_bookworm_systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+    - docs/introduction/install-bin-deb.sh
+    - manifest/**/*.ml*
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/build-keyring-deb.sh
+    - scripts/ci/create_debian_repo.sh
+    - scripts/ci/prepare-apt-repo.sh
+    - scripts/packaging/Release.conf
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez-archive-keyring/**/*
+    - scripts/packaging/octez/debian/*
+    - scripts/packaging/tests/deb/test-keyring*
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    PREFIX: ""
+    DISTRIBUTION: debian
+    RELEASE: bookworm
+
+oc.install_bin_debian_bookworm:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-100afa6d
+  stage: publishing_tests
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+    - docs/introduction/install-bin-deb.sh
+    - manifest/**/*.ml*
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/build-keyring-deb.sh
+    - scripts/ci/create_debian_repo.sh
+    - scripts/ci/prepare-apt-repo.sh
+    - scripts/packaging/Release.conf
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez-archive-keyring/**/*
+    - scripts/packaging/octez/debian/*
+    - scripts/packaging/tests/deb/test-keyring*
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./docs/introduction/install-bin-deb.sh debian bookworm
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    PREFIX: ""
+
+oc.lintian_debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  stage: publishing_tests
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
+    - docs/introduction/install-bin-deb.sh
+    - manifest/**/*.ml*
+    - scripts/ci/build-debian-packages.sh
+    - scripts/ci/build-debian-packages_current.sh
+    - scripts/ci/build-keyring-deb.sh
+    - scripts/ci/create_debian_repo.sh
+    - scripts/ci/prepare-apt-repo.sh
+    - scripts/packaging/Release.conf
+    - scripts/packaging/build-deb-local.sh
+    - scripts/packaging/octez-archive-keyring/**/*
+    - scripts/packaging/octez/debian/*
+    - scripts/packaging/tests/deb/test-keyring*
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - oc.build-debian
+  dependencies:
+  - oc.build-debian
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - export DEBIAN_FRONTEND=noninteractive
+  - apt-get update
+  - apt-get install lintian parallel -y
+  - ./scripts/ci/lintian_debian_packages.sh debian trixie
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}
