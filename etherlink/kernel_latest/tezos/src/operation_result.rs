@@ -207,6 +207,10 @@ pub enum OriginationError {
     MirBigMapAllocation(String),
     #[error("Mir failed to typecheck the contract with {0}")]
     MirTypecheckingError(String),
+    /// The originated script exceeded the maximum allowed size (mirrors L1's
+    /// `max_operation_data_length`; see L2-1706). Message carries size and limit.
+    #[error("Script too large: {0}")]
+    ScriptTooLarge(String),
     #[error("Failed because of micheline (de)serialization {0}")]
     MichelineSerializationError(String),
     #[error("Gas exhaustion")]
