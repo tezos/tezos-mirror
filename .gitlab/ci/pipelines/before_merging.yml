@@ -9,7 +9,6 @@ stages:
 - test
 - publish
 - publishing_tests
-- manual
 
 oc.docker:ci:amd64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -122,28 +121,6 @@ trigger:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-trigger:homebrew_auto:
-  stage: test
-  variables:
-    PIPELINE_TYPE: before_merging-homebrew_auto
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - changes:
-    - .gitlab/ci/pipelines/homebrew_auto.yml
-    - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
-    - scripts/packaging/homebrew_install.sh
-    - scripts/packaging/homebrew_release.sh
-    - scripts/packaging/octez/homebrew/Formula/*
-    - scripts/packaging/test_homebrew_install.sh
-    - scripts/version.sh
-    when: on_success
-  needs:
-  - trigger
-  trigger:
-    include: .gitlab/ci/pipelines/homebrew_auto.yml
-    strategy: depend
-
 oc.create-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
   stage: build
@@ -250,19 +227,6 @@ oc.build-homebrew-formula-macosx:
     - MACOS_IMAGE:
       - macos-15-xcode-16
       - macos-26-xcode-26
-
-trigger:homebrew:
-  stage: manual
-  variables:
-    PIPELINE_TYPE: before_merging-homebrew
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - when: manual
-    allow_failure: true
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/homebrew.yml
-    strategy: depend
 
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
