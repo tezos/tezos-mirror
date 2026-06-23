@@ -9613,6 +9613,7 @@ mod typecheck_tests {
                     &mut Ctx::default(),
                     &storage_lambda,
                     TypecheckViews::Enabled,
+                    AllowForgedLazyStorageId::No,
                 )
                 .map(|_| ()),
             Err(TcError::InvalidTypeProperty(
@@ -9621,7 +9622,11 @@ mod typecheck_tests {
             ))
         );
         assert!(parent
-            .typecheck_storage(&mut Ctx::default(), &storage_lambda)
+            .typecheck_storage(
+                &mut Ctx::default(),
+                &storage_lambda,
+                AllowForgedLazyStorageId::Yes,
+            )
             .is_ok());
     }
 

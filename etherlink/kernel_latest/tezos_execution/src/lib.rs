@@ -1658,9 +1658,21 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
         Micheline::decode_raw(&parser.arena, &script.storage, ctx.gas())
             .map_err(OriginationError::from)?
             .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
+    // The initial storage comes from the (external) origination operation, so
+    // it must not reference a `big_map` by a forged id — a contract cannot own
+    // a lazy-storage id before it exists. Internal `CREATE_CONTRACT`
+    // originations do not go through here: they carry an already-typechecked
+    // `TypedValue` storage straight to `originate_contract`, which legitimately
+    // references the emitting contract's big_maps. Mirrors L1's
+    // `allow_forged_lazy_storage_id_in_storage:false` at origination.
     contract_typechecked
         // Origination: validate storage-value lambda child views (L2-1635).
-        .typecheck_storage_with_views(ctx, &storage_micheline, TypecheckViews::Enabled)
+        .typecheck_storage_with_views(
+            ctx,
+            &storage_micheline,
+            TypecheckViews::Enabled,
+            AllowForgedLazyStorageId::No,
+        )
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
 }
 
@@ -8669,6 +8681,123 @@ mod tests {
         );
 
         // And the victim's `big_map` must be left untouched.
+        crate::mir_ctx::tests::assert_big_map_eq(
+            &mut ctx,
+            &Arena::new(),
+            &victim_id,
+            Type::Nat,
+            Type::String,
+            BTreeMap::from([(
+                TypedValue::nat(0),
+                TypedValue::String("genesis-42".into()),
+            )]),
+        );
+    }
+
+    // Regression test for the origination variant of the forged-`big_map`-id
+    // vulnerability: a contract's initial storage supplied in an external
+    // origination must not reference another contract's `big_map` by a forged
+    // id. Doing so would let the freshly-originated contract usurp a big_map it
+    // does not own and read or overwrite it through its own entrypoints. The
+    // origination is now rejected. Mirrors L1's
+    // `allow_forged_lazy_storage_id_in_storage:false` at origination.
+    #[test]
+    fn forged_big_map_id_in_origination_storage_is_rejected() {
+        use mir::ast::big_map::LazyStorage;
+
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+
+        let tz1 = bootstrap1();
+        init_account(ctx.host, &tz1.pkh, 10_000_000);
+        reveal_account(ctx.host, &tz1);
+
+        // Victim big_map { 0 -> "genesis-42" } owned by an existing contract.
+        let victim_id = ctx
+            .big_map_new(&Type::Nat, &Type::String, false)
+            .expect("big_map allocation should succeed");
+        ctx.big_map_update(
+            &victim_id,
+            TypedValue::nat(0),
+            Some(TypedValue::String("genesis-42".into())),
+        )
+        .expect("big_map update should succeed");
+        let victim_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeeded");
+        let _victim = init_contract(
+            ctx.host,
+            &victim_addr,
+            "parameter unit ; storage (big_map nat string) ; \
+             code { CDR ; NIL operation ; PAIR }",
+            &Micheline::Int(victim_id.value.0.clone()),
+            &0.into(),
+        );
+
+        // Originate a contract whose initial storage is the victim's forged
+        // big_map id.
+        let parser = Parser::new();
+        let code = parser
+            .parse_top_level(
+                "parameter unit ; storage (big_map nat string) ; code { CDR ; \
+                 NIL operation ; PAIR }",
+            )
+            .expect("Failed to parse origination code")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let storage = parser
+            .parse(&format!("{victim_id}"))
+            .expect("Failed to parse origination storage")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let operation = make_origination_operation(
+            15,
+            1,
+            21040,
+            60_000,
+            tz1.clone(),
+            0,
+            Script { code, storage },
+        );
+
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                ctx.host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                ctx.context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        // The origination must be rejected.
+        assert!(
+            receipts.iter().all(|r| !r.receipt.is_applied()),
+            "forged big_map id in origination storage should have been \
+             rejected, got: {receipts:?}"
+        );
+
+        // And the failure must carry the storage typecheck error, i.e. the
+        // forged big_map id is what got it refused (not some unrelated error).
+        let rendered = format!("{receipts:?}");
+        assert!(
+            rendered.contains("unexpected forged lazy storage id"),
+            "origination failure should carry the storage typecheck error, \
+             got: {rendered}"
+        );
+
+        // And the victim's big_map must be left untouched.
         crate::mir_ctx::tests::assert_big_map_eq(
             &mut ctx,
             &Arena::new(),
