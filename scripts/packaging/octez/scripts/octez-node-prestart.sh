@@ -28,7 +28,7 @@ get_value() {
     echo GET "$TEMPLATE" |
       debconf-communicate "$PACKAGE" 2> /dev/null | awk '/^0/ {print $2}'
   else
-    # if debconf is not available ( like on rpm systems ),
+    # if debconf is not available,
     # we try our luck with the default env vars
     if [ -e /etc/default/octez-node ]; then
       #shellcheck disable=SC1091
