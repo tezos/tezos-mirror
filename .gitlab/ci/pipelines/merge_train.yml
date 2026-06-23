@@ -118,33 +118,6 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-trigger:debian_repository_partial_auto:
-  stage: test
-  variables:
-    PIPELINE_TYPE: merge_train-debian_repository_partial_auto
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
-    - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
-    - scripts/ci/build-debian-packages.sh
-    - scripts/ci/build-debian-packages_current.sh
-    - scripts/ci/build-keyring-deb.sh
-    - scripts/ci/create_debian_repo.sh
-    - scripts/ci/prepare-apt-repo.sh
-    - scripts/packaging/Release.conf
-    - scripts/packaging/build-deb-local.sh
-    - scripts/packaging/octez-archive-keyring/**/*
-    - scripts/packaging/octez/debian/*
-    - scripts/packaging/tests/deb/test-keyring*
-    - scripts/version.sh
-    when: on_success
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
-    strategy: depend
-
 trigger:homebrew_auto:
   stage: test
   variables:
