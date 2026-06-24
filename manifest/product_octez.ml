@@ -3995,6 +3995,20 @@ let octez_riscv_nds_disk =
         octez_riscv_durable_storage_on_disk_api;
       ]
 
+let _octez_smart_rollup_nds_on_disk =
+  octez_l2_lib
+    "smart-rollup-nds-on-disk"
+    ~internal_name:"tezos_smart_rollup_nds_on_disk"
+    ~path:"src/lib_smart_rollup_nds_on_disk"
+    ~synopsis:"On-disk NDS backend for the dual-state WASM PVM"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_smart_rollup_wasm_dual_state;
+        octez_riscv_nds_common;
+        octez_riscv_nds_disk;
+      ]
+
 let _octez_riscv_nds_test =
   tezt
     ["test_nds_pbt"; "helpers"; "model"]
