@@ -253,6 +253,45 @@ let job_lintian_debian =
     ~distribution:"debian"
     ~releases:["bookworm"]
 
+(* Rebuild the Debian binary, data and keyring packages for trixie/amd64 and
+   check, with diffoscope, that they are byte-for-byte identical to the packages
+   already built by [job_build_debian], [job_build_data_packages] and
+   [job_build_keyring_package] (pulled in as artifacts). Reusing the existing
+   builds as the reference means we only pay for one extra build.
+
+   This job only ever runs in the scheduled [Debian_daily] pipeline (registered
+   with [Full] below). It checks a single distribution/architecture pair, pinned
+   by the DISTRIBUTION and RELEASE variables (debian/trixie) and the amd64 tag;
+   reproducibility of that pair is taken as representative of the other
+   combinations. The [pipeline_type] parameter only exists to thread the right
+   matrix variant into the [job_build_debian] dependency. *)
+let job_reproducibility_debian =
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "oc.reproducibility_debian"
+    ~__POS__
+    ~description:
+      "Rebuild the Debian packages and check they are byte-for-byte identical \
+       to the first build (reproducible builds)."
+    ~image:build_dependency_image
+    ~stage:Test_publication
+    ~tag:Dynamic
+    ~needs:
+      [
+        (Artifacts, job_build_debian pipeline_type);
+        (Artifacts, job_build_data_packages);
+        (Artifacts, job_build_keyring_package);
+      ]
+    ~variables:
+      [
+        ("DISTRIBUTION", "debian");
+        ("RELEASE", "trixie");
+        ("TAGS", tag_amd64 ~ramfs:true);
+        ("DUNE_BUILD_JOBS", "-j 12");
+      ]
+    ~sccache:(Cacio.sccache ())
+    ~script:[cargo_network_hack; "./scripts/ci/test-debian-reproducibility.sh"]
+
 let make_install_bin_job ~distribution ~release =
   CI.job
     ~stage:Test_publication
@@ -465,6 +504,7 @@ let () =
     [
       (Auto, job_apt_repo_debian Full);
       (Auto, job_apt_repo_ubuntu Full);
+      (Auto, job_reproducibility_debian Full);
       (Auto, job_lintian_ubuntu Full);
       (Auto, job_lintian_debian Full);
       (Auto, job_install_bin_ubuntu_22_04 Full);

@@ -10,8 +10,11 @@ export BLST_PORTABLE=true
 # fetch tags for releases
 git fetch -q --tags
 
-# link the dependencies files in the build directory.
-ln -s /root/tezos/_opam .
+# link the dependencies files in the build directory. -sfn makes this idempotent
+# (the reproducibility check invokes the script several times in the same job)
+# and also guarantees the link points at the expected directory even if a stale
+# _opam symlink is already present.
+ln -sfn /root/tezos/_opam _opam
 
 # Build octez debian packages
 scripts/packaging/build-deb-local.sh "$1"
