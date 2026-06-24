@@ -92,6 +92,14 @@ Packaging
 Smart Rollup node
 -----------------
 
+- Fixed the public ``secure`` RPC ACL, which did not deny the mutating
+  ``/local/dal/**`` endpoints (``POST /local/dal/batcher/injection``,
+  ``POST /local/dal/slot/indices`` and ``POST /local/dal/injection/<id>/forget``).
+  On a publicly exposed node an unauthenticated caller could enqueue DAL
+  payloads that the operator node published as an operator-funded
+  ``dal_publish_commitment`` operation on L1. These endpoints are now denied
+  like the other ``/local/**`` mutating endpoints.
+
 - The injector now splits batches when individual operations fail simulation
   with gas exhaustion (instead of repeatedly dropping them), and re-queues the
   operations set aside by a batch split so they are reconsidered in a later
