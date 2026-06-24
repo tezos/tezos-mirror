@@ -23,7 +23,7 @@ Usage: $0 [-h|--help]
   [--tag-extra <TAG_EXTRA>]
   [--targetarch <TARGETARCH>]
   [--layer-targets <LAYER_TARGETS>]
-  [-- docker build args]
+  [-- docker buildx build args]
 
 Creates all the tezos/tezos CI images from
 'images/ci/Dockerfile'. Each image corresponds to a
@@ -203,9 +203,14 @@ build() {
   # [docker buildx bake], which cannot follow context-escaping symlinks.)
   # Previously the context was images/ci with the images/ci/* symlinks
   # dereferenced into it via [tar -cvh]; those symlinks have been removed.
+  # Build with [docker buildx build] (BuildKit) rather than the legacy
+  # builder: BuildKit streams the build context incrementally instead of
+  # tarring and sending it up front, which matters now that the context is
+  # the whole repository root rather than [images/ci/]. It also matches how
+  # the base images are built (see [scripts/ci/build-base-images.sh]).
   # shellcheck disable=SC2046
   cd "$repo_dir" &&
-    docker build --network host \
+    docker buildx build --network host \
       -f "images/ci/Dockerfile.$f_LAYER_TARGET" \
       --build-arg BUILDKIT_INLINE_CACHE=1 \
       $(if [ -n "$tag_extra" ]; then echo "--cache-from=$f_image_name_extra"; fi) \
