@@ -33,12 +33,11 @@ COPY --chown=tezos:tezos images/ci/install-rust.sh /tmp/
 COPY --chown=tezos:tezos images/scripts/install_opam_static.sh /tmp/
 COPY --chown=tezos:tezos images/scripts/install_sccache_static.sh /tmp/
 
-# setup kisscache
-# kiss-fetch.sh must be on PATH: the install_*.sh scripts probe for it with
-# [command -v kiss-fetch.sh], which only searches $PATH (no slash in the name).
-COPY --chown=tezos:tezos scripts/kiss-fetch.sh /usr/local/bin/
-COPY --chown=tezos:tezos scripts/kiss-logs.sh /tmp/
-ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+# kisscache setup. kiss-fetch.sh (on PATH), kiss-logs.sh (/tmp) and KISSCACHE
+# are provided by the monitoring image this one is built FROM. Point opam at
+# kiss-fetch.sh so its downloads also go through the kisscache proxy; the
+# install_*.sh scripts above pick it up from PATH on their own via
+# [command -v kiss-fetch.sh].
 ENV OPAMFETCH="/usr/local/bin/kiss-fetch.sh"
 
 # hadolint ignore=DL3018,DL3019
@@ -48,7 +47,6 @@ RUN apk update \
  && apk add --no-cache \
     autoconf \
     automake \
-    bash \
     build-base \
     ca-certificates \
     clang-dev \
