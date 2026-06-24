@@ -150,42 +150,6 @@ oc.create-homebrew-formula:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
-  stage: build
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - changes:
-    - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
-    - scripts/packaging/homebrew_install.sh
-    - scripts/packaging/homebrew_release.sh
-    - scripts/packaging/octez/homebrew/Formula/*
-    - scripts/packaging/test_homebrew_install.sh
-    - scripts/version.sh
-    when: on_success
-  needs:
-  - oc.create-homebrew-formula
-  dependencies: []
-  allow_failure: false
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - cp images/ci/.cargo/config.toml .cargo/
-  - ./scripts/packaging/test_homebrew_install.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    DUNE_BUILD_JOBS: -j 12
-    HOMEBREW_KISSCACHE: http://kisscache.kisscache.svc.cluster.local
-    HOMEBREW_OPAMFETCH: scripts/kiss-fetch.sh
-    CARGO_NET_OFFLINE: "false"
-
 oc.build-homebrew-formula-macosx:
   image: $MACOS_IMAGE
   stage: build
@@ -2514,6 +2478,44 @@ oc.lintian_debian:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+oc.build-homebrew-formula:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
+  stage: test
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/scripts/install-gcloud.sh
+    - manifest/**/*.ml*
+    - scripts/packaging/homebrew_install.sh
+    - scripts/packaging/homebrew_release.sh
+    - scripts/packaging/octez/homebrew/Formula/*
+    - scripts/packaging/test_homebrew_install.sh
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - trigger
+  - oc.create-homebrew-formula
+  dependencies: []
+  allow_failure: false
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - cp images/ci/.cargo/config.toml .cargo/
+  - ./scripts/packaging/test_homebrew_install.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DUNE_BUILD_JOBS: -j 12
+    HOMEBREW_KISSCACHE: http://kisscache.kisscache.svc.cluster.local
+    HOMEBREW_OPAMFETCH: scripts/kiss-fetch.sh
+    CARGO_NET_OFFLINE: "false"
 
 oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}

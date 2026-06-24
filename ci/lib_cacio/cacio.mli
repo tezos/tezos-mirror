@@ -464,6 +464,8 @@ type global_pipeline =
   | Octez_latest_release_test
   (* Debian packaging pipelines *)
   | Debian_daily
+  (* Homebrew packaging pipelines *)
+  | Homebrew_daily
   (* Security scan pipelines *)
   | Schedule_security_scans
   (* Base images pipelines *)

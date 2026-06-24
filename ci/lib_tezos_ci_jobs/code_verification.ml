@@ -164,12 +164,6 @@ let jobs pipeline_type =
         ~dependencies:dependencies_needs_start
         ()
     in
-    let build_job =
-      Homebrew.make_job_build_homebrew_formula
-        ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
-        ~create_job
-        ()
-    in
     let macos_job =
       Homebrew.make_job_build_homebrew_formula_macosx
         ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
@@ -177,7 +171,7 @@ let jobs pipeline_type =
         ()
     in
     match pipeline_type with
-    | Before_merging | Merge_train -> [create_job; build_job; macos_job]
+    | Before_merging | Merge_train -> [create_job; macos_job]
     | Schedule_extended_test -> []
   in
 
