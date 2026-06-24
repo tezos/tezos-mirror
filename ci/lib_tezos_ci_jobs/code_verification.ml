@@ -34,7 +34,6 @@
 open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
-open Changesets
 
 (** Variants of the code verification pipeline.
 
@@ -146,27 +145,10 @@ let build_arm_rules ~pipeline_type =
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
-  let make_rules = make_rules ~pipeline_type in
-  (* Stages *)
   let start_stage =
     match pipeline_type with
     | Schedule_extended_test | Merge_train -> [job_datadog_pipeline_trace]
     | Before_merging -> [job_start]
   in
 
-  let dependencies_needs_start = dependencies_needs_start pipeline_type in
-
-  (* Test jobs*)
-  let test =
-    let create_job =
-      Homebrew.make_job_create_homebrew_formula
-        ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
-        ~dependencies:dependencies_needs_start
-        ()
-    in
-    match pipeline_type with
-    | Before_merging | Merge_train -> [create_job]
-    | Schedule_extended_test -> []
-  in
-
-  start_stage @ test
+  start_stage

@@ -11,26 +11,22 @@ open Changesets
 
 let image = Images.Base_images.debian_homebrew_trixie
 
-let stage = Stages.build
-
-(* this job creates a formula from a template
-     using the homebrew_release.sh script *)
-let make_job_create_homebrew_formula ?rules ?(dependencies = Dependent []) () :
-    tezos_job =
-  job
+let job_create_homebrew_formula =
+  CI.job
+    "oc.create-homebrew-formula"
     ~__POS__
-    ~name:"oc.create-homebrew-formula"
+    ~stage:Build
+    ~description:
+      "Create a Homebrew formula from a template using the homebrew_release.sh \
+       script"
     ~arch:Amd64
     ~image
-    ~stage
-    ?rules
-    ~dependencies
-    ["./scripts/packaging/homebrew_release.sh"]
-
-(* This CIAO job is used as the base for the release pipeline's
-   [job_build_homebrew_release] in [release_tag.ml], which adds artifacts to it. *)
-let job_create_homebrew_formula : tezos_job =
-  make_job_create_homebrew_formula ()
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["public/homebrew/*"])
+    ~only_if_changed:(Tezos_ci.Changeset.encode changeset_homebrew)
+    ~script:["./scripts/packaging/homebrew_release.sh"]
 
 let job_build_homebrew_formula =
   CI.job
@@ -44,7 +40,7 @@ let job_build_homebrew_formula =
     ~cpu:Very_high
     ~allow_failure:No
     ~image
-    ~needs_legacy:[(Job, job_create_homebrew_formula)]
+    ~needs:[(Job, job_create_homebrew_formula)]
     ~only_if_changed:(Tezos_ci.Changeset.encode changeset_homebrew)
     ~variables:
       [
@@ -67,7 +63,7 @@ let job_build_homebrew_formula_macosx =
     ~description:"Run the homebrew installation on MacOSX"
     ~image:(Image.mk_external ~image_path:"$MACOS_IMAGE")
     ~allow_failure:Yes
-    ~needs_legacy:[(Job, job_create_homebrew_formula)]
+    ~needs:[(Job, job_create_homebrew_formula)]
     ~only_if_changed:(Tezos_ci.Changeset.encode changeset_homebrew)
     ~parallel:
       (Matrix [[("MACOS_IMAGE", ["macos-15-xcode-16"; "macos-26-xcode-26"])]])
@@ -79,8 +75,6 @@ let job_build_homebrew_formula_macosx =
         "eval $(/opt/homebrew/bin/brew shellenv)";
         "./scripts/packaging/test_homebrew_install.sh";
       ]
-
-let jobs = [Tezos_ci.job_datadog_pipeline_trace; job_create_homebrew_formula]
 
 let () =
   Cacio.register_merge_request_jobs

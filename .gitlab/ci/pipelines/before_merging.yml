@@ -121,35 +121,6 @@ trigger:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
-    - scripts/packaging/homebrew_install.sh
-    - scripts/packaging/homebrew_release.sh
-    - scripts/packaging/octez/homebrew/Formula/*
-    - scripts/packaging/test_homebrew_install.sh
-    - scripts/version.sh
-    when: on_success
-  needs:
-  - trigger
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/packaging/homebrew_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build
@@ -2439,6 +2410,40 @@ oc.lintian_debian:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+oc.create-homebrew-formula:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - images/scripts/install-gcloud.sh
+    - manifest/**/*.ml*
+    - scripts/packaging/homebrew_install.sh
+    - scripts/packaging/homebrew_release.sh
+    - scripts/packaging/octez/homebrew/Formula/*
+    - scripts/packaging/test_homebrew_install.sh
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/packaging/homebrew_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - public/homebrew/*
 
 oc.build-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
