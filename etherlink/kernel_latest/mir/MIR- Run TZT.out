@@ -61,6 +61,7 @@
   "checksignature_00.tc.tzt": true,
   "checksignature_00.tzt": true,
   "checksignature_01.tzt": true,
+  "checksignature_02.tzt": false,
   "compare_00.tc.tzt": true,
   "compare_01.tc.tzt": true,
   "compare_02.tc.tzt": true,

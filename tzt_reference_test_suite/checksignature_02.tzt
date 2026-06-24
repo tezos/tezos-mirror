@@ -1,0 +1,5 @@
+code { CHECK_SIGNATURE } ;
+input { Stack_elt key 0x00ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f ;
+        Stack_elt signature 0xecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000 ;
+        Stack_elt bytes 0x776f726c64 } ;
+output { Stack_elt bool True }

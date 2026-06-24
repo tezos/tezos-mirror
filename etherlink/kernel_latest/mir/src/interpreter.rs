@@ -3603,6 +3603,7 @@ mod interpreter_tests {
     use crate::gas::Gas;
     use chrono::DateTime;
     use num_bigint::BigUint;
+    use tezos_crypto_rs::hash::{Ed25519Signature, HashTrait, PublicKeyEd25519};
     use tezos_crypto_rs::public_key::PublicKey;
     use tezos_data_encoding::nom::NomReader;
     use Instruction::*;
@@ -10153,5 +10154,34 @@ mod interpreter_tests {
             err,
             InterpretError::CompareError(CompareError::Incomparable)
         );
+    }
+
+    #[test]
+    fn test_ed25519_small_order_signature_rejected() {
+        let pk = PublicKeyEd25519::try_from_bytes(
+            &hex::decode(
+                "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let sig = Ed25519Signature::try_from_bytes(
+            &hex::decode("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000")
+                .unwrap(),
+        )
+        .unwrap();
+        // Raw message bytes "world" (CHECK_SIGNATURE pre-hashes with Blake2b-256).
+        let msg = hex::decode("776f726c64").unwrap();
+
+        let mut stack = stk![
+            V::Bytes(msg),
+            V::Signature(Signature::Ed25519(sig)),
+            V::Key(PublicKey::Ed25519(pk)),
+        ];
+        let mut ctx = Ctx::default();
+        interpret_one(&CheckSignature, &mut ctx, &mut stack).unwrap();
+
+        // The small-order key/signature is rejected in MIR.
+        assert_eq!(stack, stk![V::Bool(false)]);
     }
 }
