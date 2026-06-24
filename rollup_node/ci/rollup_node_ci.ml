@@ -117,6 +117,7 @@ let job_release_page =
     ~__POS__
     ~image:Images.CI.release_page
     ~stage:Publish
+    ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:
       "A job to update the rollup node release page. If running in a test \
        pipeline, the assets are pushed in the \
