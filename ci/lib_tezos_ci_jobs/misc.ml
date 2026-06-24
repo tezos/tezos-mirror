@@ -329,6 +329,15 @@ let job_oc_unit_non_proto_arm64 =
     ~artifacts:(artifacts_test_results_xml Arm64)
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
+    ~timeout:
+      ((* https://gitlab.com/tezos/tezos/-/work_items/8295
+         This job is particularly flaky.
+         When it succeeds it succeeds in less than 10 minutes.
+         When it fails it times out.
+         We set a lower timeout than the default so that at least when it fails,
+         it fails relatively early. *)
+         Minutes
+         20)
     ~script:
       [
         ". ./scripts/version.sh";
