@@ -178,15 +178,13 @@ let job_gitlab_publish =
         ])
 
 let release_page_variables ~mode =
+  (* The S3_BUCKET and DISTRIBUTION_ID depend on the release type (tests or
+     not). *)
   match mode with
   | `test ->
-      (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
-       depends on the release type (tests or not). *)
       [
         ("S3_BUCKET", "release-page-test.nomadic-labs.com");
         ("DISTRIBUTION_ID", "E19JF46UG3Z747");
-        ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
-        ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
       ]
   | `real ->
       [
