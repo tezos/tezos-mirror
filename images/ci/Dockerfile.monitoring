@@ -22,13 +22,32 @@ ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
 # python3 py3-crcmod are needed to run gcloud
 
 # hadolint ignore=DL3018,DL3019
-RUN apk update && apk add --no-cache curl jq python3 py3-crcmod
+RUN apk update && apk add --no-cache curl jq python3 py3-crcmod bash
+
+# Shared kisscache setup for this image and every image built FROM it
+# (prebuild -> build -> test, e2etest, ...): kiss-fetch.sh routes downloads
+# through the in-cluster kisscache proxy instead of hitting the origin
+# directly (which is unreliable from the build runners and was timing out).
+# It must be on PATH: scripts probe for it with [command -v kiss-fetch.sh],
+# which only searches $PATH (no slash in the name). It is a bash script,
+# hence the [bash] package added above. kiss-logs.sh summarizes the hit/miss
+# log that kiss-fetch.sh writes to /tmp/kiss.log.
+COPY --chown=tezos:tezos scripts/kiss-fetch.sh /usr/local/bin/
+COPY --chown=tezos:tezos scripts/kiss-logs.sh /tmp/
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
 
 # Install datadog-ci static binary (Alpine/musl-native since v5.18.0).
 # This replaces the previous npm-based installation, removing the need
 # for Node.js and npm in this image.
 COPY images/scripts/install_datadog_static.sh /tmp/install_datadog_static.sh
 RUN /tmp/install_datadog_static.sh && rm /tmp/install_datadog_static.sh
+
+# Summarize this image's kisscache usage and reset the log, so images built
+# FROM monitoring report only their own fetches: /tmp/kiss.log is a plain
+# file that otherwise persists across the FROM boundary and would be
+# double-counted by the descendant's own kiss-logs.sh run. kiss-fetch.sh
+# always touches /tmp/kiss.log, so it exists here after the datadog fetch.
+RUN /tmp/kiss-logs.sh /tmp/kiss.log && rm -f /tmp/kiss.log
 
 USER tezos
 ENV USER=tezos
