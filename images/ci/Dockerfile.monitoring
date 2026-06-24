@@ -27,7 +27,7 @@ RUN apk update && apk add --no-cache curl jq python3 py3-crcmod
 # Install datadog-ci static binary (Alpine/musl-native since v5.18.0).
 # This replaces the previous npm-based installation, removing the need
 # for Node.js and npm in this image.
-COPY scripts/install_datadog_static.sh /tmp/install_datadog_static.sh
+COPY images/scripts/install_datadog_static.sh /tmp/install_datadog_static.sh
 RUN /tmp/install_datadog_static.sh && rm /tmp/install_datadog_static.sh
 
 USER tezos

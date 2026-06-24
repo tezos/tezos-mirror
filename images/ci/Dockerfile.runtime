@@ -46,7 +46,7 @@ RUN echo 'tezos:x:1000:tezos' >> /etc/group \
  && chmod 440 /etc/sudoers.d/tezos
 
 # Sapling parameters
-COPY ./zcash-params/sapling-output.params ./zcash-params/sapling-spend.params /usr/share/zcash-params/
+COPY images/ci/zcash-params/sapling-output.params images/ci/zcash-params/sapling-spend.params /usr/share/zcash-params/
 
 # hadolint ignore=DL3018
 RUN apk update \

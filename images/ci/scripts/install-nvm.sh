@@ -1,1 +1,0 @@
-../../common/install-nvm.sh

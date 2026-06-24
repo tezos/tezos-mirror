@@ -125,7 +125,7 @@ RUN mkdir -p /usr/share/dal-trusted-setup && \
 ARG NPM_REGISTRY_DOMAIN
 ARG NPM_REGISTRY
 
-COPY e2etest/package.json e2etest/package-lock.json /usr/local/lib/
+COPY images/ci/e2etest/package.json images/ci/e2etest/package-lock.json /usr/local/lib/
 # Etherlink tests have hardcoded /usr/local/lib as path,
 # and `npm ci` installs the node_modules directory locally
 # hadolint ignore=DL3003

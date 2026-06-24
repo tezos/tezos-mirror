@@ -23,7 +23,7 @@ Usage: $0 [-h|--help]
   [--tag-extra <TAG_EXTRA>]
   [--targetarch <TARGETARCH>]
   [--layer-targets <LAYER_TARGETS>]
-  [-- docker build args]
+  [-- docker buildx build args]
 
 Creates all the tezos/tezos CI images from
 'images/ci/Dockerfile'. Each image corresponds to a
@@ -196,11 +196,22 @@ build() {
   fi
   echo
 
+  # The CI image Dockerfiles build from the repository root: they COPY their
+  # inputs by their real repo-root paths (opam/virtual/*, scripts/*,
+  # images/ci/*, images/scripts/*, ...), so the build context is the
+  # repository root. (This matches what is needed to build them with
+  # [docker buildx bake], which cannot follow context-escaping symlinks.)
+  # Previously the context was images/ci with the images/ci/* symlinks
+  # dereferenced into it via [tar -cvh]; those symlinks have been removed.
+  # Build with [docker buildx build] (BuildKit) rather than the legacy
+  # builder: BuildKit streams the build context incrementally instead of
+  # tarring and sending it up front, which matters now that the context is
+  # the whole repository root rather than [images/ci/]. It also matches how
+  # the base images are built (see [scripts/ci/build-base-images.sh]).
   # shellcheck disable=SC2046
-  cd "${images_dir}/ci" &&
-    tar -cvh . |
-    docker build --network host \
-      -f "Dockerfile.$f_LAYER_TARGET" \
+  cd "$repo_dir" &&
+    docker buildx build --network host \
+      -f "images/ci/Dockerfile.$f_LAYER_TARGET" \
       --build-arg BUILDKIT_INLINE_CACHE=1 \
       $(if [ -n "$tag_extra" ]; then echo "--cache-from=$f_image_name_extra"; fi) \
       --cache-from="$f_image_name_protected" \
@@ -214,7 +225,7 @@ build() {
       -t "$f_image_name" \
       $(if [ -n "$tag_extra" ]; then echo "-t $f_image_name_extra"; fi) \
       "$@" \
-      "-"
+      "."
 
   # add a local tag ( not pushed )
   docker image tag "$f_image_name" "$f_LAYER_TARGET"

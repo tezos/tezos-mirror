@@ -12,5 +12,9 @@ opam/virtual/cohttp-lwt.opam.locked
 opam/virtual/cohttp-lwt-unix.opam.locked
 images/common/install-nvm.sh
 images/scripts/install_datadog_static.sh
+images/scripts/install_opam_static.sh
+images/scripts/install_sccache_static.sh
 scripts/install_dal_trusted_setup.sh
+scripts/kiss-fetch.sh
+scripts/kiss-logs.sh
 scripts/version.sh

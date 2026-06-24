@@ -39,7 +39,7 @@ WORKDIR /home/tezos
 # The js dependencies could be downloaded from tezos/tezos and installed
 # here.
 
-COPY --chown=tezos:tezos scripts/install-nvm.sh /tmp/install-nvm.sh
+COPY --chown=tezos:tezos images/common/install-nvm.sh /tmp/install-nvm.sh
 RUN /tmp/install-nvm.sh \
  && rm -rf /tmp/*
 
@@ -49,7 +49,7 @@ RUN /tmp/install-nvm.sh \
 ENV PATH="/home/tezos/.local/bin:${PATH}"
 
 # Copy poetry files to install the dependencies in the docker image
-COPY --chown=tezos:tezos ./poetry.lock ./pyproject.toml ./
+COPY --chown=tezos:tezos poetry.lock pyproject.toml ./
 
 # Poetry will create the virtual environment in $(pwd)/.venv.
 # The containers running this image can load the virtualenv with
