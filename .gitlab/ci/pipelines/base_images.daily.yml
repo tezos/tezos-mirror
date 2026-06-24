@@ -578,3 +578,45 @@ images.alpine-ci-all:amd64:
     DOCKER_VERSION: 28.5.1
     REGISTRY: ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos
     TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-amd64
+
+images.alpine-ci-all.merge:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - images.alpine-ci-all:amd64
+  - images.alpine-ci-all:arm64
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - docker buildx create --driver docker-container --use --name tezos
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-runtime:${TAG}" "${REGISTRY}/alpine-runtime:${TAG}-amd64"
+    "${REGISTRY}/alpine-runtime:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-monitoring:${TAG}" "${REGISTRY}/alpine-monitoring:${TAG}-amd64"
+    "${REGISTRY}/alpine-monitoring:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-prebuild:${TAG}" "${REGISTRY}/alpine-prebuild:${TAG}-amd64"
+    "${REGISTRY}/alpine-prebuild:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-build:${TAG}" "${REGISTRY}/alpine-build:${TAG}-amd64"
+    "${REGISTRY}/alpine-build:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-release-page:${TAG}"
+    "${REGISTRY}/alpine-release-page:${TAG}-amd64" "${REGISTRY}/alpine-release-page:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-test:${TAG}" "${REGISTRY}/alpine-test:${TAG}-amd64"
+    "${REGISTRY}/alpine-test:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-e2etest:${TAG}" "${REGISTRY}/alpine-e2etest:${TAG}-amd64"
+    "${REGISTRY}/alpine-e2etest:${TAG}-arm64"
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    REGISTRY: ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos
+    TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}

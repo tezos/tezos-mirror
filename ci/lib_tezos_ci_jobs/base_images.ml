@@ -549,6 +549,44 @@ let job_alpine_ci =
     ~only_if_changed:Files.ci_images
     ("images.alpine-ci-all:" ^ arch_str)
 
+let job_alpine_ci_merge =
+  docker_job
+    ~extra_variables:
+      [
+        ("REGISTRY", "${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos");
+        ("TAG", "${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}");
+      ]
+    ~script:
+      ("docker buildx create --driver docker-container --use --name tezos"
+      :: List.map
+           (fun image_short_name ->
+             Format.sprintf
+               "docker buildx imagetools create --tag \
+                \"${REGISTRY}/alpine-%s:${TAG}\" \
+                \"${REGISTRY}/alpine-%s:${TAG}-amd64\" \
+                \"${REGISTRY}/alpine-%s:${TAG}-arm64\""
+               image_short_name
+               image_short_name
+               image_short_name)
+           [
+             "runtime";
+             "monitoring";
+             "prebuild";
+             "build";
+             "release-page";
+             "test";
+             "e2etest";
+           ])
+    ~__POS__
+    ~description:
+      "Merge the per-arch static alpine-* CI images into multi-arch manifests"
+    ~only_if_changed:Files.ci_images
+    ~needs:
+      [
+        (Cacio.Job, job_alpine_ci Runner.Arch.Amd64);
+        (Cacio.Job, job_alpine_ci Runner.Arch.Arm64);
+      ]
+    "images.alpine-ci-all.merge"
 
 (* ── Cacio pipeline registrations ───────────────────────────────────────── *)
 
@@ -572,6 +610,7 @@ let () =
       (Cacio.Auto, job_ubuntu_based_images);
       (Cacio.Auto, job_alpine_ci Runner.Arch.Amd64);
       (Cacio.Auto, job_alpine_ci Runner.Arch.Arm64);
+      (Cacio.Auto, job_alpine_ci_merge);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
