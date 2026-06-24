@@ -146,45 +146,6 @@ oc.create-homebrew-formula:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build-homebrew-formula-macosx:
-  image: $MACOS_IMAGE
-  stage: build
-  tags:
-  - $TAGS
-  rules:
-  - changes:
-    - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
-    - scripts/packaging/homebrew_install.sh
-    - scripts/packaging/homebrew_release.sh
-    - scripts/packaging/octez/homebrew/Formula/*
-    - scripts/packaging/test_homebrew_install.sh
-    - scripts/version.sh
-    when: on_success
-  needs:
-  - oc.create-homebrew-formula
-  dependencies: []
-  allow_failure: true
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/packaging/homebrew_install.sh
-  - eval $(/opt/homebrew/bin/brew shellenv)
-  - ./scripts/packaging/test_homebrew_install.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    TAGS: saas-macos-large-m2pro
-  parallel:
-    matrix:
-    - MACOS_IMAGE:
-      - macos-15-xcode-16
-      - macos-26-xcode-26
-
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build
@@ -2423,6 +2384,46 @@ oc.build-homebrew-formula:
     HOMEBREW_KISSCACHE: http://kisscache.kisscache.svc.cluster.local
     HOMEBREW_OPAMFETCH: scripts/kiss-fetch.sh
     CARGO_NET_OFFLINE: "false"
+
+oc.build-homebrew-formula-macosx:
+  image: $MACOS_IMAGE
+  stage: test
+  tags:
+  - $TAGS
+  rules:
+  - changes:
+    - images/scripts/install-gcloud.sh
+    - manifest/**/*.ml*
+    - scripts/packaging/homebrew_install.sh
+    - scripts/packaging/homebrew_release.sh
+    - scripts/packaging/octez/homebrew/Formula/*
+    - scripts/packaging/test_homebrew_install.sh
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - oc.create-homebrew-formula
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/packaging/homebrew_install.sh
+  - eval $(/opt/homebrew/bin/brew shellenv)
+  - ./scripts/packaging/test_homebrew_install.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TAGS: saas-macos-large-m2pro
+  parallel:
+    matrix:
+    - MACOS_IMAGE:
+      - macos-15-xcode-16
+      - macos-26-xcode-26
 
 oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}

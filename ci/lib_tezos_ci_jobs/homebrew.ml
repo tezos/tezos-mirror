@@ -32,31 +32,6 @@ let make_job_create_homebrew_formula ?rules ?(dependencies = Dependent []) () :
 let job_create_homebrew_formula : tezos_job =
   make_job_create_homebrew_formula ()
 
-let make_job_build_homebrew_formula_macosx ?rules ~create_job () : tezos_job =
-  job
-    ~__POS__
-    ~name:"oc.build-homebrew-formula-macosx"
-    ~image:(Image.mk_external ~image_path:"$MACOS_IMAGE")
-    ~variables:[("TAGS", "saas-macos-large-m2pro")]
-    ~parallel:
-      (Matrix [[("MACOS_IMAGE", ["macos-15-xcode-16"; "macos-26-xcode-26"])]])
-    ~dependencies:(Dependent [Job create_job])
-    ~stage
-    ~description:"Run the homebrew installation on MacOSX"
-    ~allow_failure:Yes
-    ?rules
-    ~tag:Dynamic
-    [
-      "./scripts/packaging/homebrew_install.sh";
-      "eval $(/opt/homebrew/bin/brew shellenv)";
-      "./scripts/packaging/test_homebrew_install.sh";
-    ]
-
-let job_build_homebrew_formula_macosx : tezos_job =
-  make_job_build_homebrew_formula_macosx
-    ~create_job:job_create_homebrew_formula
-    ()
-
 let job_build_homebrew_formula =
   CI.job
     "oc.build-homebrew-formula"
@@ -84,15 +59,38 @@ let job_build_homebrew_formula =
         "./scripts/packaging/test_homebrew_install.sh";
       ]
 
-let jobs =
-  [
-    Tezos_ci.job_datadog_pipeline_trace;
-    job_create_homebrew_formula;
-    job_build_homebrew_formula_macosx;
-  ]
+let job_build_homebrew_formula_macosx =
+  CI.job
+    "oc.build-homebrew-formula-macosx"
+    ~__POS__
+    ~stage:Test
+    ~description:"Run the homebrew installation on MacOSX"
+    ~image:(Image.mk_external ~image_path:"$MACOS_IMAGE")
+    ~allow_failure:Yes
+    ~needs_legacy:[(Job, job_create_homebrew_formula)]
+    ~only_if_changed:(Tezos_ci.Changeset.encode changeset_homebrew)
+    ~parallel:
+      (Matrix [[("MACOS_IMAGE", ["macos-15-xcode-16"; "macos-26-xcode-26"])]])
+    ~tag:Dynamic
+    ~variables:[("TAGS", "saas-macos-large-m2pro")]
+    ~script:
+      [
+        "./scripts/packaging/homebrew_install.sh";
+        "eval $(/opt/homebrew/bin/brew shellenv)";
+        "./scripts/packaging/test_homebrew_install.sh";
+      ]
+
+let jobs = [Tezos_ci.job_datadog_pipeline_trace; job_create_homebrew_formula]
 
 let () =
-  Cacio.register_merge_request_jobs [(Cacio.Auto, job_build_homebrew_formula)] ;
+  Cacio.register_merge_request_jobs
+    [
+      (Cacio.Auto, job_build_homebrew_formula);
+      (Cacio.Auto, job_build_homebrew_formula_macosx);
+    ] ;
   Cacio.register_jobs
     Cacio.Homebrew_daily
-    [(Cacio.Auto, job_build_homebrew_formula)]
+    [
+      (Cacio.Auto, job_build_homebrew_formula);
+      (Cacio.Auto, job_build_homebrew_formula_macosx);
+    ]

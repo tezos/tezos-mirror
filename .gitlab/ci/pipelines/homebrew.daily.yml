@@ -47,36 +47,6 @@ oc.create-homebrew-formula:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build-homebrew-formula-macosx:
-  image: $MACOS_IMAGE
-  stage: build
-  tags:
-  - $TAGS
-  needs:
-  - oc.create-homebrew-formula
-  dependencies: []
-  allow_failure: true
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/packaging/homebrew_install.sh
-  - eval $(/opt/homebrew/bin/brew shellenv)
-  - ./scripts/packaging/test_homebrew_install.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    TAGS: saas-macos-large-m2pro
-  parallel:
-    matrix:
-    - MACOS_IMAGE:
-      - macos-15-xcode-16
-      - macos-26-xcode-26
-
 oc.build-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
   stage: test
@@ -103,3 +73,33 @@ oc.build-homebrew-formula:
     HOMEBREW_KISSCACHE: http://kisscache.kisscache.svc.cluster.local
     HOMEBREW_OPAMFETCH: scripts/kiss-fetch.sh
     CARGO_NET_OFFLINE: "false"
+
+oc.build-homebrew-formula-macosx:
+  image: $MACOS_IMAGE
+  stage: test
+  tags:
+  - $TAGS
+  needs:
+  - oc.create-homebrew-formula
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/packaging/homebrew_install.sh
+  - eval $(/opt/homebrew/bin/brew shellenv)
+  - ./scripts/packaging/test_homebrew_install.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TAGS: saas-macos-large-m2pro
+  parallel:
+    matrix:
+    - MACOS_IMAGE:
+      - macos-15-xcode-16
+      - macos-26-xcode-26
