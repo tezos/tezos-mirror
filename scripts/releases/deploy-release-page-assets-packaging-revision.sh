@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
 
-# This script updates the release page for a packaging revision (octez-vX.Y-N).
-# It updates the build number in versions.json, re-uploads binaries, regenerates
-# the RSS feed and release page HTML, and publishes everything to S3.
+# Deploys the Octez release assets for a packaging revision (octez-vX.Y-N):
+# updates the build number in versions.json (the source of truth) and re-uploads
+# the binaries, checksums and archives to S3.
+#
+# It does NOT generate or publish the release page itself: that is done by
+# [publish-release-page.sh], which renders the page from the versions.json
+# published here.
 
 set -eu
 
 REGION="${REGION:-eu-west-1}"
 
 if [ -z "${S3_BUCKET:-}" ]; then
-  echo "S3_BUCKET variable is not set, impossible to publish assets and release page."
-  exit 1
-fi
-
-if [ -z "${DISTRIBUTION_ID:-}" ]; then
-  echo "DISTRIBUTION_ID variable is not set, impossible to create an invalidation."
+  echo "S3_BUCKET variable is not set, impossible to publish assets."
   exit 1
 fi
 
@@ -23,8 +22,11 @@ if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
   exit 1
 fi
 
-if [ -z "${CI_COMMIT_TAG}" ]; then
-  echo "No tag found. No asset will be updated on the release page."
+# This job only runs on release-tag pipelines, so a tag must be present. If it
+# is not, the job has been mis-wired: fail fast rather than silently round-trip
+# versions.json.
+if [ -z "${CI_COMMIT_TAG:-}" ]; then
+  echo "CI_COMMIT_TAG is not set; this script must run on a release-tag pipeline."
   exit 1
 fi
 
@@ -66,10 +68,6 @@ $VM \
   --minor "${gitlab_release_minor_version}" \
   --build-number "${gitlab_packaging_revision_version}"
 
-# Upload versions.json back to remote storage
-echo "Uploading versions.json..."
-$VM upload --path "${S3_PATH}"
-
 # Upload binaries to S3 bucket (overwriting existing version's binaries)
 echo "Uploading binaries..."
 aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${version_dir}/binaries/x86_64/" --region "${REGION}"
@@ -99,19 +97,6 @@ for binary in ./octez-binaries/arm64/*; do
 done
 aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${version_dir}/binaries/arm64/sha256sums.txt"
 
-# Generate the release page HTML and RSS feed
-./scripts/releases/generate-release-page.sh
-
-echo "Syncing html files to remote s3 bucket"
-if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" &&
-  aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --region "${REGION}" &&
-  aws s3 cp "./older_releases.html" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --region "${REGION}" &&
-  aws s3 cp "./feed.xml" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --region "${REGION}"; then
-  echo "Deployment successful!"
-else
-  echo "Deployment failed. Please check the configuration and try again."
-  exit 1
-fi
-
-# Create an invalidation so that the web page actually updates.
-aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"
+# Upload versions.json back to remote storage
+echo "Uploading versions.json..."
+$VM upload --path "${S3_PATH}"
