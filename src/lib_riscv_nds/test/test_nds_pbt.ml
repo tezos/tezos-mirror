@@ -535,6 +535,45 @@ let test_divergent_duplicates_commit_independently =
     ~error_msg:"duplicate commit checks out to %L, expected %R" ;
   unit
 
+(** The dual-state WASM PVM defines a single canonical
+    [empty_registry_hash] (computed from the in-memory backend) and
+    cross-checks it against [/pvm/nds_hash] markers written by any
+    backend: a disk-proving node and a memory-verifying protocol only
+    agree on the activation tick if both backends hash the empty
+    registry identically. *)
+let test_empty_registry_hash_cross_backend =
+  unit_test "empty registry hash agrees between memory and disk" @@ fun () ->
+  let repo = get_disk_repo () in
+  let disk_hash = Octez_riscv_nds_disk.Normal.Registry.(hash (create repo)) in
+  let memory_hash = Octez_riscv_nds_memory.Normal.Registry.(hash (create ())) in
+  Check.((Bytes.to_string disk_hash = Bytes.to_string memory_hash) string)
+    ~error_msg:
+      "disk and memory backends disagree on the empty registry hash: %L vs %R" ;
+  unit
+
+(** The dual-state WASM PVM's on-disk context backend commits the
+    [Normal]-mode registry at the context-commit boundary and writes
+    [commit]'s return value to the [/pvm/nds_hash] marker.  It relies
+    on that commit id doubling as the registry's content hash: the
+    marker is simultaneously the checkout key a restart needs and the
+    hash the proof-endpoint cross-checks compare against. *)
+let test_commit_equals_hash =
+  unit_test "commit returns the registry content hash" @@ fun () ->
+  let repo = get_disk_repo () in
+  let registry = Octez_riscv_nds_disk.Normal.Registry.create repo in
+  let check_one msg registry =
+    let commit_id = Octez_riscv_nds_disk.Normal.Registry.commit registry in
+    let content_hash = Octez_riscv_nds_disk.Normal.Registry.hash registry in
+    Check.((Bytes.to_string commit_id = Bytes.to_string content_hash) string)
+      ~error_msg:(msg ^ ": commit id %L differs from content hash %R")
+  in
+  check_one "empty registry" registry ;
+  (match Octez_riscv_nds_disk.Normal.Registry.resize registry 1L with
+  | Ok () -> ()
+  | Error _ -> assert false) ;
+  check_one "after resize" registry ;
+  unit
+
 (** {1 Property-based tests}
 
     Randomized tests for properties where varying inputs improves
@@ -1336,6 +1375,8 @@ let () =
   register_with_backend (module Memory_verify_backend) ;
   register_with_backend (module Disk_verify_backend) ;
   register_unit_disk test_checkout_unknown_commit ;
+  register_unit_disk test_empty_registry_hash_cross_backend ;
+  register_unit_disk test_commit_equals_hash ;
   List.iter register_unit_memory Memory_duplicate_tests.tests ;
   List.iter register_unit_disk Disk_duplicate_tests.tests ;
   register_unit_disk test_duplicate_commit_checkout ;
