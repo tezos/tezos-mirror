@@ -214,6 +214,34 @@ let job_deploy_release_page_assets =
     ~script:
       ["eval $(opam env)"; "./scripts/releases/deploy-release-page-assets.sh"]
 
+let job_deploy_release_page_assets_packaging_revision =
+  Cacio.parameterize @@ fun mode ->
+  CI.job
+    "release_page.deploy-assets-packaging-revision"
+    ~__POS__
+    ~image:Images.CI.release_page
+    ~stage:Publish
+    ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
+    ~description:
+      "Deploy the Octez release assets for a packaging revision: update the \
+       build number in versions.json and re-upload the binaries. If running in \
+       a test pipeline, the assets are pushed in the \
+       [release-page-test.nomadic-labs.com] bucket. Otherwise they are pushed \
+       in [site.prod.octez.tezos.com]."
+    ~needs:
+      [
+        ( Artifacts,
+          Build.job_build_static_linux_released_binaries Amd64 `release );
+        ( Artifacts,
+          Build.job_build_static_linux_released_binaries Arm64 `release );
+      ]
+    ~variables:(release_page_variables ~mode)
+    ~script:
+      [
+        "eval $(opam env)";
+        "./scripts/releases/deploy-release-page-assets-packaging-revision.sh";
+      ]
+
 let job_release_page =
   Cacio.parameterize @@ fun mode ->
   Cacio.parameterize @@ fun wait_for ->
@@ -234,7 +262,9 @@ let job_release_page =
     ?needs:
       (match wait_for with
       | `wait_for_nothing -> None
-      | `wait_for_deploy -> Some [(Job, job_deploy_release_page_assets mode)])
+      | `wait_for_deploy -> Some [(Job, job_deploy_release_page_assets mode)]
+      | `wait_for_packaging_revision_deploy ->
+          Some [(Job, job_deploy_release_page_assets_packaging_revision mode)])
     ~variables:(release_page_variables ~mode)
     ~script:["eval $(opam env)"; "./scripts/releases/publish-release-page.sh"]
 
@@ -448,36 +478,6 @@ let job_update_gitlab_release =
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
-let job_release_page_packaging_revision =
-  Cacio.parameterize @@ fun mode ->
-  CI.job
-    "publish:release-page-packaging-revision"
-    ~__POS__
-    ~image:Images.CI.release_page
-    ~stage:Publish
-    ~description:
-      "A job to update the Octez release page for a packaging revision. \
-       Updates build number in versions.json, re-uploads binaries, and \
-       regenerates the release page and RSS feed."
-    ~artifacts:
-      (Gitlab_ci.Util.artifacts
-         ~expire_in:(Duration (Days 1))
-         ["index.html"; "older_releases.html"; "index.md"; "older_releases.md"])
-    ?needs:
-      (Some
-         [
-           ( Artifacts,
-             Build.job_build_static_linux_released_binaries Amd64 `release );
-           ( Artifacts,
-             Build.job_build_static_linux_released_binaries Arm64 `release );
-         ])
-    ~variables:(release_page_variables ~mode)
-    ~script:
-      [
-        "eval $(opam env)";
-        "./scripts/releases/publish-release-page-packaging-revision.sh";
-      ]
-
 let register () =
   Cacio.register_jobs
     Packaging_revision
@@ -488,7 +488,8 @@ let register () =
       (Manual, job_docker `real Arm64);
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_docker_promote_to_version `real);
-      (Manual, job_release_page_packaging_revision `real);
+      (Manual, job_deploy_release_page_assets_packaging_revision `real);
+      (Auto, job_release_page `real `wait_for_packaging_revision_deploy);
       (Manual, Debian_repository.job_build_data_packages);
       (Manual, Debian_repository.job_build_debian Release);
       (Manual, Debian_repository.job_build_ubuntu Release);
@@ -504,7 +505,8 @@ let register () =
       (Manual, job_docker `test Arm64);
       (Auto, job_docker_merge_manifests `test);
       (Manual, job_docker_promote_to_version `test);
-      (Manual, job_release_page_packaging_revision `test);
+      (Manual, job_deploy_release_page_assets_packaging_revision `test);
+      (Auto, job_release_page `test `wait_for_packaging_revision_deploy);
       (Manual, Debian_repository.job_build_data_packages);
       (Manual, Debian_repository.job_build_debian Release);
       (Manual, Debian_repository.job_build_ubuntu Release);
