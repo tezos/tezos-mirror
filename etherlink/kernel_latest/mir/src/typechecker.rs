@@ -3778,6 +3778,7 @@ fn typecheck_instruction_step<'a, 'b>(
 
         (App(UPDATE, [Micheline::Int(n)], _), [.., _, _]) => {
             let n = validate_u11(n)?;
+            gas.consume(tc_cost::update_n(n as usize)?)?;
             let new_val = pop!();
             let old_val = match get_nth_field_ref(n, stack_top_mut(stack)?) {
                 Ok(res) => res,
@@ -8696,6 +8697,21 @@ mod typecheck_tests {
                 expected = Type::new_pair(Type::Unit, expected);
             }
             check(2047, ty, expected);
+        }
+
+        #[test]
+        fn gas_charged() {
+            let ty = Type::new_pair(Type::Nat, Type::new_pair(Type::String, Type::Int));
+            let mut stack = tc_stk![ty, Type::Unit];
+            let mut gas = Gas::default();
+            assert_eq!(
+                typecheck_instruction(&parse("UPDATE 2").unwrap(), &mut gas, &mut stack),
+                Ok(UpdateN(2))
+            );
+            assert_eq!(
+                Gas::default().milligas().unwrap() - gas.milligas().unwrap(),
+                tc_cost::INSTR_STEP + tc_cost::update_n(2).unwrap()
+            );
         }
     }
 
