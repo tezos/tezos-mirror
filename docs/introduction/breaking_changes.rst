@@ -19,6 +19,7 @@ current or recent protocols, protocol proposals, and Octez versions:
 - :ref:`ushuaia_breaking_changes`
 - :ref:`tallinn_breaking_changes`
 - :ref:`seoul_breaking_changes`
+- :ref:`v25_breaking_changes`
 - :ref:`v24_breaking_changes`
 - :ref:`v23_breaking_changes`
 - :ref:`v22_breaking_changes`
@@ -51,6 +52,8 @@ Protocol Ushuaia
 
 Octez Version 25
 ----------------
+
+:doc:`Full Octez Version 25 Changelog<../releases/version-25>`
 
 Octez v25 will deprecate Octez packages, and Octez v26 will remove them.
 Instead, the new ``octez-manager`` tool included in the Octez suite (see https://octez-manager.tezos.com) will handle installation, configuration, and running of static binaries in a more user-friendly way than source or binary packages.
