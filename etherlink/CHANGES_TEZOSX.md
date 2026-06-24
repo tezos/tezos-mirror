@@ -101,6 +101,11 @@
   num-bigint, which has no FFT (schoolbook/Karatsuba/Toom-3), so the L1 formula
   under-charged large multiplications super-linearly; charged gas now
   upper-bounds the real multiply work at every operand size. (!22289)
+- The binary Micheline decoder now rejects the internal-only primitive ids
+  161-164 (`Transfer_tokens`, `Set_delegate`, `Create_contract`, `Emit`),
+  matching L1, which assigns no binary tags to them. These ids are used
+  solely to unparse `operation` values and never appear in valid on-chain
+  data. (!22290)
 - `COMPARE` (and `set`/`map` literal key-ordering checks at typechecking) now
   charge their gas incrementally while walking the value, so a comparison over
   a maximally-shared value (an O(n) in-memory DAG that expands to 2^n nodes)

@@ -1,0 +1,11 @@
+# L2-1698: UNPACK of a Micheline tree whose primitive id is 161
+# (`Transfer_tokens`). Bytes: 0x05 PACK tag, 0x03 (prim, 0 args, no
+# annots), 0xa1 (prim id 161). This is an internal-only prim MIR uses to
+# unparse `operation` values; it has no on-chain binary encoding and L1's
+# `prim_encoding` assigns no tag to it, so L1's decoder rejects it. MIR's
+# binary decoder rejects it too (and, were it accepted, the decoded `App`
+# is not a valid `int` and fails typechecking). Both implementations push
+# None: this pins L1/MIR agreement at the UNPACK boundary.
+code { UNPACK int } ;
+input { Stack_elt bytes 0x0503a1 } ;
+output { Stack_elt (option int) None }

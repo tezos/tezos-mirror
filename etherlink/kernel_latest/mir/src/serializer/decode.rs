@@ -207,6 +207,23 @@ enum ContainerKind {
     AppMany { prim: Prim, annots: bool },
 }
 
+/// Primitive ids the binary decoder must reject even though they are valid
+/// `Prim` variants.
+///
+/// These `Prim` variants are not part of any released protocol. MIR uses them
+/// solely to *unparse* `operation` values (e.g. for `FAILWITH` rendering); they
+/// have no on-chain binary encoding and are never produced by `PACK`
+/// (`operation` is not packable). L1's `prim_encoding`
+/// (`michelson_v1_primitives.ml`) assigns no tags to them, so it rejects these
+/// ids when decoding binary Micheline. Excluding them here keeps MIR's binary
+/// accept-set in sync with L1 (see L2-1698).
+const DISALLOWED_PRIMS: [Prim; 4] = [
+    Prim::Transfer_tokens,
+    Prim::Set_delegate,
+    Prim::Create_contract,
+    Prim::Emit,
+];
+
 /// Read the primitive byte and validate it.
 fn read_prim(bytes: &mut BytesIt) -> Result<Prim, DecodeError> {
     let p = bytes.next().ok_or(DecodeError::UnexpectedEOF)?;
@@ -214,7 +231,11 @@ fn read_prim(bytes: &mut BytesIt) -> Result<Prim, DecodeError> {
         return Err(DecodeError::UnknownPrim(p));
     }
     // SAFETY: Prim is repr(u8) and the value is within bounds.
-    Ok(unsafe { std::mem::transmute::<u8, Prim>(p) })
+    let prim = unsafe { std::mem::transmute::<u8, Prim>(p) };
+    if DISALLOWED_PRIMS.contains(&prim) {
+        return Err(DecodeError::UnknownPrim(p));
+    }
+    Ok(prim)
 }
 
 /// Parse a length prefixed annotation block. Always returns owned
@@ -546,6 +567,25 @@ mod test {
             check((), "0x030b");
             check(true, "0x030a");
             check(false, "0x0303");
+        }
+
+        /// L2-1698: the binary decoder must reject primitive ids that L1's
+        /// `prim_encoding` does not assign. Ids 161-164 are MIR-internal
+        /// `operation`-unparsing prims (`Transfer_tokens` / `Set_delegate` /
+        /// `Create_contract` / `Emit`) with no on-chain encoding; L1 rejects
+        /// them at decode, so MIR must too. Witness: bare zero-arg `App`
+        /// (tag 0x03) followed by the primitive id.
+        #[test]
+        fn rejects_internal_only_prim_ids() {
+            // 160 (GET_ADDRESS_INDEX) is the last shared id: still accepted.
+            check(app!(GET_ADDRESS_INDEX), "0x03a0");
+            // 161-164 are internal-only: rejected (L1 rejects them too).
+            check_err("0x03a1", DecodeError::UnknownPrim(0xa1));
+            check_err("0x03a2", DecodeError::UnknownPrim(0xa2));
+            check_err("0x03a3", DecodeError::UnknownPrim(0xa3));
+            check_err("0x03a4", DecodeError::UnknownPrim(0xa4));
+            // 165 was already out of range: still rejected (control).
+            check_err("0x03a5", DecodeError::UnknownPrim(0xa5));
         }
 
         #[test]
