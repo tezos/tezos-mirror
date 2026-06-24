@@ -81,10 +81,29 @@ if [ -z "${KEYRING_VERSION:-}" ]; then
 fi
 echo "Keyring package version: ${KEYRING_VERSION}"
 
+# If SOURCE_DATE_EPOCH is undefined, set it to the UNIX timestamp of HEAD
+# (committer date). It is thus an optional parameter of the script:
+# build-deb-local.sh exports it before invoking this script; standalone runs
+# fall back to HEAD here. Anchoring embedded timestamps to it makes the build
+# reproducible.
+: "${SOURCE_DATE_EPOCH:=$(git show -s --format=%ct HEAD)}"
+export SOURCE_DATE_EPOCH
+DEB_DATE=$(date -u -R -d "@${SOURCE_DATE_EPOCH}")
+
 # Update the changelog version
 export DEBEMAIL="${DEBEMAIL:-contact@nomadic-labs.com}"
 debchange --changelog "${KEYRING_DIR}/debian/changelog" \
   --newversion "${KEYRING_VERSION}" "Octez archive keyring update"
+# Pin the changelog date for reproducibility: debchange stamps it with the
+# current local time. We do not use its --date option because that was only
+# added in devscripts 2.24.2 and bookworm ships 2.23.4; once we drop bookworm
+# this can become `debchange --date "$DEB_DATE" ...`.
+#
+# Example changelog signature:
+#  -- Albert Dupont <albert@dupont.com>  Wed, 24 Jul 2026 17:31:42 +0200
+# This sed command looks for the first line starting with " -- " and replaces the date
+# which is after the '>' character.
+sed -i "0,/^ -- /s|\(^ -- .*>  \).*|\1${DEB_DATE}|" "${KEYRING_DIR}/debian/changelog"
 
 # Build the package
 cd "${KEYRING_DIR}"

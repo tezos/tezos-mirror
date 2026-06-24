@@ -99,13 +99,31 @@ rm -f scripts/packaging/*.deb
 
 export DEBEMAIL="contact@nomadic-labs.com"
 
+# Reproducible builds: anchor all embedded timestamps to HEAD's committer date.
+# SOURCE_DATE_EPOCH -> dpkg-deb mtimes and gzip; DEB_DATE -> changelog entry
+# date; TIMESTAMP -> non-release package version.
+SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)
+export SOURCE_DATE_EPOCH
+DEB_DATE=$(date -u -R -d "@$SOURCE_DATE_EPOCH")
+TIMESTAMP=$(date -u -d "@$SOURCE_DATE_EPOCH" '+%Y%m%d%H%M')
+
+# Overwrite the date of the most recent changelog entry with DEB_DATE. debchange
+# stamps it with the current local time. We do not use its --date option because
+# that was only added in devscripts 2.24.2 and bookworm ships 2.23.4; once we
+# drop bookworm this can become `debchange --date "$DEB_DATE" ...`.
+#
+# Example changelog signature:
+#  -- Albert Dupont <albert@dupont.com>  Wed, 24 Jul 2026 17:31:42 +0200
+# The sed command looks for the first line starting with " -- " and replaces the
+# date which is after the '>' character.
+set_changelog_date() {
+  sed -i "0,/^ -- /s|\(^ -- .*>  \).*|\1$DEB_DATE|" "$1"
+}
+
 if [ -z "${CI:-}" ]; then
-  TIMESTAMP=$(date '+%Y%m%d%H%M')
   CI_COMMIT_SHORT_SHA=$(git rev-parse --short HEAD)
   CI_COMMIT_REF_NAME=$(git rev-parse --abbrev-ref HEAD)
   CI_COMMIT_TAG=$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD)
-else
-  TIMESTAMP="$(date -d "$CI_PIPELINE_CREATED_AT" '+%Y%m%d%H%M')"
 fi
 
 gitlab_release_no_v=
@@ -173,6 +191,9 @@ debchange --changelog scripts/packaging/octez/debian/changelog \
   --newversion "$DEBVERSION" "$DEBCHANGELOG"
 debchange --changelog scripts/packaging/octez-data/debian/changelog \
   --newversion "1.0.0" "Sapling params"
+# Pin the changelog dates for reproducibility (see set_changelog_date above).
+set_changelog_date scripts/packaging/octez/debian/changelog
+set_changelog_date scripts/packaging/octez-data/debian/changelog
 TARGET=all
 
 while [ $# -gt 0 ]; do
