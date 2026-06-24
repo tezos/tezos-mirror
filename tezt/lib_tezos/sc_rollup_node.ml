@@ -113,6 +113,7 @@ type argument =
   | Apply_unsafe_patches
   | Injector_retention_period of int
   | Acl_allow_all
+  | Acl_secure
   | Slow_vm_fallback
 
 let make_argument = function
@@ -137,6 +138,7 @@ let make_argument = function
   | Injector_retention_period nb_block ->
       ["--injector-retention-period"; string_of_int nb_block]
   | Acl_allow_all -> ["--acl-override"; "allow-all"]
+  | Acl_secure -> ["--acl-override"; "secure"]
   | Slow_vm_fallback -> ["--slow-vm-fallback"]
 
 let is_redundant = function
@@ -159,6 +161,7 @@ let is_redundant = function
   | Apply_unsafe_patches, Apply_unsafe_patches
   | Injector_retention_period _, Injector_retention_period _
   | Acl_allow_all, Acl_allow_all
+  | Acl_secure, Acl_secure
   | Slow_vm_fallback, Slow_vm_fallback ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
@@ -182,6 +185,7 @@ let is_redundant = function
   | Apply_unsafe_patches, _
   | Injector_retention_period _, _
   | Acl_allow_all, _
+  | Acl_secure, _
   | Slow_vm_fallback, _ ->
       false
 

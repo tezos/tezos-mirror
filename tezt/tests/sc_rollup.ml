@@ -427,6 +427,134 @@ let test_rollup_node_running ~kind =
       Test.fail "Unable to read metrics"
     else unit
 
+(* Security: the public "secure" RPC ACL must protect the local DAL mutation
+   endpoints
+   ---------------------------------------------------------------------------
+
+   A smart-rollup node exposed on a public (non-loopback) interface is served
+   with the [secure] ACL (see [Rpc_server.Acl.secure] /
+   [Rpc_server.Acl.default] in [src/lib_smart_rollup_node/rpc_server.ml]). That
+   ACL denies the local batcher, admin, stats and config endpoints. The three
+   mutating [/local/dal/**] endpoints are sensitive too: [POST /local/dal/
+   batcher/injection] enqueues caller-controlled payloads that an operator node
+   later turns into an operator-funded [dal_publish_commitment] L1 operation,
+   [POST /local/dal/slot/indices] changes the slot indices used by the DAL
+   injector, and [POST /local/dal/injection/<id>/forget] drops injection
+   bookkeeping. They are therefore at least as sensitive as [/local/batcher/**]
+   and the secure ACL must reject anonymous callers on them with HTTP 401.
+
+   This test runs a rollup node with the [secure] ACL (the policy a publicly
+   exposed node gets by default, installed here via [--acl-override secure])
+   and asserts the *expected secure behavior*:
+
+   - an allowed read-only endpoint is reachable (sanity: the node is up and the
+     ACL allows reads);
+   - [POST /local/batcher/injection] is blocked by the ACL (HTTP 401);
+   - the three mutating [/local/dal/**] endpoints are ALSO blocked by the ACL
+     (HTTP 401).
+
+   KNOWN FAILURE: the secure ACL does not currently deny [/local/dal/**], so
+   the DAL assertions presently FAIL (the endpoints are reachable; with no DAL
+   node attached the handler is reached and answers HTTP 500 [No_dal_injector]
+   instead of HTTP 401). This test documents the expected behavior and becomes
+   green once the secure ACL is fixed to also deny [/local/dal/**]. *)
+let test_dal_endpoints_protected_by_secure_acl ~kind =
+  test_full_scenario
+    {
+      variant = None;
+      tags = ["dal"; "acl"; "security"; "rpc"];
+      description = "secure RPC ACL must block /local/dal mutation endpoints";
+    }
+    ~kind
+  @@ fun _protocol rollup_node sc_rollup _tezos_node _tezos_client ->
+  (* Run the node with the [secure] ACL: this is exactly the policy that
+     [Rpc_server.Acl.default] installs for a node bound to a public,
+     non-loopback interface. *)
+  let* () =
+    Sc_rollup_node.run rollup_node sc_rollup [Sc_rollup_node.Acl_secure]
+  in
+  let unauthorized_code = 401 in
+  let call_code label rpc =
+    let* {RPC_core.code; body; _} =
+      Sc_rollup_node.RPC.call_raw rollup_node rpc
+    in
+    Log.info "%s -> HTTP %d: %s" label code body ;
+    return code
+  in
+  (* Gather all status codes first (and log them), so a failing assertion does
+     not hide the behavior of the remaining endpoints. [id] below is an
+     arbitrary but well-formed injector-operation hash: it only has to parse so
+     that the request routes to the [forget] service and the ACL is evaluated
+     (resto resolves the service, including the path argument, before checking
+     the ACL). *)
+  let* address_code =
+    call_code "GET /global/smart_rollup_address"
+    @@ Sc_rollup_rpc.get_global_smart_rollup_address ()
+  in
+  let* batcher_code =
+    call_code "POST /local/batcher/injection"
+    @@ Sc_rollup_rpc.post_local_batcher_injection ~messages:["test"] ()
+  in
+  let* dal_injection_code =
+    call_code "POST /local/dal/batcher/injection"
+    @@ Sc_rollup_rpc.post_local_dal_batcher_injection ~messages:["00"]
+  in
+  let* dal_indices_code =
+    call_code "POST /local/dal/slot/indices"
+    @@ Sc_rollup_rpc.post_dal_slot_indices ~slot_indices:[0]
+  in
+  let* dal_forget_code =
+    call_code "POST /local/dal/injection/<id>/forget"
+    @@ Sc_rollup_rpc.post_dal_injection_id_forget
+         ~id:"iop3BQ4nVAziTiTJePek2shThv5xGRsikknMH6JUBn4hDr8VLYZVG"
+  in
+  (* Sanity: a non-denied (read-only) endpoint is served. *)
+  Check.(
+    (address_code = 200)
+      int
+      ~error_msg:
+        "GET /global/smart_rollup_address: the secure ACL must allow reads \
+         (expected HTTP %R, got HTTP %L)") ;
+  (* The secure ACL must block the local batcher injection endpoint. *)
+  Check.(
+    (batcher_code = unauthorized_code)
+      int
+      ~error_msg:
+        "POST /local/batcher/injection: the secure ACL must reject anonymous \
+         callers (expected HTTP %R, got HTTP %L)") ;
+  (* The secure ACL must ALSO block the three mutating DAL endpoints: an
+     anonymous caller must not be able to enqueue DAL payloads, change the
+     injector's slot indices, or drop injection bookkeeping on a publicly
+     exposed operator node. *)
+  Check.(
+    (dal_injection_code = unauthorized_code)
+      int
+      ~error_msg:
+        "POST /local/dal/batcher/injection: the secure ACL must reject \
+         anonymous callers (expected HTTP %R), but it returned HTTP %L. An \
+         unauthenticated caller can enqueue DAL payloads that the operator \
+         node will publish on L1 at the operator's expense.") ;
+  Check.(
+    (dal_indices_code = unauthorized_code)
+      int
+      ~error_msg:
+        "POST /local/dal/slot/indices: the secure ACL must reject anonymous \
+         callers (expected HTTP %R), but it returned HTTP %L. An \
+         unauthenticated caller can change the DAL injector's slot indices on \
+         a publicly exposed operator node.") ;
+  Check.(
+    (dal_forget_code = unauthorized_code)
+      int
+      ~error_msg:
+        "POST /local/dal/injection/<id>/forget: the secure ACL must reject \
+         anonymous callers (expected HTTP %R), but it returned HTTP %L. An \
+         unauthenticated caller can drop the DAL injector's bookkeeping on a \
+         publicly exposed operator node.") ;
+  Log.info
+    "Secure behavior holds: under the secure ACL the mutating /local/** \
+     endpoints (batcher and DAL) all reject anonymous callers with HTTP 401." ;
+  unit
+
 (** Genesis information and last cemented commitment at origination are correct
 ----------------------------------------------------------
 
@@ -9532,6 +9660,7 @@ let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
   test_rpcs ~kind protocols ;
+  test_dal_endpoints_protected_by_secure_acl ~kind protocols ;
   test_commitment_scenario
     ~variant:"commitment_is_stored"
     commitment_stored

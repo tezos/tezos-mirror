@@ -331,6 +331,13 @@ let post_dal_slot_indices ~slot_indices =
 let get_dal_injected_operations_statuses () =
   make GET ["local"; "dal"; "injected"; "operations"; "statuses"] JSON.as_list
 
+let post_dal_injection_id_forget ~id =
+  make
+    POST
+    ["local"; "dal"; "injection"; id; "forget"]
+    ~data:(Data (`O []))
+    as_empty_object_or_fail
+
 type outbox_proof = {commitment_hash : string; proof : string}
 
 let outbox_proof_simple ?(block = "head") ~outbox_level ~message_index () =

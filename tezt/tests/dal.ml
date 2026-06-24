@@ -540,6 +540,114 @@ let rollup_node_injects_dal_slots protocol parameters dal_node sc_node
   in
   loop level 0 parameters.attestation_lags
 
+(** Security e2e: a publicly exposed operator rollup node is served with the
+    [secure] RPC ACL (see [Rpc_server.Acl.secure] /
+    [Rpc_server.Acl.default] in [src/lib_smart_rollup_node/rpc_server.ml]). That
+    ACL must not let an *anonymous* caller drive the operator into funding L1
+    operations.
+
+    [POST /local/dal/batcher/injection] and [POST /local/dal/slot/indices] are
+    mutating endpoints under [/local/dal/**]. If the secure ACL does not deny
+    them, a remote unauthenticated caller can enqueue a DAL payload that the
+    operator node turns into a [dal_publish_commitment] L1 operation paid for by
+    the operator account.
+
+    This test runs the rollup node with the [secure] ACL ([--acl-override
+    secure], the default policy for a node bound to a public interface) and
+    plays the role of the remote unauthenticated attacker: it hits the two
+    [/local/dal/**] RPCs (using [call_raw] so the expected HTTP 401 does not
+    abort the scenario), then bakes enough blocks for any resulting
+    [dal_publish_commitment] to be injected and included on L1. It asserts the
+    *expected secure behavior*: no [dal_publish_commitment] funded by the
+    operator account appears on L1.
+
+    KNOWN FAILURE: the secure ACL does not currently deny [/local/dal/**], so
+    the anonymous injection succeeds and the operator publishes (and pays the
+    fee for) a [dal_publish_commitment]; this test presently FAILS,
+    demonstrating the impact. It becomes green once the secure ACL is fixed to
+    also deny [/local/dal/**]. *)
+let unauthenticated_dal_injection_must_not_fund_operator _protocol _parameters
+    dal_node sc_node sc_rollup_address node client _pvm_name =
+  let client = Client.with_dal_node client ~dal_node in
+  let operator = Constant.bootstrap1.public_key_hash in
+  (* The operator rollup node is exposed with the public [secure] ACL. *)
+  let* () =
+    Sc_rollup_node.run sc_node sc_rollup_address [Sc_rollup_node.Acl_secure]
+  in
+  let slot_index = 0 in
+  (* Play the remote unauthenticated attacker: hit the mutating /local/dal/**
+     endpoints. We use [call_raw] so that the secure-by-design HTTP 401 (the
+     behavior we want once the ACL is fixed) does not abort the test. *)
+  let* indices_resp =
+    Sc_rollup_node.RPC.call_raw sc_node
+    @@ Sc_rollup_rpc.post_dal_slot_indices ~slot_indices:[slot_index]
+  in
+  Log.info
+    "anonymous POST /local/dal/slot/indices -> HTTP %d"
+    indices_resp.RPC_core.code ;
+  let* injection_resp =
+    Sc_rollup_node.RPC.call_raw sc_node
+    @@ Sc_rollup_rpc.post_local_dal_batcher_injection
+         ~messages:["unauthenticated DAL payload"]
+  in
+  Log.info
+    "anonymous POST /local/dal/batcher/injection -> HTTP %d"
+    injection_resp.RPC_core.code ;
+  (* Observe L1 directly (see the rollup-node anti-pattern note: never rely on
+     injector feedback). We bake a handful of blocks for the rollup node to (in
+     the vulnerable case) produce the DAL slot, inject the
+     [dal_publish_commitment] and have it included, scanning every baked block
+     for such an operation funded by the operator. *)
+  let find_operator_dal_publish content =
+    if
+      JSON.(content |-> "kind" |> as_string) = "dal_publish_commitment"
+      && JSON.(content |-> "source" |> as_string) = operator
+    then Some content
+    else None
+  in
+  let dal_publish_in_head () =
+    let* block_ops = Node.RPC.call node @@ RPC.get_chain_block_operations () in
+    let managers = JSON.(block_ops |=> 3 |> as_list) in
+    managers
+    |> List.concat_map (fun op -> JSON.(op |-> "contents" |> as_list))
+    |> List.filter_map find_operator_dal_publish
+    |> return
+  in
+  let rec bake_and_collect n acc =
+    if n = 0 then return acc
+    else
+      let* () = bake_for client in
+      let* current_level = Client.level client in
+      let* (_ : int) =
+        Sc_rollup_node.wait_for_level ~timeout:20. sc_node current_level
+      in
+      let* found = dal_publish_in_head () in
+      bake_and_collect (n - 1) (acc @ found)
+  in
+  (* A handful of blocks is plenty: the existing [rollup_node_injects_dal_slots]
+     test observes the injection within one bake after the RPC call. *)
+  let* published = bake_and_collect 6 [] in
+  List.iter
+    (fun content ->
+      Log.info
+        "operator-funded dal_publish_commitment found: source=%s fee=%s mutez"
+        JSON.(content |-> "source" |> as_string)
+        JSON.(content |-> "fee" |> as_string))
+    published ;
+  Check.(
+    (List.length published = 0)
+      int
+      ~error_msg:
+        "The secure ACL must prevent an anonymous caller from making the \
+         operator publish DAL commitments: no operator-funded \
+         dal_publish_commitment must appear on L1 (expected %R), found %L. An \
+         unauthenticated caller forced the operator to submit (and pay the fee \
+         for) operator-funded dal_publish_commitment operation(s) on L1.") ;
+  Log.info
+    "Secure behavior holds: no operator-funded dal_publish_commitment was \
+     produced from the anonymous injection." ;
+  unit
+
 (** This test verifies the optimal publication of DAL slots from a batch of
     messages into the DAL node and L1 via the rollup node DAL injector.
 
@@ -773,6 +881,18 @@ let register ~protocols =
          declare the slot available. Otherwise the test might be flaky as we
          bake with a timestamp in the past. *)
     ~attestation_threshold:1
+    protocols ;
+
+  scenario_with_all_nodes
+    ~__FILE__
+    "Anonymous DAL injection must not fund operator ops (secure ACL)"
+    ~regression:false
+    ~pvm_name:"wasm_2_0_0"
+    ~commitment_period:5
+    unauthenticated_dal_injection_must_not_fund_operator
+    ~operator_profiles:[0]
+    ~attestation_threshold:1
+    ~tags:["acl"; "security"]
     protocols ;
 
   scenario_with_all_nodes

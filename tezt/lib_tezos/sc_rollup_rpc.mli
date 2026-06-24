@@ -199,6 +199,10 @@ val post_dal_slot_indices : slot_indices:int list -> unit RPC_core.t
 
 val get_dal_injected_operations_statuses : unit -> JSON.t list RPC_core.t
 
+(** RPC: [POST local/dal/injection/<id>/forget] forgets information about the
+    DAL injection whose injector-operation hash is [id]. *)
+val post_dal_injection_id_forget : id:string -> unit RPC_core.t
+
 type outbox_proof = {commitment_hash : string; proof : string}
 
 (** RPC: [GET global/block/<block>/helpers/proofs/outbox/<outbox_level>/messages] *)
