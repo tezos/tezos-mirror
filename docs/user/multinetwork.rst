@@ -79,8 +79,6 @@ the following built-in networks:
 
 - ``shadownet`` (starting from Octez v24)
 
-- ``ghostnet``
-
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
 You can use the ``--network`` option with ``octez-node run`` to make sure

@@ -94,7 +94,7 @@ Setting or resetting the delegate of a user account is done as for delegating, s
 
 The delegate has no control over your stake: cannot spend it nor unstake it, so your deposit remains yours and under your control.
 Staked coins cannot be spent by yourself, either; but you can unstake them later.
-Your staked funds add to your delegate's staking balance (so staked funds count twice as much as delegated funds).
+Your staked funds add to your delegate's staking balance (they count three times as much as delegated funds!).
 In turn, your staked funds are frozen and subject to slashing in case of misbehavior of your delegate such as double signing, similarly to the delegate's own staked funds.
 In compensation of this risk assumed by stakers, they may receive some part of the delegate's rewards, the exact proportion being settable by the delegate.
 

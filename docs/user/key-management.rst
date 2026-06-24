@@ -711,7 +711,7 @@ The first step is to recover your private key using the following
 command which will ask for:
 
 - the email address used during the fundraiser
-- the 14 words mnemonic of your paper wallet
+- the 15 words mnemonic of your paper wallet
 - the password used to protect the paper wallet
 
 ::
