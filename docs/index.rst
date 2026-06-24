@@ -197,7 +197,7 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    Tallinn Protocol Reference <active/index>
-   U025 Protocol Reference <u025/index>
+   Ushuaia Protocol Reference <u025/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
