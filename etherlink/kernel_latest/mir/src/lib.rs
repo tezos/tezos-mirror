@@ -18,6 +18,8 @@
 //! - `SAPLING_VERIFY_UPDATE`
 //! - `OPEN_CHEST`
 //! - `VIEW`
+//! - `TICKET`, `READ_TICKET`, `SPLIT_TICKET`, `JOIN_TICKETS` (unless the
+//!   `tickets` feature is enabled; see L2-1680)
 //!
 //! The following types are currently not supported:
 //!
@@ -26,6 +28,7 @@
 //! - `tx_rollup_l2_address`
 //! - `sapling_state`
 //! - `sapling_transaction`
+//! - `ticket` (unless the `tickets` feature is enabled; see L2-1680)
 //!
 //! # Usage
 //!
@@ -518,6 +521,7 @@ mod tests {
         assert_eq!(input_stack, output_stack);
     }
 
+    #[cfg(feature = "tickets")]
     #[test]
     fn ticket_instr() {
         let ctx = Ctx::default();
@@ -539,6 +543,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "tickets")]
     #[test]
     fn read_ticket() {
         let ticketer_address_hash =
@@ -573,6 +578,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "tickets")]
     #[test]
     fn split_ticket() {
         let ctx = Ctx::default();
@@ -611,6 +617,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "tickets")]
     #[test]
     fn join_tickets() {
         let ctx = Ctx::default();
@@ -686,19 +693,24 @@ mod tests {
             Ctx::default(),
         );
 
-        let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
-        // When contract is implicit and contract type is Ticket
-        run_e2e_test(
-            &Arena::new(),
-            "CONTRACT (ticket unit)",
-            stk![Type::Address],
-            stk![Type::new_option(Type::new_contract(Type::new_ticket(
-                Type::Unit
-            )))],
-            stk![TypedValue::Address(addr.clone())],
-            stk![TypedValue::new_option(Some(TypedValue::Contract(addr))),],
-            Ctx::default(),
-        );
+        // When contract is implicit and contract type is Ticket.
+        // Gated on `tickets`: with tickets disabled (the default, see
+        // L2-1680) `ticket` is rejected at typechecking.
+        #[cfg(feature = "tickets")]
+        {
+            let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
+            run_e2e_test(
+                &Arena::new(),
+                "CONTRACT (ticket unit)",
+                stk![Type::Address],
+                stk![Type::new_option(Type::new_contract(Type::new_ticket(
+                    Type::Unit
+                )))],
+                stk![TypedValue::Address(addr.clone())],
+                stk![TypedValue::new_option(Some(TypedValue::Contract(addr))),],
+                Ctx::default(),
+            );
+        }
 
         let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
         // When contract is implicit and contract type is some other type

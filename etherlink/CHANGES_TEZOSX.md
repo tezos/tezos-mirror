@@ -119,6 +119,12 @@
   a maximally-shared value (an O(n) in-memory DAG that expands to 2^n nodes)
   runs out of gas mid-walk instead of doing the full walk before charging. The
   total gas charged is unchanged. (L2-1654)
+- Tickets are temporarily disabled in the Michelson runtime: the
+  `ticket` type and the `TICKET`, `READ_TICKET`, `SPLIT_TICKET` and
+  `JOIN_TICKETS` instructions are now rejected during typechecking.
+  Support can be re-enabled by building with the `tickets` cargo
+  feature once the conditions for re-enabling them are agreed.
+  (!22292)
 - The `APPLY` instruction now rejects a non-packable captured value
   (e.g. `big_map` or `ticket`) during typechecking, matching L1, which
   requires the captured type to be packable with contracts disallowed.

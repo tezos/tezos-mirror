@@ -809,6 +809,7 @@ enum BuildKind {
     Option,
     List,
     Set,
+    #[cfg(feature = "tickets")]
     Ticket,
     Contract,
 }
@@ -1019,6 +1020,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                     #[cfg(feature = "bls")]
                     App(bls12_381_g2, ..) => return unexpected(),
 
+                    #[cfg(feature = "tickets")]
                     App(ticket, [t], _) => push_single_child_visit(
                         &mut frames,
                         ty,
@@ -1027,6 +1029,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         BuildKind::Ticket,
                         t,
                     ),
+                    #[cfg(feature = "tickets")]
                     App(ticket, ..) => return unexpected(),
 
                     App(pair, [ty1, ty2, rest @ ..], _) => {
@@ -1318,6 +1321,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         t.ensure_prop(gas, TypeProperty::Comparable)?;
                         Type::new_set(t)
                     }
+                    #[cfg(feature = "tickets")]
                     BuildKind::Ticket => {
                         let t = results.pop().ok_or(TcError::InternalError(
                             TcInvariant::EmptyResultStack {
@@ -4078,6 +4082,7 @@ fn typecheck_instruction_step<'a, 'b>(
         (App(APPLY, [], _), [] | [_]) => no_overload!(APPLY, len 2),
         (App(APPLY, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        #[cfg(feature = "tickets")]
         (App(TICKET, [], _), [.., T::Nat, _]) => {
             let content_ty = pop!();
             // The content of a ticket must be comparable; this mirrors the
@@ -4090,10 +4095,14 @@ fn typecheck_instruction_step<'a, 'b>(
             *stack_top_mut(stack)? = T::new_option(T::new_ticket(content_ty.clone()));
             I::Ticket(content_ty)
         }
+        #[cfg(feature = "tickets")]
         (App(TICKET, [], _), [.., _, _]) => no_overload!(TICKET),
+        #[cfg(feature = "tickets")]
         (App(TICKET, [], _), [] | [_]) => no_overload!(TICKET, len 2),
+        #[cfg(feature = "tickets")]
         (App(TICKET, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        #[cfg(feature = "tickets")]
         (App(READ_TICKET, [], _), [.., T::Ticket(t)]) => {
             stack.push(T::new_pair(
                 T::Address,
@@ -4101,10 +4110,14 @@ fn typecheck_instruction_step<'a, 'b>(
             ));
             I::ReadTicket
         }
+        #[cfg(feature = "tickets")]
         (App(READ_TICKET, [], _), [.., _]) => no_overload!(READ_TICKET),
+        #[cfg(feature = "tickets")]
         (App(READ_TICKET, [], _), []) => no_overload!(READ_TICKET, len 1),
+        #[cfg(feature = "tickets")]
         (App(READ_TICKET, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        #[cfg(feature = "tickets")]
         (App(SPLIT_TICKET, [], _), [.., T::Pair(n), T::Ticket(_)])
             if matches!(n.as_ref(), (T::Nat, T::Nat)) =>
         {
@@ -4112,10 +4125,14 @@ fn typecheck_instruction_step<'a, 'b>(
             *stack_top_mut(stack)? = Type::new_option(Type::new_pair(typ.clone(), typ));
             I::SplitTicket
         }
+        #[cfg(feature = "tickets")]
         (App(SPLIT_TICKET, [], _), [.., _, _]) => no_overload!(SPLIT_TICKET),
+        #[cfg(feature = "tickets")]
         (App(SPLIT_TICKET, [], _), [] | [_]) => no_overload!(SPLIT_TICKET, len 2),
+        #[cfg(feature = "tickets")]
         (App(SPLIT_TICKET, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        #[cfg(feature = "tickets")]
         (App(JOIN_TICKETS, [], _), [.., T::Pair(tickets)])
             if matches!(tickets.as_ref(), (Type::Ticket(_), Type::Ticket(_))) =>
         {
@@ -4130,8 +4147,11 @@ fn typecheck_instruction_step<'a, 'b>(
             *stack_top_mut(stack)? = Type::new_option(tickets.0.clone());
             I::JoinTickets
         }
+        #[cfg(feature = "tickets")]
         (App(JOIN_TICKETS, [], _), [.., _]) => no_overload!(JOIN_TICKETS),
+        #[cfg(feature = "tickets")]
         (App(JOIN_TICKETS, [], _), []) => no_overload!(JOIN_TICKETS, len 1),
+        #[cfg(feature = "tickets")]
         (App(JOIN_TICKETS, expect_args!(0), _), _) => unexpected_micheline!(),
 
         // stack type doesn't change in these instructions, so we don't touch it
@@ -12564,6 +12584,7 @@ code { DROP ;
         assert_eq!(msg, expected, "n-ary pair tail wording diverged");
     }
 
+    #[cfg(feature = "tickets")]
     #[test]
     fn ticket() {
         let stk = &mut tc_stk![Type::Nat];
@@ -12598,6 +12619,7 @@ code { DROP ;
         );
     }
 
+    #[cfg(feature = "tickets")]
     #[test]
     fn read_ticket() {
         let stk = &mut tc_stk![Type::Nat];
@@ -12630,6 +12652,7 @@ code { DROP ;
         );
     }
 
+    #[cfg(feature = "tickets")]
     #[test]
     fn split_ticket() {
         let stk = &mut tc_stk![Type::Nat];
@@ -12679,6 +12702,7 @@ code { DROP ;
         );
     }
 
+    #[cfg(feature = "tickets")]
     #[test]
     fn join_tickets() {
         let stk = &mut tc_stk![Type::Nat];
@@ -12739,6 +12763,36 @@ code { DROP ;
             stk,
             &tc_stk![Type::new_option(Type::new_ticket(Type::Unit))]
         );
+    }
+
+    // When the `tickets` feature is disabled (the default, see L2-1680), the
+    // `ticket` type is rejected by the typechecker as unsupported.
+    #[cfg(not(feature = "tickets"))]
+    #[test]
+    fn ticket_type_disabled() {
+        let err = parse_ty(&mut Gas::default(), &parse("ticket int").unwrap())
+            .expect_err("ticket type must be rejected when tickets are disabled");
+        assert_eq!(err, TcError::TodoType(Prim::ticket));
+    }
+
+    // When the `tickets` feature is disabled (the default, see L2-1680), the
+    // ticket instructions are rejected by the typechecker as unsupported.
+    #[cfg(not(feature = "tickets"))]
+    #[test]
+    fn ticket_instructions_disabled() {
+        for (src, prim) in [
+            ("TICKET", Prim::TICKET),
+            ("READ_TICKET", Prim::READ_TICKET),
+            ("SPLIT_TICKET", Prim::SPLIT_TICKET),
+            ("JOIN_TICKETS", Prim::JOIN_TICKETS),
+        ] {
+            let stk = &mut tc_stk![Type::Nat];
+            assert_eq!(
+                typecheck_instruction(&parse(src).unwrap(), &mut Gas::default(), stk),
+                Err(TcError::TodoInstr(prim)),
+                "{src} must be rejected when tickets are disabled",
+            );
+        }
     }
 
     #[test]
