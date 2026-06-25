@@ -1671,10 +1671,10 @@ let test_metrics_not_on_rpc_listener () =
     |> Process.check_and_read_stdout
   in
   let status = String.trim status in
-  Check.((status <> "200") string)
+  Check.((status = "404") string)
     ~error_msg:
-      "GET /metrics on the main RPC listener returned 200 but must not be \
-       served when --metrics-addr is not configured (got %L)" ;
+      "GET /metrics on the main RPC listener returned %L but must return 404 \
+       when --metrics-addr is not configured (the route is not registered)" ;
   unit
 
 let binary_regression_test () =
