@@ -1,0 +1,40 @@
+# cargo-audit configuration for octez-rollup-node-rust-deps.
+#
+# The advisories ignored below are all deep transitive dependencies pulled
+# in by vendored crates (the Zcash Sapling FFI in src/rustzcash_deps and the
+# vendored Tezos context in src/rust_deps/rust_tezos_context). None has a
+# realistic exploitation path in how the rollup node uses these crates;
+# actually fixing them requires major upgrades of the vendored stacks, which
+# is tracked separately. Each entry documents the accepted risk.
+#
+# Tracked in https://gitlab.com/tezos/tezos/-/issues/8331.
+
+[advisories]
+ignore = [
+  # RUSTSEC-2022-0090 (CVE-2022-35737) — libsqlite3-sys 0.22.2, CVSS 7.5.
+  # Bundled SQLite < 3.39.2 array-bounds overflow in printf when a string
+  # larger than ~1GB is passed to %Q/%q/%w. Reaches us via rusqlite 0.25.4
+  # ("bundled") in the vendored tezos_timing crate, a local SQLite file that
+  # only records context-access timing statistics and is never fed
+  # attacker-controlled >1GB strings (and is only populated when context
+  # timing profiling is enabled). Fix requires a rusqlite major bump in the
+  # vendored timing crate.
+  "RUSTSEC-2022-0090",
+
+  # RUSTSEC-2024-0344 — curve25519-dalek 3.2.0 (unrated).
+  # Timing variability in Scalar29::sub/Scalar52::sub (potential side-channel
+  # on secret scalars). Reaches us via ed25519-zebra 3.1.0 -> the vendored
+  # librustzcash (Zcash Sapling FFI). No remote vector; exploitation needs
+  # co-located precise timing of secret-dependent operations. Fix requires
+  # upgrading the vendored Zcash stack (curve25519-dalek 3 -> 4 is
+  # FFI-breaking).
+  "RUSTSEC-2024-0344",
+
+  # RUSTSEC-2025-0009 — ring 0.16.20 (unrated).
+  # AES/QUIC functions may panic when overflow checking is compiled in. ring
+  # has a single consumer here, hdwallet 0.3.1, which uses it only for
+  # HMAC-SHA512 (BIP-32) and never calls the affected AES-GCM / QUIC code
+  # paths; release builds also disable overflow checks. Not reachable. Fix
+  # requires upgrading the vendored Zcash stack (ring 0.16 -> 0.17).
+  "RUSTSEC-2025-0009",
+]
