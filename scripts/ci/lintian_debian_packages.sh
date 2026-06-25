@@ -18,36 +18,35 @@ EOF
   exit 1
 fi
 
-# Array to store failed files
-FAILED_FILES=()
-
-# Set trap to catch errors and store the failing file
-trap 'FAILED_FILES+=("$file")' ERR
-
 # The linux distribution for which we are creating the apt repository
 # E.g. 'ubuntu' or 'debian'
 DISTRIBUTION=${1}
 shift
-# The release of the linux distribution for which
-# we are creating the apt repository
-# E.g. '22_04', 'bookworm'
+# The releases of the linux distribution for which we lint packages.
+# E.g. '22_04', 'bookworm'.
 RELEASES=$*
 
+# Records whether any release failed lintian. We keep linting the
+# remaining releases so the full report is produced before exiting.
+failed=0
+
 for release in $RELEASES; do # unstable, 22_04, 24_04 ...
-  find "packages/${DISTRIBUTION}/${release}" \( -name '*amd64.deb' -o -name '*_all.deb' \) |
+  # 'lintian' exits non-zero when it reports errors and 'parallel'
+  # propagates that as a non-zero exit status of the pipeline.
+  if ! find "packages/${DISTRIBUTION}/${release}" \( -name '*amd64.deb' -o -name '*_all.deb' \) |
     parallel -j4 '
       echo "Lintian package {}"
       lintian "{}" --tag-display-limit 0 --verbose --allow-root
-    '
+    '; then
+    echo "Lintian reported errors for ${DISTRIBUTION}/${release}"
+    failed=1
+  fi
 done
 
-if [ ${#FAILED_FILES[@]} -ne 0 ]; then
-  echo "Lintian check failed for the following files:"
-  for file in "${FAILED_FILES[@]}"; do
-    echo "- $file"
-  done
+if [ "$failed" -ne 0 ]; then
+  echo "Lintian check failed; see the errors reported above."
   exit 1
-else
-  echo "All clean"
-  exit 0
 fi
+
+echo "All clean"
+exit 0
