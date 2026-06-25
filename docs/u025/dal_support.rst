@@ -65,6 +65,7 @@ In the block’s metadata, there is a specific field for the DAL, called ``"dal_
 
 Shard attestations for a given slot accumulate across all levels in its attestation window (from the smallest to the largest lag). Therefore, a slot committed (published) at level ``n`` may become available as early as the metadata of the block at level ``n + min(ATTESTATION_LAGS)`` -- if enough bakers attest at the first opportunity -- or as late as level ``n + ATTESTATION_LAG`` (the maximum lag). A smart rollup can utilize the slot's data from the level following the one where it was declared available.
 
+.. _DAL_incentives_scheme:
 .. _DAL_incentives_scheme_u025:
 
 DAL incentives scheme
@@ -156,6 +157,7 @@ Penalties
 
 A baker that is correctly accused, through an accusation operation included in a block, loses their DAL rewards for the cycle containing the block.
 
+.. _dal_rollups_integration:
 .. _dal_rollups_integration_u025:
 
 Smart Rollups integration
@@ -171,6 +173,7 @@ If the kernel requests a page that does not satisfy the mentioned conditions, th
 
 Moreover, the rollup kernel has access to the protocol constants so that the same kernel code can be used on different test networks.
 
+.. _dal_constants:
 .. _dal_constants_u025:
 
 DAL-related protocol constants
