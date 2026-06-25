@@ -6496,6 +6496,44 @@ mod typecheck_tests {
             .expect("pack succeeds");
     }
 
+    // Exact-gas oracles for `key`/`signature` literal decoding. Each
+    // typechecks one valid literal and asserts the precise milligas consumed:
+    // `VALUE_STEP` (100, charged once per value node in `visit_value`) plus the
+    // decode constant. Hardcoded totals so reverting a `gas::tc_cost` constant
+    // fails the test. Costs were benchmarked with `examples/decode_gas.rs`.
+    fn value_typecheck_gas(v: &Micheline, t: &Type) -> u32 {
+        let mut ctx = Ctx::default();
+        let start = ctx.gas.milligas().unwrap();
+        typecheck_value(v, &mut ctx, t, AllowForgedLazyStorageId::No)
+            .expect("valid literal typechecks");
+        start - ctx.gas.milligas().unwrap()
+    }
+
+    #[test]
+    fn key_readable_literal_gas() {
+        let v = Micheline::String(
+            "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK".to_string(),
+        );
+        // VALUE_STEP (100) + KEY_READABLE (36500)
+        assert_eq!(value_typecheck_gas(&v, &Type::Key), 36600);
+    }
+
+    #[test]
+    fn key_optimized_literal_gas() {
+        use tezos_crypto_rs::public_key::PublicKey;
+        use tezos_data_encoding::enc::BinWriter;
+        let mut bytes = Vec::new();
+        PublicKey::from_b58check(
+            "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK",
+        )
+        .unwrap()
+        .bin_write(&mut bytes)
+        .unwrap();
+        let v = Micheline::Bytes(bytes);
+        // VALUE_STEP (100) + KEY_OPTIMIZED (34000)
+        assert_eq!(value_typecheck_gas(&v, &Type::Key), 34100);
+    }
+
     /// hack to simplify syntax in tests
     fn typecheck_instruction<'a>(
         i: &Micheline<'a>,
