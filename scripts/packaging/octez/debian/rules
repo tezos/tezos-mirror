@@ -8,15 +8,17 @@ override_dh_auto_build:
 	binaries/octez-dal-node --help=groff > manpages/octez-dal-node.1
 	dh_auto_build --parallel
 
+# Sort the file lists below so the symlinks are created in a deterministic
+# order regardless of the filesystem readdir order (reproducible builds).
 override_dh_installman:
 	dh_installman
-	find binaries/ -name octez-baker-P\* -type f -printf "%f\n" | \
+	find binaries/ -name octez-baker-P\* -type f -printf "%f\n" | sort | \
 		while read bin; \
 		do \
 			ln -s debian/octez-baker/usr/share/man/man1/octez-baker.1.gz \
 			debian/octez-baker/usr/share/man/man1/$$bin.1.gz ; \
 		done
-	find binaries/ -name octez-accuser-P\* -type f -printf "%f\n" | \
+	find binaries/ -name octez-accuser-P\* -type f -printf "%f\n" | sort | \
 		while read bin; \
 		do \
 			ln -s debian/octez-baker/usr/share/man/man1/octez-accuser.1.gz \
