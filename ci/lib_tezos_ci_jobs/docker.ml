@@ -19,7 +19,13 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
     ~__POS__
     ~description
     ~stage:Build
-    ~only_if_changed:["build.Dockerfile"; "Dockerfile"]
+    ~only_if_changed:
+      [
+        "build.Dockerfile";
+        "Dockerfile";
+        "docker-bake.hcl";
+        "scripts/create_docker_image.sh";
+      ]
     ~allow_failure:No
     ~retry:
       {
@@ -202,6 +208,7 @@ let job_script_docker_verify_image =
       [
         "build.Dockerfile";
         "Dockerfile";
+        "docker-bake.hcl";
         (* Scripts that are directly called by this job. *)
         "scripts/ci/docker_initialize.sh";
         "scripts/ci/docker_verify_signature.sh";
