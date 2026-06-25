@@ -136,7 +136,7 @@ exclude_patterns = [
     'doc_gen',
     'ushuaia',
 ]
-# TODO tezos/tezos#2170: update the active protocol folder above
+# TODO #2170: update the active protocol folder above
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
