@@ -12,12 +12,11 @@
 use std::borrow::Cow;
 use std::str::FromStr;
 
+use tezos_smart_rollup_host::storage::v2;
+
 #[cfg(feature = "irmin-compat")]
 mod irmin_path_validator;
-
-/// The maximum size that a V2 durable storage key can have.
-#[cfg(not(feature = "irmin-compat"))]
-pub const MAX_STORE_V2_KEY_SIZE: usize = 256;
+mod wasm_nds;
 
 /// Key creation error
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
@@ -38,18 +37,20 @@ pub enum KeyError {
 /// (see [`Key::from_static`]), owned for keys built dynamically (see
 /// [`Key::from_bytes`]). Being a sized, owned type, a key can be returned from
 /// a builder and passed by reference wherever a `&Key` is expected.
+///
+/// `Key` is guaranteed compatible with `WasmNds` key, regardless of whether
+/// `irmin-compat` feature is enabled.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Key(Cow<'static, [u8]>);
 
 impl Key {
-    // Fallback: when `irmin-compat` is not enabled, only a size check is performed.
-    // The full validation logic lives in `irmin_path_validator::Key::check_bytes`.
+    /// `Key` must be a valid [`v2::Key`].
     #[cfg(not(feature = "irmin-compat"))]
     const fn check_bytes(bytes: &[u8]) -> Result<(), KeyError> {
-        if bytes.len() > MAX_STORE_V2_KEY_SIZE {
-            return Err(KeyError::KeyTooLarge);
+        match v2::Key::new(bytes) {
+            Some(_key) => Ok(()),
+            None => Err(KeyError::KeyTooLarge),
         }
-        Ok(())
     }
 
     /// Create a key from raw bytes, taking ownership of them.
@@ -72,6 +73,13 @@ impl Key {
     /// The raw bytes of the key.
     pub fn as_bytes(&self) -> &[u8] {
         self.0.as_ref()
+    }
+}
+
+impl AsRef<v2::Key> for Key {
+    fn as_ref(&self) -> &v2::Key {
+        v2::Key::new(self.as_bytes())
+            .expect("KeySpace Key is guaranteed to always be a valid WasmNds Key")
     }
 }
 
@@ -109,7 +117,6 @@ impl core::fmt::Display for Key {
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum NameError {
     /// Attempted to create a name that exceeds the maximum allowed size.
-    #[cfg(feature = "irmin-compat")]
     #[error("name exceeds the maximum allowed size")]
     NameTooLong,
     /// Path validation error (e.g. missing leading `/`, trailing `/`, invalid bytes,
@@ -128,11 +135,13 @@ pub enum NameError {
 pub struct Name(Cow<'static, str>);
 
 impl Name {
-    // Fallback: when `irmin-compat` is not enabled, no validation is performed.
-    // The actual validation logic lives in `irmin_path_validator::Name::check_bytes`.
+    // [`Name`] must be a valid [`v2::Key`].
     #[cfg(not(feature = "irmin-compat"))]
-    const fn check_bytes(_bytes: &[u8]) -> Result<(), NameError> {
-        Ok(())
+    const fn check_bytes(bytes: &[u8]) -> Result<(), NameError> {
+        match v2::Key::new(bytes) {
+            Some(_key) => Ok(()),
+            None => Err(NameError::NameTooLong),
+        }
     }
 
     /// Create a name from a static string without allocating. Should only be
@@ -142,6 +151,13 @@ impl Name {
     pub const fn from_static(name: &'static str) -> Self {
         assert!(Self::check_bytes(name.as_bytes()).is_ok(), "Invalid name");
         Name(Cow::Borrowed(name))
+    }
+
+    #[cfg(all(pvm_kind = "wasm", not(feature = "irmin-compat")))]
+    fn as_key(&self) -> &v2::Key {
+        let name: &str = self.as_ref();
+        v2::Key::new(name.as_bytes())
+            .expect("KeySpace Name is guaranteed to always be a valid WasmNds key")
     }
 }
 
@@ -279,6 +295,14 @@ pub enum KeySpaceLoaderError {
     /// dropped yet.
     #[error("a key space with this name is already loaded")]
     AlreadyLoaded,
+    /// Invalid/Inconsistent storage detected
+    #[cfg(not(feature = "irmin-compat"))]
+    #[error("KeySpaceLoader encountered a malformed name mapping for {0}")]
+    InconsistentNameMapping(Name),
+    /// Only up to `i32::MAX` databases are supported.
+    #[cfg(not(feature = "irmin-compat"))]
+    #[error("Could not allocated database for the given name - ran out of db indices.")]
+    TooManyDatabases,
 }
 
 /// A loader for [`KeySpace`] instances backed by a specific storage implementation.

@@ -15,6 +15,7 @@
 //! - Valid [`Name`]: `/evm/world_state`, `/kernel`
 //! - Valid [`Key`]: `/my_key`, `/a/b/c`
 
+use tezos_smart_rollup_constants::core::NDS_MAX_KEY_SIZE;
 use tezos_smart_rollup_host::path::{validate_path, Path, PATH_MAX_SIZE};
 
 use super::{Key, Name};
@@ -46,6 +47,14 @@ impl Key {
         if bytes.len() > MAX_KEY_SIZE {
             return Err(KeyError::KeyTooLarge);
         }
+
+        const {
+            assert!(
+                MAX_KEY_SIZE < NDS_MAX_KEY_SIZE,
+                "Key must always be a valid NDS key"
+            )
+        };
+
         match validate_path(bytes) {
             Ok(()) => Ok(()),
             Err(e) => Err(KeyError::PathError(e)),
@@ -64,6 +73,7 @@ impl Name {
         if bytes.len() > MAX_KEYSPACE_NAME_SIZE {
             return Err(NameError::NameTooLong);
         }
+
         match validate_path(bytes) {
             Ok(()) => Ok(()),
             Err(e) => Err(NameError::PathError(e)),

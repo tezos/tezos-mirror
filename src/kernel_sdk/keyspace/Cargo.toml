@@ -11,12 +11,15 @@ publish = false
 
 [features]
 default = ["irmin-compat"]
-irmin-compat = ["dep:tezos-smart-rollup-host"]
+irmin-compat = []
 
 [dependencies]
 thiserror.workspace = true
 
+[dependencies.tezos-smart-rollup-constants]
+path = "../constants"
+default-features = false
+
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
 default-features = false
-optional = true
