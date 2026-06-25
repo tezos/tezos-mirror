@@ -221,16 +221,16 @@ pub(crate) const RUNTIME_GATEWAY_BASE_COST: u64 = 5_000;
 
 // Per 32-byte word surcharge applied on top of the flat base cost for
 // every gateway entrypoint, proportional to calldata + outgoing body +
-// incoming response body. Matches `G_copy` (3/word), the same rate
-// REVM uses for CALLDATACOPY/RETURNDATACOPY memory expansion — but
-// charged here *inside* the precompile, since REVM does not
-// automatically meter per-byte work performed by custom precompiles
-// (ABI decode, `to_vec()` clones, HeaderMap inserts).
-pub(crate) const RUNTIME_GATEWAY_PER_WORD_COST: u64 = 3;
+// incoming response body. Canonical value lives in `tezosx_constants` so
+// the Michelson-side milligas mirror cannot desync (L2-1726).
+pub(crate) const RUNTIME_GATEWAY_PER_WORD_COST: u64 =
+    tezosx_constants::RUNTIME_GATEWAY_PER_WORD_COST;
 
 // Surcharge when msg.value > 0 (precompile balance burn after cross-runtime
-// value transfer). Equivalent to SSTORE non-zero to zero (EIP-2929 + YP).
-pub(crate) const VALUE_TRANSFER_SURCHARGE: u64 = 5_000;
+// value transfer). Canonical value lives in `tezosx_constants` so the
+// Michelson-side milligas mirror cannot desync (L2-1726).
+pub(crate) const VALUE_TRANSFER_SURCHARGE: u64 =
+    tezosx_constants::VALUE_TRANSFER_SURCHARGE;
 
 // Per user-supplied header validation cost for the generic call()
 // function. Covers the byte-level prefix check against forbidden
@@ -248,8 +248,10 @@ pub(crate) const RESOLVE_ADDRESS_BASE_COST: u64 = 1_500;
 pub(crate) const ORIGIN_OF_BASE_COST: u64 = 1_500;
 
 // Per-hop cost for deriving an alias string (hashing + b58check or
-// hex encoding). 1 500 covers the hashing and encoding work per hop.
-pub(crate) const DERIVE_ALIAS_STRING_COST: u64 = 1_500;
+// hex encoding). Canonical value lives in `tezosx_constants` so the
+// Michelson-side milligas mirror cannot desync (L2-1726).
+pub(crate) const DERIVE_ALIAS_STRING_COST: u64 =
+    tezosx_constants::DERIVE_ALIAS_STRING_COST;
 
 // Rationale regarding the cost:
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints

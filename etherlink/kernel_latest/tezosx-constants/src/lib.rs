@@ -54,3 +54,27 @@ pub const EVM_GAS_TO_MILLIGAS: u64 = 22;
 /// `etherlink/bin_node/lib_dev/tezlink/tezlink_constants.ml`.
 pub const MICHELSON_MAX_MILLIGAS_PER_OPERATION: u64 =
     EVM_MAX_GAS_PER_TRANSACTION * EVM_GAS_TO_MILLIGAS;
+
+// ── Cross-runtime gateway base costs (EVM gas) ───────────────────────────
+//
+// Canonical, single source of truth for the cross-runtime (CRAC) gateway
+// surcharges, expressed in EVM gas. Both sides derive from these so they
+// cannot desync: the EVM precompile charges them directly (re-exported in
+// `revm::precompiles::constants`), while the Michelson runtime converts
+// them to milligas via [`EVM_GAS_TO_MILLIGAS`]. Bump a value here and both
+// runtimes follow.
+
+/// Per 32-byte-word surcharge applied by the gateway to calldata, outgoing
+/// body, and incoming response. Matches `G_copy` (3/word), the rate REVM
+/// uses for CALLDATACOPY/RETURNDATACOPY — charged inside the precompile
+/// because REVM does not meter the per-byte work of custom precompiles.
+pub const RUNTIME_GATEWAY_PER_WORD_COST: u64 = 3;
+
+/// Surcharge when a cross-runtime call carries value (`msg.value > 0`):
+/// the precompile's balance burn after the transfer, equivalent to an
+/// SSTORE non-zero→zero (EIP-2929 + YP).
+pub const VALUE_TRANSFER_SURCHARGE: u64 = 5_000;
+
+/// Per-hop cost of deriving an alias string (BLAKE2b-160 + base58check or
+/// hex encoding). Conservative against the actual hashing + encoding work.
+pub const DERIVE_ALIAS_STRING_COST: u64 = 1_500;

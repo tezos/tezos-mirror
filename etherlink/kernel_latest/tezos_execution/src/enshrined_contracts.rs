@@ -349,18 +349,41 @@ where
 /// Micheline typechecking is metered separately by the MIR typechecker.
 const TEZOSX_GATEWAY_BASE_COST_MILLIGAS: u64 = 100_000;
 
-/// Per-byte surcharge on the flat base cost, charged at Tezos-as-caller
-/// gateway entrypoints (`%call`, `%call_evm`, ...) for the
+/// Per 32-byte-word surcharge on the flat base cost, charged at
+/// Tezos-as-caller gateway entrypoints (`%call`, `%call_evm`, ...) for the
 /// boundary work performed when bytes cross the CRAC: outgoing-body
 /// marshalling and incoming-response ingest (`Vec::to_vec`, header-map
 /// allocation, callback/selector assembly, ...).
 ///
+/// Tezos milligas mirror of the EVM-side `RUNTIME_GATEWAY_PER_WORD_COST`,
+/// converted via `EVM_GAS_TO_MILLIGAS`. Charged over `ceil(bytes / 32)`
+/// words ([`charge_gateway_payload`]) exactly like the EVM precompile, so
+/// the same payload costs the same on either side of the CRAC.
+pub(crate) const TEZOSX_GATEWAY_PER_WORD_MILLIGAS: u64 =
+    tezosx_constants::RUNTIME_GATEWAY_PER_WORD_COST
+        * tezosx_constants::EVM_GAS_TO_MILLIGAS;
+
+/// Per-byte gas charged on attacker-controlled bytes that are persisted
+/// verbatim into the failed CRAC receipt (BSON sink) — the Debug-rendered
+/// `FAILWITH` payload, internal-op error bodies, and 4xx response bodies.
+///
+/// This is a Tezos-specific **DoS bound**, deliberately *not* the EVM-parity
+/// gateway crossing rate ([`TEZOSX_GATEWAY_PER_WORD_MILLIGAS`]). It is the
+/// meter that forces an oversized persisted body to `OutOfGas` (so the
+/// receipt falls back to a small bounded message) under a tight user gas
+/// budget — see `test_crac_failwith_receipt_is_gas_bounded`. Lowering it to
+/// the ~per-word crossing rate would let a large payload persist ~145× more
+/// cheaply, weakening that bound, so it is kept at the original per-byte rate
+/// and charged per byte (not per word) to bound every persisted byte.
+///
 /// TODO(L2-1165): replace with a benchmarked value.
-pub(crate) const TEZOSX_GATEWAY_PER_BYTE_MILLIGAS: u64 = 300;
+pub(crate) const PERSISTED_ERROR_PER_BYTE_MILLIGAS: u64 = 300;
 
 /// Surcharge when amount > 0 (balance reset after value transfer).
-/// Equivalent to SSTORE non-zero→zero (5,000 EVM gas × 100).
-const VALUE_TRANSFER_SURCHARGE_MILLIGAS: u64 = 500_000;
+/// Tezos milligas mirror of the EVM-side `VALUE_TRANSFER_SURCHARGE`
+/// (an SSTORE non-zero→zero) converted via `EVM_GAS_TO_MILLIGAS`.
+const VALUE_TRANSFER_SURCHARGE_MILLIGAS: u64 =
+    tezosx_constants::VALUE_TRANSFER_SURCHARGE * tezosx_constants::EVM_GAS_TO_MILLIGAS;
 
 /// Per user-supplied header validation in %call: byte-level prefix
 /// check against forbidden X-Tezos-* headers plus the subsequent
@@ -421,9 +444,11 @@ pub(crate) fn charge_gateway_base_cost(
         .map_err(TransferError::OutOfGas)
 }
 
-/// Charge `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * bytes` for a chunk of
-/// gateway payload (outgoing body or response body). Complements the
-/// flat `charge_gateway_base_cost` with a size-proportional component.
+/// Charge `TEZOSX_GATEWAY_PER_WORD_MILLIGAS * ceil(bytes / 32)` for a chunk
+/// of gateway payload (outgoing body or response body). Complements the
+/// flat `charge_gateway_base_cost` with a size-proportional component, and
+/// mirrors the EVM precompile's per-word `charge_payload` exactly so the
+/// same payload costs the same on either side of the CRAC.
 pub(crate) fn charge_gateway_payload(
     ctx: &mut impl HasOperationGas,
     bytes: usize,
@@ -438,7 +463,26 @@ fn charge_gateway_payload_gas(
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     bytes: usize,
 ) -> Result<(), TransferError> {
-    let cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS.saturating_mul(bytes as u64);
+    let words = (bytes as u64).div_ceil(32);
+    let cost = TEZOSX_GATEWAY_PER_WORD_MILLIGAS.saturating_mul(words);
+    if cost == 0 {
+        return Ok(());
+    }
+    operation_gas
+        .cast_and_consume_milligas(cost)
+        .map_err(TransferError::OutOfGas)
+}
+
+/// Charge the persisted-error DoS bound ([`PERSISTED_ERROR_PER_BYTE_MILLIGAS`]
+/// per byte) over `bytes` of attacker-controlled content that will be rendered
+/// verbatim into the failed CRAC receipt. Distinct from
+/// [`charge_gateway_payload`]: this is a size bound on persisted metadata, not
+/// the EVM-parity cost of a payload crossing.
+fn charge_persisted_bytes(
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    bytes: usize,
+) -> Result<(), TransferError> {
+    let cost = PERSISTED_ERROR_PER_BYTE_MILLIGAS.saturating_mul(bytes as u64);
     if cost == 0 {
         return Ok(());
     }
@@ -462,12 +506,26 @@ fn charge_gateway_payload_gas(
 /// bare `TransferError`.  The wrapped form is `"Transfer(" + bare_debug + ")"`,
 /// so its byte length equals the bare Debug length plus the 10-byte constant
 /// wrapper (`"Transfer("` = 9 bytes, `")"` = 1 byte).  This helper charges
-/// `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS` per persisted byte — the same rate
-/// [`charge_gateway_payload`] uses for the `GatewayError` response body — so
+/// [`PERSISTED_ERROR_PER_BYTE_MILLIGAS`] per persisted byte — the dedicated
+/// persisted-error DoS rate, *not* the EVM-parity gateway crossing rate — so
 /// the gas bound tracks the size actually persisted.
 ///
 /// The wrapped length is derived from the bare Debug length without cloning
 /// the (potentially attacker-sized) error string.
+///
+/// ## Security: this is the operative DoS bound on the persisted body
+///
+/// Under a tight user gas budget this charge is what forces an oversized
+/// persisted body to `OutOfGas` — the failure path then replaces it with the
+/// small `OutOfGas` message below, so a large attacker-controlled `FAILWITH`
+/// payload cannot leak verbatim into the receipt
+/// (`test_crac_failwith_receipt_is_gas_bounded`). It is therefore kept at the
+/// per-byte rate rather than the ~145× cheaper EVM per-word crossing rate;
+/// the two were the same constant before L2-1726 and are now deliberately
+/// decoupled. The drop-time / observation-time overflow on a deep
+/// structurally-shared value is a separate rendering concern, closed by the
+/// iterative `Debug for TypedValue` and the `FailedWith` `Drop` drain
+/// (L2-1436 / L2-1446).
 ///
 /// On success the **original** error is returned wrapped in
 /// [`CracError::Operation`] so the receipt body is unchanged.  On gas
@@ -488,16 +546,16 @@ pub(crate) fn charge_persisted_error(
     let bare_len = format!("{error:?}").len();
     let wrapped_len = bare_len + "Transfer(".len() + ")".len();
     let persisted_len = wrapped_len;
-    match charge_gateway_payload_gas(operation_gas, persisted_len) {
+    match charge_persisted_bytes(operation_gas, persisted_len) {
         Ok(()) => CracError::Operation(error),
         Err(_oog) => CracError::Operation(TransferError::OutOfGas(mir::gas::OutOfGas)),
     }
 }
 
 /// Meter the persisted error bodies in `internal_receipts` that will land in
-/// the failed CRAC receipt BSON sink, charging
-/// `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS` per byte of the Debug-rendered
-/// `ApplyOperationError` body for each `ContentResult::Failed` entry.
+/// the failed CRAC receipt BSON sink, charging the persisted-error per-byte
+/// rate over the Debug-rendered `ApplyOperationError` body for each
+/// `ContentResult::Failed` entry.
 ///
 /// This closes the bypass by which an attacker-controlled internal-op
 /// FAILWITH payload routes unmetered into the persisted receipt.  The BSON
@@ -518,7 +576,7 @@ pub(crate) fn charge_internal_receipt_bodies(
             if let ContentResult::Failed(ref errors) = $r.result {
                 let len: usize =
                     errors.errors.iter().map(|e| format!("{e:?}").len()).sum();
-                if charge_gateway_payload_gas(operation_gas, len).is_err() {
+                if charge_persisted_bytes(operation_gas, len).is_err() {
                     $r.result = ContentResult::Failed(
                         ApplyOperationError::OutOfGas(mir::gas::OutOfGas).into(),
                     );
@@ -1421,13 +1479,14 @@ where
 /// Per-hop cost for the alias-derivation path in `resolveAddress`
 /// (BLAKE2b-160 + base58check / hex encoding).
 ///
-/// Tezos milligas mirror of the EVM-side `DERIVE_ALIAS_STRING_COST = 1_500`
-/// (× `EVM_GAS_TO_MILLIGAS = 100`). Same notional cost on both runtimes so a
+/// Tezos milligas mirror of the EVM-side `DERIVE_ALIAS_STRING_COST`
+/// (× `EVM_GAS_TO_MILLIGAS`). Same notional cost on both runtimes so a
 /// contract pays the same amount for the same derivation regardless of
 /// which side it calls from. Like its EVM peer, conservative against the
 /// actual hashing + encoding work — the value mirrors the EVM-side
 /// category pin rather than measured derivation cost.
-const DERIVE_ALIAS_MILLIGAS: u64 = 150_000;
+const DERIVE_ALIAS_MILLIGAS: u64 =
+    tezosx_constants::DERIVE_ALIAS_STRING_COST * tezosx_constants::EVM_GAS_TO_MILLIGAS;
 
 // ── Resolution constants (Michelson nat encoding) ────────────────────────
 
@@ -2093,7 +2152,7 @@ fn classify_and_charge_crac_response(
         // like any FAILWITH payload.
         let status = response.status();
         let body = String::from_utf8_lossy(response.body()).into_owned();
-        charge_gateway_payload_gas(ctx.operation_gas(), body.len())?;
+        charge_persisted_bytes(ctx.operation_gas(), body.len())?;
         Err(CracError::Operation(TransferError::GatewayError(format!(
             "Cross-runtime call failed with status {status}: {body}"
         ))))
@@ -2267,6 +2326,31 @@ pub(crate) mod tests {
         assert![is_enshrined(&contract)];
         assert![contract.to_base58_check().as_str() == GATEWAY_KT1];
         assert![from_kt1(&contract) == Some(EnshrinedContracts::TezosXGateway)];
+    }
+
+    /// The Tezos-side gateway milligas surcharges must equal their canonical
+    /// EVM-side base cost (`tezosx_constants`, the single source both runtimes
+    /// derive from) converted by `EVM_GAS_TO_MILLIGAS`. Regression guard for
+    /// L2-1726: these were stale `×100`-era literals after the coefficient
+    /// dropped to 22, over-charging a Tezos-originated CRAC. Referencing the
+    /// shared base constants (not a re-typed literal) means the test fails if
+    /// a milligas mirror is ever hardcoded again or an EVM base cost is bumped
+    /// without the Michelson side following.
+    #[test]
+    fn test_gateway_milligas_surcharges_mirror_evm() {
+        let coeff = tezosx_constants::EVM_GAS_TO_MILLIGAS;
+        assert_eq!(
+            VALUE_TRANSFER_SURCHARGE_MILLIGAS,
+            tezosx_constants::VALUE_TRANSFER_SURCHARGE * coeff
+        );
+        assert_eq!(
+            DERIVE_ALIAS_MILLIGAS,
+            tezosx_constants::DERIVE_ALIAS_STRING_COST * coeff
+        );
+        assert_eq!(
+            TEZOSX_GATEWAY_PER_WORD_MILLIGAS,
+            tezosx_constants::RUNTIME_GATEWAY_PER_WORD_COST * coeff
+        );
     }
 
     #[test]
@@ -3135,7 +3219,7 @@ pub(crate) mod tests {
             .body(vec![b'A'; body_len])
             .unwrap();
         // No callee-gas header, so the only charge is the body surcharge:
-        // body_len * TEZOSX_GATEWAY_PER_BYTE_MILLIGAS.
+        // body_len * PERSISTED_ERROR_PER_BYTE_MILLIGAS (persisted-error bound).
         let start = 10_000_000;
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias");
@@ -3155,12 +3239,12 @@ pub(crate) mod tests {
             crate::gas::TezlinkOperationGas::start_milligas(start).unwrap();
         let _ = classify_and_charge_crac_response(response, Some("ethereum"), &mut ctx)
             .unwrap_err();
-        let expected_charge = (body_len as u64) * TEZOSX_GATEWAY_PER_BYTE_MILLIGAS;
+        let expected_charge = (body_len as u64) * PERSISTED_ERROR_PER_BYTE_MILLIGAS;
         let remaining = ctx.operation_gas.remaining.milligas().unwrap() as u64;
         assert_eq!(
             remaining,
             start - expected_charge,
-            "4xx body must be charged at the gateway per-byte rate"
+            "4xx body must be charged at the persisted-error per-byte rate"
         );
     }
 
@@ -3199,7 +3283,7 @@ pub(crate) mod tests {
         };
         let decoded_len = String::from_utf8_lossy(&body).len();
         assert!(decoded_len > body.len(), "lossy must expand invalid bytes");
-        let expected_charge = (decoded_len as u64) * TEZOSX_GATEWAY_PER_BYTE_MILLIGAS;
+        let expected_charge = (decoded_len as u64) * PERSISTED_ERROR_PER_BYTE_MILLIGAS;
         let remaining = ctx.operation_gas.remaining.milligas().unwrap() as u64;
         assert_eq!(
             remaining,
@@ -5625,11 +5709,11 @@ pub(crate) mod tests {
             .expect("milligas within limit")
     }
 
-    /// A `MichelsonContractInterpretError` body is charged at the per-byte
+    /// A `MichelsonContractInterpretError` body is charged at the per-word
     /// rate, against the size *actually persisted*.  The failed CRAC receipt
     /// stores the error once (on the synthetic alias(E_1)→target
     /// failed-transfer internal op), so the charge equals
-    /// `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * len` where `len` is the
+    /// `PERSISTED_ERROR_PER_BYTE_MILLIGAS * len` where `len` is the
     /// Debug-rendered length of `ApplyOperationError::Transfer(error)` (the
     /// wrapping variant stored by the BSON sink), i.e. bare Debug length + 10.
     #[test]
@@ -5639,7 +5723,7 @@ pub(crate) mod tests {
         // The BSON sink stores the wrapped form: "Transfer(" + bare_debug + ")",
         // persisted once in the receipt (alias→target internal op only).
         let wrapped_len = format!("{err:?}").len() + "Transfer(".len() + ")".len();
-        let expected_cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * wrapped_len as u64;
+        let expected_cost = PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64;
 
         let ample = expected_cost + 1_000_000;
         let mut gas = make_operation_gas(ample);
@@ -5654,7 +5738,7 @@ pub(crate) mod tests {
         let consumed = u64::from(gas.total_milligas_consumed());
         assert_eq!(
             consumed, expected_cost,
-            "charge should equal TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * {wrapped_len}"
+            "charge should equal PERSISTED_ERROR_PER_BYTE_MILLIGAS * {wrapped_len}"
         );
     }
 
@@ -5684,11 +5768,11 @@ pub(crate) mod tests {
         let cost_long = u64::from(gas_long.total_milligas_consumed());
         assert_eq!(
             cost_short,
-            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * short_len as u64
+            PERSISTED_ERROR_PER_BYTE_MILLIGAS * short_len as u64
         );
         assert_eq!(
             cost_long,
-            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * long_len as u64
+            PERSISTED_ERROR_PER_BYTE_MILLIGAS * long_len as u64
         );
         assert!(
             cost_long > cost_short,
@@ -5705,7 +5789,7 @@ pub(crate) mod tests {
         // Wrapped length: "Transfer(" + bare_debug + ")" = bare + 10,
         // persisted once in the receipt (alias→target internal op only).
         let wrapped_len = format!("{err:?}").len() + "Transfer(".len() + ")".len();
-        let cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * wrapped_len as u64;
+        let cost = PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64;
 
         // Budget is strictly less than the required cost.
         let mut gas = make_operation_gas(cost - 1);

@@ -413,6 +413,17 @@
   carry bracket pairs. The existing begin-event byte shape is unchanged,
   so consumers that only inspect the `"crac"` begin event keep working.
   (!22151)
+- Fix the Tezos-side cross-runtime gateway gas surcharges (value transfer,
+  alias derivation, per-word payload crossing), which were stale `×100`-era
+  milligas constants not rescaled when the EVM-to-milligas coefficient dropped
+  to 22. A Tezos-originated cross-runtime call was over-charged for these costs
+  relative to the equivalent EVM-originated call. The EVM base costs now live
+  in a single shared crate that both runtimes derive from (the Michelson side
+  via the milligas coefficient), and the payload-crossing surcharge is charged
+  per 32-byte word exactly like the EVM precompile, so the two sides can no
+  longer desync. The separate per-byte bound on attacker-controlled error
+  bodies persisted into the failed-call receipt is kept at its prior rate (it
+  is a DoS guard, not an EVM-parity crossing cost). (!22323)
 
 ### Native Atomic Composability
 
