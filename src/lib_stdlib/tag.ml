@@ -81,11 +81,6 @@ let maybe_eq : type a b. a def -> b def -> (a, b) eq option =
   let module T = (val t) in
   match S.Me with T.Me -> Some Refl | _ -> None
 
-let selector_of : type a. a def -> a selector =
- fun d ->
-  let module D = (val d) in
-  D.Me
-
 let name : type a. a def -> string =
  fun d ->
   let module D = (val d) in
@@ -106,9 +101,10 @@ let pp_def ppf d = Format.fprintf ppf "tag:%s" (name d)
 module Key = struct
   type t = V : 'a def -> t
 
-  type s = S : 'a selector -> s
-
-  let compare (V k0) (V k1) = compare (S (selector_of k0)) (S (selector_of k1))
+  let compare (V k0) (V k1) =
+    let module K0 = (val k0) in
+    let module K1 = (val k1) in
+    Int.compare K0.uid K1.uid
 end
 
 module TagSet = Map.Make (Key)
