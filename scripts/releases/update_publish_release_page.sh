@@ -50,11 +50,11 @@ for component in "${COMPONENTS[@]}"; do
   echo "After:"
   cat "./versions.json"
 
-  # echo "Uploading versions.json..."
-  # if aws s3 cp "./versions.json" "${remote}" --region "${REGION}"; then
-  #   echo "Upload of versions.json successful!"
-  # else
-  #   echo "Upload of versions.json failed. Please check the configuration and try again."
-  #   exit 1
-  # fi
+  echo "Uploading versions.json..."
+  if aws s3 cp "./versions.json" "${remote}" --region "${REGION}"; then
+    echo "Upload of versions.json successful!"
+  else
+    echo "Upload of versions.json failed. Please check the configuration and try again."
+    exit 1
+  fi
 done
