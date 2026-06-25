@@ -14,23 +14,47 @@ if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
   exit 1
 fi
 
-echo "Downloading versions.json..."
-aws s3 cp "s3://${S3_BUCKET}${BUCKET_PATH:-}/octez-smart-rollup-node/versions.json" "./versions.json" --region "${REGION}"
+# Components whose versions.json lives under "<S3_BUCKET><BUCKET_PATH>/<component>/".
+COMPONENTS=(
+  "octez-smart-rollup-node"
+  "grafazos"
+  "teztale"
+)
 
-echo "Before:"
-cat "./versions.json"
+# Migrate to the new versions.json schema using version_manager itself, the
+# source of truth for the format: its parser still reads the old flat "rc"/
+# "beta" integer fields, and its serializer always writes the new canonical
+# form, where a prerelease is a nested object { "kind", "number" }.
+echo "Building version_manager..."
+dune build ci/bin_release_page/src/
+VM="_build/default/ci/bin_release_page/src/version_manager.exe"
 
-echo "Removing all v25 entries from versions.json..."
-jq '[.[] | select(.major != 25)]' ./versions.json > ./tmp.json
-mv ./tmp.json ./versions.json
+for component in "${COMPONENTS[@]}"; do
+  remote="s3://${S3_BUCKET}${BUCKET_PATH:-}/${component}/versions.json"
 
-echo "After:"
-cat "./versions.json"
+  echo "=== ${component} ==="
 
-echo "Uploading versions.json..."
-if aws s3 cp "./versions.json" "s3://${S3_BUCKET}${BUCKET_PATH:-}/octez-smart-rollup-node/versions.json" --region "${REGION}"; then
-  echo "Upload of versions.json successful!"
-else
-  echo "Upload of versions.json failed. Please check the configuration and try again."
-  exit 1
-fi
+  echo "Downloading versions.json..."
+  aws s3 cp "${remote}" "./versions.json" --region "${REGION}"
+
+  echo "Before:"
+  cat "./versions.json"
+
+  # [set-inactive] is used as a no-op load+save: the predicate (v0.0) matches no
+  # version, so no flag is modified, but the file is reparsed and rewritten in
+  # the new format. Note this also re-emits the canonical [active]/[latest]/
+  # [pubDate] fields with their defaults for any entry that lacked them.
+  echo "Migrating versions.json to the new format..."
+  "$VM" --file ./versions.json set-inactive --major 0 --minor 0
+
+  echo "After:"
+  cat "./versions.json"
+
+  # echo "Uploading versions.json..."
+  # if aws s3 cp "./versions.json" "${remote}" --region "${REGION}"; then
+  #   echo "Upload of versions.json successful!"
+  # else
+  #   echo "Upload of versions.json failed. Please check the configuration and try again."
+  #   exit 1
+  # fi
+done
