@@ -158,6 +158,8 @@ unsafe extern "C" {
     /// - [`INPUT_OUTPUT_TOO_LARGE`]: `key_len > 4096 || max_bytes > 2048`.
     /// - [`STORE_INVALID_KEY`]: the bytes pointed to by `key` and `key_len` are not a valid nds key.
     /// - [`STORE_NOT_A_VALUE`]: Key not found in the relevant database.
+    /// - [`STORE_INVALID_ACCESS`]: the offset is larger than the current length of the value
+    ///   pointed to by `key`.
     /// - [`NDS_DATABASE_OUT_OF_BOUNDS`]: `db_index >= registry_size`.
     ///
     /// # Safety
@@ -171,6 +173,7 @@ unsafe extern "C" {
     /// [`INPUT_OUTPUT_TOO_LARGE`]: super::INPUT_OUTPUT_TOO_LARGE
     /// [`STORE_INVALID_KEY`]: super::STORE_INVALID_KEY
     /// [`STORE_NOT_A_VALUE`]: super::STORE_NOT_A_VALUE
+    /// [`STORE_INVALID_ACCESS`]: super::STORE_INVALID_ACCESS
     /// [`NDS_DATABASE_OUT_OF_BOUNDS`]: super::NDS_DATABASE_OUT_OF_BOUNDS
     pub unsafe fn nds_store_read(
         db_index: u64,

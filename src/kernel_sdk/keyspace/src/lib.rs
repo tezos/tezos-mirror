@@ -223,7 +223,7 @@ pub trait KeySpace {
     }
 
     /// Read a portion of the value associated with the key and return the number of bytes written.
-    /// Returns `None` if the key does not exist.
+    /// Returns `None` if the key does not exist, or if the offset is invalid.
     fn read(&self, key: &Key, offset: usize, buffer: &mut [u8]) -> Option<usize>;
 
     /// Read the exact number of bytes from a portion of the value associated with the key and return them in a fixed-size array.

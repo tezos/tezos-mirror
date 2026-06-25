@@ -16,8 +16,9 @@
 
 use std::{mem::MaybeUninit, num::NonZeroUsize, rc::Rc};
 
-use crate::{KeySpace, KeySpaceLoader, KeySpaceLoaderError};
+use crate::{KeySpace, KeySpaceLoader, KeySpaceLoaderError, KeySpaceWriteError};
 
+use tezos_smart_rollup_constants::core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host::{
     storage::v2::{NdsError, RegistryResizeRequest, WasmNds},
     wasm::WasmHost,
@@ -160,13 +161,132 @@ pub struct WasmNdsKeySpace<Handle: WasmNds> {
     db_index: NonZeroUsize,
 }
 
+impl<Handle: WasmNds> WasmNdsKeySpace<Handle> {
+    /// Read into buffer, from the given offset of the value mapped to by `key`.
+    ///
+    /// Will only read up to [`MAX_FILE_CHUNK_SIZE`] at a time.
+    /// Returns the number of bytes read, which will never be more than `buffer.len()`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the key does not exist in the current keyspace, or if `offset > value_length`.
+    fn read_from(
+        &self,
+        key: &crate::Key,
+        offset: usize,
+        buffer: &mut [MaybeUninit<u8>],
+    ) -> usize {
+        let num_bytes = buffer.len().min(MAX_FILE_CHUNK_SIZE);
+
+        match self.registry.store_read(
+            self.db_index.get(),
+            key.as_ref(),
+            offset,
+            &mut buffer[..num_bytes],
+        ) {
+            Ok(num_read) => num_read,
+            Err(NdsError::KeyNotFound) => panic!("caller violation - key not found"),
+            Err(NdsError::OffsetTooLarge) => {
+                panic!("caller violation - offset too large")
+            }
+            Err(NdsError::NdsDisabled) => unreachable!("Nds guaranteed to be enabled"),
+            Err(NdsError::DatabaseOutOfBounds) => {
+                unreachable!("db_idx guaranteed to be within registry size")
+            }
+            Err(NdsError::InputOutputTooLarge) => {
+                unreachable!("Reads <= MAX_FILE_CHUNK_SIZE in size are allowed")
+            }
+            Err(NdsError::ResizeInvalid | NdsError::StoreValueSizeExceeded) => {
+                unreachable!("Irrelevant error variants")
+            }
+        }
+    }
+
+    /// Write to the key, from the given offset of the value mapped to by `key`, where
+    /// contents is from the start of the buffer.
+    fn write_from(
+        &self,
+        key: &crate::Key,
+        mut offset: usize,
+        mut buffer: &[u8],
+    ) -> Result<(), KeySpaceWriteError> {
+        while !buffer.is_empty() {
+            let num_bytes = buffer.len().min(MAX_FILE_CHUNK_SIZE);
+            let (to_write, rest) = buffer.split_at(num_bytes);
+
+            match self.registry.store_write(
+                self.db_index.get(),
+                key.as_ref(),
+                offset,
+                to_write,
+            ) {
+                Ok(()) => {
+                    offset = offset.checked_add(num_bytes).expect("The maximum size of values allowed in NDS is less than usize::MAX");
+                    buffer = rest;
+                    continue;
+                }
+                Err(NdsError::OffsetTooLarge) => {
+                    return Err(KeySpaceWriteError::InvalidOffset);
+                }
+                Err(NdsError::StoreValueSizeExceeded) => {
+                    return Err(KeySpaceWriteError::ValueSizeExceeded)
+                }
+                Err(NdsError::NdsDisabled) => {
+                    unreachable!("Nds guaranteed to be enabled")
+                }
+                Err(NdsError::DatabaseOutOfBounds) => {
+                    unreachable!("db_idx guaranteed to be within registry size")
+                }
+                Err(NdsError::InputOutputTooLarge) => {
+                    unreachable!("Writes <= MAX_FILE_CHUNK_SIZE in size are allowed")
+                }
+                Err(NdsError::KeyNotFound | NdsError::ResizeInvalid) => {
+                    unreachable!("Irrelevant error variants")
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl<Handle: WasmNds> KeySpace for WasmNdsKeySpace<Handle> {
     fn get(&self, key: &crate::Key) -> Option<Vec<u8>> {
-        todo!()
+        let value_size = self.value_length(key)?;
+
+        let mut value = Vec::with_capacity(value_size);
+        let mut len = value.len();
+
+        while len < value_size {
+            let read = self.read_from(key, len, value.spare_capacity_mut());
+
+            len = len
+                .checked_add(read)
+                .expect("Values in NDS are capped to a value smaller than usize::MAX");
+
+            // on each iteration, an additional `read` bytes are guaranteed to be initialised.
+            unsafe { value.set_len(len) }
+        }
+
+        Some(value)
     }
 
     fn read(&self, key: &crate::Key, offset: usize, buffer: &mut [u8]) -> Option<usize> {
-        todo!()
+        let value_size = self.value_length(key)?;
+
+        // technically NDS supports reading from an offset exactly the
+        // value size, but StorageV1 would error here. For compatibility, we should probably ensure
+        // these behave the same.
+        if offset >= value_size {
+            return None;
+        }
+
+        // SAFETY: `MaybeUninit` is transparent over its contents, allowing this cast to be safe.
+        let num_read = self.read_from(key, offset, unsafe {
+            std::mem::transmute::<&mut [u8], &mut [MaybeUninit<u8>]>(buffer)
+        });
+
+        Some(num_read)
     }
 
     fn set(
@@ -174,7 +294,30 @@ impl<Handle: WasmNds> KeySpace for WasmNdsKeySpace<Handle> {
         key: &crate::Key,
         value: impl AsRef<[u8]>,
     ) -> Result<(), crate::KeySpaceWriteError> {
-        todo!()
+        let value = value.as_ref();
+        let (initial_set, rest) = value.split_at(value.len().min(MAX_FILE_CHUNK_SIZE));
+
+        match self
+            .registry
+            .store_set(self.db_index.get(), key.as_ref(), initial_set)
+        {
+            Ok(()) => {}
+            Err(NdsError::NdsDisabled) => unreachable!("Nds guaranteed to be enabled"),
+            Err(NdsError::DatabaseOutOfBounds) => {
+                unreachable!("db_idx guaranteed to be within registry size")
+            }
+            Err(NdsError::InputOutputTooLarge) => {
+                unreachable!("Set of <= MAX_FILE_CHUNK_SIZE guaranteed to succeed")
+            }
+            Err(
+                NdsError::ResizeInvalid
+                | NdsError::KeyNotFound
+                | NdsError::OffsetTooLarge
+                | NdsError::StoreValueSizeExceeded,
+            ) => unreachable!("Irrelevant error variants"),
+        }
+
+        self.write_from(key, initial_set.len(), rest)
     }
 
     fn write(
@@ -183,34 +326,147 @@ impl<Handle: WasmNds> KeySpace for WasmNdsKeySpace<Handle> {
         offset: usize,
         data: impl AsRef<[u8]>,
     ) -> Result<usize, crate::KeySpaceWriteError> {
-        todo!()
+        let data = data.as_ref();
+
+        self.write_from(key, offset, data).map(|()| data.len())
     }
 
     fn value_length(&self, key: &crate::Key) -> Option<usize> {
-        todo!()
+        match self
+            .registry
+            .store_value_size(self.db_index.get(), key.as_ref())
+        {
+            Ok(size) => Some(size),
+            Err(NdsError::KeyNotFound) => None,
+            Err(NdsError::NdsDisabled) => unreachable!("Nds guaranteed to be enabled"),
+            Err(NdsError::DatabaseOutOfBounds) => {
+                unreachable!("db_idx guaranteed to be within registry size")
+            }
+            Err(
+                NdsError::ResizeInvalid
+                | NdsError::InputOutputTooLarge
+                | NdsError::OffsetTooLarge
+                | NdsError::StoreValueSizeExceeded,
+            ) => unreachable!("Irrelevant error variants"),
+        }
     }
 
     fn contains(&self, key: &crate::Key) -> bool {
-        todo!()
+        match self
+            .registry
+            .store_exists(self.db_index.get(), key.as_ref())
+        {
+            Ok(exists) => exists,
+            Err(NdsError::NdsDisabled) => unreachable!("Nds guaranteed to be enabled"),
+            Err(NdsError::DatabaseOutOfBounds) => {
+                unreachable!("db_idx guaranteed to be within registry size")
+            }
+            Err(
+                NdsError::ResizeInvalid
+                | NdsError::InputOutputTooLarge
+                | NdsError::KeyNotFound
+                | NdsError::OffsetTooLarge
+                | NdsError::StoreValueSizeExceeded,
+            ) => unreachable!("Irrelevant error variants"),
+        }
     }
 
     fn delete(&mut self, key: &crate::Key) -> bool {
-        todo!()
+        if !self.contains(key) {
+            return false;
+        }
+
+        match self
+            .registry
+            .store_delete(self.db_index.get(), key.as_ref())
+        {
+            Ok(()) => true,
+            Err(NdsError::NdsDisabled) => unreachable!("Nds guaranteed to be enabled"),
+            Err(NdsError::DatabaseOutOfBounds) => {
+                unreachable!("db_idx guaranteed to be within registry size")
+            }
+            Err(
+                NdsError::ResizeInvalid
+                | NdsError::InputOutputTooLarge
+                | NdsError::KeyNotFound
+                | NdsError::OffsetTooLarge
+                | NdsError::StoreValueSizeExceeded,
+            ) => unreachable!("Irrelevant error variants"),
+        }
     }
 
+    // TODO (SDK-148): enable dropping the underlying mapping to reclaim db allocations
     fn clear(&mut self) {
-        todo!()
+        match self.registry.clear_db(self.db_index.get()) {
+            Ok(()) => (),
+            Err(NdsError::NdsDisabled) => unreachable!("Nds guaranteed to be enabled"),
+            Err(NdsError::DatabaseOutOfBounds) => {
+                unreachable!("db_idx guaranteed to be within registry size")
+            }
+            Err(
+                NdsError::ResizeInvalid
+                | NdsError::InputOutputTooLarge
+                | NdsError::KeyNotFound
+                | NdsError::OffsetTooLarge
+                | NdsError::StoreValueSizeExceeded,
+            ) => unreachable!("Irrelevant error variants"),
+        }
     }
 
     fn copy_from(&mut self, other: &Self) {
-        todo!()
+        match self
+            .registry
+            .copy_db(other.db_index.get(), self.db_index.get())
+        {
+            Ok(()) => (),
+            Err(NdsError::NdsDisabled) => unreachable!("Nds guaranteed to be enabled"),
+            Err(NdsError::DatabaseOutOfBounds) => {
+                unreachable!("db_idx guaranteed to be within registry size")
+            }
+            Err(
+                NdsError::ResizeInvalid
+                | NdsError::InputOutputTooLarge
+                | NdsError::KeyNotFound
+                | NdsError::OffsetTooLarge
+                | NdsError::StoreValueSizeExceeded,
+            ) => unreachable!("Irrelevant error variants"),
+        }
     }
 
     fn move_from(&mut self, other: &mut Self) {
-        todo!()
+        match self
+            .registry
+            .move_db(other.db_index.get(), self.db_index.get())
+        {
+            Ok(()) => (),
+            Err(NdsError::NdsDisabled) => unreachable!("Nds guaranteed to be enabled"),
+            Err(NdsError::DatabaseOutOfBounds) => {
+                unreachable!("db_idx guaranteed to be within registry size")
+            }
+            Err(
+                NdsError::ResizeInvalid
+                | NdsError::InputOutputTooLarge
+                | NdsError::KeyNotFound
+                | NdsError::OffsetTooLarge
+                | NdsError::StoreValueSizeExceeded,
+            ) => unreachable!("Irrelevant error variants"),
+        }
     }
 
     fn hash(&self) -> Vec<u8> {
-        todo!()
+        match self.registry.hash_db(self.db_index.get()) {
+            Ok(hash) => hash.to_vec(),
+            Err(NdsError::NdsDisabled) => unreachable!("Nds guaranteed to be enabled"),
+            Err(NdsError::DatabaseOutOfBounds) => {
+                unreachable!("db_idx guaranteed to be within registry size")
+            }
+            Err(
+                NdsError::ResizeInvalid
+                | NdsError::InputOutputTooLarge
+                | NdsError::KeyNotFound
+                | NdsError::OffsetTooLarge
+                | NdsError::StoreValueSizeExceeded,
+            ) => unreachable!("Irrelevant error variants"),
+        }
     }
 }

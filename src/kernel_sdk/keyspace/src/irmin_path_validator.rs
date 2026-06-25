@@ -25,15 +25,32 @@ use crate::{KeyError, NameError};
 ///
 /// A keyspace name represents a path prefix in the irmin-backed durable storage.
 /// Together with the key, the full path `{name}{key}` must fit within [`PATH_MAX_SIZE`].
-pub const MAX_KEYSPACE_NAME_SIZE: usize = 64;
+pub const MAX_KEYSPACE_NAME_SIZE: usize = {
+    let size = 64;
+    assert!(
+        size < NDS_MAX_KEY_SIZE,
+        "Name must always be a valid NDS key"
+    );
+
+    size
+};
 
 /// The maximum size (in bytes) that a key can have.
 ///
 /// Derived from the irmin path limit: a full path is `{name}{key}`,
 /// so `key_max = PATH_MAX_SIZE - MAX_KEYSPACE_NAME_SIZE`.
-pub const MAX_KEY_SIZE: usize = match PATH_MAX_SIZE.checked_sub(MAX_KEYSPACE_NAME_SIZE) {
-    Some(size) => size,
-    None => panic!("PATH_MAX_SIZE must be greater than MAX_KEYSPACE_NAME_SIZE"),
+pub const MAX_KEY_SIZE: usize = {
+    let size = match PATH_MAX_SIZE.checked_sub(MAX_KEYSPACE_NAME_SIZE) {
+        Some(size) => size,
+        None => panic!("PATH_MAX_SIZE must be greater than MAX_KEYSPACE_NAME_SIZE"),
+    };
+
+    assert!(
+        size < NDS_MAX_KEY_SIZE,
+        "Key must always be a valid NDS key"
+    );
+
+    size
 };
 
 impl Key {
