@@ -86,6 +86,9 @@ for test_case in "$@"; do
   "install-bin-rc-bookworm")
     docker run --rm -i -e RELEASETYPE=ReleaseCandidate -e GCP_LINUX_PACKAGES_BUCKET=tezos-linux-repo -v "$DOCS_DIR/..":/Tezos "$DEBIAN_BOOKWORM" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh debian bookworm rc"
     ;;
+  "install-bin-rc-trixie")
+    docker run --rm -i -e RELEASETYPE=ReleaseCandidate -e GCP_LINUX_PACKAGES_BUCKET=tezos-linux-repo -v "$DOCS_DIR/..":/Tezos "$DEBIAN_TRIXIE" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh debian trixie rc"
+    ;;
   "compile-release-sources-bookworm")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-12 /Scripts/compile-sources.sh tezos/tezos latest-release
     ;;
@@ -115,7 +118,8 @@ for test_case in "$@"; do
 
   esac
 
-  echo "test $test_case returned $?"
+  echo "test $test_case
+  $?"
   echo "*******************************************************************"
 done
 

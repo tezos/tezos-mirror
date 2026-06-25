@@ -1,5 +1,3 @@
-.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
-
 Protocol Ushuaia
 ================
 
@@ -17,7 +15,7 @@ tagged with **Breaking change** or **Deprecation**.
 
 The code is available in directory :src:`src/proto_025_PsUshuai` of
 the ``master`` branch of Octez and the full documentation in
-:doc:`this page <../u025/index>`.
+:doc:`this page <../active/index>`.
 
 Environment Version
 -------------------

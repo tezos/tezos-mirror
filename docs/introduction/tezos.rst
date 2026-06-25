@@ -1,3 +1,6 @@
+.. TODO #2170:
+   search shifted protocol name/number & adapt
+
 .. _octez:
 
 Octez & Protocol overview
@@ -23,7 +26,7 @@ This website contains technical documentation about both Octez and the Tezos pro
 The current latest release of Octez is :doc:`../releases/version-25`.
 See that page for minimal hardware requirements for running Octez in a typical setup.
 
-The current Tezos protocol is :doc:`Tallinn <../protocols/024_tallinn>`.
+The current Tezos protocol is :doc:`Ushuaia <../protocols/025_u025>`.
 
 For installing instructions, see :doc:`./howtoget`.
 

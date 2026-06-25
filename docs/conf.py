@@ -134,9 +134,9 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'doc_gen',
-    'tallinn',
+    'u025',
 ]
-# TODO tezos/tezos#2170: exclude the active protocol 'NNN' above
+# TODO tezos/tezos#2170: update the active protocol folder above
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
