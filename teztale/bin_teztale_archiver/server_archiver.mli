@@ -40,4 +40,10 @@ val backup_post : string -> chunk -> unit Lwt.t
     send is aborted and treated as a failure. *)
 val set_request_timeout : float -> unit
 
+(** [replay_backups_loop t dir] periodically re-sends the POST records left in
+    [dir] by {!backup_post} and deletes each one once the server accepts it
+    (HTTP OK), so the local backup does not grow without bound. Runs forever and
+    never raises. *)
+val replay_backups_loop : ctx -> string -> unit Lwt.t
+
 include Archiver.S with type t = ctx

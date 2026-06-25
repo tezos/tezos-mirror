@@ -154,6 +154,50 @@ let backup_post dir chunk =
             (Printexc.to_string exn)) ;
       Lwt.return_unit)
 
+(* Replay of backed-up POSTs. When --replay-backups is set, a background loop
+   periodically re-sends the records left by [backup_post] and deletes each only
+   after the server accepts it (HTTP OK). Server inserts are idempotent, so
+   re-sending a record the server already stored is harmless; this keeps the
+   on-disk backup from growing without bound once the server is reachable. *)
+
+let replay_interval = 60.
+
+let replay_record ctx file =
+  let logger = Log.logger () in
+  Lwt.catch
+    (fun () ->
+      let*! json = Lwt_utils_unix.Json.read_file file in
+      match json with
+      | Error _ -> Lwt.return_unit (* unreadable record: leave it in place *)
+      | Ok json ->
+          let path = Ezjsonm.get_string (Ezjsonm.find json ["path"]) in
+          let body = Ezjsonm.get_string (Ezjsonm.find json ["body"]) in
+          (* send_something raises on a non-OK / failed POST *)
+          let*! () = send_something ctx path (`String body) in
+          let*! () = Lwt_unix.unlink file in
+          Log.debug logger (fun () -> "Replayed and purged " ^ path) ;
+          Lwt.return_unit)
+    (fun _ -> Lwt.return_unit)
+(* send failed or record malformed: keep it for the next sweep *)
+
+let replay_once ctx dir =
+  let*! exists = Lwt_unix.file_exists dir in
+  if not exists then Lwt.return_unit
+  else
+    let files =
+      Sys.readdir dir |> Array.to_list
+      |> List.filter (fun f -> Filename.check_suffix f ".json")
+      |> List.map (Filename.concat dir)
+    in
+    Lwt_list.iter_s (replay_record ctx) files
+
+let rec replay_backups_loop ctx dir =
+  let*! () =
+    Lwt.catch (fun () -> replay_once ctx dir) (fun _ -> Lwt.return_unit)
+  in
+  let*! () = Lwt_unix.sleep replay_interval in
+  replay_backups_loop ctx dir
+
 let launch actx _source =
   Lwt_stream.iter_n
     ~max_concurrency:max_concurrent_sends
