@@ -52,7 +52,11 @@ pub const X_TEZOS_STORAGE_COST: &str = "X-Tezos-Storage-Cost";
 /// worst-case per-operation kernel work bounded. A gas-based termination
 /// (charged symmetrically across runtimes) is the longer-term fix and
 /// will subsume this cap.
-pub const MAX_CRAC_DEPTH: u32 = 128;
+///
+/// It must also stay well below the depth at which a self-recursive cycle
+/// would exhaust the kernel's WASM memory: that trap is not a catchable
+/// error, so the over-depth rejection has to fire first.
+pub const MAX_CRAC_DEPTH: u32 = 32;
 
 pub const ERR_FORBIDDEN_TEZOS_HEADER: &str =
     "user-supplied X-Tezos-* headers are forbidden";

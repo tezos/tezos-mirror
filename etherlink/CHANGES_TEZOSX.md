@@ -435,6 +435,15 @@
   originates in the Michelson runtime — including a top-level manager
   operation that calls the gateway `%call_evm` directly — instead of being
   dropped. (!22065)
+- A self-recursive cross-runtime gateway cycle now fails as a clean
+  operation-level revert instead of exhausting the kernel's WASM memory.
+  The cross-runtime chain-depth cap is lowered so the catchable over-depth
+  rejection fires well before the cycle reaches the heap-exhaustion
+  threshold (the earlier cap sat above it, so a heap trap hit first). This
+  keeps the offending operation's failure local: the rest of the blueprint
+  still applies and any co-resident operations — including deposits — are
+  preserved, rather than being lost when the whole blueprint is dropped on
+  trap recovery. (!22320)
 
 ### Storage versions
 
