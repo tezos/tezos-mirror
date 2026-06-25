@@ -247,8 +247,6 @@ while true; do
   shift
 done
 
-build_image_name="${image_name}build"
-
 echo "Executables to include in Docker images:"
 for executable in $executables; do
   echo "- $executable"
@@ -301,7 +299,6 @@ echo "### Building tezos via docker buildx bake (targets: ${bake_targets})..."
 IMAGE_NAME="$image_name" \
   MINIMAL_IMAGE_NAME="${image_name%?}" \
   IMAGE_VERSION="$image_version" \
-  BUILD_IMAGE_NAME="$build_image_name" \
   CI_IMAGE_NAME="$ci_image_name" \
   CI_IMAGE_VERSION="$ci_image_version" \
   DOCKER_TARGET="$docker_target" \
