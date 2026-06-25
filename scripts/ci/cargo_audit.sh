@@ -222,11 +222,11 @@ SKIP ${dir} no Cargo.lock"
 
   echo "--- cargo audit: ${dir} ---"
   audit_exit=0
-  # --quiet suppresses cargo audit's progress chatter (advisory-db
-  # fetch, per-crate scanning) so only the JSON report lands in
-  # $TMPFILE; the summary below is produced from that JSON.
-  cargo audit --quiet --json --file "${dir}/Cargo.lock" > "$TMPFILE" 2>&1 ||
-    audit_exit=$?
+  # --quiet leaves only the JSON report in $TMPFILE for the summary below.
+  # cd into ${dir} (subshell, so the loop's cwd is untouched): cargo audit
+  # reads .cargo/audit.toml from its working dir, not relative to --file.
+  (cd "${dir}" && cargo audit --quiet --json --file Cargo.lock) \
+    > "$TMPFILE" 2>&1 || audit_exit=$?
 
   # Print a human-readable line per advisory.
   jq -r '
