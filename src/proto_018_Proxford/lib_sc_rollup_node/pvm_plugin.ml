@@ -216,11 +216,6 @@ let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
             Environment.Error_monad.pp
             err)
 
-module Wasm_2_0_0 = struct
-  let decode_durable_state =
-    Wasm_2_0_0_pvm.Durable_state.Tree_encoding_runner.decode
-end
-
 module Unsafe = struct
   let apply_patch (kind : Octez_smart_rollup.Kind.t) state
       (patch : Pvm_patches.unsafe_patch) =

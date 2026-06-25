@@ -6,10 +6,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [current_level plugin ctxt] returns the current Etherlink level for the PVM
+(** [current_level ctxt] returns the current Etherlink level for the PVM
     state in the context [ctxt].
 
     NOTE: This function only works for Etherlink rollups (returns [None]
     otherwise). *)
-val current_level :
-  (module Pvm_plugin_sig.S) -> 'a Context.t -> int option Lwt.t
+val current_level : 'a Context.t -> int option Lwt.t
