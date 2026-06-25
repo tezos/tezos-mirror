@@ -31,6 +31,21 @@ type t = ctx
 
 let name = "remote-archiver"
 
+(* Maximum time (seconds) to wait for a single POST (request + response read)
+   to a teztale-server before giving up. Without a timeout, a server that
+   accepts the connection but then stalls (e.g. blocked on its database) makes
+   the send hang forever, leaking the connection; enough such hangs wedge the
+   archiver entirely. On timeout we raise, so the chunk goes through the usual
+   failure path ([backup]) instead of hanging silently. *)
+let request_timeout = ref 30.
+
+let set_request_timeout t = request_timeout := t
+
+(* Upper bound on the number of POSTs in flight at once, bounding how many
+   concurrent connections we open to a slow or stalled server. Note this does
+   not bound the [chunk_stream] backlog: pending chunks still queue there. *)
+let max_concurrent_sends = 8
+
 let extract_auth uri =
   let user = Option.value (Uri.user uri) ~default:"archiver" in
   let pass = Option.value (Uri.password uri) ~default:"secret" in
@@ -48,6 +63,7 @@ let send_something =
         let logger = Log.logger () in
         let headers = Cohttp.Header.add_authorization headers (`Basic auth) in
         let uri = Uri.with_path endpoint (Uri.path endpoint ^ "/" ^ path) in
+        Lwt_unix.with_timeout !request_timeout @@ fun () ->
         incr sent ;
         let*! resp, out =
           Log.debug logger (fun () -> "Sending " ^ path) ;
@@ -139,7 +155,8 @@ let backup_post dir chunk =
       Lwt.return_unit)
 
 let launch actx _source =
-  Lwt_stream.iter_p
+  Lwt_stream.iter_n
+    ~max_concurrency:max_concurrent_sends
     (fun chunk ->
       Lwt.catch (fun () -> send actx chunk) (fun _ -> actx.backup chunk))
     chunk_stream
