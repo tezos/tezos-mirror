@@ -14,8 +14,7 @@ changes are also listed below in their respective topical section,
 tagged with **Breaking change** or **Deprecation**.
 
 The code is available in directory :src:`src/proto_024_PtTALLiN` of
-the ``master`` branch of Octez and the full documentation in
-:doc:`this page <../active/index>`.
+the ``master`` branch of Octez but the full documentation has been dropped.
 
 
 Environment Version

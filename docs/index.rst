@@ -4,7 +4,9 @@
    contain the root ``toctree`` directive.
 
 .. TODO #2170:
-   search shifted protocol name/number & adapt
+   search shifted protocol name/number & adapt:
+   - remove the protocol pages index for the old protocol
+   - move the home page of the old protocol into the history page
 
 Welcome to the Octez and Protocol Documentation!
 ================================================
@@ -224,7 +226,6 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    protocols/naming
-   protocols/024_tallinn
    protocols/025_u025
    protocols/alpha
    protocols/history

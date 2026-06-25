@@ -7,7 +7,7 @@ economic protocol represents the amendable part of Tezos.
 
 The following pages provide the full documentation for this protocol.
 The differences with respect to other protocols are summarized in the protocol release page
-:doc:`../protocols/alpha`.
+:doc:`../protocols/025_u025`.
 
 .. toctree::
    :maxdepth: 2
