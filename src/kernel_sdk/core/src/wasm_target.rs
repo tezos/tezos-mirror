@@ -157,6 +157,7 @@ unsafe extern "C" {
     /// - [`NDS_NOT_ENABLED`]: nds has not yet been enabled.
     /// - [`INPUT_OUTPUT_TOO_LARGE`]: `key_len > 4096 || max_bytes > 2048`.
     /// - [`STORE_INVALID_KEY`]: the bytes pointed to by `key` and `key_len` are not a valid nds key.
+    /// - [`STORE_NOT_A_VALUE`]: Key not found in the relevant database.
     /// - [`NDS_DATABASE_OUT_OF_BOUNDS`]: `db_index >= registry_size`.
     ///
     /// # Safety
@@ -169,6 +170,7 @@ unsafe extern "C" {
     /// [`NDS_NOT_ENABLED`]: super::NDS_NOT_ENABLED
     /// [`INPUT_OUTPUT_TOO_LARGE`]: super::INPUT_OUTPUT_TOO_LARGE
     /// [`STORE_INVALID_KEY`]: super::STORE_INVALID_KEY
+    /// [`STORE_NOT_A_VALUE`]: super::STORE_NOT_A_VALUE
     /// [`NDS_DATABASE_OUT_OF_BOUNDS`]: super::NDS_DATABASE_OUT_OF_BOUNDS
     pub unsafe fn nds_store_read(
         db_index: u64,
@@ -206,7 +208,7 @@ unsafe extern "C" {
     /// [`NDS_DATABASE_OUT_OF_BOUNDS`]: super::NDS_DATABASE_OUT_OF_BOUNDS
     /// [`STORE_INVALID_ACCESS`]: super::STORE_INVALID_ACCESS
     /// [`STORE_VALUE_SIZE_EXCEEDED`]: super::STORE_VALUE_SIZE_EXCEEDED
-    pub fn nds_store_write(
+    pub unsafe fn nds_store_write(
         db_index: u64,
         key: *const u8,
         key_len: usize,
@@ -236,7 +238,7 @@ unsafe extern "C" {
     /// [`INPUT_OUTPUT_TOO_LARGE`]: super::INPUT_OUTPUT_TOO_LARGE
     /// [`STORE_INVALID_KEY`]: super::STORE_INVALID_KEY
     /// [`NDS_DATABASE_OUT_OF_BOUNDS`]: super::NDS_DATABASE_OUT_OF_BOUNDS
-    pub fn nds_store_set(
+    pub unsafe fn nds_store_set(
         db_index: u64,
         key: *const u8,
         key_len: usize,
@@ -261,7 +263,11 @@ unsafe extern "C" {
     /// [`INPUT_OUTPUT_TOO_LARGE`]: super::INPUT_OUTPUT_TOO_LARGE
     /// [`STORE_INVALID_KEY`]: super::STORE_INVALID_KEY
     /// [`NDS_DATABASE_OUT_OF_BOUNDS`]: super::NDS_DATABASE_OUT_OF_BOUNDS
-    pub fn nds_store_delete(db_index: u64, key: *const u8, key_len: usize) -> isize;
+    pub unsafe fn nds_store_delete(
+        db_index: u64,
+        key: *const u8,
+        key_len: usize,
+    ) -> isize;
 
     /// Return the length in bytes of the value at `(db_index, key)`.
     ///
@@ -269,6 +275,7 @@ unsafe extern "C" {
     /// - [`NDS_NOT_ENABLED`]: nds has not yet been enabled.
     /// - [`INPUT_OUTPUT_TOO_LARGE`]: `key_len > 4096`.
     /// - [`STORE_INVALID_KEY`]: the bytes pointed to by `key` and `key_len` are not a valid nds key.
+    /// - [`STORE_NOT_A_VALUE`]: Key not found in the relevant database.
     /// - [`NDS_DATABASE_OUT_OF_BOUNDS`]: `db_index >= registry_size`.
     ///
     /// # Safety
@@ -278,8 +285,13 @@ unsafe extern "C" {
     /// [`NDS_NOT_ENABLED`]: super::NDS_NOT_ENABLED
     /// [`INPUT_OUTPUT_TOO_LARGE`]: super::INPUT_OUTPUT_TOO_LARGE
     /// [`STORE_INVALID_KEY`]: super::STORE_INVALID_KEY
+    /// [`STORE_NOT_A_VALUE`]: super::STORE_NOT_A_VALUE
     /// [`NDS_DATABASE_OUT_OF_BOUNDS`]: super::NDS_DATABASE_OUT_OF_BOUNDS
-    pub fn nds_store_value_size(db_index: u64, key: *const u8, key_len: usize) -> isize;
+    pub unsafe fn nds_store_value_size(
+        db_index: u64,
+        key: *const u8,
+        key_len: usize,
+    ) -> isize;
 
     /// Write up to `max_bytes` of the Blake3 root-hash of the database at
     /// `db_index` to `dst`. The full hash is 32 bytes
@@ -297,5 +309,9 @@ unsafe extern "C" {
     ///
     /// [`NDS_NOT_ENABLED`]: super::NDS_NOT_ENABLED
     /// [`NDS_DATABASE_OUT_OF_BOUNDS`]: super::NDS_DATABASE_OUT_OF_BOUNDS
-    pub fn nds_database_get_hash(db_index: u64, dst: *mut u8, max_bytes: usize) -> i32;
+    pub unsafe fn nds_database_get_hash(
+        db_index: u64,
+        dst: *mut u8,
+        max_bytes: usize,
+    ) -> i32;
 }

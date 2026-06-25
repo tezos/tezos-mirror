@@ -60,6 +60,8 @@
   irmin durable storage.
 - `store_read_all` skips the `store_value_size` call when the value fits in
   a single chunk, saving one host call per read.
+- Add initial NDS support for the Wasm PVM - via `WasmNds` trait and `WasmNdsHandle`. Intended for use by kernels only via the
+  `KeySpace` trait in future.
 
 ### Installer client/kernel
 
