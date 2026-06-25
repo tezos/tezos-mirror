@@ -10,7 +10,7 @@
 
 ARG BUILD_IMAGE
 # hadolint ignore=DL3006
-FROM ${BUILD_IMAGE} as runtime
+FROM ${BUILD_IMAGE} AS runtime
 
 # We must re-introduce BUILD_IMAGE in the scope to use it in the label.
 ARG BUILD_IMAGE

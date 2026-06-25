@@ -60,13 +60,13 @@ WORKDIR /home/tezos
 
 # this is needed because we COPY --from=build below
 # hadolint ignore=DL3006
-FROM build as build
+FROM build AS build
 
 ARG OCAML_IMAGE
 ARG BUILD_IMAGE
 
 # hadolint ignore=DL3006
-FROM monitoring as e2etest
+FROM monitoring AS e2etest
 
 LABEL org.opencontainers.image.title="e2etest"
 

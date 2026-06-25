@@ -7,7 +7,7 @@
 # - building the Octez release page
 
 # hadolint ignore=DL3006
-FROM prebuild as release-page
+FROM prebuild AS release-page
 
 LABEL org.opencontainers.image.title="release-page"
 

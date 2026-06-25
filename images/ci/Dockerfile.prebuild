@@ -12,7 +12,7 @@
 # - building images on top of it in the image stack (see README.md)
 
 # hadolint ignore=DL3006
-FROM monitoring as prebuild
+FROM monitoring AS prebuild
 
 LABEL org.opencontainers.image.title="prebuild"
 
