@@ -228,6 +228,15 @@ pub mod tc_cost {
     pub const KEY_READABLE: u32 = 36500;
     pub const KEY_OPTIMIZED: u32 = 34000;
 
+    // `signature` literal decode: the decode plus `Signature::check_validity`
+    // charged by the typechecker's `T::Signature` arms. The base58 form pays the
+    // base58check decode; the bytes form constructs an unvalidated `Unknown`
+    // signature, so it is cheap. Measured and scaled as above.
+    // Re-derive if the `bls` feature is enabled: BLS signatures would then be
+    // validated (subgroup check) instead of decoding cheaply as `Unknown`.
+    pub const SIGNATURE_READABLE: u32 = 2700;
+    pub const SIGNATURE_OPTIMIZED: u32 = 42;
+
     // corresponds to cost_B58CHECK_DECODING_CHAIN_ID in the protocol
     pub const CHAIN_ID_READABLE: u32 = 1600;
 

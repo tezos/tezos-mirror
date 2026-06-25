@@ -5850,7 +5850,7 @@ fn visit_value<'a, 'b>(
             results.push(TV::Key(key));
         }
         (T::Signature, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::SIGNATURE_READABLE)?;
             let sig = Signature::from_base58_check(str)
                 .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?;
             sig.check_validity()
@@ -5858,7 +5858,7 @@ fn visit_value<'a, 'b>(
             results.push(TV::Signature(sig));
         }
         (T::Signature, V::Bytes(bs)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::SIGNATURE_OPTIMIZED)?;
             let sig = Signature::try_from(bs.clone())
                 .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?;
             sig.check_validity()
@@ -6532,6 +6532,29 @@ mod typecheck_tests {
         let v = Micheline::Bytes(bytes);
         // VALUE_STEP (100) + KEY_OPTIMIZED (34000)
         assert_eq!(value_typecheck_gas(&v, &Type::Key), 34100);
+    }
+
+    #[test]
+    fn signature_readable_literal_gas() {
+        let v = Micheline::String(
+            "edsigtoeXp3xFtGugwCTDSDuifQ9Ka81X4gXFoxRQ6Xao2Ryc3yioptrKMfNy5c9pHhbA9Xn3sYZdx2SPiCGTFXjjXx9xKCPDoq"
+                .to_string(),
+        );
+        // VALUE_STEP (100) + SIGNATURE_READABLE (2700)
+        assert_eq!(value_typecheck_gas(&v, &Type::Signature), 2800);
+    }
+
+    #[test]
+    fn signature_optimized_literal_gas() {
+        use tezos_crypto_rs::signature::Signature;
+        let bytes: Vec<u8> = Signature::from_base58_check(
+            "edsigtoeXp3xFtGugwCTDSDuifQ9Ka81X4gXFoxRQ6Xao2Ryc3yioptrKMfNy5c9pHhbA9Xn3sYZdx2SPiCGTFXjjXx9xKCPDoq",
+        )
+        .unwrap()
+        .into();
+        let v = Micheline::Bytes(bytes);
+        // VALUE_STEP (100) + SIGNATURE_OPTIMIZED (42)
+        assert_eq!(value_typecheck_gas(&v, &Type::Signature), 142);
     }
 
     /// hack to simplify syntax in tests
