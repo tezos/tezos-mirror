@@ -14,6 +14,9 @@
 - Changing the sequencer key, via the `change_sequencer_key` precompile or a
   governance sequencer upgrade, rejects public keys that are not valid curve
   points. (!22502)
+- The Michelson runtime charges substantially more gas to typecheck `key` and
+  `signature` literals, reflecting the actual decode and curve point-validation
+  cost (benchmarked on the MIR interpreter). (!22503)
 - The account info record (`/info`) may now carry a fourth RLP field,
   the origin classification (alias payload included). Legacy 3-field
   records remain valid and are migrated lazily as accounts are touched;
