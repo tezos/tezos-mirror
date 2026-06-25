@@ -126,10 +126,12 @@ end
 module Version = struct
   type revision = {build_number : int; revision_date : float}
 
+  type prerelease = RC of int | Beta of int
+
   type t = {
     major : int;
     minor : int;
-    rc : int option;
+    prerelease : prerelease option;
     revisions : revision list;
     latest : bool;
     active : bool;
@@ -137,12 +139,12 @@ module Version = struct
     publication_date : float;
   }
 
-  let make ~major ~minor ?rc ?(revisions = []) ~latest ~active ?announcement
-      ~publication_date () =
+  let make ~major ~minor ?prerelease ?(revisions = []) ~latest ~active
+      ?announcement ~publication_date () =
     {
       major;
       minor;
-      rc;
+      prerelease;
       revisions;
       latest;
       active;
@@ -150,9 +152,10 @@ module Version = struct
       publication_date;
     }
 
-  let to_string {major; minor; rc; _} =
-    match rc with
-    | Some rc -> sf "v%d.%d-rc%d" major minor rc
+  let to_string {major; minor; prerelease; _} =
+    match prerelease with
+    | Some (RC n) -> sf "v%d.%d-rc%d" major minor n
+    | Some (Beta n) -> sf "v%d.%d-beta%d" major minor n
     | None -> sf "v%d.%d" major minor
 
   let revision_of_json json =
@@ -166,10 +169,25 @@ module Version = struct
   let of_json json =
     let open JSON in
     try
+      let prerelease =
+        let field = json |-> "prerelease" in
+        if is_null field then
+          (* Backward compat: read old "rc"/"beta" keys *)
+          match json |-> "rc" |> as_int_opt with
+          | Some n -> Some (RC n)
+          | None -> Option.map (fun n -> Beta n) (json |-> "beta" |> as_int_opt)
+        else
+          let kind = field |-> "kind" |> as_string in
+          let number = field |-> "number" |> as_int in
+          match kind with
+          | "rc" -> Some (RC number)
+          | "beta" -> Some (Beta number)
+          | _ -> failwith (sf "Unknown prerelease kind: %s" kind)
+      in
       {
         major = json |-> "major" |> as_int;
         minor = json |-> "minor" |> as_int;
-        rc = json |-> "rc" |> as_int_opt;
+        prerelease;
         revisions = json |-> "revisions" |> as_list |> List.map revision_of_json;
         latest = json |-> "latest" |> as_bool_opt |> Option.value ~default:false;
         active = json |-> "active" |> as_bool_opt |> Option.value ~default:false;
@@ -196,7 +214,7 @@ module Version = struct
       {
         major;
         minor;
-        rc;
+        prerelease;
         revisions;
         latest;
         active;
@@ -211,9 +229,22 @@ module Version = struct
          ("active", `Bool active);
          ("pubDate", `Float publication_date);
        ]
-      @ (match rc with
+      @ (match prerelease with
         | None -> []
-        | Some rc -> [("rc", `Float (Int.to_float rc))])
+        | Some (RC n) ->
+            [
+              ( "prerelease",
+                `O [("kind", `String "rc"); ("number", `Float (Int.to_float n))]
+              );
+            ]
+        | Some (Beta n) ->
+            [
+              ( "prerelease",
+                `O
+                  [
+                    ("kind", `String "beta"); ("number", `Float (Int.to_float n));
+                  ] );
+            ])
       @ (match revisions with
         | [] -> []
         | revs -> [("revisions", `A (List.map revision_to_json revs))])
@@ -253,7 +284,7 @@ module Version = struct
     let version_exists version =
       version.major = new_version.major
       && version.minor = new_version.minor
-      && version.rc = new_version.rc
+      && version.prerelease = new_version.prerelease
     in
     if List.exists version_exists versions then
       failwith (sf "Version %s already exists" (to_string new_version))
@@ -263,11 +294,18 @@ module Version = struct
      appends a new packaging revision to the version matching major/minor/rc.
      Each call adds a new entry to the [revisions] list, preserving the full
      history. Fails if no matching version is found. *)
-  let add_build_number ~major ~minor ?rc ~build_number ~revision_date versions =
+  let add_build_number ~major ~minor ?prerelease ~build_number ~revision_date
+      versions =
     let matches version =
-      version.major = major && version.minor = minor && version.rc = rc
+      version.major = major && version.minor = minor
+      && version.prerelease = prerelease
     in
-    let rc_suffix = match rc with Some rc -> sf "-rc%d" rc | None -> "" in
+    let version_suffix =
+      match prerelease with
+      | Some (RC n) -> sf "-rc%d" n
+      | Some (Beta n) -> sf "-beta%d" n
+      | None -> ""
+    in
     match List.filter matches versions with
     | [] ->
         failwith
@@ -275,7 +313,7 @@ module Version = struct
              "Version v%d.%d%s not found, cannot add build number"
              major
              minor
-             rc_suffix)
+             version_suffix)
     | [version] ->
         if
           List.exists (fun r -> r.build_number = build_number) version.revisions
@@ -286,7 +324,7 @@ module Version = struct
                build_number
                major
                minor
-               rc_suffix) ;
+               version_suffix) ;
         List.map
           (fun version ->
             if matches version then
@@ -300,7 +338,7 @@ module Version = struct
              "Multiple versions v%d.%d%s found, data is inconsistent"
              major
              minor
-             rc_suffix)
+             version_suffix)
 
   (* [set_latest target_version versions] sets a specific version as latest, unset all others. *)
   let set_latest target_version versions =
@@ -309,7 +347,7 @@ module Version = struct
         if
           version.major = target_version.major
           && version.minor = target_version.minor
-          && version.rc = target_version.rc
+          && version.prerelease = target_version.prerelease
         then {version with latest = true}
         else {version with latest = false})
       versions

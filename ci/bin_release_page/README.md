@@ -113,7 +113,14 @@ This file is a JSON file with the following schema:
     "properties": {
       "major": { "type": "integer" },
       "minor": { "type": "integer" },
-      "rc": { "type": "integer" },
+      "prerelease": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["rc", "beta"] },
+          "number": { "type": "integer" }
+        },
+        "required": ["kind", "number"]
+      },
       "revisions": {
         "type": "array",
         "items": {
@@ -126,6 +133,7 @@ This file is a JSON file with the following schema:
         }
       },
       "latest": { "type": "boolean" },
+      "active": { "type": "boolean" },
       "announcement": { "type": "string" },
       "pubDate": { "type": "number" }
     },
@@ -134,7 +142,9 @@ This file is a JSON file with the following schema:
 }
 ```
 
-Each item of the array represents a version `<major>.<minor>[~rc]`.
+For backward compatibility, the parser also accepts the legacy flat fields `rc` (integer) and `beta` (integer) instead of the `prerelease` object.
+
+Each item of the array represents a version `<major>.<minor>[~rc<N>|~beta<N>]`.
 If `latest` is `true`, the version will be identified as "latest" in the generated page, for instance by appending "(latest)" to its section title. Only one version should be identified as latest, although this is not enforced by the script.
 
 The `revisions` field is an optional array that tracks packaging revisions. Each time a packaging revision tag (e.g. `octez-v20.0-1`, `octez-v20.0-2`) is processed, a new entry is appended with the revision's `buildNumber` and `revisionDate`. This preserves the full history of packaging revisions. The version string and S3 paths are not affected. The RSS feed generates a distinct entry for each revision alongside the original release entry.
@@ -148,18 +158,26 @@ For instance, a valid JSON would look like:
   {
     "major": 22,
     "minor": 1,
+    "active": true,
     "announcement": "https://octez.tezos.com/docs/releases/version-22.html"
   },
   {
     "major": 23,
     "minor": 0,
-    "rc": 1,
+    "prerelease": { "kind": "beta", "number": 1 },
+    "announcement": "https://octez.tezos.com/docs/releases/version-23.html"
+  },
+  {
+    "major": 23,
+    "minor": 0,
+    "prerelease": { "kind": "rc", "number": 1 },
     "announcement": "https://octez.tezos.com/docs/releases/version-23.html"
   },
   {
     "major": 23,
     "minor": 0,
     "latest": true,
+    "active": true,
     "revisions": [
       { "buildNumber": 1, "revisionDate": 1740000000.0 },
       { "buildNumber": 2, "revisionDate": 1741000000.0 }

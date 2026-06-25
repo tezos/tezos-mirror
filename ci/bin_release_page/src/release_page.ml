@@ -206,16 +206,23 @@ let asset_content ~component ~version = function
    the [version] of [component] in the release page,
    containing the assets of [asset_types]. *)
 let version_section ~component ~asset_types ~version =
-  let {major; minor; rc; latest; _} = version in
+  let {major; minor; prerelease; latest; _} = version in
   let title =
-    match rc with
-    | Some rcn ->
+    match prerelease with
+    | Some (RC rcn) ->
         sf
           "%s Release Candidate %i.%i~rc%i\n"
           (String.capitalize_ascii component.name)
           major
           minor
           rcn
+    | Some (Beta bn) ->
+        sf
+          "%s Beta %i.%i~beta%i\n"
+          (String.capitalize_ascii component.name)
+          major
+          minor
+          bn
     | None ->
         if latest then
           sf
@@ -443,6 +450,12 @@ let () =
          else sf "%s%s/%s" bucket path component);
       asset_path =
         (fun version asset_type ->
+          let variant_suffix =
+            match version.prerelease with
+            | Some (RC n) -> sf "-rc%d" n
+            | Some (Beta n) -> sf "-beta%d" n
+            | None -> ""
+          in
           if component = "octez" then
             sf
               "%s%s/%s-v%i.%i%s/%s"
@@ -451,9 +464,7 @@ let () =
               component
               version.major
               version.minor
-              (match version.rc with
-              | Some n -> sf "-rc%s" @@ string_of_int n
-              | None -> "")
+              variant_suffix
               (string_of_asset_type asset_type |> String.lowercase_ascii)
           else
             sf
@@ -464,9 +475,7 @@ let () =
               component
               version.major
               version.minor
-              (match version.rc with
-              | Some n -> sf "-rc%s" @@ string_of_int n
-              | None -> "")
+              variant_suffix
               (string_of_asset_type asset_type |> String.lowercase_ascii));
       url;
     }
