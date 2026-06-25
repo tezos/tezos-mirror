@@ -23,7 +23,6 @@
 variable "IMAGE_NAME" { default = "tezos-" } # base name; the minimal variant uses MINIMAL_IMAGE_NAME
 variable "MINIMAL_IMAGE_NAME" { default = "tezos" }
 variable "IMAGE_VERSION" { default = "latest" }
-variable "BUILD_IMAGE_NAME" { default = "tezos-build" }
 variable "CI_IMAGE_NAME" { default = "" }    # BASE_IMAGE
 variable "CI_IMAGE_VERSION" { default = "" } # e.g. amd64--<hash>
 variable "DOCKER_TARGET" { default = "without-evm-artifacts" }
@@ -76,15 +75,28 @@ target "_variant" {
     BASE_IMAGE                 = CI_IMAGE_NAME
     BASE_IMAGE_VERSION         = "runtime:${CI_IMAGE_VERSION}"
     BASE_IMAGE_VERSION_NON_MIN = "build:${CI_IMAGE_VERSION}"
-    BUILD_IMAGE                = BUILD_IMAGE_NAME
-    BUILD_IMAGE_VERSION        = IMAGE_VERSION
+    BUILD_IMAGE                = "localhost/octez-build"
+    BUILD_IMAGE_VERSION        = "local"
     COMMIT_SHORT_SHA           = COMMIT_SHORT_SHA
   }
   # Resolve Dockerfile's `FROM ${BUILD_IMAGE}:${BUILD_IMAGE_VERSION}` to the
-  # in-graph `build` target rather than a registry pull. The key must match the
-  # FROM reference after ARG expansion (BUILD_IMAGE_NAME:IMAGE_VERSION).
+  # in-graph `build` target rather than a registry pull. The context key must
+  # be byte-identical to that FROM reference after ARG expansion, hence the
+  # literal below MUST stay in sync with the BUILD_IMAGE/BUILD_IMAGE_VERSION
+  # args above.
+  #
+  # The reference is a fixed `localhost/`-qualified name, deliberately
+  # decoupled from the published IMAGE_NAME. The intermediate build image is
+  # never pushed (target "build" is output=cacheonly), so its name is internal
+  # to this graph. Using a registry-qualified host (`localhost`) makes the
+  # familiar and canonical forms of the reference identical, so the named
+  # context matches the FROM on every pipeline. A Docker Hub name (e.g.
+  # docker.io/tezos/tezos-build:amd64_master, as produced on master_branch
+  # pipelines) does NOT: buildx normalizes it to a differing familiar form,
+  # the context lookup misses, and the FROM falls back to a registry pull of
+  # the never-pushed image — which fails with "not found". See !22081.
   contexts = {
-    "${BUILD_IMAGE_NAME}:${IMAGE_VERSION}" = "target:build"
+    "localhost/octez-build:local" = "target:build"
   }
   # The variant solve embeds the linked `build` target's LLB, which uses
   # host networking, so the entitlement must be granted here too.
