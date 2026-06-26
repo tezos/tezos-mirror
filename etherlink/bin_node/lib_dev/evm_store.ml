@@ -1039,6 +1039,10 @@ DO UPDATE SET value = excluded.value
       (unit ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM pending_confirmations|}
 
+    let clear_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM pending_confirmations WHERE level > ?|}
+
     let count =
       (unit ->! level) ~name:__FUNCTION__ ~table
       @@ {|SELECT COUNT(*) FROM pending_confirmations|}
@@ -1979,6 +1983,10 @@ module Pending_confirmations = struct
   let clear store =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Pending_confirmations.clear ()
+
+  let clear_after store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Pending_confirmations.clear_after level
 
   let is_empty store =
     let open Lwt_result_syntax in

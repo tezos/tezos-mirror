@@ -755,6 +755,25 @@ module State = struct
              })
     | None ->
         let*! () = Evm_events_follower_events.rollup_node_ahead (Qty number) in
+
+        let* () =
+          (* On Shadownet the recovery migration discards blocks the
+             rollup node had already confirmed; replaying their
+             [blueprint_applied] events re-records a level that still
+             holds a stale pending confirmation. There, drop the stale
+             row first so the healed confirmation overwrites it
+             instead of violating the [level] primary key. On every
+             other network a duplicate level is a genuine anomaly and
+             must surface, so the plain insert is kept. *)
+          when_
+            (is_shadownet ctxt
+            && Z.geq number shadownet_healthy_block_number
+            && Z.leq number (Z.succ shadownet_healthy_block_number_2))
+            (fun () ->
+              Evm_store.Pending_confirmations.delete_with_level
+                conn
+                (Qty number))
+        in
         Evm_store.Pending_confirmations.insert
           conn
           (Qty number)
@@ -1818,6 +1837,54 @@ module State = struct
       ~healed_marker:"/__shadownet_really_healed"
       l1_level
 
+  (* On Shadownet recovery, the rollup-node events follower registered pending
+     confirmations for the blocks produced past [shadownet_healthy_block_number]
+     (the rollup node confirmed them but the node never applied them locally,
+     see [blueprint_applied_event]). The kernel migration discards those blocks,
+     so the confirmations reference a different chain: when the node re-applies
+     the first healed block it would compare it against the stale confirmation
+     and wrongly report a divergence (see [commit_application_result]). Drop the
+     pending confirmations so the healed chain is accepted. *)
+  let clear_shadownet_pending_confirmations_at conn ctxt ~healthy_block_number
+      ~healed_marker =
+    let open Lwt_result_syntax in
+    let (Ethereum_types.Qty next) = ctxt.session.next_blueprint_number in
+    let evm_state = ctxt.session.evm_state in
+    if is_shadownet ctxt && Z.equal (Z.pred next) healthy_block_number then
+      (* Marker written by the healing migration (see [migration.rs]): asserts
+       the healing kernel actually ran before we drop the confirmations. *)
+      let* healed =
+        Durable_storage.read_opt (Raw_path healed_marker) evm_state
+      in
+      if Option.is_some healed then
+        (* Only the confirmations above the healthy block reference the
+           discarded chain; the ones up to [healthy_block_number] are still
+           valid. *)
+        let* () =
+          Evm_store.Pending_confirmations.clear_after
+            conn
+            (Ethereum_types.Qty healthy_block_number)
+        in
+        let*! () = Events.cleared_shadownet_pending_confirmations () in
+        return_unit
+      else return_unit
+    else return_unit
+
+  let clear_shadownet_pending_confirmations conn ctxt =
+    let open Lwt_result_syntax in
+    let* () =
+      clear_shadownet_pending_confirmations_at
+        conn
+        ctxt
+        ~healthy_block_number:shadownet_healthy_block_number
+        ~healed_marker:"/__shadownet_healed"
+    in
+    clear_shadownet_pending_confirmations_at
+      conn
+      ctxt
+      ~healthy_block_number:shadownet_healthy_block_number_2
+      ~healed_marker:"/__shadownet_really_healed"
+
   let rec apply_blueprint ?(events = []) ?expected_block_hash ctxt conn
       timestamp chunks payload delayed_transactions :
       ('a L2_types.block * L2_types.Tezos_block.t option) tzresult Lwt.t =
@@ -2608,6 +2675,7 @@ module State = struct
     in
     let* () = heal_shadownet_sequencer_key conn ctxt in
     let* l1_level = clear_shadownet_finalized_levels conn ctxt l1_level in
+    let* () = clear_shadownet_pending_confirmations conn ctxt in
 
     let* () =
       let* ro_store =

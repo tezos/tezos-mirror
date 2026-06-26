@@ -334,6 +334,13 @@ module Pending_confirmations : sig
 
   val delete_with_level : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
+  (** [clear conn] removes every pending confirmation from the store. *)
+  val clear : conn -> unit tzresult Lwt.t
+
+  (** [clear_after conn level] removes every pending confirmation strictly
+      above [level], leaving the confirmations up to and including [level]. *)
+  val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
   val is_empty : conn -> bool tzresult Lwt.t
 end
 

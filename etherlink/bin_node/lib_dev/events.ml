@@ -476,6 +476,14 @@ let cleared_shadownet_finalized_levels =
     ("healed_level", Ethereum_types.quantity_encoding)
     ("level", Ethereum_types.quantity_encoding)
 
+let cleared_shadownet_pending_confirmations =
+  Internal_event.Simple.declare_0
+    ~level:Warning
+    ~section
+    ~name:"cleared_shadownet_pending_confirmations"
+    ~msg:"Shadownet: cleared the pending confirmations from the store"
+    ()
+
 let preload_kernel =
   Internal_event.Simple.declare_1
     ~level:Notice
@@ -713,6 +721,9 @@ let healed_shadownet_sequencer_key key = emit healed_shadownet_sequencer_key key
 
 let cleared_shadownet_finalized_levels ~healthy_level ~finalized_level =
   emit cleared_shadownet_finalized_levels (healthy_level, finalized_level)
+
+let cleared_shadownet_pending_confirmations () =
+  emit cleared_shadownet_pending_confirmations ()
 
 let predownload_kernel_failed root_hash error =
   emit predownload_kernel_failed (Hex.show root_hash, error)

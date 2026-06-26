@@ -160,6 +160,10 @@ val cleared_shadownet_finalized_levels :
   finalized_level:Ethereum_types.quantity ->
   unit Lwt.t
 
+(** [cleared_shadownet_pending_confirmations ()] advertizes that the Shadownet
+    pending confirmations have been removed from the store. *)
+val cleared_shadownet_pending_confirmations : unit -> unit Lwt.t
+
 (** [predownload_kernel root_hash] advertizes the EVM node has
     downloaded all preimages under [root_hash]. *)
 val predownload_kernel : Hex.t -> unit Lwt.t
