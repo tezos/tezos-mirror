@@ -25,7 +25,7 @@ pub enum NdsError {
     ResizeInvalid,
     /// A database index referenced an entry past the end of the registry.
     DatabaseOutOfBounds,
-    /// A key or value argument exceeded the maximum permitted size.
+    /// A `buffer` argument exceeded the maximum permitted size.
     InputOutputTooLarge,
     /// The key was not found in the database.
     KeyNotFound,
@@ -56,7 +56,7 @@ impl Key {
     /// Validate `bytes` as an NDS key.
     ///
     /// Returns [`None`] if `bytes` is longer than [`NDS_MAX_KEY_SIZE`].
-    pub fn new(bytes: &[u8]) -> Option<&Key> {
+    pub const fn new(bytes: &[u8]) -> Option<&Key> {
         if bytes.len() > NDS_MAX_KEY_SIZE {
             return None;
         }
