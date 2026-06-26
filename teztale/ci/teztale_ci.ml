@@ -92,8 +92,6 @@ let job_release_page =
           [
             ("S3_BUCKET", "release-page-test.nomadic-labs.com");
             ("DISTRIBUTION_ID", "E19JF46UG3Z747");
-            ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
-            ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
           ]
       | `real ->
           [
