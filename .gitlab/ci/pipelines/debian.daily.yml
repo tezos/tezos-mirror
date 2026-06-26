@@ -689,7 +689,7 @@ oc.install_bin_ubuntu_22_04:
     PREFIX: ""
 
 oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
   stage: publishing_tests
   tags:
   - gcp
@@ -708,7 +708,7 @@ oc.lintian_debian:
   - export DEBIAN_FRONTEND=noninteractive
   - apt-get update
   - apt-get install lintian parallel -y
-  - ./scripts/ci/lintian_debian_packages.sh debian bookworm
+  - ./scripts/ci/lintian_debian_packages.sh debian bookworm trixie
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

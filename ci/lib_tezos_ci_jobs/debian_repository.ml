@@ -37,6 +37,13 @@ let tag_amd64 ~ramfs =
 
 let tag_arm64 = Runner.Tag.show Gcp_arm64
 
+(** Debian releases tested per pipeline type.
+
+    Partial pipelines (merge requests) only test the current Debian
+    stable; Full and Release pipelines test both supported releases. *)
+let debian_releases : repository_pipeline -> string list = function
+  | Partial | Full | Release -> ["bookworm"; "trixie"]
+
 (* Job names use [_] instead of [.] in releases (e.g. [22_04] for
    Ubuntu [22.04]). Debian codenames have no dots so this is a no-op
    for them. *)
@@ -53,16 +60,14 @@ let release_token release = String.map (function '.' -> '_' | c -> c) release
 
     Set [arm64] to false to exclude from the matrix arm64 architecture.
     *)
-let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
-  | Partial ->
-      [[("RELEASE", ["bookworm"; "trixie"]); ("TAGS", [tag_amd64 ~ramfs])]]
-  | Full | Release ->
-      [
-        [
-          ("RELEASE", ["bookworm"; "trixie"]);
-          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
-        ];
-      ]
+let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) pipeline_type
+    =
+  let tags =
+    match pipeline_type with
+    | Partial -> [tag_amd64 ~ramfs]
+    | Full | Release -> tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else [])
+  in
+  [[("RELEASE", debian_releases pipeline_type); ("TAGS", tags)]]
 
 (* Points to [(debian|ubuntu)-build] static images. *)
 let build_dependency_image =
@@ -211,7 +216,7 @@ let job_apt_repo_debian =
     ~build_job:job_build_debian
     ~image:Images.Base_images.debian_trixie
     ~distribution:"debian"
-    ~releases:["bookworm"; "trixie"]
+    ~releases:(debian_releases pipeline_type)
 
 let job_apt_repo_ubuntu =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -254,9 +259,9 @@ let job_lintian_debian =
     "oc.lintian_debian"
     ~__POS__
     ~needs:[(Artifacts, job_build_debian pipeline_type)]
-    ~image:Images.Base_images.debian_bookworm
+    ~image:Images.Base_images.debian_trixie
     ~distribution:"debian"
-    ~releases:["bookworm"]
+    ~releases:(debian_releases pipeline_type)
 
 (* Rebuild the Debian binary, data and keyring packages for trixie/amd64 and
    check, with diffoscope, that they are byte-for-byte identical to the packages
