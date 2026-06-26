@@ -42,7 +42,8 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
     Partial pipelines (merge requests) only test the current Debian
     stable; Full and Release pipelines test both supported releases. *)
 let debian_releases : repository_pipeline -> string list = function
-  | Partial | Full | Release -> ["bookworm"; "trixie"]
+  | Partial -> ["trixie"]
+  | Full | Release -> ["bookworm"; "trixie"]
 
 (* Job names use [_] instead of [.] in releases (e.g. [22_04] for
    Ubuntu [22.04]). Debian codenames have no dots so this is a no-op
@@ -348,6 +349,13 @@ let job_install_bin_debian_bookworm =
     ~image:Images.Base_images.debian_bookworm
     ~apt_repo:job_apt_repo_debian
 
+let job_install_bin_debian_trixie =
+  job_install_bin
+    ~distribution:"debian"
+    ~release:"trixie"
+    ~image:Images.Base_images.debian_trixie
+    ~apt_repo:job_apt_repo_debian
+
 let make_systemd_test_job ~script ~distribution ~release =
   CI.job
     ~stage:Test_publication
@@ -436,6 +444,15 @@ let job_install_bin_debian_bookworm_systemd =
     ~distribution:"debian"
     ~release:"bookworm"
 
+let job_install_bin_debian_trixie_systemd =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_systemd_install_job
+    "oc.install_bin_debian_trixie_systemd"
+    ~__POS__
+    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~distribution:"debian"
+    ~release:"trixie"
+
 (* Note: this job is in the publish stage because it depends on a job
    that is in the publish stage, but it is a test.
    Ideally we would build the images in the build stage, test them in the test stage,
@@ -462,6 +479,15 @@ let job_test_keyring_debian_trixie =
   Cacio.parameterize @@ fun pipeline_type ->
   make_systemd_keyring_test_job
     "oc.test_keyring_debian_trixie"
+    ~__POS__
+    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~distribution:"debian"
+    ~release:"trixie"
+
+let job_upgrade_bin_debian_trixie_systemd =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_systemd_upgrade_job
+    "oc.upgrade_bin_debian_trixie_systemd"
     ~__POS__
     ~needs:[(Job, job_apt_repo_debian pipeline_type)]
     ~distribution:"debian"
@@ -502,10 +528,10 @@ let () =
     [
       (Auto, job_apt_repo_debian Partial);
       (Auto, job_lintian_debian Partial);
-      (Auto, job_install_bin_debian_bookworm Partial);
-      (Auto, job_install_bin_debian_bookworm_systemd Partial);
-      (Auto, job_upgrade_bin_debian_bookworm_systemd Partial);
-      (Auto, job_test_keyring_debian_bookworm Partial);
+      (Auto, job_install_bin_debian_trixie Partial);
+      (Auto, job_install_bin_debian_trixie_systemd Partial);
+      (Auto, job_upgrade_bin_debian_trixie_systemd Partial);
+      (Auto, job_test_keyring_debian_trixie Partial);
     ] ;
   Cacio.register_jobs
     Debian_daily
