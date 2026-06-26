@@ -37,6 +37,19 @@ let tag_amd64 ~ramfs =
 
 let tag_arm64 = Runner.Tag.show Gcp_arm64
 
+(** Debian releases tested per pipeline type.
+
+    Partial pipelines (merge requests) only test the current Debian
+    stable; Full and Release pipelines test both supported releases. *)
+let debian_releases : repository_pipeline -> string list = function
+  | Partial -> ["trixie"]
+  | Full | Release -> ["bookworm"; "trixie"]
+
+(* Job names use [_] instead of [.] in releases (e.g. [22_04] for
+   Ubuntu [22.04]). Debian codenames have no dots so this is a no-op
+   for them. *)
+let release_token release = String.map (function '.' -> '_' | c -> c) release
+
 (** These are the set of Debian release-architecture combinations for
     which we build deb packages in the job [oc.build-debian].
     A dependency image will be built once for each combination of [RELEASE] and [TAGS].
@@ -48,16 +61,14 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
 
     Set [arm64] to false to exclude from the matrix arm64 architecture.
     *)
-let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
-  | Partial ->
-      [[("RELEASE", ["bookworm"; "trixie"]); ("TAGS", [tag_amd64 ~ramfs])]]
-  | Full | Release ->
-      [
-        [
-          ("RELEASE", ["bookworm"; "trixie"]);
-          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
-        ];
-      ]
+let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) pipeline_type
+    =
+  let tags =
+    match pipeline_type with
+    | Partial -> [tag_amd64 ~ramfs]
+    | Full | Release -> tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else [])
+  in
+  [[("RELEASE", debian_releases pipeline_type); ("TAGS", tags)]]
 
 (* Points to [(debian|ubuntu)-build] static images. *)
 let build_dependency_image =
@@ -206,7 +217,7 @@ let job_apt_repo_debian =
     ~build_job:job_build_debian
     ~image:Images.Base_images.debian_trixie
     ~distribution:"debian"
-    ~releases:["bookworm"; "trixie"]
+    ~releases:(debian_releases pipeline_type)
 
 let job_apt_repo_ubuntu =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -249,9 +260,9 @@ let job_lintian_debian =
     "oc.lintian_debian"
     ~__POS__
     ~needs:[(Artifacts, job_build_debian pipeline_type)]
-    ~image:Images.Base_images.debian_bookworm
+    ~image:Images.Base_images.debian_trixie
     ~distribution:"debian"
-    ~releases:["bookworm"]
+    ~releases:(debian_releases pipeline_type)
 
 (* Rebuild the Debian binary, data and keyring packages for trixie/amd64 and
    check, with diffoscope, that they are byte-for-byte identical to the packages
@@ -300,45 +311,50 @@ let make_install_bin_job ~distribution ~release =
     ~script:
       ["./docs/introduction/install-bin-deb.sh " ^ distribution ^ " " ^ release]
 
-let job_install_bin_ubuntu_22_04 =
+let job_install_bin ~distribution ~release ~image ~apt_repo =
   Cacio.parameterize @@ fun pipeline_type ->
   make_install_bin_job
-    "oc.install_bin_ubuntu_22_04"
+    (sf "oc.install_bin_%s_%s" distribution (release_token release))
     ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~image:Images.Base_images.ubuntu_22_04
+    ~needs:[(Job, apt_repo pipeline_type)]
+    ~image
+    ~distribution
+    ~release
+
+let job_install_bin_ubuntu_22_04 =
+  job_install_bin
     ~distribution:"ubuntu"
     ~release:"22.04"
+    ~image:Images.Base_images.ubuntu_22_04
+    ~apt_repo:job_apt_repo_ubuntu
 
 let job_install_bin_ubuntu_24_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_install_bin_job
-    "oc.install_bin_ubuntu_24_04"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~image:Images.Base_images.ubuntu_24_04
+  job_install_bin
     ~distribution:"ubuntu"
     ~release:"24.04"
+    ~image:Images.Base_images.ubuntu_24_04
+    ~apt_repo:job_apt_repo_ubuntu
 
 let job_install_bin_ubuntu_26_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_install_bin_job
-    "oc.install_bin_ubuntu_26_04"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~image:Images.Base_images.ubuntu_26_04
+  job_install_bin
     ~distribution:"ubuntu"
     ~release:"26.04"
+    ~image:Images.Base_images.ubuntu_26_04
+    ~apt_repo:job_apt_repo_ubuntu
 
 let job_install_bin_debian_bookworm =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_install_bin_job
-    "oc.install_bin_debian_bookworm"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~image:Images.Base_images.debian_bookworm
+  job_install_bin
     ~distribution:"debian"
     ~release:"bookworm"
+    ~image:Images.Base_images.debian_bookworm
+    ~apt_repo:job_apt_repo_debian
+
+let job_install_bin_debian_trixie =
+  job_install_bin
+    ~distribution:"debian"
+    ~release:"trixie"
+    ~image:Images.Base_images.debian_trixie
+    ~apt_repo:job_apt_repo_debian
 
 let make_systemd_test_job ~script ~distribution ~release =
   CI.job
@@ -428,6 +444,15 @@ let job_install_bin_debian_bookworm_systemd =
     ~distribution:"debian"
     ~release:"bookworm"
 
+let job_install_bin_debian_trixie_systemd =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_systemd_install_job
+    "oc.install_bin_debian_trixie_systemd"
+    ~__POS__
+    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~distribution:"debian"
+    ~release:"trixie"
+
 (* Note: this job is in the publish stage because it depends on a job
    that is in the publish stage, but it is a test.
    Ideally we would build the images in the build stage, test them in the test stage,
@@ -454,6 +479,15 @@ let job_test_keyring_debian_trixie =
   Cacio.parameterize @@ fun pipeline_type ->
   make_systemd_keyring_test_job
     "oc.test_keyring_debian_trixie"
+    ~__POS__
+    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~distribution:"debian"
+    ~release:"trixie"
+
+let job_upgrade_bin_debian_trixie_systemd =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_systemd_upgrade_job
+    "oc.upgrade_bin_debian_trixie_systemd"
     ~__POS__
     ~needs:[(Job, job_apt_repo_debian pipeline_type)]
     ~distribution:"debian"
@@ -494,10 +528,10 @@ let () =
     [
       (Auto, job_apt_repo_debian Partial);
       (Auto, job_lintian_debian Partial);
-      (Auto, job_install_bin_debian_bookworm Partial);
-      (Auto, job_install_bin_debian_bookworm_systemd Partial);
-      (Auto, job_upgrade_bin_debian_bookworm_systemd Partial);
-      (Auto, job_test_keyring_debian_bookworm Partial);
+      (Auto, job_install_bin_debian_trixie Partial);
+      (Auto, job_install_bin_debian_trixie_systemd Partial);
+      (Auto, job_upgrade_bin_debian_trixie_systemd Partial);
+      (Auto, job_test_keyring_debian_trixie Partial);
     ] ;
   Cacio.register_jobs
     Debian_daily
@@ -516,8 +550,11 @@ let () =
       (Auto, job_upgrade_bin_ubuntu_24_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_26_04_systemd Full);
       (Auto, job_install_bin_debian_bookworm Full);
+      (Auto, job_install_bin_debian_trixie Full);
       (Auto, job_install_bin_debian_bookworm_systemd Full);
+      (Auto, job_install_bin_debian_trixie_systemd Full);
       (Auto, job_upgrade_bin_debian_bookworm_systemd Full);
+      (Auto, job_upgrade_bin_debian_trixie_systemd Full);
       (Auto, job_test_keyring_debian_bookworm Full);
       (Auto, job_test_keyring_debian_trixie Full);
       (Auto, job_test_keyring_ubuntu_22_04 Full);

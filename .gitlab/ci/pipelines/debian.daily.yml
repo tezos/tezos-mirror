@@ -390,6 +390,36 @@ oc.test_keyring_debian_bookworm:
     DISTRIBUTION: debian
     RELEASE: bookworm
 
+oc.upgrade_bin_debian_trixie_systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    PREFIX: ""
+    DISTRIBUTION: debian
+    RELEASE: trixie
+
 oc.upgrade_bin_debian_bookworm-systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: publishing_tests
@@ -420,6 +450,36 @@ oc.upgrade_bin_debian_bookworm-systemd:
     DISTRIBUTION: debian
     RELEASE: bookworm
 
+oc.install_bin_debian_trixie_systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    PREFIX: ""
+    DISTRIBUTION: debian
+    RELEASE: trixie
+
 oc.install_bin_debian_bookworm_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: publishing_tests
@@ -449,6 +509,28 @@ oc.install_bin_debian_bookworm_systemd:
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
+
+oc.install_bin_debian_trixie:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./docs/introduction/install-bin-deb.sh debian trixie
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    PREFIX: ""
 
 oc.install_bin_debian_bookworm:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-100afa6d
@@ -689,7 +771,7 @@ oc.install_bin_ubuntu_22_04:
     PREFIX: ""
 
 oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
   stage: publishing_tests
   tags:
   - gcp
@@ -708,7 +790,7 @@ oc.lintian_debian:
   - export DEBIAN_FRONTEND=noninteractive
   - apt-get update
   - apt-get install lintian parallel -y
-  - ./scripts/ci/lintian_debian_packages.sh debian bookworm
+  - ./scripts/ci/lintian_debian_packages.sh debian bookworm trixie
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
