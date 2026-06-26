@@ -550,8 +550,11 @@ let () =
       (Auto, job_upgrade_bin_ubuntu_24_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_26_04_systemd Full);
       (Auto, job_install_bin_debian_bookworm Full);
+      (Auto, job_install_bin_debian_trixie Full);
       (Auto, job_install_bin_debian_bookworm_systemd Full);
+      (Auto, job_install_bin_debian_trixie_systemd Full);
       (Auto, job_upgrade_bin_debian_bookworm_systemd Full);
+      (Auto, job_upgrade_bin_debian_trixie_systemd Full);
       (Auto, job_test_keyring_debian_bookworm Full);
       (Auto, job_test_keyring_debian_trixie Full);
       (Auto, job_test_keyring_ubuntu_22_04 Full);
