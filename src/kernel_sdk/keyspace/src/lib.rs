@@ -16,7 +16,7 @@ use tezos_smart_rollup_host::storage::v2;
 
 #[cfg(feature = "irmin-compat")]
 mod irmin_path_validator;
-mod wasm_nds;
+pub mod wasm_nds;
 
 /// Key creation error
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]

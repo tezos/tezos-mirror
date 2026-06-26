@@ -2,9 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#![cfg(not(feature = "irmin-compat"))]
-#![allow(dead_code)]
-#![allow(unused)]
+#![cfg(all(pvm_kind = "wasm", not(feature = "irmin-compat")))]
 
 //! Implementation of [`KeySpace`] for [`WasmNds`].
 //!
@@ -31,7 +29,22 @@ const NAME_DB: usize = 0;
 pub trait WasmHostNds: WasmHost {
     /// Initialise the loader. May fail - for example if the `nds` feature
     /// has not yet been activated.
-    fn init(&self) -> Result<impl KeySpaceLoader, NdsError>;
+    ///
+    /// # Safety
+    ///
+    /// If this call succeeds, it _must_ be the case that:
+    /// - the WASM NDS feature flag has been enabled.
+    /// - the underlying registry has size _at least 1_.
+    unsafe fn init(&self) -> Result<impl KeySpaceLoader, NdsError>;
+}
+
+/// WASM PVM-specific wiring up for [`WasmNds`].
+// TODO (SDK-147): add mock-host/native support for `WasmNds` for unit testing etc
+#[cfg(pvm_kind = "wasm")]
+impl WasmHostNds for tezos_smart_rollup_core::rollup_host::RollupHost {
+    unsafe fn init(&self) -> Result<impl KeySpaceLoader, NdsError> {
+        NdsKeySpaceLoader::new(tezos_smart_rollup_host::storage::v2::WasmNdsHandle)
+    }
 }
 
 /// Wrapper around a [`WasmNds`] impl.
