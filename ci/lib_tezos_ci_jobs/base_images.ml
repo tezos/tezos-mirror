@@ -144,6 +144,25 @@ module Files = struct
       "images/scripts/install-gcloud.sh";
       "images/base-images/Dockerfile.debian-release";
     ]
+
+  (* Inputs of the static "alpine-*" CI images built by [docker buildx bake]
+     (images/ci/ci-images.hcl): the bake file, the per-image Dockerfiles and
+     everything they COPY from the build context (repository root). *)
+  let ci_images =
+    [
+      "images/ci/**";
+      "opam/virtual/*.opam.locked";
+      "pyproject.toml";
+      "poetry.lock";
+      "scripts/version.sh";
+      "scripts/kiss-fetch.sh";
+      "scripts/kiss-logs.sh";
+      "scripts/install_dal_trusted_setup.sh";
+      "images/scripts/install_opam_static.sh";
+      "images/scripts/install_sccache_static.sh";
+      "images/scripts/install_datadog_static.sh";
+      "images/common/install-nvm.sh";
+    ]
 end
 
 module Distribution = struct
@@ -475,6 +494,100 @@ let job_rust_sdk_bindings_based_images =
     ~needs:[(Cacio.Job, job_debian_based_images)]
     "images.debian-rust-sdk-bindings"
 
+(* ── Cacio: static "alpine-*" CI images (docker buildx bake) ─────────────── *)
+
+(* Build the static "alpine-*" CI images (runtime, monitoring, prebuild,
+   build, test, e2etest, release-page) with [docker buildx bake]
+   (images/ci/ci-images.hcl). Each architecture is built natively; the
+   per-arch images are then merged into multi-arch manifests by
+   [job_alpine_ci_merge].
+
+   [--allow=fs.read=/tmp/npm_token.txt] grants the filesystem entitlement that
+   recent buildx requires to read the npm_token secret declared on the e2etest
+   target (its src is outside the build context). *)
+let job_alpine_ci =
+  Cacio.parameterize @@ fun arch ->
+  let arch_str = Runner.Arch.show_uniform arch in
+  docker_job
+    ~extra_variables:
+      [
+        ("REGISTRY", "${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos");
+        ( "TAG",
+          Format.sprintf
+            "${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-%s"
+            arch_str );
+      ]
+    ~script:
+      [
+        "docker buildx create --driver docker-container --use --name tezos";
+        Format.sprintf
+          "docker buildx bake --allow=fs.read=/tmp/npm_token.txt --push --set \
+           \"*.platform=linux/%s\" -f images/ci/ci-images.hcl"
+          arch_str;
+      ]
+    ~__POS__
+    ~description:("Build the static alpine-* CI images for " ^ arch_str)
+    ~timeout:(Minutes 90)
+    ~arch
+      (* amd64 builds on a very-high-CPU runner to shorten the build; arm64
+         builds on a ramfs (memory-backed) work volume for build I/O. *)
+    ?cpu:
+      (match arch with
+      | Runner.Arch.Amd64 -> Some Runner.CPU.Very_high
+      | _ -> None)
+    ?storage:
+      (match arch with
+    | Runner.Arch.Arm64 -> Some Runner.Storage.Ramfs
+    | _ -> None)
+      (* The arm64 CI jobs see runner-infrastructure flakiness, so retry once
+         on a runner system failure. *)
+    ?retry:
+      (match arch with
+      | Runner.Arch.Arm64 ->
+          Some Gitlab_ci.Types.{max = 1; when_ = [Runner_system_failure]}
+      | _ -> None)
+    ~only_if_changed:Files.ci_images
+    ("images.alpine-ci-all:" ^ arch_str)
+
+let job_alpine_ci_merge =
+  docker_job
+    ~extra_variables:
+      [
+        ("REGISTRY", "${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos");
+        ("TAG", "${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}");
+      ]
+    ~script:
+      ("docker buildx create --driver docker-container --use --name tezos"
+      :: List.map
+           (fun image_short_name ->
+             Format.sprintf
+               "docker buildx imagetools create --tag \
+                \"${REGISTRY}/alpine-%s:${TAG}\" \
+                \"${REGISTRY}/alpine-%s:${TAG}-amd64\" \
+                \"${REGISTRY}/alpine-%s:${TAG}-arm64\""
+               image_short_name
+               image_short_name
+               image_short_name)
+           [
+             "runtime";
+             "monitoring";
+             "prebuild";
+             "build";
+             "release-page";
+             "test";
+             "e2etest";
+           ])
+    ~__POS__
+    ~description:
+      "Merge the per-arch static alpine-* CI images into multi-arch manifests"
+    ~only_if_changed:Files.ci_images
+    ~needs:
+      [
+        (Cacio.Job, job_alpine_ci Runner.Arch.Amd64);
+        (Cacio.Job, job_alpine_ci Runner.Arch.Arm64);
+      ]
+    "images.alpine-ci-all.merge"
+
 (* ── Cacio pipeline registrations ───────────────────────────────────────── *)
 
 let () =
@@ -495,6 +608,9 @@ let () =
       (Cacio.Auto, job_rust_based_images_merge);
       (Cacio.Auto, job_debian_based_images);
       (Cacio.Auto, job_ubuntu_based_images);
+      (Cacio.Auto, job_alpine_ci Runner.Arch.Amd64);
+      (Cacio.Auto, job_alpine_ci Runner.Arch.Arm64);
+      (Cacio.Auto, job_alpine_ci_merge);
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
