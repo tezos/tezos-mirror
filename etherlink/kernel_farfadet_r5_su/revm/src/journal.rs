@@ -295,8 +295,11 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         balance: U256,
         spec_id: SpecId,
     ) -> Result<JournalCheckpoint, TransferError> {
-        self.inner
-            .create_account_checkpoint(caller, address, balance, spec_id)
+        let checkpoint = self
+            .inner
+            .create_account_checkpoint(caller, address, balance, spec_id)?;
+        self.layered_state.checkpoint();
+        Ok(checkpoint)
     }
 
     #[inline]
