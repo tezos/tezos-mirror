@@ -465,6 +465,17 @@ let healed_shadownet_sequencer_key =
       "Shadownet: sequencer public key healed in the local state, set to {key}"
     ("key", Signature.Public_key.encoding)
 
+let cleared_shadownet_finalized_levels =
+  Internal_event.Simple.declare_2
+    ~level:Warning
+    ~section
+    ~name:"cleared_shadownet_finalized_levels"
+    ~msg:
+      "Shadownet: cleared the finalized L1/L2 levels past the healed head \
+       {healed_level} from the store, new finalized level is {level}"
+    ("healed_level", Ethereum_types.quantity_encoding)
+    ("level", Ethereum_types.quantity_encoding)
+
 let preload_kernel =
   Internal_event.Simple.declare_1
     ~level:Notice
@@ -699,6 +710,9 @@ let preload_kernel commit = emit preload_kernel commit
 let patched_state key level = emit patched_state (key, level)
 
 let healed_shadownet_sequencer_key key = emit healed_shadownet_sequencer_key key
+
+let cleared_shadownet_finalized_levels ~healthy_level ~finalized_level =
+  emit cleared_shadownet_finalized_levels (healthy_level, finalized_level)
 
 let predownload_kernel_failed root_hash error =
   emit predownload_kernel_failed (Hex.show root_hash, error)

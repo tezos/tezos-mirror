@@ -672,6 +672,11 @@ module State = struct
      is about to apply the first blueprint of the recovered sequencer. *)
   let shadownet_healthy_block_number = Z.of_int 5107609
 
+  (* The sequencer later diverged from the rollup node at block 5122749;
+     [fix_shadownet_2] (see [migration.rs]) rewinds the chain to block 5122748,
+     the last block both sides agreed on. *)
+  let shadownet_healthy_block_number_2 = Z.of_int 5122748
+
   (* Shadownet healing.
 
      The sequencer public key stored in Shadownet's durable storage got
@@ -1747,6 +1752,72 @@ module State = struct
       return_unit)
     else return_unit
 
+  (* On Shadownet, the kernel migration rewinds the chain to
+     [shadownet_healthy_block_number] and discards the blocks produced after it.
+     The rollup-node events follower may have recorded finalized L2 levels past
+     that block: it advances [finalized_number] from the rollup's events even
+     for blocks it has not applied locally (see [blueprint_applied_event]). When
+     the node sits exactly on the healthy block (i.e. it is about to apply the
+     first blueprint of the recovered sequencer), drop those stale finalized
+     levels so the node does not believe it is finalized past the healed head.
+
+     We use [clear_after] rather than wiping the table so the [healthy_level]
+     row is kept and [Context_hashes.find_finalized] keeps working. The
+     finalized level is then recomputed from the remaining rows and returned to
+     the caller. *)
+  let clear_shadownet_finalized_levels_at conn ctxt ~healthy_block_number
+      ~healed_marker l1_level =
+    let open Lwt_result_syntax in
+    let (Ethereum_types.Qty next) = ctxt.session.next_blueprint_number in
+    let evm_state = ctxt.session.evm_state in
+    if is_shadownet ctxt && Z.equal (Z.pred next) healthy_block_number then
+      (* Marker written by the healing migration (see [migration.rs]): asserts
+         the healing kernel actually ran before we drop the finalized levels. *)
+      let* healed =
+        Durable_storage.read_opt (Raw_path healed_marker) evm_state
+      in
+      if Option.is_some healed then (
+        let healthy_level = Ethereum_types.Qty healthy_block_number in
+        let* () =
+          Evm_store.L1_l2_finalized_levels.clear_after conn healthy_level
+        in
+        let* latest = Evm_store.L1_l2_finalized_levels.last conn in
+        let finalized_level, l1_level =
+          match latest with
+          | None -> (Ethereum_types.Qty Z.zero, None)
+          | Some (l1_level, {end_l2_level; _}) -> (end_l2_level, Some l1_level)
+        in
+        ctxt.session.finalized_number <- finalized_level ;
+        let*! () =
+          Events.cleared_shadownet_finalized_levels
+            ~healthy_level
+            ~finalized_level
+        in
+        return l1_level)
+      else return l1_level
+    else return l1_level
+
+  let clear_shadownet_finalized_levels conn ctxt l1_level =
+    let open Lwt_result_syntax in
+    (* Only one heal can be active at a given head, and each [_at] call is a
+       pass-through no-op when its own guard is inactive, so threading the
+       value through both calls returns the recomputed level of whichever heal
+       fired (or the input untouched if none did). *)
+    let* l1_level =
+      clear_shadownet_finalized_levels_at
+        conn
+        ctxt
+        ~healthy_block_number:shadownet_healthy_block_number
+        ~healed_marker:"/__shadownet_healed"
+        l1_level
+    in
+    clear_shadownet_finalized_levels_at
+      conn
+      ctxt
+      ~healthy_block_number:shadownet_healthy_block_number_2
+      ~healed_marker:"/__shadownet_really_healed"
+      l1_level
+
   let rec apply_blueprint ?(events = []) ?expected_block_hash ctxt conn
       timestamp chunks payload delayed_transactions :
       ('a L2_types.block * L2_types.Tezos_block.t option) tzresult Lwt.t =
@@ -2536,6 +2607,7 @@ module State = struct
       }
     in
     let* () = heal_shadownet_sequencer_key conn ctxt in
+    let* l1_level = clear_shadownet_finalized_levels conn ctxt l1_level in
 
     let* () =
       let* ro_store =

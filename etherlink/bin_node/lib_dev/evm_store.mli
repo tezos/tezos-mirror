@@ -402,6 +402,8 @@ module L1_l2_finalized_levels : sig
     (int32 * t) list tzresult Lwt.t
 
   val clear_before : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
 type metadata = {
