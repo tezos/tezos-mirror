@@ -35,7 +35,10 @@ ARG CHECKSUM_ARM64="0f38061652335e637f211e506206bc7e8c228123cde8de734b2a3e576a8c
 ARG BINARY_FILE="foundry_nightly_alpine_${TARGETARCH}.tar.gz"
 ARG URL_BASE="https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_TAG}"
 
-RUN curl -sSLO "${URL_BASE}/${BINARY_FILE}"; \
+# Fetch foundry through the kisscache proxy with kiss-fetch.sh instead of
+# pulling from GitHub directly, to improve reliability.
+# Falls back to a direct download when kisscache is unreachable.
+RUN kiss-fetch.sh -sS -o "${BINARY_FILE}" "${URL_BASE}/${BINARY_FILE}"; \
     # Assign the correct hash based on the architecture
     case "${TARGETARCH}" in \
         "amd64") \
