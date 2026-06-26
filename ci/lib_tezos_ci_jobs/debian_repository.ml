@@ -37,6 +37,11 @@ let tag_amd64 ~ramfs =
 
 let tag_arm64 = Runner.Tag.show Gcp_arm64
 
+(* Job names use [_] instead of [.] in releases (e.g. [22_04] for
+   Ubuntu [22.04]). Debian codenames have no dots so this is a no-op
+   for them. *)
+let release_token release = String.map (function '.' -> '_' | c -> c) release
+
 (** These are the set of Debian release-architecture combinations for
     which we build deb packages in the job [oc.build-debian].
     A dependency image will be built once for each combination of [RELEASE] and [TAGS].
@@ -300,45 +305,43 @@ let make_install_bin_job ~distribution ~release =
     ~script:
       ["./docs/introduction/install-bin-deb.sh " ^ distribution ^ " " ^ release]
 
-let job_install_bin_ubuntu_22_04 =
+let job_install_bin ~distribution ~release ~image ~apt_repo =
   Cacio.parameterize @@ fun pipeline_type ->
   make_install_bin_job
-    "oc.install_bin_ubuntu_22_04"
+    (sf "oc.install_bin_%s_%s" distribution (release_token release))
     ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~image:Images.Base_images.ubuntu_22_04
+    ~needs:[(Job, apt_repo pipeline_type)]
+    ~image
+    ~distribution
+    ~release
+
+let job_install_bin_ubuntu_22_04 =
+  job_install_bin
     ~distribution:"ubuntu"
     ~release:"22.04"
+    ~image:Images.Base_images.ubuntu_22_04
+    ~apt_repo:job_apt_repo_ubuntu
 
 let job_install_bin_ubuntu_24_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_install_bin_job
-    "oc.install_bin_ubuntu_24_04"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~image:Images.Base_images.ubuntu_24_04
+  job_install_bin
     ~distribution:"ubuntu"
     ~release:"24.04"
+    ~image:Images.Base_images.ubuntu_24_04
+    ~apt_repo:job_apt_repo_ubuntu
 
 let job_install_bin_ubuntu_26_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_install_bin_job
-    "oc.install_bin_ubuntu_26_04"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~image:Images.Base_images.ubuntu_26_04
+  job_install_bin
     ~distribution:"ubuntu"
     ~release:"26.04"
+    ~image:Images.Base_images.ubuntu_26_04
+    ~apt_repo:job_apt_repo_ubuntu
 
 let job_install_bin_debian_bookworm =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_install_bin_job
-    "oc.install_bin_debian_bookworm"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~image:Images.Base_images.debian_bookworm
+  job_install_bin
     ~distribution:"debian"
     ~release:"bookworm"
+    ~image:Images.Base_images.debian_bookworm
+    ~apt_repo:job_apt_repo_debian
 
 let make_systemd_test_job ~script ~distribution ~release =
   CI.job
