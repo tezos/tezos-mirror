@@ -30,13 +30,28 @@ RELEASES=$*
 # remaining releases so the full report is produced before exiting.
 failed=0
 
+# Debian trixie's lintian (2.122) flags systemd units shipped under
+# /lib/systemd/system as 'aliased-location' on usr-merged systems. We lint
+# with the trixie image in every pipeline, so this affects all Debian
+# packages, not only bookworm: whether a package ships under /lib or
+# /usr/lib depends on the debhelper version of the release it was built on
+# (we pin no debhelper-compat), so trixie packages can trip it too. The
+# proper fix is to ship the units under /usr/lib/systemd/system; until the
+# packaging is updated we suppress the tag to keep the lint green.
+# Debian only: Ubuntu's older lintian (2.117) does not know the tag and
+# errors out on an unknown --suppress-tags argument.
+suppress=""
+if [ "$DISTRIBUTION" = "debian" ]; then
+  suppress="--suppress-tags aliased-location"
+fi
+
 for release in $RELEASES; do # unstable, 22_04, 24_04 ...
   # 'lintian' exits non-zero when it reports errors and 'parallel'
   # propagates that as a non-zero exit status of the pipeline.
   if ! find "packages/${DISTRIBUTION}/${release}" \( -name '*amd64.deb' -o -name '*_all.deb' \) |
     parallel -j4 '
       echo "Lintian package {}"
-      lintian "{}" --tag-display-limit 0 --verbose --allow-root
+      lintian "{}" --tag-display-limit 0 --verbose --allow-root '"$suppress"'
     '; then
     echo "Lintian reported errors for ${DISTRIBUTION}/${release}"
     failed=1
