@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos_tezlink_farfadet_r4_su"
+name = "tezos_tezlink_farfadet_r5_su"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
