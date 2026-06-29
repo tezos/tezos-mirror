@@ -114,6 +114,7 @@ let job_release_page =
     ~__POS__
     ~image:Images.CI.release_page
     ~stage:Publish
+    ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:
       "A job to update the rollup node release page. If running in a test \
        pipeline, the assets are pushed in the \
@@ -133,15 +134,13 @@ let job_release_page =
           ]
       | `no_build_dependencies -> [])
     ~variables:
+      (* The S3_BUCKET and DISTRIBUTION_ID depend on the release type (tests
+         or not). *)
       (match pipeline_type with
       | `test ->
-          (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
-            depends on the release type (tests or not). *)
           [
             ("S3_BUCKET", "release-page-test.nomadic-labs.com");
             ("DISTRIBUTION_ID", "E19JF46UG3Z747");
-            ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
-            ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
           ]
       | `real ->
           [
