@@ -4,13 +4,15 @@
 // SPDX-License-Identifier: MIT
 
 use crate::error::EvmDbError;
+use crate::helpers::storage::read_u256_le_default;
 use crate::storage::{
     block::{get_block_hash, BLOCKS_STORED},
     code::CodeStorage,
-    sequencer_key_change::store_sequencer_key_change,
+    sequencer_key_change::{store_sequencer_key_change, write_sequencer_change_counter},
     world_state_handler::{
         AccountInfo, AccountOrigin, StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_PATH,
-        KT1_B58_SIZE, NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_PATH,
+        KT1_B58_SIZE, NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_CHANGE_COUNTER_PATH,
+        SEQUENCER_KEY_PATH,
     },
 };
 use evm_types::{
@@ -304,6 +306,14 @@ where
             Err(e) => Err(e.into()),
         }
     }
+
+    fn sequencer_change_counter(&self) -> Result<U256, PrecompileStateError> {
+        Ok(read_u256_le_default(
+            self.host,
+            &SEQUENCER_KEY_CHANGE_COUNTER_PATH,
+            U256::ZERO,
+        )?)
+    }
 }
 
 impl<Host, R: Registry> Database for EtherlinkVMDB<'_, Host, R>
@@ -366,6 +376,20 @@ where
                 self,
                 store_sequencer_key_change(self.host, new_sequencer_key_change),
                 "DatabaseCommitPrecompileStateChanges `store_sequencer_key_change`"
+            );
+        }
+        // Persist the replay counter finalized by the layered state. The bump
+        // happens at store-time (see `LayeredState::store_sequencer_key_change`)
+        // so the counter -- like the change itself -- is rolled back by a
+        // reverting transaction, and `commit` only writes the finalized value
+        // rather than doing a durable read-modify-write. This is the only bump
+        // on the precompile path (application via `store_sequencer` does not bump
+        // again), so a single change advances the counter by exactly one.
+        if let Some(sequencer_change_counter) = etherlink_data.sequencer_change_counter {
+            abort_on_error!(
+                self,
+                write_sequencer_change_counter(self.host, sequencer_change_counter),
+                "DatabaseCommitPrecompileStateChanges `write_sequencer_change_counter`"
             );
         }
         if let Some(global_counter) = etherlink_data.global_counter {

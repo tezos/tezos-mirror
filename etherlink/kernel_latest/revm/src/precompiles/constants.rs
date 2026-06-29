@@ -291,6 +291,20 @@ pub const TICKS_PER_FA_DEPOSIT_PARSING: u64 = 3_500_000;
 
 pub(crate) const SEQUENCER_UPGRADE_DELAY: u64 = 60 * 60 * 24; // 24 hours
 
+/// Domain-separation tag prepended to the payload the sequencer signs for a key
+/// change (see [`crate::precompiles::change_sequencer_key`]).
+///
+/// It is a unique, human-readable label so that the change message domain is
+/// disjoint from every other message the sequencer key signs, now and in the
+/// future. Its first byte (`0x73`, 's') is already `< 0xc0`, which alone makes
+/// it disjoint from the RLP-encoded blueprint chunks the sequencer also signs
+/// (an RLP list always starts with a byte `>= 0xc0`). The full string tag goes
+/// further: it guarantees no accidental clash even with a hypothetical future
+/// signed message that does not start `>= 0xc0`. A signature captured over any
+/// such message can therefore never be replayed as a valid change signature
+/// (and vice-versa).
+pub(crate) const SEQUENCER_KEY_CHANGE_SIGN_TAG: &[u8] = b"sequencer_change";
+
 #[cfg(test)]
 mod test {
     use super::{
