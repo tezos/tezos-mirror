@@ -785,7 +785,7 @@ pub fn store_sequencer<Host: Runtime>(
 ) -> anyhow::Result<()> {
     let pk_b58 = PublicKey::to_b58check(public_key);
     let bytes = String::as_bytes(&pk_b58);
-    host.store_write(&SEQUENCER, bytes, 0).map_err(Into::into)
+    host.store_write_all(&SEQUENCER, bytes).map_err(Into::into)
 }
 
 pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
