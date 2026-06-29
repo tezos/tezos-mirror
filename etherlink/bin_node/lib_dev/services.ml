@@ -1739,6 +1739,22 @@ let dispatch_request (type f) ~websocket
               rpc_ok pk
             in
             build ~f module_ parameters
+        | Sequencer_key_change_counter.Method ->
+            let f block_param =
+              let block =
+                Option.value
+                  ~default:(Block_parameter.Block_parameter Latest)
+                  block_param
+              in
+              let* state = Evm_ro_context.get_state ro_ctxt ~block () in
+              (* The counter only exists once a change has happened; the
+                 kernel treats its absence as zero, so we do the same. *)
+              let* counter =
+                Durable_storage.(read_opt Sequencer_change_counter state)
+              in
+              rpc_ok (Option.value ~default:Qty.zero counter)
+            in
+            build ~f module_ parameters
         | Eth_max_priority_fee_per_gas.Method ->
             let f (_ : unit option) = rpc_ok Qty.zero in
             build ~f module_ parameters
