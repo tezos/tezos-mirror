@@ -195,6 +195,12 @@ module Request = struct
     in
     {method_ = "tez_kernelRootHash"; parameters}
 
+  let tez_getSequencerKeyChangeCounter ?(block = Latest) () =
+    {
+      method_ = "tez_getSequencerKeyChangeCounter";
+      parameters = `A [block_param_to_json block];
+    }
+
   let tez_getMichelsonActivationLevel =
     {method_ = "tez_getMichelsonActivationLevel"; parameters = `Null}
 
@@ -805,6 +811,19 @@ let tez_kernelRootHash ?websocket ?block evm_node =
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string_opt)
+       response
+
+let tez_getSequencerKeyChangeCounter ?websocket ?block evm_node =
+  let* response =
+    Evm_node.jsonrpc
+      ?websocket
+      evm_node
+      (Request.tez_getSequencerKeyChangeCounter ?block ())
+  in
+  return
+  @@ decode_or_error
+       (fun response ->
+         Evm_node.extract_result response |> JSON.as_string |> Int64.of_string)
        response
 
 let tez_getMichelsonActivationLevel ?websocket evm_node =
