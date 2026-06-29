@@ -4,6 +4,13 @@
 
 ### EVM Runtime
 
+- Sequencer key changes via the `change_sequencer_key` precompile are now
+  replay-protected: the signature covers the new key bound to the chain id and a
+  monotonic change counter, so captured calldata is single-use and cannot be
+  replayed to indefinitely postpone a pending change's activation. The counter
+  advances by exactly one per change — at scheduling time for a precompile
+  change, at activation time for a governance change — and is exposed to the
+  next signer. (!22504)
 - The `verify_tezos_signature` precompile (reached through an alias
   forwarder's EIP-1271 `isValidSignature`) now rejects non-canonical
   high-S P-256 (tz3) signatures. ECDSA is malleable: for any valid
