@@ -196,19 +196,6 @@ trigger:debian_repository_partial:
     include: .gitlab/ci/pipelines/debian_repository_partial.yml
     strategy: depend
 
-trigger:base_images:
-  stage: manual
-  variables:
-    PIPELINE_TYPE: before_merging-base_images
-    DOCKER_FORCE_BUILD: "true"
-  rules:
-  - when: manual
-    allow_failure: true
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/base_images.yml
-    strategy: depend
-
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build

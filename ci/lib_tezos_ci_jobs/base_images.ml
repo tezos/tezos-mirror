@@ -615,9 +615,3 @@ let () =
   in
   Cacio.register_merge_request_jobs jobs ;
   Cacio.register_jobs Cacio.Base_images_daily jobs
-
-let child_pipeline =
-  Pipeline.register_child
-    "base_images"
-    ~description:"Build CI base images"
-    ~jobs:(job_datadog_pipeline_trace :: Cacio.get_jobs Cacio.Base_images_daily)
