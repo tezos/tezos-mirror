@@ -2077,7 +2077,7 @@ mod tests {
         );
         // Inbound CRAC: source = A (originator), sender = B (caller).
         // Use a finite gas limit: gas::convert(Ethereum, Tezos, gas) =
-        // gas * EVM_GAS_TO_MILLIGAS (100), so u64::MAX overflows and the
+        // gas * EVM_GAS_TO_MILLIGAS (22), so u64::MAX overflows and the
         // alias generation returns an error before ensure_alias is called.
         // 30_000_000 (30 M) is large enough for the bytecode + precompile but
         // small enough not to overflow the milligas conversion.

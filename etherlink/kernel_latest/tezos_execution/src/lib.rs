@@ -2489,7 +2489,7 @@ mod tests {
     use tezosx_journal::TezosXJournal;
     use typed_arena::Arena;
 
-    use crate::enshrined_contracts::{CracError, TEZOSX_GATEWAY_PER_BYTE_MILLIGAS};
+    use crate::enshrined_contracts::{CracError, PERSISTED_ERROR_PER_BYTE_MILLIGAS};
     use crate::gas::TezlinkOperationGas;
     use crate::make_default_ctx;
     use crate::storage_fees::{COST_PER_BYTES, ORIGINATION_SIZE};
@@ -10186,14 +10186,15 @@ mod tests {
     }
 
     /// Gas consumed by `cross_runtime_transfer` scales with the FAILWITH
-    /// payload length.  The exact per-byte delta matches the sum of three
-    /// contributions that each scale linearly with `n`:
+    /// payload length.  The exact delta matches the sum of three
+    /// contributions that grow with `n`:
     ///
     /// 1. Storage code read (`STORAGE_READ_PER_BYTE_MILLIGAS` per code byte)
     /// 2. Micheline decode (`interpret_cost::micheline_decoding_bytes` per code byte)
-    /// 3. `charge_persisted_error` (`TEZOSX_GATEWAY_PER_BYTE_MILLIGAS` per
-    ///    rendered Debug byte, charged on the one persisted copy of the
-    ///    error — synthetic alias(E_1)→target failed-transfer internal op)
+    /// 3. `charge_persisted_error` (`PERSISTED_ERROR_PER_BYTE_MILLIGAS` per
+    ///    byte of the persisted Debug body, charged on the one persisted copy
+    ///    of the error — synthetic alias(E_1)→target failed-transfer internal
+    ///    op)
     ///
     /// The two scripts differ by exactly `N_LONG - N_SHORT = 190` bytes in
     /// both binary encoding and rendered error length.
@@ -10260,10 +10261,12 @@ mod tests {
             other => panic!("expected Operation error (long), got: {other:?}"),
         };
         // The error is persisted once (synthetic alias(E_1)→target
-        // failed-transfer entry only), so the per-byte charge applies to 1×
-        // the rendered length delta.
+        // failed-transfer entry only), charged per byte over the *wrapped*
+        // length ("Transfer(" + bare_debug + ")", i.e. bare + 10). The
+        // constant +10 wrapper cancels in the delta, so the per-byte charge
+        // applies to the rendered length delta.
         let metering_delta =
-            TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * (long_rendered - short_rendered);
+            PERSISTED_ERROR_PER_BYTE_MILLIGAS * (long_rendered - short_rendered);
 
         assert_eq!(
             gas_long - gas_short,
