@@ -14178,8 +14178,32 @@ let test_claim_deposit_event =
   capture_logs ~header:"Claimed deposit" receipt.logs ;
   unit
 
-let call_evm_based_sequencer_key_change ~sender ~sequencer ~sequencer_owner
-    ~new_key =
+(* Builds the [change_sequencer_key] calldata: the new public key (Tezos binary
+   encoding) and a Tezos signature produced by [sequencer_owner] (the current
+   sequencer). The signed payload is a domain-separation tag followed by the new
+   key bound to [chain_id] and to the current change [counter], each appended
+   as a 32-byte big-endian integer:
+
+     sign( tag ++ pk_bytes ++ be32(chain_id) ++ be32(counter) )
+
+   [tag] is a unique domain-separation label (kept in sync with the kernel's
+   [SEQUENCER_KEY_CHANGE_SIGN_TAG]). It makes the change signing domain
+   disjoint from every other message the sequencer key signs (e.g. RLP-encoded
+   blueprint chunks), so a signature captured elsewhere cannot be replayed here.
+
+   The kernel recomputes [chain_id] (from the block config) and [counter] (from
+   storage) itself — they are NOT part of the calldata — so a captured
+   [(publicKey, signature)] is valid on this chain only, and only until the next
+   change bumps the counter. It therefore cannot be replayed on another
+   Etherlink chain nor after the key has rotated again. *)
+let sequencer_key_change_sign_tag = "sequencer_change"
+
+let be32_of_int n =
+  let b = Bytes.make 32 '\000' in
+  Bytes.set_int64_be b 24 (Int64.of_int n) ;
+  b
+
+let sequencer_key_change_calldata ~sequencer_owner ~chain_id ~counter ~new_key =
   let new_pk = Tezos_crypto.Signature.Public_key.of_b58check_exn new_key in
   let bytes =
     match
@@ -14196,11 +14220,21 @@ let call_evm_based_sequencer_key_change ~sender ~sequencer ~sequencer_owner
              err)
   in
   let hex_pk = Hex.of_bytes bytes |> Hex.show in
+  let signed_payload =
+    Bytes.concat
+      Bytes.empty
+      [
+        Bytes.of_string sequencer_key_change_sign_tag;
+        bytes;
+        be32_of_int chain_id;
+        be32_of_int counter;
+      ]
+  in
   let hex_signature =
     match
       Data_encoding.Binary.to_bytes
         Tezos_crypto.Signature.encoding
-        (Account.sign_bytes ~signer:sequencer_owner bytes)
+        (Account.sign_bytes ~signer:sequencer_owner signed_payload)
     with
     | Ok bytes -> Hex.of_bytes bytes |> Hex.show
     | Error err ->
@@ -14210,20 +14244,47 @@ let call_evm_based_sequencer_key_change ~sender ~sequencer ~sequencer_owner
              Data_encoding.Binary.pp_write_error
              err)
   in
+  (hex_pk, hex_signature)
+
+(* Wraps the [change_sequencer_key] calldata in a fresh EVM transaction with an
+   explicit [nonce], so the same inner calldata can be (re)submitted any number
+   of times under different EVM-level nonces / senders. *)
+let craft_sequencer_key_change_tx ~sender ~sequencer ~chain_id ~nonce ~hex_pk
+    ~hex_signature =
   let* gas_price = Rpc.get_gas_price sequencer in
   let gas_price = Int32.to_int gas_price in
+  Cast.craft_tx
+    ~signature:"change_sequencer_key(bytes,bytes)"
+    ~source_private_key:sender
+    ~chain_id
+    ~nonce
+    ~gas_price
+    ~gas:100_000
+    ~value:(Wei.of_eth_int 1)
+    ~address:Solidity_contracts.Precompile.sequencer_key_change
+    ~arguments:[hex_pk; hex_signature]
+    ()
+
+let call_evm_based_sequencer_key_change ~sender ~sequencer ~sequencer_owner
+    ~new_key =
+  (* Fetch the chain_id and the current change counter from the node rather
+     than hardcoding them, so the helper is valid on any chain and after any
+     number of previous changes (the payload must be signed against the
+     counter the *next* change will be checked against). *)
+  let*@ chain_id = Rpc.get_chain_id sequencer in
+  let*@ counter = Rpc.tez_getSequencerKeyChangeCounter sequencer in
+  let counter = Int64.to_int counter in
+  let hex_pk, hex_signature =
+    sequencer_key_change_calldata ~sequencer_owner ~chain_id ~counter ~new_key
+  in
   let* raw_sequencer_upgrade =
-    Cast.craft_tx
-      ~signature:"change_sequencer_key(bytes,bytes)"
-      ~source_private_key:sender
-      ~chain_id:1337
+    craft_sequencer_key_change_tx
+      ~sender
+      ~sequencer
+      ~chain_id
       ~nonce:0
-      ~gas_price
-      ~gas:100_000
-      ~value:(Wei.of_eth_int 1)
-      ~address:Solidity_contracts.Precompile.sequencer_key_change
-      ~arguments:[hex_pk; hex_signature]
-      ()
+      ~hex_pk
+      ~hex_signature
   in
   let*@ tx = Rpc.send_raw_transaction ~raw_tx:raw_sequencer_upgrade sequencer in
   return tx
@@ -14353,6 +14414,147 @@ let test_sequencer_key_change_fails_if_governance_upgrade_exists =
     Rpc.get_transaction_receipt ~tx_hash:tx sequencer
   in
   Check.((status = false) bool ~error_msg:"Transaction should have failed") ;
+  unit
+
+(* Replaying [change_sequencer_key] must NOT reset the activation clock.
+
+   The precompile has no caller guard (auth is by signature), so the
+   [(publicKey, signature)] calldata of a legitimate change can be re-wrapped
+   in a fresh EVM tx by anyone. Were a resubmission accepted, it would overwrite
+   the pending change with a *fresh* [block.timestamp + SEQUENCER_UPGRADE_DELAY],
+   letting anyone postpone the change indefinitely (griefing).
+
+   The signed payload binds the new key to the chain_id and the change counter,
+   and the counter is bumped as soon as a change is *stored* (not only when it is
+   applied). So the captured signature becomes stale the moment the pending change
+   is scheduled: any replay is signed against an outdated counter and reverts. This
+   scenario schedules a change at genesis (activates at genesis + 1d), replays
+   the very same calldata once before that deadline (which must be rejected), and
+   checks the change still fires at its ORIGINAL deadline — i.e. the clock was
+   not pushed back. *)
+let test_sequencer_key_change_replay_doesnt_reset_activation =
+  let sequencer_owner = Constant.bootstrap1 in
+  let new_sequencer_owner = Constant.bootstrap2 in
+  let genesis_timestamp_str = "2020-01-01T00:00:00Z" in
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn genesis_timestamp_str))
+  in
+  (* SEQUENCER_UPGRADE_DELAY = 86400s (1 day), so the genesis change activates
+     at 2020-01-02T00:00:00Z; this deadline is just past it. *)
+  let original_activation_deadline = "2020-01-02T01:00:00Z" in
+  (* A replay lands here, before the activation. Were it accepted it would push
+     activation to 2020-01-02T12:00:00Z, strictly after the deadline above. *)
+  let replay_timestamp = "2020-01-01T12:00:00Z" in
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "sequencer_upgrade"]
+    ~title:
+      "Replaying change_sequencer_key calldata does not reset the activation \
+       delay"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+    ~sequencer:sequencer_owner
+    ~additional_sequencer_keys:[new_sequencer_owner]
+    ~genesis_timestamp
+    ~instant_confirmations:true
+  @@ fun {sequencer; sc_rollup_node; client; kernel; _} _protocol ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let new_key = new_sequencer_owner.public_key in
+  let new_key_hex = Hex.of_string new_key |> Hex.show in
+  let*@ chain_id = Rpc.get_chain_id sequencer in
+  (* No change has happened yet on this fresh chain, so the counter the next
+     change must be signed against is 0. *)
+  let*@ counter_before = Rpc.tez_getSequencerKeyChangeCounter sequencer in
+  Check.(
+    (counter_before = 0L)
+      int64
+      ~error_msg:"Expected genesis change counter %R, got %L") ;
+  (* The sequencer signs ONE change to [new_key] (against the current counter,
+     fetched above); this calldata is reused for every (re)submission below. *)
+  let hex_pk, hex_signature =
+    sequencer_key_change_calldata
+      ~sequencer_owner
+      ~chain_id
+      ~counter:(Int64.to_int counter_before)
+      ~new_key
+  in
+  (* [propose_next_block_timestamp] writes the timestamp into the blueprint, so
+     the observer replays the same block deterministically. (Producing a
+     tx-bearing block with [produce_block ~timestamp] instead diverges the
+     observer.) *)
+  let send_key_change ~nonce ~timestamp =
+    let*@ () = Rpc.propose_next_block_timestamp ~timestamp sequencer in
+    let* raw =
+      craft_sequencer_key_change_tx
+        ~sender:whale.private_key
+        ~sequencer
+        ~chain_id
+        ~nonce
+        ~hex_pk
+        ~hex_signature
+    in
+    let*@ tx = Rpc.send_raw_transaction ~raw_tx:raw sequencer in
+    let*@ _ = produce_block sequencer in
+    let*@! Transaction.{status; _} =
+      Rpc.get_transaction_receipt ~tx_hash:tx sequencer
+    in
+    return status
+  in
+  (* Block 1 @ genesis: schedule the legitimate change.
+     Stored activation = genesis + 1d = 2020-01-02T00:00:00Z. *)
+  let* status0 = send_key_change ~nonce:0 ~timestamp:genesis_timestamp_str in
+  Check.((status0 = true) bool ~error_msg:"Initial change tx failed") ;
+  (* Storing the change bumps the counter immediately (the new key was signed
+     against counter 0, so that calldata is now stale), even though the change
+     has not activated yet. *)
+  let*@ counter_after = Rpc.tez_getSequencerKeyChangeCounter sequencer in
+  Check.(
+    (counter_after = 1L)
+      int64
+      ~error_msg:"Expected change counter %R after scheduling, got %L") ;
+  (* Block 2 @ genesis+12h: REPLAY the same calldata. Its signature was made
+     against counter 0, which is now stale, so the precompile rejects it; the
+     original activation (2020-01-02T00:00:00Z) is left untouched. *)
+  let* status1 = send_key_change ~nonce:1 ~timestamp:replay_timestamp in
+  Check.(
+    (status1 = false)
+      bool
+      ~error_msg:
+        "Replay of the change calldata was accepted: a stale-counter signature \
+         must not be able to reschedule the pending change") ;
+  (* Block 3 @ original deadline: we are past the ORIGINAL activation
+     (2020-01-02T00:00:00Z). Since the replay was rejected, the clock was not
+     pushed back, so the change has fired and the sequencer key is the new
+     one. *)
+  let*@ () =
+    Rpc.propose_next_block_timestamp
+      ~timestamp:original_activation_deadline
+      sequencer
+  in
+  let*@ _ = produce_block sequencer in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
+  let*@! value =
+    Rpc.state_value sequencer (Durable_storage_path.sequencer kernel)
+  in
+  Check.(
+    (value = new_key_hex)
+      string
+      ~error_msg:
+        "Change did not fire at its original deadline: expected the key to be \
+         %R, but got %L") ;
+  (* Applying the change must NOT bump the counter a second time: the bump
+     already happened when the change was stored. A single change therefore
+     advances the counter by exactly one (1, not 2). A post-activation value of
+     2 would mean the apply path double-counts, which would silently reject a
+     legitimately pre-signed next change. *)
+  let*@ counter_applied = Rpc.tez_getSequencerKeyChangeCounter sequencer in
+  Check.(
+    (counter_applied = 1L)
+      int64
+      ~error_msg:
+        "Expected change counter %R after the change activated, got %L (a \
+         value of 2 means the apply path double-incremented)") ;
   unit
 
 let test_eip2930_storage_access =
@@ -16943,6 +17145,7 @@ let () =
   test_claim_deposit_event [Alpha] ;
   test_sequencer_key_change [Alpha] ;
   test_sequencer_key_change_fails_if_governance_upgrade_exists [Alpha] ;
+  test_sequencer_key_change_replay_doesnt_reset_activation [Alpha] ;
   test_eip2930_storage_access [Alpha] ;
   test_eip7702 [Alpha] ;
   test_deposits_on_eip7702_accounts [Alpha] ;

@@ -326,6 +326,16 @@ val tez_kernelRootHash :
   Evm_node.t ->
   (string option, error) result Lwt.t
 
+(** [tez_getSequencerKeyChangeCounter ?block evm_node] calls
+    [tez_getSequencerKeyChangeCounter]. Returns the sequencer key change
+    counter at [block] (defaults to [Latest] if omitted), i.e. the value the
+    next change must be signed against. Absent from storage is reported as 0. *)
+val tez_getSequencerKeyChangeCounter :
+  ?websocket:Websocket.t ->
+  ?block:block_param ->
+  Evm_node.t ->
+  (int64, error) result Lwt.t
+
 (** [tez_getMichelsonActivationLevel evm_node] calls
     [tez_getMichelsonActivationLevel]. Returns the EVM block level at which the
     Michelson runtime was activated, or [None] if it has not been activated. *)
