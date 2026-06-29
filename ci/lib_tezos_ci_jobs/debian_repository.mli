@@ -25,9 +25,3 @@ val job_apt_repo_debian : repository_pipeline -> Cacio.job
 
 (** Job [apt_repo_ubuntu]. *)
 val job_apt_repo_ubuntu : repository_pipeline -> Cacio.job
-
-(** Child pipeline [debian_repository_partial]. *)
-val child_pipeline_partial : Tezos_ci.Pipeline.child_pipeline
-
-(** Child pipeline [debian_repository_partial_auto]. *)
-val child_pipeline_partial_auto : Tezos_ci.Pipeline.child_pipeline

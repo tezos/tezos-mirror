@@ -60,7 +60,6 @@ let changeset_debian_packages =
   Changeset.(
     make
       [
-        ".gitlab/ci/pipelines/debian_repository_partial_auto.yml";
         "scripts/packaging/build-deb-local.sh";
         "scripts/packaging/Release.conf";
         "scripts/packaging/octez/debian/*";

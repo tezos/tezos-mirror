@@ -172,26 +172,6 @@ let jobs pipeline_type =
 
   (* Test jobs*)
   let test =
-    (* This job triggers the debian child pipeline automatically if any
-       files in the changeset is modified. It's the same as
-       job_debian_repository_trigger that can be run manually.
-        We want both:
-       - to trigger the debian repository test automatically when relevant
-          files change, if the whole pipeline was triggered;
-       - and to be able to trigger the debian repository test manually,
-          whether relevant files changed or not, without having to trigger the
-          whole pipeline.
-         To achieve that we need to duplicate the job, because
-         it needs two different sets of dependencies. *)
-    let job_debian_repository_trigger_auto =
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:No ~changes:changeset_debian_packages ())
-        ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
-        Debian_repository.child_pipeline_partial_auto
-    in
-
     let job_homebrew_trigger_auto =
       trigger_job
         ~__POS__
@@ -202,30 +182,12 @@ let jobs pipeline_type =
     in
 
     match pipeline_type with
-    | Before_merging | Merge_train ->
-        [job_debian_repository_trigger_auto; job_homebrew_trigger_auto]
+    | Before_merging | Merge_train -> [job_homebrew_trigger_auto]
     | Schedule_extended_test -> []
   in
 
   (* Manual jobs *)
   let manual =
-    (* On scheduled pipelines we build and test the full packages test matrix.
-       On [Before_merging] pipelines only a subset of the packages are built
-       and tested. There is a similar job job_debian_repository_trigger_auto
-       in the test stage that is started automatically if any files related to
-       packaging is changed. *)
-    let job_debian_repository_trigger_partial : tezos_job =
-      (* Same as [job_debian_repository_trigger_auto] but manual,
-         so that one can trigger it without triggering the whole main pipeline.
-         See comment near the definition of [job_debian_repository_trigger_auto]. *)
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:Yes ())
-        ~dependencies:(Dependent [])
-        ~stage:Stages.manual
-        Debian_repository.child_pipeline_partial
-    in
-
     let job_homebrew_repository_trigger : tezos_job =
       (* We leave the possibility to run this pipeline manually, in particular
          to generate the formula on scheduled pipelines *)
@@ -246,7 +208,7 @@ let jobs pipeline_type =
              already manual, and what's more, puts the pipeline in a
              confusing "pending state" with a yellow "pause" icon on the
              [manual] stage. *)
-        [job_homebrew_repository_trigger; job_debian_repository_trigger_partial]
+        [job_homebrew_repository_trigger]
     (* No manual jobs on the scheduled pipeline *)
     | Merge_train | Schedule_extended_test -> []
   in

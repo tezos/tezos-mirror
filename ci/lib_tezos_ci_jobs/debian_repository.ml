@@ -186,6 +186,8 @@ let job_build_ubuntu =
 
 let make_apt_repo_job ~pipeline_type ~build_job ~distribution ~releases =
   CI.job
+    ~only_if_changed:
+      (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~description:
       (sf "Create the apt repository for %s packages and sign it." distribution)
     ~stage:Publish
@@ -232,6 +234,8 @@ let job_apt_repo_ubuntu =
 
 let make_lintian_job ~distribution ~releases =
   CI.job
+    ~only_if_changed:
+      (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~stage:Test_publication
     ~description:(sf "Run lintian on %s packages." distribution)
     ~script:
@@ -305,6 +309,8 @@ let job_reproducibility_debian =
 
 let make_install_bin_job ~distribution ~release =
   CI.job
+    ~only_if_changed:
+      (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~stage:Test_publication
     ~description:(sf "Check that %s packages can be installed." distribution)
     ~variables:[("PREFIX", "")]
@@ -358,6 +364,8 @@ let job_install_bin_debian_trixie =
 
 let make_systemd_test_job ~script ~distribution ~release =
   CI.job
+    ~only_if_changed:
+      (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~stage:Test_publication
     ~image:Images.Base_images.alpine_docker_ci
     ~services:[{name = Images.Base_images.dind_service}]
@@ -521,18 +529,20 @@ let job_test_keyring_ubuntu_26_04 =
     ~release:"26.04"
 
 let () =
-  (* In merge pipelines we tests only Debian.
-     Ubuntu packages are built and tested in the scheduled pipelines. *)
-  Cacio.register_jobs
-    Debian_partial
+  (* Register the Debian partial jobs directly into before_merging and
+     merge_train pipelines with only_if_changed so they run automatically
+     only when relevant files change. *)
+  Cacio.register_merge_request_jobs
     [
       (Auto, job_apt_repo_debian Partial);
       (Auto, job_lintian_debian Partial);
-      (Auto, job_install_bin_debian_trixie Partial);
-      (Auto, job_install_bin_debian_trixie_systemd Partial);
-      (Auto, job_upgrade_bin_debian_trixie_systemd Partial);
-      (Auto, job_test_keyring_debian_trixie Partial);
+      (Auto, job_install_bin_debian_bookworm Partial);
+      (Auto, job_install_bin_debian_bookworm_systemd Partial);
+      (Auto, job_upgrade_bin_debian_bookworm_systemd Partial);
+      (Auto, job_test_keyring_debian_bookworm Partial);
     ] ;
+  (* In merge pipelines we tests only Debian.
+     Ubuntu packages are built and tested in the scheduled pipelines. *)
   Cacio.register_jobs
     Debian_daily
     [
@@ -562,33 +572,3 @@ let () =
       (Auto, job_test_keyring_ubuntu_26_04 Full);
     ] ;
   ()
-
-let register ~auto ~description pipeline_type =
-  let pipeline_name =
-    match (pipeline_type, auto) with
-    | Partial, false -> "debian_repository_partial"
-    | Partial, true -> "debian_repository_partial_auto"
-    | Full, _ -> "debian_repository_full"
-    | Release, _ -> "debian_repository_release"
-  in
-  Pipeline.register_child
-    pipeline_name
-    ~description
-    ~jobs:(job_datadog_pipeline_trace :: Cacio.get_jobs Debian_partial)
-
-let child_pipeline_partial =
-  register
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       Debian stable .deb packages."
-    ~auto:false
-    Partial
-
-let child_pipeline_partial_auto =
-  register
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       Debian stable .deb packages. Starts automatically on certain \
-       conditions."
-    ~auto:true
-    Partial
