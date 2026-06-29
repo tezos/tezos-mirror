@@ -240,6 +240,7 @@ type ('a, 'cap) path =
   | Kernel_root_hash : (Ethereum_types.hex, ro) path
   | Multichain_flag : (unit, ro) path
   | Sequencer_key : (Signature.Public_key.t, ro) path
+  | Sequencer_change_counter : (Ethereum_types.quantity, ro) path
   | Chain_config_family :
       L2_types.chain_id
       -> (L2_types.ex_chain_family, ro) path
@@ -529,6 +530,9 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               (fun bytes ->
                 Signature.Public_key.of_b58check (Bytes.to_string bytes));
           })
+  | Sequencer_change_counter ->
+      static_ro
+        (qty_le_ro_codec ~path:Durable_storage_path.sequencer_change_counter)
   | Chain_config_family cid ->
       versioned_ro (fun ~storage_version ->
           {
