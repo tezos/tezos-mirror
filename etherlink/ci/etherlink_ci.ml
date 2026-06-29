@@ -270,6 +270,36 @@ let job_mir_tzt =
          --bin tzt_runner tzt_reference_test_suite/*.tzt";
       ]
 
+(* Tickets are enabled in MIR's default feature set but disabled in the shipped
+   Tezos X / etherlink kernel, which depends on MIR with [default-features =
+   false] (see L2-1680). The default MIR builds (e.g. [job_mir_tzt]) therefore
+   exercise the ticket implementation, but nothing otherwise checks the
+   tickets-disabled configuration the kernel actually ships. This job checks and
+   tests MIR with that configuration so the disabled path (rejection at
+   typechecking) stays clean and tested. *)
+let job_mir_no_tickets =
+  CI.job
+    "mir_no_tickets"
+    ~__POS__
+    ~stage:Test
+    ~description:
+      "Check and test MIR with tickets disabled, as shipped in the kernel \
+       (L2-1680)."
+    ~image:Images.Base_images.debian_rust_trixie
+    ~only_if_changed:Files.mir
+    ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    ~script:
+      [
+        "cargo clippy --manifest-path etherlink/kernel_latest/mir/Cargo.toml \
+         --no-default-features --features bls,allow_lazy_storage_transfer \
+         --all-targets -- --deny warnings";
+        "RUST_MIN_STACK=104857600 RUST_TEST_THREADS=1 cargo test \
+         --manifest-path etherlink/kernel_latest/mir/Cargo.toml \
+         --no-default-features --features bls,allow_lazy_storage_transfer";
+      ]
+
 let job_build_tezt =
   CI.job
     "build_tezt"
@@ -442,6 +472,7 @@ let register () =
       (Auto, job_test_evm_compatibility);
       (Auto, job_test_revm_compatibility);
       (Auto, job_mir_tzt);
+      (Auto, job_mir_no_tickets);
       (Auto, job_tezt `merge_request);
       (Manual, job_tezt_slow `merge_request);
       (Manual, job_tezt_extra `merge_request);
@@ -480,5 +511,6 @@ let register () =
       (Auto, job_tezt_extra `scheduled);
       (Auto, job_tezt_flaky `scheduled);
       (Auto, job_mir_tzt);
+      (Auto, job_mir_no_tickets);
     ] ;
   ()

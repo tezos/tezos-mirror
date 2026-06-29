@@ -379,17 +379,40 @@ macro_rules! micheline_unsupported_types_common {
     };
 }
 
+// Tickets are disabled by default (see L2-1680): unless the `tickets` feature
+// is enabled, the `ticket` type is part of the unsupported set and rejected by
+// the typechecker with `TcError::TodoType`.
+/// Pattern synonym for the unsupported types common to all configurations,
+/// extended with `ticket` when the `tickets` feature is disabled.
+#[cfg(not(feature = "tickets"))]
+#[macro_export]
+macro_rules! micheline_unsupported_types_base {
+    () => {
+        $crate::micheline_unsupported_types_common!() | Prim::ticket
+    };
+}
+
+/// Pattern synonym for the unsupported types common to all configurations
+/// (with the `tickets` feature enabled, `ticket` is supported).
+#[cfg(feature = "tickets")]
+#[macro_export]
+macro_rules! micheline_unsupported_types_base {
+    () => {
+        $crate::micheline_unsupported_types_common!()
+    };
+}
+
 #[cfg(feature = "bls")]
 macro_rules! micheline_unsupported_types {
     () => {
-        $crate::micheline_unsupported_types_common!()
+        $crate::micheline_unsupported_types_base!()
     };
 }
 
 #[cfg(not(feature = "bls"))]
 macro_rules! micheline_unsupported_types {
     () => {
-        $crate::micheline_unsupported_types_common!()
+        $crate::micheline_unsupported_types_base!()
             | Prim::bls12_381_fr
             | Prim::bls12_381_g1
             | Prim::bls12_381_g2
@@ -479,17 +502,47 @@ macro_rules! micheline_unsupported_instructions_common {
     };
 }
 
+// Tickets are disabled by default (see L2-1680): unless the `tickets` feature
+// is enabled, the TICKET/READ_TICKET/SPLIT_TICKET/JOIN_TICKETS instructions are
+// part of the unsupported set and rejected by the typechecker with
+// `TcError::TodoInstr`. (`TICKET_DEPRECATED` is already unsupported above.)
+/// Pattern synonym for the unsupported instructions common to all
+/// configurations, extended with the ticket instructions when the `tickets`
+/// feature is disabled.
+#[cfg(not(feature = "tickets"))]
+#[macro_export]
+macro_rules! micheline_unsupported_instructions_base {
+    () => {
+        $crate::micheline_unsupported_instructions_common!()
+            | Prim::TICKET
+            | Prim::READ_TICKET
+            | Prim::SPLIT_TICKET
+            | Prim::JOIN_TICKETS
+    };
+}
+
+/// Pattern synonym for the unsupported instructions common to all
+/// configurations (with the `tickets` feature enabled, the ticket instructions
+/// are supported).
+#[cfg(feature = "tickets")]
+#[macro_export]
+macro_rules! micheline_unsupported_instructions_base {
+    () => {
+        $crate::micheline_unsupported_instructions_common!()
+    };
+}
+
 #[cfg(feature = "bls")]
 macro_rules! micheline_unsupported_instructions {
     () => {
-        $crate::micheline_unsupported_instructions_common!()
+        $crate::micheline_unsupported_instructions_base!()
     };
 }
 
 #[cfg(not(feature = "bls"))]
 macro_rules! micheline_unsupported_instructions {
     () => {
-        $crate::micheline_unsupported_instructions_common!() | Prim::PAIRING_CHECK
+        $crate::micheline_unsupported_instructions_base!() | Prim::PAIRING_CHECK
     };
 }
 

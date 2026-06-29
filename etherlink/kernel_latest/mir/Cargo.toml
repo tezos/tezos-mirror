@@ -35,9 +35,15 @@ nom = { version = "7.1", default-features = false }
 regex = "1.11.3"
 
 [features]
-default = ["bls", "allow_lazy_storage_transfer"]
+default = ["bls", "allow_lazy_storage_transfer", "tickets"]
 bls = ["dep:blst", "tezos_crypto_rs/bls"]
 allow_lazy_storage_transfer = []
+# Ticket support (the `ticket` type and the TICKET/READ_TICKET/SPLIT_TICKET/
+# JOIN_TICKETS instructions). On by default; the Tezos X / etherlink kernel
+# disables it (see L2-1680) by depending on `mir` with `default-features =
+# false` and not listing this feature, so tickets are rejected at typechecking
+# in the shipped runtime.
+tickets = []
 
 [dev-dependencies]
 proptest = "1.3.1"
