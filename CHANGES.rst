@@ -45,6 +45,14 @@ General
 Node
 ----
 
+- **Breaking change** The node ``/metrics`` endpoint is no longer served
+  on the ``--rpc-addr`` (or ``--external-rpc-addr``) listener; querying
+  ``/metrics`` on the RPC port now returns ``404``. Metrics are served
+  only by the dedicated metrics server enabled with ``--metrics-addr``.
+  This aligns the node with the smart rollup and
+  DAL nodes. Setups scraping ``/metrics`` on the RPC port must now run the
+  node with ``--metrics-addr``.
+
 Client
 ------
 
