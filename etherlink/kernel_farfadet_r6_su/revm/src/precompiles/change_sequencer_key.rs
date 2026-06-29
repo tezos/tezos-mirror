@@ -115,9 +115,9 @@ where
                 )));
             };
 
-            if sequencer_key
+            if !sequencer_key
                 .verify_signature(&signature, &call.publicKey)
-                .is_err()
+                .unwrap_or(false)
             {
                 return Err(CustomPrecompileError::Revert(String::from(
                     "invalid signature",
