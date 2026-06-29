@@ -1635,6 +1635,11 @@ where
     }
 }
 
+/// Maximum size, in bytes, of an originated Michelson script (code + storage).
+/// Mirrors L1's `max_operation_data_length`; bounds `decode_raw` at origination
+/// time (defense-in-depth on top of the per-type cap, L2-1706).
+pub const MICHELSON_MAXIMUM_SCRIPT_SIZE: usize = 32 * 1024;
+
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
 pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
@@ -1642,6 +1647,12 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
     parser: &'a Parser<'a>,
     script: &Script,
 ) -> Result<TypedValue<'a>, OriginationError> {
+    let script_size = script.code.len() + script.storage.len();
+    if script_size > MICHELSON_MAXIMUM_SCRIPT_SIZE {
+        return Err(OriginationError::ScriptTooLarge(format!(
+            "{script_size} bytes exceeds the maximum of {MICHELSON_MAXIMUM_SCRIPT_SIZE}"
+        )));
+    }
     let contract_micheline =
         Micheline::decode_raw(&parser.arena, &script.code, ctx.gas())
             .map_err(OriginationError::from)?
@@ -7531,6 +7542,155 @@ mod tests {
             )
             )
         ), "Expected Failed Origination operation result with MirTypecheckingError, got {:?}", receipts[0]);
+    }
+
+    // L2-1706: an oversized script is rejected at origination with
+    // `ScriptTooLarge`. The gate runs before decoding, so raw bytes suffice.
+    #[test]
+    fn test_origination_script_too_large() {
+        let mut host = MockKernelHost::default();
+
+        let src = bootstrap1();
+
+        init_account(&mut host, &src.pkh, 50000);
+        reveal_account(&mut host, &src);
+
+        let context = context::TezlinkContext::init_context();
+
+        let code = vec![1u8; crate::MICHELSON_MAXIMUM_SCRIPT_SIZE + 1];
+        let storage = vec![];
+        let origination_content = OriginationContent {
+            balance: 10.into(),
+            delegate: None,
+            script: Script { code, storage },
+        };
+        let operation = make_operation(
+            10,
+            1,
+            1000,
+            0,
+            src.clone(),
+            vec![OperationContent::Origination(origination_content)],
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        assert_eq!(receipts.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipts[0].receipt,
+                OperationResultSum::Origination(OperationResult {
+                result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                ..
+                }) if errors.len() == 1 && matches!(
+                &errors[0],
+                ApplyOperationError::Origination(
+                    OriginationError::ScriptTooLarge(_)
+                )
+                )
+            ),
+            "Expected Failed Origination operation result with ScriptTooLarge, got {:?}",
+            receipts[0]
+        );
+    }
+
+    // L2-1706 regression: a deeply nested `or` parameter type exceeds the
+    // type-size cap while staying under the script-size cap (~8 kB), so it is
+    // rejected with `MirTypecheckingError` (`TypeTooLarge`) instead of OOM.
+    #[test]
+    fn test_origination_deeply_nested_or_parameter_rejected() {
+        let mut host = MockKernelHost::default();
+
+        let src = bootstrap1();
+
+        init_account(&mut host, &src.pkh, 50000);
+        reveal_account(&mut host, &src);
+
+        let context = context::TezlinkContext::init_context();
+
+        // 1001 `or` levels => 2003 type nodes > 2001 cap, but only ~8 kB.
+        let mut param = String::from("unit");
+        for _ in 0..1001 {
+            param = format!("(or unit {param})");
+        }
+        let script_str = format!(
+            "parameter {param}; storage unit; code {{ CDR; NIL operation; PAIR }}"
+        );
+        let code = mir::parser::Parser::new()
+            .parse_top_level(&script_str)
+            .expect("Should have parsed the deeply nested script")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        assert!(
+            code.len() < crate::MICHELSON_MAXIMUM_SCRIPT_SIZE,
+            "script must stay under the byte cap to exercise the type-size cap",
+        );
+        let storage = Micheline::from(0)
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let origination_content = OriginationContent {
+            balance: 10.into(),
+            delegate: None,
+            script: Script { code, storage },
+        };
+        let operation = make_operation(
+            10,
+            1,
+            100000,
+            0,
+            src.clone(),
+            vec![OperationContent::Origination(origination_content)],
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        assert_eq!(receipts.len(), 1, "There should be one receipt");
+        assert!(matches!(
+            &receipts[0].receipt,
+            OperationResultSum::Origination(OperationResult {
+            result: ContentResult::Failed(ApplyOperationErrors { errors }),
+            ..
+            }) if errors.len() == 1 && matches!(
+            &errors[0],
+            ApplyOperationError::Origination(
+                OriginationError::MirTypecheckingError(msg)
+            ) if msg.contains("type too large")
+            )
+        ), "Expected Failed Origination with MirTypecheckingError(type too large), got {:?}", receipts[0]);
     }
 
     #[test]

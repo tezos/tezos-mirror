@@ -5343,26 +5343,24 @@ let nested_or_param_script depth =
   Buffer.add_string buf " ; storage int ; code { CDR ; NIL operation ; PAIR }" ;
   Buffer.contents buf
 
-(* Depths sit just below the protocol operation size limit (32 KB) so a
-   regression that grows the encoded operation surfaces in CI rather
-   than silently leaving headroom. Layer cost is about 4 bytes for pair
-   and or, 24 bytes for IF. *)
-let deep_pair_depth = 8100
+(* A [pair]/[or] parameter type of depth N has 2*N+1 type nodes, so depth 1000
+   yields exactly [michelson_maximum_type_size] (2001) — the largest type the
+   typechecker accepts (L2-1706). The pair/or tests check that a type right at
+   that cap is still parsed iteratively, without overflowing the stack; a
+   deeper type is rejected, which is covered by the kernel unit tests.
+   [deep_if_depth] is unaffected by the type-size cap: nested [IF] is code, not
+   a parsed type. *)
+let deep_pair_depth = 1000
 
 let deep_if_depth = 1300
 
-let deep_or_depth = 8100
+let deep_or_depth = 1000
 
-(* Smaller depth used by [test_deep_type_in_invalid_arg_error]. The deep
-   parameter type is decoded once at typecheck_value time (the
-   non-recursive walk handles 8100), then rejected and embedded in a
-   [TcError] whose error-body formatter walks the type via the (formerly)
-   recursive [Type] [Debug]. ~2500 layers of [pair int (pair int ...)]
-   suffice to overflow the kernel's ~1 MiB WASM stack along that
-   [Debug] path: per-frame growth on the [Debug] walk is roughly twice
-   that of the [decode] walk, so the safe depth is correspondingly
-   smaller than [deep_pair_depth]. *)
-let deep_pair_invalid_arg_error_depth = 2500
+(* [test_deep_type_in_invalid_arg_error] needs the deep parameter type to be
+   accepted at origination, so it stays at the type-size cap; the transfer then
+   passes a wrong argument so the rejection embeds the deep type and exercises
+   the iterative [Debug] for [Type] without trapping the kernel. *)
+let deep_pair_invalid_arg_error_depth = 1000
 
 let test_deep_pair_param =
   register_tezosx_test
@@ -5376,7 +5374,6 @@ let test_deep_pair_param =
       ~name:"deep_pair_param"
       ~contents:(nested_pair_param_script deep_pair_depth)
   in
-  (* About 32 KB encoded, so the origination burn is around 8 tez. *)
   let* _alias =
     Client.originate_contract
       ~endpoint
@@ -5430,7 +5427,6 @@ let test_deep_or_param =
       ~name:"deep_or_param"
       ~contents:(nested_or_param_script deep_or_depth)
   in
-  (* About 32 KB encoded, so the origination burn is around 8 tez. *)
   let* _alias =
     Client.originate_contract
       ~endpoint

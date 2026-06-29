@@ -69,6 +69,14 @@ pub enum TcError {
     /// child-script nesting.
     #[error("too many recursive calls during typechecking")]
     TypecheckingTooManyRecursiveCalls,
+    /// A type expression exceeded [`MICHELSON_MAXIMUM_TYPE_SIZE`] nodes.
+    #[error("type too large: {size} nodes exceeds the maximum of {max}")]
+    TypeTooLarge {
+        /// Number of nodes seen when the limit was exceeded.
+        size: usize,
+        /// The maximum allowed number of nodes.
+        max: usize,
+    },
     /// Failed to interpret a number as a value of some type due to a numeric
     /// conversion error.
     #[error("numeric conversion failed: {0}")]
@@ -300,6 +308,13 @@ pub enum TcInvariant {
 /// Under `panic = "unwind"` (native embedders, debug tooling) `Drop`
 /// fires on the unwind path and the counter balances normally.
 const MAX_TYPECHECK_RECURSION_DEPTH: u16 = 10_000;
+
+/// Maximum number of nodes in a single Michelson type expression, matching the
+/// L1 `michelson_maximum_type_size` constant. Enforced per type expression in
+/// `parse_ty_with_entrypoints`. It is not threaded through type construction
+/// (unlike L1's `Type_size`), so types synthesized during typechecking are not
+/// bounded by it.
+const MICHELSON_MAXIMUM_TYPE_SIZE: usize = 2001;
 
 std::thread_local! {
     static TYPECHECK_RECURSION_DEPTH: std::cell::Cell<u16> = const { std::cell::Cell::new(0) };
@@ -907,6 +922,9 @@ fn parse_ty_with_entrypoints<'a, 'b>(
         path,
     }];
     let mut results: Vec<Type> = Vec::new();
+    // Type nodes visited so far; bounds this type expression to
+    // `MICHELSON_MAXIMUM_TYPE_SIZE` (per-call, matching L1's per-type cap).
+    let mut nodes: usize = 0;
 
     while let Some(frame) = frames.pop() {
         match frame {
@@ -917,6 +935,13 @@ fn parse_ty_with_entrypoints<'a, 'b>(
             } => {
                 use Prim::*;
                 gas.consume(gas::tc_cost::PARSE_TYPE_STEP)?;
+                nodes += 1;
+                if nodes > MICHELSON_MAXIMUM_TYPE_SIZE {
+                    return Err(TcError::TypeTooLarge {
+                        size: nodes,
+                        max: MICHELSON_MAXIMUM_TYPE_SIZE,
+                    });
+                }
                 let unexpected = || Err(TcError::UnexpectedMicheline(format!("{ty:?}")));
                 // Small helper that captures the current Visit's metadata so
                 // leaf arms can finalize in one short line.
@@ -1011,6 +1036,19 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         // in reverse so the first child pops first and the
                         // outermost Build::Pair pops last.
                         let total_children = 2 + rest.len();
+                        // A k-ary comb `pair` desugars to k-1 binary `pair`
+                        // nodes (the k-1 `Build::Pair` frames below). The
+                        // per-`Visit` increment above counted one; add the
+                        // remaining k-2 implicit inner pairs so the node count
+                        // matches L1's `Type_size`, which sees the desugared
+                        // binary form.
+                        nodes += total_children - 2;
+                        if nodes > MICHELSON_MAXIMUM_TYPE_SIZE {
+                            return Err(TcError::TypeTooLarge {
+                                size: nodes,
+                                max: MICHELSON_MAXIMUM_TYPE_SIZE,
+                            });
+                        }
                         for _ in 0..(total_children - 1) {
                             // All but the outermost Build::Pair are anonymous:
                             // they do not carry the entrypoint path of the
@@ -5808,25 +5846,71 @@ mod typecheck_tests {
     use Instruction::*;
     use Option::None;
 
-    /// Parses a 100k deep right leaning `pair` type without overflowing the
-    /// Rust call stack, then drops it at end of scope -- exercising the
-    /// iterative `Drop for Type` this MR adds. Both the parse and the drop
-    /// would overflow at this depth with a recursive implementation.
+    /// L2-1706: `parse_ty` rejects a type past `MICHELSON_MAXIMUM_TYPE_SIZE`
+    /// with `TypeTooLarge`; one at the cap still parses. (Deep-`Type`
+    /// stack-safety lives in `deeply_nested_if_unifies_deep_types`, which
+    /// bypasses the parser.)
     #[test]
-    fn deeply_nested_pair_parses() {
-        const DEPTH: usize = 100_000;
+    fn parse_ty_enforces_type_size_limit() {
         let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
-        let int_app: Micheline<'_> = Micheline::App(Prim::int, &[], NO_ANNS);
-        let mut current: Micheline<'_> = int_app.clone();
-        for _ in 0..DEPTH {
-            let pair_args = arena.alloc_extend([int_app.clone(), current]);
-            current = Micheline::App(Prim::pair, pair_args, NO_ANNS);
-        }
+        let unit_app: Micheline<'_> = Micheline::App(Prim::unit, &[], NO_ANNS);
+        // Right-leaning `(or unit … unit)` with `ors` `or` nodes => 2*ors+1 nodes.
+        let build = |ors: usize| {
+            let mut current = unit_app.clone();
+            for _ in 0..ors {
+                let args = arena.alloc_extend([unit_app.clone(), current]);
+                current = Micheline::App(Prim::or, args, NO_ANNS);
+            }
+            current
+        };
+
+        // Exactly at the cap (2 * 1000 + 1 == MICHELSON_MAXIMUM_TYPE_SIZE): OK.
+        let at_cap = build((MICHELSON_MAXIMUM_TYPE_SIZE - 1) / 2);
         let mut gas = Gas::new(u32::MAX);
-        let parsed = parse_ty(&mut gas, &current).expect("deep pair parses");
-        assert!(matches!(parsed, Type::Pair(_)), "expected outer Type::Pair");
-        // `parsed` (a 100k-deep Type) drops here through the iterative
-        // `Drop for Type`; a recursive destructor would overflow.
+        let parsed = parse_ty(&mut gas, &at_cap).expect("type at the cap parses");
+        assert!(matches!(parsed, Type::Or(_)), "expected outer Type::Or");
+        drop(parsed); // iterative `Drop for Type` at the maximum legal depth.
+
+        // Over the cap: rejected with `TypeTooLarge`, not parsed (no OOM).
+        let over_cap = build(MICHELSON_MAXIMUM_TYPE_SIZE);
+        let mut gas = Gas::new(u32::MAX);
+        let err = parse_ty(&mut gas, &over_cap).expect_err("over-cap type rejected");
+        assert!(
+            matches!(err, TcError::TypeTooLarge { max, .. } if max == MICHELSON_MAXIMUM_TYPE_SIZE),
+            "expected TypeTooLarge, got {err:?}",
+        );
+    }
+
+    /// A k-ary comb `pair` counts as the k-1 binary `pair` nodes it desugars
+    /// to, matching L1's `Type_size`: a flat comb of `m` args is `2*m-1`
+    /// nodes, so the cap boundary sits at `m = (cap+1)/2` args.
+    #[test]
+    fn parse_ty_comb_pair_counts_like_l1() {
+        let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+        let unit_app: Micheline<'_> = Micheline::App(Prim::unit, &[], NO_ANNS);
+        // Flat comb `pair unit unit … unit` with `args` children: 2*args-1 nodes.
+        let comb = |args: usize| {
+            let children = vec![unit_app.clone(); args];
+            Micheline::App(Prim::pair, arena.alloc_extend(children), NO_ANNS)
+        };
+
+        // 2 * 1001 - 1 == MICHELSON_MAXIMUM_TYPE_SIZE: accepted.
+        let cap_args = MICHELSON_MAXIMUM_TYPE_SIZE.div_ceil(2);
+        let at_cap = comb(cap_args);
+        let mut gas = Gas::new(u32::MAX);
+        assert!(
+            matches!(parse_ty(&mut gas, &at_cap), Ok(Type::Pair(_))),
+            "comb at the cap must parse",
+        );
+
+        // One more arg adds two nodes, over the cap: rejected.
+        let over_cap = comb(cap_args + 1);
+        let mut gas = Gas::new(u32::MAX);
+        let err = parse_ty(&mut gas, &over_cap).expect_err("over-cap comb rejected");
+        assert!(
+            matches!(err, TcError::TypeTooLarge { .. }),
+            "expected TypeTooLarge, got {err:?}",
+        );
     }
 
     /// Typechecks a 100k deep nested IF, demonstrating that both the
@@ -5892,7 +5976,9 @@ mod typecheck_tests {
     /// would call in production code paths.
     #[test]
     fn deeply_nested_pair_value_typechecks() {
-        const DEPTH: usize = 100_000;
+        // L2-1706: a `pair` chain of `DEPTH` levels has `2*DEPTH+1` type nodes,
+        // so `(cap-1)/2` sits exactly at `MICHELSON_MAXIMUM_TYPE_SIZE`.
+        const DEPTH: usize = (MICHELSON_MAXIMUM_TYPE_SIZE - 1) / 2;
         let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
 
         // Build the type: pair(int, pair(int, pair(int, ..., int))).

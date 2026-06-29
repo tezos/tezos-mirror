@@ -106,6 +106,14 @@
   matching L1, which assigns no binary tags to them. These ids are used
   solely to unparse `operation` values and never appear in valid on-chain
   data. (!22290)
+- The typechecker now bounds a parsed type expression to 2001 nodes (L1's
+  `michelson_maximum_type_size`) and rejects originated scripts larger than
+  32 kB (L1's `max_operation_data_length`). Previously the Michelson runtime
+  had neither limit, diverging from L1; a deeply nested `or` parameter type
+  could make entrypoint parsing allocate memory quadratic in the type size
+  while gas grew only linearly, trapping the PVM. (Types synthesized during
+  typechecking are not bounded the way L1 threads `Type_size` through every
+  constructor; that is O(N) memory, not the O(N²) trap.) (!22297)
 - `COMPARE` (and `set`/`map` literal key-ordering checks at typechecking) now
   charge their gas incrementally while walking the value, so a comparison over
   a maximally-shared value (an O(n) in-memory DAG that expands to 2^n nodes)
