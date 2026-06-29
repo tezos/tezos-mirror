@@ -20,5 +20,6 @@ pub struct PrecompileStateChanges {
     pub withdrawals: Vec<Withdrawal>,
     pub global_counter: Option<U256>,
     pub sequencer_key_change: Option<SequencerKeyChange>,
+    pub sequencer_change_counter: Option<U256>,
     pub created_aliases: HashMap<Address, Origin>,
 }
