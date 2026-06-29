@@ -286,7 +286,9 @@ sdk_bindings.test:
   rules:
   - changes:
     - contrib/sdk-bindings/**/*
+    - etherlink/kernel_latest/mir/**/*
     - sdk/rust/**/*
+    - src/kernel_sdk/**/*
     when: on_success
   needs: []
   dependencies: []
