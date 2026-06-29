@@ -8,6 +8,12 @@
 
 ### RPCs changes
 
+- Add the `tez_getSequencerKeyChangeCounter` RPC, returning the value the next
+  sequencer key change must be signed against. It is a monotonic counter that
+  advances by exactly one per change: at scheduling time for a precompile
+  change (so its signed calldata is immediately single-use) and at activation
+  time for a governance change.
+
 ### Monitoring changes
 
 ### Command-line interface changes
