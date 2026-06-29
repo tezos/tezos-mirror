@@ -1645,6 +1645,38 @@ let test_blacklist address () =
   let* _success_resp = Client.RPC.call client @@ RPC.get_network_connections in
   unit
 
+(* Regression test for the ACL bypass on /metrics reported in bug-bounty-37334.
+   The main RPC listener must not serve GET /metrics when --metrics-addr is not
+   configured, even though the Secure ACL allows neighbouring routes. *)
+let test_metrics_not_on_rpc_listener () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC metrics not served on main listener without --metrics-addr"
+    ~tags:["rpc"; "acl"; "metrics"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* node = Node.init [] in
+  let addr =
+    Format.sprintf
+      "http://%s:%d/metrics"
+      Constant.default_host
+      (Node.rpc_port node)
+  in
+  let* status =
+    Process.spawn
+      ~log_output:false
+      "curl"
+      ["-s"; "-o"; "/dev/null"; "-w"; "%{http_code}"; addr]
+    |> Process.check_and_read_stdout
+  in
+  let status = String.trim status in
+  Check.((status = "404") string)
+    ~error_msg:
+      "GET /metrics on the main RPC listener returned %L but must return 404 \
+       when --metrics-addr is not configured (the route is not registered)" ;
+  unit
+
 let binary_regression_test () =
   let node = Node.create [] in
   let endpoint = Client.(Node node) in
@@ -1864,4 +1896,5 @@ let register protocols =
         ~title:(mk_title "node_binary_mode" addr)
         ~tags:["rpc"; "binary"]
         (test_node_binary_mode addr))
-    addresses
+    addresses ;
+  test_metrics_not_on_rpc_listener ()

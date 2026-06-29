@@ -445,18 +445,16 @@ let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
       dir
   in
   let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
-    let path = Cohttp.Request.uri req |> Uri.path in
-    if path = "/metrics" then
-      let*! response = Metrics_server.callback conn req body in
-      Lwt.return (`Response response)
-    else
-      (* Every call on endpoints which is not in [/metrics]
-         path will be logged inside the RPC report. *)
-      Tezos_rpc_http_server.RPC_server.resto_callback
-        server
-        conn
-        req
-        body [@profiler.span_s {verbosity = Notice} [path]]
+    (* Every call is routed through the ACL-governed RPC dispatcher.
+       /metrics is intentionally excluded: it is only served by the dedicated
+       metrics server when --metrics-addr is explicitly configured. *)
+    (Tezos_rpc_http_server.RPC_server.resto_callback
+       server
+       conn
+       req
+       body
+     [@profiler.span_s
+       {verbosity = Notice} [Cohttp.Request.uri req |> Uri.path]])
   in
   let update_metrics uri meth =
     Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time)

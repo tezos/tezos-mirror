@@ -8,20 +8,18 @@ and :doc:`the RPC references <../shell/rpc>`.
 Most practically, however, is to use Octez Metrics to gather information and statistics, which has been integrated directly into the node
 since Octez version 14. Users are now able to get metrics without using an external tool,
 such as `tezos-metrics <https://gitlab.com/nomadic-labs/tezos-metrics>`_ (which is now deprecated).
-The node now includes a server that registers the implemented metrics and outputs them for each received ``/metrics`` http request.
-So now you can configure and launch your node with a metrics exporter.
+The node includes a dedicated metrics server that registers the implemented metrics and outputs them for each received ``/metrics`` http request.
+So you can configure and launch your node with a metrics exporter.
 
 
 Starting a node with monitoring
 -------------------------------
 
-Metrics for the node are always available on the ``/metrics`` endpoint of the address and port of the ``--rpc-addr`` (or ``--external-rpc-addr``) argument. One can query this using:
+Metrics are exposed on the ``/metrics`` endpoint of the dedicated metrics server, which is enabled with the ``--metrics-addr`` argument. They are **not** served on the ``--rpc-addr`` (or ``--external-rpc-addr``) listener: querying ``/metrics`` on the RPC port returns ``404``.
 
-.. code-block:: shell
+.. note::
 
-  curl http://<rpc_addr>:<rpc_port>/metrics
-
-Alternatively, the user has an option to gather metrics when no RPC server is setup at all, or when they want a dedicated server for this process.
+   Before Octez v26, metrics were also served on the ``/metrics`` endpoint of the RPC listener. This is no longer the case: use ``--metrics-addr`` instead, consistently with the smart rollup and DAL nodes.
 
 Starting metrics server manually
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
