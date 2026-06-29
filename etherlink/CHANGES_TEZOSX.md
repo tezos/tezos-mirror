@@ -103,6 +103,11 @@
   the configured Michelson runtime chain id from `CHAIN_ID`, matching the
   sequenced and gateway ingress lanes. Previously the delayed path derived
   the chain id from the EVM chain id's low 4 bytes. (!22348)
+- Block finalization now rejects, rather than saturating the receipt nonce
+  into duplicates, if a block ever crosses the 65,535 internal-operation cap;
+  the delayed-inbox and EVM-origin cross-runtime paths fold their
+  internal-operation counts into the block's cumulative cap so it fires at
+  apply time on every path, matching the native path. (!22343)
 - Integer `MUL` is now priced on the product of operand sizes (`~ s1*s2`)
   instead of L1's FFT-shaped `a*log(a)`. The Michelson runtime multiplies with
   num-bigint, which has no FFT (schoolbook/Karatsuba/Toom-3), so the L1 formula

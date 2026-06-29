@@ -49,8 +49,8 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::operation_result::{
-    ContentResult, OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
-    OperationResultSum,
+    ApplyOperationError, ContentResult, OperationBatchWithMetadata,
+    OperationDataAndMetadata, OperationError, OperationResultSum,
 };
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::{Registry, RuntimeId};
@@ -436,11 +436,20 @@ fn force_top_level_failed(receipt: &mut AppliedOperation) {
 }
 
 /// Count the internal operations already recorded in a block's receipts.
-/// Used as the cumulative base for L1's per-block internal-operation cap on
-/// the operation path: the count mirrors exactly what [`renumber_nonces`]
-/// numbers. Cross-runtime (CRAC) and delayed-inbox sub-operations cap
-/// per-execution (base 0) and are not yet folded into this cumulative base;
-/// their internal-op counts are bounded by the triggering EVM gas.
+/// Used as the cumulative base folded into the per-block internal-operation cap
+/// on every path — native and delayed-inbox via `BlockCtx`, EVM-origin
+/// cross-runtime (CRAC) via the seeded Michelson journal counter.
+///
+/// It counts *every* `internal_operation_results` entry, matching exactly what
+/// [`renumber_nonces`] numbers. That includes CRAC synthetic markers (begin/end
+/// events, synthetic transfers, alias originations) stamped via `nonce_counter`
+/// that never advance the op-level MIR counter. So on CRAC blocks this
+/// population exceeds the op-level counter by the marker count, and the
+/// apply-time cap (fail the op in isolation) coincides with the finalization
+/// backstop (fail the block) exactly only on the native/delayed paths; on the
+/// CRAC path the backstop can lead. Both sit at
+/// [`mir::interpreter::MAX_INTERNAL_OPERATIONS`] and are gas-bounded, so the
+/// divergence is latent (see L2-1727).
 pub fn count_internal_operations(operations: &[AppliedOperation]) -> u128 {
     let mut count: u128 = 0;
     for op in operations {
@@ -467,8 +476,16 @@ pub fn count_internal_operations(operations: &[AppliedOperation]) -> u128 {
 ///
 /// Called once at block finalization so that individual operations can
 /// use 0-based local nonces during execution.
-pub fn renumber_nonces(operations: &mut [AppliedOperation]) {
-    use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
+///
+/// Backstop for L1's internal-operation cap: rejects with
+/// [`ApplyOperationError::InternalOperationNonceOverflow`] at
+/// [`MAX_INTERNAL_OPERATIONS`] instead of saturating the `u16` nonce (which
+/// would duplicate nonce `65535`). Unreachable once every path threads the
+/// per-block cap; guards a future path that bypasses it.
+pub fn renumber_nonces(
+    operations: &mut [AppliedOperation],
+) -> Result<(), ApplyOperationError> {
+    use mir::interpreter::MAX_INTERNAL_OPERATIONS;
     let mut counter: u16 = 0;
     for op in operations.iter_mut() {
         let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
@@ -484,11 +501,22 @@ pub fn renumber_nonces(operations: &mut [AppliedOperation]) {
                 OperationResultSum::Reveal(_) => continue,
             };
             for iop in internals.iter_mut() {
+                if u128::from(counter) >= MAX_INTERNAL_OPERATIONS {
+                    return Err(ApplyOperationError::InternalOperationNonceOverflow(
+                        format!(
+                            "block exceeded internal-operation cap of \
+                             {MAX_INTERNAL_OPERATIONS}"
+                        ),
+                    ));
+                }
                 iop.set_nonce(counter);
-                counter = counter.saturating_add(1);
+                // Bounded by the check above (counter <= MAX - 1), so this
+                // never overflows the u16.
+                counter += 1;
             }
         }
     }
+    Ok(())
 }
 
 /// Merge `other`'s internal operations into `target` by appending them
@@ -658,6 +686,9 @@ fn apply_ethereum_transaction_common<Host>(
     limits: &EvmLimits,
     crac_id: CracId,
     http_trace_enabled: bool,
+    // Block's prior internal-op count; seeded into the journal so EVM-origin
+    // CRAC sub-operations enforce L1's per-block cap cumulatively.
+    internal_operations_base: u128,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, anyhow::Error>
 where
     Host: StorageV1,
@@ -725,6 +756,10 @@ where
     );
     let mut journal =
         TezosXJournal::new(crac_id, operation_hash, block_constants.clone());
+    // Fold the block's prior internal ops into this op's cap (anti-DoS).
+    journal
+        .michelson
+        .set_internal_operation_counter(internal_operations_base);
     let run_result = revm_run_transaction(
         host,
         registry,
@@ -1249,6 +1284,9 @@ pub fn apply_transaction<Host>(
     // Fold into the Michelson runtime block constants so the chain id travels
     // with that runtime's per-block context instead of a separate parameter.
     michelson_chain_id: &ChainId,
+    // Block's prior internal-op count, threaded so the delayed and EVM-origin
+    // CRAC paths enforce the per-block cap cumulatively (like the native path).
+    internal_operations_base: u128,
 ) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1,
@@ -1270,6 +1308,7 @@ where
             limits,
             crac_id,
             http_trace_enabled,
+            internal_operations_base,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
@@ -1283,6 +1322,7 @@ where
             limits,
             crac_id,
             http_trace_enabled,
+            internal_operations_base,
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(Benchmarking, "Transaction type: DEPOSIT");
@@ -1360,9 +1400,8 @@ where
                     },
                     now: &Timestamp::from(i64_timestamp),
                     chain_id: michelson_chain_id,
-                    // CRAC/delayed sub-operation: its internal ops are bounded
-                    // by EVM gas; the per-execution cap from base 0 applies.
-                    internal_operations_base: 0,
+                    // Folded into the block's cumulative cap, like the native path.
+                    internal_operations_base,
                     // Delayed-inbox path: preserve the existing always-promote
                     // trace behavior (not on the block-production hot path).
                     tracing_enabled: true,
@@ -2206,5 +2245,39 @@ mod tests {
             ),
             "third internal op is the begin marker of frame 2"
         );
+    }
+
+    /// L2-1727: `renumber_nonces` assigns block-sequential nonces and rejects
+    /// at L1's cap instead of saturating the `u16` into duplicates.
+    #[test]
+    fn test_renumber_nonces_rejects_at_cap() {
+        use mir::interpreter::MAX_INTERNAL_OPERATIONS;
+        use tezos_tezlink::operation_result::ApplyOperationError;
+        let cap = MAX_INTERNAL_OPERATIONS as usize; // 65_535
+
+        let block_of = |total: usize| {
+            // Spread internal ops across two operations to exercise the
+            // cross-operation, never-reset block counter.
+            let proto = make_transfer(0, 0);
+            let first = total / 2;
+            vec![
+                dummy_crac_receipt(vec![proto.clone(); first]),
+                dummy_crac_receipt(vec![proto; total - first]),
+            ]
+        };
+
+        // At the cap (65_535 ops): Ok, nonces 0..=65_534, all distinct.
+        let mut ok = block_of(cap);
+        super::renumber_nonces(&mut ok).expect("at-cap block must be accepted");
+        let nonces: Vec<u16> = ok.iter().flat_map(extract_nonces).collect();
+        assert_eq!(nonces, (0..cap as u16).collect::<Vec<_>>());
+        assert_eq!(*nonces.iter().max().unwrap(), 65_534);
+
+        // One past the cap: rejected, not saturated into a duplicate 65_535.
+        let mut over = block_of(cap + 1);
+        assert!(matches!(
+            super::renumber_nonces(&mut over),
+            Err(ApplyOperationError::InternalOperationNonceOverflow(_))
+        ));
     }
 }

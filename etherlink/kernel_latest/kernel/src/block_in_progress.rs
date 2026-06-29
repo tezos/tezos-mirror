@@ -545,7 +545,11 @@ impl BlockInProgress {
                 Err(_) => TARGET_TEZOS_PROTOCOL,
             };
             let mut tezos_ops = self.cumulative_tezos_operation_receipts.list;
-            crate::apply::renumber_nonces(&mut tezos_ops);
+            crate::apply::renumber_nonces(&mut tezos_ops).map_err(|e| {
+                anyhow::anyhow!(
+                    "failed to assign block-wide internal-operation nonces: {e}"
+                )
+            })?;
             let tez_state_root =
                 crate::state_hash::tez_accounts_state_hash(host, &blueprint_hash)
                     .try_into()

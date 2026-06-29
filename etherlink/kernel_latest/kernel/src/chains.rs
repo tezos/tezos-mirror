@@ -699,6 +699,10 @@ impl ChainConfigTrait for TezosXChainConfig {
                     } // Tezos
                 };
                 let crac_id = tezosx_journal::CracId::new(origin_runtime, id);
+                // Cumulative base for the per-block internal-op cap.
+                let internal_operations_base = crate::apply::count_internal_operations(
+                    &block_in_progress.cumulative_tezos_operation_receipts.list,
+                );
                 crate::apply::apply_transaction(
                     host,
                     registry,
@@ -718,6 +722,7 @@ impl ChainConfigTrait for TezosXChainConfig {
                     // chain id is folded into the Michelson runtime block constants,
                     // so it travels with that runtime's per-block context.
                     &self.michelson_chain_id,
+                    internal_operations_base,
                 )
             }
             TezosXTransaction::Tezos(operation) => {

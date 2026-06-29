@@ -1785,7 +1785,10 @@ fn interpret_step<'a, 'b, 'c>(
 /// L1 caps internal operations at 65,535 (`raw_context.fresh_internal_nonce`):
 /// the first allocates nonce 0 and allocating nonce 65,535 fails with
 /// `Too_many_internal_operations`. Mirror that bound at production.
-const MAX_INTERNAL_OPERATIONS: u128 = 65_535;
+///
+/// Exposed so the block-finalization backstop (`renumber_nonces`) rejects at
+/// exactly the same boundary instead of redefining the literal.
+pub const MAX_INTERNAL_OPERATIONS: u128 = 65_535;
 
 fn fresh_operation_counter<'a>(
     ctx: &mut impl CtxTrait<'a>,
