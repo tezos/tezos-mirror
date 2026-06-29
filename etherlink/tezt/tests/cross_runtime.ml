@@ -11090,6 +11090,370 @@ let test_crac_callback_receives_result_bytes () =
     ~expected_bytes:(Some abi_encoded_uint256_42)
     caller
 
+(** The synthetic cross-runtime-call frame is ordered before the result callback.
+ *
+ * EVM[evm_outer_bridge] ~CRAC~> TEZ[callback_runner] --%run-->
+ *     Gateway.call_evm(Some callback) ~> EVM[evm_inner_bridge]
+ *         EVM[evm_inner_bridge] ~CRAC~> TEZ[tez_runner]
+ *     Gateway --> TEZ[callback_runner %on_result]
+ *
+ * The re-entrant EVM→Michelson frame (begin ... end) must appear before the
+ * %on_result callback in internal_operation_results.  Both run as part of
+ * the same gateway call, but the cross-runtime leg executes first and
+ * produces the bytes the callback then consumes.
+ *)
+let test_crac_callback_frame_precedes_on_result () =
+  register_crac_runner_test
+    ~title:"CRAC: cross-runtime call frame precedes result callback"
+    ~tags:["callback"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-FRAME-CB" in
+  Log.debug ~prefix "Originate TEZ leaf runner" ;
+  let* tez_runner = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy inner EVM bridge (calls TEZ leaf runner)" ;
+  let* evm_inner_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  Log.debug ~prefix "Originate callback runner targeting inner EVM bridge" ;
+  let* callback_runner =
+    TezCallbackRunnerEvm.originate
+      ~method_sig:"run()"
+      ~abi_params:""
+      evm_inner_bridge
+  in
+  Log.debug ~prefix "Deploy outer EVM bridge (calls callback runner via CRAC)" ;
+  let* evm_outer_bridge =
+    EvmCrossRuntimeRunnerTez.deploy_and_init callback_runner
+  in
+  Log.debug ~prefix "Call outer EVM bridge" ;
+  (* The EVM→Michelson→EVM→Michelson crossing forwards its gas budget
+     across four runtime boundaries; 3M leaves headroom for every leg. *)
+  let* _ = EvmRunner.call_run ~gas:3_000_000 evm_outer_bridge in
+  Log.debug ~prefix "Verify callback runner counter" ;
+  let* () =
+    TezCallbackRunnerEvm.check_counter ~expected_counter:3 callback_runner
+  in
+  Log.debug ~prefix "Verify TEZ leaf runner was called" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner in
+  Log.debug ~prefix "Fetch Michelson manager ops" ;
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:"Expected 1 manager operation, got %L") ;
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"applied"
+      top
+  in
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  let find_index pred lst =
+    let rec go i = function
+      | [] -> None
+      | x :: tl -> if pred x then Some i else go (i + 1) tl
+    in
+    go 0 lst
+  in
+  (* Locate the first cross_runtime_call_end event from the handler: this is
+     the end marker of the re-entrant EVM→Michelson frame drained by
+     drain_reentrant_crac_ops.  It is spliced immediately after the parent
+     gateway receipt, ahead of any inline children such as the %on_result
+     callback. *)
+  let is_crac_end iop =
+    JSON.(iop |-> "kind" |> as_string) = "event"
+    && JSON.(iop |-> "source" |> as_string) = handler_address
+    &&
+    match JSON.(iop |-> "tag" |> as_opt) with
+    | Some t -> JSON.as_string t = "cross_runtime_call_end"
+    | None -> false
+  in
+  (* Locate the %on_result callback transaction. *)
+  let is_on_result iop =
+    JSON.(iop |-> "kind" |> as_string) = "transaction"
+    &&
+    match JSON.(iop |-> "parameters" |-> "entrypoint" |> as_opt) with
+    | Some ep -> JSON.as_string ep = "on_result"
+    | None -> false
+  in
+  let idx_cre =
+    match find_index is_crac_end internals with
+    | Some i -> i
+    | None ->
+        Test.fail
+          "%s: cross_runtime_call_end marker not found in internal ops"
+          prefix
+  in
+  let idx_on_result =
+    match find_index is_on_result internals with
+    | Some i -> i
+    | None ->
+        Test.fail "%s: %%on_result callback not found in internal ops" prefix
+  in
+  Log.info
+    "%s: cross_runtime_call_end at index %d, %%on_result at index %d"
+    prefix
+    idx_cre
+    idx_on_result ;
+  Check.is_true
+    (idx_cre < idx_on_result)
+    ~error_msg:
+      (sf
+         "%s: cross_runtime_call_end (index %d) must precede %%on_result \
+          (index %d); the synthetic cross-runtime-call frame executes before \
+          the callback that consumes its payload"
+         prefix
+         idx_cre
+         idx_on_result) ;
+  unit
+
+(** Cross-runtime call frame precedes failing result callback (revert path).
+ *
+ * Mirror of [test_crac_callback_frame_precedes_on_result] on the failure
+ * path.  The failing callback runner's [%run] emits three internal ops:
+ *   [pre_incr, gateway.call_evm(evm_inner_bridge, Some SELF.%on_result), post_incr]
+ * The gateway leg performs a re-entrant EVM→TEZ crossing that produces a
+ * [cross_runtime_call] / [cross_runtime_call_end] frame.  After the
+ * gateway returns, [%on_result] runs and FAILWITHs.
+ *
+ * The fix (splice runs unconditionally) must reorder the frame even when
+ * the group fails.  Assertions:
+ *   1. [cross_runtime_call_end] precedes [%on_result] in internals —
+ *      the regression guard for the revert path.
+ *   2. [check_crac_brackets] passes on the internals.
+ *   3. [%on_result].result.status = "failed".
+ *   4. Frame entries and [pre_incr] and [gateway %call_evm] are "backtracked".
+ *   5. [post_incr] is "skipped".
+ *
+ * Topology:
+ *    TEZ[failing_callback_runner] --%run-->
+ *        pre_incr
+ *        Gateway.call_evm(evm_inner_bridge, Some SELF.%on_result)
+ *            EVM[evm_inner_bridge] ~CRAC~> TEZ[tez_leaf]
+ *        %on_result --> FAILWITH
+ *        post_incr (skipped)
+ *)
+let test_crac_callback_frame_precedes_on_result_revert () =
+  register_crac_runner_test
+    ~title:"CRAC: cross-runtime call frame precedes failing result callback"
+    ~tags:["callback"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-FRAME-CB-REVERT" in
+  Log.debug ~prefix "Originate TEZ leaf runner" ;
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy inner EVM bridge (calls TEZ leaf runner)" ;
+  let* evm_inner_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  Log.debug
+    ~prefix
+    "Originate failing callback runner targeting inner EVM bridge" ;
+  let* failing_callback_runner =
+    TezCallbackRunnerEvm.originate
+      ~failing:true
+      ~method_sig:"run()"
+      ~abi_params:""
+      evm_inner_bridge
+  in
+  Log.debug ~prefix "Call failing callback runner (Michelson-originated)" ;
+  let* () = TezRunner.call_run ~gas_limit:400_000 failing_callback_runner in
+  Log.debug ~prefix "Verify state rolled back: counter 0, leaf counter 0" ;
+  let* () =
+    TezCallbackRunnerEvm.check_counter
+      ~expected_counter:0
+      failing_callback_runner
+  in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_leaf in
+  Log.debug ~prefix "Fetch Michelson manager ops" ;
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:"Expected 1 manager operation, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let metadata = JSON.(top |-> "metadata") in
+  let top_status =
+    JSON.(metadata |-> "operation_result" |-> "status" |> as_string)
+  in
+  Log.info "%s: top-level manager op status = %s" prefix top_status ;
+  (* The %run contract succeeds in emitting its ops; only the internal
+     %on_result fails. An Ok parent with a failed internal is demoted to
+     "backtracked" (not "failed", which is reserved for an op whose own
+     execution errors — e.g. a direct gateway call whose leg reverts). *)
+  Check.(
+    (top_status = "backtracked")
+      string
+      ~error_msg:
+        "Expected top-level status %R (parent op succeeds, internal callback \
+         fails -> backtracked), got %L") ;
+  let internals = JSON.(metadata |-> "internal_operation_results" |> as_list) in
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  List.iteri
+    (fun i iop ->
+      let kind = JSON.(iop |-> "kind" |> as_string) in
+      let tag =
+        JSON.(iop |-> "tag" |> as_opt |> Option.fold ~none:"-" ~some:as_string)
+      in
+      let ep =
+        match JSON.(iop |-> "parameters" |-> "entrypoint" |> as_opt) with
+        | Some ep -> JSON.as_string ep
+        | None -> "-"
+      in
+      let status =
+        match JSON.(iop |-> "result" |> as_opt) with
+        | Some r -> JSON.(r |-> "status" |> as_string)
+        | None -> "-"
+      in
+      Log.info
+        "%s:   [%d] kind=%s tag=%s ep=%s status=%s"
+        prefix
+        i
+        kind
+        tag
+        ep
+        status)
+    internals ;
+  let find_index pred lst =
+    let rec go i = function
+      | [] -> None
+      | x :: tl -> if pred x then Some i else go (i + 1) tl
+    in
+    go 0 lst
+  in
+  (* Locate the cross_runtime_call_end event from the handler. *)
+  let is_crac_end iop =
+    JSON.(iop |-> "kind" |> as_string) = "event"
+    && JSON.(iop |-> "source" |> as_string) = handler_address
+    &&
+    match JSON.(iop |-> "tag" |> as_opt) with
+    | Some t -> JSON.as_string t = "cross_runtime_call_end"
+    | None -> false
+  in
+  (* Locate the %on_result callback transaction. *)
+  let is_on_result iop =
+    JSON.(iop |-> "kind" |> as_string) = "transaction"
+    &&
+    match JSON.(iop |-> "parameters" |-> "entrypoint" |> as_opt) with
+    | Some ep -> JSON.as_string ep = "on_result"
+    | None -> false
+  in
+  (* Locate the %_incrementWitness transactions (pre_incr = first, post_incr = last). *)
+  let is_incr iop =
+    JSON.(iop |-> "kind" |> as_string) = "transaction"
+    &&
+    match JSON.(iop |-> "parameters" |-> "entrypoint" |> as_opt) with
+    | Some ep -> JSON.as_string ep = "_incrementWitness"
+    | None -> false
+  in
+  (* Locate the gateway %call_evm transaction. *)
+  let is_call_evm iop =
+    JSON.(iop |-> "kind" |> as_string) = "transaction"
+    &&
+    match JSON.(iop |-> "parameters" |-> "entrypoint" |> as_opt) with
+    | Some ep -> JSON.as_string ep = "call_evm"
+    | None -> false
+  in
+  let idx_cre =
+    match find_index is_crac_end internals with
+    | Some i -> i
+    | None ->
+        Test.fail
+          "%s: cross_runtime_call_end marker not found in internal ops"
+          prefix
+  in
+  let idx_on_result =
+    match find_index is_on_result internals with
+    | Some i -> i
+    | None ->
+        Test.fail "%s: %%on_result callback not found in internal ops" prefix
+  in
+  Log.info
+    "%s: cross_runtime_call_end at index %d, %%on_result at index %d"
+    prefix
+    idx_cre
+    idx_on_result ;
+  (* Assertion 1 (load-bearing regression guard): frame end precedes callback. *)
+  Check.is_true
+    (idx_cre < idx_on_result)
+    ~error_msg:
+      (sf
+         "%s: cross_runtime_call_end (index %d) must precede %%on_result \
+          (index %d) on the revert path; the splice must run unconditionally \
+          even when the callback group fails"
+         prefix
+         idx_cre
+         idx_on_result) ;
+  (* Assertion 2: CRAC brackets are balanced. *)
+  check_crac_brackets ~prefix internals ;
+  (* Assertion 3: %on_result status = "failed". *)
+  let on_result_iop = List.nth internals idx_on_result in
+  Check.(
+    (JSON.(on_result_iop |-> "result" |-> "status" |> as_string) = "failed")
+      string
+      ~error_msg:
+        (sf "%s: Expected %%on_result status %%R (FAILWITH), got %%L" prefix)) ;
+  (* Assertion 4: gateway %call_evm and pre_incr are "backtracked". *)
+  let call_evm_iop =
+    match find_index is_call_evm internals with
+    | Some i -> List.nth internals i
+    | None ->
+        Test.fail "%s: gateway %%call_evm not found in internal ops" prefix
+  in
+  Check.(
+    (JSON.(call_evm_iop |-> "result" |-> "status" |> as_string) = "backtracked")
+      string
+      ~error_msg:
+        (sf
+           "%s: Expected gateway %%call_evm status %%R (rolled back by \
+            %%on_result failure), got %%L"
+           prefix)) ;
+  let pre_incr_iop =
+    match find_index is_incr internals with
+    | Some i -> List.nth internals i
+    | None ->
+        Test.fail
+          "%s: pre_incr (%%_incrementWitness) not found in internals"
+          prefix
+  in
+  Check.(
+    (JSON.(pre_incr_iop |-> "result" |-> "status" |> as_string) = "backtracked")
+      string
+      ~error_msg:
+        (sf
+           "%s: Expected pre_incr status %%R (rolled back by %%on_result \
+            failure), got %%L"
+           prefix)) ;
+  (* Assertion 5: post_incr is "skipped" (sibling after the failing gateway op). *)
+  let post_incr_iop =
+    (* Find the last %_incrementWitness in the internals list. *)
+    let rec last_incr i cur = function
+      | [] -> cur
+      | x :: tl ->
+          if is_incr x then last_incr (i + 1) (Some x) tl
+          else last_incr (i + 1) cur tl
+    in
+    match last_incr 0 None internals with
+    | Some iop -> iop
+    | None ->
+        Test.fail
+          "%s: post_incr (%%_incrementWitness) not found in internals"
+          prefix
+  in
+  Check.(
+    (JSON.(post_incr_iop |-> "result" |-> "status" |> as_string) = "skipped")
+      string
+      ~error_msg:
+        (sf
+           "%s: Expected post_incr status %%R (sibling after the failing \
+            gateway op), got %%L"
+           prefix)) ;
+  unit
+
 (** Failing callback reverts entire operation group.
  *
  *    TEZ[failing_callback_runner] --%run-->
@@ -15015,6 +15379,8 @@ let () =
   test_l1_vs_tezosx_nested_failwith_receipt [Alpha] ;
   test_crac_callback_fire_and_forget () ;
   test_crac_callback_receives_result_bytes () ;
+  test_crac_callback_frame_precedes_on_result () ;
+  test_crac_callback_frame_precedes_on_result_revert () ;
   test_crac_callback_failure_reverts_all () ;
   test_crac_callback_behind_crac () ;
   test_crac_callback_tez_revert_rolls_back_callback () ;
