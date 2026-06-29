@@ -161,6 +161,13 @@ pub fn decode_field_u256_le(
     field_name: &'static str,
 ) -> Result<U256, DecoderError> {
     let bytes: Vec<u8> = decode_field(decoder, field_name)?;
+    // `U256::from_little_endian` asserts `bytes.len() <= 32` and panics
+    // otherwise. Reject oversized fields with a clean `DecoderError` so the
+    // caller's `from_rlp_bytes(..).ok()` turns it into a parse failure instead
+    // of trapping the kernel. Mirrors the `_u16`/`_u32`/`_u64_le` helpers.
+    if bytes.len() > 32 {
+        return Err(DecoderError::Custom("Field is more than 32 bytes"));
+    }
     Ok(U256::from_little_endian(&bytes))
 }
 
@@ -385,5 +392,38 @@ pub struct IgnoredField();
 impl Decodable for IgnoredField {
     fn decode(_decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
         Ok(Self())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_field_u256_le;
+    use primitive_types::U256;
+    use rlp::Rlp;
+
+    // Encode `bytes` as a single RLP string and decode it as a little-endian
+    // U256 field, mimicking how `number`/`chain_id` blueprint fields are read.
+    fn decode_u256_le_of(bytes: &[u8]) -> Result<U256, rlp::DecoderError> {
+        let encoded = rlp::encode(&bytes.to_vec());
+        decode_field_u256_le(&Rlp::new(encoded.as_ref()), "number")
+    }
+
+    // Regression test for L2-1747: a U256 field longer than 32 bytes used to
+    // panic the kernel via `U256::from_little_endian`'s internal `assert!`,
+    // upstream of any signature check. It must now return a clean
+    // `DecoderError` so `from_rlp_bytes(..).ok()` maps it to a parse failure.
+    #[test]
+    fn decode_field_u256_le_rejects_oversized_field() {
+        let oversized = [0xffu8; 33];
+        assert!(decode_u256_le_of(&oversized).is_err());
+    }
+
+    // Fields of 32 bytes or fewer must keep decoding (LE, zero-padded for
+    // shorter inputs) so currently-valid blueprints are unaffected.
+    #[test]
+    fn decode_field_u256_le_accepts_up_to_32_bytes() {
+        assert_eq!(decode_u256_le_of(&[]).unwrap(), U256::zero());
+        assert_eq!(decode_u256_le_of(&[1u8]).unwrap(), U256::one());
+        assert_eq!(decode_u256_le_of(&[0xffu8; 32]).unwrap(), U256::max_value());
     }
 }
