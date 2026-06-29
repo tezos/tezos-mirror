@@ -24,36 +24,48 @@ WORKDIR /home/tezos
 RUN mkdir -p /home/tezos/tezos/scripts/ci /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters /home/tezos/evm_kernel
 # Cargo registry: use the CI crates-io mirror proxy (requires --network=host)
 COPY --chown=tezos:nogroup images/ci/.cargo/config.toml /home/tezos/.cargo/config.toml
+# COPY layers are ordered by change frequency (rarely -> frequently) so that a
+# change in a later group does not invalidate the cached COPY layers of the
+# earlier groups, maximizing Docker layer cache reuse across commits.
+
+# Group 1: build-system files (change rarely)
 COPY --chown=tezos:nogroup Makefile tezos
+COPY --chown=tezos:nogroup dune tezos/dune
+COPY --chown=tezos:nogroup dune-workspace tezos/dune-workspace
+COPY --chown=tezos:nogroup dune-project tezos/dune-project
+COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
+COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
+COPY --chown=tezos:nogroup scripts/custom-flags.sh tezos/scripts/
+COPY --chown=tezos:nogroup scripts/ci/dune.sh tezos/scripts/ci/dune.sh
+
+# Group 2: script inputs (change rarely)
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions_without_number tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/released-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/experimental-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/dev-executables tezos/script-inputs/
-COPY --chown=tezos:nogroup dune tezos
-COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
-COPY --chown=tezos:nogroup scripts/custom-flags.sh tezos/scripts/
-COPY --chown=tezos:nogroup scripts/ci/dune.sh tezos/scripts/ci/dune.sh
-COPY --chown=tezos:nogroup src tezos/src
-COPY --chown=tezos:nogroup sdk/rust tezos/sdk/rust
+
+# Group 3: vendored/forked libraries (change infrequently)
+COPY --chown=tezos:nogroup vendors tezos/vendors
 COPY --chown=tezos:nogroup irmin tezos/irmin
 COPY --chown=tezos:nogroup brassaia tezos/brassaia
 COPY --chown=tezos:nogroup data-encoding tezos/data-encoding
-COPY --chown=tezos:nogroup etherlink tezos/etherlink
-COPY --chown=tezos:nogroup tezt tezos/tezt
-COPY --chown=tezos:nogroup opam tezos/opam
-COPY --chown=tezos:nogroup dune tezos/dune
-COPY --chown=tezos:nogroup dune-workspace tezos/dune-workspace
-COPY --chown=tezos:nogroup dune-project tezos/dune-project
-COPY --chown=tezos:nogroup vendors tezos/vendors
-COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
-COPY --chown=tezos:nogroup websocket tezos/websocket
-COPY --chown=tezos:nogroup lwt_domain tezos/lwt_domain
 COPY --chown=tezos:nogroup resto tezos/resto
 COPY --chown=tezos:nogroup prometheus tezos/prometheus
+COPY --chown=tezos:nogroup websocket tezos/websocket
+COPY --chown=tezos:nogroup lwt_domain tezos/lwt_domain
 COPY --chown=tezos:nogroup efunc-core tezos/efunc-core
+
+# Group 4: ancillary source (change occasionally)
+COPY --chown=tezos:nogroup opam tezos/opam
+COPY --chown=tezos:nogroup sdk/rust tezos/sdk/rust
+COPY --chown=tezos:nogroup tezt tezos/tezt
 COPY --chown=tezos:nogroup teztale tezos/teztale
 COPY --chown=tezos:nogroup contrib tezos/contrib
+
+# Group 5: main source (changes frequently)
+COPY --chown=tezos:nogroup src tezos/src
+COPY --chown=tezos:nogroup etherlink tezos/etherlink
 # sccache configuration for Rust compilation caching (via GCS backend).
 # When SCCACHE_GCS_BUCKET is non-empty, RUSTC_WRAPPER=sccache is activated.
 # Authentication uses GCP Application Default Credentials (ADC) via the
