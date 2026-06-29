@@ -95,7 +95,8 @@ module Setup = struct
       ~with_runtimes
 
   let register_fullstack_test ~title ~tags ~with_runtimes
-      ?(kernel = Kernel.Latest) ?additional_uses ?tez_bootstrap_accounts =
+      ?(kernel = Kernel.Latest) ?additional_uses ?tez_bootstrap_accounts
+      ?time_between_blocks ?michelson_runtime_chain_id =
     Setup.register_test
       ~__FILE__
       ~rpc_server:Evm_node.Resto
@@ -106,6 +107,8 @@ module Setup = struct
       ~enable_dal:false
       ?additional_uses
       ?tez_bootstrap_accounts
+      ?time_between_blocks
+      ?michelson_runtime_chain_id
 end
 
 let test_runtime_feature_flag ~runtime () =
@@ -5804,6 +5807,94 @@ let test_michelson_chain_id_in_crac ~runtime () =
          contains %L") ;
   unit
 
+(** The configured Michelson runtime chain id used by the delayed-inbox
+    CHAIN_ID regression test.  Deliberately != the default derived value for
+    EVM chain id 1337 so that the buggy path (raw LE bytes of 1337) and the
+    correct path (configured chain id) can be told apart. *)
+let delayed_chain_id_test_value = "NetXohUVN5QWR4f"
+
+(** Verify that a Michelson contract executed via the delayed inbox observes
+    the configured Michelson runtime chain id — not the EVM chain id's low
+    4 bytes.  All three ingress lanes (sequenced, gateway, delayed) must
+    present the same CHAIN_ID value so that Michelson contract behavior is
+    independent of which lane delivered the operation. *)
+let test_delayed_michelson_chain_id =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~michelson_runtime_chain_id:delayed_chain_id_test_value
+    ~title:
+      "Delayed-inbox CHAIN_ID matches the configured Michelson runtime chain id"
+    ~tags:["michelson"; "chain_id"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  (* Inline the chain_id_store script: parameter unit, stores the result of
+     CHAIN_ID as (option chain_id). *)
+  let chain_id_store_code =
+    "parameter unit ; storage (option chain_id) ; code { DROP ; CHAIN_ID ; \
+     SOME ; NIL operation ; PAIR }"
+  in
+  let* code =
+    Client.convert_script_to_json ~script:chain_id_store_code client
+  in
+  let source = Constant.bootstrap5 in
+  (* Step 1: Originate the contract via the delayed inbox. *)
+  let* contract_hex, _kt1_address =
+    originate_michelson_code_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~code
+      ~init_storage_data:"None"
+      ()
+  in
+  (* Step 2: Call the contract via the delayed inbox to trigger CHAIN_ID. *)
+  let kt1_address = decode_michelson_contract_address contract_hex in
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:2
+      ~dest:kt1_address
+      ~arg_data:"Unit"
+      ()
+  in
+  (* Step 3: Read the stored chain_id and assert it equals the configured
+     value.  On the buggy path the contract would see the EVM chain id's low
+     4 bytes instead of the configured Michelson runtime chain id. *)
+  let* raw = read_michelson_contract_storage sc_rollup_node contract_hex in
+  let storage_json =
+    match Option.bind raw decode_micheline_storage with
+    | Some j -> j
+    | None -> Test.fail "Could not read or decode storage of %s" kt1_address
+  in
+  let stored_hex =
+    JSON.(storage_json |-> "args" |=> 0 |-> "bytes" |> as_string)
+  in
+  let stored_chain_id =
+    Hex.to_bytes (`Hex stored_hex)
+    |> Tezos_crypto.Hashed.Chain_id.of_bytes_exn
+    |> Tezos_crypto.Hashed.Chain_id.to_b58check
+  in
+  Check.(
+    (stored_chain_id = delayed_chain_id_test_value)
+      string
+      ~error_msg:
+        "Expected delayed-inbox CHAIN_ID to equal the configured Michelson \
+         runtime chain id %R but got %L (the EVM chain id's low bytes were \
+         incorrectly used on the delayed ingress lane)") ;
+  unit
+
 (** tz2 (secp256k1) test account generated with octez-client. *)
 let tz2_bootstrap : Account.key =
   {
@@ -6261,6 +6352,7 @@ let () =
     ~expected_chain_id:"NetXohUVN5QWR4f"
     () ;
   test_michelson_chain_id_in_crac ~runtime:Tezos () ;
+  test_delayed_michelson_chain_id [Alpha] ;
   test_eip1271_signature_verification [Alpha] ;
   test_eip1271_wrong_signature_rejected [Alpha] ;
   test_meta_block_rpcs ~runtime:Tezos () ;
