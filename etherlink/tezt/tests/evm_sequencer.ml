@@ -1038,6 +1038,138 @@ let test_publish_blueprints_signatory =
   let* () = Lwt_unix.sleep 2. in
   check_rollup_head_consistency ~evm_node:sequencer ~sc_rollup_node ()
 
+(* L2-1747: a blueprint chunk whose RLP `number` field is longer than 32 bytes
+   panics the kernel during RLP decode -- upstream of the envelope and
+   signature checks -- because `decode_field_u256_le` hands the oversized slice
+   straight to `U256::from_little_endian`, whose `assert!(len <= 32)` traps. Any
+   L1 account can trigger it with no sequencer key and no valid signature.
+
+   On this branch the rollup node falls back to the slow WASM PVM by default
+   when fast execution traps, so the daemon survives. This test injects a batch
+   of invalid blueprint chunks in a single inbox level and logs how long the
+   rollup node takes to process that block: fast (clean rejection) with the
+   `> 32` guard in `decode_field_u256_le`, slow (fallback through the trap) if
+   the guard is reverted. *)
+let test_blueprint_chunk_oversized_u256_does_not_panic =
+  register_all
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "blueprint"; "cov10"]
+    ~title:"Oversized U256 in a blueprint chunk does not panic the kernel"
+  @@ fun {sequencer; client; sc_rollup_node; sc_rollup_address; _} _protocol ->
+  (* Establish a baseline both sides agree on. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
+  let*@ baseline = rollup_level sc_rollup_node in
+  (* Build the poisoned blueprint chunks.
+
+     A sequencer blueprint chunk reaches the kernel framed as an external
+     message:
+       0x00                      (ExternalMessageFrame::Targetted tag)
+       <20-byte rollup address>
+       0x03                      (SEQUENCER_BLUEPRINT_TAG)
+       <RLP-encoded SequencerBlueprint>
+     We build the frame ourselves -- no signing key is involved at all, which
+     is the point: the decode panics long before any signature is checked. *)
+  let frame_prefix =
+    (* tag + address + tag *)
+    "\000"
+    ^ Tezos_crypto.Hashed.Smart_rollup_address.(
+        of_b58check_exn sc_rollup_address |> to_string)
+    ^ "\003"
+    |> Hex.of_string |> Hex.show
+  in
+  (* RLP of SequencerBlueprint = list [chunk; number; nb_chunks; chunk_index;
+     signature] (no optional chain_id, so 5 items):
+       - chunk       = ""               -> 0x80
+       - number      = 33 bytes         -> 0xa1 (string, len 0x21=33) + 33 bytes
+                        ** 33 > 32: this is the poison **
+       - nb_chunks   = 1 (u16 LE)       -> 0x82 0x01 0x00
+       - chunk_index = 0 (u16 LE)       -> 0x82 0x00 0x00
+       - signature   = ""               -> 0x80  (never reached)
+     payload = 42 bytes -> list header 0xc0 + 42 = 0xea.
+
+     [fill] is the hex byte used for the 33-byte `number`; varying it yields
+     distinct-but-equally-poisonous chunks so we can inject several at once. *)
+  let poisoned_chunk fill =
+    String.concat
+      ""
+      [
+        frame_prefix;
+        "ea";
+        "80";
+        "a1";
+        String.make (33 * 2) fill;
+        "820100";
+        "820000";
+        "80";
+      ]
+  in
+  (* Five distinct invalid blueprint chunks (number filled with 0xaa..0xee). *)
+  let poisoned_chunks = List.map poisoned_chunk ['a'; 'b'; 'c'; 'd'; 'e'] in
+  (* Inject all the invalid blueprint chunks at once, from a plain L1 account
+     (not the sequencer) to show no key or valid signature is required. They
+     land in the same inbox level. *)
+  let* () =
+    let messages =
+      `A (List.map (fun c -> `String c) poisoned_chunks)
+      |> JSON.annotate ~origin:"poisoned_blueprint_chunks"
+      |> JSON.encode
+    in
+    Client.Sc_rollup.send_message
+      ?wait:None
+      ~msg:("hex:" ^ messages)
+      ~src:Constant.bootstrap2.alias
+      client
+  in
+  (* Time how long the rollup node takes to process the block carrying the
+     invalid blueprints. We arm the listener before baking and bake with
+     [bake_for_and_wait_level] (L1 only) rather than [next_rollup_node_level],
+     whose 30s wait on the rollup node would time out if the guard is reverted
+     and the slow VM runs. The first processed head after baking is the one
+     carrying the poison (we are synced and the sequencer is idle). *)
+  let wait_processed =
+    Sc_rollup_node.wait_for
+      ~timeout:600.
+      sc_rollup_node
+      "smart_rollup_node_daemon_new_head_processed.v0"
+      (fun json ->
+        Some
+          ( JSON.(json |-> "level" |> as_int),
+            JSON.(json |-> "process_time" |> encode) ))
+  in
+  let start = Unix.gettimeofday () in
+  let* _ =
+    repeat 3 (fun () ->
+        let* _ = Client.bake_for_and_wait_level ~keys:[] client in
+        unit)
+  in
+  let* processed_level, process_time = wait_processed in
+  Log.info
+    "Rollup node processed the block with the invalid blueprints (L1 level %d) \
+     in %.3fs wall-clock (kernel process_time: %s)"
+    processed_level
+    (Unix.gettimeofday () -. start)
+    process_time ;
+  (* The kernel is still alive: fresh blueprints are applied and the rollup
+     node catches back up past the baseline. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
+  let*@ final = rollup_level sc_rollup_node in
+  Check.((final > baseline) int32)
+    ~error_msg:
+      "Rollup node should keep applying blueprints after the poisoned chunks \
+       (rollup head %L should exceed baseline %R)" ;
+  check_rollup_head_consistency ~evm_node:sequencer ~sc_rollup_node ()
+
 let test_sequencer_too_ahead =
   let max_blueprints_ahead = 5 in
   register_all
@@ -17031,6 +17163,7 @@ let () =
   test_patch_state [Protocol.Alpha] ;
   test_publish_blueprints protocols ;
   test_publish_blueprints_signatory protocols ;
+  test_blueprint_chunk_oversized_u256_does_not_panic protocols ;
   test_sequencer_too_ahead protocols ;
   test_resilient_to_rollup_node_disconnect protocols ;
   test_can_fetch_smart_rollup_address protocols ;
