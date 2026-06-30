@@ -378,54 +378,40 @@ let job_test_keyring =
     ~pipeline_type
     ~script:"scripts/packaging/tests/deb/test-keyring.sh"
 
+let jobs_for (distro : Distro.t) pipeline_type =
+  [
+    (Cacio.Auto, job_apt_repo distro.name pipeline_type);
+    (Cacio.Auto, job_lintian distro.name pipeline_type);
+    (Cacio.Auto, job_install_bin distro pipeline_type);
+  ]
+  @ (match distro with
+    | {name = Ubuntu; release = "22.04"} ->
+        (* Not sure why this exception? *)
+        []
+    | _ -> [(Cacio.Auto, job_install_bin_systemd distro pipeline_type)])
+  @ [
+      (Cacio.Auto, job_upgrade_bin_systemd distro pipeline_type);
+      (Cacio.Auto, job_test_keyring distro pipeline_type);
+    ]
+
+let jobs pipeline_type =
+  match pipeline_type with
+  | Partial -> jobs_for (Distro.debian "trixie") Partial
+  | Full | Release ->
+      let concat_map l f = List.concat_map f l in
+      concat_map [Distro.Debian; Ubuntu] @@ fun distro ->
+      concat_map (Distro.supported_releases distro pipeline_type)
+      @@ fun release -> jobs_for {name = distro; release} pipeline_type
+
 let () =
   (* Register the Debian partial jobs directly into before_merging and
      merge_train pipelines with only_if_changed so they run automatically
      only when relevant files change. *)
-  Cacio.register_merge_request_jobs
-    [
-      (Auto, job_apt_repo Debian Partial);
-      (Auto, job_lintian Debian Partial);
-      (* These test jobs consume the apt repository published by
-         [job_apt_repo_debian Partial], which only contains the releases
-         returned by [debian_releases Partial]. They must therefore target the
-         same release, otherwise the install/upgrade/keyring tests request a
-         distribution whose Release file was never published (404). *)
-      (Auto, job_install_bin (Distro.debian "trixie") Partial);
-      (Auto, job_install_bin_systemd (Distro.debian "trixie") Partial);
-      (Auto, job_upgrade_bin_systemd (Distro.debian "trixie") Partial);
-      (Auto, job_test_keyring (Distro.debian "trixie") Partial);
-    ] ;
+  Cacio.register_merge_request_jobs (jobs Partial) ;
   (* In merge pipelines we tests only Debian.
      Ubuntu packages are built and tested in the scheduled pipelines. *)
-  Cacio.register_jobs
-    Debian_daily
-    [
-      (Auto, job_apt_repo Debian Full);
-      (Auto, job_apt_repo Ubuntu Full);
-      (Auto, job_reproducibility_debian Full);
-      (Auto, job_lintian Ubuntu Full);
-      (Auto, job_lintian Debian Full);
-      (Auto, job_install_bin (Distro.ubuntu 22 04) Full);
-      (Auto, job_install_bin (Distro.ubuntu 24 04) Full);
-      (Auto, job_install_bin (Distro.ubuntu 26 04) Full);
-      (Auto, job_install_bin_systemd (Distro.ubuntu 24 04) Full);
-      (Auto, job_install_bin_systemd (Distro.ubuntu 26 04) Full);
-      (Auto, job_upgrade_bin_systemd (Distro.ubuntu 22 04) Full);
-      (Auto, job_upgrade_bin_systemd (Distro.ubuntu 24 04) Full);
-      (Auto, job_upgrade_bin_systemd (Distro.ubuntu 26 04) Full);
-      (Auto, job_install_bin (Distro.debian "bookworm") Full);
-      (Auto, job_install_bin (Distro.debian "trixie") Full);
-      (Auto, job_install_bin_systemd (Distro.debian "bookworm") Full);
-      (Auto, job_install_bin_systemd (Distro.debian "trixie") Full);
-      (Auto, job_upgrade_bin_systemd (Distro.debian "bookworm") Full);
-      (Auto, job_upgrade_bin_systemd (Distro.debian "trixie") Full);
-      (Auto, job_test_keyring (Distro.debian "bookworm") Full);
-      (Auto, job_test_keyring (Distro.debian "trixie") Full);
-      (Auto, job_test_keyring (Distro.ubuntu 22 04) Full);
-      (Auto, job_test_keyring (Distro.ubuntu 24 04) Full);
-      (Auto, job_test_keyring (Distro.ubuntu 26 04) Full);
-    ] ;
+  Cacio.register_jobs Debian_daily (jobs Full) ;
+  Cacio.register_jobs Debian_daily [(Auto, job_reproducibility_debian Full)] ;
   ()
 
 (* Jobs exported outside this module.
