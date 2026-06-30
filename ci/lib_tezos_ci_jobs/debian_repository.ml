@@ -88,29 +88,6 @@ let tag_amd64 ~ramfs =
 
 let tag_arm64 = Runner.Tag.show Gcp_arm64
 
-(** These are the set of distro/release/architecture combinations for
-    which we build deb packages in the [oc.build-*] jobs.
-    A dependency image will be built once for each combination of [RELEASE] and [TAGS].
-
-    If [release_pipeline] is false, we only tests a subset of the matrix,
-    one release, and one architecture.
-
-    Specify [ramfs] to select the specific runner for amd64.
-
-    Set [arm64] to false to exclude from the matrix arm64 architecture. *)
-let package_release_matrix ?(ramfs = false) ?(arm64 = true) distro pipeline_type
-    =
-  [
-    [
-      ("RELEASE", Distro.supported_releases distro pipeline_type);
-      ( "TAGS",
-        match pipeline_type with
-        | Partial -> [tag_amd64 ~ramfs]
-        | Full | Release ->
-            tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []) );
-    ];
-  ]
-
 (* Points to [(debian|ubuntu)-build] static images. *)
 let build_dependency_image =
   Image.mk_external
@@ -184,6 +161,19 @@ let job_build_keyring_package =
 let job_build =
   Cacio.parameterize @@ fun distro ->
   Cacio.parameterize @@ fun pipeline_type ->
+  let matrix =
+    (* Set of distro/release/architecture combinations for which we build deb packages.
+       A dependency image will be built once for each combination of [RELEASE] and [TAGS]. *)
+    [
+      [
+        ("RELEASE", Distro.supported_releases distro pipeline_type);
+        ( "TAGS",
+          match pipeline_type with
+          | Partial -> [tag_amd64 ~ramfs:true]
+          | Full | Release -> [tag_amd64 ~ramfs:true; tag_arm64] );
+      ];
+    ]
+  in
   make_package_build_job
     ("oc.build-" ^ Distro.name_for_scripts distro)
     ~__POS__
@@ -194,7 +184,7 @@ let job_build =
         ("DISTRIBUTION", Distro.name_for_scripts distro);
         ("DUNE_BUILD_JOBS", "-j 12");
       ]
-    ~parallel:(Matrix (package_release_matrix ~ramfs:true distro pipeline_type))
+    ~parallel:(Matrix matrix)
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
 
