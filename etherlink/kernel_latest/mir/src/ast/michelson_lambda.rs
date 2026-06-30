@@ -71,6 +71,97 @@ pub enum Closure<'a> {
     },
 }
 
+/// The data retained by one `APPLY` level.
+///
+/// The typed value is needed by `EXEC`; the Micheline value is retained for
+/// exact `PACK` roundtripping. Keeping both representations eagerly mirrors
+/// L1's `APPLY`, which materializes `PUSH ty value ; PAIR` when the closure is
+/// created. The cache also lets a later `PACK` charge before copying any large
+/// literal. This does use more memory than the typed value alone, but that
+/// memory is paid for by the size-dependent charge at `APPLY`.
+///
+/// Private fields funnel construction through one explicit call shape and
+/// prevent later mutation from desynchronizing the representations. The
+/// complete record is itself `Rc`-shared, making every `Closure::clone`
+/// independent of both value and type size.
+pub struct AppliedCapture<'a> {
+    arg_ty: Type,
+    arg_val: Rc<TypedValue<'a>>,
+    cached_unparsed_arg: CachedUnparsedArg<'a>,
+}
+
+struct CachedUnparsedArg<'a> {
+    arg_ty: Micheline<'a>,
+    arg_val: Micheline<'a>,
+    cost: u32,
+}
+
+impl<'a> AppliedCapture<'a> {
+    pub(crate) fn new(
+        arg_ty: Type,
+        arg_val: Rc<TypedValue<'a>>,
+        arg_ty_micheline: Micheline<'a>,
+        arg_val_micheline: Micheline<'a>,
+        unparse_cost: u32,
+    ) -> Self {
+        Self {
+            arg_ty,
+            arg_val,
+            cached_unparsed_arg: CachedUnparsedArg {
+                arg_ty: arg_ty_micheline,
+                arg_val: arg_val_micheline,
+                cost: unparse_cost,
+            },
+        }
+    }
+
+    pub(crate) fn arg_ty(&self) -> &Type {
+        &self.arg_ty
+    }
+
+    pub(crate) fn arg_val(&self) -> &Rc<TypedValue<'a>> {
+        &self.arg_val
+    }
+
+    /// Consume the capture, returning its typed value. Used by the iterative
+    /// drop to drain a (possibly deep) captured value onto the worklist
+    /// instead of recursing through a nested `TypedValue` destructor.
+    pub(crate) fn into_arg_val(self) -> Rc<TypedValue<'a>> {
+        self.arg_val
+    }
+
+    pub(crate) fn clone_unparsed(
+        &self,
+        gas: &mut Gas,
+    ) -> Result<(Micheline<'a>, Micheline<'a>), OutOfGas> {
+        gas.consume(self.cached_unparsed_arg.cost)?;
+        Ok((
+            self.cached_unparsed_arg.arg_ty.clone(),
+            self.cached_unparsed_arg.arg_val.clone(),
+        ))
+    }
+}
+
+impl PartialEq for AppliedCapture<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        // Spell out every field without `..`: adding semantic state must make
+        // this implementation fail to compile until equality is reconsidered.
+        let AppliedCapture {
+            arg_ty: lhs_arg_ty,
+            arg_val: lhs_arg_val,
+            cached_unparsed_arg: _,
+        } = self;
+        let AppliedCapture {
+            arg_ty: rhs_arg_ty,
+            arg_val: rhs_arg_val,
+            cached_unparsed_arg: _,
+        } = other;
+        lhs_arg_ty == rhs_arg_ty && lhs_arg_val == rhs_arg_val
+    }
+}
+
+impl Eq for AppliedCapture<'_> {}
+
 impl<'a> Closure<'a> {
     /// Take a `Closure` out of an `Rc`, cloning only when the `Rc` is shared.
     /// Cloning a `Closure` is O(1) (its fields are `Rc`s), so a shared spine is
