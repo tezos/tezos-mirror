@@ -51,6 +51,11 @@ module Distro = struct
     | {name = Ubuntu; release = "24.04"} -> ubuntu_24_04
     | {name = Ubuntu; release = "26.04"} -> ubuntu_26_04
     | _ -> failwith ("no base image for " ^ full_name_for_humans distro)
+
+  (* Image for jobs that just need one version that works, such as [apt_repo_*]. *)
+  let main_image = function
+    | Debian -> image (debian "trixie")
+    | Ubuntu -> image (ubuntu 24 04)
 end
 
 (* Types for the repository pipelines.
@@ -218,19 +223,29 @@ let job_build_ubuntu =
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
 
-let make_apt_repo_job ~pipeline_type ~build_job ~distribution ~releases =
+let job_apt_repo =
+  Cacio.parameterize @@ fun (distro : Distro.name) ->
+  Cacio.parameterize @@ fun pipeline_type ->
   CI.job
+    ("apt_repo_" ^ Distro.name_for_scripts distro)
+    ~__POS__
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~description:
-      (sf "Create the apt repository for %s packages and sign it." distribution)
+      (sf
+         "Create the apt repository for %s packages and sign it."
+         (Distro.name_for_humans distro))
     ~stage:Publish
     ~needs:
       [
         (Artifacts, job_build_data_packages);
         (Artifacts, job_build_keyring_package);
-        (Artifacts, build_job pipeline_type);
+        ( Artifacts,
+          match distro with
+          | Debian -> job_build_debian pipeline_type
+          | Ubuntu -> job_build_ubuntu pipeline_type );
       ]
+    ~image:(Distro.main_image distro)
     ~variables:
       (archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
@@ -240,31 +255,22 @@ let make_apt_repo_job ~pipeline_type ~build_job ~distribution ~releases =
       [
         ". ./scripts/version.sh";
         "apt-get install -y --update apt-utils debsigs";
-        "./scripts/ci/create_debian_repo.sh "
-        ^ String.concat " " (distribution :: releases);
+        String.concat
+          " "
+          ("./scripts/ci/create_debian_repo.sh"
+          :: Distro.name_for_scripts distro
+          ::
+          (match distro with
+          | Debian -> debian_releases pipeline_type
+          | Ubuntu -> ["22.04"; "24.04"; "26.04"]));
       ]
 
-let job_apt_repo_debian =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_apt_repo_job
-    "apt_repo_debian"
-    ~__POS__
-    ~pipeline_type
-    ~build_job:job_build_debian
-    ~image:Images.Base_images.debian_trixie
-    ~distribution:"debian"
-    ~releases:(debian_releases pipeline_type)
+(* We usually would not define such short-hands for use inside the module,
+   but those two jobs need to be exposed in the interface,
+   and for now we do not wish to also expose the [Distro.name] type. *)
+let job_apt_repo_debian = job_apt_repo Debian
 
-let job_apt_repo_ubuntu =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_apt_repo_job
-    "apt_repo_ubuntu"
-    ~__POS__
-    ~pipeline_type
-    ~build_job:job_build_ubuntu
-    ~image:Images.Base_images.ubuntu_24_04
-    ~distribution:"ubuntu"
-    ~releases:["22.04"; "24.04"; "26.04"]
+let job_apt_repo_ubuntu = job_apt_repo Ubuntu
 
 let make_lintian_job ~distribution ~releases =
   CI.job
@@ -361,13 +367,7 @@ let job_install_bin =
       (sf
          "Check that %s packages can be installed."
          (Distro.name_for_humans distro.name))
-    ~needs:
-      [
-        ( Job,
-          match distro.name with
-          | Ubuntu -> job_apt_repo_ubuntu pipeline_type
-          | Debian -> job_apt_repo_debian pipeline_type );
-      ]
+    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
     ~image:(Distro.image distro)
     ~variables:[("PREFIX", "")]
     ~script:
