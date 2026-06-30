@@ -118,6 +118,23 @@ fn charge_payload(gas: &mut Gas, bytes: usize) -> Result<(), CustomPrecompileErr
     Ok(())
 }
 
+/// Charge the EVM caller for `consumed` gas reported in `from` runtime
+/// units. The conversion is rounded UP (L2-1751) so the charge always
+/// covers the consumed amount instead of leaking the sub-`EVM_GAS_TO_MILLIGAS`
+/// remainder; a conversion overflow charges the full budget (OOG).
+fn charge_consumed_gas(
+    gas: &mut Gas,
+    from: RuntimeId,
+    consumed: u64,
+) -> Result<(), CustomPrecompileError> {
+    let consumed_evm =
+        gas::convert_ceil(from, RuntimeId::Ethereum, consumed).unwrap_or(u64::MAX);
+    if consumed_evm > 0 {
+        charge(gas, consumed_evm)?;
+    }
+    Ok(())
+}
+
 /// Charge the gateway's flat base cost plus the per-word payload
 /// surcharge on the inbound calldata and the outgoing request body.
 ///
@@ -232,7 +249,7 @@ fn classify_and_charge_crac_response(
         .get(X_TEZOS_GAS_CONSUMED)
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<u64>().ok())
-        .and_then(|c| gas::convert(target_runtime, RuntimeId::Ethereum, c));
+        .and_then(|c| gas::convert_ceil(target_runtime, RuntimeId::Ethereum, c));
 
     if let Some(evm_consumed) = callee_gas {
         charge(gas, evm_consumed)?;
@@ -349,9 +366,7 @@ fn dispatch_origin_of<Host: StorageV1, R: Registry>(
         }
     };
     // Convert consumed back to EVM gas and charge.
-    let consumed_evm = gas::convert(source_runtime, RuntimeId::Ethereum, consumed_source)
-        .unwrap_or(u64::MAX);
-    charge(gas, consumed_evm)?;
+    charge_consumed_gas(gas, source_runtime, consumed_source)?;
 
     let output: Vec<u8> = match classification {
         Classification::Unknown => {
@@ -428,9 +443,7 @@ fn dispatch_resolve_address<Host: StorageV1, R: Registry>(
                 })?
         }
     };
-    let consumed_evm = gas::convert(source_runtime, RuntimeId::Ethereum, consumed_source)
-        .unwrap_or(u64::MAX);
-    charge(gas, consumed_evm)?;
+    charge_consumed_gas(gas, source_runtime, consumed_source)?;
 
     let output: Vec<u8> = match source_classification {
         Classification::Unknown => {
@@ -490,10 +503,7 @@ fn dispatch_resolve_address<Host: StorageV1, R: Registry>(
                         *gas,
                     )
                 })?;
-            let consumed_dest_evm =
-                gas::convert(target_runtime, RuntimeId::Ethereum, consumed_dest)
-                    .unwrap_or(u64::MAX);
-            charge(gas, consumed_dest_evm)?;
+            charge_consumed_gas(gas, target_runtime, consumed_dest)?;
 
             let resolution = match inverse_class {
                 Classification::Alias(info_back)
@@ -731,15 +741,7 @@ where
     let (sender_alias, sender_resolution) = context
         .journal_mut()
         .tezosx_resolve_source_alias(sender, target_runtime, gas.remaining())?;
-    let sender_gen_evm = gas::convert(
-        target_runtime,
-        RuntimeId::Ethereum,
-        sender_resolution.consumed_gas,
-    )
-    .unwrap_or(u64::MAX);
-    if sender_gen_evm > 0 {
-        charge(gas, sender_gen_evm)?;
-    }
+    charge_consumed_gas(gas, target_runtime, sender_resolution.consumed_gas)?;
     charge_delegated_storage_cost(
         gas,
         sender_resolution.delegated_storage_cost,
@@ -757,15 +759,7 @@ where
     let (source_alias, source_resolution) = context
         .journal_mut()
         .tezosx_resolve_source_alias(source, target_runtime, gas.remaining())?;
-    let source_gen_evm = gas::convert(
-        target_runtime,
-        RuntimeId::Ethereum,
-        source_resolution.consumed_gas,
-    )
-    .unwrap_or(u64::MAX);
-    if source_gen_evm > 0 {
-        charge(gas, source_gen_evm)?;
-    }
+    charge_consumed_gas(gas, target_runtime, source_resolution.consumed_gas)?;
     charge_delegated_storage_cost(
         gas,
         source_resolution.delegated_storage_cost,
@@ -2663,8 +2657,8 @@ mod tests {
 
     #[test]
     fn test_classify_and_charge_crac_response_no_storage_cost_header() {
-        // 2xx without `X-Tezos-Storage-Cost` → only the callee gas is
-        // charged (1000 Tezos milligas = 1 Tezos gas = 45 EVM gas), no storage.
+        // 2xx without `X-Tezos-Storage-Cost` → only the callee gas is charged.
+        // 1000 milligas = ceil(1000 / 22) = 46 EVM gas (rounded up, L2-1751).
         let response = http::Response::builder()
             .status(http::status::StatusCode::OK)
             .header(X_TEZOS_GAS_CONSUMED, "1000")
@@ -2681,9 +2675,48 @@ mod tests {
         .expect("should succeed");
         assert_eq!(
             gas.remaining(),
-            gas_limit - 45,
+            gas_limit - 46,
             "an absent storage-cost header must not deduct any storage gas"
         );
+    }
+
+    #[test]
+    fn test_classify_and_charge_crac_response_rounds_consumed_up() {
+        // L2-1751: 944 milligas = 22 * 42 + 20 must charge 43 EVM gas (ceil),
+        // not the floored 42 — the sub-22 remainder is no longer uncharged.
+        let response = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "944")
+            .body(vec![])
+            .unwrap();
+        let gas_limit = 1_000_000u64;
+        let mut gas = Gas::new(gas_limit);
+        classify_and_charge_crac_response(
+            response,
+            RuntimeId::Tezos,
+            &mut gas,
+            1_000_000_000,
+        )
+        .expect("should succeed");
+        assert_eq!(gas.remaining(), gas_limit - 43);
+    }
+
+    #[test]
+    fn charge_consumed_gas_rounds_up() {
+        // L2-1751: the consumed-gas charge-back shared by the alias-resolution
+        // and originOf/resolveAddress paths rounds up. 944 milligas =
+        // 22 * 42 + 20 must charge ceil = 43 EVM gas, not the floored 42.
+        let mut gas = Gas::new(1_000_000);
+        charge_consumed_gas(&mut gas, RuntimeId::Tezos, 944).expect("affordable");
+        assert_eq!(gas.spent(), 43);
+    }
+
+    #[test]
+    fn charge_consumed_gas_zero_no_charge() {
+        // A cache hit / round-trip reports 0 consumed gas: no charge.
+        let mut gas = Gas::new(1_000_000);
+        charge_consumed_gas(&mut gas, RuntimeId::Tezos, 0).expect("affordable");
+        assert_eq!(gas.spent(), 0);
     }
 
     #[test]
