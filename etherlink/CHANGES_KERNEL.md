@@ -44,6 +44,12 @@
   copied keeps its `update` entry instead of being dropped. This restores
   receipt faithfulness to L1 (and to indexers) for operations touching a
   multi-key big_map, removing a big_map, or duplicating one. (!22357)
+- Michelson runtime: a big_map duplicated into an emitted operation now carries
+  its pre-update content, matching L1. The contract result's deferred in-place
+  updates are applied only after both the storage and operation dumps, so an
+  operation's copy of a big_map observes the source as it was before the storage
+  update (previously it observed the post-update value, diverging from L1 and
+  reaching the called contract's final state). (!22357)
 
 ## Version 6 (Farfadet)
 

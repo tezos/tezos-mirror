@@ -22,7 +22,8 @@ use tezos_crypto_rs::{
 use typed_arena::Arena;
 
 use crate::ast::big_map::{
-    dump_big_map_walk, remove_unreferenced_big_maps, BigMap, LazyStorageError,
+    apply_deferred_big_map_updates, dump_big_map_walk, remove_unreferenced_big_maps,
+    BigMap, LazyStorageError,
 };
 use crate::ast::*;
 #[cfg(feature = "bls")]
@@ -336,7 +337,7 @@ impl<'a> ContractScript<'a> {
         // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
         let mut storage_big_maps = vec![];
         storage.view_big_maps_mut(&mut storage_big_maps);
-        dump_big_map_walk(
+        let deferred_storage = dump_big_map_walk(
             lazy_storage,
             &mut storage_big_maps,
             false,
@@ -347,7 +348,7 @@ impl<'a> ContractScript<'a> {
         let mut seen_in_operations = BTreeSet::new();
         let mut operations_big_maps = vec![];
         operation_list.view_big_maps_mut(&mut operations_big_maps);
-        dump_big_map_walk(
+        let deferred_operations = dump_big_map_walk(
             lazy_storage,
             &mut operations_big_maps,
             true,
@@ -361,6 +362,11 @@ impl<'a> ContractScript<'a> {
             &started_with_map_ids,
             &seen_in_storage,
         )?;
+        // Apply deferred updates only now, after the operation walk copied from
+        // the pre-update source, mirroring L1's `op_diffs @ [storage_diff]`
+        // (L2-1761).
+        apply_deferred_big_map_updates(lazy_storage, deferred_operations)?;
+        apply_deferred_big_map_updates(lazy_storage, deferred_storage)?;
 
         let vec = match &mut operation_list {
             V::List(vec) => std::mem::take(vec),

@@ -1578,8 +1578,8 @@ pub mod tests {
         gas::TezlinkOperationGas,
     };
     use mir::ast::big_map::{
-        dump_big_map_updates, dump_big_map_walk, remove_unreferenced_big_maps, BigMap,
-        BigMapContent, BigMapFromId, BigMapId,
+        apply_deferred_big_map_updates, dump_big_map_updates, dump_big_map_walk,
+        remove_unreferenced_big_maps, BigMap, BigMapContent, BigMapFromId, BigMapId,
     };
     use std::collections::{BTreeMap, BTreeSet};
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -2055,6 +2055,120 @@ pub mod tests {
                 .is_none(),
             "S should have been removed from durable storage"
         );
+    }
+
+    #[test]
+    fn dump_retained_then_moved_big_map_copies_pre_update_state() {
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        let arena = Arena::new();
+
+        let p = storage
+            .big_map_new(&Type::Int, &Type::String, false)
+            .unwrap();
+        assert_eq!(p, 0.into());
+        storage
+            .big_map_update(
+                &p,
+                TypedValue::int(1),
+                Some(TypedValue::String("old".into())),
+            )
+            .unwrap();
+
+        let mut returned_storage = BigMap {
+            content: BigMapContent::FromId(BigMapFromId {
+                id: p.clone(),
+                overlay: BTreeMap::from([(
+                    TypedValue::int(1),
+                    Some(TypedValue::String("new".into())),
+                )]),
+            }),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        let mut seen_in_storage = BTreeSet::new();
+        let deferred_storage = dump_big_map_walk(
+            &mut storage,
+            &mut [&mut returned_storage],
+            false,
+            &mut seen_in_storage,
+        )
+        .unwrap();
+        assert!(seen_in_storage.contains(&p));
+        assert_eq!(
+            storage
+                .big_map_get(&arena, &p, &TypedValue::int(1), &Type::String)
+                .unwrap(),
+            Some(TypedValue::String("old".into())),
+            "the storage walk must NOT flush P's overlay yet",
+        );
+
+        let mut operation_map = BigMap {
+            content: BigMapContent::FromId(BigMapFromId {
+                id: p.clone(),
+                overlay: BTreeMap::new(),
+            }),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        let mut seen_in_operations = BTreeSet::new();
+        let deferred_operations = dump_big_map_walk(
+            &mut storage,
+            &mut [&mut operation_map],
+            true,
+            &mut seen_in_operations,
+        )
+        .unwrap();
+        let operation_id = match &operation_map.content {
+            BigMapContent::FromId(m) => m.id.clone(),
+            BigMapContent::InMemory(_) => panic!("operation big map was not dumped"),
+        };
+        assert_ne!(operation_id, p);
+        assert!(operation_id.is_temporary());
+
+        apply_deferred_big_map_updates(&mut storage, deferred_operations).unwrap();
+        apply_deferred_big_map_updates(&mut storage, deferred_storage).unwrap();
+
+        assert_eq!(
+            storage
+                .big_map_get(&arena, &operation_id, &TypedValue::int(1), &Type::String)
+                .unwrap(),
+            Some(TypedValue::String("old".into())),
+            "operation copy must observe P's pre-update content, as on L1",
+        );
+        assert_eq!(
+            storage
+                .big_map_get(&arena, &p, &TypedValue::int(1), &Type::String)
+                .unwrap(),
+            Some(TypedValue::String("new".into())),
+            "the storage update is applied last, after the operation copy",
+        );
+    }
+
+    #[test]
+    fn cloning_from_id_big_map_preserves_same_id() {
+        let original = BigMap {
+            content: BigMapContent::FromId(BigMapFromId {
+                id: BigMapId::from(7),
+                overlay: BTreeMap::from([(
+                    TypedValue::int(1),
+                    Some(TypedValue::String("v".into())),
+                )]),
+            }),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        let duplicated = original.clone();
+        let id_of = |m: &BigMap| match &m.content {
+            BigMapContent::FromId(c) => c.id.clone(),
+            BigMapContent::InMemory(_) => panic!("expected FromId"),
+        };
+        assert_eq!(
+            id_of(&original),
+            id_of(&duplicated),
+            "DUP (Clone) must preserve the big_map id",
+        );
+        assert_eq!(id_of(&duplicated), BigMapId::from(7));
     }
 
     /// Root-cause guard for L2-1636: copying a big map whose durable source

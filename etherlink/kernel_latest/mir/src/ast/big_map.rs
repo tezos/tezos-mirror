@@ -830,8 +830,28 @@ pub fn dump_big_map_updates<'a>(
     // never appears in `seen_source_ids` is dropped storage that we
     // must clean up.
     let mut seen_source_ids: BTreeSet<BigMapId> = BTreeSet::new();
-    dump_big_map_walk(storage, finished_with_maps, temporary, &mut seen_source_ids)?;
+    let deferred =
+        dump_big_map_walk(storage, finished_with_maps, temporary, &mut seen_source_ids)?;
     remove_unreferenced_big_maps(storage, started_with_map_ids, &seen_source_ids)?;
+    // Single walk: apply the deferral now (safe after the removal pass, which
+    // only touches ids absent from `seen_source_ids`).
+    apply_deferred_big_map_updates(storage, deferred)?;
+    Ok(())
+}
+
+/// Deferred first-occurrence in-place overlays from [dump_big_map_walk],
+/// applied once every walk sharing the lazy storage has run.
+pub type DeferredBigMapUpdates<'a> =
+    Vec<(BigMapId, BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>)>;
+
+/// Apply the deferred in-place overlays returned by [dump_big_map_walk].
+pub fn apply_deferred_big_map_updates<'a>(
+    storage: &mut (impl LazyStorage<'a> + ?Sized),
+    deferred: DeferredBigMapUpdates<'a>,
+) -> Result<(), LazyStorageError> {
+    for (id, overlay) in deferred {
+        storage.big_map_bulk_update(&id, overlay)?;
+    }
     Ok(())
 }
 
@@ -853,11 +873,8 @@ pub fn dump_big_map_walk<'a>(
     finished_with_maps: &mut [&mut BigMap<'a>],
     temporary: bool,
     seen_source_ids: &mut BTreeSet<BigMapId>,
-) -> Result<(), LazyStorageError> {
-    let mut deferred_in_place_updates: Vec<(
-        BigMapId,
-        BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
-    )> = Vec::new();
+) -> Result<DeferredBigMapUpdates<'a>, LazyStorageError> {
+    let mut deferred_in_place_updates: DeferredBigMapUpdates<'a> = Vec::new();
     for map in finished_with_maps.iter_mut() {
         // the "map" variable has type `&mut &mut BigMap<'_>`, the
         // following assignment casts it to a single `&mut`.
@@ -901,13 +918,9 @@ pub fn dump_big_map_walk<'a>(
         }
     }
 
-    // Apply deferred in-place updates last so that any earlier copies
-    // captured the pre-update state of their source.
-    for (id, overlay) in deferred_in_place_updates {
-        storage.big_map_bulk_update(&id, overlay)?;
-    }
-
-    Ok(())
+    // Return the deferred updates so a multi-walk caller applies them only
+    // after every walk has copied from the pre-update source (L2-1761).
+    Ok(deferred_in_place_updates)
 }
 
 /// Remove every id in `started_with_map_ids` that is absent from

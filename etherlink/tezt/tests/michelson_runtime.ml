@@ -5792,6 +5792,112 @@ code { CDR ;
       (JSON.encode tezosx_lsd) ;
   unit
 
+(** L2-1761: a contract DUPs its persisted big_map, mutates one copy in place
+    (returned storage) and TRANSFER_TOKENS the unmutated copy; the receiver must
+    observe the pre-update content on Tezos X, as on L1. *)
+let test_big_map_dup_retention_l1_vs_tezosx =
+  let receiver_prg =
+    {|parameter (big_map nat string) ;
+storage (option string) ;
+code { CAR ; PUSH nat 1 ; GET ; NIL operation ; PAIR }|}
+  in
+  let parent_prg =
+    {|parameter (contract (big_map nat string)) ;
+storage (big_map nat string) ;
+code { UNPAIR ;
+       SWAP ;
+       DUP ;
+       PUSH string "new" ; SOME ; PUSH nat 1 ; UPDATE ;
+       DUG 2 ;
+       PUSH mutez 0 ;
+       SWAP ;
+       TRANSFER_TOKENS ;
+       NIL operation ; SWAP ; CONS ;
+       PAIR }|}
+  in
+  register_tezosx_test
+    ~title:"big_map DUP'd into an operation carries pre-update content like L1"
+    ~tags:["big_map"; "operations"; "l1_comparison"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; node; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  (* Cap gas: octez-client's 3M default is rejected by the Tezlink node. *)
+  let gas_limit = 660_000 in
+  (* Originate the receiver and the parent, call the parent (which emits the
+     internal op carrying the DUP'd big_map), and return the receiver's stored
+     value. [endpoint] selects L1 (absent) vs Tezos X (the tezlink endpoint). *)
+  let run ~name ~src ?endpoint ~bake () =
+    let* receiver =
+      Client.originate_contract
+        ?endpoint
+        ~alias:(sf "dup_receiver_%s" name)
+        ~amount:Tez.zero
+        ~src
+        ~prg:receiver_prg
+        ~init:"None"
+        ~gas_limit
+        ~burn_cap:Tez.one
+        client
+    in
+    let* () = bake () in
+    let* parent =
+      Client.originate_contract
+        ?endpoint
+        ~alias:(sf "dup_parent_%s" name)
+        ~amount:Tez.zero
+        ~src
+        ~prg:parent_prg
+        ~init:{|{ Elt 1 "old" }|}
+        ~gas_limit
+        ~burn_cap:Tez.one
+        client
+    in
+    let* () = bake () in
+    let* () =
+      Client.transfer
+        ?endpoint
+        ~amount:Tez.zero
+        ~giver:src
+        ~receiver:parent
+        ~arg:(sf "%S" receiver)
+        ~gas_limit
+        ~burn_cap:Tez.one
+        client
+    in
+    let* () = bake () in
+    let* storage = Client.contract_storage ?endpoint receiver client in
+    return (String.trim storage)
+  in
+  (* bootstrap1 is the rollup's L1 operator here, so L1 uses bootstrap2. *)
+  let* l1 =
+    run
+      ~name:"l1"
+      ~src:Constant.bootstrap2.public_key_hash
+      ~bake:(fun () -> Client.bake_for_and_wait ~node client)
+      ()
+  in
+  let* tezosx =
+    run
+      ~name:"tezosx"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~endpoint
+      ~bake:(fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+      ()
+  in
+  Log.info "receiver storage: L1 = %s ; Tezos X = %s" l1 tezosx ;
+  Check.(
+    (l1 = {|Some "old"|})
+      string
+      ~error_msg:"L1 oracle: expected receiver storage %R but got %L") ;
+  Check.(
+    (tezosx = l1)
+      string
+      ~error_msg:
+        "Tezos X receiver storage %L must match L1 %R (pre-update copy)") ;
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -5834,6 +5940,7 @@ let () =
   test_bigmap_option [Alpha] ;
   test_bigmap_counter [Alpha] ;
   test_lazy_storage_diff_order_l1_vs_tezosx [Alpha] ;
+  test_big_map_dup_retention_l1_vs_tezosx [Alpha] ;
   test_bootstrap_kt1_is_executable [Alpha] ;
   test_bigmap_rpcs [Alpha] ;
   test_pack_data [Alpha] ;
