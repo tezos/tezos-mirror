@@ -2223,7 +2223,7 @@ apt_repo_debian:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.test_keyring_debian_bookworm:
+oc.test_keyring_debian_trixie:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: publishing_tests
   tags:
@@ -2265,12 +2265,12 @@ oc.test_keyring_debian_bookworm:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     DOCKER_VERSION: 28.5.1
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
     PREFIX: ""
     DISTRIBUTION: debian
-    RELEASE: bookworm
+    RELEASE: trixie
 
-oc.upgrade_bin_debian_bookworm-systemd:
+oc.upgrade_bin_debian_trixie_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: publishing_tests
   tags:
@@ -2312,12 +2312,12 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     DOCKER_VERSION: 28.5.1
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
     PREFIX: ""
     DISTRIBUTION: debian
-    RELEASE: bookworm
+    RELEASE: trixie
 
-oc.install_bin_debian_bookworm_systemd:
+oc.install_bin_debian_trixie_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: publishing_tests
   tags:
@@ -2359,13 +2359,13 @@ oc.install_bin_debian_bookworm_systemd:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     DOCKER_VERSION: 28.5.1
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
     PREFIX: ""
     DISTRIBUTION: debian
-    RELEASE: bookworm
+    RELEASE: trixie
 
-oc.install_bin_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-100afa6d
+oc.install_bin_debian_trixie:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
   stage: publishing_tests
   tags:
   - gcp
@@ -2396,7 +2396,7 @@ oc.install_bin_debian_bookworm:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./docs/introduction/install-bin-deb.sh debian bookworm
+  - ./docs/introduction/install-bin-deb.sh debian trixie
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

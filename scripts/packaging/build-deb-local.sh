@@ -44,8 +44,7 @@ zcash() {
   eval "$(opam env)"
   # Link the zcash DAL parameters to be packaged
   if [ ! -e scripts/packaging/octez-data/zcash-params ]; then
-    md5sum --status -c script-inputs/sapling-params.md5
-    if $? != 0; then
+    if ! md5sum --status -c script-inputs/sapling-params.md5; then
       echo "Sapling params md5 mismatch. You can fix this problem running :"
       echo "md5sum _opam/share/zcash-params/* > script-inputs/sapling-params.md5"
       md5sum -c script-inputs/sapling-params.md5

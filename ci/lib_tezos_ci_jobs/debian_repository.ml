@@ -304,6 +304,13 @@ let job_reproducibility_debian =
         ("TAGS", tag_amd64 ~ramfs:true);
         ("DUNE_BUILD_JOBS", "-j 12");
       ]
+      (* The rebuild includes the keyring package, whose build sources
+         repository-keys.sh to fetch the production public signing key(s) from
+         GCP on protected branches. That fetch authenticates to GCP via Workload
+         Identity Federation, which needs the GCP_ID_TOKEN OIDC token generated
+         by this id_tokens section; without it the rebuild falls back to the
+         temporary key and produces a differently-versioned keyring package. *)
+    ~id_tokens:Tezos_ci.id_tokens
     ~sccache:(Cacio.sccache ())
     ~script:[cargo_network_hack; "./scripts/ci/test-debian-reproducibility.sh"]
 
@@ -536,10 +543,15 @@ let () =
     [
       (Auto, job_apt_repo_debian Partial);
       (Auto, job_lintian_debian Partial);
-      (Auto, job_install_bin_debian_bookworm Partial);
-      (Auto, job_install_bin_debian_bookworm_systemd Partial);
-      (Auto, job_upgrade_bin_debian_bookworm_systemd Partial);
-      (Auto, job_test_keyring_debian_bookworm Partial);
+      (* These test jobs consume the apt repository published by
+         [job_apt_repo_debian Partial], which only contains the releases
+         returned by [debian_releases Partial]. They must therefore target the
+         same release, otherwise the install/upgrade/keyring tests request a
+         distribution whose Release file was never published (404). *)
+      (Auto, job_install_bin_debian_trixie Partial);
+      (Auto, job_install_bin_debian_trixie_systemd Partial);
+      (Auto, job_upgrade_bin_debian_trixie_systemd Partial);
+      (Auto, job_test_keyring_debian_trixie Partial);
     ] ;
   (* In merge pipelines we tests only Debian.
      Ubuntu packages are built and tested in the scheduled pipelines. *)
