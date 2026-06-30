@@ -319,19 +319,20 @@ let job_install_bin =
         ^ " " ^ distro.release;
       ]
 
-let make_systemd_test_job ~script ~distribution ~release =
+let make_systemd_test_job ~script ~(distro : Distro.t) ~pipeline_type =
   CI.job
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~stage:Test_publication
+    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
     ~image:Images.Base_images.alpine_docker_ci
     ~services:[{name = Images.Base_images.dind_service}]
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
       @ make_debian_variables
-          distribution
+          (Distro.name_for_scripts distro.name)
           "systemd"
-          release
+          distro.release
           Tezos_ci.Images.Base_images.debian_version)
     ~script:
       [
@@ -347,9 +348,8 @@ let job_install_bin_systemd =
     (sf "oc.install_bin_%s_systemd" (Distro.full_name_with_underscores distro))
     ~__POS__
     ~description:"Check that packages that use systemd can be installed."
-    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
-    ~distribution:(Distro.name_for_scripts distro.name)
-    ~release:distro.release
+    ~distro
+    ~pipeline_type
     ~script:"scripts/packaging/tests/deb/install-bin-deb.sh"
 
 (* Note: this job is in the publish stage because it depends on a job
@@ -363,9 +363,8 @@ let job_upgrade_bin_systemd =
     (sf "oc.upgrade_bin_%s_systemd" (Distro.full_name_with_underscores distro))
     ~__POS__
     ~description:"Check the upgrade process in a systemd enabled Docker image."
-    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
-    ~distribution:(Distro.name_for_scripts distro.name)
-    ~release:distro.release
+    ~distro
+    ~pipeline_type
     ~script:"scripts/packaging/tests/deb/upgrade-systemd-test.sh"
 
 let job_test_keyring =
@@ -375,9 +374,8 @@ let job_test_keyring =
     ("oc.test_keyring_" ^ Distro.full_name_with_underscores distro)
     ~__POS__
     ~description:"Check that the keyring package works for APT authentication."
-    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
-    ~distribution:(Distro.name_for_scripts distro.name)
-    ~release:distro.release
+    ~distro
+    ~pipeline_type
     ~script:"scripts/packaging/tests/deb/test-keyring.sh"
 
 let () =
