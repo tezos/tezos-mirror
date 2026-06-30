@@ -114,6 +114,45 @@ clippy. When it's known to be safe, `allow` directive is added on the call.
 */
 
 impl<'a> Micheline<'a> {
+    /// Charge the same per-node cost as constructing this Micheline tree.
+    ///
+    /// Lambda values retain their original Micheline code for exact
+    /// roundtripping. Reusing that tree during unparsing avoids rebuilding it,
+    /// but must still pay the cost that rebuilding it would have consumed.
+    /// Charge incrementally while walking so an oversized tree cannot be fully
+    /// traversed before gas exhaustion is observed.
+    pub(crate) fn charge_unparsing_cost(&self, gas: &mut Gas) -> Result<(), OutOfGas> {
+        let mut pending = vec![self];
+        while let Some(node) = pending.pop() {
+            match node {
+                Micheline::Int(i) => {
+                    gas.consume(unparsing_cost::int(i).map_err(|_| OutOfGas)?)?
+                }
+                Micheline::String(s) => {
+                    gas.consume(unparsing_cost::string(s).map_err(|_| OutOfGas)?)?
+                }
+                Micheline::Bytes(bytes) => {
+                    gas.consume(unparsing_cost::bytes(bytes).map_err(|_| OutOfGas)?)?
+                }
+                Micheline::Seq(items) => {
+                    gas.consume(unparsing_cost::NODE)?;
+                    pending.extend(items.iter().rev());
+                }
+                Micheline::App(_, args, annotations) => {
+                    gas.consume(unparsing_cost::NODE)?;
+                    for annotation in annotations.iter() {
+                        gas.consume(
+                            unparsing_cost::annotation(annotation)
+                                .map_err(|_| OutOfGas)?,
+                        )?;
+                    }
+                    pending.extend(args.iter().rev());
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn alloc_seq<const N: usize>(
         arena: &'a Arena<Self>,
         args: [Self; N],
