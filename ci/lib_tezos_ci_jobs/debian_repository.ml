@@ -340,9 +340,16 @@ let make_systemd_test_job ~script ~distribution ~release =
         ^ " images/packages/debian-systemd-tests.Dockerfile";
       ]
 
-let make_systemd_install_job =
+let job_install_bin_systemd =
+  Cacio.parameterize @@ fun (distro : Distro.t) ->
+  Cacio.parameterize @@ fun pipeline_type ->
   make_systemd_test_job
+    (sf "oc.install_bin_%s_systemd" (Distro.full_name_with_underscores distro))
+    ~__POS__
     ~description:"Check that packages that use systemd can be installed."
+    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
+    ~distribution:(Distro.name_for_scripts distro.name)
+    ~release:distro.release
     ~script:"scripts/packaging/tests/deb/install-bin-deb.sh"
 
 let make_systemd_upgrade_job =
@@ -354,24 +361,6 @@ let make_systemd_keyring_test_job =
   make_systemd_test_job
     ~description:"Check that the keyring package works for APT authentication."
     ~script:"scripts/packaging/tests/deb/test-keyring.sh"
-
-let job_install_bin_ubuntu_24_04_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_install_job
-    "oc.install_bin_ubuntu_24_04_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"24.04"
-
-let job_install_bin_ubuntu_26_04_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_install_job
-    "oc.install_bin_ubuntu_26_04_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"26.04"
 
 let job_upgrade_bin_ubuntu_22_04_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -399,24 +388,6 @@ let job_upgrade_bin_ubuntu_26_04_systemd =
     ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"26.04"
-
-let job_install_bin_debian_bookworm_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_install_job
-    "oc.install_bin_debian_bookworm_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo Debian pipeline_type)]
-    ~distribution:"debian"
-    ~release:"bookworm"
-
-let job_install_bin_debian_trixie_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_install_job
-    "oc.install_bin_debian_trixie_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo Debian pipeline_type)]
-    ~distribution:"debian"
-    ~release:"trixie"
 
 (* Note: this job is in the publish stage because it depends on a job
    that is in the publish stage, but it is a test.
@@ -499,7 +470,7 @@ let () =
          same release, otherwise the install/upgrade/keyring tests request a
          distribution whose Release file was never published (404). *)
       (Auto, job_install_bin (Distro.debian "trixie") Partial);
-      (Auto, job_install_bin_debian_trixie_systemd Partial);
+      (Auto, job_install_bin_systemd (Distro.debian "trixie") Partial);
       (Auto, job_upgrade_bin_debian_trixie_systemd Partial);
       (Auto, job_test_keyring_debian_trixie Partial);
     ] ;
@@ -516,15 +487,15 @@ let () =
       (Auto, job_install_bin (Distro.ubuntu 22 04) Full);
       (Auto, job_install_bin (Distro.ubuntu 24 04) Full);
       (Auto, job_install_bin (Distro.ubuntu 26 04) Full);
-      (Auto, job_install_bin_ubuntu_24_04_systemd Full);
-      (Auto, job_install_bin_ubuntu_26_04_systemd Full);
+      (Auto, job_install_bin_systemd (Distro.ubuntu 24 04) Full);
+      (Auto, job_install_bin_systemd (Distro.ubuntu 26 04) Full);
       (Auto, job_upgrade_bin_ubuntu_22_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_24_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_26_04_systemd Full);
       (Auto, job_install_bin (Distro.debian "bookworm") Full);
       (Auto, job_install_bin (Distro.debian "trixie") Full);
-      (Auto, job_install_bin_debian_bookworm_systemd Full);
-      (Auto, job_install_bin_debian_trixie_systemd Full);
+      (Auto, job_install_bin_systemd (Distro.debian "bookworm") Full);
+      (Auto, job_install_bin_systemd (Distro.debian "trixie") Full);
       (Auto, job_upgrade_bin_debian_bookworm_systemd Full);
       (Auto, job_upgrade_bin_debian_trixie_systemd Full);
       (Auto, job_test_keyring_debian_bookworm Full);
