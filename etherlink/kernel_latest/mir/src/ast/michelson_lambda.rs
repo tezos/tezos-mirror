@@ -65,10 +65,19 @@ pub enum Closure<'a> {
         /// Captured argument type
         arg_ty: Type,
         /// Captured argument value
-        arg_val: Box<TypedValue<'a>>,
+        arg_val: Rc<TypedValue<'a>>,
         /// Inner closure
-        closure: Box<Closure<'a>>,
+        closure: Rc<Closure<'a>>,
     },
+}
+
+impl<'a> Closure<'a> {
+    /// Take a `Closure` out of an `Rc`, cloning only when the `Rc` is shared.
+    /// Cloning a `Closure` is O(1) (its fields are `Rc`s), so a shared spine is
+    /// walked without deep-copying the whole chain.
+    pub(crate) fn unwrap_rc(rc: Rc<Self>) -> Self {
+        Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
+    }
 }
 
 /// A trivial empty lambda, used as a cheap placeholder when moving a `Closure`
@@ -109,6 +118,8 @@ impl<'a> IntoMicheline<'a> for Closure<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use typed_arena::Arena;
 
     use crate::{
@@ -159,9 +170,6 @@ mod tests {
     /// `Closure::Apply` spine (an APPLY chain is ~7400-deep reachable within
     /// one operation's gas budget). Builds N nested `Apply` and formats on a
     /// 1 MiB worker thread; a regression to recursive walking would overflow.
-    /// `Closure` has no iterative `Drop` yet (its `Box<Closure>` spine recurses
-    /// on drop — tracked in L2-1446), so the deep value is `mem::forget`-ed to
-    /// avoid the recursive destructor.
     #[test]
     fn deeply_nested_closure_apply_debug_format() {
         use crate::ast::{Micheline, Type};
@@ -176,8 +184,8 @@ mod tests {
                 for _ in 0..DEPTH {
                     c = super::Closure::Apply {
                         arg_ty: Type::Unit,
-                        arg_val: Box::new(TypedValue::Unit),
-                        closure: Box::new(c),
+                        arg_val: Rc::new(TypedValue::Unit),
+                        closure: Rc::new(c),
                     };
                 }
                 let tv = TypedValue::Lambda(c);
@@ -216,8 +224,8 @@ mod tests {
                 for _ in 0..DEPTH {
                     c = super::Closure::Apply {
                         arg_ty: Type::new_lambda(Type::Unit, Type::Unit),
-                        arg_val: Box::new(TypedValue::Lambda(leaf())),
-                        closure: Box::new(c),
+                        arg_val: Rc::new(TypedValue::Lambda(leaf())),
+                        closure: Rc::new(c),
                     };
                 }
                 // Wrap the whole chain inside one final outer Lambda so the

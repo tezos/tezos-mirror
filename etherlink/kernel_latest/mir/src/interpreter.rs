@@ -1652,9 +1652,12 @@ fn interpret_step<'a, 'b, 'c>(
                         closure: inner,
                         ..
                     } => {
+                        // The capture is reused directly (no deep copy): a
+                        // `DUP`'d applied closure shares the `Rc`, so executing
+                        // it bumps a refcount instead of copying the capture.
                         ctx.gas().consume(interpret_cost::PAIR)?;
-                        arg = V::new_pair(*arg_val, arg);
-                        closure = *inner;
+                        arg = V::new_pair_rc(arg_val, Rc::new(arg));
+                        closure = Closure::unwrap_rc(inner);
                     }
                 }
             }
@@ -3190,13 +3193,15 @@ fn interpret_one<'a>(
             stack.push(V::Lambda(Closure::Lambda(lam.clone())));
         }
         I::Apply { arg_ty } => {
-            let arg_val = pop!();
+            // Keep the stack's Rc rather than unwrapping it. If the capture
+            // was DUP'd, `pop!` would clone a large Bytes/String/Int payload.
+            let arg_val = pop_rc!();
             let closure = pop!(V::Lambda);
             ctx.gas().consume(interpret_cost::APPLY)?;
             stack.push(V::Lambda(Closure::Apply {
                 arg_ty: arg_ty.clone(),
-                arg_val: Box::new(arg_val),
-                closure: Box::new(closure),
+                arg_val,
+                closure: Rc::new(closure),
             }))
         }
         I::HashKey => {
@@ -7536,8 +7541,8 @@ mod interpreter_tests {
             stack,
             stk![TypedValue::Lambda(Closure::Apply {
                 arg_ty: Type::Int,
-                arg_val: Box::new(TypedValue::int(1)),
-                closure: Box::new(lam),
+                arg_val: Rc::new(TypedValue::int(1)),
+                closure: Rc::new(lam),
             })]
         );
         stack.push(TypedValue::nat(5));
@@ -7579,8 +7584,8 @@ mod interpreter_tests {
             stack,
             stk![TypedValue::Lambda(Closure::Apply {
                 arg_ty: Type::Bool,
-                arg_val: Box::new(TypedValue::Bool(true)),
-                closure: Box::new(lam),
+                arg_val: Rc::new(TypedValue::Bool(true)),
+                closure: Rc::new(lam),
             })]
         );
         stack.push(TypedValue::nat(5));
@@ -7622,13 +7627,82 @@ mod interpreter_tests {
             stack,
             stk![TypedValue::Lambda(Closure::Apply {
                 arg_ty: Type::Bool,
-                arg_val: Box::new(TypedValue::Bool(false)),
-                closure: Box::new(lam),
+                arg_val: Rc::new(TypedValue::Bool(false)),
+                closure: Rc::new(lam),
             })]
         );
         stack.push(TypedValue::nat(5));
         assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::nat(5)]);
+    }
+
+    // Builds an applied closure directly so the caller keeps control of the
+    // `arg_val` `Rc` identity for the capture-sharing assertions.
+    fn applied_drop_closure(capture: Rc<TypedValue<'static>>) -> TypedValue<'static> {
+        TypedValue::Lambda(Closure::Apply {
+            arg_ty: Type::Bytes,
+            arg_val: capture,
+            closure: Rc::new(Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: vec![Drop(None), Unit].into(),
+            })),
+        })
+    }
+
+    #[test]
+    fn dup_exec_loop_does_not_deep_clone_capture() {
+        // Regression for L2-1643 leg 2 (the DoS severity driver).
+        //
+        // The attack is `APPLY large_capture; loop k { DUP; EXEC }`. Each
+        // `EXEC` of a `DUP`'d (refcount >= 2) applied closure has to clone the
+        // closure out of its shared `Rc` (`pop_v!`/`unwrap_rc`). Because
+        // `Closure::Apply` now stores its capture in an `Rc`, that clone bumps
+        // a refcount (O(1)) instead of deep-copying the whole capture. With the
+        // previous `Box`, every `EXEC` deep-copied the capture: O(k * |capture|)
+        // memcpy for a flat, size-independent `EXEC` charge -- a repeatable,
+        // unmetered block-production DoS.
+        const ITERATIONS: usize = 64;
+
+        // Cloning an applied closure -- exactly what `EXEC` does to a `DUP`'d
+        // closure -- must share the capture allocation, not deep-copy it.
+        let capture = Rc::new(V::Bytes(vec![0; 1 << 16]));
+        let arg_val_of = |tv: &TypedValue<'static>| match tv {
+            TypedValue::Lambda(Closure::Apply { arg_val, .. }) => Rc::clone(arg_val),
+            value => panic!("expected applied closure, got {value:?}"),
+        };
+        let closure = applied_drop_closure(Rc::clone(&capture));
+        assert!(Rc::ptr_eq(&arg_val_of(&closure.clone()), &capture));
+
+        // The closure takes `unit` and returns `unit` (`DROP ; UNIT`), so each
+        // loop iteration `DUP`s it, pushes the `unit` argument, `EXEC`s the
+        // copy and drops the `unit` result, leaving the original for the next
+        // round.
+        let mut body = Vec::new();
+        for _ in 0..ITERATIONS {
+            body.extend([Dup(None), Push(Rc::new(V::Unit)), Exec, Drop(None)]);
+        }
+
+        let run = |capture: Rc<TypedValue<'static>>| -> u32 {
+            let mut ctx = Ctx::default();
+            let mut stack = stk![applied_drop_closure(Rc::clone(&capture))];
+            let start_milligas = ctx.gas().milligas().unwrap();
+            interpret(&body, &mut ctx, &mut stack).unwrap();
+            // The surviving closure still points at the *original* capture
+            // allocation: the loop never re-allocated it.
+            assert_eq!(stack.len(), 1);
+            assert!(Rc::ptr_eq(
+                &arg_val_of(stack.get(0).unwrap().as_ref()),
+                &capture
+            ));
+            start_milligas - ctx.gas().milligas().unwrap()
+        };
+
+        // Flat `EXEC` gas is acceptable now precisely because the per-iteration
+        // work is O(1): the same flat charge for a 1-byte and a 64-KiB capture.
+        let large_gas = run(capture);
+        let small_gas = run(Rc::new(V::Bytes(vec![0; 1])));
+        assert_eq!(large_gas, small_gas);
+        assert!(large_gas > 0);
     }
 
     #[test]

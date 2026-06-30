@@ -1166,8 +1166,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     arg_val,
                                     closure,
                                 } => {
-                                    applies.push((arg_ty, *arg_val));
-                                    cur = *closure;
+                                    applies.push((arg_ty, TypedValue::unwrap_rc(arg_val)));
+                                    cur = Closure::unwrap_rc(closure);
                                 }
                                 Closure::Lambda(lambda) => break lambda,
                             }
@@ -1794,10 +1794,12 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue
         }
         TV::Lambda(closure) => {
             // Walk the `Closure::Apply` spine iteratively so the
-            // `Box<Closure>` chain (a deep `APPLY` chain) does not recurse on
-            // drop, pushing each captured `arg_val` (a possibly-deep value)
-            // onto the worklist. The final `Closure::Lambda` drops trivially:
-            // its `Type` fields and `Rc<[Instruction]>` code have their own
+            // `Rc<Closure>` chain (a deep `APPLY` chain) does not recurse on
+            // drop. When we hold the last reference to a captured value, drain
+            // it onto the worklist (it too may be a deep value); when the
+            // capture is still shared, the holder that drops it last reaches
+            // this same path. The final `Closure::Lambda` drops trivially: its
+            // `Type` fields and `Rc<[Instruction]>` code have their own
             // iterative `Drop`.
             let dummy = Closure::Lambda(Lambda::Lambda {
                 micheline_code: Micheline::Seq(&[]),
@@ -1810,8 +1812,8 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue
                 ..
             } = cur
             {
-                stack.push(*arg_val);
-                cur = *inner;
+                push_rc(arg_val, stack);
+                cur = Closure::unwrap_rc(inner);
             }
         }
         TV::Ticket(t) => {
@@ -2506,8 +2508,8 @@ mod drop_safety {
 
     #[test]
     fn drain_deep_lambda_apply_spine() {
-        // A deep `APPLY` chain nests `Closure::Apply { closure: Box<Closure> }`;
-        // the `Box<Closure>` spine must be drained iteratively, not recurse.
+        // A deep `APPLY` chain nests `Closure::Apply { closure: Rc<Closure> }`;
+        // the `Rc<Closure>` spine must be drained iteratively, not recurse.
         on_kernel_stack(|| {
             let mut closure = Closure::Lambda(Lambda::Lambda {
                 micheline_code: Micheline::Seq(&[]),
@@ -2516,12 +2518,67 @@ mod drop_safety {
             for _ in 0..DEPTH {
                 closure = Closure::Apply {
                     arg_ty: Type::Unit,
-                    arg_val: Box::new(TypedValue::Unit),
-                    closure: Box::new(closure),
+                    arg_val: Rc::new(TypedValue::Unit),
+                    closure: Rc::new(closure),
                 };
             }
             let mut tv = TypedValue::Lambda(closure);
             drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn drain_deep_captured_apply_value() {
+        // Each `APPLY` level captures the *previous* applied closure as its
+        // `arg_val`, building a deep capture-value chain (distinct from the
+        // spine above, which nests via `closure`). Drop must drain the captured
+        // value onto the worklist rather than recurse through a nested
+        // `TypedValue` destructor per captured level.
+        on_kernel_stack(|| {
+            let terminal = || {
+                Closure::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: Vec::new().into(),
+                })
+            };
+            let mut tv = TypedValue::Lambda(terminal());
+            for _ in 0..DEPTH {
+                tv = TypedValue::Lambda(Closure::Apply {
+                    arg_ty: Type::new_lambda(Type::Unit, Type::Unit),
+                    arg_val: Rc::new(tv),
+                    closure: Rc::new(terminal()),
+                });
+            }
+            drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn drain_deep_shared_captured_apply_value() {
+        // As above, but the whole closure is cloned first so every capture is
+        // shared. Dropping both copies must stay iterative: the first drop
+        // walks the spine without draining (captures still shared), the second
+        // drains each now-unique captured value onto the worklist.
+        on_kernel_stack(|| {
+            let terminal = || {
+                Closure::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: Vec::new().into(),
+                })
+            };
+            let mut tv = TypedValue::Lambda(terminal());
+            for _ in 0..DEPTH {
+                tv = TypedValue::Lambda(Closure::Apply {
+                    arg_ty: Type::new_lambda(Type::Unit, Type::Unit),
+                    arg_val: Rc::new(tv),
+                    closure: Rc::new(terminal()),
+                });
+            }
+            // Cloning the top is O(1) (it only bumps the spine's `Rc`s), so the
+            // two values share every captured allocation.
+            let copy = tv.clone();
+            drop(tv);
+            drop(copy);
         });
     }
 
@@ -2653,8 +2710,8 @@ mod drop_safety {
             for _ in 0..DEPTH {
                 tv = TypedValue::Lambda(Closure::Apply {
                     arg_ty: Type::Unit,
-                    arg_val: Box::new(tv),
-                    closure: Box::new(mk_terminal()),
+                    arg_val: Rc::new(tv),
+                    closure: Rc::new(mk_terminal()),
                 });
             }
             let arena = Arena::new();
