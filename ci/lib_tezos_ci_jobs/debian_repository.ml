@@ -181,25 +181,20 @@ let job_build_keyring_package =
 
 (* These jobs build the packages in a matrix using the
    build dependencies images *)
-let job_build_debian =
+let job_build =
+  Cacio.parameterize @@ fun distro ->
   Cacio.parameterize @@ fun pipeline_type ->
   make_package_build_job
-    "oc.build-debian"
+    ("oc.build-" ^ Distro.name_for_scripts distro)
     ~__POS__
-    ~description:"Build the Debian packages for Debian."
-    ~variables:[("DISTRIBUTION", "debian"); ("DUNE_BUILD_JOBS", "-j 12")]
-    ~parallel:(Matrix (package_release_matrix ~ramfs:true Debian pipeline_type))
-    ~sccache:(Cacio.sccache ())
-    ~target:"binaries"
-
-let job_build_ubuntu =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_package_build_job
-    "oc.build-ubuntu"
-    ~__POS__
-    ~description:"Build the Debian packages for Ubuntu."
-    ~variables:[("DISTRIBUTION", "ubuntu"); ("DUNE_BUILD_JOBS", "-j 12")]
-    ~parallel:(Matrix (package_release_matrix ~ramfs:true Ubuntu pipeline_type))
+    ~description:
+      (sf "Build the Debian packages for %s." (Distro.name_for_humans distro))
+    ~variables:
+      [
+        ("DISTRIBUTION", Distro.name_for_scripts distro);
+        ("DUNE_BUILD_JOBS", "-j 12");
+      ]
+    ~parallel:(Matrix (package_release_matrix ~ramfs:true distro pipeline_type))
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
 
@@ -220,10 +215,7 @@ let job_apt_repo =
       [
         (Artifacts, job_build_data_packages);
         (Artifacts, job_build_keyring_package);
-        ( Artifacts,
-          match distro with
-          | Debian -> job_build_debian pipeline_type
-          | Ubuntu -> job_build_ubuntu pipeline_type );
+        (Artifacts, job_build distro pipeline_type);
       ]
     ~image:(Distro.main_image distro)
     ~variables:
@@ -263,7 +255,7 @@ let job_lintian_ubuntu =
   make_lintian_job
     "oc.lintian_ubuntu"
     ~__POS__
-    ~needs:[(Artifacts, job_build_ubuntu pipeline_type)]
+    ~needs:[(Artifacts, job_build Ubuntu pipeline_type)]
     ~image:Images.Base_images.ubuntu_24_04
     ~distribution:"ubuntu"
     ~releases:(Distro.supported_releases Ubuntu pipeline_type)
@@ -273,7 +265,7 @@ let job_lintian_debian =
   make_lintian_job
     "oc.lintian_debian"
     ~__POS__
-    ~needs:[(Artifacts, job_build_debian pipeline_type)]
+    ~needs:[(Artifacts, job_build Debian pipeline_type)]
     ~image:Images.Base_images.debian_trixie
     ~distribution:"debian"
     ~releases:(Distro.supported_releases Debian pipeline_type)
@@ -303,7 +295,7 @@ let job_reproducibility_debian =
     ~tag:Dynamic
     ~needs:
       [
-        (Artifacts, job_build_debian pipeline_type);
+        (Artifacts, job_build Debian pipeline_type);
         (Artifacts, job_build_data_packages);
         (Artifacts, job_build_keyring_package);
       ]
@@ -566,6 +558,10 @@ let () =
 (* Jobs exported outside this module.
    For now we do not need the Distro module outside of this module,
    so we export instances instead of the functions themselves. *)
+
+let job_build_debian = job_build Debian
+
+let job_build_ubuntu = job_build Ubuntu
 
 let job_apt_repo_debian = job_apt_repo Debian
 
