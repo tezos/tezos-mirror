@@ -1363,7 +1363,7 @@ pub mod interpret_cost {
 /// to cover the cost of allocating the Micheline tree (the memory but
 /// also the time spent to allocate).
 pub mod unparsing_cost {
-    use super::{AsGasCost, BigInt, BigIntByteSize, CostOverflow};
+    use super::{AsGasCost, BigInt, BigIntByteSize, BigUint, CostOverflow};
     use crate::ast::annotations::Annotation;
     use checked::Checked;
 
@@ -1373,8 +1373,18 @@ pub mod unparsing_cost {
 
     /// Cost for allocating a Micheline Int node: 125 mg + 25 mg/byte.
     pub fn int(i: &BigInt) -> Result<u32, CostOverflow> {
-        let size = Checked::from(i.byte_size());
+        int_by_size(i.byte_size())
+    }
+
+    fn int_by_size(size: u64) -> Result<u32, CostOverflow> {
+        let size = Checked::from(size);
         (125 + size * 25).as_gas_cost()
+    }
+
+    /// Cost for allocating a non-negative Micheline Int node without first
+    /// converting the source [`BigUint`] into an owned [`BigInt`].
+    pub fn nat(i: &BigUint) -> Result<u32, CostOverflow> {
+        int_by_size(i.byte_size())
     }
 
     /// Cost for allocating a Micheline String node: 125 mg + 10 mg/byte
