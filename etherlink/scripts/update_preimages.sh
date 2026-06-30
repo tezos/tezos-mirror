@@ -3,7 +3,7 @@
 set -e
 
 usage() {
-  echo "usage: etherlink/scripts/update_preimages.sh <GIT_COMMIT>... [--network NETWORK]"
+  echo "usage: etherlink/scripts/update_preimages.sh <GIT_COMMIT>... [--commits C1,C2,...] [--network NETWORK]"
 }
 
 NETWORK="mainnet"
@@ -25,6 +25,20 @@ while [ "$#" -gt 0 ]; do
     ;;
   --network=*)
     NETWORK="${1#--network=}"
+    shift
+    ;;
+  --commits)
+    [ "$#" -ge 2 ] || {
+      echo "missing value for --commits" >&2
+      usage
+      exit 1
+    }
+    # Split the comma-separated list into individual commits.
+    COMMITS="$COMMITS $(echo "$2" | tr ',' ' ')"
+    shift 2
+    ;;
+  --commits=*)
+    COMMITS="$COMMITS $(echo "${1#--commits=}" | tr ',' ' ')"
     shift
     ;;
   -h | --help)
