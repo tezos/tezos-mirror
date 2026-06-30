@@ -175,16 +175,51 @@ impl<'a> Micheline<'a> {
         Ok(Self::Int(i))
     }
 
+    /// Construct the Int case by cloning a borrowed integer after charging
+    /// its full size-dependent unparsing cost.
+    ///
+    /// This intentionally cannot delegate to [`Self::int`]: evaluating the
+    /// owned argument would clone the integer before that constructor charges.
+    pub fn int_cloned(i: &BigInt, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
+        gas.consume(unparsing_cost::int(i).map_err(|_| OutOfGas)?)?;
+        Ok(Self::Int(i.clone()))
+    }
+
+    /// Construct a non-negative Int case by cloning a borrowed natural after
+    /// charging its full size-dependent unparsing cost.
+    pub fn nat_cloned(i: &BigUint, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
+        gas.consume(unparsing_cost::nat(i).map_err(|_| OutOfGas)?)?;
+        Ok(Self::Int(i.clone().into()))
+    }
+
     /// Construct the String case.
     pub fn string(s: String, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
         gas.consume(unparsing_cost::string(&s).map_err(|_| OutOfGas)?)?;
         Ok(Self::String(s))
     }
 
+    /// Construct the String case by cloning a borrowed string after charging
+    /// its full size-dependent unparsing cost.
+    ///
+    /// Kept separate from [`Self::string`] so charging precedes `to_owned`.
+    pub fn string_cloned(s: &str, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
+        gas.consume(unparsing_cost::string(s).map_err(|_| OutOfGas)?)?;
+        Ok(Self::String(s.to_owned()))
+    }
+
     /// Construct the Bytes case.
     pub fn bytes(s: Vec<u8>, gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
         gas.consume(unparsing_cost::bytes(&s).map_err(|_| OutOfGas)?)?;
         Ok(Self::Bytes(s))
+    }
+
+    /// Construct the Bytes case by cloning a borrowed slice after charging
+    /// its full size-dependent unparsing cost.
+    ///
+    /// Kept separate from [`Self::bytes`] so charging precedes `to_vec`.
+    pub fn bytes_cloned(s: &[u8], gas: &mut Gas) -> Result<Micheline<'a>, OutOfGas> {
+        gas.consume(unparsing_cost::bytes(s).map_err(|_| OutOfGas)?)?;
+        Ok(Self::Bytes(s.to_vec()))
     }
 
     /// Construct a primitive application with zero arguments.
