@@ -517,6 +517,9 @@ impl Evaluation {
             Default::default(),
             constants.clone(),
         );
+        // The result is always paired with its traces below (→
+        // `store_simulation_http_traces`), so capture is on for every call.
+        journal.set_http_trace_enabled(true);
         let sim_result = match revm_run_transaction(
             host,
             registry,

@@ -142,7 +142,7 @@ impl Registry for RegistryImpl {
                 )
                 .unwrap(),
         };
-        journal.record_response(response.clone());
+        journal.record_response(&response);
         response
     }
 }

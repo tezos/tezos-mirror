@@ -1253,6 +1253,7 @@ mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
+        journal.set_http_trace_enabled(true);
         let request = http::Request::builder()
             .method("GET")
             .uri("http://tezos/KT1abc/default")
@@ -1265,7 +1266,7 @@ mod tests {
             .header("X-Tezos-Gas-Consumed", "42")
             .body(b"world".to_vec())
             .unwrap();
-        journal.record_response(response);
+        journal.record_response(&response);
         assert_eq!(journal.http_traces().len(), 1);
 
         let tx_hash = [0xABu8; 32];
@@ -1306,6 +1307,7 @@ mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
+        journal.set_http_trace_enabled(true);
 
         // First exchange: GET /first.
         let req1 = http::Request::builder()
@@ -1318,7 +1320,7 @@ mod tests {
             .status(200)
             .body(b"r1".to_vec())
             .unwrap();
-        journal.record_response(resp1);
+        journal.record_response(&resp1);
 
         // Second exchange: POST /second.
         let req2 = http::Request::builder()
@@ -1331,7 +1333,7 @@ mod tests {
             .status(204)
             .body(b"r2".to_vec())
             .unwrap();
-        journal.record_response(resp2);
+        journal.record_response(&resp2);
 
         assert_eq!(journal.http_traces().len(), 2);
 

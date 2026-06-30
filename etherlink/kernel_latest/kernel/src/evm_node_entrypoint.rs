@@ -317,6 +317,9 @@ where
         trace_operation_hash,
         block_constants.evm_runtime_block_constants.clone(),
     );
+    // This journal exists solely to capture traces for the `http_trace*`
+    // RPCs (read back via `into_http_traces` below), so capture is always on.
+    trace_journal.set_http_trace_enabled(true);
     let execution_result = match transaction {
         chains::TezosXTransaction::Tezos(operation) => {
             let enable_gas_refund = chain_config

@@ -760,6 +760,7 @@ where
     journal
         .michelson
         .set_internal_operation_counter(internal_operations_base);
+    journal.set_http_trace_enabled(http_trace_enabled);
     let run_result = revm_run_transaction(
         host,
         registry,
@@ -1383,6 +1384,7 @@ where
             // live block observables instead of zero (see chains.rs).
             let mut tezosx_journal =
                 TezosXJournal::new(crac_id, synthetic_op_hash, block_constants.clone());
+            tezosx_journal.set_http_trace_enabled(http_trace_enabled);
             let validation_result = tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
