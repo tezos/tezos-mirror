@@ -31,9 +31,6 @@
    that it appears in both variants as applicable, with the
    appropriate rules. *)
 
-open Gitlab_ci.Types
-open Gitlab_ci.Util
-
 (** Variants of the code verification pipeline.
 
     Encodes the conditional [before_merging] pipeline, the [merge_train]
@@ -53,7 +50,7 @@ let job_start =
     ~__POS__
     ~image:Tezos_ci.Images.datadog_ci
     ~stage:Tezos_ci.Stages.start
-    ~rules:[job_rule ~allow_failure:No ~when_:Manual ()]
+    ~rules:[Gitlab_ci.Util.job_rule ~allow_failure:No ~when_:Manual ()]
     ~timeout:(Minutes 10)
     ~name:"trigger"
     [
