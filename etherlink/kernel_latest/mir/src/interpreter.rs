@@ -180,6 +180,8 @@ pub enum InterpretInvariant {
     ExpectedListOperation,
     #[error("script result's operation list contained a non-operation element")]
     ExpectedOperationElement,
+    #[error("APPLY reached the borrowed unparser with a non-pushable capture")]
+    NonPushableApplyCapture,
 }
 
 #[allow(missing_docs)]
@@ -208,6 +210,17 @@ pub enum EnshrinedViewDispatchError {
 impl<'a> From<OutOfGas> for InterpretError<'a> {
     fn from(_: OutOfGas) -> Self {
         InterpretError::OutOfGas
+    }
+}
+
+impl<'a> From<BorrowedUnparseError> for InterpretError<'a> {
+    fn from(error: BorrowedUnparseError) -> Self {
+        match error {
+            BorrowedUnparseError::OutOfGas => InterpretError::OutOfGas,
+            BorrowedUnparseError::NonPushable => {
+                InterpretError::InternalError(InterpretInvariant::NonPushableApplyCapture)
+            }
+        }
     }
 }
 
@@ -3208,12 +3221,13 @@ fn interpret_one<'a>(
             let arg_ty_micheline =
                 arg_ty.into_micheline_optimized_legacy(arena, ctx.gas())?;
             let ty_cost = before_ty - ctx.gas().milligas().ok_or(OutOfGas)?;
-            // Unparse a clone of the capture so the typed value is retained for
-            // EXEC. (A later change unparses it by reference to avoid the
-            // clone.)
+            // Retain the typed capture for EXEC while unparsing it by
+            // reference. The borrowed unparser walks containers in place and
+            // charges size-dependent leaves before cloning them into the
+            // cache.
             let before_val = ctx.gas().milligas().ok_or(OutOfGas)?;
             let arg_val_micheline =
-                (*arg_val).clone().into_micheline_optimized_legacy(arena, ctx.gas())?;
+                arg_val.clone_into_micheline_optimized_legacy(arena, ctx.gas())?;
             let val_cost = before_val - ctx.gas().milligas().ok_or(OutOfGas)?;
             let cached_unparse_cost =
                 ty_cost.checked_add(val_cost).ok_or(CostOverflow)?;
