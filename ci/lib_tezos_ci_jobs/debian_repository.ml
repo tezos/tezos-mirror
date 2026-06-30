@@ -14,6 +14,45 @@
 open Tezos_ci
 module CI = Cacio.Shared
 
+(* "Distribution" would be a more proper name but the "Distro" slang
+   makes it more clear that we are talking about a Linux distribution
+   and not about the distribution of something else. (Also it's shorter.)
+
+   Feel free to move this into e.g. Tezos_ci.Images.Base_images instead.
+   For now it's only used in debian_repository.ml so we can define it here,
+   closer to where it is actually used. *)
+module Distro = struct
+  type name = Debian | Ubuntu
+
+  type t = {name : name; release : string}
+
+  let debian release = {name = Debian; release}
+
+  let ubuntu year month = {name = Ubuntu; release = sf "%02d.%02d" year month}
+
+  let name_for_humans = function Debian -> "Debian" | Ubuntu -> "Ubuntu"
+
+  let name_for_scripts distro = String.lowercase_ascii (name_for_humans distro)
+
+  let full_name_for_humans distro =
+    name_for_humans distro.name ^ " " ^ distro.release
+
+  let full_name_with_underscores distro =
+    name_for_scripts distro.name
+    ^ "_"
+    ^ String.map (function '.' -> '_' | c -> c) distro.release
+
+  let image distro =
+    let open Tezos_ci.Images.Base_images in
+    match distro with
+    | {name = Debian; release = "bookworm"} -> debian_bookworm
+    | {name = Debian; release = "trixie"} -> debian_trixie
+    | {name = Ubuntu; release = "22.04"} -> ubuntu_22_04
+    | {name = Ubuntu; release = "24.04"} -> ubuntu_24_04
+    | {name = Ubuntu; release = "26.04"} -> ubuntu_26_04
+    | _ -> failwith ("no base image for " ^ full_name_for_humans distro)
+end
+
 (* Types for the repository pipelines.
    - Release: we run all the release jobs, but no tests
    - Partial: we run only a subset of the tests jobs
@@ -44,11 +83,6 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
 let debian_releases : repository_pipeline -> string list = function
   | Partial -> ["trixie"]
   | Full | Release -> ["bookworm"; "trixie"]
-
-(* Job names use [_] instead of [.] in releases (e.g. [22_04] for
-   Ubuntu [22.04]). Debian codenames have no dots so this is a no-op
-   for them. *)
-let release_token release = String.map (function '.' -> '_' | c -> c) release
 
 (** These are the set of Debian release-architecture combinations for
     which we build deb packages in the job [oc.build-debian].
@@ -314,60 +348,34 @@ let job_reproducibility_debian =
     ~sccache:(Cacio.sccache ())
     ~script:[cargo_network_hack; "./scripts/ci/test-debian-reproducibility.sh"]
 
-let make_install_bin_job ~distribution ~release =
+let job_install_bin =
+  Cacio.parameterize @@ fun (distro : Distro.t) ->
+  Cacio.parameterize @@ fun pipeline_type ->
   CI.job
+    (sf "oc.install_bin_%s" (Distro.full_name_with_underscores distro))
+    ~__POS__
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~stage:Test_publication
-    ~description:(sf "Check that %s packages can be installed." distribution)
+    ~description:
+      (sf
+         "Check that %s packages can be installed."
+         (Distro.name_for_humans distro.name))
+    ~needs:
+      [
+        ( Job,
+          match distro.name with
+          | Ubuntu -> job_apt_repo_ubuntu pipeline_type
+          | Debian -> job_apt_repo_debian pipeline_type );
+      ]
+    ~image:(Distro.image distro)
     ~variables:[("PREFIX", "")]
     ~script:
-      ["./docs/introduction/install-bin-deb.sh " ^ distribution ^ " " ^ release]
-
-let job_install_bin ~distribution ~release ~image ~apt_repo =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_install_bin_job
-    (sf "oc.install_bin_%s_%s" distribution (release_token release))
-    ~__POS__
-    ~needs:[(Job, apt_repo pipeline_type)]
-    ~image
-    ~distribution
-    ~release
-
-let job_install_bin_ubuntu_22_04 =
-  job_install_bin
-    ~distribution:"ubuntu"
-    ~release:"22.04"
-    ~image:Images.Base_images.ubuntu_22_04
-    ~apt_repo:job_apt_repo_ubuntu
-
-let job_install_bin_ubuntu_24_04 =
-  job_install_bin
-    ~distribution:"ubuntu"
-    ~release:"24.04"
-    ~image:Images.Base_images.ubuntu_24_04
-    ~apt_repo:job_apt_repo_ubuntu
-
-let job_install_bin_ubuntu_26_04 =
-  job_install_bin
-    ~distribution:"ubuntu"
-    ~release:"26.04"
-    ~image:Images.Base_images.ubuntu_26_04
-    ~apt_repo:job_apt_repo_ubuntu
-
-let job_install_bin_debian_bookworm =
-  job_install_bin
-    ~distribution:"debian"
-    ~release:"bookworm"
-    ~image:Images.Base_images.debian_bookworm
-    ~apt_repo:job_apt_repo_debian
-
-let job_install_bin_debian_trixie =
-  job_install_bin
-    ~distribution:"debian"
-    ~release:"trixie"
-    ~image:Images.Base_images.debian_trixie
-    ~apt_repo:job_apt_repo_debian
+      [
+        "./docs/introduction/install-bin-deb.sh "
+        ^ Distro.name_for_scripts distro.name
+        ^ " " ^ distro.release;
+      ]
 
 let make_systemd_test_job ~script ~distribution ~release =
   CI.job
@@ -548,7 +556,7 @@ let () =
          returned by [debian_releases Partial]. They must therefore target the
          same release, otherwise the install/upgrade/keyring tests request a
          distribution whose Release file was never published (404). *)
-      (Auto, job_install_bin_debian_trixie Partial);
+      (Auto, job_install_bin (Distro.debian "trixie") Partial);
       (Auto, job_install_bin_debian_trixie_systemd Partial);
       (Auto, job_upgrade_bin_debian_trixie_systemd Partial);
       (Auto, job_test_keyring_debian_trixie Partial);
@@ -563,16 +571,16 @@ let () =
       (Auto, job_reproducibility_debian Full);
       (Auto, job_lintian_ubuntu Full);
       (Auto, job_lintian_debian Full);
-      (Auto, job_install_bin_ubuntu_22_04 Full);
-      (Auto, job_install_bin_ubuntu_24_04 Full);
-      (Auto, job_install_bin_ubuntu_26_04 Full);
+      (Auto, job_install_bin (Distro.ubuntu 22 04) Full);
+      (Auto, job_install_bin (Distro.ubuntu 24 04) Full);
+      (Auto, job_install_bin (Distro.ubuntu 26 04) Full);
       (Auto, job_install_bin_ubuntu_24_04_systemd Full);
       (Auto, job_install_bin_ubuntu_26_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_22_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_24_04_systemd Full);
       (Auto, job_upgrade_bin_ubuntu_26_04_systemd Full);
-      (Auto, job_install_bin_debian_bookworm Full);
-      (Auto, job_install_bin_debian_trixie Full);
+      (Auto, job_install_bin (Distro.debian "bookworm") Full);
+      (Auto, job_install_bin (Distro.debian "trixie") Full);
       (Auto, job_install_bin_debian_bookworm_systemd Full);
       (Auto, job_install_bin_debian_trixie_systemd Full);
       (Auto, job_upgrade_bin_debian_bookworm_systemd Full);
