@@ -45,6 +45,7 @@ delegate fees, the :ref:`allocation algorithm
 :ref:`rules and constants <stez_safeguards_u025>` that govern the
 system.
 
+.. _stez_staking_ledger:
 .. _stez_staking_ledger_u025:
 
 sTEZ Staking and Unstaked Frozen Ledgers
@@ -78,6 +79,7 @@ transferred back to the redeemer's spendable balance by calling the
 :ref:`receipts <stez_receipts_u025>`, this ledger appears as
 ``stez_redeemed_deposits``.
 
+.. _exchange_rate:
 .. _exchange_rate_u025:
 
 Exchange Rate
@@ -120,6 +122,7 @@ tez. The user can either redeem their sTEZ to receive ~105 tez, or
 sell the sTEZ tokens directly on an exchange.
 
 
+.. _stez_global_fee:
 .. _stez_global_fee_u025:
 
 Global Fee Mechanism
@@ -147,6 +150,7 @@ For details on how :ref:`participation rewards
 <adaptive_rewards_u025>` are computed and distributed, see
 :doc:`adaptive_issuance`.
 
+.. _stez_staking_power:
 .. _stez_staking_power_u025:
 
 Staking Power Distribution Across Delegates
@@ -223,6 +227,7 @@ tez). If the delegate raised their capacity to the global maximum
 (``20%``), up to ``1800`` tez of sTEZ could have their rights
 allocated to them.
 
+.. _stez_safeguards:
 .. _stez_safeguards_u025:
 
 Protocol Rules and Constants
@@ -249,6 +254,7 @@ They can be adjusted through on-chain governance as conditions change:
   automatically excluded and may re-register once they are active
   again.
 
+.. _stez_constants:
 .. _stez_constants_u025:
 
 .. list-table:: sTEZ protocol constants
@@ -274,6 +280,7 @@ Protocol constants can be queried via::
 
    octez-client rpc get /chains/<chain>/blocks/<block>/context/constants
 
+.. _stez_user_operations:
 .. _stez_user_operations_u025:
 
 User Operations
@@ -387,6 +394,7 @@ or more conveniently::
 
    octez-client stez finalize redeem for <redeemer>
 
+.. _stez_delegate_operations:
 .. _stez_delegate_operations_u025:
 
 Delegate Operations
@@ -482,6 +490,7 @@ or more conveniently::
 
    octez-client stez unregister key <delegate> as delegate
 
+.. _stez_fa21:
 .. _stez_fa21_u025:
 
 FA2.1 Token Standard
@@ -531,6 +540,7 @@ Entrypoints emit events (``transfer_event``, ``balance_update``,
 ``total_supply_update``, ``operator_update``, ``allowance_update``,
 ``token_metadata_update``) to support indexer discoverability.
 
+.. _stez_reference:
 .. _stez_reference_u025:
 
 Reference
@@ -539,6 +549,7 @@ Reference
 This section provides the RPC endpoints and receipt formats for
 interacting with and monitoring the sTEZ system.
 
+.. _stez_rpc:
 .. _stez_rpc_u025:
 
 RPC Endpoints
@@ -687,6 +698,7 @@ Base path: ``/chains/<chain>/blocks/<block>/context/delegates/<delegate>``
    * - ``../stez_staking_power``
      - Current staking power from sTEZ allocated to this delegate.
 
+.. _stez_receipts:
 .. _stez_receipts_u025:
 
 Receipts

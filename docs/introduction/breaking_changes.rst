@@ -218,7 +218,7 @@ Additionally, fields related to the consensus were added in the block metadata:
 ``attestations`` and ``preattestations``. They can be ``null`` when the corresponding
 consensus operations are not required in the block. Otherwise, they contain three fields:
 the ``total_committee_power`` and ``threshold``, as described in
-:ref:`the consensus documentation<tb_validator_tallinn>`, and the
+:ref:`the consensus documentation<tb_validator>`, and the
 ``recorded_power``, summing the power of all (pre)attestations
 of the block.
 

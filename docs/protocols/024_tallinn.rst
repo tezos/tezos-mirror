@@ -1,5 +1,3 @@
-.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
-
 Protocol Tallinn
 =================
 
@@ -16,8 +14,7 @@ changes are also listed below in their respective topical section,
 tagged with **Breaking change** or **Deprecation**.
 
 The code is available in directory :src:`src/proto_024_PtTALLiN` of
-the ``master`` branch of Octez and the full documentation in
-:doc:`this page <../active/index>`.
+the ``master`` branch of Octez but the full documentation has been dropped.
 
 
 Environment Version
@@ -129,7 +126,7 @@ Blocks and block receipts
   ``attestations`` and ``preattestations``. They can be ``null`` when the corresponding
   consensus operations are not required in the block. Otherwise, they contain three fields:
   the ``total_committee_power`` and ``threshold``, as described in
-  :ref:`the consensus documentation<tb_validator_tallinn>`, and the
+  :ref:`the consensus documentation<tb_validator>`, and the
   ``recorded_power``, summing the power of all (pre)attestations
   of the block. (MR :gl:`!19835`)
 

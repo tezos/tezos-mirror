@@ -3,8 +3,10 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root ``toctree`` directive.
 
-.. TODO https://gitlab.com/tezos/tezos/-/issues/2170:
-   search shifted protocol name/number & adapt
+.. TODO #2170:
+   search shifted protocol name/number & adapt:
+   - remove the protocol pages index for the old protocol
+   - move the home page of the old protocol into the history page
 
 Welcome to the Octez and Protocol Documentation!
 ================================================
@@ -196,8 +198,7 @@ You may also access this whole documentation as a single `text file <https://oct
    :caption: Protocol Reference Manuals
    :hidden:
 
-   Tallinn Protocol Reference <active/index>
-   U025 Protocol Reference <u025/index>
+   Ushuaia Protocol Reference <active/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -225,7 +226,6 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    protocols/naming
-   protocols/024_tallinn
    protocols/025_u025
    protocols/alpha
    protocols/history
