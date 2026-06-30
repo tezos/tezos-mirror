@@ -14,6 +14,12 @@
 open Tezos_ci
 module CI = Cacio.Shared
 
+(* Types for the repository pipelines.
+   - Release: we run all the release jobs, but no tests
+   - Partial: we run only a subset of the tests jobs
+   - Full: we run the complete test matrix *)
+type repository_pipeline = Full | Partial | Release
+
 (* "Distribution" would be a more proper name but the "Distro" slang
    makes it more clear that we are talking about a Linux distribution
    and not about the distribution of something else. (Also it's shorter.)
@@ -56,13 +62,14 @@ module Distro = struct
   let main_image = function
     | Debian -> image (debian "trixie")
     | Ubuntu -> image (ubuntu 24 04)
-end
 
-(* Types for the repository pipelines.
-   - Release: we run all the release jobs, but no tests
-   - Partial: we run only a subset of the tests jobs
-   - Full: we run the complete test matrix *)
-type repository_pipeline = Full | Partial | Release
+  let supported_releases name pipeline_type =
+    match (name, pipeline_type) with
+    | Debian, Partial -> ["trixie"]
+    | Debian, (Full | Release) -> ["bookworm"; "trixie"]
+    | Ubuntu, Partial -> ["22.04"]
+    | Ubuntu, (Full | Release) -> ["22.04"; "24.04"; "26.04"]
+end
 
 (** Return a tuple (ARCHITECTURES, <archs>) based on the type
     of repository pipeline. *)
@@ -81,16 +88,8 @@ let tag_amd64 ~ramfs =
 
 let tag_arm64 = Runner.Tag.show Gcp_arm64
 
-(** Debian releases tested per pipeline type.
-
-    Partial pipelines (merge requests) only test the current Debian
-    stable; Full and Release pipelines test both supported releases. *)
-let debian_releases : repository_pipeline -> string list = function
-  | Partial -> ["trixie"]
-  | Full | Release -> ["bookworm"; "trixie"]
-
-(** These are the set of Debian release-architecture combinations for
-    which we build deb packages in the job [oc.build-debian].
+(** These are the set of distro/release/architecture combinations for
+    which we build deb packages in the [oc.build-*] jobs.
     A dependency image will be built once for each combination of [RELEASE] and [TAGS].
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
@@ -98,16 +97,19 @@ let debian_releases : repository_pipeline -> string list = function
 
     Specify [ramfs] to select the specific runner for amd64.
 
-    Set [arm64] to false to exclude from the matrix arm64 architecture.
-    *)
-let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) pipeline_type
+    Set [arm64] to false to exclude from the matrix arm64 architecture. *)
+let package_release_matrix ?(ramfs = false) ?(arm64 = true) distro pipeline_type
     =
-  let tags =
-    match pipeline_type with
-    | Partial -> [tag_amd64 ~ramfs]
-    | Full | Release -> tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else [])
-  in
-  [[("RELEASE", debian_releases pipeline_type); ("TAGS", tags)]]
+  [
+    [
+      ("RELEASE", Distro.supported_releases distro pipeline_type);
+      ( "TAGS",
+        match pipeline_type with
+        | Partial -> [tag_amd64 ~ramfs]
+        | Full | Release ->
+            tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []) );
+    ];
+  ]
 
 (* Points to [(debian|ubuntu)-build] static images. *)
 let build_dependency_image =
@@ -126,28 +128,6 @@ let make_debian_variables distribution image_kind release version =
       release
       version )
   :: [("PREFIX", ""); ("DISTRIBUTION", distribution); ("RELEASE", release)]
-
-(** These are the set of Ubuntu release-architecture combinations for
-    which we build deb packages in the job
-    [job_build_ubuntu_package]. See {!debian_package_release_matrix}
-    for more information.
-
-    If [release_pipeline] is false, we only tests a subset of the matrix,
-    one release, and one architecture.
-
-    Specify [ramfs] to select the specific runner for amd64.
-
-    Set [arm64] to false to exclude from the matrix arm64 architecture.
-    *)
-let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
-  | Partial -> [[("RELEASE", ["22.04"]); ("TAGS", [tag_amd64 ~ramfs])]]
-  | Full | Release ->
-      [
-        [
-          ("RELEASE", ["22.04"; "24.04"; "26.04"]);
-          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
-        ];
-      ]
 
 (* This is a hack to enable Cargo networking for jobs in child pipelines.
 
@@ -208,7 +188,7 @@ let job_build_debian =
     ~__POS__
     ~description:"Build the Debian packages for Debian."
     ~variables:[("DISTRIBUTION", "debian"); ("DUNE_BUILD_JOBS", "-j 12")]
-    ~parallel:(Matrix (debian_package_release_matrix ~ramfs:true pipeline_type))
+    ~parallel:(Matrix (package_release_matrix ~ramfs:true Debian pipeline_type))
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
 
@@ -219,7 +199,7 @@ let job_build_ubuntu =
     ~__POS__
     ~description:"Build the Debian packages for Ubuntu."
     ~variables:[("DISTRIBUTION", "ubuntu"); ("DUNE_BUILD_JOBS", "-j 12")]
-    ~parallel:(Matrix (ubuntu_package_release_matrix ~ramfs:true pipeline_type))
+    ~parallel:(Matrix (package_release_matrix ~ramfs:true Ubuntu pipeline_type))
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
 
@@ -259,10 +239,7 @@ let job_apt_repo =
           " "
           ("./scripts/ci/create_debian_repo.sh"
           :: Distro.name_for_scripts distro
-          ::
-          (match distro with
-          | Debian -> debian_releases pipeline_type
-          | Ubuntu -> ["22.04"; "24.04"; "26.04"]));
+          :: Distro.supported_releases distro pipeline_type);
       ]
 
 (* We usually would not define such short-hands for use inside the module,
@@ -296,7 +273,7 @@ let job_lintian_ubuntu =
     ~needs:[(Artifacts, job_build_ubuntu pipeline_type)]
     ~image:Images.Base_images.ubuntu_24_04
     ~distribution:"ubuntu"
-    ~releases:["22.04"; "24.04"; "26.04"]
+    ~releases:(Distro.supported_releases Ubuntu pipeline_type)
 
 let job_lintian_debian =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -306,7 +283,7 @@ let job_lintian_debian =
     ~needs:[(Artifacts, job_build_debian pipeline_type)]
     ~image:Images.Base_images.debian_trixie
     ~distribution:"debian"
-    ~releases:(debian_releases pipeline_type)
+    ~releases:(Distro.supported_releases Debian pipeline_type)
 
 (* Rebuild the Debian binary, data and keyring packages for trixie/amd64 and
    check, with diffoscope, that they are byte-for-byte identical to the packages
