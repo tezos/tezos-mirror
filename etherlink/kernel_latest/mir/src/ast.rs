@@ -1508,6 +1508,183 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
     }
 }
 
+impl<'a> TypedValue<'a> {
+    /// Unparse a pushable value while retaining the typed value, charging
+    /// before cloning any size-dependent leaf payload.
+    ///
+    /// `APPLY` needs both representations of its capture: the typed value for
+    /// `EXEC`, and Micheline for later `PACK`s. Cloning the whole value before
+    /// calling the consuming [`IntoMicheline`] implementation would copy
+    /// arbitrarily large integers and collection structure before their
+    /// unparsing gas was charged. This borrowed worklist walks collections in
+    /// place and only clones leaf payloads through charged constructors.
+    pub(crate) fn clone_into_micheline_optimized_legacy(
+        &self,
+        arena: &'a Arena<Micheline<'a>>,
+        gas: &mut Gas,
+    ) -> Result<Micheline<'a>, BorrowedUnparseError> {
+        use Micheline as V;
+        use TypedValue as TV;
+
+        enum Frame<'v, 'a> {
+            Visit(&'v TypedValue<'a>),
+            ListNext(michelson_list::Iter<'v, Rc<TypedValue<'a>>>),
+            SetNext(std::collections::btree_set::Iter<'v, Rc<TypedValue<'a>>>),
+            MapNext(
+                std::collections::btree_map::Iter<
+                    'v,
+                    Rc<TypedValue<'a>>,
+                    Rc<TypedValue<'a>>,
+                >,
+            ),
+            BuildPrim1(Prim),
+            BuildPrim2(Prim),
+            BuildSeqOf {
+                count: usize,
+            },
+        }
+
+        let mut frames = vec![Frame::Visit(self)];
+        let mut results = Vec::new();
+
+        while let Some(frame) = frames.pop() {
+            match frame {
+                Frame::ListNext(mut iter) => {
+                    if let Some(value) = iter.next() {
+                        frames.push(Frame::ListNext(iter));
+                        frames.push(Frame::Visit(value));
+                    }
+                }
+                Frame::SetNext(mut iter) => {
+                    if let Some(value) = iter.next() {
+                        frames.push(Frame::SetNext(iter));
+                        frames.push(Frame::Visit(value));
+                    }
+                }
+                Frame::MapNext(mut iter) => {
+                    if let Some((key, value)) = iter.next() {
+                        frames.push(Frame::MapNext(iter));
+                        frames.push(Frame::BuildPrim2(Prim::Elt));
+                        frames.push(Frame::Visit(value));
+                        frames.push(Frame::Visit(key));
+                    }
+                }
+                Frame::Visit(value) => match value {
+                    TV::Int(i) | TV::Timestamp(i) => results.push(V::int_cloned(i, gas)?),
+                    TV::Nat(i) => results.push(V::nat_cloned(i, gas)?),
+                    TV::Mutez(i) => results.push(V::int((*i).into(), gas)?),
+                    TV::Bool(true) => results.push(V::prim0(Prim::True, gas)?),
+                    TV::Bool(false) => results.push(V::prim0(Prim::False, gas)?),
+                    TV::String(s) => results.push(V::string_cloned(s, gas)?),
+                    TV::Bytes(bytes) => results.push(V::bytes_cloned(bytes, gas)?),
+                    TV::Unit => results.push(V::prim0(Prim::Unit, gas)?),
+                    TV::Address(address) => {
+                        results.push(V::bytes(address.to_bytes_vec(), gas)?)
+                    }
+                    TV::ChainId(chain_id) => {
+                        results.push(V::bytes(chain_id.clone().into(), gas)?)
+                    }
+                    TV::Contract(address) => {
+                        results.push(V::bytes(address.to_bytes_vec(), gas)?)
+                    }
+                    TV::Key(key) => results.push(V::bytes(key.to_bytes().unwrap(), gas)?),
+                    TV::Signature(signature) => {
+                        results.push(V::bytes(signature.clone().into(), gas)?)
+                    }
+                    TV::KeyHash(key_hash) => {
+                        results.push(V::bytes(key_hash.to_bytes().unwrap(), gas)?)
+                    }
+                    TV::Lambda(closure) => {
+                        results.push(unparse_closure(closure, arena, gas)?)
+                    }
+                    #[cfg(feature = "bls")]
+                    TV::Bls12381Fr(x) => {
+                        results.push(V::bytes(x.to_bytes().to_vec(), gas)?)
+                    }
+                    #[cfg(feature = "bls")]
+                    TV::Bls12381G1(x) => {
+                        results.push(V::bytes(x.to_bytes().to_vec(), gas)?)
+                    }
+                    #[cfg(feature = "bls")]
+                    TV::Bls12381G2(x) => {
+                        results.push(V::bytes(x.to_bytes().to_vec(), gas)?)
+                    }
+                    TV::Pair(left, right) => {
+                        frames.push(Frame::BuildPrim2(Prim::Pair));
+                        frames.push(Frame::Visit(right));
+                        frames.push(Frame::Visit(left));
+                    }
+                    TV::Option(None) => results.push(V::prim0(Prim::None, gas)?),
+                    TV::Option(Some(value)) => {
+                        frames.push(Frame::BuildPrim1(Prim::Some));
+                        frames.push(Frame::Visit(value));
+                    }
+                    TV::Or(Or::Left(value)) => {
+                        frames.push(Frame::BuildPrim1(Prim::Left));
+                        frames.push(Frame::Visit(value));
+                    }
+                    TV::Or(Or::Right(value)) => {
+                        frames.push(Frame::BuildPrim1(Prim::Right));
+                        frames.push(Frame::Visit(value));
+                    }
+                    TV::List(values) => {
+                        frames.push(Frame::BuildSeqOf {
+                            count: values.len(),
+                        });
+                        frames.push(Frame::ListNext(values.iter()));
+                    }
+                    TV::Set(values) => {
+                        frames.push(Frame::BuildSeqOf {
+                            count: values.len(),
+                        });
+                        frames.push(Frame::SetNext(values.iter()));
+                    }
+                    TV::Map(values) => {
+                        frames.push(Frame::BuildSeqOf {
+                            count: values.len(),
+                        });
+                        frames.push(Frame::MapNext(values.iter()));
+                    }
+                    // The typechecker only emits `APPLY` for pushable capture
+                    // types, which exclude these variants.
+                    TV::BigMap(_) | TV::Operation(_) | TV::Ticket(_) => {
+                        return Err(BorrowedUnparseError::NonPushable);
+                    }
+                },
+                Frame::BuildPrim1(prim) => {
+                    let inner = results.pop().expect("BuildPrim1: missing inner");
+                    results.push(V::prim1(arena, prim, inner, gas)?);
+                }
+                Frame::BuildPrim2(prim) => {
+                    let right = results.pop().expect("BuildPrim2: missing right");
+                    let left = results.pop().expect("BuildPrim2: missing left");
+                    results.push(V::prim2(arena, prim, left, right, gas)?);
+                }
+                Frame::BuildSeqOf { count } => {
+                    let start = results.len() - count;
+                    #[allow(clippy::disallowed_methods)]
+                    let values = arena.alloc_extend(results.drain(start..));
+                    results.push(V::seq(values, gas)?);
+                }
+            }
+        }
+
+        Ok(results.pop().expect("final result"))
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum BorrowedUnparseError {
+    OutOfGas,
+    NonPushable,
+}
+
+impl From<OutOfGas> for BorrowedUnparseError {
+    fn from(_: OutOfGas) -> Self {
+        Self::OutOfGas
+    }
+}
+
 pub(crate) fn unwrap_ticket(t: Ticket) -> TypedValue {
     use TypedValue as TV;
     TV::new_pair(
@@ -2363,6 +2540,23 @@ mod test_untypers {
         },
     };
 
+    fn assert_borrowed_owned_unparse_match(value: &TypedValue<'_>) {
+        let owned_arena = Arena::new();
+        let borrowed_arena = Arena::new();
+        let mut owned_gas = Gas::default();
+        let mut borrowed_gas = Gas::default();
+        let owned = value
+            .clone()
+            .into_micheline_optimized_legacy(&owned_arena, &mut owned_gas)
+            .unwrap();
+        let borrowed = value
+            .clone_into_micheline_optimized_legacy(&borrowed_arena, &mut borrowed_gas)
+            .unwrap();
+
+        assert_eq!(borrowed, owned);
+        assert_eq!(borrowed_gas.milligas(), owned_gas.milligas());
+    }
+
     proptest! {
         #[test]
         fn value_typecheck_untype_roundtrip(typed in TS::typed_value_and_type()) {
@@ -2375,6 +2569,100 @@ mod test_untypers {
                 typecheck_value(&untyped, &mut ctx, &typed.ty, AllowForgedLazyStorageId::Yes);
             assert_eq!(typed_, Ok(typed.val))
         }
+
+        #[test]
+        fn borrowed_and_owned_pushable_unparsers_match(
+            typed in TS::typed_value_and_type().prop_filter(
+                "APPLY accepts only pushable captures",
+                |typed| typed.ty.ensure_prop(&mut Gas::unmetered(), TypeProperty::Pushable).is_ok(),
+            )
+        ) {
+            assert_borrowed_owned_unparse_match(&typed.val);
+        }
+    }
+
+    #[test]
+    fn borrowed_and_owned_lambda_unparsers_match() {
+        // The owned (PACK) and borrowed (APPLY) unparsers share
+        // `unparse_closure`, so this exercises every closure shape — bare
+        // `Lambda`/`LambdaRec`, an `APPLY` spine, and a recursive terminal —
+        // through both entry points and guards against a future re-divergence.
+        let arena = Arena::new();
+        let body = || {
+            Micheline::Seq(Micheline::alloc_seq(
+                &arena,
+                [
+                    Micheline::prim0_uncarbonated(Prim::DROP),
+                    Micheline::prim0_uncarbonated(Prim::UNIT),
+                ],
+            ))
+        };
+        let lambda = || {
+            Closure::Lambda(Lambda::Lambda {
+                micheline_code: body(),
+                code: vec![Instruction::Drop(None), Instruction::Unit].into(),
+            })
+        };
+        let lambda_rec = || {
+            Closure::Lambda(Lambda::LambdaRec {
+                in_ty: Type::Unit,
+                out_ty: Type::Unit,
+                micheline_code: body(),
+                code: vec![Instruction::Drop(None), Instruction::Unit].into(),
+            })
+        };
+
+        // A capture carrying a real cached unparsing of `Int 7`.
+        let mut gas = Gas::default();
+        let arg_ty_mich = (&Type::Int)
+            .into_micheline_optimized_legacy(&arena, &mut gas)
+            .unwrap();
+        let arg_val_mich = TypedValue::int(7)
+            .into_micheline_optimized_legacy(&arena, &mut gas)
+            .unwrap();
+        let cost = Gas::default().milligas().unwrap() - gas.milligas().unwrap();
+        let capture = Rc::new(AppliedCapture::new(
+            Type::Int,
+            Rc::new(TypedValue::int(7)),
+            arg_ty_mich,
+            arg_val_mich,
+            cost,
+        ));
+        fn applied<'a>(
+            capture: &Rc<AppliedCapture<'a>>,
+            terminal: Closure<'a>,
+            levels: usize,
+        ) -> TypedValue<'a> {
+            let mut c = terminal;
+            for _ in 0..levels {
+                c = Closure::Apply {
+                    capture: Rc::clone(capture),
+                    closure: Rc::new(c),
+                };
+            }
+            TypedValue::Lambda(c)
+        }
+
+        assert_borrowed_owned_unparse_match(&applied(&capture, lambda(), 0));
+        assert_borrowed_owned_unparse_match(&applied(&capture, lambda_rec(), 0));
+        assert_borrowed_owned_unparse_match(&applied(&capture, lambda(), 1));
+        assert_borrowed_owned_unparse_match(&applied(&capture, lambda(), 3));
+        assert_borrowed_owned_unparse_match(&applied(&capture, lambda_rec(), 2));
+        assert_borrowed_owned_unparse_match(&TypedValue::new_pair(
+            applied(&capture, lambda(), 1),
+            TypedValue::new_option(Some(TypedValue::Unit)),
+        ));
+    }
+
+    #[test]
+    fn borrowed_unparser_rejects_non_pushable_values_without_panicking() {
+        let arena = Arena::new();
+        let value = TypedValue::BigMap(BigMap::empty(Type::Nat, Type::Unit));
+
+        assert_eq!(
+            value.clone_into_micheline_optimized_legacy(&arena, &mut Gas::default()),
+            Err(BorrowedUnparseError::NonPushable)
+        );
     }
 
     // We used to have a bug in which a panic was raised in the
