@@ -1664,9 +1664,12 @@ fn interpret_step<'a, 'b, 'c>(
                         capture,
                         closure: inner,
                     } => {
-                        // The capture is reused directly (no deep copy): a
-                        // `DUP`'d applied closure shares the `Rc`, so executing
-                        // it bumps a refcount instead of copying the capture.
+                        // L1 materializes each applied capture as the code
+                        // `PUSH ty val ; PAIR`, so its EXEC pays `IPush +
+                        // ICons_pair` per captured level. Mirror that here: the
+                        // closure's typed `arg_val` is reused directly (no
+                        // re-push), only the gas is brought in line.
+                        ctx.gas().consume(interpret_cost::PUSH)?;
                         ctx.gas().consume(interpret_cost::PAIR)?;
                         arg = V::new_pair_rc(Rc::clone(capture.arg_val()), Rc::new(arg));
                         closure = Closure::unwrap_rc(inner);
@@ -7807,6 +7810,41 @@ mod interpreter_tests {
                 Err(InterpretError::OutOfGas)
             );
         }
+    }
+
+    #[test]
+    fn exec_applied_closure_charges_push_and_pair_per_capture() {
+        // L1 rewrites an applied lambda to `PUSH ty val ; PAIR ; <body>`, so its
+        // EXEC pays `IPush + ICons_pair` for every captured argument. MIR reuses
+        // the typed capture directly, but must charge the same per-level gas.
+        // Each extra `APPLY`-captured level must add exactly `PUSH + PAIR` to the
+        // cost of executing the closure (the flat `EXEC` and the fixed body cost
+        // cancel in the difference).
+        fn exec_gas_with_captures(n: usize) -> u32 {
+            let lam = Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: vec![Drop(None), Unit].into(),
+            });
+            let mut ctx = Ctx::default();
+            let mut stack = stk![TypedValue::Lambda(lam)];
+            for _ in 0..n {
+                stack.push(V::Unit);
+                interpret_one(&Apply { arg_ty: Type::Unit }, &mut ctx, &mut stack)
+                    .unwrap();
+            }
+            stack.push(V::Unit);
+            let start = ctx.gas().milligas().unwrap();
+            interpret(&[Exec], &mut ctx, &mut stack).unwrap();
+            start - ctx.gas().milligas().unwrap()
+        }
+
+        let per_level = interpret_cost::PUSH + interpret_cost::PAIR;
+        let g1 = exec_gas_with_captures(1);
+        let g2 = exec_gas_with_captures(2);
+        let g3 = exec_gas_with_captures(3);
+
+        assert_eq!(g2 - g1, per_level);
+        assert_eq!(g3 - g2, per_level);
     }
 
     // Builds an applied closure directly (not via `APPLY`) so the caller keeps
