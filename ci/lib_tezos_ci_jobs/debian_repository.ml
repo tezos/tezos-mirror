@@ -234,41 +234,31 @@ let job_apt_repo =
           :: Distro.supported_releases distro pipeline_type);
       ]
 
-let make_lintian_job ~distribution ~releases =
+let job_lintian =
+  Cacio.parameterize @@ fun distro ->
+  Cacio.parameterize @@ fun pipeline_type ->
   CI.job
+    ("oc.lintian_" ^ Distro.name_for_scripts distro)
+    ~__POS__
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~stage:Test_publication
-    ~description:(sf "Run lintian on %s packages." distribution)
+    ~description:
+      (sf "Run lintian on %s packages." (Distro.name_for_humans distro))
+    ~needs:[(Artifacts, job_build distro pipeline_type)]
+    ~image:(Distro.main_image distro)
     ~script:
       [
         ". ./scripts/version.sh";
         "export DEBIAN_FRONTEND=noninteractive";
         "apt-get update";
         "apt-get install lintian parallel -y";
-        "./scripts/ci/lintian_debian_packages.sh "
-        ^ String.concat " " (distribution :: releases);
+        String.concat
+          " "
+          ("./scripts/ci/lintian_debian_packages.sh"
+          :: Distro.name_for_scripts distro
+          :: Distro.supported_releases distro pipeline_type);
       ]
-
-let job_lintian_ubuntu =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_lintian_job
-    "oc.lintian_ubuntu"
-    ~__POS__
-    ~needs:[(Artifacts, job_build Ubuntu pipeline_type)]
-    ~image:Images.Base_images.ubuntu_24_04
-    ~distribution:"ubuntu"
-    ~releases:(Distro.supported_releases Ubuntu pipeline_type)
-
-let job_lintian_debian =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_lintian_job
-    "oc.lintian_debian"
-    ~__POS__
-    ~needs:[(Artifacts, job_build Debian pipeline_type)]
-    ~image:Images.Base_images.debian_trixie
-    ~distribution:"debian"
-    ~releases:(Distro.supported_releases Debian pipeline_type)
 
 (* Rebuild the Debian binary, data and keyring packages for trixie/amd64 and
    check, with diffoscope, that they are byte-for-byte identical to the packages
@@ -512,7 +502,7 @@ let () =
   Cacio.register_merge_request_jobs
     [
       (Auto, job_apt_repo Debian Partial);
-      (Auto, job_lintian_debian Partial);
+      (Auto, job_lintian Debian Partial);
       (* These test jobs consume the apt repository published by
          [job_apt_repo_debian Partial], which only contains the releases
          returned by [debian_releases Partial]. They must therefore target the
@@ -531,8 +521,8 @@ let () =
       (Auto, job_apt_repo Debian Full);
       (Auto, job_apt_repo Ubuntu Full);
       (Auto, job_reproducibility_debian Full);
-      (Auto, job_lintian_ubuntu Full);
-      (Auto, job_lintian_debian Full);
+      (Auto, job_lintian Ubuntu Full);
+      (Auto, job_lintian Debian Full);
       (Auto, job_install_bin (Distro.ubuntu 22 04) Full);
       (Auto, job_install_bin (Distro.ubuntu 24 04) Full);
       (Auto, job_install_bin (Distro.ubuntu 26 04) Full);
