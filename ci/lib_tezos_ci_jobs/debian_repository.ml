@@ -368,55 +368,17 @@ let job_upgrade_bin_systemd =
     ~release:distro.release
     ~script:"scripts/packaging/tests/deb/upgrade-systemd-test.sh"
 
-let make_systemd_keyring_test_job =
+let job_test_keyring =
+  Cacio.parameterize @@ fun (distro : Distro.t) ->
+  Cacio.parameterize @@ fun pipeline_type ->
   make_systemd_test_job
+    ("oc.test_keyring_" ^ Distro.full_name_with_underscores distro)
+    ~__POS__
     ~description:"Check that the keyring package works for APT authentication."
+    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
+    ~distribution:(Distro.name_for_scripts distro.name)
+    ~release:distro.release
     ~script:"scripts/packaging/tests/deb/test-keyring.sh"
-
-let job_test_keyring_debian_bookworm =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_keyring_test_job
-    "oc.test_keyring_debian_bookworm"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo Debian pipeline_type)]
-    ~distribution:"debian"
-    ~release:"bookworm"
-
-let job_test_keyring_debian_trixie =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_keyring_test_job
-    "oc.test_keyring_debian_trixie"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo Debian pipeline_type)]
-    ~distribution:"debian"
-    ~release:"trixie"
-
-let job_test_keyring_ubuntu_22_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_keyring_test_job
-    "oc.test_keyring_ubuntu_22_04"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"22.04"
-
-let job_test_keyring_ubuntu_24_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_keyring_test_job
-    "oc.test_keyring_ubuntu_24_04"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"24.04"
-
-let job_test_keyring_ubuntu_26_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_keyring_test_job
-    "oc.test_keyring_ubuntu_26_04"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"26.04"
 
 let () =
   (* Register the Debian partial jobs directly into before_merging and
@@ -434,7 +396,7 @@ let () =
       (Auto, job_install_bin (Distro.debian "trixie") Partial);
       (Auto, job_install_bin_systemd (Distro.debian "trixie") Partial);
       (Auto, job_upgrade_bin_systemd (Distro.debian "trixie") Partial);
-      (Auto, job_test_keyring_debian_trixie Partial);
+      (Auto, job_test_keyring (Distro.debian "trixie") Partial);
     ] ;
   (* In merge pipelines we tests only Debian.
      Ubuntu packages are built and tested in the scheduled pipelines. *)
@@ -460,11 +422,11 @@ let () =
       (Auto, job_install_bin_systemd (Distro.debian "trixie") Full);
       (Auto, job_upgrade_bin_systemd (Distro.debian "bookworm") Full);
       (Auto, job_upgrade_bin_systemd (Distro.debian "trixie") Full);
-      (Auto, job_test_keyring_debian_bookworm Full);
-      (Auto, job_test_keyring_debian_trixie Full);
-      (Auto, job_test_keyring_ubuntu_22_04 Full);
-      (Auto, job_test_keyring_ubuntu_24_04 Full);
-      (Auto, job_test_keyring_ubuntu_26_04 Full);
+      (Auto, job_test_keyring (Distro.debian "bookworm") Full);
+      (Auto, job_test_keyring (Distro.debian "trixie") Full);
+      (Auto, job_test_keyring (Distro.ubuntu 22 04) Full);
+      (Auto, job_test_keyring (Distro.ubuntu 24 04) Full);
+      (Auto, job_test_keyring (Distro.ubuntu 26 04) Full);
     ] ;
   ()
 
