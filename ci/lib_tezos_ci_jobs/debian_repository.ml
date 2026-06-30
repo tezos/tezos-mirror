@@ -242,13 +242,6 @@ let job_apt_repo =
           :: Distro.supported_releases distro pipeline_type);
       ]
 
-(* We usually would not define such short-hands for use inside the module,
-   but those two jobs need to be exposed in the interface,
-   and for now we do not wish to also expose the [Distro.name] type. *)
-let job_apt_repo_debian = job_apt_repo Debian
-
-let job_apt_repo_ubuntu = job_apt_repo Ubuntu
-
 let make_lintian_job ~distribution ~releases =
   CI.job
     ~only_if_changed:
@@ -395,7 +388,7 @@ let job_install_bin_ubuntu_24_04_systemd =
   make_systemd_install_job
     "oc.install_bin_ubuntu_24_04_systemd"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"24.04"
 
@@ -404,7 +397,7 @@ let job_install_bin_ubuntu_26_04_systemd =
   make_systemd_install_job
     "oc.install_bin_ubuntu_26_04_systemd"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"26.04"
 
@@ -413,7 +406,7 @@ let job_upgrade_bin_ubuntu_22_04_systemd =
   make_systemd_upgrade_job
     "oc.upgrade_bin_ubuntu_22_04_systemd"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"22.04"
 
@@ -422,7 +415,7 @@ let job_upgrade_bin_ubuntu_24_04_systemd =
   make_systemd_upgrade_job
     "oc.upgrade_bin_ubuntu_24_04_systemd"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"24.04"
 
@@ -431,7 +424,7 @@ let job_upgrade_bin_ubuntu_26_04_systemd =
   make_systemd_upgrade_job
     "oc.upgrade_bin_ubuntu_26_04_systemd"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"26.04"
 
@@ -440,7 +433,7 @@ let job_install_bin_debian_bookworm_systemd =
   make_systemd_install_job
     "oc.install_bin_debian_bookworm_systemd"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~needs:[(Job, job_apt_repo Debian pipeline_type)]
     ~distribution:"debian"
     ~release:"bookworm"
 
@@ -449,7 +442,7 @@ let job_install_bin_debian_trixie_systemd =
   make_systemd_install_job
     "oc.install_bin_debian_trixie_systemd"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~needs:[(Job, job_apt_repo Debian pipeline_type)]
     ~distribution:"debian"
     ~release:"trixie"
 
@@ -462,7 +455,7 @@ let job_upgrade_bin_debian_bookworm_systemd =
   make_systemd_upgrade_job
     "oc.upgrade_bin_debian_bookworm-systemd"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~needs:[(Job, job_apt_repo Debian pipeline_type)]
     ~distribution:"debian"
     ~release:"bookworm"
 
@@ -471,7 +464,7 @@ let job_test_keyring_debian_bookworm =
   make_systemd_keyring_test_job
     "oc.test_keyring_debian_bookworm"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~needs:[(Job, job_apt_repo Debian pipeline_type)]
     ~distribution:"debian"
     ~release:"bookworm"
 
@@ -480,7 +473,7 @@ let job_test_keyring_debian_trixie =
   make_systemd_keyring_test_job
     "oc.test_keyring_debian_trixie"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~needs:[(Job, job_apt_repo Debian pipeline_type)]
     ~distribution:"debian"
     ~release:"trixie"
 
@@ -489,7 +482,7 @@ let job_upgrade_bin_debian_trixie_systemd =
   make_systemd_upgrade_job
     "oc.upgrade_bin_debian_trixie_systemd"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~needs:[(Job, job_apt_repo Debian pipeline_type)]
     ~distribution:"debian"
     ~release:"trixie"
 
@@ -498,7 +491,7 @@ let job_test_keyring_ubuntu_22_04 =
   make_systemd_keyring_test_job
     "oc.test_keyring_ubuntu_22_04"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"22.04"
 
@@ -507,7 +500,7 @@ let job_test_keyring_ubuntu_24_04 =
   make_systemd_keyring_test_job
     "oc.test_keyring_ubuntu_24_04"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"24.04"
 
@@ -516,7 +509,7 @@ let job_test_keyring_ubuntu_26_04 =
   make_systemd_keyring_test_job
     "oc.test_keyring_ubuntu_26_04"
     ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~needs:[(Job, job_apt_repo Ubuntu pipeline_type)]
     ~distribution:"ubuntu"
     ~release:"26.04"
 
@@ -526,7 +519,7 @@ let () =
      only when relevant files change. *)
   Cacio.register_merge_request_jobs
     [
-      (Auto, job_apt_repo_debian Partial);
+      (Auto, job_apt_repo Debian Partial);
       (Auto, job_lintian_debian Partial);
       (* These test jobs consume the apt repository published by
          [job_apt_repo_debian Partial], which only contains the releases
@@ -543,8 +536,8 @@ let () =
   Cacio.register_jobs
     Debian_daily
     [
-      (Auto, job_apt_repo_debian Full);
-      (Auto, job_apt_repo_ubuntu Full);
+      (Auto, job_apt_repo Debian Full);
+      (Auto, job_apt_repo Ubuntu Full);
       (Auto, job_reproducibility_debian Full);
       (Auto, job_lintian_ubuntu Full);
       (Auto, job_lintian_debian Full);
@@ -569,3 +562,11 @@ let () =
       (Auto, job_test_keyring_ubuntu_26_04 Full);
     ] ;
   ()
+
+(* Jobs exported outside this module.
+   For now we do not need the Distro module outside of this module,
+   so we export instances instead of the functions themselves. *)
+
+let job_apt_repo_debian = job_apt_repo Debian
+
+let job_apt_repo_ubuntu = job_apt_repo Ubuntu
