@@ -304,6 +304,13 @@ let job_reproducibility_debian =
         ("TAGS", tag_amd64 ~ramfs:true);
         ("DUNE_BUILD_JOBS", "-j 12");
       ]
+      (* The rebuild includes the keyring package, whose build sources
+         repository-keys.sh to fetch the production public signing key(s) from
+         GCP on protected branches. That fetch authenticates to GCP via Workload
+         Identity Federation, which needs the GCP_ID_TOKEN OIDC token generated
+         by this id_tokens section; without it the rebuild falls back to the
+         temporary key and produces a differently-versioned keyring package. *)
+    ~id_tokens:Tezos_ci.id_tokens
     ~sccache:(Cacio.sccache ())
     ~script:[cargo_network_hack; "./scripts/ci/test-debian-reproducibility.sh"]
 
