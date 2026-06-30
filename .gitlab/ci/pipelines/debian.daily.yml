@@ -420,7 +420,7 @@ oc.upgrade_bin_debian_trixie_systemd:
     DISTRIBUTION: debian
     RELEASE: trixie
 
-oc.upgrade_bin_debian_bookworm-systemd:
+oc.upgrade_bin_debian_bookworm_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: publishing_tests
   tags:
