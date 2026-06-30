@@ -336,7 +336,7 @@ First, you have to make some choices:
 Create an environment file called ``.env`` in your current directory with a content of the following form::
 
     LIQUIDITY_BAKING_VOTE='pass'
-    NETWORK='tallinnnet'
+    NETWORK='ushuaianet'
 
 and build the compose file::
 
