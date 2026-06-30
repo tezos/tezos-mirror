@@ -56,16 +56,14 @@ implementation)
 /// which in turn formats `TypedValue::Lambda(Closure)` via `Closure`'s
 /// `Debug`; the kernel runs `err.to_string()` outside MIR's gas
 /// accounting).
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub enum Closure<'a> {
     /// Simple [Lambda].
     Lambda(Lambda<'a>),
     /// Partially-applied [Lambda].
     Apply {
-        /// Captured argument type
-        arg_ty: Type,
-        /// Captured argument value
-        arg_val: Rc<TypedValue<'a>>,
+        /// Captured type/value and their canonical unparsed representation.
+        capture: Rc<AppliedCapture<'a>>,
         /// Inner closure
         closure: Rc<Closure<'a>>,
     },
@@ -162,10 +160,28 @@ impl PartialEq for AppliedCapture<'_> {
 
 impl Eq for AppliedCapture<'_> {}
 
+impl<'a> PartialEq for Closure<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Closure::Lambda(lhs), Closure::Lambda(rhs)) => lhs == rhs,
+            (
+                Closure::Apply {
+                    capture: lhs_capture,
+                    closure: lhs_closure,
+                },
+                Closure::Apply {
+                    capture: rhs_capture,
+                    closure: rhs_closure,
+                },
+            ) => lhs_capture == rhs_capture && lhs_closure == rhs_closure,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Closure<'_> {}
+
 impl<'a> Closure<'a> {
-    /// Take a `Closure` out of an `Rc`, cloning only when the `Rc` is shared.
-    /// Cloning a `Closure` is O(1) (its fields are `Rc`s), so a shared spine is
-    /// walked without deep-copying the whole chain.
     pub(crate) fn unwrap_rc(rc: Rc<Self>) -> Self {
         Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
     }
@@ -184,7 +200,7 @@ impl Default for Closure<'_> {
 }
 
 /// Debug seeds the shared `TypedValue`/`Closure` walker so the alternating
-/// `Closure::Apply { arg_val: TypedValue, .. }` /
+/// `Closure::Apply { capture: AppliedCapture, .. }` /
 /// `TypedValue::Lambda(Closure)` cycle (reachable via repeated `APPLY` of
 /// lambda values) is unwound on the heap, not the call stack.
 impl<'a> std::fmt::Debug for Closure<'a> {
@@ -272,10 +288,18 @@ mod tests {
                     micheline_code: Micheline::Seq(&[]),
                     code: Vec::new().into(),
                 });
+                // Debug ignores the cache; a trivial shared capture keeps the
+                // spine cheap to build.
+                let capture = Rc::new(super::AppliedCapture::new(
+                    Type::Unit,
+                    Rc::new(TypedValue::Unit),
+                    Micheline::Seq(&[]),
+                    Micheline::Seq(&[]),
+                    0,
+                ));
                 for _ in 0..DEPTH {
                     c = super::Closure::Apply {
-                        arg_ty: Type::Unit,
-                        arg_val: Rc::new(TypedValue::Unit),
+                        capture: Rc::clone(&capture),
                         closure: Rc::new(c),
                     };
                 }
@@ -312,10 +336,16 @@ mod tests {
                     })
                 };
                 let mut c = leaf();
+                let capture = Rc::new(super::AppliedCapture::new(
+                    Type::new_lambda(Type::Unit, Type::Unit),
+                    Rc::new(TypedValue::Lambda(leaf())),
+                    Micheline::Seq(&[]),
+                    Micheline::Seq(&[]),
+                    0,
+                ));
                 for _ in 0..DEPTH {
                     c = super::Closure::Apply {
-                        arg_ty: Type::new_lambda(Type::Unit, Type::Unit),
-                        arg_val: Rc::new(TypedValue::Lambda(leaf())),
+                        capture: Rc::clone(&capture),
                         closure: Rc::new(c),
                     };
                 }
