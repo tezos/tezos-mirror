@@ -33,7 +33,6 @@
 
 open Gitlab_ci.Types
 open Gitlab_ci.Util
-open Tezos_ci
 
 (** Variants of the code verification pipeline.
 
@@ -50,10 +49,10 @@ type code_verification_pipeline =
    for [Before_merging] pipelines, instead of running it on
    each update to the merge request. *)
 let job_start =
-  job
+  Tezos_ci.job
     ~__POS__
-    ~image:Images.datadog_ci
-    ~stage:Stages.start
+    ~image:Tezos_ci.Images.datadog_ci
+    ~stage:Tezos_ci.Stages.start
     ~rules:[job_rule ~allow_failure:No ~when_:Manual ()]
     ~timeout:(Minutes 10)
     ~name:"trigger"
@@ -68,5 +67,6 @@ let job_start =
    [schedule_extended_test]. *)
 let jobs pipeline_type =
   match pipeline_type with
-  | Schedule_extended_test | Merge_train -> [job_datadog_pipeline_trace]
+  | Schedule_extended_test | Merge_train ->
+      [Tezos_ci.job_datadog_pipeline_trace]
   | Before_merging -> [job_start]
