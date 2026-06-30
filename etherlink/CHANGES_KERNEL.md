@@ -37,6 +37,13 @@
   all world-state roots, for operations that provably touch nothing else
   (reveals and transfers to implicit accounts), removing the per-operation
   `store_copy`/`store_move` of the other roots. (!22276)
+- Michelson runtime: the operation receipt's `lazy_storage_diff` now matches
+  L1's layout — all big_map removals are listed first, then
+  allocations/updates/copies; within each map the per-key updates are ordered by
+  `Script_expr_hash` descending; and a big_map kept in storage while also being
+  copied keeps its `update` entry instead of being dropped. This restores
+  receipt faithfulness to L1 (and to indexers) for operations touching a
+  multi-key big_map, removing a big_map, or duplicating one. (!22357)
 
 ## Version 6 (Farfadet)
 

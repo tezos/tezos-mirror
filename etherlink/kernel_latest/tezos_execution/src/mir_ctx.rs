@@ -1113,23 +1113,56 @@ fn hash_key(
     hash_micheline_expr(&key_micheline, gas)
 }
 
+/// Sort a diff's per-key updates by `key_hash` (`Script_expr_hash`) descending,
+/// matching L1's `Big_map_overlay` fold (`script_ir_translator.ml`).
+fn sort_updates_by_key_hash_desc(storage_diff: &mut StorageDiff) {
+    let updates = match storage_diff {
+        StorageDiff::Update(updates) => updates,
+        StorageDiff::Alloc(alloc) => &mut alloc.updates,
+        StorageDiff::Copy(copy) => &mut copy.updates,
+        StorageDiff::Remove => return,
+    };
+    updates.sort_by(|a, b| {
+        let a: &[u8] = a.key_hash.as_ref();
+        let b: &[u8] = b.key_hash.as_ref();
+        b.cmp(a)
+    });
+}
+
 /// Function to convert a BtreeMap that represent the lazy_storage_diff
 /// in a valid Tezos representation.
+///
+/// The element order mirrors L1's `extract_lazy_storage_diff`
+/// (`script_ir_translator.ml`) so that the content-addressed receipt stays
+/// faithful to L1 and to downstream indexers:
+///   * top level: all `Remove` entries come first, then alloc/update/copy,
+///     each group ordered by big_map id descending. L1 prepends the dead-id
+///     set ahead of the alloc/update/copy diffs.
+///   * per map: updates are ordered by `key_hash` (`Script_expr_hash`)
+///     descending (see [`sort_updates_by_key_hash_desc`]).
 pub fn convert_big_map_diff(
     big_map_diff: BTreeMap<Zarith, StorageDiff>,
 ) -> Option<LazyStorageDiffList> {
-    let mut list_diff = vec![];
-    // L1 receipts big_map diffs are in reverse order, this is mandatory for external tools that
-    // except such an order.
-    for (id, storage_diff) in big_map_diff.into_iter().rev() {
+    if big_map_diff.is_empty() {
+        return None;
+    }
+    // Iterate big_map ids in descending order (`.rev()` over the ascending
+    // BTreeMap), splitting removals from the rest so the former can lead.
+    let mut removes = vec![];
+    let mut others = vec![];
+    for (id, mut storage_diff) in big_map_diff.into_iter().rev() {
+        sort_updates_by_key_hash_desc(&mut storage_diff);
+        let is_remove = matches!(storage_diff, StorageDiff::Remove);
         let diff = LazyStorageDiff::BigMap(BigMapDiff { id, storage_diff });
-        list_diff.push(diff);
+        if is_remove {
+            removes.push(diff);
+        } else {
+            others.push(diff);
+        }
     }
-    if list_diff.is_empty() {
-        None
-    } else {
-        Some(LazyStorageDiffList { diff: list_diff })
-    }
+    // Emit every removal before any alloc/update/copy entry.
+    removes.extend(others);
+    Some(LazyStorageDiffList { diff: removes })
 }
 
 #[derive(Debug, BinWriter, NomReader)]
@@ -1511,6 +1544,14 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
 
         // Write in the diff that there was a copy
         self.big_map_diff_copy(dest_id.value.clone(), id.value.clone());
+
+        // Kept-and-copied permanent source: keep an (empty) update entry for
+        // the original so it still appears in the receipt, as on L1 (L2-1735).
+        if !temporary && !id.is_temporary() {
+            self.big_map_diff
+                .entry(id.value.clone())
+                .or_insert(StorageDiff::Update(vec![]));
+        }
         Ok(dest_id)
     }
 
@@ -2108,6 +2149,148 @@ pub mod tests {
             ],
         });
         assert_eq!(diff_list, expected, "Receipt should be in reverse order");
+    }
+
+    // `convert_big_map_diff` element ordering must match L1's
+    // `extract_lazy_storage_diff` (`script_ir_translator.ml`):
+    //   * removals lead, ahead of alloc/update/copy, both groups id-descending;
+    //   * per-map updates are ordered by `key_hash` (`Script_expr_hash`)
+    //     descending.
+
+    fn empty_nat_unit_alloc() -> StorageDiff {
+        let mut gas = Gas::default();
+        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat, &mut gas)
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit, &mut gas)
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        StorageDiff::Alloc(Alloc {
+            updates: vec![],
+            key_type,
+            value_type,
+        })
+    }
+
+    fn updates_of(diff: &StorageDiff) -> &[Update] {
+        match diff {
+            StorageDiff::Update(updates) => updates,
+            StorageDiff::Alloc(alloc) => &alloc.updates,
+            StorageDiff::Copy(copy) => &copy.updates,
+            StorageDiff::Remove => &[],
+        }
+    }
+
+    fn kind_str(diff: &StorageDiff) -> &'static str {
+        match diff {
+            StorageDiff::Update(_) => "update",
+            StorageDiff::Remove => "remove",
+            StorageDiff::Copy(_) => "copy",
+            StorageDiff::Alloc(_) => "alloc",
+        }
+    }
+
+    #[test]
+    fn lazy_storage_diff_removal_leads_lower_id_alloc() {
+        let alloc = empty_nat_unit_alloc();
+        let mut map: BTreeMap<Zarith, StorageDiff> = BTreeMap::new();
+        map.insert(3u64.into(), StorageDiff::Remove);
+        map.insert(7u64.into(), alloc.clone());
+
+        let converted = convert_big_map_diff(map).expect("non-empty diff");
+
+        let expected = LazyStorageDiffList {
+            diff: vec![
+                LazyStorageDiff::BigMap(BigMapDiff {
+                    id: 3u64.into(),
+                    storage_diff: StorageDiff::Remove,
+                }),
+                LazyStorageDiff::BigMap(BigMapDiff {
+                    id: 7u64.into(),
+                    storage_diff: alloc,
+                }),
+            ],
+        };
+        assert_eq!(
+            converted, expected,
+            "Remove(3) must precede Alloc(7), as on L1"
+        );
+    }
+
+    #[test]
+    fn lazy_storage_diff_removals_grouped_and_descending() {
+        let mut map: BTreeMap<Zarith, StorageDiff> = BTreeMap::new();
+        map.insert(3u64.into(), StorageDiff::Remove);
+        map.insert(5u64.into(), StorageDiff::Remove);
+        map.insert(7u64.into(), empty_nat_unit_alloc());
+
+        let converted = convert_big_map_diff(map).expect("non-empty diff");
+
+        let order: Vec<(Zarith, &str)> = converted
+            .diff
+            .iter()
+            .map(|LazyStorageDiff::BigMap(BigMapDiff { id, storage_diff })| {
+                (id.clone(), kind_str(storage_diff))
+            })
+            .collect();
+        assert_eq!(
+            order,
+            vec![
+                (5u64.into(), "remove"),
+                (3u64.into(), "remove"),
+                (7u64.into(), "alloc"),
+            ],
+            "removals lead in id-descending order, then the alloc"
+        );
+    }
+
+    #[test]
+    fn lazy_storage_diff_updates_sorted_by_key_hash_descending() {
+        let mut host = MockKernelHost::default();
+        let context = TezlinkContext::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let id = ctx.big_map_new(&Type::Int, &Type::Int, false).unwrap();
+        for k in 0i64..=5 {
+            ctx.big_map_update(&id, TypedValue::int(k), Some(TypedValue::int(k * 10)))
+                .unwrap();
+        }
+
+        let converted = convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff))
+            .expect("non-empty diff");
+        let updates = match converted.diff.as_slice() {
+            [LazyStorageDiff::BigMap(BigMapDiff { storage_diff, .. })] => {
+                updates_of(storage_diff)
+            }
+            _ => panic!("expected exactly one big_map diff"),
+        };
+        let got: Vec<Vec<u8>> = updates
+            .iter()
+            .map(|u| u.key_hash.as_ref().to_vec())
+            .collect();
+
+        let mut gas = Gas::default();
+        let key_hash = |k: i64, gas: &mut Gas| {
+            hash_key(TypedValue::int(k), gas).unwrap().as_ref().to_vec()
+        };
+        let mut expected: Vec<Vec<u8>> =
+            (0i64..=5).map(|k| key_hash(k, &mut gas)).collect();
+        expected.sort();
+        expected.reverse();
+        assert_eq!(
+            got, expected,
+            "updates must be Script_expr_hash descending (L1 order)"
+        );
+
+        let application_order: Vec<Vec<u8>> =
+            (0i64..=5).map(|k| key_hash(k, &mut gas)).collect();
+        assert_ne!(
+            got, application_order,
+            "key-hash descending order must differ from value-ascending application order"
+        );
     }
 
     /// Regression test for the existence-probe in
