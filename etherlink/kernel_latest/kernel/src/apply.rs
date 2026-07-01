@@ -31,7 +31,6 @@ use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     ExecutionOutcome, TransactionOrigin,
 };
-use tezos_crypto_rs::hash::HashTrait;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionType, TRANSACTION_HASH_SIZE,
@@ -1242,6 +1241,14 @@ pub fn apply_transaction<Host>(
     // caller because [BlockConstants] is EVM-flavored and doesn't carry
     // Tezos-side storage boundaries.
     tezos_safe_roots: &[tezos_smart_rollup_host::path::OwnedPath],
+    // Configured Michelson runtime chain id.  All ingress lanes (sequenced,
+    // gateway, delayed) must present the same value so that a Michelson
+    // contract reading CHAIN_ID sees a consistent domain regardless of how
+    // the operation arrived.
+    // TODO: https://linear.app/tezos/issue/L2-1765
+    // Fold into the Michelson runtime block constants so the chain id travels
+    // with that runtime's per-block context instead of a separate parameter.
+    michelson_chain_id: &ChainId,
 ) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1,
@@ -1315,10 +1322,6 @@ where
             let i64_timestamp: i64 = i128_timestamp
                 .try_into()
                 .map_err(|e| anyhow!("Failed to convert timestamp to i64: {e}"))?;
-            let mut chain_id_bytes = vec![0u8; 32];
-            block_constants
-                .chain_id
-                .to_little_endian(&mut chain_id_bytes);
             let op_hash = op.hash()?;
             // Delayed operations already paid L1 fees through the delayed inbox,
             // so DA fee check is not applicable.
@@ -1356,8 +1359,7 @@ where
                             .map_err(|e| anyhow!("{e}"))?,
                     },
                     now: &Timestamp::from(i64_timestamp),
-                    // SAFETY: chain_id_bytes is defined as 32 bytes long.
-                    chain_id: &ChainId::try_from_bytes(&chain_id_bytes[..4])?,
+                    chain_id: michelson_chain_id,
                     // CRAC/delayed sub-operation: its internal ops are bounded
                     // by EVM gas; the per-execution cap from base 0 applies.
                     internal_operations_base: 0,

@@ -713,6 +713,11 @@ impl ChainConfigTrait for TezosXChainConfig {
                     &self.limits,
                     http_trace_enabled,
                     &block_constants.michelson_runtime_block_constants.safe_roots,
+                    // TODO: https://linear.app/tezos/issue/L2-1765
+                    // Read from michelson_runtime_block_constants.chain_id once the
+                    // chain id is folded into the Michelson runtime block constants,
+                    // so it travels with that runtime's per-block context.
+                    &self.michelson_chain_id,
                 )
             }
             TezosXTransaction::Tezos(operation) => {

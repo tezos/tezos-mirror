@@ -96,6 +96,10 @@
 
 ### Michelson Runtime
 
+- **Bug fix:** Michelson contracts executed via the delayed inbox now observe
+  the configured Michelson runtime chain id from `CHAIN_ID`, matching the
+  sequenced and gateway ingress lanes. Previously the delayed path derived
+  the chain id from the EVM chain id's low 4 bytes. (!22348)
 - Integer `MUL` is now priced on the product of operand sizes (`~ s1*s2`)
   instead of L1's FFT-shaped `a*log(a)`. The Michelson runtime multiplies with
   num-bigint, which has no FFT (schoolbook/Karatsuba/Toom-3), so the L1 formula
