@@ -410,6 +410,11 @@ module L1_l2_finalized_levels : sig
 
   val clear_before : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
+  (** [clear_after conn level] removes every finalized L2 level strictly above
+      [level]. A single L1 level can finalize a range of L2 blocks: the row
+      straddling [level] is trimmed down to [level] (keeping the healthy L2
+      blocks it also covers) rather than deleted, and the rows lying strictly
+      above are removed. *)
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
