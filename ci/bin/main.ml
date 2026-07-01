@@ -129,7 +129,7 @@ let () =
   register
     "before_merging"
     If.(merge_request && not merge_train)
-    ~jobs:(Code_verification.jobs Before_merging @ Cacio.get_jobs Before_merging)
+    ~jobs:(Cacio.get_jobs Before_merging)
     ~description:
       "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
        This pipeline is created on each push to a branch with an associated \
@@ -140,7 +140,7 @@ let () =
     "merge_train"
     ~auto_cancel:{on_job_failure = true; on_new_commit = false}
     If.(on_tezos_namespace && merge_request && merge_train)
-    ~jobs:(Code_verification.jobs Merge_train @ Cacio.get_jobs Merge_train)
+    ~jobs:(Cacio.get_jobs Merge_train)
     ~description:
       "A merge-train-specific version of 'before_merging'.\n\n\
        This pipeline contains the same set of jobs as 'before_merging' but \
@@ -354,8 +354,7 @@ let () =
     "schedule_extended_test"
     schedule_extended_tests
     ~jobs:
-      (Code_verification.jobs Schedule_extended_test
-       @ Cacio.get_jobs Schedule_extended_test
+      (Cacio.get_jobs Schedule_extended_test
       |> List.map (with_interruptible false))
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
