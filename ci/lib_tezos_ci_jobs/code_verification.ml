@@ -42,8 +42,4 @@ type code_verification_pipeline =
 
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
-let jobs pipeline_type =
-  match pipeline_type with
-  | Schedule_extended_test | Merge_train ->
-      [Tezos_ci.job_datadog_pipeline_trace]
-  | Before_merging -> []
+let jobs (_pipeline_type : code_verification_pipeline) = []

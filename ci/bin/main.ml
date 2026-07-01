@@ -152,7 +152,7 @@ let () =
   register
     "master_branch"
     If.(on_tezos_namespace && push && on_branch "master")
-    ~jobs:(Tezos_ci.job_datadog_pipeline_trace :: Cacio.get_jobs Master)
+    ~jobs:(Cacio.get_jobs Master)
     ~description:
       "Publishes artifacts (docs, static binaries) from master on each merge.\n\n\
        This pipeline publishes the documentation at tezos.gitlab.io, builds \
@@ -207,9 +207,7 @@ let () =
   (* TODO: rename 'octez_docker_latest_release' ?? *)
   register
     "octez_latest_release"
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace
-      :: Cacio.get_jobs Octez_latest_release)
+    ~jobs:(Cacio.get_jobs Octez_latest_release)
     If.(on_tezos_namespace && push && on_branch "latest-release")
     ~description:
       ("Updates 'latest' tag of the Octez Docker distribution on Docker Hub.\n\n\
@@ -224,9 +222,7 @@ let () =
   register
     "octez_latest_release_test"
     If.(not_on_tezos_namespace && push && on_branch "latest-release-test")
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace
-      :: Cacio.get_jobs Octez_latest_release_test)
+    ~jobs:(Cacio.get_jobs Octez_latest_release_test)
     ~description:
       "Dry-run pipeline for 'octez_latest_release' pipelines.\n\n\
        This pipeline is used to dry run the 'octez_latest_release' pipeline, \
@@ -356,9 +352,9 @@ let () =
     "schedule_extended_test"
     schedule_extended_tests
     ~jobs:
-      ((Code_verification.jobs Schedule_extended_test
-       |> List.map (with_interruptible false))
-      @ Cacio.get_jobs Schedule_extended_test)
+      (Code_verification.jobs Schedule_extended_test
+       @ Cacio.get_jobs Schedule_extended_test
+      |> List.map (with_interruptible false))
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
        This pipeline unconditionally executes all jobs in 'before_merging' \
@@ -369,15 +365,14 @@ let () =
   register
     "debian.daily"
     debian_daily
-    ~jobs:(Tezos_ci.job_datadog_pipeline_trace :: Cacio.get_jobs Debian_daily)
+    ~jobs:(Cacio.get_jobs Debian_daily)
     ~description:
       "Daily pipeline containing all Debian jobs (build and extended tests)." ;
   register
     "homebrew.daily"
     homebrew_daily
     ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace
-       :: Cacio.get_jobs Cacio.Homebrew_daily
+      (Cacio.get_jobs Cacio.Homebrew_daily
       |> List.map (with_interruptible false))
     ~description:
       "Daily pipeline containing all Homebrew jobs (build and extended tests)." ;
@@ -385,8 +380,7 @@ let () =
     "base_images.daily"
     base_images_daily
     ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Cacio.get_jobs Base_images_daily
-      |> List.map (with_interruptible false))
+      (Cacio.get_jobs Base_images_daily |> List.map (with_interruptible false))
     ~description:
       "Daily pipeline containing all Base Images jobs (build and merge)." ;
 
@@ -398,9 +392,7 @@ let () =
      It duplicates a lot of tests that do not actually contribute
      to testing the special options, and there is no reason why at least some tests
      could be run with special options in dedicated jobs in [before_merging] pipelines. *)
-  let custom_extended_test_jobs =
-    Cacio.get_jobs Custom_extended_test @ [job_datadog_pipeline_trace]
-  in
+  let custom_extended_test_jobs = Cacio.get_jobs Custom_extended_test in
   register
     "schedule_extended_rpc_test"
     schedule_extended_rpc_tests
@@ -445,7 +437,7 @@ let () =
   register
     "schedule_security_scans"
     schedule_security_scans
-    ~jobs:(job_datadog_pipeline_trace :: Cacio.get_jobs Schedule_security_scans)
+    ~jobs:(Cacio.get_jobs Schedule_security_scans)
     ~description:
       "Scheduled pipeline for various security scans. Currently scanning for \
        vulnerabilities in Docker images" ;
@@ -453,8 +445,7 @@ let () =
     "schedule_docker_master_snapshot"
     schedule_docker_master_snapshot
     ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace
-       :: Cacio.get_jobs Scheduled_docker_master_snapshot
+      (Cacio.get_jobs Scheduled_docker_master_snapshot
       |> List.map (with_interruptible false))
     ~description:
       "Scheduled pipeline publishing a dated master Docker image to Docker \
@@ -466,9 +457,7 @@ let () =
   register
     "schedule_docker_build_pipeline"
     schedule_docker_build
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace
-      :: Cacio.get_jobs Scheduled_docker_build)
+    ~jobs:(Cacio.get_jobs Scheduled_docker_build)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       "Scheduled pipeline for forcing building fresh Docker image (skipping \
@@ -483,16 +472,12 @@ let () =
   register
     "publish_test_release_page"
     If.(api_release_page && not_on_tezos_namespace)
-    ~jobs:
-      ([Tezos_ci.job_datadog_pipeline_trace]
-      @ Cacio.get_jobs Test_publish_release_page)
+    ~jobs:(Cacio.get_jobs Test_publish_release_page)
     ~description:"Pipeline that updates and publishes the test release page." ;
   register
     "publish_release_page"
     If.(api_release_page && on_tezos_namespace)
-    ~jobs:
-      ([Tezos_ci.job_datadog_pipeline_trace]
-      @ Cacio.get_jobs Publish_release_page)
+    ~jobs:(Cacio.get_jobs Publish_release_page)
     ~description:"Pipeline that updates and publishes the release page."
 
 (** {2 Entry point of the generator binary} *)
