@@ -146,6 +146,24 @@ val preload_kernel : string -> unit Lwt.t
 
 val patched_state : string -> Ethereum_types.quantity -> unit Lwt.t
 
+(** [healed_shadownet_sequencer_key key] advertizes that the Shadownet
+    sequencer public key has been repaired in the local state and set to
+    [key]. *)
+val healed_shadownet_sequencer_key : Signature.Public_key.t -> unit Lwt.t
+
+(** [cleared_shadownet_finalized_levels ~healthy_level ~finalized_level]
+    advertizes that the Shadownet finalized L1/L2 levels recorded past the
+    healed head [healthy_level] have been removed from the store, leaving
+    [finalized_level] as the new finalized level. *)
+val cleared_shadownet_finalized_levels :
+  healthy_level:Ethereum_types.quantity ->
+  finalized_level:Ethereum_types.quantity ->
+  unit Lwt.t
+
+(** [cleared_shadownet_pending_confirmations ()] advertizes that the Shadownet
+    pending confirmations have been removed from the store. *)
+val cleared_shadownet_pending_confirmations : unit -> unit Lwt.t
+
 (** [predownload_kernel root_hash] advertizes the EVM node has
     downloaded all preimages under [root_hash]. *)
 val predownload_kernel : Hex.t -> unit Lwt.t

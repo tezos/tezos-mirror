@@ -23,7 +23,32 @@
 *No guarantees are provided regarding backward compatibility of experimental
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
---config-
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.62 (2026-07-01)
+
+This release provides support for Etherlink 6.5 (`farfadet-r5`), including
+native execution. Etherlink 6.5 was activated in block 46,606,524 on Etherlink
+Mainnet. It also recovers Shadownet EVM nodes from the sequencer-key corruption
+incident. Node operators are encouraged to upgrade.
+
+This release will not apply any migration to the node’s store (version 24),
+meaning it is possible to downgrade to previous versions.
+
+### Command-line interface changes
+
+- Add support for downloading Etherlink 6.5 (`farfadet-r5`) kernel by name
+  using `download kernel farfadet-r5`. (!22347)
+
+### Execution changes
+
+- Recover Shadownet EVM nodes from the sequencer-key corruption and
+  chain-rewind incident: heal the corrupted sequencer key in the node's local
+  state so the healing blueprint's signature is accepted, and clear the stale
+  finalized levels and pending confirmations that still referenced the
+  discarded blocks. Scoped to the Shadownet chain id; other networks are
+  unaffected. (!22358)
+- Add support for executing Etherlink 6.5 (`farfadet-r5`) natively. (!22347)
 
 ## Version 0.61 (2026-06-11)
 

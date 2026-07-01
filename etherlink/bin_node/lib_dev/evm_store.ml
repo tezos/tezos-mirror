@@ -729,10 +729,20 @@ module Q = struct
       @@ {|DELETE FROM l1_l2_finalized_levels
            WHERE start_l2_level < ?|}
 
-    let clear_after =
+    (* A single L1 level can finalize several L2 blocks, so the row whose
+       [start_l2_level, end_l2_level] range straddles [level] (start <= level <
+       end) also covers healthy L2 blocks. Trim that row down to [level] rather
+       than deleting it, then remove the rows lying strictly above. *)
+    let trim_straddling =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|UPDATE l1_l2_finalized_levels
+           SET end_l2_level = $1
+           WHERE start_l2_level <= $1 AND end_l2_level > $1|}
+
+    let delete_strictly_after =
       (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM l1_l2_finalized_levels
-           WHERE end_l2_level > ?|}
+           WHERE start_l2_level > ?|}
   end
 
   module Metadata = struct
@@ -1038,6 +1048,10 @@ DO UPDATE SET value = excluded.value
     let clear =
       (unit ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM pending_confirmations|}
+
+    let clear_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM pending_confirmations WHERE level > ?|}
 
     let count =
       (unit ->! level) ~name:__FUNCTION__ ~table
@@ -1487,7 +1501,9 @@ module L1_l2_finalized_levels = struct
 
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.L1_l2_finalized_levels.clear_after l2_level
+    let open Lwt_result_syntax in
+    let* () = Db.exec conn Q.L1_l2_finalized_levels.trim_straddling l2_level in
+    Db.exec conn Q.L1_l2_finalized_levels.delete_strictly_after l2_level
 end
 
 module Metadata = struct
@@ -1979,6 +1995,10 @@ module Pending_confirmations = struct
   let clear store =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Pending_confirmations.clear ()
+
+  let clear_after store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Pending_confirmations.clear_after level
 
   let is_empty store =
     let open Lwt_result_syntax in

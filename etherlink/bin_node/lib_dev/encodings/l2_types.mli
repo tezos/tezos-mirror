@@ -29,6 +29,8 @@ module Chain_id : sig
 
   val compare : chain_id -> chain_id -> int
 
+  val equal : chain_id -> chain_id -> bool
+
   val pp : Format.formatter -> chain_id -> unit
 end
 

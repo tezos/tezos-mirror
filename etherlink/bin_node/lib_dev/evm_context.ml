@@ -94,6 +94,10 @@ type t = {
   configuration : Configuration.t;
   index : Pvm.Context.rw_index;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
+  chain_id : L2_types.chain_id option;
+      (** The L2 chain id, read once from the durable storage at startup (it is
+          immutable for the life of the node). [None] for a freshly created
+          node whose state has no chain id yet. *)
   store : Evm_store.t;
   session : session_state;
   signer : Signer.map option;
@@ -662,6 +666,38 @@ module State = struct
         in
         tzfail exit_error
 
+  (* The last block produced before Shadownet broke; the kernel migration
+     rewinds the chain to it (see [fix_shadownet] in [migration.rs]). We only
+     heal the sequencer key when the node sits exactly on this block, i.e. it
+     is about to apply the first blueprint of the recovered sequencer. *)
+  let shadownet_healthy_block_number = Z.of_int 5107609
+
+  (* The sequencer later diverged from the rollup node at block 5122749;
+     [fix_shadownet_2] (see [migration.rs]) rewinds the chain to block 5122748,
+     the last block both sides agreed on. *)
+  let shadownet_healthy_block_number_2 = Z.of_int 5122748
+
+  (* Shadownet healing.
+
+     The sequencer public key stored in Shadownet's durable storage got
+     corrupted, which prevents the node from validating the signature of the
+     blueprints produced by the (recovered) sequencer. The kernel repairs the
+     key during its migration (see [fix_shadownet] in [migration.rs]), but the
+     EVM node checks blueprint signatures against its local state *before*
+     executing the kernel. It would therefore reject the very blueprint
+     carrying the healing migration, and would never apply it.
+
+     We mirror the kernel fix here, patching the sequencer key directly in the
+     local state so the node accepts the next blueprint. The patched state is
+     committed (replacing the stale commit for the current head level) so the
+     corrupted key is not reloaded on the next restart. Applying the healing
+     blueprint later runs the kernel migration which rewrites the key (and the
+     rest of the healed state) consistently. *)
+  let shadownet_chain_id = L2_types.Chain_id.of_string_exn "127823"
+
+  let is_shadownet ctxt =
+    Option.equal L2_types.Chain_id.equal ctxt.chain_id (Some shadownet_chain_id)
+
   let blueprint_applied_event ctxt conn
       ({number = Qty number; hash = expected_block_hash} :
         Evm_events.Blueprint_applied.t) =
@@ -719,6 +755,25 @@ module State = struct
              })
     | None ->
         let*! () = Evm_events_follower_events.rollup_node_ahead (Qty number) in
+
+        let* () =
+          (* On Shadownet the recovery migration discards blocks the
+             rollup node had already confirmed; replaying their
+             [blueprint_applied] events re-records a level that still
+             holds a stale pending confirmation. There, drop the stale
+             row first so the healed confirmation overwrites it
+             instead of violating the [level] primary key. On every
+             other network a duplicate level is a genuine anomaly and
+             must surface, so the plain insert is kept. *)
+          when_
+            (is_shadownet ctxt
+            && Z.geq number shadownet_healthy_block_number
+            && Z.leq number (Z.succ shadownet_healthy_block_number_2))
+            (fun () ->
+              Evm_store.Pending_confirmations.delete_with_level
+                conn
+                (Qty number))
+        in
         Evm_store.Pending_confirmations.insert
           conn
           (Qty number)
@@ -1695,6 +1750,150 @@ module State = struct
     ctxt.session.evm_state <- cleaned_evm_state ;
     return_unit
 
+  let shadownet_sequencer_key =
+    Signature.Public_key.of_b58check_exn
+      "edpkup5BgSfjSqEtFkUyKyqF4vLjuiEGvjmxN2wMG2eJ2MCVq97XH8"
+
+  let heal_shadownet_sequencer_key conn ctxt =
+    let open Lwt_result_syntax in
+    let (Ethereum_types.Qty next) = ctxt.session.next_blueprint_number in
+    let evm_state = ctxt.session.evm_state in
+    if is_shadownet ctxt && Z.equal (Z.pred next) shadownet_healthy_block_number
+    then (
+      (* Write through [Raw_path] (as [patch_sequencer_key_if_necessary] does) *)
+      let sequencer_key_path =
+        Durable_storage_path.sequencer_key
+          ~storage_version:ctxt.session.storage_version
+      in
+      let* evm_state =
+        Durable_storage.write
+          (Raw_path sequencer_key_path)
+          (Bytes.of_string
+             (Signature.Public_key.to_b58check shadownet_sequencer_key))
+          evm_state
+      in
+      let*! () =
+        Events.healed_shadownet_sequencer_key shadownet_sequencer_key
+      in
+      ctxt.session.evm_state <- evm_state ;
+      let* () = replace_current_commit ctxt conn in
+      return_unit)
+    else return_unit
+
+  (* On Shadownet, the kernel migration rewinds the chain to
+     [shadownet_healthy_block_number] and discards the blocks produced after it.
+     The rollup-node events follower may have recorded finalized L2 levels past
+     that block: it advances [finalized_number] from the rollup's events even
+     for blocks it has not applied locally (see [blueprint_applied_event]). When
+     the node sits exactly on the healthy block (i.e. it is about to apply the
+     first blueprint of the recovered sequencer), drop those stale finalized
+     levels so the node does not believe it is finalized past the healed head.
+
+     We use [clear_after] rather than wiping the table so the [healthy_level]
+     row is kept and [Context_hashes.find_finalized] keeps working. The
+     finalized level is then recomputed from the remaining rows and returned to
+     the caller. *)
+  let clear_shadownet_finalized_levels_at conn ctxt ~healthy_block_number
+      ~healed_marker l1_level =
+    let open Lwt_result_syntax in
+    let (Ethereum_types.Qty next) = ctxt.session.next_blueprint_number in
+    let evm_state = ctxt.session.evm_state in
+    if is_shadownet ctxt && Z.equal (Z.pred next) healthy_block_number then
+      (* Marker written by the healing migration (see [migration.rs]): asserts
+         the healing kernel actually ran before we drop the finalized levels. *)
+      let* healed =
+        Durable_storage.read_opt (Raw_path healed_marker) evm_state
+      in
+      if Option.is_some healed then (
+        let healthy_level = Ethereum_types.Qty healthy_block_number in
+        let* () =
+          Evm_store.L1_l2_finalized_levels.clear_after conn healthy_level
+        in
+        let* latest = Evm_store.L1_l2_finalized_levels.last conn in
+        let finalized_level, l1_level =
+          match latest with
+          | None -> (Ethereum_types.Qty Z.zero, None)
+          | Some (l1_level, {end_l2_level; _}) -> (end_l2_level, Some l1_level)
+        in
+        ctxt.session.finalized_number <- finalized_level ;
+        let*! () =
+          Events.cleared_shadownet_finalized_levels
+            ~healthy_level
+            ~finalized_level
+        in
+        return l1_level)
+      else return l1_level
+    else return l1_level
+
+  let clear_shadownet_finalized_levels conn ctxt l1_level =
+    let open Lwt_result_syntax in
+    (* Only one heal can be active at a given head, and each [_at] call is a
+       pass-through no-op when its own guard is inactive, so threading the
+       value through both calls returns the recomputed level of whichever heal
+       fired (or the input untouched if none did). *)
+    let* l1_level =
+      clear_shadownet_finalized_levels_at
+        conn
+        ctxt
+        ~healthy_block_number:shadownet_healthy_block_number
+        ~healed_marker:"/__shadownet_healed"
+        l1_level
+    in
+    clear_shadownet_finalized_levels_at
+      conn
+      ctxt
+      ~healthy_block_number:shadownet_healthy_block_number_2
+      ~healed_marker:"/__shadownet_really_healed"
+      l1_level
+
+  (* On Shadownet recovery, the rollup-node events follower registered pending
+     confirmations for the blocks produced past [shadownet_healthy_block_number]
+     (the rollup node confirmed them but the node never applied them locally,
+     see [blueprint_applied_event]). The kernel migration discards those blocks,
+     so the confirmations reference a different chain: when the node re-applies
+     the first healed block it would compare it against the stale confirmation
+     and wrongly report a divergence (see [commit_application_result]). Drop the
+     pending confirmations so the healed chain is accepted. *)
+  let clear_shadownet_pending_confirmations_at conn ctxt ~healthy_block_number
+      ~healed_marker =
+    let open Lwt_result_syntax in
+    let (Ethereum_types.Qty next) = ctxt.session.next_blueprint_number in
+    let evm_state = ctxt.session.evm_state in
+    if is_shadownet ctxt && Z.equal (Z.pred next) healthy_block_number then
+      (* Marker written by the healing migration (see [migration.rs]): asserts
+       the healing kernel actually ran before we drop the confirmations. *)
+      let* healed =
+        Durable_storage.read_opt (Raw_path healed_marker) evm_state
+      in
+      if Option.is_some healed then
+        (* Only the confirmations above the healthy block reference the
+           discarded chain; the ones up to [healthy_block_number] are still
+           valid. *)
+        let* () =
+          Evm_store.Pending_confirmations.clear_after
+            conn
+            (Ethereum_types.Qty healthy_block_number)
+        in
+        let*! () = Events.cleared_shadownet_pending_confirmations () in
+        return_unit
+      else return_unit
+    else return_unit
+
+  let clear_shadownet_pending_confirmations conn ctxt =
+    let open Lwt_result_syntax in
+    let* () =
+      clear_shadownet_pending_confirmations_at
+        conn
+        ctxt
+        ~healthy_block_number:shadownet_healthy_block_number
+        ~healed_marker:"/__shadownet_healed"
+    in
+    clear_shadownet_pending_confirmations_at
+      conn
+      ctxt
+      ~healthy_block_number:shadownet_healthy_block_number_2
+      ~healed_marker:"/__shadownet_really_healed"
+
   let rec apply_blueprint ?(events = []) ?expected_block_hash ctxt conn
       timestamp chunks payload delayed_transactions :
       ('a L2_types.block * L2_types.Tezos_block.t option) tzresult Lwt.t =
@@ -1793,6 +1992,26 @@ module State = struct
           current_block
           blueprint_with_events
       in
+      (* Heal the Shadownet sequencer key once the head has advanced onto the
+         healthy block, so the next blueprint's signature check uses the
+         repaired key even while live-following without a restart. The head,
+         its state and its commit have just been updated by [on_new_head], so
+         the re-commit performed by [heal_shadownet_sequencer_key] targets the
+         block we just applied. *)
+      let* () = heal_shadownet_sequencer_key conn ctxt in
+      (* The finalized-levels and pending-confirmations cleanups must run here
+         too, not only at [create]: a node started below the healthy block
+         reaches it while live-following, and without clearing the stale
+         finalized levels / pending confirmations it would compare the first
+         healed block against the discarded chain and wrongly report a
+         divergence. Each cleanup is a no-op unless the head is exactly on a
+         healthy block whose healing marker is set, so running it on every
+         applied block is safe. The recomputed L1 level is irrelevant here (it
+         is only threaded into the startup return value). *)
+      let* (_ : int32 option) =
+        clear_shadownet_finalized_levels conn ctxt None
+      in
+      let* () = clear_shadownet_pending_confirmations conn ctxt in
       return
         ( current_block,
           current_tezos_block,
@@ -2445,11 +2664,17 @@ module State = struct
       else Disabled
     in
 
+    (* Read the chain id once at startup; it is immutable for the life of the
+       node, so callers can rely on the cached value instead of reading the
+       durable storage on every event. *)
+    let* chain_id = Durable_storage.read_opt Chain_id evm_state in
+
     let ctxt =
       {
         configuration;
         index;
         smart_rollup_address;
+        chain_id;
         session =
           {
             context;
@@ -2470,6 +2695,9 @@ module State = struct
         execution_pool = pool;
       }
     in
+    let* () = heal_shadownet_sequencer_key conn ctxt in
+    let* l1_level = clear_shadownet_finalized_levels conn ctxt l1_level in
+    let* () = clear_shadownet_pending_confirmations conn ctxt in
 
     let* () =
       let* ro_store =

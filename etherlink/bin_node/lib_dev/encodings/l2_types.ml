@@ -30,6 +30,8 @@ module Chain_id = struct
 
   let compare (Chain_id c1) (Chain_id c2) = Z.compare c1 c2
 
+  let equal (Chain_id c1) (Chain_id c2) = Z.compare c1 c2 = 0
+
   let pp fmt (Chain_id cid) =
     Format.fprintf fmt "Chain_id (%s)" (Z.to_string cid)
 end

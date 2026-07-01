@@ -33,6 +33,7 @@ type kernel =
   | FarfadetR2
   | FarfadetR3
   | FarfadetR4
+  | FarfadetR5
   | Previewnet02
   | Previewnet04
   | Previewnet05

@@ -334,6 +334,13 @@ module Pending_confirmations : sig
 
   val delete_with_level : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
+  (** [clear conn] removes every pending confirmation from the store. *)
+  val clear : conn -> unit tzresult Lwt.t
+
+  (** [clear_after conn level] removes every pending confirmation strictly
+      above [level], leaving the confirmations up to and including [level]. *)
+  val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
   val is_empty : conn -> bool tzresult Lwt.t
 end
 
@@ -402,6 +409,13 @@ module L1_l2_finalized_levels : sig
     (int32 * t) list tzresult Lwt.t
 
   val clear_before : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  (** [clear_after conn level] removes every finalized L2 level strictly above
+      [level]. A single L1 level can finalize a range of L2 blocks: the row
+      straddling [level] is trimmed down to [level] (keeping the healthy L2
+      blocks it also covers) rather than deleted, and the rows lying strictly
+      above are removed. *)
+  val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
 type metadata = {
