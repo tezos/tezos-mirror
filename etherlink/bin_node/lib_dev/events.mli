@@ -146,6 +146,11 @@ val preload_kernel : string -> unit Lwt.t
 
 val patched_state : string -> Ethereum_types.quantity -> unit Lwt.t
 
+(** [healed_shadownet_sequencer_key key] advertizes that the Shadownet
+    sequencer public key has been repaired in the local state and set to
+    [key]. *)
+val healed_shadownet_sequencer_key : Signature.Public_key.t -> unit Lwt.t
+
 (** [predownload_kernel root_hash] advertizes the EVM node has
     downloaded all preimages under [root_hash]. *)
 val predownload_kernel : Hex.t -> unit Lwt.t

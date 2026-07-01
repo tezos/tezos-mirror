@@ -239,7 +239,7 @@ type ('a, 'cap) path =
   | Kernel_version : (string, ro) path
   | Kernel_root_hash : (Ethereum_types.hex, ro) path
   | Multichain_flag : (unit, ro) path
-  | Sequencer_key : (Signature.Public_key.t, ro) path
+  | Sequencer_key : (Signature.Public_key.t, rw) path
   | Chain_config_family :
       L2_types.chain_id
       -> (L2_types.ex_chain_family, ro) path
@@ -518,12 +518,13 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
       static_ro
         (unit_flag_ro_codec ~path:Durable_storage_path.Feature_flags.multichain)
   | Sequencer_key ->
-      versioned_ro (fun ~storage_version ->
+      versioned_rw (fun ~storage_version ->
           {
             path = Durable_storage_path.sequencer_key ~storage_version;
             decode =
               (fun bytes ->
                 Signature.Public_key.of_b58check (Bytes.to_string bytes));
+            encode = (fun key -> Signature.Public_key.to_b58check key);
           })
   | Chain_config_family cid ->
       versioned_ro (fun ~storage_version ->

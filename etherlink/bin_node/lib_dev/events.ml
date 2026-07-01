@@ -456,6 +456,15 @@ let patched_state =
     ("key", Data_encoding.string)
     ("level", Ethereum_types.quantity_encoding)
 
+let healed_shadownet_sequencer_key =
+  Internal_event.Simple.declare_1
+    ~level:Warning
+    ~section
+    ~name:"healed_shadownet_sequencer_key"
+    ~msg:
+      "Shadownet: sequencer public key healed in the local state, set to {key}"
+    ("key", Signature.Public_key.encoding)
+
 let preload_kernel =
   Internal_event.Simple.declare_1
     ~level:Notice
@@ -688,6 +697,8 @@ let connection_acquired ~endpoint =
 let preload_kernel commit = emit preload_kernel commit
 
 let patched_state key level = emit patched_state (key, level)
+
+let healed_shadownet_sequencer_key key = emit healed_shadownet_sequencer_key key
 
 let predownload_kernel_failed root_hash error =
   emit predownload_kernel_failed (Hex.show root_hash, error)

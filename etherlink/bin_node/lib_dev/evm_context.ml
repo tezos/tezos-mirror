@@ -666,6 +666,33 @@ module State = struct
         in
         tzfail exit_error
 
+  (* The last block produced before Shadownet broke; the kernel migration
+     rewinds the chain to it (see [fix_shadownet] in [migration.rs]). We only
+     heal the sequencer key when the node sits exactly on this block, i.e. it
+     is about to apply the first blueprint of the recovered sequencer. *)
+  let shadownet_healthy_block_number = Z.of_int 5107609
+
+  (* Shadownet healing.
+
+     The sequencer public key stored in Shadownet's durable storage got
+     corrupted, which prevents the node from validating the signature of the
+     blueprints produced by the (recovered) sequencer. The kernel repairs the
+     key during its migration (see [fix_shadownet] in [migration.rs]), but the
+     EVM node checks blueprint signatures against its local state *before*
+     executing the kernel. It would therefore reject the very blueprint
+     carrying the healing migration, and would never apply it.
+
+     We mirror the kernel fix here, patching the sequencer key directly in the
+     local state so the node accepts the next blueprint. The patched state is
+     committed (replacing the stale commit for the current head level) so the
+     corrupted key is not reloaded on the next restart. Applying the healing
+     blueprint later runs the kernel migration which rewrites the key (and the
+     rest of the healed state) consistently. *)
+  let shadownet_chain_id = L2_types.Chain_id.of_string_exn "127823"
+
+  let is_shadownet ctxt =
+    Option.equal L2_types.Chain_id.equal ctxt.chain_id (Some shadownet_chain_id)
+
   let blueprint_applied_event ctxt conn
       ({number = Qty number; hash = expected_block_hash} :
         Evm_events.Blueprint_applied.t) =
@@ -1699,6 +1726,27 @@ module State = struct
     ctxt.session.evm_state <- cleaned_evm_state ;
     return_unit
 
+  let shadownet_sequencer_key =
+    Signature.Public_key.of_b58check_exn
+      "edpkup5BgSfjSqEtFkUyKyqF4vLjuiEGvjmxN2wMG2eJ2MCVq97XH8"
+
+  let heal_shadownet_sequencer_key conn ctxt =
+    let open Lwt_result_syntax in
+    let (Ethereum_types.Qty next) = ctxt.session.next_blueprint_number in
+    let evm_state = ctxt.session.evm_state in
+    if is_shadownet ctxt && Z.equal (Z.pred next) shadownet_healthy_block_number
+    then (
+      let* evm_state =
+        Durable_storage.write Sequencer_key shadownet_sequencer_key evm_state
+      in
+      let*! () =
+        Events.healed_shadownet_sequencer_key shadownet_sequencer_key
+      in
+      ctxt.session.evm_state <- evm_state ;
+      let* () = replace_current_commit ctxt conn in
+      return_unit)
+    else return_unit
+
   let rec apply_blueprint ?(events = []) ?expected_block_hash ctxt conn
       timestamp chunks payload delayed_transactions :
       ('a L2_types.block * L2_types.Tezos_block.t option) tzresult Lwt.t =
@@ -1797,6 +1845,13 @@ module State = struct
           current_block
           blueprint_with_events
       in
+      (* Heal the Shadownet sequencer key once the head has advanced onto the
+         healthy block, so the next blueprint's signature check uses the
+         repaired key even while live-following without a restart. The head,
+         its state and its commit have just been updated by [on_new_head], so
+         the re-commit performed by [heal_shadownet_sequencer_key] targets the
+         block we just applied. *)
+      let* () = heal_shadownet_sequencer_key conn ctxt in
       return
         ( current_block,
           current_tezos_block,
@@ -2480,6 +2535,7 @@ module State = struct
         execution_pool = pool;
       }
     in
+    let* () = heal_shadownet_sequencer_key conn ctxt in
 
     let* () =
       let* ro_store =
