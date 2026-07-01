@@ -638,7 +638,7 @@ where
         // assigned at block finalization by renumber_nonces().
         let nonce = *nonce_counter;
         *nonce_counter = nonce_counter.saturating_add(1);
-        // Internal-operation replay detection (L2-1637). `operation` is
+        // Internal-operation replay detection. `operation` is
         // `Duplicable`, so a contract may `DUP` an `operation` value and
         // emit both copies. They share the MIR `counter`, the identity
         // L1 uses to enforce internal-operation linearity. Record each
@@ -648,12 +648,12 @@ where
         // of being applied a second time under a fresh display nonce.
         let is_replay = !operation_ctx.applied_counters.insert(counter);
         let receipts_before = all_internal_receipts.len();
-        // Watermarks for `drain_reentrant_crac_ops`: any CRAC receipt
-        // pushed during this internal operation's execution — to any
-        // of the three lists — is a re-entrant inner CRAC and must
-        // be spliced into the parent op's flat list at this point
-        // rather than reach the top-level merge with a smaller seq
-        // than its outer parent (would invert DFS order — L2-1300).
+        // Watermarks for `drain_reentrant_crac_ops`. Execution is
+        // synchronous and stack-nested, so everything pushed to the three
+        // CRAC lists between here and the drain below is this op's own
+        // re-entrant subtree. Splicing it at the parent site keeps DFS
+        // order rather than letting it reach the top-level merge with a
+        // smaller seq than its outer parent (would invert DFS — L2-1300).
         let pending_crac_receipts_before = journal.michelson.pending_crac_receipts.len();
         let failed_crac_receipts_before = journal.michelson.failed_crac_receipts.len();
         let backtracked_crac_receipts_before =
@@ -904,18 +904,24 @@ where
             receipts_before,
             TaggedInternalOp::own(internal_receipt, delegated_storage_cost_delta),
         );
-        // Drain any re-entrant CRAC ops that accumulated during this
-        // operation's execution (e.g. a gateway call that re-entered
-        // Michelson).  Placing the drain here — right after the gateway
-        // receipt — preserves execution order (RFC Example 8).
+        // Drain the re-entrant CRAC ops accumulated during this op's
+        // execution (a gateway leg that re-entered the Michelson runtime)
+        // and splice the synthetic frame in at `receipts_before + 1` —
+        // right after the parent (just inserted at `receipts_before`) and
+        // ahead of its inline children (e.g. the %on_result callback). The
+        // leg runs before the callback that consumes its payload, so the
+        // frame must precede it. Empty drain → no-op (`frame_at == len`).
         let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
             journal,
             pending_crac_receipts_before,
             failed_crac_receipts_before,
             backtracked_crac_receipts_before,
         );
-        all_internal_receipts
-            .extend(reentrant_ops.into_iter().map(TaggedInternalOp::from_crac));
+        let frame_at = receipts_before + 1;
+        all_internal_receipts.splice(
+            frame_at..frame_at,
+            reentrant_ops.into_iter().map(TaggedInternalOp::from_crac),
+        );
     }
     Ok(())
 }

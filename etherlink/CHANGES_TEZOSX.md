@@ -469,6 +469,12 @@
   still applies and any co-resident operations — including deposits — are
   preserved, rather than being lost when the whole blueprint is dropped on
   trap recovery. (!22320)
+- The synthetic cross-runtime-call frame (begin marker, inner ops, end
+  marker) is now ordered immediately after the gateway internal operation
+  that triggered it and ahead of the result callback and its fan-out in the
+  Michelson operation's `internal_operation_results`. Previously the
+  callback and its sub-operations appeared before the frame that produced
+  the payload they consume, inverting execution order in the receipt. (!22344)
 
 ### Storage versions
 
