@@ -520,7 +520,7 @@ apt_repo_debian:
   retry: 0
 
 gitlab:publish:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-be43e621
   stage: publish
   tags:
   - gcp_not_interruptible
