@@ -135,6 +135,14 @@
   Previously the Michelson runtime typechecker accepted such scripts,
   diverging from L1 and producing closure storage that failed to reload
   on the next call. (!22248)
+- MIR `APPLY` now shares captured arguments inside applied closures and charges
+  MIR's size-dependent type/value unparsing cost when the closure is created,
+  at the same materialization point as L1, avoiding repeated deep copies when a
+  duplicated applied closure is later executed. The unparsing computed at
+  `APPLY` is the closure's sole serialized form, reused verbatim by every
+  `PACK`/unparse (never recomputed), and executing an applied closure now
+  charges MIR's `PUSH + PAIR` costs per captured argument, mirroring L1's
+  `PUSH ty val ; PAIR` instruction sequence. (!22270)
 - Michelson `signature` values are now compared and hashed by their raw
   bytes, matching L1 (`Signature.compare` over `to_bytes`). Previously the
   ordering keyed on the signature variant first, so the same bytes read as

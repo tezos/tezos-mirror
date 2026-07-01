@@ -180,6 +180,8 @@ pub enum InterpretInvariant {
     ExpectedListOperation,
     #[error("script result's operation list contained a non-operation element")]
     ExpectedOperationElement,
+    #[error("APPLY reached the borrowed unparser with a non-pushable capture")]
+    NonPushableApplyCapture,
 }
 
 #[allow(missing_docs)]
@@ -208,6 +210,17 @@ pub enum EnshrinedViewDispatchError {
 impl<'a> From<OutOfGas> for InterpretError<'a> {
     fn from(_: OutOfGas) -> Self {
         InterpretError::OutOfGas
+    }
+}
+
+impl<'a> From<BorrowedUnparseError> for InterpretError<'a> {
+    fn from(error: BorrowedUnparseError) -> Self {
+        match error {
+            BorrowedUnparseError::OutOfGas => InterpretError::OutOfGas,
+            BorrowedUnparseError::NonPushable => {
+                InterpretError::InternalError(InterpretInvariant::NonPushableApplyCapture)
+            }
+        }
     }
 }
 
@@ -1648,13 +1661,18 @@ fn interpret_step<'a, 'b, 'c>(
                         }
                     },
                     Closure::Apply {
-                        arg_val,
+                        capture,
                         closure: inner,
-                        ..
                     } => {
+                        // L1 materializes each applied capture as the code
+                        // `PUSH ty val ; PAIR`, so its EXEC pays `IPush +
+                        // ICons_pair` per captured level. Mirror that here: the
+                        // closure's typed `arg_val` is reused directly (no
+                        // re-push), only the gas is brought in line.
+                        ctx.gas().consume(interpret_cost::PUSH)?;
                         ctx.gas().consume(interpret_cost::PAIR)?;
-                        arg = V::new_pair(*arg_val, arg);
-                        closure = *inner;
+                        arg = V::new_pair_rc(Rc::clone(capture.arg_val()), Rc::new(arg));
+                        closure = Closure::unwrap_rc(inner);
                     }
                 }
             }
@@ -3190,13 +3208,41 @@ fn interpret_one<'a>(
             stack.push(V::Lambda(Closure::Lambda(lam.clone())));
         }
         I::Apply { arg_ty } => {
-            let arg_val = pop!();
+            // Keep the stack's Rc rather than unwrapping it. If the capture
+            // was DUP'd, `pop!` would clone a large Bytes/String/Int payload
+            // before any size-dependent gas had been charged.
+            let arg_val = pop_rc!();
             let closure = pop!(V::Lambda);
             ctx.gas().consume(interpret_cost::APPLY)?;
+            // Cache exactly the type and value unparse cost. Each is measured
+            // around its own call and the two are summed, so the cached cost is
+            // tied to the constructors' gas model (recalibrating it stays in
+            // sync) and an unrelated charge inserted between these calls cannot
+            // inflate it. The cost avoids a second uncharged Micheline
+            // traversal merely to recompute it.
+            let before_ty = ctx.gas().milligas().ok_or(OutOfGas)?;
+            let arg_ty_micheline =
+                arg_ty.into_micheline_optimized_legacy(arena, ctx.gas())?;
+            let ty_cost = before_ty - ctx.gas().milligas().ok_or(OutOfGas)?;
+            // Retain the typed capture for EXEC while unparsing it by
+            // reference. The borrowed unparser walks containers in place and
+            // charges size-dependent leaves before cloning them into the
+            // cache.
+            let before_val = ctx.gas().milligas().ok_or(OutOfGas)?;
+            let arg_val_micheline =
+                arg_val.clone_into_micheline_optimized_legacy(arena, ctx.gas())?;
+            let val_cost = before_val - ctx.gas().milligas().ok_or(OutOfGas)?;
+            let cached_unparse_cost =
+                ty_cost.checked_add(val_cost).ok_or(CostOverflow)?;
             stack.push(V::Lambda(Closure::Apply {
-                arg_ty: arg_ty.clone(),
-                arg_val: Box::new(arg_val),
-                closure: Box::new(closure),
+                capture: Rc::new(AppliedCapture::new(
+                    arg_ty.clone(),
+                    arg_val,
+                    arg_ty_micheline,
+                    arg_val_micheline,
+                    cached_unparse_cost,
+                )),
+                closure: Rc::new(closure),
             }))
         }
         I::HashKey => {
@@ -3648,6 +3694,65 @@ mod interpreter_tests {
             .into_iter()
             .map(|(key, value)| (Rc::new(key), Rc::new(value)))
             .collect()
+    }
+
+    fn unparse_type_cost(ty: &Type) -> u32 {
+        let arena = Arena::new();
+        let mut gas = Gas::default();
+        ty.into_micheline_optimized_legacy(&arena, &mut gas)
+            .unwrap();
+        Gas::default().milligas().unwrap() - gas.milligas().unwrap()
+    }
+
+    fn unparse_value_cost(value: TypedValue) -> u32 {
+        let arena = Arena::new();
+        let mut gas = Gas::default();
+        value
+            .into_micheline_optimized_legacy(&arena, &mut gas)
+            .unwrap();
+        Gas::default().milligas().unwrap() - gas.milligas().unwrap()
+    }
+
+    fn apply_gas_for_capture(arg_ty: Type, arg_val: TypedValue) -> u32 {
+        let lam = Closure::Lambda(Lambda::Lambda {
+            micheline_code: Micheline::Seq(&[]),
+            code: vec![Drop(None), Unit].into(),
+        });
+        let mut stack = stk![TypedValue::Lambda(lam), arg_val];
+        let mut ctx = Ctx::default();
+        let start_milligas = ctx.gas().milligas().unwrap();
+        interpret_one(&Apply { arg_ty }, &mut ctx, &mut stack).unwrap();
+        start_milligas - ctx.gas().milligas().unwrap()
+    }
+
+    fn lambda_capture(depth: usize) -> TypedValue<'static> {
+        let arena: &'static Arena<Micheline<'static>> = Box::leak(Box::default());
+        let mut micheline_code = Micheline::Seq(&[]);
+        for _ in 0..depth {
+            micheline_code =
+                Micheline::Seq(std::slice::from_ref(arena.alloc(micheline_code)));
+        }
+        V::Lambda(Closure::Lambda(Lambda::Lambda {
+            micheline_code,
+            code: Vec::new().into(),
+        }))
+    }
+
+    #[track_caller]
+    fn assert_cached_apply<'a>(
+        stack: &crate::stack::IStack<'a>,
+        expected_arg_ty: &Type,
+        expected_arg_val: &TypedValue<'a>,
+        expected_closure: &Closure<'a>,
+    ) {
+        match stack.get(0).unwrap().as_ref() {
+            TypedValue::Lambda(Closure::Apply { capture, closure }) => {
+                assert_eq!(capture.arg_ty(), expected_arg_ty);
+                assert_eq!(capture.arg_val().as_ref(), expected_arg_val);
+                assert_eq!(closure.as_ref(), expected_closure);
+            }
+            value => panic!("expected applied closure, got {value:?}"),
+        }
     }
 
     #[test]
@@ -7532,14 +7637,7 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(
-            stack,
-            stk![TypedValue::Lambda(Closure::Apply {
-                arg_ty: Type::Int,
-                arg_val: Box::new(TypedValue::int(1)),
-                closure: Box::new(lam),
-            })]
-        );
+        assert_cached_apply(&stack, &Type::Int, &TypedValue::int(1), &lam);
         stack.push(TypedValue::nat(5));
         assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::int(6)]);
@@ -7575,14 +7673,7 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(
-            stack,
-            stk![TypedValue::Lambda(Closure::Apply {
-                arg_ty: Type::Bool,
-                arg_val: Box::new(TypedValue::Bool(true)),
-                closure: Box::new(lam),
-            })]
-        );
+        assert_cached_apply(&stack, &Type::Bool, &TypedValue::Bool(true), &lam);
         stack.push(TypedValue::nat(5));
         assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::nat(10)]);
@@ -7618,17 +7709,309 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(
-            stack,
-            stk![TypedValue::Lambda(Closure::Apply {
-                arg_ty: Type::Bool,
-                arg_val: Box::new(TypedValue::Bool(false)),
-                closure: Box::new(lam),
-            })]
-        );
+        assert_cached_apply(&stack, &Type::Bool, &TypedValue::Bool(false), &lam);
         stack.push(TypedValue::nat(5));
         assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::nat(5)]);
+    }
+
+    #[test]
+    fn apply_charges_capture_unparse_cost() {
+        let used = apply_gas_for_capture(Type::Int, TypedValue::int(1));
+        let expected = interpret_cost::APPLY
+            + unparse_type_cost(&Type::Int)
+            + unparse_value_cost(TypedValue::int(1));
+
+        assert_eq!(used, expected);
+    }
+
+    #[test]
+    fn apply_capture_gas_grows_with_capture_size() {
+        let small = apply_gas_for_capture(Type::Bytes, V::Bytes(vec![0; 1]));
+        let large = apply_gas_for_capture(Type::Bytes, V::Bytes(vec![0; 4096]));
+
+        assert!(large > small);
+    }
+
+    #[test]
+    fn apply_capture_gas_grows_with_lambda_body() {
+        let lambda_ty = Type::new_lambda(Type::Unit, Type::Unit);
+        let small = apply_gas_for_capture(lambda_ty.clone(), lambda_capture(1));
+        let large = apply_gas_for_capture(lambda_ty, lambda_capture(4096));
+
+        assert!(large > small);
+    }
+
+    #[test]
+    fn apply_preserves_shared_capture_allocation() {
+        let lambda = Closure::Lambda(Lambda::Lambda {
+            micheline_code: Micheline::Seq(&[]),
+            code: vec![Drop(None), Unit].into(),
+        });
+        let capture = Rc::new(V::Bytes(vec![0; 4096]));
+        let mut stack = IStack::new();
+        stack.push(V::Lambda(lambda));
+        stack.push(Rc::clone(&capture));
+
+        interpret_one(
+            &Apply {
+                arg_ty: Type::Bytes,
+            },
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .unwrap();
+
+        match stack.get(0).unwrap().as_ref() {
+            V::Lambda(Closure::Apply {
+                capture: applied_capture,
+                ..
+            }) => assert!(Rc::ptr_eq(applied_capture.arg_val(), &capture)),
+            value => panic!("expected applied closure, got {value:?}"),
+        }
+    }
+
+    #[test]
+    fn apply_charges_before_copying_sizable_capture_into_cache() {
+        let large_int = BigInt::from(1) << 32_768usize;
+        let large_nat = BigUint::from(1u8) << 32_768usize;
+        let list = V::List((0..4096).map(|_| V::Unit).collect());
+        let set = V::Set(rc_set((0..4096).map(V::int)));
+        let map = V::Map(rc_map((0..4096).map(|i| (V::int(i), V::Unit))));
+        let cases = [
+            (Type::Bytes, V::Bytes(vec![0; 4096])),
+            (Type::String, V::String("x".repeat(4096))),
+            (Type::Int, V::Int(large_int.clone())),
+            (Type::Nat, V::Nat(large_nat)),
+            (Type::Timestamp, V::Timestamp(large_int)),
+            (Type::new_list(Type::Unit), list),
+            (Type::new_set(Type::Int), set),
+            (Type::new_map(Type::Int, Type::Unit), map),
+            (
+                Type::new_lambda(Type::Unit, Type::Unit),
+                lambda_capture(4096),
+            ),
+        ];
+
+        for (arg_ty, capture) in cases {
+            let lam = Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: vec![Drop(None), Unit].into(),
+            });
+            let required = interpret_cost::APPLY
+                + unparse_type_cost(&arg_ty)
+                + unparse_value_cost(capture.clone());
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(required - 1);
+            let mut stack = stk![V::Lambda(lam), capture];
+
+            assert_eq!(
+                interpret_one(&Apply { arg_ty }, &mut ctx, &mut stack),
+                Err(InterpretError::OutOfGas)
+            );
+        }
+    }
+
+    #[test]
+    fn exec_applied_closure_charges_push_and_pair_per_capture() {
+        // L1 rewrites an applied lambda to `PUSH ty val ; PAIR ; <body>`, so its
+        // EXEC pays `IPush + ICons_pair` for every captured argument. MIR reuses
+        // the typed capture directly, but must charge the same per-level gas.
+        // Each extra `APPLY`-captured level must add exactly `PUSH + PAIR` to the
+        // cost of executing the closure (the flat `EXEC` and the fixed body cost
+        // cancel in the difference).
+        fn exec_gas_with_captures(n: usize) -> u32 {
+            let lam = Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: vec![Drop(None), Unit].into(),
+            });
+            let mut ctx = Ctx::default();
+            let mut stack = stk![TypedValue::Lambda(lam)];
+            for _ in 0..n {
+                stack.push(V::Unit);
+                interpret_one(&Apply { arg_ty: Type::Unit }, &mut ctx, &mut stack)
+                    .unwrap();
+            }
+            stack.push(V::Unit);
+            let start = ctx.gas().milligas().unwrap();
+            interpret(&[Exec], &mut ctx, &mut stack).unwrap();
+            start - ctx.gas().milligas().unwrap()
+        }
+
+        let per_level = interpret_cost::PUSH + interpret_cost::PAIR;
+        let g1 = exec_gas_with_captures(1);
+        let g2 = exec_gas_with_captures(2);
+        let g3 = exec_gas_with_captures(3);
+
+        assert_eq!(g2 - g1, per_level);
+        assert_eq!(g3 - g2, per_level);
+    }
+
+    // Builds an applied closure directly (not via `APPLY`) so the caller keeps
+    // control of the `arg_val` `Rc` identity for the capture-sharing assertions.
+    // The capture-unparse cache is irrelevant to those tests (EXEC and `Rc`
+    // sharing ignore it), so a trivial one is used; tests that exercise the
+    // cache build it through `APPLY` via `cached_applied_drop_closure`.
+    fn applied_drop_closure(capture: Rc<TypedValue<'static>>) -> TypedValue<'static> {
+        TypedValue::Lambda(Closure::Apply {
+            capture: Rc::new(AppliedCapture::new(
+                Type::Bytes,
+                capture,
+                Micheline::Seq(&[]),
+                Micheline::Seq(&[]),
+                0,
+            )),
+            closure: Rc::new(Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: vec![Drop(None), Unit].into(),
+            })),
+        })
+    }
+
+    fn cached_applied_drop_closure(capture: TypedValue<'static>) -> TypedValue<'static> {
+        let lam = Closure::Lambda(Lambda::Lambda {
+            micheline_code: Micheline::Seq(&[]),
+            code: vec![Drop(None), Unit].into(),
+        });
+        let mut stack = stk![TypedValue::Lambda(lam), capture];
+        interpret_one(
+            &Apply {
+                arg_ty: Type::Bytes,
+            },
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .unwrap();
+        TypedValue::unwrap_rc(stack.pop().unwrap())
+    }
+
+    #[test]
+    fn dup_exec_loop_does_not_deep_clone_capture() {
+        // Regression for L2-1643 leg 2 (the DoS severity driver).
+        //
+        // The attack is `APPLY large_capture; loop k { DUP; EXEC }`. Each
+        // `EXEC` of a `DUP`'d (refcount >= 2) applied closure has to clone the
+        // closure out of its shared `Rc` (`pop_v!`/`unwrap_rc`). Because
+        // `Closure::Apply` now stores its capture in an `Rc`, that clone bumps
+        // a refcount (O(1)) instead of deep-copying the whole capture. With the
+        // previous `Box`, every `EXEC` deep-copied the capture: O(k * |capture|)
+        // memcpy for a flat, size-independent `EXEC` charge -- a repeatable,
+        // unmetered block-production DoS.
+        const ITERATIONS: usize = 64;
+
+        // Cloning an applied closure -- exactly what `EXEC` does to a `DUP`'d
+        // closure -- must share the capture allocation, not deep-copy it.
+        let capture = Rc::new(V::Bytes(vec![0; 1 << 16]));
+        let arg_val_of = |tv: &TypedValue<'static>| match tv {
+            TypedValue::Lambda(Closure::Apply { capture, .. }) => {
+                Rc::clone(capture.arg_val())
+            }
+            value => panic!("expected applied closure, got {value:?}"),
+        };
+        let closure = applied_drop_closure(Rc::clone(&capture));
+        assert!(Rc::ptr_eq(&arg_val_of(&closure.clone()), &capture));
+
+        // The closure takes `unit` and returns `unit` (`DROP ; UNIT`), so each
+        // loop iteration `DUP`s it, pushes the `unit` argument, `EXEC`s the
+        // copy and drops the `unit` result, leaving the original for the next
+        // round.
+        let mut body = Vec::new();
+        for _ in 0..ITERATIONS {
+            body.extend([Dup(None), Push(Rc::new(V::Unit)), Exec, Drop(None)]);
+        }
+
+        let run = |capture: Rc<TypedValue<'static>>| -> u32 {
+            let mut ctx = Ctx::default();
+            let mut stack = stk![applied_drop_closure(Rc::clone(&capture))];
+            let start_milligas = ctx.gas().milligas().unwrap();
+            interpret(&body, &mut ctx, &mut stack).unwrap();
+            // The surviving closure still points at the *original* capture
+            // allocation: the loop never re-allocated it.
+            assert_eq!(stack.len(), 1);
+            assert!(Rc::ptr_eq(
+                &arg_val_of(stack.get(0).unwrap().as_ref()),
+                &capture
+            ));
+            start_milligas - ctx.gas().milligas().unwrap()
+        };
+
+        // Flat `EXEC` gas is acceptable now precisely because the per-iteration
+        // work is O(1): the same flat charge for a 1-byte and a 64-KiB capture.
+        let large_gas = run(capture);
+        let small_gas = run(Rc::new(V::Bytes(vec![0; 1])));
+        assert_eq!(large_gas, small_gas);
+        assert!(large_gas > 0);
+    }
+
+    #[test]
+    fn dup_applied_closure_shares_cached_capture_unparse() {
+        let mut stack = stk![
+            cached_applied_drop_closure(V::Bytes(vec![0; 4096])),
+            V::Unit
+        ];
+
+        interpret(
+            &[Dip(None, vec![Dup(None)])],
+            &mut Ctx::default(),
+            &mut stack,
+        )
+        .unwrap();
+
+        let capture_at = |stack: &crate::stack::IStack<'static>, index| match stack
+            .get(index)
+            .unwrap()
+            .as_ref()
+        {
+            TypedValue::Lambda(Closure::Apply { capture, .. }) => Rc::clone(capture),
+            value => panic!("expected cached applied closure, got {value:?}"),
+        };
+
+        assert!(Rc::ptr_eq(&capture_at(&stack, 1), &capture_at(&stack, 2)));
+    }
+
+    fn pack_gas_for_value(value: TypedValue<'static>) -> u32 {
+        let mut ctx = Ctx::default();
+        let mut stack = stk![value];
+        let start_milligas = ctx.gas().milligas().unwrap();
+        interpret_one(&Pack, &mut ctx, &mut stack).unwrap();
+        start_milligas - ctx.gas().milligas().unwrap()
+    }
+
+    #[test]
+    fn pack_applied_closure_reuses_cached_capture_unparse() {
+        // The capture is unparsed once at `APPLY` (its cost grows with the
+        // capture size — see `apply_capture_gas_grows_with_capture_size`) and
+        // stored in the closure. `PACK` reuses that cached unparsing verbatim,
+        // but charges its unparse cost again before cloning and serializing it,
+        // just as L1 charges every PACK.
+        let small_cached =
+            pack_gas_for_value(cached_applied_drop_closure(V::Bytes(vec![0; 1])));
+        let large_cached =
+            pack_gas_for_value(cached_applied_drop_closure(V::Bytes(vec![0; 4096])));
+
+        assert!(large_cached > small_cached);
+        assert!(large_cached > 0);
+    }
+
+    #[test]
+    fn repeated_pack_charges_cached_capture_size_each_time() {
+        const ITERATIONS: u32 = 8;
+
+        let run = |capture| {
+            let mut body = Vec::new();
+            for _ in 0..ITERATIONS {
+                body.extend([Dup(None), Pack, Drop(None)]);
+            }
+            let mut ctx = Ctx::default();
+            let mut stack = stk![cached_applied_drop_closure(capture)];
+            let start = ctx.gas().milligas().unwrap();
+            interpret(&body, &mut ctx, &mut stack).unwrap();
+            start - ctx.gas().milligas().unwrap()
+        };
+
+        let small = run(V::Bytes(vec![0; 1]));
+        let large = run(V::Bytes(vec![0; 4096]));
+        assert_eq!(large - small, ITERATIONS * (4096 - 1) * 10);
     }
 
     #[test]

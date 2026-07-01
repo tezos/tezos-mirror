@@ -44,7 +44,7 @@ pub use big_map::BigMap;
 pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
 pub use micheline::IntoMicheline;
 pub use michelson_address::*;
-pub use michelson_lambda::{Closure, Lambda};
+pub use michelson_lambda::{AppliedCapture, Closure, Lambda};
 pub use michelson_list::MichelsonList;
 pub use michelson_operation::{
     CreateContract, Emit, Operation, OperationInfo, SetDelegate, TransferTokens,
@@ -827,7 +827,7 @@ impl<'a> std::fmt::Debug for TypedValue<'a> {
 ///
 /// `VisitTv` and `VisitCl` are pushed onto the same worklist so that the
 /// alternating `TypedValue::Lambda(Closure)` /
-/// `Closure::Apply { arg_val: TypedValue, .. }` cycle is unwound on the
+/// `Closure::Apply { capture: AppliedCapture, .. }` cycle is unwound on the
 /// heap instead of the call stack. An attacker can chain
 /// `Lambda(Apply { arg_val: Lambda(Apply { arg_val: … }), .. })` to any
 /// depth (via repeated `APPLY` of lambda values), and a recursive Debug
@@ -929,21 +929,17 @@ pub(crate) fn debug_fmt_walk<'a, 'b>(
                     }
                     f.write_str(")")?;
                 }
-                Closure::Apply {
-                    arg_ty,
-                    arg_val,
-                    closure,
-                } => {
+                Closure::Apply { capture, closure } => {
                     // `arg_ty` is rendered inline (iterative `Type` Debug).
                     // `arg_val` may itself be `Lambda(Apply { … })`, and
                     // `closure` may chain further `Apply` spines — both go
                     // back through the worklist so neither path burns a
                     // real stack frame.
-                    write!(f, "Apply {{ arg_ty: {arg_ty:?}, arg_val: ")?;
+                    write!(f, "Apply {{ arg_ty: {:?}, arg_val: ", capture.arg_ty())?;
                     stack.push(DebugFrame::Str(" }"));
                     stack.push(DebugFrame::VisitCl(closure.as_ref()));
                     stack.push(DebugFrame::Str(", closure: "));
-                    stack.push(DebugFrame::VisitTv(arg_val.as_ref()));
+                    stack.push(DebugFrame::VisitTv(capture.arg_val().as_ref()));
                 }
             },
             DebugFrame::VisitTv(v) => match v {
@@ -1046,6 +1042,109 @@ pub(crate) fn debug_fmt_walk<'a, 'b>(
     Ok(())
 }
 
+/// Unparse a [`Closure`] (an `APPLY` spine ending in a terminal lambda) to its
+/// optimized-legacy Micheline. Shared by the owned and borrowed `TypedValue`
+/// unparsers so the two cannot diverge on the closure encoding or its gas.
+///
+/// No worklist and no recursion: the spine is walked by reference (no per-level
+/// clone) and each captured argument's type/value are taken verbatim from the
+/// cache built once at `APPLY` ([`AppliedCapture::clone_unparsed`]), so a
+/// captured value's own (possibly deep) structure is never re-walked here. Only
+/// the terminal lambda body is cloned.
+fn unparse_closure<'a>(
+    closure: &Closure<'a>,
+    arena: &'a Arena<Micheline<'a>>,
+    gas: &mut Gas,
+) -> Result<Micheline<'a>, OutOfGas> {
+    use Micheline as V;
+
+    // Walk the spine outer-to-inner, collecting captures and stopping at the
+    // terminal lambda.
+    let mut captures = Vec::new();
+    let mut cur = closure;
+    let terminal = loop {
+        match cur {
+            Closure::Apply { capture, closure } => {
+                captures.push(capture);
+                cur = closure;
+            }
+            Closure::Lambda(lambda) => break lambda,
+        }
+    };
+
+    // A bare lambda (no captures) unparses to its stored Micheline.
+    if captures.is_empty() {
+        return Ok(match terminal {
+            Lambda::Lambda { micheline_code, .. } => {
+                micheline_code.charge_unparsing_cost(gas)?;
+                micheline_code.clone()
+            }
+            Lambda::LambdaRec { micheline_code, .. } => {
+                micheline_code.charge_unparsing_cost(gas)?;
+                V::prim1(arena, Prim::Lambda_rec, micheline_code.clone(), gas)?
+            }
+        });
+    }
+
+    // Otherwise the closure unparses to nested `seq[PUSH arg_ty arg_val; PAIR;
+    // ..]` ending in `inner_tail`: the lambda body, or `LAMBDA_REC; SWAP; EXEC`
+    // for a `LambdaRec`.
+    let inner_tail: Vec<V<'a>> = match terminal {
+        Lambda::Lambda { micheline_code, .. } => {
+            micheline_code.charge_unparsing_cost(gas)?;
+            vec![micheline_code.clone()]
+        }
+        Lambda::LambdaRec {
+            in_ty,
+            out_ty,
+            micheline_code,
+            ..
+        } => {
+            micheline_code.charge_unparsing_cost(gas)?;
+            vec![
+                V::prim3(
+                    arena,
+                    Prim::LAMBDA_REC,
+                    in_ty.into_micheline_optimized_legacy(arena, gas)?,
+                    out_ty.into_micheline_optimized_legacy(arena, gas)?,
+                    micheline_code.clone(),
+                    gas,
+                )?,
+                V::prim0(Prim::SWAP, gas)?,
+                V::prim0(Prim::EXEC, gas)?,
+            ]
+        }
+    };
+
+    // Reuse the unparsing built at `APPLY` verbatim, charging the cached cost
+    // on every reuse before cloning the cached Micheline (PACK will traverse
+    // and copy these again). `captures` is outer-to-inner.
+    let mut arg_ty_michs = Vec::with_capacity(captures.len());
+    let mut arg_val_michs = Vec::with_capacity(captures.len());
+    for capture in captures {
+        let (arg_ty_mich, arg_val_mich) = capture.clone_unparsed(gas)?;
+        arg_ty_michs.push(arg_ty_mich);
+        arg_val_michs.push(arg_val_mich);
+    }
+
+    // Assemble inner-to-outer: the innermost (last) capture wraps `inner_tail`,
+    // then each outer capture wraps the accumulator.
+    let arg_ty = arg_ty_michs.pop().expect("captures is non-empty");
+    let arg_val = arg_val_michs.pop().expect("captures is non-empty");
+    let mut inner = Vec::with_capacity(2 + inner_tail.len());
+    inner.push(V::prim2(arena, Prim::PUSH, arg_ty, arg_val, gas)?);
+    inner.push(V::prim0(Prim::PAIR, gas)?);
+    inner.extend(inner_tail);
+    #[allow(clippy::disallowed_methods)]
+    let mut acc = V::seq(arena.alloc_extend(inner), gas)?;
+    while let (Some(arg_ty), Some(arg_val)) = (arg_ty_michs.pop(), arg_val_michs.pop()) {
+        let push = V::prim2(arena, Prim::PUSH, arg_ty, arg_val, gas)?;
+        let pair = V::prim0(Prim::PAIR, gas)?;
+        acc = V::seq_arr(arena, [push, pair, acc], gas)?;
+    }
+    Ok(acc)
+}
+
 impl<'a> IntoMicheline<'a> for TypedValue<'a> {
     /// Iterative tree fold over the input [`TypedValue`] driven by a
     /// `frames: Vec<TvImFrame>` worklist plus a `results: Vec<Micheline>`
@@ -1103,17 +1202,6 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                 id_part: Micheline<'b>,
                 count: usize,
             },
-            /// Pops `arg_ty_michs.len()` unparsed `APPLY` arg values (the
-            /// closure's captured `arg_val`s, drained via `Visit` so a deep
-            /// chain of lambda-valued args does not recurse) and assembles the
-            /// nested `seq[PUSH(arg_ty, arg_val); PAIR; …]` closure encoding.
-            /// `arg_ty_michs` are the (already unparsed) captured arg types,
-            /// outer-to-inner; `inner_tail` is the innermost seq's tail after
-            /// `PUSH; PAIR` (the lambda body, or `LAMBDA_REC; SWAP; EXEC`).
-            BuildClosure {
-                arg_ty_michs: Vec<Micheline<'b>>,
-                inner_tail: Vec<Micheline<'b>>,
-            },
         }
 
         let mut frames: Vec<TvImFrame<'a>> = vec![TvImFrame::Visit(self)];
@@ -1147,91 +1235,10 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     TV::KeyHash(s) => results.push(V::bytes(s.to_bytes().unwrap(), gas)?),
                     TV::Timestamp(s) => results.push(V::int(std::mem::take(s), gas)?),
                     TV::Contract(x) => results.push(V::bytes(x.to_bytes_vec(), gas)?),
+                    // The closure is unparsed by reference; `v` (and its
+                    // possibly-deep spine) then drops via the iterative `Drop`.
                     TV::Lambda(closure) => {
-                        let closure = std::mem::take(closure);
-                        // Flatten the closure onto this worklist: a captured
-                        // `APPLY` arg (`Closure::Apply.arg_val`) may itself be a
-                        // deep lambda, so unparsing it via a recursive
-                        // `Closure -> TypedValue` call could overflow the stack.
-                        // The arg *types* (and a LambdaRec's in/out types) are
-                        // `Type`s, whose own `into_micheline` is iterative, so
-                        // they are unparsed synchronously here; only the arg
-                        // *values* are pushed back as `Visit` frames.
-                        let mut applies: Vec<(Type, TypedValue<'a>)> = Vec::new();
-                        let mut cur = closure;
-                        let terminal = loop {
-                            match cur {
-                                Closure::Apply {
-                                    arg_ty,
-                                    arg_val,
-                                    closure,
-                                } => {
-                                    applies.push((arg_ty, *arg_val));
-                                    cur = *closure;
-                                }
-                                Closure::Lambda(lambda) => break lambda,
-                            }
-                        };
-                        if applies.is_empty() {
-                            // Bare lambda: emit its stored Micheline directly.
-                            results.push(match terminal {
-                                Lambda::Lambda { micheline_code, .. } => micheline_code,
-                                Lambda::LambdaRec { micheline_code, .. } => V::prim1(
-                                    arena,
-                                    Prim::Lambda_rec,
-                                    micheline_code,
-                                    gas,
-                                )?,
-                            });
-                        } else {
-                            // Tail of the innermost seq, after `PUSH; PAIR`.
-                            let inner_tail: Vec<V<'a>> = match terminal {
-                                Lambda::Lambda { micheline_code, .. } => {
-                                    vec![micheline_code]
-                                }
-                                Lambda::LambdaRec {
-                                    in_ty,
-                                    out_ty,
-                                    micheline_code,
-                                    ..
-                                } => vec![
-                                    V::prim3(
-                                        arena,
-                                        Prim::LAMBDA_REC,
-                                        (&in_ty).into_micheline_optimized_legacy(
-                                            arena, gas,
-                                        )?,
-                                        (&out_ty).into_micheline_optimized_legacy(
-                                            arena, gas,
-                                        )?,
-                                        micheline_code,
-                                        gas,
-                                    )?,
-                                    V::prim0(Prim::SWAP, gas)?,
-                                    V::prim0(Prim::EXEC, gas)?,
-                                ],
-                            };
-                            let mut arg_ty_michs: Vec<V<'a>> =
-                                Vec::with_capacity(applies.len());
-                            let mut arg_vals: Vec<TypedValue<'a>> =
-                                Vec::with_capacity(applies.len());
-                            for (arg_ty, arg_val) in applies {
-                                arg_ty_michs.push(
-                                    (&arg_ty)
-                                        .into_micheline_optimized_legacy(arena, gas)?,
-                                );
-                                arg_vals.push(arg_val);
-                            }
-                            frames.push(TvImFrame::BuildClosure {
-                                arg_ty_michs,
-                                inner_tail,
-                            });
-                            // Reverse-push so arg values land in `results` in
-                            // outer-to-inner order.
-                            while let Some(arg_val) = arg_vals.pop() {
-                                frames.push(TvImFrame::Visit(arg_val));
-                            }
-                        }
+                        results.push(unparse_closure(closure, arena, gas)?)
                     }
                     #[cfg(feature = "bls")]
                     TV::Bls12381Fr(x) => {
@@ -1494,37 +1501,187 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     let map_part = V::seq(slice, gas)?;
                     results.push(V::prim2(arena, Prim::Pair, id_part, map_part, gas)?);
                 }
-                TvImFrame::BuildClosure {
-                    mut arg_ty_michs,
-                    inner_tail,
-                } => {
-                    let k = arg_ty_michs.len();
-                    let start = results.len() - k;
-                    // Unparsed arg values, outer-to-inner (`results` order).
-                    let mut arg_val_michs: Vec<V<'a>> = results.drain(start..).collect();
-                    // Assemble inner-to-outer: pop the innermost (last) layer
-                    // first, then wrap outward.
-                    let at = arg_ty_michs.pop().expect("BuildClosure: arg_ty");
-                    let av = arg_val_michs.pop().expect("BuildClosure: arg_val");
-                    let mut inner: Vec<V<'a>> = Vec::with_capacity(2 + inner_tail.len());
-                    inner.push(V::prim2(arena, Prim::PUSH, at, av, gas)?);
-                    inner.push(V::prim0(Prim::PAIR, gas)?);
-                    inner.extend(inner_tail);
-                    #[allow(clippy::disallowed_methods)]
-                    let mut acc = V::seq(arena.alloc_extend(inner), gas)?;
-                    while let (Some(at), Some(av)) =
-                        (arg_ty_michs.pop(), arg_val_michs.pop())
-                    {
-                        let push = V::prim2(arena, Prim::PUSH, at, av, gas)?;
-                        let pair = V::prim0(Prim::PAIR, gas)?;
-                        acc = V::seq_arr(arena, [push, pair, acc], gas)?;
+            }
+        }
+
+        Ok(results.pop().expect("final result"))
+    }
+}
+
+impl<'a> TypedValue<'a> {
+    /// Unparse a pushable value while retaining the typed value, charging
+    /// before cloning any size-dependent leaf payload.
+    ///
+    /// `APPLY` needs both representations of its capture: the typed value for
+    /// `EXEC`, and Micheline for later `PACK`s. Cloning the whole value before
+    /// calling the consuming [`IntoMicheline`] implementation would copy
+    /// arbitrarily large integers and collection structure before their
+    /// unparsing gas was charged. This borrowed worklist walks collections in
+    /// place and only clones leaf payloads through charged constructors.
+    pub(crate) fn clone_into_micheline_optimized_legacy(
+        &self,
+        arena: &'a Arena<Micheline<'a>>,
+        gas: &mut Gas,
+    ) -> Result<Micheline<'a>, BorrowedUnparseError> {
+        use Micheline as V;
+        use TypedValue as TV;
+
+        enum Frame<'v, 'a> {
+            Visit(&'v TypedValue<'a>),
+            ListNext(michelson_list::Iter<'v, Rc<TypedValue<'a>>>),
+            SetNext(std::collections::btree_set::Iter<'v, Rc<TypedValue<'a>>>),
+            MapNext(
+                std::collections::btree_map::Iter<
+                    'v,
+                    Rc<TypedValue<'a>>,
+                    Rc<TypedValue<'a>>,
+                >,
+            ),
+            BuildPrim1(Prim),
+            BuildPrim2(Prim),
+            BuildSeqOf {
+                count: usize,
+            },
+        }
+
+        let mut frames = vec![Frame::Visit(self)];
+        let mut results = Vec::new();
+
+        while let Some(frame) = frames.pop() {
+            match frame {
+                Frame::ListNext(mut iter) => {
+                    if let Some(value) = iter.next() {
+                        frames.push(Frame::ListNext(iter));
+                        frames.push(Frame::Visit(value));
                     }
-                    results.push(acc);
+                }
+                Frame::SetNext(mut iter) => {
+                    if let Some(value) = iter.next() {
+                        frames.push(Frame::SetNext(iter));
+                        frames.push(Frame::Visit(value));
+                    }
+                }
+                Frame::MapNext(mut iter) => {
+                    if let Some((key, value)) = iter.next() {
+                        frames.push(Frame::MapNext(iter));
+                        frames.push(Frame::BuildPrim2(Prim::Elt));
+                        frames.push(Frame::Visit(value));
+                        frames.push(Frame::Visit(key));
+                    }
+                }
+                Frame::Visit(value) => match value {
+                    TV::Int(i) | TV::Timestamp(i) => results.push(V::int_cloned(i, gas)?),
+                    TV::Nat(i) => results.push(V::nat_cloned(i, gas)?),
+                    TV::Mutez(i) => results.push(V::int((*i).into(), gas)?),
+                    TV::Bool(true) => results.push(V::prim0(Prim::True, gas)?),
+                    TV::Bool(false) => results.push(V::prim0(Prim::False, gas)?),
+                    TV::String(s) => results.push(V::string_cloned(s, gas)?),
+                    TV::Bytes(bytes) => results.push(V::bytes_cloned(bytes, gas)?),
+                    TV::Unit => results.push(V::prim0(Prim::Unit, gas)?),
+                    TV::Address(address) => {
+                        results.push(V::bytes(address.to_bytes_vec(), gas)?)
+                    }
+                    TV::ChainId(chain_id) => {
+                        results.push(V::bytes(chain_id.clone().into(), gas)?)
+                    }
+                    TV::Contract(address) => {
+                        results.push(V::bytes(address.to_bytes_vec(), gas)?)
+                    }
+                    TV::Key(key) => results.push(V::bytes(key.to_bytes().unwrap(), gas)?),
+                    TV::Signature(signature) => {
+                        results.push(V::bytes(signature.clone().into(), gas)?)
+                    }
+                    TV::KeyHash(key_hash) => {
+                        results.push(V::bytes(key_hash.to_bytes().unwrap(), gas)?)
+                    }
+                    TV::Lambda(closure) => {
+                        results.push(unparse_closure(closure, arena, gas)?)
+                    }
+                    #[cfg(feature = "bls")]
+                    TV::Bls12381Fr(x) => {
+                        results.push(V::bytes(x.to_bytes().to_vec(), gas)?)
+                    }
+                    #[cfg(feature = "bls")]
+                    TV::Bls12381G1(x) => {
+                        results.push(V::bytes(x.to_bytes().to_vec(), gas)?)
+                    }
+                    #[cfg(feature = "bls")]
+                    TV::Bls12381G2(x) => {
+                        results.push(V::bytes(x.to_bytes().to_vec(), gas)?)
+                    }
+                    TV::Pair(left, right) => {
+                        frames.push(Frame::BuildPrim2(Prim::Pair));
+                        frames.push(Frame::Visit(right));
+                        frames.push(Frame::Visit(left));
+                    }
+                    TV::Option(None) => results.push(V::prim0(Prim::None, gas)?),
+                    TV::Option(Some(value)) => {
+                        frames.push(Frame::BuildPrim1(Prim::Some));
+                        frames.push(Frame::Visit(value));
+                    }
+                    TV::Or(Or::Left(value)) => {
+                        frames.push(Frame::BuildPrim1(Prim::Left));
+                        frames.push(Frame::Visit(value));
+                    }
+                    TV::Or(Or::Right(value)) => {
+                        frames.push(Frame::BuildPrim1(Prim::Right));
+                        frames.push(Frame::Visit(value));
+                    }
+                    TV::List(values) => {
+                        frames.push(Frame::BuildSeqOf {
+                            count: values.len(),
+                        });
+                        frames.push(Frame::ListNext(values.iter()));
+                    }
+                    TV::Set(values) => {
+                        frames.push(Frame::BuildSeqOf {
+                            count: values.len(),
+                        });
+                        frames.push(Frame::SetNext(values.iter()));
+                    }
+                    TV::Map(values) => {
+                        frames.push(Frame::BuildSeqOf {
+                            count: values.len(),
+                        });
+                        frames.push(Frame::MapNext(values.iter()));
+                    }
+                    // The typechecker only emits `APPLY` for pushable capture
+                    // types, which exclude these variants.
+                    TV::BigMap(_) | TV::Operation(_) | TV::Ticket(_) => {
+                        return Err(BorrowedUnparseError::NonPushable);
+                    }
+                },
+                Frame::BuildPrim1(prim) => {
+                    let inner = results.pop().expect("BuildPrim1: missing inner");
+                    results.push(V::prim1(arena, prim, inner, gas)?);
+                }
+                Frame::BuildPrim2(prim) => {
+                    let right = results.pop().expect("BuildPrim2: missing right");
+                    let left = results.pop().expect("BuildPrim2: missing left");
+                    results.push(V::prim2(arena, prim, left, right, gas)?);
+                }
+                Frame::BuildSeqOf { count } => {
+                    let start = results.len() - count;
+                    #[allow(clippy::disallowed_methods)]
+                    let values = arena.alloc_extend(results.drain(start..));
+                    results.push(V::seq(values, gas)?);
                 }
             }
         }
 
         Ok(results.pop().expect("final result"))
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum BorrowedUnparseError {
+    OutOfGas,
+    NonPushable,
+}
+
+impl From<OutOfGas> for BorrowedUnparseError {
+    fn from(_: OutOfGas) -> Self {
+        Self::OutOfGas
     }
 }
 
@@ -1794,10 +1951,12 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue
         }
         TV::Lambda(closure) => {
             // Walk the `Closure::Apply` spine iteratively so the
-            // `Box<Closure>` chain (a deep `APPLY` chain) does not recurse on
-            // drop, pushing each captured `arg_val` (a possibly-deep value)
-            // onto the worklist. The final `Closure::Lambda` drops trivially:
-            // its `Type` fields and `Rc<[Instruction]>` code have their own
+            // `Rc<Closure>` chain (a deep `APPLY` chain) does not recurse on
+            // drop. When we hold the last reference to a captured value, drain
+            // it onto the worklist (it too may be a deep value); when the
+            // capture is still shared, the holder that drops it last reaches
+            // this same path. The final `Closure::Lambda` drops trivially: its
+            // `Type` fields and `Rc<[Instruction]>` code have their own
             // iterative `Drop`.
             let dummy = Closure::Lambda(Lambda::Lambda {
                 micheline_code: Micheline::Seq(&[]),
@@ -1805,13 +1964,14 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue
             });
             let mut cur = replace(closure, dummy);
             while let Closure::Apply {
-                arg_val,
+                capture,
                 closure: inner,
-                ..
             } = cur
             {
-                stack.push(*arg_val);
-                cur = *inner;
+                if let Ok(capture) = Rc::try_unwrap(capture) {
+                    push_rc(capture.into_arg_val(), stack);
+                }
+                cur = Closure::unwrap_rc(inner);
             }
         }
         TV::Ticket(t) => {
@@ -2375,8 +2535,27 @@ mod test_untypers {
     use crate::{
         ast::test_strategies as TS,
         context::Ctx,
-        typechecker::{typecheck_value, AllowForgedLazyStorageId},
+        typechecker::{
+            type_props::TypeProperty, typecheck_value, AllowForgedLazyStorageId,
+        },
     };
+
+    fn assert_borrowed_owned_unparse_match(value: &TypedValue<'_>) {
+        let owned_arena = Arena::new();
+        let borrowed_arena = Arena::new();
+        let mut owned_gas = Gas::default();
+        let mut borrowed_gas = Gas::default();
+        let owned = value
+            .clone()
+            .into_micheline_optimized_legacy(&owned_arena, &mut owned_gas)
+            .unwrap();
+        let borrowed = value
+            .clone_into_micheline_optimized_legacy(&borrowed_arena, &mut borrowed_gas)
+            .unwrap();
+
+        assert_eq!(borrowed, owned);
+        assert_eq!(borrowed_gas.milligas(), owned_gas.milligas());
+    }
 
     proptest! {
         #[test]
@@ -2390,6 +2569,100 @@ mod test_untypers {
                 typecheck_value(&untyped, &mut ctx, &typed.ty, AllowForgedLazyStorageId::Yes);
             assert_eq!(typed_, Ok(typed.val))
         }
+
+        #[test]
+        fn borrowed_and_owned_pushable_unparsers_match(
+            typed in TS::typed_value_and_type().prop_filter(
+                "APPLY accepts only pushable captures",
+                |typed| typed.ty.ensure_prop(&mut Gas::unmetered(), TypeProperty::Pushable).is_ok(),
+            )
+        ) {
+            assert_borrowed_owned_unparse_match(&typed.val);
+        }
+    }
+
+    #[test]
+    fn borrowed_and_owned_lambda_unparsers_match() {
+        // The owned (PACK) and borrowed (APPLY) unparsers share
+        // `unparse_closure`, so this exercises every closure shape — bare
+        // `Lambda`/`LambdaRec`, an `APPLY` spine, and a recursive terminal —
+        // through both entry points and guards against a future re-divergence.
+        let arena = Arena::new();
+        let body = || {
+            Micheline::Seq(Micheline::alloc_seq(
+                &arena,
+                [
+                    Micheline::prim0_uncarbonated(Prim::DROP),
+                    Micheline::prim0_uncarbonated(Prim::UNIT),
+                ],
+            ))
+        };
+        let lambda = || {
+            Closure::Lambda(Lambda::Lambda {
+                micheline_code: body(),
+                code: vec![Instruction::Drop(None), Instruction::Unit].into(),
+            })
+        };
+        let lambda_rec = || {
+            Closure::Lambda(Lambda::LambdaRec {
+                in_ty: Type::Unit,
+                out_ty: Type::Unit,
+                micheline_code: body(),
+                code: vec![Instruction::Drop(None), Instruction::Unit].into(),
+            })
+        };
+
+        // A capture carrying a real cached unparsing of `Int 7`.
+        let mut gas = Gas::default();
+        let arg_ty_mich = (&Type::Int)
+            .into_micheline_optimized_legacy(&arena, &mut gas)
+            .unwrap();
+        let arg_val_mich = TypedValue::int(7)
+            .into_micheline_optimized_legacy(&arena, &mut gas)
+            .unwrap();
+        let cost = Gas::default().milligas().unwrap() - gas.milligas().unwrap();
+        let capture = Rc::new(AppliedCapture::new(
+            Type::Int,
+            Rc::new(TypedValue::int(7)),
+            arg_ty_mich,
+            arg_val_mich,
+            cost,
+        ));
+        fn applied<'a>(
+            capture: &Rc<AppliedCapture<'a>>,
+            terminal: Closure<'a>,
+            levels: usize,
+        ) -> TypedValue<'a> {
+            let mut c = terminal;
+            for _ in 0..levels {
+                c = Closure::Apply {
+                    capture: Rc::clone(capture),
+                    closure: Rc::new(c),
+                };
+            }
+            TypedValue::Lambda(c)
+        }
+
+        assert_borrowed_owned_unparse_match(&applied(&capture, lambda(), 0));
+        assert_borrowed_owned_unparse_match(&applied(&capture, lambda_rec(), 0));
+        assert_borrowed_owned_unparse_match(&applied(&capture, lambda(), 1));
+        assert_borrowed_owned_unparse_match(&applied(&capture, lambda(), 3));
+        assert_borrowed_owned_unparse_match(&applied(&capture, lambda_rec(), 2));
+        assert_borrowed_owned_unparse_match(&TypedValue::new_pair(
+            applied(&capture, lambda(), 1),
+            TypedValue::new_option(Some(TypedValue::Unit)),
+        ));
+    }
+
+    #[test]
+    fn borrowed_unparser_rejects_non_pushable_values_without_panicking() {
+        let arena = Arena::new();
+        let value = TypedValue::BigMap(BigMap::empty(Type::Nat, Type::Unit));
+
+        assert_eq!(
+            value.clone_into_micheline_optimized_legacy(&arena, &mut Gas::default()),
+            Err(BorrowedUnparseError::NonPushable)
+        );
     }
 
     // We used to have a bug in which a panic was raised in the
@@ -2506,22 +2779,93 @@ mod drop_safety {
 
     #[test]
     fn drain_deep_lambda_apply_spine() {
-        // A deep `APPLY` chain nests `Closure::Apply { closure: Box<Closure> }`;
-        // the `Box<Closure>` spine must be drained iteratively, not recurse.
+        // A deep `APPLY` chain nests `Closure::Apply { closure: Rc<Closure> }`;
+        // the `Rc<Closure>` spine must be drained iteratively, not recurse.
         on_kernel_stack(|| {
             let mut closure = Closure::Lambda(Lambda::Lambda {
                 micheline_code: Micheline::Seq(&[]),
                 code: Vec::new().into(),
             });
+            let capture = Rc::new(AppliedCapture::new(
+                Type::Unit,
+                Rc::new(TypedValue::Unit),
+                Micheline::Seq(&[]),
+                Micheline::Seq(&[]),
+                0,
+            ));
             for _ in 0..DEPTH {
                 closure = Closure::Apply {
-                    arg_ty: Type::Unit,
-                    arg_val: Box::new(TypedValue::Unit),
-                    closure: Box::new(closure),
+                    capture: Rc::clone(&capture),
+                    closure: Rc::new(closure),
                 };
             }
             let mut tv = TypedValue::Lambda(closure);
             drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn drain_deep_captured_apply_value() {
+        // Each `APPLY` level captures the *previous* applied closure as its
+        // `arg_val`, building a deep capture-value chain (distinct from the
+        // spine above, which nests via `closure`). Drop must drain the captured
+        // value onto the worklist rather than recurse through a nested
+        // `TypedValue` destructor per captured level.
+        on_kernel_stack(|| {
+            let terminal = || {
+                Closure::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: Vec::new().into(),
+                })
+            };
+            let mut tv = TypedValue::Lambda(terminal());
+            for _ in 0..DEPTH {
+                tv = TypedValue::Lambda(Closure::Apply {
+                    capture: Rc::new(AppliedCapture::new(
+                        Type::new_lambda(Type::Unit, Type::Unit),
+                        Rc::new(tv),
+                        Micheline::Seq(&[]),
+                        Micheline::Seq(&[]),
+                        0,
+                    )),
+                    closure: Rc::new(terminal()),
+                });
+            }
+            drain_deep_typed_value(&mut tv);
+        });
+    }
+
+    #[test]
+    fn drain_deep_shared_captured_apply_value() {
+        // As above, but the whole closure is cloned first so every capture `Rc`
+        // is shared (refcount 2). Dropping both copies must stay iterative: the
+        // first drop walks the spine without draining (captures still shared),
+        // the second drains each now-unique captured value onto the worklist.
+        on_kernel_stack(|| {
+            let terminal = || {
+                Closure::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]),
+                    code: Vec::new().into(),
+                })
+            };
+            let mut tv = TypedValue::Lambda(terminal());
+            for _ in 0..DEPTH {
+                tv = TypedValue::Lambda(Closure::Apply {
+                    capture: Rc::new(AppliedCapture::new(
+                        Type::new_lambda(Type::Unit, Type::Unit),
+                        Rc::new(tv),
+                        Micheline::Seq(&[]),
+                        Micheline::Seq(&[]),
+                        0,
+                    )),
+                    closure: Rc::new(terminal()),
+                });
+            }
+            // Cloning the top is O(1) (it only bumps the spine's `Rc`s), so the
+            // two values share every capture and inner-closure allocation.
+            let copy = tv.clone();
+            drop(tv);
+            drop(copy);
         });
     }
 
@@ -2637,26 +2981,32 @@ mod drop_safety {
 
     #[test]
     fn pack_deep_apply_arg_lambda() {
-        // A closure whose captured APPLY arg is itself a lambda, nested deeply
-        // (`Apply { arg_val: Lambda(Apply { arg_val: Lambda(…) }) }`), must
-        // unparse (PACK) without recursing through Closure -> TypedValue per
-        // level. The worklist drains each `arg_val` as a Visit frame instead.
+        // Unparsing (PACK) a closure with a deep `Closure::Apply` spine must
+        // walk the `Rc<Closure>` chain iteratively, not recurse one frame per
+        // captured level. Each captured arg's unparsing is taken verbatim from
+        // its `cached_unparsed_arg` (built at `APPLY`), so a trivial shared
+        // cache suffices here — the test exercises the spine walk, not the
+        // per-arg unparse.
         use crate::ast::{Closure, Lambda};
         on_kernel_stack(|| {
-            let mk_terminal = || {
-                Closure::Lambda(Lambda::Lambda {
-                    micheline_code: Micheline::Seq(&[]),
-                    code: Vec::new().into(),
-                })
-            };
-            let mut tv = TypedValue::Lambda(mk_terminal());
+            let capture = Rc::new(AppliedCapture::new(
+                Type::Unit,
+                Rc::new(TypedValue::Unit),
+                Micheline::Seq(&[]),
+                Micheline::Seq(&[]),
+                0,
+            ));
+            let mut closure = Closure::Lambda(Lambda::Lambda {
+                micheline_code: Micheline::Seq(&[]),
+                code: Vec::new().into(),
+            });
             for _ in 0..DEPTH {
-                tv = TypedValue::Lambda(Closure::Apply {
-                    arg_ty: Type::Unit,
-                    arg_val: Box::new(tv),
-                    closure: Box::new(mk_terminal()),
-                });
+                closure = Closure::Apply {
+                    capture: Rc::clone(&capture),
+                    closure: Rc::new(closure),
+                };
             }
+            let tv = TypedValue::Lambda(closure);
             let arena = Arena::new();
             let mut gas = Gas::unmetered();
             tv.into_micheline_optimized_legacy(&arena, &mut gas)

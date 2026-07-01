@@ -56,19 +56,135 @@ implementation)
 /// which in turn formats `TypedValue::Lambda(Closure)` via `Closure`'s
 /// `Debug`; the kernel runs `err.to_string()` outside MIR's gas
 /// accounting).
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub enum Closure<'a> {
     /// Simple [Lambda].
     Lambda(Lambda<'a>),
     /// Partially-applied [Lambda].
     Apply {
-        /// Captured argument type
-        arg_ty: Type,
-        /// Captured argument value
-        arg_val: Box<TypedValue<'a>>,
+        /// Captured type/value and their canonical unparsed representation.
+        capture: Rc<AppliedCapture<'a>>,
         /// Inner closure
-        closure: Box<Closure<'a>>,
+        closure: Rc<Closure<'a>>,
     },
+}
+
+/// The data retained by one `APPLY` level.
+///
+/// The typed value is needed by `EXEC`; the Micheline value is retained for
+/// exact `PACK` roundtripping. Keeping both representations eagerly mirrors
+/// L1's `APPLY`, which materializes `PUSH ty value ; PAIR` when the closure is
+/// created. The cache also lets a later `PACK` charge before copying any large
+/// literal. This does use more memory than the typed value alone, but that
+/// memory is paid for by the size-dependent charge at `APPLY`.
+///
+/// Private fields funnel construction through one explicit call shape and
+/// prevent later mutation from desynchronizing the representations. The
+/// complete record is itself `Rc`-shared, making every `Closure::clone`
+/// independent of both value and type size.
+pub struct AppliedCapture<'a> {
+    arg_ty: Type,
+    arg_val: Rc<TypedValue<'a>>,
+    cached_unparsed_arg: CachedUnparsedArg<'a>,
+}
+
+struct CachedUnparsedArg<'a> {
+    arg_ty: Micheline<'a>,
+    arg_val: Micheline<'a>,
+    cost: u32,
+}
+
+impl<'a> AppliedCapture<'a> {
+    pub(crate) fn new(
+        arg_ty: Type,
+        arg_val: Rc<TypedValue<'a>>,
+        arg_ty_micheline: Micheline<'a>,
+        arg_val_micheline: Micheline<'a>,
+        unparse_cost: u32,
+    ) -> Self {
+        Self {
+            arg_ty,
+            arg_val,
+            cached_unparsed_arg: CachedUnparsedArg {
+                arg_ty: arg_ty_micheline,
+                arg_val: arg_val_micheline,
+                cost: unparse_cost,
+            },
+        }
+    }
+
+    pub(crate) fn arg_ty(&self) -> &Type {
+        &self.arg_ty
+    }
+
+    pub(crate) fn arg_val(&self) -> &Rc<TypedValue<'a>> {
+        &self.arg_val
+    }
+
+    /// Consume the capture, returning its typed value. Used by the iterative
+    /// drop to drain a (possibly deep) captured value onto the worklist
+    /// instead of recursing through a nested `TypedValue` destructor.
+    pub(crate) fn into_arg_val(self) -> Rc<TypedValue<'a>> {
+        self.arg_val
+    }
+
+    pub(crate) fn clone_unparsed(
+        &self,
+        gas: &mut Gas,
+    ) -> Result<(Micheline<'a>, Micheline<'a>), OutOfGas> {
+        gas.consume(self.cached_unparsed_arg.cost)?;
+        Ok((
+            self.cached_unparsed_arg.arg_ty.clone(),
+            self.cached_unparsed_arg.arg_val.clone(),
+        ))
+    }
+}
+
+impl PartialEq for AppliedCapture<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        // Spell out every field without `..`: adding semantic state must make
+        // this implementation fail to compile until equality is reconsidered.
+        let AppliedCapture {
+            arg_ty: lhs_arg_ty,
+            arg_val: lhs_arg_val,
+            cached_unparsed_arg: _,
+        } = self;
+        let AppliedCapture {
+            arg_ty: rhs_arg_ty,
+            arg_val: rhs_arg_val,
+            cached_unparsed_arg: _,
+        } = other;
+        lhs_arg_ty == rhs_arg_ty && lhs_arg_val == rhs_arg_val
+    }
+}
+
+impl Eq for AppliedCapture<'_> {}
+
+impl<'a> PartialEq for Closure<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Closure::Lambda(lhs), Closure::Lambda(rhs)) => lhs == rhs,
+            (
+                Closure::Apply {
+                    capture: lhs_capture,
+                    closure: lhs_closure,
+                },
+                Closure::Apply {
+                    capture: rhs_capture,
+                    closure: rhs_closure,
+                },
+            ) => lhs_capture == rhs_capture && lhs_closure == rhs_closure,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Closure<'_> {}
+
+impl<'a> Closure<'a> {
+    pub(crate) fn unwrap_rc(rc: Rc<Self>) -> Self {
+        Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
+    }
 }
 
 /// A trivial empty lambda, used as a cheap placeholder when moving a `Closure`
@@ -84,7 +200,7 @@ impl Default for Closure<'_> {
 }
 
 /// Debug seeds the shared `TypedValue`/`Closure` walker so the alternating
-/// `Closure::Apply { arg_val: TypedValue, .. }` /
+/// `Closure::Apply { capture: AppliedCapture, .. }` /
 /// `TypedValue::Lambda(Closure)` cycle (reachable via repeated `APPLY` of
 /// lambda values) is unwound on the heap, not the call stack.
 impl<'a> std::fmt::Debug for Closure<'a> {
@@ -109,6 +225,8 @@ impl<'a> IntoMicheline<'a> for Closure<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use typed_arena::Arena;
 
     use crate::{
@@ -159,9 +277,6 @@ mod tests {
     /// `Closure::Apply` spine (an APPLY chain is ~7400-deep reachable within
     /// one operation's gas budget). Builds N nested `Apply` and formats on a
     /// 1 MiB worker thread; a regression to recursive walking would overflow.
-    /// `Closure` has no iterative `Drop` yet (its `Box<Closure>` spine recurses
-    /// on drop — tracked in L2-1446), so the deep value is `mem::forget`-ed to
-    /// avoid the recursive destructor.
     #[test]
     fn deeply_nested_closure_apply_debug_format() {
         use crate::ast::{Micheline, Type};
@@ -173,11 +288,19 @@ mod tests {
                     micheline_code: Micheline::Seq(&[]),
                     code: Vec::new().into(),
                 });
+                // Debug ignores the cache; a trivial shared capture keeps the
+                // spine cheap to build.
+                let capture = Rc::new(super::AppliedCapture::new(
+                    Type::Unit,
+                    Rc::new(TypedValue::Unit),
+                    Micheline::Seq(&[]),
+                    Micheline::Seq(&[]),
+                    0,
+                ));
                 for _ in 0..DEPTH {
                     c = super::Closure::Apply {
-                        arg_ty: Type::Unit,
-                        arg_val: Box::new(TypedValue::Unit),
-                        closure: Box::new(c),
+                        capture: Rc::clone(&capture),
+                        closure: Rc::new(c),
                     };
                 }
                 let tv = TypedValue::Lambda(c);
@@ -213,11 +336,17 @@ mod tests {
                     })
                 };
                 let mut c = leaf();
+                let capture = Rc::new(super::AppliedCapture::new(
+                    Type::new_lambda(Type::Unit, Type::Unit),
+                    Rc::new(TypedValue::Lambda(leaf())),
+                    Micheline::Seq(&[]),
+                    Micheline::Seq(&[]),
+                    0,
+                ));
                 for _ in 0..DEPTH {
                     c = super::Closure::Apply {
-                        arg_ty: Type::new_lambda(Type::Unit, Type::Unit),
-                        arg_val: Box::new(TypedValue::Lambda(leaf())),
-                        closure: Box::new(c),
+                        capture: Rc::clone(&capture),
+                        closure: Rc::new(c),
                     };
                 }
                 // Wrap the whole chain inside one final outer Lambda so the
