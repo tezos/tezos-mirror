@@ -1999,6 +1999,19 @@ module State = struct
          the re-commit performed by [heal_shadownet_sequencer_key] targets the
          block we just applied. *)
       let* () = heal_shadownet_sequencer_key conn ctxt in
+      (* The finalized-levels and pending-confirmations cleanups must run here
+         too, not only at [create]: a node started below the healthy block
+         reaches it while live-following, and without clearing the stale
+         finalized levels / pending confirmations it would compare the first
+         healed block against the discarded chain and wrongly report a
+         divergence. Each cleanup is a no-op unless the head is exactly on a
+         healthy block whose healing marker is set, so running it on every
+         applied block is safe. The recomputed L1 level is irrelevant here (it
+         is only threaded into the startup return value). *)
+      let* (_ : int32 option) =
+        clear_shadownet_finalized_levels conn ctxt None
+      in
+      let* () = clear_shadownet_pending_confirmations conn ctxt in
       return
         ( current_block,
           current_tezos_block,
