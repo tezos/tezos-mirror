@@ -1552,16 +1552,13 @@ module Base_images = struct
     make_img (sf "alpine-docker-ci:%s" docker_version) "master-be43e621"
 
   (* [ci-release] *)
-  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+  (* Built daily by [images.ci-release] in the [base_images.daily] pipeline.
+     Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
      May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
      https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
-  (* FIXME: currently not used. + make name consistent *)
-  let _ci_release_version = "master-be43e621"
+  let ci_release_version = "master-be43e621"
 
-  let ci_release =
-    Image.mk_external
-      ~image_path:
-        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
+  let ci_release = make_img "ci-release:trixie" ci_release_version
 
   let pp = Image.pp
 end
