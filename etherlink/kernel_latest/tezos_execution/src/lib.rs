@@ -1646,6 +1646,22 @@ where
 /// time (defense-in-depth on top of the per-type cap, L2-1706).
 pub const MICHELSON_MAXIMUM_SCRIPT_SIZE: usize = 32 * 1024;
 
+/// Render a typechecking error, capped at
+/// [`mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES`]. Origination
+/// typechecks attacker-supplied code, which can synthesise a
+/// structurally-shared `Type` DAG whose render is far larger than its node
+/// count; the per-type parse cap does not bound instruction-synthesised
+/// types. Building such a type is gas-bounded (the typechecker's `DUP` walks
+/// the unfolded type in its `Duplicable` check), so the render is `O(gas)`
+/// rather than unbounded, but that ceiling is still large, so the error text
+/// is capped here as on the transfer and view sinks.
+fn bounded_tc_error(e: &mir::typechecker::TcError) -> String {
+    mir::bounded_fmt::display_bounded(
+        e,
+        mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES,
+    )
+}
+
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
 pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
@@ -1667,10 +1683,18 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
     let contract_typechecked = contract_micheline
         .split_script()
         .map_err(|e| {
-            OriginationError::MirTypecheckingError(format!("Splitting script : {e}"))
+            OriginationError::MirTypecheckingError(format!(
+                "Splitting script : {}",
+                bounded_tc_error(&e)
+            ))
         })?
         .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage, true)
-        .map_err(|e| OriginationError::MirTypecheckingError(format!("Script : {e}")))?;
+        .map_err(|e| {
+            OriginationError::MirTypecheckingError(format!(
+                "Script : {}",
+                bounded_tc_error(&e)
+            ))
+        })?;
     let storage_micheline =
         Micheline::decode_raw(&parser.arena, &script.storage, ctx.gas())
             .map_err(OriginationError::from)?
@@ -1690,7 +1714,12 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
             TypecheckViews::Enabled,
             AllowForgedLazyStorageId::No,
         )
-        .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
+        .map_err(|e| {
+            OriginationError::MirTypecheckingError(format!(
+                "Storage : {}",
+                bounded_tc_error(&e)
+            ))
+        })
 }
 
 fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(

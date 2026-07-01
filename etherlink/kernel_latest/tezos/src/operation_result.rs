@@ -244,13 +244,26 @@ impl From<mir::interpreter::ContractInterpretError<'_>> for TransferError {
                 return Self::EnshrinedViewDispatchAbort(inner.to_string());
             }
         }
-        Self::MichelsonContractInterpretError(err.to_string())
+        Self::MichelsonContractInterpretError(mir::bounded_fmt::display_bounded(
+            &err,
+            mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES,
+        ))
     }
 }
 
 impl From<mir::typechecker::TcError> for TransferError {
     fn from(err: mir::typechecker::TcError) -> Self {
-        Self::MirTypecheckingError(err.to_string())
+        // Bounded like the interpreter sink above: a `TcError` can embed a
+        // `Type` synthesised during typechecking that is a structurally-shared
+        // DAG whose render is far larger than its node count, and the per-type
+        // parse cap does not bound instruction-synthesised types. Building
+        // such a type is gas-bounded (the typechecker's `DUP` walks the
+        // unfolded type), so the render is `O(gas)` rather than unbounded, but
+        // that ceiling is still large enough to cap here.
+        Self::MirTypecheckingError(mir::bounded_fmt::display_bounded(
+            &err,
+            mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES,
+        ))
     }
 }
 

@@ -106,7 +106,13 @@ pub enum TcError {
     #[error("sequence elements must contain no duplicate keys for type {0:?}")]
     DuplicateElements(Type),
     /// The given instruction can not be used with its input stack.
-    #[error("no matching overload for {instr} on stack {stack:?}{}", .reason.as_ref().map_or("".to_owned(), |x| format!(", reason: {x}")))]
+    // The optional `reason` is rendered through [`DisplayReason`] rather than
+    // an eager `format!`: the reason can embed a `Type` (e.g. `ExpectedPair`,
+    // `TypesNotEqual`) which, like the `stack`, may be a structurally-shared
+    // DAG whose unfolded render is exponential. Writing it straight
+    // into the caller's formatter lets a byte-bounded sink abort the walk;
+    // `format!` would materialise the full string first, defeating the cap.
+    #[error("no matching overload for {instr} on stack {stack:?}{}", DisplayReason(.reason.as_ref()))]
     NoMatchingOverload {
         /// The instruction being typechecked.
         instr: Prim,
@@ -418,6 +424,23 @@ pub enum NoMatchingOverloadReason {
     /// comparable.
     #[error("type not comparable: {0:?}")]
     TypeNotComparable(Type),
+}
+
+/// Lazy `Display` adapter for [`TcError::NoMatchingOverload`]'s optional
+/// `reason`. Renders `, reason: <reason>` (or nothing) straight into the
+/// caller's formatter, propagating any write error, instead of eagerly
+/// building the string via `format!`. This keeps the whole `TcError`
+/// `Display` chain abortable by a byte-bounded sink even when the reason
+/// embeds an exponentially-rendering `Type`.
+struct DisplayReason<'a>(Option<&'a NoMatchingOverloadReason>);
+
+impl std::fmt::Display for DisplayReason<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            Some(reason) => write!(f, ", reason: {reason}"),
+            None => Ok(()),
+        }
+    }
 }
 
 /// More detailed explanation for [TcError::StacksNotEqual]
@@ -5931,6 +5954,72 @@ mod typecheck_tests {
             matches!(err, TcError::TypeTooLarge { .. }),
             "expected TypeTooLarge, got {err:?}",
         );
+    }
+
+    /// Regression (L2-1705): a `Type` synthesised during typechecking can be
+    /// a structurally-shared `Rc` DAG whose sharing-unaware render is far
+    /// larger than its node count, and the per-type parse cap
+    /// ([`MICHELSON_MAXIMUM_TYPE_SIZE`]) does **not** bound
+    /// instruction-synthesised types. Such a `Type` reaches the kernel's
+    /// typecheck-error sinks embedded in a [`TcError`] — rendered via
+    /// `Display` (`From<TcError> for TransferError`, origination typecheck)
+    /// and `Debug` (view-path `classify_tc_error`). Both must abort at the
+    /// byte ceiling. This covers a plain `{:?}` type-carrying variant and the
+    /// [`TcError::NoMatchingOverload`] arm, whose optional `reason` is the one
+    /// place the `Display` chain used to build the render eagerly via
+    /// `format!` (now [`DisplayReason`]).
+    ///
+    /// The DAG is built directly via shared `Rc::clone` (K=64) to stress the
+    /// *renderer*: building a type this large through Michelson would cost
+    /// `Θ(2^K)` gas (the typechecker's `DUP` walks the unfolded type in its
+    /// `Duplicable` check), so the real vector is gas-bounded — but the render
+    /// cap must still hold for whatever size gas does allow.
+    #[test]
+    fn typecheck_exponential_type_renders_bounded() {
+        use crate::bounded_fmt::{
+            debug_bounded, display_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP,
+            TRUNCATION_SUFFIX,
+        };
+        use crate::stack::Stack;
+
+        // K=64 ⇒ 2^65 unfolded nodes: rendering unbounded would never
+        // terminate / would OOM, so any passing assertion proves the walk
+        // was cut short. Built with shared `Rc::clone`s (as `PAIR` does), so
+        // construction is O(K), not O(2^K).
+        const K: usize = 64;
+        let mut ty = Type::Int;
+        for _ in 0..K {
+            ty = Type::new_pair(ty.clone(), ty.clone());
+        }
+
+        let assert_bounded = |rendered: String| {
+            assert!(
+                rendered.len() <= CAP + TRUNCATION_SUFFIX.len(),
+                "render must be bounded, got {} bytes",
+                rendered.len()
+            );
+            assert!(
+                rendered.ends_with(TRUNCATION_SUFFIX),
+                "must be marked truncated: {}",
+                &rendered[rendered.len().saturating_sub(40)..]
+            );
+        };
+
+        // Plain `{0:?}` type-carrying variant.
+        let direct = TcError::UnexpectedImplicitAccountType(ty.clone());
+        assert_bounded(display_bounded(&direct, CAP));
+        assert_bounded(debug_bounded(&direct, CAP));
+
+        // `NoMatchingOverload` with the exponential type in the optional
+        // `reason` — exercises the previously-eager `format!` path via the
+        // `Display` sink, and the derived `Debug` via the view sink.
+        let overload = TcError::NoMatchingOverload {
+            instr: Prim::PAIR,
+            stack: Stack::new(),
+            reason: Some(NoMatchingOverloadReason::ExpectedPair(ty)),
+        };
+        assert_bounded(display_bounded(&overload, CAP));
+        assert_bounded(debug_bounded(&overload, CAP));
     }
 
     /// Typechecks a 100k deep nested IF, demonstrating that both the

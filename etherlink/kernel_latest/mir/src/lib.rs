@@ -139,6 +139,7 @@
 pub mod ast;
 #[cfg(feature = "bls")]
 pub mod bls;
+pub mod bounded_fmt;
 pub mod context;
 pub mod gas;
 pub mod interpreter;

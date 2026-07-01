@@ -19,6 +19,20 @@
 - The Michelson runtime no longer probes durable storage to promote
   per-operation trace subtrees when no tracer is active, removing the
   per-operation `store_has` calls on the block-production path. (!22277)
+- Michelson runtime: the rendered text of an interpreter or typechecker
+  error is now capped at a fixed byte ceiling while it is being walked. A
+  `FAILWITH` value can be a shared-pointer `Pair` DAG built for `O(K)` gas
+  whose unfolded form is `2^K` nodes, so rendering it materialised a
+  multi-gigabyte error string and OOM'd the kernel; that render is now cut
+  short at the ceiling. The typechecker embeds a similar structurally-shared
+  `Type` in its errors (the per-type parse cap does not bound
+  instruction-synthesised types); building such a type is gas-bounded, so its
+  render ceiling is `O(gas)` rather than unbounded, but it is capped too as
+  defense-in-depth. The cap applies on every sink that carries such text: the
+  native failed-operation receipt, the origination typecheck receipt, the
+  cross-runtime `BadRequest` body (both the interpreter and typecheck view
+  arms), and the BSON metadata — not only the previously-metered cross-runtime
+  path. (!22312)
 
 ## Version 6 (Farfadet)
 
