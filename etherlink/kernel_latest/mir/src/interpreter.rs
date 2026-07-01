@@ -3793,6 +3793,67 @@ mod interpreter_tests {
             .expect("worker thread completes");
     }
 
+    /// Regression (L2-1705 / F-1566): a `{ DUP; DUP; PAIR }` loop builds a
+    /// shared-pointer DAG of `K + 1` heap nodes for `O(K)` gas, but its
+    /// *unfolded* form is `2^(K+1) - 1` nodes. `FAILWITH` embeds that value
+    /// and the error text renders it through the (sharing-unaware) `Debug`
+    /// walk, so rendering it unbounded materialises `2^K` bytes — a kernel
+    /// OOM for a fraction of a tez. Rendering through the byte-bounded
+    /// writer must abort the walk at the ceiling instead, on both the
+    /// `Display` (native receipt / CRAC) and `Debug` (view) sinks. Built
+    /// directly via shared `Rc::clone` to match the runtime shape without
+    /// actually paying `2^K` to construct it.
+    #[test]
+    fn failwith_exponential_value_renders_bounded() {
+        use crate::bounded_fmt::{
+            debug_bounded, display_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP,
+            TRUNCATION_SUFFIX,
+        };
+
+        // K=64 ⇒ 2^65 unfolded nodes: rendering this unbounded is
+        // physically impossible (it would never terminate / would OOM), so
+        // a passing assertion proves the walk was actually cut short.
+        const K: usize = 64;
+        let mut node = Rc::new(V::int(0));
+        for _ in 0..K {
+            node = Rc::new(V::new_pair_rc(Rc::clone(&node), Rc::clone(&node)));
+        }
+        // O(1) clones of the shared DAG root (two refcount bumps each).
+        let value = (*node).clone();
+
+        // Display sink (native failed-operation receipt / CRAC BadRequest),
+        // through the full `ContractInterpretError` Display chain.
+        let cie = ContractInterpretError::from(InterpretError::FailedWith(
+            Type::Int,
+            value.clone(),
+        ));
+        let rendered = display_bounded(&cie, CAP);
+        assert!(
+            rendered.len() <= CAP + TRUNCATION_SUFFIX.len(),
+            "display render must be bounded, got {} bytes",
+            rendered.len()
+        );
+        assert!(
+            rendered.ends_with(TRUNCATION_SUFFIX),
+            "must be marked truncated"
+        );
+        assert!(
+            rendered.starts_with("runtime failure while running the script:"),
+            "prefix preserved up to the cap: {}",
+            &rendered[..rendered.len().min(60)]
+        );
+
+        // Debug sink (view path `classify_interpret_error` default arm).
+        let err = InterpretError::FailedWith(Type::Int, value);
+        let rendered_dbg = debug_bounded(&err, CAP);
+        assert!(
+            rendered_dbg.len() <= CAP + TRUNCATION_SUFFIX.len(),
+            "debug render must be bounded, got {} bytes",
+            rendered_dbg.len()
+        );
+        assert!(rendered_dbg.ends_with(TRUNCATION_SUFFIX));
+    }
+
     /// Regression: on the error path the caller's restored stack may still
     /// carry a deep runtime-built value pushed before the error -- e.g. a
     /// `LOOP`-built right-comb DUP'd onto the stack and then a separate
