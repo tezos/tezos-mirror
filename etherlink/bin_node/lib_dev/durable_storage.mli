@@ -73,7 +73,7 @@ type ('a, 'cap) path =
   | Kernel_version : (string, ro) path
   | Kernel_root_hash : (Ethereum_types.hex, ro) path
   | Multichain_flag : (unit, ro) path
-  | Sequencer_key : (Signature.Public_key.t, rw) path
+  | Sequencer_key : (Signature.Public_key.t, ro) path
   | Chain_config_family :
       L2_types.chain_id
       -> (L2_types.ex_chain_family, ro) path

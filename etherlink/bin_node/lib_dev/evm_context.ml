@@ -1760,8 +1760,17 @@ module State = struct
     let evm_state = ctxt.session.evm_state in
     if is_shadownet ctxt && Z.equal (Z.pred next) shadownet_healthy_block_number
     then (
+      (* Write through [Raw_path] (as [patch_sequencer_key_if_necessary] does) *)
+      let sequencer_key_path =
+        Durable_storage_path.sequencer_key
+          ~storage_version:ctxt.session.storage_version
+      in
       let* evm_state =
-        Durable_storage.write Sequencer_key shadownet_sequencer_key evm_state
+        Durable_storage.write
+          (Raw_path sequencer_key_path)
+          (Bytes.of_string
+             (Signature.Public_key.to_b58check shadownet_sequencer_key))
+          evm_state
       in
       let*! () =
         Events.healed_shadownet_sequencer_key shadownet_sequencer_key
