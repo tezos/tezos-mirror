@@ -226,7 +226,7 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    protocols/naming
-   protocols/025_u025
+   protocols/025_ushuaia
    protocols/alpha
    protocols/history
 

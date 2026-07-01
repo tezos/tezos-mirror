@@ -16,15 +16,15 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = u025
+NAMED_PROTOS  = ushuaia
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-u025_long      = PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY
+ushuaia_long      = PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-u025_short       = PsUshuai
+ushuaia_short       = PsUshuai
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -141,7 +141,7 @@ redirectcheck:
 # - on each other protocol including alpha, also checking label defs (option -l)
 .PHONY: xrefscheck
 xrefscheck:
-	$(CHECKXREFS) u025
+	$(CHECKXREFS) ushuaia
 	$(CHECKXREFS) -l alpha
 
 .PHONY: installcheck
@@ -192,7 +192,7 @@ user/default-acl.json: $(RPCDOCEXE)
 
 .PHONY: rpc
 rpc: user/default-acl.json shell/rpc.rst \
-	alpha/rpc.rst u025/rpc.rst
+	alpha/rpc.rst ushuaia/rpc.rst
 
 # To be triggered manually when needed
 .PHONY: rpc-protocols
@@ -229,7 +229,7 @@ docexes-gen: api/errors.rst shell/p2p_api.rst rpc
 sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	$(SPHINXBUILD) --builder html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/u025" || true
+	@ln -s active "$(BUILDDIR)/ushuaia" || true
 
 # Syntax check RST files.
 # Run Sphinx, but first create dummy version of all generated files,
@@ -318,6 +318,6 @@ fmt: black
 clean:
 	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst u025/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv $(BUILDDIR)/octezdoc.txt
-	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html u025/octez-*.html
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst ushuaia/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv $(BUILDDIR)/octezdoc.txt
+	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html ushuaia/octez-*.html
 	@-rm -Rf ../openapi-tmp

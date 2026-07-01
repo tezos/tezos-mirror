@@ -26,7 +26,7 @@ This website contains technical documentation about both Octez and the Tezos pro
 The current latest release of Octez is :doc:`../releases/version-25`.
 See that page for minimal hardware requirements for running Octez in a typical setup.
 
-The current Tezos protocol is :doc:`Ushuaia <../protocols/025_u025>`.
+The current Tezos protocol is :doc:`Ushuaia <../protocols/025_ushuaia>`.
 
 For installing instructions, see :doc:`./howtoget`.
 
