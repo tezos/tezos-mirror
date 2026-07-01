@@ -14,6 +14,13 @@
 
 ### Execution changes
 
+- Recover Shadownet EVM nodes from the sequencer-key corruption and
+  chain-rewind incident: heal the corrupted sequencer key in the node's local
+  state so the healing blueprint's signature is accepted, and clear the stale
+  finalized levels and pending confirmations that still referenced the
+  discarded blocks. Scoped to the Shadownet chain id; other networks are
+  unaffected. (!22358)
+
 ### Storage changes
 
 ### Documentation changes
