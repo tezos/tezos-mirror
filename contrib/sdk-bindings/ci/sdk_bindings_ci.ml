@@ -8,7 +8,18 @@
 open Tezos_ci
 
 module Files = struct
-  let code = ["sdk/rust/**/*"; "contrib/sdk-bindings/**/*"]
+  (* Our [Cargo.lock] pins crates reached by [path] into these other
+     directories; a dependency change there stales it. Watch those dirs so
+     drift is caught in the offending MR, not a later unrelated one. *)
+  let code =
+    [
+      "sdk/rust/**/*";
+      "contrib/sdk-bindings/**/*";
+      (* [mir] path-dependency *)
+      "etherlink/kernel_latest/mir/**/*";
+      (* [tezos-smart-rollup-host] and its kernel-SDK path-dependencies *)
+      "src/kernel_sdk/**/*";
+    ]
 
   let all = code
 end
