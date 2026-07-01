@@ -44,12 +44,16 @@ use typed_arena::Arena;
 
 pub struct InterpretContext {
     lazy_storage_size_diff: Zarith,
+    /// Big-map ids in dump-walk (AST pre-order) order; reversed at receipt time
+    /// to match L1's reverse-AST `lazy_storage_diff` order (L2-1735).
+    big_map_diff_order: Vec<Zarith>,
 }
 
 impl InterpretContext {
     pub fn new() -> Self {
         Self {
             lazy_storage_size_diff: 0.into(),
+            big_map_diff_order: Vec::new(),
         }
     }
 
@@ -64,6 +68,16 @@ impl InterpretContext {
     /// Return the accumulated lazy-storage size delta and reset it to zero.
     pub fn take_lazy_storage_size_diff(&mut self) -> Zarith {
         std::mem::replace(&mut self.lazy_storage_size_diff, 0.into())
+    }
+
+    /// Record a big-map id at the position the dump walk reaches it.
+    pub fn record_big_map_diff_order(&mut self, id: &Zarith) {
+        self.big_map_diff_order.push(id.clone());
+    }
+
+    /// Return the recorded visit order and reset it.
+    pub fn take_big_map_diff_order(&mut self) -> Vec<Zarith> {
+        std::mem::take(&mut self.big_map_diff_order)
     }
 }
 
@@ -1129,40 +1143,45 @@ fn sort_updates_by_key_hash_desc(storage_diff: &mut StorageDiff) {
     });
 }
 
-/// Function to convert a BtreeMap that represent the lazy_storage_diff
-/// in a valid Tezos representation.
-///
-/// The element order mirrors L1's `extract_lazy_storage_diff`
-/// (`script_ir_translator.ml`) so that the content-addressed receipt stays
-/// faithful to L1 and to downstream indexers:
-///   * top level: all `Remove` entries come first, then alloc/update/copy,
-///     each group ordered by big_map id descending. L1 prepends the dead-id
-///     set ahead of the alloc/update/copy diffs.
-///   * per map: updates are ordered by `key_hash` (`Script_expr_hash`)
-///     descending (see [`sort_updates_by_key_hash_desc`]).
+/// Build an operation's `lazy_storage_diff` receipt in L1's order
+/// (`extract_lazy_storage_diff`): removals first (id descending), then
+/// alloc/update/copy in the reverse of `visit_order` (the dump-walk AST order),
+/// each map's updates key_hash descending (L2-1735).
 pub fn convert_big_map_diff(
-    big_map_diff: BTreeMap<Zarith, StorageDiff>,
+    mut big_map_diff: BTreeMap<Zarith, StorageDiff>,
+    visit_order: Vec<Zarith>,
 ) -> Option<LazyStorageDiffList> {
     if big_map_diff.is_empty() {
         return None;
     }
-    // Iterate big_map ids in descending order (`.rev()` over the ascending
-    // BTreeMap), splitting removals from the rest so the former can lead.
-    let mut removes = vec![];
-    let mut others = vec![];
-    for (id, mut storage_diff) in big_map_diff.into_iter().rev() {
+    let mut alive = vec![];
+    for id in visit_order.into_iter().rev() {
+        let Some(mut storage_diff) = big_map_diff.remove(&id) else {
+            continue;
+        };
+        if matches!(storage_diff, StorageDiff::Remove) {
+            big_map_diff.insert(id, storage_diff);
+            continue;
+        }
         sort_updates_by_key_hash_desc(&mut storage_diff);
-        let is_remove = matches!(storage_diff, StorageDiff::Remove);
-        let diff = LazyStorageDiff::BigMap(BigMapDiff { id, storage_diff });
-        if is_remove {
-            removes.push(diff);
+        alive.push(LazyStorageDiff::BigMap(BigMapDiff { id, storage_diff }));
+    }
+    // Remaining ids are the never-visited dead-id `Remove` set (leading, id
+    // descending); a stray unvisited alive entry only trails defensively.
+    let mut removes = vec![];
+    let mut leftover = vec![];
+    for (id, mut storage_diff) in big_map_diff.into_iter().rev() {
+        if matches!(storage_diff, StorageDiff::Remove) {
+            removes.push(LazyStorageDiff::BigMap(BigMapDiff { id, storage_diff }));
         } else {
-            others.push(diff);
+            sort_updates_by_key_hash_desc(&mut storage_diff);
+            leftover.push(LazyStorageDiff::BigMap(BigMapDiff { id, storage_diff }));
         }
     }
-    // Emit every removal before any alloc/update/copy entry.
-    removes.extend(others);
-    Some(LazyStorageDiffList { diff: removes })
+    let mut diff = removes;
+    diff.extend(alive);
+    diff.extend(leftover);
+    Some(LazyStorageDiffList { diff })
 }
 
 #[derive(Debug, BinWriter, NomReader)]
@@ -1567,6 +1586,10 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         self.big_map_diff_remove(id.value.clone());
 
         Ok(())
+    }
+
+    fn record_diff_order(&mut self, id: &BigMapId) {
+        self.interpret_context.record_big_map_diff_order(&id.value);
     }
 }
 
@@ -2171,6 +2194,55 @@ pub mod tests {
         assert_eq!(id_of(&duplicated), BigMapId::from(7));
     }
 
+    // L2-1057: each internal operation carrying the same persisted big_map
+    // gets its own copy, as on L1 (no cross-operation deduplication).
+    #[test]
+    fn operation_big_maps_sharing_a_source_are_copied_independently() {
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+
+        let p = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
+        storage
+            .big_map_update(&p, TypedValue::int(1), Some(TypedValue::int(1)))
+            .unwrap();
+        storage.big_map_diff.clear();
+        let _ = storage.interpret_context.take_big_map_diff_order();
+
+        let mk = || BigMap {
+            content: BigMapContent::FromId(BigMapFromId {
+                id: p.clone(),
+                overlay: BTreeMap::new(),
+            }),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        };
+        let mut op1 = mk();
+        let mut op2 = mk();
+        let mut seen = BTreeSet::new();
+        dump_big_map_walk(&mut storage, &mut [&mut op1, &mut op2], true, &mut seen)
+            .unwrap();
+
+        let id_of = |m: &BigMap| match &m.content {
+            BigMapContent::FromId(c) => c.id.clone(),
+            BigMapContent::InMemory(_) => panic!("expected FromId"),
+        };
+        let (id1, id2) = (id_of(&op1), id_of(&op2));
+        assert_ne!(
+            id1, id2,
+            "each operation must get its own copy id (no dedup)"
+        );
+        assert!(id1.is_temporary() && id2.is_temporary());
+        let copies: Vec<Zarith> = storage
+            .big_map_diff
+            .iter()
+            .filter_map(|(id, d)| match d {
+                StorageDiff::Copy(c) if c.source == p.value => Some(id.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(copies.len(), 2, "expected one copy per operation, as on L1");
+    }
+
     /// Root-cause guard for L2-1636: copying a big map whose durable source
     /// paths have already been removed fails. This is exactly the failure
     /// the fix avoids by deferring removal until after the operation walk
@@ -2211,65 +2283,25 @@ pub mod tests {
         );
     }
 
-    // L1 receipts big_map diffs are in reverse order, this is mandatory for external tools that
-    // except such an order.
+    // Alive entries follow reverse-visit order, not id order: after a swap the
+    // walk visits [id 6, id 5] so the receipt is [id 5, id 6] (L2-1735).
     #[test]
-    fn test_convert_big_map_diff_order() {
-        let mut gas = Gas::default();
-        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat, &mut gas)
-            .unwrap()
-            .encode(&mut Gas::default())
-            .unwrap()
-            .unwrap();
-        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit, &mut gas)
-            .unwrap()
-            .encode(&mut Gas::default())
-            .unwrap()
-            .unwrap();
-        let alloc_0 = StorageDiff::Alloc(Alloc {
-            updates: vec![],
-            key_type: key_type.clone(),
-            value_type: value_type.clone(),
-        });
-        let alloc_5 = StorageDiff::Alloc(Alloc {
-            updates: vec![],
-            key_type: key_type.clone(),
-            value_type: value_type.clone(),
-        });
-        let alloc_4 = StorageDiff::Alloc(Alloc {
-            updates: vec![],
-            key_type: key_type.clone(),
-            value_type: value_type.clone(),
-        });
+    fn convert_big_map_diff_alive_follows_reverse_visit_order() {
         let mut map: BTreeMap<Zarith, StorageDiff> = BTreeMap::new();
-        map.insert(0u64.into(), alloc_0.clone());
-        map.insert(5u64.into(), alloc_5.clone());
-        map.insert(4u64.into(), alloc_4.clone());
-        let diff_list = convert_big_map_diff(map);
-        let expected = Some(LazyStorageDiffList {
-            diff: vec![
-                LazyStorageDiff::BigMap(BigMapDiff {
-                    id: 5u64.into(),
-                    storage_diff: alloc_5,
-                }),
-                LazyStorageDiff::BigMap(BigMapDiff {
-                    id: 4u64.into(),
-                    storage_diff: alloc_4,
-                }),
-                LazyStorageDiff::BigMap(BigMapDiff {
-                    id: 0u64.into(),
-                    storage_diff: alloc_0,
-                }),
-            ],
-        });
-        assert_eq!(diff_list, expected, "Receipt should be in reverse order");
-    }
+        map.insert(5u64.into(), StorageDiff::Update(vec![]));
+        map.insert(6u64.into(), StorageDiff::Update(vec![]));
+        let visit_order = vec![6u64.into(), 5u64.into()];
 
-    // `convert_big_map_diff` element ordering must match L1's
-    // `extract_lazy_storage_diff` (`script_ir_translator.ml`):
-    //   * removals lead, ahead of alloc/update/copy, both groups id-descending;
-    //   * per-map updates are ordered by `key_hash` (`Script_expr_hash`)
-    //     descending.
+        let converted = convert_big_map_diff(map, visit_order).expect("non-empty diff");
+        let ids: Vec<Zarith> = converted
+            .diff
+            .iter()
+            .map(|LazyStorageDiff::BigMap(BigMapDiff { id, .. })| id.clone())
+            .collect();
+
+        assert_eq!(ids, vec![5u64.into(), 6u64.into()]);
+        assert_ne!(ids, vec![6u64.into(), 5u64.into()]);
+    }
 
     fn empty_nat_unit_alloc() -> StorageDiff {
         let mut gas = Gas::default();
@@ -2314,8 +2346,9 @@ pub mod tests {
         let mut map: BTreeMap<Zarith, StorageDiff> = BTreeMap::new();
         map.insert(3u64.into(), StorageDiff::Remove);
         map.insert(7u64.into(), alloc.clone());
+        let visit_order = vec![7u64.into()];
 
-        let converted = convert_big_map_diff(map).expect("non-empty diff");
+        let converted = convert_big_map_diff(map, visit_order).expect("non-empty diff");
 
         let expected = LazyStorageDiffList {
             diff: vec![
@@ -2341,8 +2374,9 @@ pub mod tests {
         map.insert(3u64.into(), StorageDiff::Remove);
         map.insert(5u64.into(), StorageDiff::Remove);
         map.insert(7u64.into(), empty_nat_unit_alloc());
+        let visit_order = vec![7u64.into()];
 
-        let converted = convert_big_map_diff(map).expect("non-empty diff");
+        let converted = convert_big_map_diff(map, visit_order).expect("non-empty diff");
 
         let order: Vec<(Zarith, &str)> = converted
             .diff
@@ -2373,8 +2407,11 @@ pub mod tests {
                 .unwrap();
         }
 
-        let converted = convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff))
-            .expect("non-empty diff");
+        let converted = convert_big_map_diff(
+            std::mem::take(&mut ctx.big_map_diff),
+            vec![id.value.clone()],
+        )
+        .expect("non-empty diff");
         let updates = match converted.diff.as_slice() {
             [LazyStorageDiff::BigMap(BigMapDiff { storage_diff, .. })] => {
                 updates_of(storage_diff)

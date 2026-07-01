@@ -1159,8 +1159,11 @@ where
                 .operation_gas
                 .get_and_reset_milligas_consumed()
                 .map_err(TransferError::OutOfGas)?;
-            let lazy_storage_diff =
-                convert_big_map_diff(std::mem::take(&mut tc_ctx.big_map_diff));
+            let big_map_diff_order = tc_ctx.interpret_context.take_big_map_diff_order();
+            let lazy_storage_diff = convert_big_map_diff(
+                std::mem::take(&mut tc_ctx.big_map_diff),
+                big_map_diff_order,
+            );
 
             // Persist the storage blob and the accounting record now that
             // their gas has been charged (no-op for enshrined contracts).
@@ -1744,7 +1747,9 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
     // Drain the diff before the fallible encode below: otherwise an
     // encode failure leaves `ctx.big_map_diff` half-populated and the
     // next operation in the same batch inherits stale entries.
-    let lazy_storage_diff = convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff));
+    let big_map_diff_order = ctx.interpret_context.take_big_map_diff_order();
+    let lazy_storage_diff =
+        convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff), big_map_diff_order);
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
         .encode(ctx.gas())?

@@ -357,6 +357,10 @@ pub trait LazyStorage<'a> {
     /// The caller is obliged to never use this big map ID in the given
     /// storage.
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError>;
+
+    /// Record a big map's id at its position in the dump walk (AST pre-order);
+    /// the receipt builder reverses it to match L1's order. Default: no-op.
+    fn record_diff_order(&mut self, _id: &BigMapId) {}
 }
 
 /// Bulk-update the big_map. This trait exists mostly for convenience, and has a
@@ -896,6 +900,7 @@ pub fn dump_big_map_walk<'a>(
                     deferred_in_place_updates
                         .push((m.id.clone(), mem::take(&mut m.overlay)));
                 }
+                storage.record_diff_order(&m.id);
             }
             BigMapContent::InMemory(ref mut m) => {
                 // The entire big map is still in memory. Allocate a
@@ -904,6 +909,7 @@ pub fn dump_big_map_walk<'a>(
                 // no need to defer.
                 let id =
                     storage.big_map_new(&map.key_type, &map.value_type, temporary)?;
+                storage.record_diff_order(&id);
                 storage.big_map_bulk_update(
                     &id,
                     mem::take(m)

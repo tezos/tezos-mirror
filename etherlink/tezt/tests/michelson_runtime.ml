@@ -5792,6 +5792,134 @@ code { CDR ;
       (JSON.encode tezosx_lsd) ;
   unit
 
+(** L2-1735: the [lazy_storage_diff] element order (not just its content as a
+    multiset) must match L1. The contract swaps two big_maps in its storage and
+    updates both, so id order and AST order disagree; we assert L1 and Tezos X
+    list the entries in the same order (ids compared up to content). *)
+let test_lazy_storage_diff_element_order_l1_vs_tezosx =
+  let contract =
+    {|parameter unit ;
+storage (pair (big_map nat nat) (big_map nat nat)) ;
+code { CDR ; UNPAIR ;
+       PUSH (option nat) (Some 1) ; PUSH nat 0 ; UPDATE ;
+       SWAP ;
+       PUSH (option nat) (Some 2) ; PUSH nat 0 ; UPDATE ;
+       PAIR ; NIL operation ; PAIR }|}
+  in
+  let init_storage = "(Pair {} {})" in
+  register_tezosx_test
+    ~title:"lazy_storage_diff element order matches L1 (swapped big_maps)"
+    ~tags:["big_map"; "lazy_storage_diff"; "receipt"; "l1_comparison"; "order"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; node; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let l1_src = Constant.bootstrap2.public_key_hash in
+  let tezosx_src = Constant.bootstrap1.public_key_hash in
+  let extract ~name ~contract operations =
+    let contents =
+      JSON.(operations |=> 3 |> as_list)
+      |> List.concat_map (fun op -> JSON.(op |-> "contents" |> as_list))
+    in
+    let is_call c =
+      JSON.(c |-> "kind" |> as_string) = "transaction"
+      && JSON.(c |-> "destination" |> as_string_opt) = Some contract
+    in
+    match List.find_opt is_call contents with
+    | None ->
+        Test.fail "%s: no transaction to %s in the produced block" name contract
+    | Some c ->
+        JSON.(c |-> "metadata" |-> "operation_result" |-> "lazy_storage_diff")
+  in
+  let ordered_signatures lsd =
+    JSON.as_list lsd
+    |> List.map (fun entry ->
+           let diff = JSON.(entry |-> "diff") in
+           let action = JSON.(diff |-> "action" |> as_string) in
+           let updates =
+             if action = "remove" then []
+             else
+               JSON.(diff |-> "updates" |> as_list)
+               |> List.map (fun upd ->
+                      ( JSON.(upd |-> "key_hash" |> as_string),
+                        JSON.(upd |-> "key" |> encode),
+                        JSON.(upd |-> "value" |> encode) ))
+           in
+           (action, updates))
+  in
+  (* L1 *)
+  let* l1_contract =
+    Client.originate_contract
+      ~alias:"lsd_swap_l1"
+      ~amount:Tez.zero
+      ~src:l1_src
+      ~prg:contract
+      ~init:init_storage
+      ~burn_cap:(Tez.of_int 10)
+      client
+  in
+  let* () = Client.bake_for_and_wait ~node client in
+  let* () =
+    Client.transfer
+      ~amount:Tez.zero
+      ~giver:l1_src
+      ~receiver:l1_contract
+      ~arg:"Unit"
+      ~burn_cap:(Tez.of_int 10)
+      client
+  in
+  let* () = Client.bake_for_and_wait ~node client in
+  let* l1_ops =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_operations ~force_metadata:true ()
+  in
+  let l1_lsd = extract ~name:"L1" ~contract:l1_contract l1_ops in
+  (* Tezos X (Michelson runtime) *)
+  let* tezosx_contract =
+    Client.originate_contract
+      ~endpoint
+      ~alias:"lsd_swap_tezosx"
+      ~amount:Tez.zero
+      ~src:tezosx_src
+      ~prg:contract
+      ~init:init_storage
+      ~burn_cap:(Tez.of_int 10)
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:Tez.zero
+      ~giver:tezosx_src
+      ~receiver:tezosx_contract
+      ~arg:"Unit"
+      ~burn_cap:(Tez.of_int 10)
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* tezosx_ops =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_block_operations ()
+  in
+  let tezosx_lsd =
+    extract ~name:"TezosX" ~contract:tezosx_contract tezosx_ops
+  in
+  Log.info "L1     lazy_storage_diff = %s" (JSON.encode l1_lsd) ;
+  Log.info "TezosX lazy_storage_diff = %s" (JSON.encode tezosx_lsd) ;
+  let l1_sig = ordered_signatures l1_lsd in
+  let tezosx_sig = ordered_signatures tezosx_lsd in
+  Check.(
+    (List.length l1_sig = 2)
+      int
+      ~error_msg:"expected 2 lazy_storage_diff entries on L1, got %L") ;
+  if l1_sig <> tezosx_sig then
+    Test.fail
+      "lazy_storage_diff element ORDER differs between L1 and Tezos X:\n\
+       L1      = %s\n\
+       Tezos X = %s"
+      (JSON.encode l1_lsd)
+      (JSON.encode tezosx_lsd) ;
+  unit
+
 (** L2-1761: a contract DUPs its persisted big_map, mutates one copy in place
     (returned storage) and TRANSFER_TOKENS the unmutated copy; the receiver must
     observe the pre-update content on Tezos X, as on L1. *)
@@ -5940,6 +6068,7 @@ let () =
   test_bigmap_option [Alpha] ;
   test_bigmap_counter [Alpha] ;
   test_lazy_storage_diff_order_l1_vs_tezosx [Alpha] ;
+  test_lazy_storage_diff_element_order_l1_vs_tezosx [Alpha] ;
   test_big_map_dup_retention_l1_vs_tezosx [Alpha] ;
   test_bootstrap_kt1_is_executable [Alpha] ;
   test_bigmap_rpcs [Alpha] ;

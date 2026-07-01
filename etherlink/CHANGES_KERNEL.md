@@ -38,12 +38,17 @@
   (reveals and transfers to implicit accounts), removing the per-operation
   `store_copy`/`store_move` of the other roots. (!22276)
 - Michelson runtime: the operation receipt's `lazy_storage_diff` now matches
-  L1's layout — all big_map removals are listed first, then
-  allocations/updates/copies; within each map the per-key updates are ordered by
-  `Script_expr_hash` descending; and a big_map kept in storage while also being
-  copied keeps its `update` entry instead of being dropped. This restores
-  receipt faithfulness to L1 (and to indexers) for operations touching a
-  multi-key big_map, removing a big_map, or duplicating one. (!22357)
+  L1's layout — all big_map removals are listed first (id descending), then
+  allocations/updates/copies in the reverse of the storage AST traversal order
+  (matching L1's `extract_lazy_storage_updates`) rather than by big_map id;
+  within each map the per-key updates are ordered by `Script_expr_hash`
+  descending; and a big_map kept in storage while also being copied keeps its
+  `update` entry instead of being dropped. Ordering by id happened to agree with
+  L1 only when the storage laid its maps out in ascending-id order, so e.g. a
+  contract that swaps two big_maps in its storage now produces the same receipt
+  order as L1. This restores receipt faithfulness to L1 (and to indexers) for
+  operations touching a multi-key big_map, removing a big_map, reordering its
+  big_maps, or duplicating one. (!22357)
 - Michelson runtime: a big_map duplicated into an emitted operation now carries
   its pre-update content, matching L1. The contract result's deferred in-place
   updates are applied only after both the storage and operation dumps, so an
