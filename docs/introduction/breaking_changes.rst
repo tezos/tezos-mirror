@@ -42,7 +42,7 @@ versions, see :doc:`past_breaking_changes`.
 Protocol Ushuaia
 ----------------
 
-:doc:`Full Protocol Ushuaia Changelog<../protocols/025_u025>`
+:doc:`Full Protocol Ushuaia Changelog<../protocols/025_ushuaia>`
 
 (No breaking changes yet.)
 

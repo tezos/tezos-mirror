@@ -134,7 +134,7 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'doc_gen',
-    'u025',
+    'ushuaia',
 ]
 # TODO tezos/tezos#2170: update the active protocol folder above
 
