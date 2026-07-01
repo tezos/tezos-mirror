@@ -84,6 +84,25 @@ impl core::fmt::Display for DispatchSlotError {
     }
 }
 
+/// A single dispatch slot: the `%collect_result` payload, plus the
+/// address of the contract that owns the slot.
+///
+/// The owner is the serve target — the contract whose code the current
+/// `serve` invocation is running. Only that contract's own
+/// `%collect_result` may write the slot; `owner: None` means the slot
+/// has not been assigned yet (e.g. the view/GET path, which never
+/// assigns an owner because views cannot emit `%collect_result`).
+///
+/// Stored as the canonical `AddressHash::to_bytes` encoding rather
+/// than the typed Michelson address: the journal only ever stores the
+/// owner and compares it for equality, so it has no need to depend on
+/// the Michelson interpreter crate to interpret it.
+#[derive(Debug, PartialEq, Eq, Default)]
+struct DispatchSlot {
+    owner: Option<Vec<u8>>,
+    payload: Option<Vec<u8>>,
+}
+
 impl std::error::Error for DispatchSlotError {}
 
 /// A pending revert target: the indexed location where the world-state
@@ -109,7 +128,7 @@ pub struct MichelsonJournal {
     /// lifecycle is Michelson-dispatch-shaped (at most one deposit per
     /// `serve` invocation) whereas `external_checkpoints` is shaped by
     /// EVM call boundaries.
-    dispatch_result_slots: Vec<Option<Vec<u8>>>,
+    dispatch_result_slots: Vec<DispatchSlot>,
     /// Currently-applied CRAC receipts (EVM → Michelson).  Subject to
     /// revert: when the calling EVM frame reverts, `revert_frame`
     /// drains the entries pushed during the frame, transforms every
@@ -358,9 +377,39 @@ impl MichelsonJournal {
 
     /// Open a fresh dispatch slot for the current `serve` invocation.
     /// Paired with [`take_dispatch_result`]; not touched by REVM
-    /// checkpoints.
+    /// checkpoints. The slot has no owner until
+    /// [`set_current_dispatch_owner`] assigns one.
     pub fn push_dispatch_slot(&mut self) {
-        self.dispatch_result_slots.push(None);
+        self.dispatch_result_slots.push(DispatchSlot::default());
+    }
+
+    /// Assign the owner of the topmost dispatch slot: the contract
+    /// whose code is about to run for this `serve` invocation. Only
+    /// this address's own `%collect_result` may write the slot.
+    ///
+    /// A no-op if no slot is open — a POST request always has one
+    /// open at this point, so an empty stack here is a kernel bug,
+    /// not a state this method needs to surface as an error.
+    pub fn set_current_dispatch_owner(&mut self, owner: Vec<u8>) {
+        if let Some(top) = self.dispatch_result_slots.last_mut() {
+            top.owner = Some(owner);
+        }
+    }
+
+    /// The owner of the topmost dispatch slot, if any. `None` if no
+    /// slot is open, or if the slot's owner hasn't been assigned yet.
+    pub fn dispatch_slot_owner(&self) -> Option<&[u8]> {
+        self.dispatch_result_slots.last()?.owner.as_deref()
+    }
+
+    /// Whether a dispatch slot is currently open. Lets a caller
+    /// distinguish "no slot at all" (an unbalanced call outside
+    /// `serve` — a kernel bug) from "a slot is open but its owner
+    /// doesn't match" (an unauthorized `%collect_result`, expected to
+    /// happen under normal operation and handled by dropping the
+    /// write rather than erroring).
+    pub fn has_dispatch_slot(&self) -> bool {
+        !self.dispatch_result_slots.is_empty()
     }
 
     /// Deposit the `%collect_result` payload on the topmost dispatch
@@ -370,6 +419,12 @@ impl MichelsonJournal {
     /// is open (i.e. called outside `serve`), or
     /// [`DispatchSlotError::AlreadySet`] if the current slot already
     /// holds a payload (once-per-dispatch invariant).
+    ///
+    /// Identity-agnostic: this method does not check the caller
+    /// against the slot's owner. The owner check is the
+    /// `%collect_result` handler's responsibility (via
+    /// [`dispatch_slot_owner`]); the view (GET) path calls this
+    /// method directly with no sender to authenticate.
     pub fn set_dispatch_result(
         &mut self,
         bytes: Vec<u8>,
@@ -378,10 +433,10 @@ impl MichelsonJournal {
             .dispatch_result_slots
             .last_mut()
             .ok_or(DispatchSlotError::NoSlot)?;
-        if top.is_some() {
+        if top.payload.is_some() {
             return Err(DispatchSlotError::AlreadySet);
         }
-        *top = Some(bytes);
+        top.payload = Some(bytes);
         Ok(())
     }
 
@@ -398,6 +453,7 @@ impl MichelsonJournal {
         self.dispatch_result_slots
             .pop()
             .ok_or(DispatchSlotError::NoSlot)
+            .map(|slot| slot.payload)
     }
 
     // Called by EVM journal on checkpoint commit.
@@ -1532,6 +1588,79 @@ mod tests {
             journal.set_dispatch_result(vec![0x01]),
             Err(DispatchSlotError::NoSlot)
         );
+    }
+
+    // --- dispatch slot owner ---
+
+    fn owner_a() -> Vec<u8> {
+        vec![1, 2, 3]
+    }
+
+    fn owner_b() -> Vec<u8> {
+        vec![4, 5, 6]
+    }
+
+    // A freshly-pushed slot has no owner until explicitly assigned.
+    #[test]
+    fn test_dispatch_slot_owner_unset_by_default() {
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        journal.push_dispatch_slot();
+        assert_eq!(journal.dispatch_slot_owner(), None);
+    }
+
+    // `set_current_dispatch_owner` assigns the topmost slot's owner,
+    // observable via `dispatch_slot_owner`.
+    #[test]
+    fn test_dispatch_slot_owner_set_and_get() {
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        journal.push_dispatch_slot();
+        journal.set_current_dispatch_owner(owner_a());
+        assert_eq!(journal.dispatch_slot_owner(), Some(owner_a().as_slice()));
+    }
+
+    // `set_current_dispatch_owner` with no open slot is a no-op — it
+    // must not panic and must not create a slot.
+    #[test]
+    fn test_dispatch_slot_owner_set_without_slot_is_noop() {
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        journal.set_current_dispatch_owner(owner_a());
+        assert_eq!(journal.dispatch_slot_owner(), None);
+        assert_eq!(
+            journal.take_dispatch_result(),
+            Err(DispatchSlotError::NoSlot)
+        );
+    }
+
+    // `set_dispatch_result` remains identity-agnostic: it writes
+    // regardless of the slot's owner. The sender check is the
+    // caller's (the `%collect_result` handler's) responsibility, not
+    // the journal's — this is what lets the view path keep depositing
+    // via `set_dispatch_result` with no owner assigned at all.
+    #[test]
+    fn test_dispatch_result_set_is_owner_agnostic() {
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        journal.push_dispatch_slot();
+        journal.set_current_dispatch_owner(owner_a());
+        // No sender check here: the write succeeds regardless of who
+        // "would" be calling — the journal only enforces the
+        // once-per-dispatch invariant.
+        journal.set_dispatch_result(vec![0x01]).unwrap();
+        assert_eq!(journal.take_dispatch_result(), Ok(Some(vec![0x01])));
+    }
+
+    // Nested slots each carry their own independent owner.
+    #[test]
+    fn test_dispatch_slot_owner_nested_independent() {
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        journal.push_dispatch_slot();
+        journal.set_current_dispatch_owner(owner_a());
+
+        journal.push_dispatch_slot();
+        journal.set_current_dispatch_owner(owner_b());
+        assert_eq!(journal.dispatch_slot_owner(), Some(owner_b().as_slice()));
+
+        journal.take_dispatch_result().unwrap();
+        assert_eq!(journal.dispatch_slot_owner(), Some(owner_a().as_slice()));
     }
 
     // --- origination nonce state ---
