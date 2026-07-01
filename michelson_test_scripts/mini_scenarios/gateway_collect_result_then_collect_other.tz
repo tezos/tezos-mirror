@@ -1,0 +1,40 @@
+# Deposits a bytes payload via the gateway's %collect_result entrypoint,
+# then makes an internal TRANSFER_TOKENS (unit parameter, 0 mutez) to
+# another Michelson contract. Used to verify that the dispatch slot's
+# owner check rejects a %collect_result issued by that internally-called
+# contract: the caller must still observe THIS contract's own payload,
+# not whatever the internally-called contract deposits.
+#
+# Storage: pair address (pair address bytes)
+#   1st address = gateway KT1 (target of %collect_result)
+#   2nd address = internally-called contract KT1 (unit parameter)
+#   bytes       = payload to deposit via %collect_result
+parameter unit;
+storage (pair address (pair address bytes));
+code {
+       CDR;
+       DUP;
+       CAR;
+       CONTRACT %collect_result bytes;
+       ASSERT_SOME;
+       DUP 2;
+       CDR;
+       CDR;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       DUP 2;
+       CDR;
+       CAR;
+       CONTRACT unit;
+       ASSERT_SOME;
+       PUSH mutez 0;
+       UNIT;
+       TRANSFER_TOKENS;
+       NIL operation;
+       SWAP;
+       CONS;
+       SWAP;
+       CONS;
+       PAIR
+     };

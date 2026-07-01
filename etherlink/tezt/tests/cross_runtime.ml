@@ -336,6 +336,48 @@ module TezContract = struct
         in
         return consumed
 
+  (** [get_collect_result_statuses ~block sequencer] queries the tezlink
+   *  RPC for [block]'s first manager operation and returns, in
+   *  execution order, the [(status, error_message option)] of every
+   *  internal [%collect_result] operation.  [error_message] is the
+   *  [error_message] field of the first entry in the internal op's
+   *  [errors] list, if any.  Used to check that an owner-mismatch
+   *  collect is the [failed] op carrying the owner-check error message,
+   *  and that no collect fails with the [AlreadySet] error instead.
+   *
+   *  @param block Block identifier (default ["head"]). *)
+  let get_collect_result_statuses ?(block = "head") sequencer =
+    let path = sf "/tezlink/chains/main/blocks/%s/operations/3/0" block in
+    let* res =
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    let json = JSON.parse ~origin:"tezlink_operation_receipt" res in
+    let internal_ops =
+      JSON.(
+        json |-> "contents" |=> 0 |-> "metadata"
+        |-> "internal_operation_results" |> as_list)
+    in
+    return
+      (List.filter_map
+         (fun op ->
+           match
+             JSON.(op |-> "parameters" |-> "entrypoint" |> as_string_opt)
+           with
+           | Some "collect_result" ->
+               let status = JSON.(op |-> "result" |-> "status" |> as_string) in
+               let error_message =
+                 match JSON.(op |-> "result" |-> "errors" |> as_list) with
+                 | [] -> None
+                 | first :: _ ->
+                     JSON.(first |-> "error_message" |> as_string_opt)
+               in
+               Some (status, error_message)
+           | Some _ | None -> None)
+         internal_ops)
+
   (** Reads the decoded Micheline storage of the Michelson contract
    *  identified by [contract_address] (a b58check KT1 address) from the
    *  tezlink RPC of [sequencer]. *)
@@ -1500,6 +1542,69 @@ module TezCollectResultThenFail = struct
       protocol
 end
 
+(** Tezos contract that deposits a payload via the gateway's
+ *  [%collect_result] entrypoint, then makes an internal
+ *  [TRANSFER_TOKENS] (unit parameter, 0 mutez) to another Michelson
+ *  contract.  Used to verify the dispatch-slot owner check: the
+ *  internally-called contract's own [%collect_result] (if any) is
+ *  rejected as an owner mismatch and reverts the whole operation,
+ *  so it can never clobber this contract's deposit nor let its
+ *  bytes surface as the caller's result. *)
+module TezCollectResultThenCollectOther = struct
+  open TezContract
+
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~other_kt1 ~payload_hex () =
+    let script_name =
+      ["mini_scenarios"; "gateway_collect_result_then_collect_other"]
+    in
+    let init_storage_data =
+      sf {|Pair "%s" (Pair "%s" 0x%s)|} gateway_address other_kt1 payload_hex
+    in
+    originate_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+end
+
+(** Tezos contract that deposits a payload via the gateway's
+ *  [%collect_result] entrypoint, makes an internal [TRANSFER_TOKENS]
+ *  (unit parameter, 0 mutez) to another Michelson contract, then
+ *  deposits the SAME payload via [%collect_result] a second time.
+ *  Used to verify that a natively-reached callee's [%collect_result]
+ *  is rejected as an owner mismatch and reverts the whole operation
+ *  before this contract's own second collect is ever reached — the
+ *  owner check fires first, not the once-per-frame [AlreadySet]
+ *  invariant. *)
+module TezCollectResultThenCollectOtherThenSelf = struct
+  open TezContract
+
+  let originate ~client ~client_tezlink ~sequencer ~source ~counter ~protocol
+      ?init_balance ~other_kt1 ~payload_hex () =
+    let script_name =
+      ["mini_scenarios"; "gateway_collect_result_then_collect_other_then_self"]
+    in
+    let init_storage_data =
+      sf {|Pair "%s" (Pair "%s" 0x%s)|} gateway_address other_kt1 payload_hex
+    in
+    originate_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+end
+
 (** Tezos contract that accepts unit and succeeds immediately without
  *  emitting any internal operations.  Used to verify that a CRAC
  *  which never calls [%collect_result] returns empty bytes to the EVM
@@ -1833,6 +1938,9 @@ module CracRunnerWrapper = struct
 
       val get_gateway_consumed_milligas :
         ?block:string -> ?entrypoint:string -> unit -> int Lwt.t
+
+      val get_collect_result_statuses :
+        ?block:string -> unit -> (string * string option) list Lwt.t
     end
 
     module TezCrossRuntimeRunnerEvm : sig
@@ -1891,6 +1999,24 @@ module CracRunnerWrapper = struct
       val originate :
         ?init_balance:int ->
         failing:tez_runner ->
+        payload_hex:string ->
+        unit ->
+        tez_runner Lwt.t
+    end
+
+    module TezCollectResultThenCollectOther : sig
+      val originate :
+        ?init_balance:int ->
+        other:tez_runner ->
+        payload_hex:string ->
+        unit ->
+        tez_runner Lwt.t
+    end
+
+    module TezCollectResultThenCollectOtherThenSelf : sig
+      val originate :
+        ?init_balance:int ->
+        other:tez_runner ->
         payload_hex:string ->
         unit ->
         tez_runner Lwt.t
@@ -2358,6 +2484,9 @@ module CracRunnerWrapper = struct
 
         let get_gateway_consumed_milligas ?block ?entrypoint () =
           TezContract.get_gateway_consumed_milligas ?block ?entrypoint sequencer
+
+        let get_collect_result_statuses ?block () =
+          TezContract.get_collect_result_statuses ?block sequencer
       end
 
       module TezCrossRuntimeRunnerEvm = struct
@@ -2554,6 +2683,44 @@ module CracRunnerWrapper = struct
               ~protocol
               ?init_balance
               ~failing_kt1
+              ~payload_hex
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezCollectResultThenCollectOther = struct
+        let originate ?init_balance ~other:(`Tez_runner (_, other_kt1))
+            ~payload_hex () =
+          let* runner_hex, runner =
+            TezCollectResultThenCollectOther.originate
+              ~client
+              ~client_tezlink
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~other_kt1
+              ~payload_hex
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezCollectResultThenCollectOtherThenSelf = struct
+        let originate ?init_balance ~other:(`Tez_runner (_, other_kt1))
+            ~payload_hex () =
+          let* runner_hex, runner =
+            TezCollectResultThenCollectOtherThenSelf.originate
+              ~client
+              ~client_tezlink
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~other_kt1
               ~payload_hex
               ()
           in
@@ -12779,6 +12946,166 @@ let test_crac_collect_result_rejects_nonzero_amount () =
       ~error_msg:"Expected gateway balance %R mutez but got %L") ;
   unit
 
+(** Dispatch-slot owner check, injection: the dispatched Michelson
+    contract [M1] deposits its own bytes via [%collect_result], then
+    internally [TRANSFER_TOKENS] (unit, 0 mutez) to another Michelson
+    contract [L] that also calls [%collect_result] with different
+    bytes. [L] is reached natively (an internal operation of [M1]'s
+    own execution), not through the gateway, so its [SENDER] at the
+    collect is [L], not [M1] — the dispatch slot's owner. [L]'s
+    unauthorized collect is rejected and reverts the whole operation,
+    so [L]'s bytes can never surface as the caller's result: the EVM
+    caller sees the CRAC revert and the result slot stays empty. *)
+let test_crac_collect_result_injection_native_callee_reverts () =
+  register_crac_runner_test
+    ~title:"CRAC: a natively-reached callee's %collect_result reverts the op"
+    ~tags:["collect_result"; "http_call"; "security"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let m1_payload_hex = "cafebabe" in
+  let l_payload_hex = "deadbeef" in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate L (calls %%collect_result with its own bytes)" ;
+  let* tez_l = TezCollectResult.originate ~payload_hex:l_payload_hex () in
+  Log.debug
+    ~prefix
+    "Originate M1 (calls %%collect_result then internally transfers to L)" ;
+  let* tez_m1 =
+    TezCollectResultThenCollectOther.originate
+      ~other:tez_l
+      ~payload_hex:m1_payload_hex
+      ()
+  in
+  Log.debug ~prefix "Deploy EVM reader targeting M1" ;
+  let* evm_reader = EvmCollectResult.deploy_and_init tez_m1 in
+  Log.debug
+    ~prefix
+    "Run (catching): L's unauthorized collect must revert the operation" ;
+  let* _ = EvmCollectResult.call_run_catch evm_reader in
+  Log.debug ~prefix "Verify the precompile call was caught as reverted" ;
+  let* () = EvmCollectResult.check_caught ~expected:true evm_reader in
+  Log.debug ~prefix "Verify no bytes surfaced as the caller's result" ;
+  EvmCollectResult.check_result ~expected_hex:"" evm_reader
+
+(** Dispatch-slot owner check, same-bytes collision: same topology as
+    the injection case, but [L]'s payload equals [M1]'s. The owner
+    check rejects [L]'s collect on sender mismatch before it ever
+    reaches the slot, so the payload is irrelevant: the collision
+    never becomes an [AlreadySet] failure — [L]'s collect reverts the
+    operation outright, exactly as with distinct bytes. *)
+let test_crac_collect_result_grief_native_callee_reverts () =
+  register_crac_runner_test
+    ~title:
+      "CRAC: a natively-reached callee's %collect_result reverts even with \
+       matching bytes"
+    ~tags:["collect_result"; "http_call"; "security"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let m1_payload_hex = "cafebabe" in
+  let l_payload_hex = "cafebabe" in
+  let prefix = "CRAC" in
+  Log.debug
+    ~prefix
+    "Originate L (calls %%collect_result with the same bytes as M1)" ;
+  let* tez_l = TezCollectResult.originate ~payload_hex:l_payload_hex () in
+  Log.debug
+    ~prefix
+    "Originate M1 (calls %%collect_result then internally transfers to L)" ;
+  let* tez_m1 =
+    TezCollectResultThenCollectOther.originate
+      ~other:tez_l
+      ~payload_hex:m1_payload_hex
+      ()
+  in
+  Log.debug ~prefix "Deploy EVM reader targeting M1" ;
+  let* evm_reader = EvmCollectResult.deploy_and_init tez_m1 in
+  Log.debug
+    ~prefix
+    "Run (catching): L's unauthorized collect must revert the operation" ;
+  let* _ = EvmCollectResult.call_run_catch evm_reader in
+  Log.debug ~prefix "Verify the precompile call was caught as reverted" ;
+  let* () = EvmCollectResult.check_caught ~expected:true evm_reader in
+  Log.debug ~prefix "Verify no bytes surfaced as the caller's result" ;
+  EvmCollectResult.check_result ~expected_hex:"" evm_reader
+
+(** Owner check fires before the owner's own re-collect: M1 collects
+    its own payload, makes a native [TRANSFER_TOKENS] to [L] which
+    also calls [%collect_result], then M1 collects its own payload a
+    second time.  [L]'s natively-reached collect is rejected on owner
+    mismatch and reverts the whole operation before M1's second
+    collect is ever reached — so the failure carries the owner-check
+    error, NOT the [AlreadySet] error M1's re-collect would otherwise
+    trip. *)
+let test_crac_collect_result_owner_recollect_after_native_reverts () =
+  register_crac_runner_test
+    ~title:
+      "CRAC: a native callee's collect reverts before the owner's re-collect"
+    ~tags:["collect_result"; "http_call"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let m1_payload_hex = "cafe" in
+  let l_payload_hex = "beef" in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate L (calls %%collect_result with its own bytes)" ;
+  let* tez_l = TezCollectResult.originate ~payload_hex:l_payload_hex () in
+  Log.debug
+    ~prefix
+    "Originate M1 (collects own payload, transfers to L, collects own payload \
+     again)" ;
+  let* tez_m1 =
+    TezCollectResultThenCollectOtherThenSelf.originate
+      ~other:tez_l
+      ~payload_hex:m1_payload_hex
+      ()
+  in
+  Log.debug ~prefix "Deploy EVM reader targeting M1" ;
+  let* evm_reader = EvmCollectResult.deploy_and_init tez_m1 in
+  Log.debug
+    ~prefix
+    "Run (catching): L's unauthorized collect should revert the CRAC" ;
+  let* _ = EvmCollectResult.call_run_catch evm_reader in
+  Log.debug ~prefix "Verify the precompile call was caught as reverted" ;
+  let* () = EvmCollectResult.check_caught ~expected:true evm_reader in
+  Log.debug ~prefix "Verify no bytes leaked into the result slot" ;
+  let* () = EvmCollectResult.check_result ~expected_hex:"" evm_reader in
+  Log.debug
+    ~prefix
+    "Verify the failure is L's owner-mismatch collect, not M1's AlreadySet \
+     re-collect" ;
+  let* statuses = TezRunner.get_collect_result_statuses () in
+  let owner_mismatch_error =
+    "Transfer(GatewayError(\"collect_result: sender is not the dispatch slot \
+     owner\"))"
+  in
+  let already_set_error =
+    "Transfer(GatewayError(\"collect_result: dispatch result already set\"))"
+  in
+  let failed = List.filter (fun (status, _) -> status = "failed") statuses in
+  Check.(
+    (List.length failed = 1)
+      int
+      ~error_msg:
+        "Expected exactly %R failed %%collect_result op (L's owner mismatch), \
+         got %L") ;
+  let has_already_set =
+    List.exists (fun (_, error) -> error = Some already_set_error) statuses
+  in
+  Check.(
+    (has_already_set = false)
+      bool
+      ~error_msg:
+        "No %%collect_result op should fail with AlreadySet: the owner check \
+         must revert before M1's re-collect (got %L)") ;
+  (match failed with
+  | [(_, error)] ->
+      Check.(
+        (error = Some owner_mismatch_error)
+          (option string)
+          ~error_msg:
+            "The failed collect must carry the owner-mismatch error %R, got %L")
+  | _ -> Test.fail "Unreachable: failed list length was checked above") ;
+  unit
+
 (** End-to-end revert-path check: the Michelson contract deposits bytes
     via [%collect_result] then triggers a failure via a second internal
     op.  The server must return 4xx with no bytes leaking, so the EVM
@@ -15633,6 +15960,9 @@ let () =
   test_crac_gas_oog_path_reporting () ;
   test_crac_collect_result_surfaces_in_response_body () ;
   test_crac_collect_result_rejects_nonzero_amount () ;
+  test_crac_collect_result_injection_native_callee_reverts () ;
+  test_crac_collect_result_grief_native_callee_reverts () ;
+  test_crac_collect_result_owner_recollect_after_native_reverts () ;
   test_crac_collect_result_revert_discards_bytes () ;
   test_crac_collect_result_size_sweep_matches_model () ;
   test_crac_collect_result_fire_and_forget_empty_body () ;

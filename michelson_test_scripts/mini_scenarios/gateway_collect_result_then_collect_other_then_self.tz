@@ -1,0 +1,54 @@
+# Deposits a bytes payload via the gateway's %collect_result entrypoint,
+# then makes an internal TRANSFER_TOKENS (unit parameter, 0 mutez) to
+# another Michelson contract, then deposits the SAME bytes payload via
+# %collect_result a second time. Used to verify that a natively-reached
+# callee's dropped %collect_result (owner mismatch) neither errors nor
+# occupies the dispatch slot: this contract's own second collect must
+# still trip the once-per-frame invariant and revert the whole
+# operation, exactly as if the internal transfer had never happened.
+#
+# Storage: pair address (pair address bytes)
+#   1st address = gateway KT1 (target of %collect_result)
+#   2nd address = internally-called contract KT1 (unit parameter)
+#   bytes       = payload deposited via %collect_result (twice)
+parameter unit;
+storage (pair address (pair address bytes));
+code {
+       CDR;
+       DUP;
+       CAR;
+       CONTRACT %collect_result bytes;
+       ASSERT_SOME;
+       DUP 2;
+       CDR;
+       CDR;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       DUP 2;
+       CDR;
+       CAR;
+       CONTRACT unit;
+       ASSERT_SOME;
+       PUSH mutez 0;
+       UNIT;
+       TRANSFER_TOKENS;
+       DUP 3;
+       CAR;
+       CONTRACT %collect_result bytes;
+       ASSERT_SOME;
+       DUP 4;
+       CDR;
+       CDR;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       NIL operation;
+       SWAP;
+       CONS;
+       SWAP;
+       CONS;
+       SWAP;
+       CONS;
+       PAIR
+     };
