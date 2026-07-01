@@ -154,62 +154,31 @@ let jobs pipeline_type =
     | Before_merging -> [job_start]
   in
 
-  (* Used in trigger job definitions. For code verification pipelines,
-     add type of parent pipeline. This definition shadows
-     [Tezos_ci.trigger_job]. *)
-  let trigger_job ~__POS__ ?rules ?dependencies ?description ?variables
-      child_pipeline_path =
-    trigger_job
-      ~__POS__
-      ?rules
-      ?dependencies
-      ?description
-      ?variables
-      ~parent_pipeline_name:(code_verification_pipeline_name pipeline_type)
-      child_pipeline_path
-  in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
 
   (* Test jobs*)
   let test =
-    let job_homebrew_trigger_auto =
-      trigger_job
-        ~__POS__
+    let create_job =
+      Homebrew.make_job_create_homebrew_formula
         ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
-        ~stage:Stages.test
         ~dependencies:dependencies_needs_start
-        Homebrew.child_pipeline_full_auto
+        ()
     in
-
+    let build_job =
+      Homebrew.make_job_build_homebrew_formula
+        ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
+        ~create_job
+        ()
+    in
+    let macos_job =
+      Homebrew.make_job_build_homebrew_formula_macosx
+        ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
+        ~create_job
+        ()
+    in
     match pipeline_type with
-    | Before_merging | Merge_train -> [job_homebrew_trigger_auto]
+    | Before_merging | Merge_train -> [create_job; build_job; macos_job]
     | Schedule_extended_test -> []
   in
 
-  (* Manual jobs *)
-  let manual =
-    let job_homebrew_repository_trigger : tezos_job =
-      (* We leave the possibility to run this pipeline manually, in particular
-         to generate the formula on scheduled pipelines *)
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:Yes ())
-        ~dependencies:(Dependent [])
-        ~stage:Stages.manual
-        Homebrew.child_pipeline_full
-    in
-    match pipeline_type with
-    | Before_merging ->
-        (* Note: manual jobs in stage [manual] (which is the final
-             stage) in [Before_merging] pipelines should be [Dependent]
-             by default, and in particular [Dependent []] if they have
-             no need for artifacts from other jobs. Making these
-             dependent on [job_start] is redundant since they are
-             already manual, and what's more, puts the pipeline in a
-             confusing "pending state" with a yellow "pause" icon on the
-             [manual] stage. *)
-        [job_homebrew_repository_trigger]
-    (* No manual jobs on the scheduled pipeline *)
-    | Merge_train | Schedule_extended_test -> []
-  in
-  start_stage @ test @ manual
+  start_stage @ test

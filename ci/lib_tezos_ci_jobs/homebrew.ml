@@ -8,26 +8,30 @@
 open Tezos_ci
 open Tezos_ci.Cache
 
-type homebrew_pipeline = Full | Release
-
 let image = Images.Base_images.debian_homebrew_trixie
 
 let stage = Stages.build
 
 (* this job creates a formula from a template
      using the homebrew_release.sh script *)
-let job_create_homebrew_formula : tezos_job =
+let make_job_create_homebrew_formula ?rules ?(dependencies = Dependent []) () :
+    tezos_job =
   job
     ~__POS__
     ~name:"oc.create-homebrew-formula"
     ~arch:Amd64
     ~image
     ~stage
+    ?rules
+    ~dependencies
     ["./scripts/packaging/homebrew_release.sh"]
+
+let job_create_homebrew_formula : tezos_job =
+  make_job_create_homebrew_formula ()
 
 (* this job tests if the formula created by job_create_homebrew_formula
      can be compiled and installed *)
-let job_build_homebrew_formula : tezos_job =
+let make_job_build_homebrew_formula ?rules ~create_job () : tezos_job =
   job
     ~__POS__
     ~name:"oc.build-homebrew-formula"
@@ -36,7 +40,8 @@ let job_build_homebrew_formula : tezos_job =
     ~allow_failure:No
     ~image
     ~stage
-    ~dependencies:(Dependent [Job job_create_homebrew_formula])
+    ?rules
+    ~dependencies:(Dependent [Job create_job])
     ~variables:
       [
         ("DUNE_BUILD_JOBS", "-j 12");
@@ -51,7 +56,10 @@ let job_build_homebrew_formula : tezos_job =
     ]
   |> enable_networked_cargo
 
-let job_build_homebrew_formula_macosx : tezos_job =
+let job_build_homebrew_formula : tezos_job =
+  make_job_build_homebrew_formula ~create_job:job_create_homebrew_formula ()
+
+let make_job_build_homebrew_formula_macosx ?rules ~create_job () : tezos_job =
   job
     ~__POS__
     ~name:"oc.build-homebrew-formula-macosx"
@@ -59,10 +67,11 @@ let job_build_homebrew_formula_macosx : tezos_job =
     ~variables:[("TAGS", "saas-macos-large-m2pro")]
     ~parallel:
       (Matrix [[("MACOS_IMAGE", ["macos-15-xcode-16"; "macos-26-xcode-26"])]])
-    ~dependencies:(Dependent [Job job_create_homebrew_formula])
+    ~dependencies:(Dependent [Job create_job])
     ~stage
     ~description:"Run the homebrew installation on MacOSX"
     ~allow_failure:Yes
+    ?rules
     ~tag:Dynamic
     [
       "./scripts/packaging/homebrew_install.sh";
@@ -70,31 +79,15 @@ let job_build_homebrew_formula_macosx : tezos_job =
       "./scripts/packaging/test_homebrew_install.sh";
     ]
 
-let jobs pipeline_type : tezos_job list =
-  match pipeline_type with
-  | Release -> [job_create_homebrew_formula]
-  | Full ->
-      [
-        job_build_homebrew_formula;
-        job_create_homebrew_formula;
-        job_build_homebrew_formula_macosx;
-      ]
+let job_build_homebrew_formula_macosx : tezos_job =
+  make_job_build_homebrew_formula_macosx
+    ~create_job:job_create_homebrew_formula
+    ()
 
-let jobs pipeline_type = job_datadog_pipeline_trace :: jobs pipeline_type
-
-let child_pipeline_full =
-  Pipeline.register_child
-    "homebrew"
-    ~description:
-      "A child pipeline of 'before_merging' building and testing the homebrew \
-       packaging. Manually triggered."
-    ~jobs:(jobs Full)
-
-let child_pipeline_full_auto =
-  Pipeline.register_child
-    "homebrew_auto"
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       and testing the homebrew packaging. Starts automatically on certain \
-       conditions."
-    ~jobs:(jobs Full)
+let jobs =
+  [
+    Tezos_ci.job_datadog_pipeline_trace;
+    job_build_homebrew_formula;
+    job_create_homebrew_formula;
+    job_build_homebrew_formula_macosx;
+  ]

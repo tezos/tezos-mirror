@@ -375,7 +375,7 @@ let () =
   register
     "homebrew.daily"
     homebrew_daily
-    ~jobs:(Homebrew.(jobs Full) |> List.map (with_interruptible false))
+    ~jobs:(Homebrew.jobs |> List.map (with_interruptible false))
     ~description:
       "Daily pipeline containing all Homebrew jobs (build and extended tests)." ;
   register
