@@ -383,11 +383,6 @@ let () =
     [(Auto, job_docker_promote_to_latest `test)] ;
   ()
 
-(** Create an Octez release tag pipeline of type {!pipeline_type},
-    which is expected to be a release pipeline type. *)
-let octez_jobs (pipeline_type : Cacio.global_pipeline) =
-  Cacio.get_jobs pipeline_type
-
 let job_docker_promote_to_version =
   Cacio.parameterize @@ fun mode ->
   CI.job
