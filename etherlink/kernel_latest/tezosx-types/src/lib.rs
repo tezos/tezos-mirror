@@ -393,6 +393,18 @@ pub mod gas {
         }
     }
 
+    /// Like [`convert`], but rounds UP. Use on charge-back paths so the
+    /// charged EVM gas never under-covers the consumed milligas. Do **not**
+    /// use for gas-limit forwarding.
+    pub fn convert_ceil(source: RuntimeId, target: RuntimeId, gas: u64) -> Option<u64> {
+        match (source, target) {
+            (RuntimeId::Tezos, RuntimeId::Ethereum) => {
+                Some(gas.div_ceil(EVM_GAS_TO_MILLIGAS))
+            }
+            _ => convert(source, target, gas),
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -452,6 +464,44 @@ pub mod gas {
         fn zero() {
             assert_eq!(convert(RuntimeId::Ethereum, RuntimeId::Tezos, 0), Some(0));
             assert_eq!(convert(RuntimeId::Tezos, RuntimeId::Ethereum, 0), Some(0));
+        }
+
+        #[test]
+        fn tezos_to_ethereum_ceil_rounds_up() {
+            // 944 = 22 * 42 + 20 (the %collect_result witness from L2-1751).
+            assert_eq!(
+                convert_ceil(RuntimeId::Tezos, RuntimeId::Ethereum, 944),
+                Some(43)
+            );
+            // Exact multiple: no over-charge.
+            assert_eq!(
+                convert_ceil(
+                    RuntimeId::Tezos,
+                    RuntimeId::Ethereum,
+                    EVM_GAS_TO_MILLIGAS * 42
+                ),
+                Some(42)
+            );
+            assert_eq!(
+                convert_ceil(RuntimeId::Tezos, RuntimeId::Ethereum, 1),
+                Some(1)
+            );
+            assert_eq!(
+                convert_ceil(RuntimeId::Tezos, RuntimeId::Ethereum, 0),
+                Some(0)
+            );
+        }
+
+        #[test]
+        fn ceil_other_paths_match_convert() {
+            assert_eq!(
+                convert_ceil(RuntimeId::Ethereum, RuntimeId::Tezos, 100),
+                Some(100 * EVM_GAS_TO_MILLIGAS)
+            );
+            assert_eq!(
+                convert_ceil(RuntimeId::Ethereum, RuntimeId::Ethereum, 42),
+                Some(42)
+            );
         }
     }
 }

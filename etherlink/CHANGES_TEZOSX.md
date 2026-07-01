@@ -4,6 +4,9 @@
 
 ### EVM Runtime
 
+- Cross-runtime calls: the EVM-side charge-back for consumed gas now rounds the
+  milligas→EVM-gas conversion up instead of down, so the sub-22-milligas
+  remainder of each hop is no longer left uncharged. (!22350)
 - **Breaking change (requires a previewnet reset):** the address origin
   classification — alias payload included — now lives inside the
   account info record (`/info`, fourth RLP field); the sibling
