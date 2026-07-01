@@ -436,6 +436,29 @@ catching_up:
         { "from": integer ∈ [-2^31-1, 2^31],
           "to": integer ∈ [-2^31-1, 2^31] } }
   
+cleared_shadownet_finalized_levels:
+  description: Shadownet: cleared the finalized L1/L2 levels past the healed head {healed_level} from the store, new finalized level is {level}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* cleared_shadownet_finalized_levels version 0 */
+      "cleared_shadownet_finalized_levels.v0":
+        { "healed_level": $unistring,
+          "level": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+cleared_shadownet_pending_confirmations:
+  description: Shadownet: cleared the pending confirmations from the store
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* cleared_shadownet_pending_confirmations version 0 */
+      "cleared_shadownet_pending_confirmations.v0": any }
+  
 compressing_snapshot:
   description: compressing snapshot {filename}
   level: notice
@@ -1261,6 +1284,22 @@ gcp_kms_sign_transient_error:
       "gcp_kms_sign_transient_error.v0":
         { "attempt": integer ∈ [-2^30, 2^30],
           "reason": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+healed_shadownet_sequencer_key:
+  description: Shadownet: sequencer public key healed in the local state, set to {key}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* healed_shadownet_sequencer_key version 0 */
+      "healed_shadownet_sequencer_key.v0": $Signature.Public_key }
+    $Signature.Public_key:
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
+      $unistring
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
