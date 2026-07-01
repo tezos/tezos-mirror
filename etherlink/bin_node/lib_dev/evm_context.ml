@@ -94,6 +94,10 @@ type t = {
   configuration : Configuration.t;
   index : Pvm.Context.rw_index;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
+  chain_id : L2_types.chain_id option;
+      (** The L2 chain id, read once from the durable storage at startup (it is
+          immutable for the life of the node). [None] for a freshly created
+          node whose state has no chain id yet. *)
   store : Evm_store.t;
   session : session_state;
   signer : Signer.map option;
@@ -2445,11 +2449,17 @@ module State = struct
       else Disabled
     in
 
+    (* Read the chain id once at startup; it is immutable for the life of the
+       node, so callers can rely on the cached value instead of reading the
+       durable storage on every event. *)
+    let* chain_id = Durable_storage.read_opt Chain_id evm_state in
+
     let ctxt =
       {
         configuration;
         index;
         smart_rollup_address;
+        chain_id;
         session =
           {
             context;
