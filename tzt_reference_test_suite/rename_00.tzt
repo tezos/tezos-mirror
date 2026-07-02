@@ -1,0 +1,3 @@
+code { RENAME } ;
+input { Stack_elt unit Unit } ;
+output { Stack_elt unit Unit }
