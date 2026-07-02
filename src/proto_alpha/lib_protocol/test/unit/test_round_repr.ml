@@ -681,9 +681,64 @@ let test_round_and_offset_correction =
       | Ok _, Error _ -> failwith "expected error is ok"
       | Error _, Ok _ -> failwith "expected ok is error")
 
+(* The block round is folded into the cache nonce so that two blocks sharing
+   the same payload but baked at different rounds obtain distinct nonces. *)
+module Test_cache_nonce = struct
+  let dummy_shell : Block_header.shell_header =
+    {
+      level = 0l;
+      proto_level = 0;
+      predecessor = Block_hash.zero;
+      timestamp = Time.Protocol.epoch;
+      validation_passes = 0;
+      operations_hash = Operation_list_list_hash.zero;
+      fitness = [];
+      context = Context_hash.zero;
+    }
+
+  let dummy_contents : Block_header.contents =
+    {
+      payload_hash = Block_payload_hash.zero;
+      payload_round = Round.zero;
+      per_block_votes =
+        {liquidity_baking_vote = Per_block_votes.Per_block_vote_pass};
+      seed_nonce_hash = None;
+      proof_of_work_nonce =
+        Bytes.make Constants_repr.proof_of_work_nonce_size '0';
+    }
+
+  let nonce_at round =
+    Cache.cache_nonce_from_block_header ~round dummy_shell dummy_contents
+
+  (* [cache_nonce] is abstract; it is [bytes] underneath, so structural
+     equality compares its content. *)
+  let equal_nonce a b = Stdlib.( = ) a b
+
+  let test_round_makes_nonce_branch_unique () =
+    let open Lwt_result_syntax in
+    let n0 = nonce_at Round.zero in
+    let n0' = nonce_at Round.zero in
+    let n1 = nonce_at (Round.succ Round.zero) in
+    (* The nonce must be stable for a fixed round: the baker computes it at
+       block construction and the validator must recompute the same one at
+       application. *)
+    let* () =
+      if equal_nonce n0 n0' then return_unit
+      else failwith "cache_nonce must be stable for a fixed round"
+    in
+    if not (equal_nonce n0 n1) then return_unit
+    else
+      failwith
+        "sibling blocks at different rounds must get distinct cache nonces"
+end
+
 let tests =
   Tztest.
     [
+      tztest
+        "cache_nonce depends on block round"
+        `Quick
+        Test_cache_nonce.test_round_makes_nonce_branch_unique;
       tztest "level_offset_of_round" `Quick test_level_offset_of_round;
       tztest "Round_duration" `Quick test_round;
       tztest "round_of_timestamp" `Quick test_round_of_timestamp;
