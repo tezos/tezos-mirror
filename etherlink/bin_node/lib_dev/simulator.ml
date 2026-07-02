@@ -516,6 +516,12 @@ module Http_trace = struct
     let* simulation_state =
       Evm_ro_context.get_state ctxt ~block:block_param ()
     in
+    (* Enable trace capture for this simulation: the kernel only clones the
+       cross-runtime HTTP traces when this flag is set, so plain [eth_call]
+       does not pay for it. *)
+    let* simulation_state =
+      Evm_ro_context.Http_tracer.set_http_trace_flag simulation_state
+    in
     let timestamp = Misc.now () in
     let* simulation_version = Etherlink.simulation_version simulation_state in
     let*? messages =
@@ -573,6 +579,8 @@ module Http_trace = struct
   let trace_michelson_call ctxt ~skip_signature ~operation ~block =
     let open Lwt_result_syntax in
     let* state = Evm_ro_context.get_state ctxt ~block () in
+    (* Enable trace capture for this simulation — see [trace_evm_call]. *)
+    let* state = Evm_ro_context.Http_tracer.set_http_trace_flag state in
     let skip_sig_bytes =
       if skip_signature then Bytes.make 1 '\001' else Bytes.make 1 '\000'
     in

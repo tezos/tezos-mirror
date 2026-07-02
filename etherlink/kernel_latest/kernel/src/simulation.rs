@@ -517,9 +517,11 @@ impl Evaluation {
             Default::default(),
             constants.clone(),
         );
-        // The result is always paired with its traces below (→
-        // `store_simulation_http_traces`), so capture is on for every call.
-        journal.set_http_trace_enabled(true);
+        // Capture HTTP traces only when the node requested them (it writes
+        // the flag before an `http_traceCall`). Plain `eth_call` /
+        // `eth_estimateGas` — which share this path and are called a lot —
+        // leave the flag unset and pay no trace clone.
+        journal.set_http_trace_enabled(crate::storage::is_http_trace_enabled(host));
         let sim_result = match revm_run_transaction(
             host,
             registry,

@@ -317,9 +317,13 @@ where
         trace_operation_hash,
         block_constants.evm_runtime_block_constants.clone(),
     );
-    // This journal exists solely to capture traces for the `http_trace*`
-    // RPCs (read back via `into_http_traces` below), so capture is always on.
-    trace_journal.set_http_trace_enabled(true);
+    // Capture HTTP traces only when the node requested them by writing the
+    // flag before an `http_traceCall` (read back via `into_http_traces`
+    // below). This entrypoint is shared with the non-trace Michelson
+    // simulate used by `eth_call` / `eth_estimateGas`, which leave the flag
+    // unset and pay no trace clone. Read on the base host, before any
+    // `SafeStorage` wrapping, exactly as the applied path does.
+    trace_journal.set_http_trace_enabled(crate::storage::is_http_trace_enabled(&host));
     let execution_result = match transaction {
         chains::TezosXTransaction::Tezos(operation) => {
             let enable_gas_refund = chain_config

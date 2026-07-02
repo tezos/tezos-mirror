@@ -511,12 +511,13 @@
 ### Internals
 
 - The cross-runtime gateway no longer clones each leg's request body and
-  full response into the journal's in-memory HTTP-trace stack when HTTP
-  trace capture is disabled (the default for block production). The clone
-  is now gated on the per-transaction `http_trace_enabled` flag, so a
-  normal block no longer retains O(payload) uncharged bytes per
-  cross-runtime leg; the trace-simulation paths that surface the
-  `http_trace*` RPCs keep capturing. (!22352)
+  full response into the journal's in-memory HTTP-trace stack unless HTTP
+  trace capture is requested. The clone is gated on the `http_trace_enabled`
+  flag on both the block-production path (off by default) and the simulation
+  path — so a normal block, an `eth_call` and an `eth_estimateGas` retain no
+  O(payload) uncharged bytes per cross-runtime leg, while the `http_trace*`
+  RPCs still capture (the node sets the flag before the trace replay or
+  simulation). (!22352)
 - Michelson callee now reports the storage cost it allocates back to
   the caller through `X-Tezos-Storage-Cost` (post-execution) and
   `alias_storage_cost` (pre-dispatch, on alias materialization).
