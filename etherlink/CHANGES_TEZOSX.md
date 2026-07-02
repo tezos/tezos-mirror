@@ -4,6 +4,14 @@
 
 ### EVM Runtime
 
+- A signed transaction's signature scalars `r`/`s` are now
+  rejected unless canonically encoded. A list-shaped or leading-zero-padded
+  scalar decodes to the same value but changes the raw bytes, so one signed
+  transaction had several valid wire encodings, each with a distinct
+  `tx_hash`, a transaction-hash malleability. There is no fund or consensus
+  impact (both encodings share `(sender, nonce)` and execute at most once);
+  the risk was to third parties tracking a transaction by its hash (wallets,
+  indexers, bridges). (!22371)
 - Cross-runtime calls: the EVM-side charge-back for consumed gas now rounds the
   milligas→EVM-gas conversion up instead of down, so the sub-22-milligas
   remainder of each hop is no longer left uncharged. (!22350)
