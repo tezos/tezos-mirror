@@ -265,8 +265,8 @@ pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TezlinkOriginatedAccount {
-    pub path: OwnedPath,
-    pub kt1: ContractKt1Hash,
+    pub(crate) path: OwnedPath,
+    pub(crate) kt1: ContractKt1Hash,
 }
 
 impl TezlinkAccount for TezlinkOriginatedAccount {

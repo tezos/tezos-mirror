@@ -30,9 +30,7 @@ use mir::typechecker::{
 };
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_data_encoding::types::{Narith, Zarith};
-use tezos_execution::account_storage::{
-    TezlinkAccount, TezlinkOriginatedAccount, TezosOriginatedAccount,
-};
+use tezos_execution::account_storage::TezlinkAccount;
 use tezos_execution::context;
 use tezos_execution::mir_ctx::{Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx};
 use tezos_execution::{OriginationNonce, TezlinkOperationGas};
@@ -293,10 +291,7 @@ where
         amount: 0,
         self_address: AddressHash::Kt1(destination_kt1.clone()),
         balance,
-        contract_account: TezlinkOriginatedAccount {
-            path: dest_account.path().clone(),
-            kt1: dest_account.kt1().clone(),
-        },
+        contract_account: dest_account,
     };
 
     let mut mir_ctx = Ctx {
