@@ -627,12 +627,6 @@ module Context = struct
             observe start_loading_cache_lazily stop_loading_cache_lazily
             @@ fun () -> load_on_demand ctxt cache builder)
 
-    let ensure_valid_recycling (Context ctxt) cache =
-      let open Lwt_syntax in
-      let* layout = get_cache_layout (Context ctxt) in
-      if Environment_cache.compatible_layout cache layout then Lwt.return cache
-      else Lwt.return (Environment_cache.from_layout layout)
-
     let key_rank (Context ctxt) key = Environment_cache.key_rank ctxt.cache key
 
     let cache_size (Context ctxt) ~cache_index =
@@ -672,14 +666,19 @@ module Context = struct
         else
           (*
 
-             The client of [load_cache] has provided a cache that is not
-             the cache of the predecessor but the predecessor and the
-             block have a common ancestor. Therefore, the inherited
-             cache is supposed to contain many entries that can be
-             recycled to build the new cache.
+             The provided in-memory cache is not the predecessor's (for
+             instance after a reorg, where the last-applied block is on a
+             sibling branch). In that case we do not recycle its entries:
+             an entry could otherwise be reused for a key whose
+             [cache_nonce] matches the committed one while its value
+             differs. We rebuild the cache from the committed context,
+             exactly as the [`Load] source does. The [`Inherited] fast path
+             above (equal hashes) keeps linear application cheap; only this
+             less common case pays a full rebuild.
 
           *)
-          let* cache = Cache.ensure_valid_recycling (Context ctxt) cache in
+          let* layout = Cache.get_cache_layout (Context ctxt) in
+          let cache = Environment_cache.from_layout layout in
           Cache.load_cache (Context ctxt) cache `Load builder
     | (`Load | `Lazy) as mode ->
         let* layout = Cache.get_cache_layout (Context ctxt) in
