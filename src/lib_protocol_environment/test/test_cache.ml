@@ -741,8 +741,94 @@ let check_load_cache_fails_if_builder_fails mode_label mode =
             ("Unexpected success while testing from_cache " ^ mode_label)
       | _ -> true)
 
+(*
+
+   Loading a cache inherited from a non-predecessor block
+   ======================================================
+
+   When a cache is inherited from a block that is not the predecessor of the
+   block being loaded (for instance after a reorg, where the last-applied block
+   is on a sibling branch), its entries are not recycled: an entry whose
+   [cache_nonce] matches the committed one could otherwise be reused with a
+   value from another branch. [Context.load_cache] instead rebuilds from the
+   committed context, exactly as [`Load].
+
+   This test builds two contexts sharing the same [cache_nonce] for the same key
+   but holding different values, then loads a cache for the first context while
+   inheriting the second's cache under a mismatching predecessor hash. The
+   loaded value must be the one from the committed context (the builder), not
+   the inherited value.
+
+*)
+
+let cache_of_context (ctxt : Context.t) =
+  match ctxt with Context.Context {cache; _} -> cache
+
+let inherited_from_foreign_branch_is_not_recycled seed =
+  let open Lwt_result_syntax in
+  let layout = [100_000] in
+  let cache_index = 0 in
+  let entry_size = 10 in
+  let key = Context.Cache.key_of_identifier ~cache_index "poisoned-key" in
+  (* Both branches share the same cache nonce. *)
+  let nonce = Bytes.of_string "shared-sibling-nonce" in
+  let build_ctxt value =
+    let open Lwt_syntax in
+    let ctxt = Memory_context.empty in
+    let* ctxt = Context.Cache.set_cache_layout ctxt layout in
+    let ctxt = Context.Cache.update ctxt key (Some (Int value, entry_size)) in
+    Context.Cache.sync ctxt ~cache_nonce:nonce
+  in
+  (* Canonical branch: committed context (and builder) yield value 1. *)
+  let*! canon_ctxt = build_ctxt 1 in
+  (* Orphan branch: its in-memory cache holds value 2 with the SAME nonce. *)
+  let*! orphan_ctxt = build_ctxt 2 in
+  let inherited =
+    Context.
+      {
+        context_hash = Tezos_crypto.Hashed.Context_hash.hash_string ["orphan"];
+        cache = cache_of_context orphan_ctxt;
+      }
+  in
+  (* The predecessor hash differs from the inherited cache's hash: this is the
+     cross-branch (reorg) case. *)
+  let predecessor_hash =
+    Tezos_crypto.Hashed.Context_hash.hash_string ["canonical"]
+  in
+  let builder _key = return (Int 1) in
+  let block =
+    Tezos_crypto.Hashed.Block_hash.hash_string
+      ["cache-reorg-test"; string_of_int seed]
+  in
+  let canon_ctxt = Context.Cache.clear canon_ctxt in
+  let* loaded =
+    Context.load_cache
+      block
+      canon_ctxt
+      (`Inherited (inherited, predecessor_hash))
+      builder
+  in
+  let*! v = Context.Cache.find loaded key in
+  match v with
+  | Some (Int 1) -> return true
+  | Some (Int 2) -> return false
+  | _ -> Test.fail_report "unexpected value in cache"
+
+let check_inherited_from_foreign_branch_is_not_recycled =
+  Test.make
+    ~count:25
+    ~name:"inherited cache from a non-predecessor block is not recycled"
+    Gen.int
+    (fun seed ->
+      Lwt_main.run (inherited_from_foreign_branch_is_not_recycled seed)
+      |> function
+      | Ok b -> b
+      | Error _ ->
+          Test.fail_report "unexpected error while testing cross-branch inherit")
+
 let qtests =
   [
+    check_inherited_from_foreign_branch_is_not_recycled;
     check_uninitialised_is_unusable;
     check_from_layout_is_empty;
     check_from_layout_with_negative_size;
