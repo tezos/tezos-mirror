@@ -1473,6 +1473,213 @@ let test_delayed_transfer_is_included =
   in
   unit
 
+(* Minimal RLP surgery on a *signed legacy* transaction, used to exhibit EVM
+   tx-hash malleability.
+
+   [decode_compressed_h256] (etherlink/kernel_latest/ethereum/src/rlp_helpers.rs)
+   decodes the signature scalars [r]/[s] without a minimality check: it accepts a
+   zero-padded encoding and zero-extends it back to the same [H256]. The kernel,
+   however, sets [tx_hash = Keccak256(raw_bytes_as_received)]. So re-encoding [r]
+   (or [s]) one byte longer yields a byte-different transaction that decodes to
+   the exact same logical transaction (same [v/r/s], same recovered sender, valid
+   signature) but hashes to a different [tx_hash]. *)
+module Malleable_rlp = struct
+  (* Big-endian encoding of a non-negative int, no leading zeros (empty for 0). *)
+  let be_of_int n =
+    let rec aux acc n =
+      if n = 0 then acc
+      else aux (String.make 1 (Char.chr (n land 0xff)) ^ acc) (n lsr 8)
+    in
+    aux "" n
+
+  let int_of_be s =
+    let n = ref 0 in
+    String.iter (fun c -> n := (!n lsl 8) lor Char.code c) s ;
+    !n
+
+  (* Canonical RLP encoding of a byte-string. *)
+  let encode_string s =
+    let n = String.length s in
+    if n = 1 && Char.code s.[0] <= 0x7f then s
+    else if n <= 55 then String.make 1 (Char.chr (0x80 + n)) ^ s
+    else
+      let lb = be_of_int n in
+      String.make 1 (Char.chr (0xb7 + String.length lb)) ^ lb ^ s
+
+  (* RLP encoding of a list from its already-encoded items. *)
+  let encode_list items =
+    let payload = String.concat "" items in
+    let n = String.length payload in
+    if n <= 55 then String.make 1 (Char.chr (0xc0 + n)) ^ payload
+    else
+      let lb = be_of_int n in
+      String.make 1 (Char.chr (0xf7 + String.length lb)) ^ lb ^ payload
+
+  (* Split a flat RLP list (a signed legacy tx) into its item *contents*. *)
+  let decode_legacy_items s =
+    let b0 = Char.code s.[0] in
+    let payload_off, payload_len =
+      if b0 >= 0xc0 && b0 <= 0xf7 then (1, b0 - 0xc0)
+      else if b0 >= 0xf8 then
+        let ll = b0 - 0xf7 in
+        (1 + ll, int_of_be (String.sub s 1 ll))
+      else Test.fail "Malleable_rlp: not an RLP list"
+    in
+    let stop = payload_off + payload_len in
+    let rec items off acc =
+      if off >= stop then List.rev acc
+      else
+        let b = Char.code s.[off] in
+        let content, next =
+          if b <= 0x7f then (String.sub s off 1, off + 1)
+          else if b <= 0xb7 then
+            let len = b - 0x80 in
+            (String.sub s (off + 1) len, off + 1 + len)
+          else if b <= 0xbf then
+            let ll = b - 0xb7 in
+            let len = int_of_be (String.sub s (off + 1) ll) in
+            (String.sub s (off + 1 + ll) len, off + 1 + ll + len)
+          else Test.fail "Malleable_rlp: unexpected nested list"
+        in
+        items next (content :: acc)
+    in
+    items payload_off []
+
+  (* [malleate hex] takes the canonical hex encoding (no ["0x"]) of a signed
+     legacy transaction and returns an alternative encoding of the *same* logical
+     transaction with different raw bytes, by prepending a zero byte to whichever
+     of [r]/[s] is shorter than 32 bytes (i.e. has a stripped leading zero).
+     Returns [None] when both are a full 32 bytes (not paddable within the
+     32-byte budget the decoder accepts). *)
+  let malleate hex =
+    let raw = Bytes.to_string (Hex.to_bytes (`Hex hex)) in
+    match decode_legacy_items raw with
+    | [nonce; gas_price; gas; to_; value; data; v; r; s] ->
+        let pad x = "\000" ^ x in
+        let items' =
+          if String.length r < 32 then
+            Some [nonce; gas_price; gas; to_; value; data; v; pad r; s]
+          else if String.length s < 32 then
+            Some [nonce; gas_price; gas; to_; value; data; v; r; pad s]
+          else None
+        in
+        Option.map
+          (fun items' ->
+            let encoded = encode_list (List.map encode_string items') in
+            let (`Hex h) = Hex.of_string encoded in
+            h)
+          items'
+    | _ -> Test.fail "Malleable_rlp: expected a 9-field legacy transaction"
+end
+
+let test_tx_hash_malleability =
+  register_all
+    ~__FILE__
+    ~da_fee:arb_da_fee_for_delayed_inbox
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "malleability"]
+    ~title:"Non-canonical r/s yields tx-hash malleability"
+    ~time_between_blocks:Nothing
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0).address in
+  let receiver = Eth_account.bootstrap_accounts.(1).address in
+  (* 1. Craft a signed legacy transfer whose canonical encoding admits a
+        non-canonical (zero-padded [r]/[s]) twin.
+
+        [cast] uses deterministic (RFC-6979) ECDSA, so for these exact parameters
+        the signature is fixed. Grinding the transfer value offline shows
+        [1 ETH + 138 wei] is the smallest value whose signature has a 31-byte [s]
+        scalar (a stripped leading zero) -- i.e. re-encodable one byte longer. We
+        hardcode it to avoid searching at runtime; [malleate] re-derives the twin
+        and asserts the property still holds. *)
+  let* canonical_raw =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:Wei.(one_eth + (one * Z.of_int 138))
+      ~address:receiver
+      ()
+  in
+  let twin_raw =
+    match Malleable_rlp.malleate canonical_raw with
+    | Some twin -> twin
+    | None ->
+        Test.fail
+          "expected the crafted transaction to have a paddable r/s (its s \
+           scalar should be 31 bytes); cast's signing may have changed"
+  in
+  (* The two encodings are genuinely different bytes... *)
+  Check.((canonical_raw <> twin_raw) string)
+    ~error_msg:"expected the canonical and malleated encodings to differ" ;
+  let hash_of raw =
+    "0x"
+    ^ (`Hex raw |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+     |> Hex.of_bytes |> Hex.show)
+  in
+  let canonical_hash = hash_of canonical_raw in
+  let twin_hash = hash_of twin_raw in
+  (* ...so their keccak (= the kernel's tx-hash) differ too. *)
+  Check.((canonical_hash <> twin_hash) string)
+    ~error_msg:"expected the canonical and malleated tx-hashes to differ" ;
+  (* 2. Submit ONLY the malleated encoding, through the (unconditional) delayed
+        inbox. *)
+  let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
+  let* delayed_hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      twin_raw
+  in
+  (* The delayed inbox keys the tx by keccak(raw bytes) = the malleated hash. *)
+  Check.(("0x" ^ delayed_hash = twin_hash) string)
+    ~error_msg:"the delayed-inbox hash %L should be the malleated hash %R" ;
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  (* 3. The transaction executed (balances moved): a valid, ordinary transfer. *)
+  let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
+  let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
+  Check.((sender_balance_prev > sender_balance_next) Wei.typ)
+    ~error_msg:"expected the sender balance to decrease (before %L, after %R)" ;
+  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
+    ~error_msg:"expected the receiver balance to increase (before %R, after %L)" ;
+  (* 4. The bug: it is retrievable under the malleated hash... *)
+  let*@ receipt_twin =
+    Rpc.get_transaction_receipt ~tx_hash:twin_hash sequencer
+  in
+  (match receipt_twin with
+  | Some _ -> ()
+  | None ->
+      Test.fail
+        "the malleated tx-hash %s should be retrievable on chain"
+        twin_hash) ;
+  (* ...but NOT under the hash the signer's wallet computed for its own
+     transaction. *)
+  let*@ receipt_canonical =
+    Rpc.get_transaction_receipt ~tx_hash:canonical_hash sequencer
+  in
+  (match receipt_canonical with
+  | None -> ()
+  | Some _ ->
+      Test.fail
+        "the canonical tx-hash %s must NOT exist on chain (it was malleated)"
+        canonical_hash) ;
+  unit
+
 let test_delayed_typed_transaction_is_reconstructed =
   register_all
     ~__FILE__
@@ -16742,6 +16949,7 @@ let () =
   test_get_block_by_number_block_param protocols ;
   test_extended_block_param protocols ;
   test_delayed_transfer_is_included protocols ;
+  test_tx_hash_malleability protocols ;
   test_delayed_typed_transaction_is_reconstructed protocols ;
   test_delayed_deposit_is_included protocols ;
   test_empty_deposit_info_does_not_block_valid_deposits protocols ;
