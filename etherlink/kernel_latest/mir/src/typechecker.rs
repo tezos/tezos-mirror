@@ -12460,20 +12460,14 @@ mod typecheck_tests {
     // <inner-lambda>) ; DROP }` (the DROP returns the body stack to `[unit]`
     // for the `out_ty` unification).
     //
-    // `mem::forget` isolates the L2-1663 typecheck fix under test. Dropping the
-    // deep result instead would still overflow: the value is an *alternating*
-    // `TypedValue` -> `Lambda` -> `Rc<[Instruction]>` -> `Push(Rc<TypedValue>)`
-    // -> ... nesting, and neither iterative `Drop` drains across that boundary
-    // (`TypedValue`'s drain does not walk a lambda's instruction code, and
-    // `Instruction`'s drop re-enters `TypedValue`'s), so the drop recurses one
-    // frame per level. That is a separate stack-overflow path (the deep-value
-    // *drop* family, cf. L2-1672) which this MR does not address and which the
-    // production origination path avoids by draining within the 32 KB
-    // operation-size bound; `forget` keeps this test focused on typechecking.
+    // Returns the typechecked value; the caller decides whether to `drop` it
+    // (the [`deeply_nested_container_lambda_value_drops_without_stack_overflow`]
+    // L2-1672 regression) or `mem::forget` it (the typecheck-only test, which
+    // isolates the L2-1663 typecheck fix from the drop path).
     fn typecheck_nested_container_lambda<'a>(
         arena: &'a typed_arena::Arena<Micheline<'a>>,
         depth: usize,
-    ) -> Result<(), TcError> {
+    ) -> Result<TypedValue<'a>, TcError> {
         let unit_ty = Micheline::App(Prim::unit, &[], NO_ANNS);
         let lambda_ty = Micheline::App(
             Prim::lambda,
@@ -12512,13 +12506,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         ctx.gas = Gas::new(u32::MAX);
         let ty = Type::new_pair(Type::Unit, Type::new_lambda(Type::Unit, Type::Unit));
-        match typecheck_value(&top_value, &mut ctx, &ty, AllowForgedLazyStorageId::No) {
-            Ok(tv) => {
-                std::mem::forget(tv);
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
+        typecheck_value(&top_value, &mut ctx, &ty, AllowForgedLazyStorageId::No)
     }
 
     // Regression for L2-1663. Before the fix the value-level `T::Lambda` arm
@@ -12530,7 +12518,9 @@ mod typecheck_tests {
     // return `TypecheckingTooManyRecursiveCalls`). With the value-lambda body
     // routed through the shared `drive` worklist (AfterLambdaValue), depth is
     // bounded by gas/heap only. Run on a 1 MiB worker thread matching the
-    // kernel budget; `mem::forget` (in the helper) skips the recursive Drop.
+    // kernel budget; `mem::forget` keeps this test focused on typechecking (the
+    // drop path is covered separately by
+    // `deeply_nested_container_lambda_value_drops_without_stack_overflow`).
     #[test]
     fn deeply_nested_container_lambda_value_typechecks_without_stack_overflow() {
         use std::thread;
@@ -12539,8 +12529,9 @@ mod typecheck_tests {
             .stack_size(1024 * 1024)
             .spawn(|| {
                 let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
-                typecheck_nested_container_lambda(&arena, DEPTH)
+                let tv = typecheck_nested_container_lambda(&arena, DEPTH)
                     .expect("container-hidden lambda chain must typecheck iteratively");
+                std::mem::forget(tv);
                 TYPECHECK_RECURSION_DEPTH.with(|d| {
                     assert_eq!(
                         d.get(),
@@ -12637,6 +12628,38 @@ mod typecheck_tests {
                 .is_err(),
             "an ill-typed container-hidden Lambda_rec body must be rejected on the value path",
         );
+    }
+
+    // Regression for L2-1672. The L2-1663 fix makes a deep container-hidden
+    // lambda *value* typecheck successfully, so it is now reachable that such a
+    // value is then dropped (e.g. the typechecked origination storage falls out
+    // of scope after validation). The value is an *alternating*
+    // `TypedValue -> Closure::Lambda -> Rc<[Instruction]> -> Push(Rc<TypedValue>)
+    // -> ...` nesting; before the unified drop worklist (`DropNode` in
+    // `ast.rs`), `TypedValue`'s drain let the closure body drop into
+    // `Drop for Instruction`, whose `Push` arm re-entered the value drain — one
+    // native frame per level, overflowing the kernel's WASM stack on drop (a
+    // size-legal value ~depth 1150 aborted the PVM end-to-end). With the drop
+    // worklist spanning the `TypedValue <-> Instruction` boundary, the
+    // alternation stays on the heap. Run on a 1 MiB worker thread matching the
+    // kernel budget; this DROPs the value (no `mem::forget`).
+    #[test]
+    fn deeply_nested_container_lambda_value_drops_without_stack_overflow() {
+        use std::thread;
+        const DEPTH: usize = 5_000;
+        thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+                let tv = typecheck_nested_container_lambda(&arena, DEPTH)
+                    .expect("container-hidden lambda chain must typecheck iteratively");
+                // The point of the test: dropping this deep alternating value
+                // must not overflow the (kernel-sized) stack.
+                drop(tv);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
     }
 
     // Regression: pre-fix, nested LAMBDAs grew the Rust call stack by one

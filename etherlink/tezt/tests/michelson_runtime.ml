@@ -5528,6 +5528,31 @@ let test_deep_container_lambda_storage =
     ~burn_cap:(Tez.of_int 10)
     ()
 
+(* L2-1703 regression. Once the L2-1663 fix makes *typechecking* a deep
+   container-hidden lambda value iterative, such a value is ACCEPTED at
+   origination (see [test_deep_container_lambda_storage]) — after which the
+   in-memory typechecked [TypedValue] is dropped (the stored storage is
+   re-encoded to bytes). Dropping it crosses the [TypedValue] <-> [Instruction]
+   boundary (ast.rs [extract_tv_children] Lambda arm lets the [Closure::Lambda]
+   drop into [Drop for Instruction], whose [Push] arm re-enters
+   [drain_deep_typed_value]); before L2-1703 the two iterative drainers did NOT
+   span that boundary, so the drop recursed one native frame per nesting level.
+   This test originates just under the 32 KB [max_operation_data_length]
+   prevalidation limit (the deepest reachable through the sequencer) and replays
+   through the small-stack PVM: a residual overflow would stall
+   [bake_until_sync] (test timeout). *)
+let deep_container_lambda_drop_depth = 1150
+
+let test_deep_container_lambda_storage_drop =
+  register_deep_container_lambda_storage_test
+    ~title:
+      "Deep container-hidden lambda storage value does not overflow on drop"
+    ~extra_tags:["drop"]
+    ~alias:"deep_container_lambda_drop"
+    ~depth:deep_container_lambda_drop_depth
+    ~burn_cap:(Tez.of_int 20)
+    ()
+
 (* Originates a contract whose recursive lambda loops via self execution.
    After the conversion the interpreter exhausts gas instead of trapping
    the WASM stack. Script reused by the cross runtime test. *)
@@ -6206,5 +6231,6 @@ let () =
   test_deep_if_code [Alpha] ;
   test_deep_or_param [Alpha] ;
   test_deep_container_lambda_storage [Alpha] ;
+  test_deep_container_lambda_storage_drop [Alpha] ;
   test_recursive_lambda_exhausts_gas [Alpha] ;
   test_deep_type_in_invalid_arg_error [Alpha]
