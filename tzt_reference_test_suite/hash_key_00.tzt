@@ -1,0 +1,3 @@
+code { HASH_KEY } ;
+input { Stack_elt key "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" } ;
+output { Stack_elt key_hash "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" }
