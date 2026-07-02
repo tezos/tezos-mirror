@@ -243,6 +243,7 @@ let hooks ~check_invalid_kernel ~fallback_to_slow_vm =
     no_hooks
     |> on_fast_exec_panicked panicked_hook
     |> fast_exec_fallback fallback_to_slow_vm
+    |> on_fast_exec_wasm_trap Interpreter_event.fast_exec_wasm_trap
   in
   if check_invalid_kernel then hooks
   else disable_fast_exec_invalid_kernel_check hooks

@@ -8,6 +8,7 @@
 type fast_exec = {
   invalid_kernel :
     [`Check_with_hook of (unit -> unit Lwt.t) option | `No_check];
+  wasm_trap : (string -> unit Lwt.t) option;
   panicked : (exn -> unit Lwt.t) option;
   completed : (unit -> unit Lwt.t) option;
   fallback : bool;
@@ -22,6 +23,7 @@ let no_hooks =
     fast_exec =
       {
         invalid_kernel = `Check_with_hook None;
+        wasm_trap = None;
         panicked = None;
         completed = None;
         fallback = true;
@@ -38,6 +40,9 @@ let on_fast_exec_invalid_kernel hook hooks =
     fast_exec =
       {hooks.fast_exec with invalid_kernel = `Check_with_hook (Some hook)};
   }
+
+let on_fast_exec_wasm_trap hook hooks =
+  {hooks with fast_exec = {hooks.fast_exec with wasm_trap = Some hook}}
 
 let on_fast_exec_panicked hook hooks =
   {hooks with fast_exec = {hooks.fast_exec with panicked = Some hook}}

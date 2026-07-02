@@ -1,0 +1,5 @@
+(module
+  (memory 1)
+  (export "memory" (memory 0))
+  (func $kernel_run (export "kernel_run")
+    (call $kernel_run)))

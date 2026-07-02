@@ -42,9 +42,8 @@ let run_slow =
   Wasm.compute_step_many
     ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
 
-let apply_fast ?write_debug ?(fast_should_run = true)
-    ?(images = Preimage_map.empty) ?metadata ?(stop_at_snapshot = false)
-    ?(max_steps = Int64.max_int) counter tree =
+let apply_fast ?write_debug ?(images = Preimage_map.empty) ?metadata
+    ?(stop_at_snapshot = false) ?(max_steps = Int64.max_int) tree =
   let open Lwt.Syntax in
   let run_counter = ref 0l in
   let reveal_builtins req =
@@ -77,14 +76,8 @@ let apply_fast ?write_debug ?(fast_should_run = true)
       ~max_steps
       tree
   in
-  if counter > 0l then
-    (* Assert that the FE actual ran. We must consider that before the first
-       message is inserted, FE is unlikely to run. *)
-    if fast_should_run && !run_counter <= 0l then
-      Stdlib.failwith "Fast Execution was expected to run!"
-    else if (not fast_should_run) && !run_counter > 0l then
-      (* If we didn't expect FE to run, and e.g. expected it to fallback to PVM *)
-      Stdlib.failwith "Fast Execution was NOT expected to run!" ;
+  if (not stop_at_snapshot) && !run_counter <= 0l then
+    Stdlib.failwith "Fast Execution was expected to run!" ;
   (tree, ticks)
 
 let rec apply_slow ?write_debug ?images ?metadata ?(max_steps = Int64.max_int)
@@ -141,7 +134,7 @@ and check_reveal ?write_debug ?(images = Preimage_map.empty) ?metadata
     - [write_debug] is the implementation of the host function to use.
     - [metadata] is used in case of Reveal_metadata step.
     - [images] is a hashmap used in case of reveal steps. *)
-let test_against_both ~version ?write_debug ?(fast_should_run = true)
+let test_against_both ~version ?write_debug
     ?(set_input = Wasm_utils.set_full_input_step) ?images ?metadata ~from_binary
     ~kernel ~messages ?(max_steps = Int64.max_int) () =
   let open Lwt.Syntax in
@@ -153,7 +146,7 @@ let test_against_both ~version ?write_debug ?(fast_should_run = true)
     let hash2 = Tezos_context_memory.Context_binary.Tree.hash tree in
 
     (* kernel_run (including reboots) *)
-    let* tree = apply counter tree in
+    let* tree = apply tree in
     let hash3 = Tezos_context_memory.Context_binary.Tree.hash tree in
 
     let+ stuck = Wasm_utils.Wasm.Internal_for_tests.is_stuck tree in
@@ -189,20 +182,11 @@ let test_against_both ~version ?write_debug ?(fast_should_run = true)
   in
 
   let* slow_hashes =
-    run_with (fun _ -> apply_slow ?write_debug ?images ?metadata ~max_steps)
+    run_with (apply_slow ?write_debug ?images ?metadata ~max_steps)
   in
   let* fast_hashes =
-    run_with (fun i t ->
-        let+ tree, _ =
-          apply_fast
-            ~fast_should_run
-            ?write_debug
-            ?images
-            ?metadata
-            ~max_steps
-            i
-            t
-        in
+    run_with (fun t ->
+        let+ tree, _ = apply_fast ?write_debug ?images ?metadata ~max_steps t in
         tree)
   in
 
@@ -515,6 +499,59 @@ let test_too_many_reboots ~version () =
   in
   test_against_both ~version ~from_binary:false ~kernel ~messages:[""] ()
 
+let test_memory_growth ~version () =
+  let kernel =
+    {|
+    (module
+      (memory 1)
+      (export "mem" (memory 0))
+      (func (export "kernel_run")
+        (if (i32.eq (memory.grow (i32.const -1)) (i32.const -1))
+          (then (unreachable)))))
+  |}
+  in
+  test_against_both ~version ~from_binary:false ~kernel ~messages:[""] ()
+
+let test_oob ~version () =
+  let kernel =
+    {|
+    (module
+      (memory 1)
+      (export "mem" (memory 0))
+      (func (export "kernel_run")
+        (drop (i32.load (i32.const 0x7fffffff)))))
+  |}
+  in
+  test_against_both ~version ~from_binary:false ~kernel ~messages:[""] ()
+
+let test_div_by_zero ~version () =
+  let kernel =
+    {|
+    (module
+      (memory 1)
+      (export "mem" (memory 0))
+      (func (export "kernel_run")
+        (drop (i32.div_s (i32.const 1) (i32.const 0)))))
+  |}
+  in
+  test_against_both ~version ~from_binary:false ~kernel ~messages:[""] ()
+
+let test_indirect_calls_mismatch ~version () =
+  let kernel =
+    {|
+    (module
+      (memory 1)
+      (export "mem" (memory 0))
+      (type $ret_i32 (func (result i32)))
+      (table 1 funcref)
+      (elem (i32.const 0) $no_result)
+      (func $no_result)
+      (func (export "kernel_run")
+        (drop (call_indirect (type $ret_i32) (i32.const 0)))))
+  |}
+  in
+  test_against_both ~version ~from_binary:false ~kernel ~messages:[""] ()
+
 let test_store_read_write ~version () =
   let kernel =
     {|
@@ -821,7 +858,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set ~version () =
   (* Check precondition that we are not in Snapshot *)
   assert (tick_state <> Snapshot) ;
 
-  let*! fast_tree, fast_ticks = apply_fast ~stop_at_snapshot:true 0l tree in
+  let*! fast_tree, fast_ticks = apply_fast ~stop_at_snapshot:true tree in
   let*! slow_tree, slow_ticks =
     Wasm_utils.Wasm.compute_step_many
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
@@ -842,9 +879,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set ~version () =
   let*! slow_tick_state = Wasm.Internal_for_tests.get_tick_state slow_tree in
   assert (slow_tick_state = Snapshot) ;
 
-  let*! fast_tree, fast_ticks =
-    apply_fast ~stop_at_snapshot:true 1l fast_tree
-  in
+  let*! fast_tree, fast_ticks = apply_fast ~stop_at_snapshot:true fast_tree in
   let*! slow_tree, slow_ticks =
     Wasm_utils.Wasm.compute_step_many
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
@@ -886,7 +921,7 @@ let test_check_nb_ticks ~version () =
   (* Check precondition that we are not in Snapshot *)
   assert (tick_state <> Snapshot) ;
 
-  let*! _, fast_ticks = apply_fast ~stop_at_snapshot:false 0l tree in
+  let*! _, fast_ticks = apply_fast ~stop_at_snapshot:false tree in
   let*! _, slow_ticks =
     Wasm_utils.Wasm.compute_step_many
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
@@ -965,19 +1000,17 @@ let test_read_input_write_output_failing ~version () =
       |}
   in
   let messages = ["abc"; "bonjour"; "привет"; "guten Tag"] in
-  test_against_both
-    ~fast_should_run:false
-    ~version
-    ~from_binary:false
-    ~kernel
-    ~messages
-    ()
+  test_against_both ~version ~from_binary:false ~kernel ~messages ()
 
 let tests =
   tztests_with_all_pvms
     [
       ("Big addresses are working correctly", `Quick, test_big_address);
       ("Computation kernel", `Quick, test_computation);
+      ("Memory growth fails", `Quick, test_memory_growth);
+      ("Oob", `Quick, test_oob);
+      ("Div by zero", `Quick, test_div_by_zero);
+      ("indirect call mismatch", `Quick, test_indirect_calls_mismatch);
       ("Store read/write kernel", `Quick, test_store_read_write);
       ("read_input", `Quick, test_read_input);
       ("reboot", `Quick, test_reboot);

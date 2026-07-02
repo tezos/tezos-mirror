@@ -8416,9 +8416,7 @@ let register_riscv_kernel ~protocols ~kernel =
 
 let test_slow_vm_fallback ~kind =
   let boot_sector () =
-    Sc_rollup_helpers.read_kernel
-      ~base:"tezt/tests/kernels"
-      "unreachable_kernel"
+    Sc_rollup_helpers.read_kernel ~base:"tezt/tests/kernels" "stack_overflow"
   in
   test_full_scenario
     ~kind

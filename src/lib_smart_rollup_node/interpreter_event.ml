@@ -86,6 +86,15 @@ module Simple = struct
       ("patch", Pvm_patches.unsafe_patch_encoding)
       ~pp1:Pvm_patches.pp_unsafe_patch
 
+  let fast_exec_wasm_trap =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_interpreter_fast_exec_wasm_trap"
+      ~msg:"Fast execution returned the WASM trap {trap}"
+      ~level:Warning
+      ("trap", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+
   let fast_exec_panic =
     declare_1
       ~section
@@ -206,6 +215,8 @@ let fetched_incorrect_pre_image ~expected_hash ~content_hash =
 let patching_genesis_state patch = Simple.(emit patching_genesis_state) patch
 
 let fast_exec_panic exn = Simple.(emit fast_exec_panic) (Printexc.to_string exn)
+
+let fast_exec_wasm_trap = Simple.(emit fast_exec_wasm_trap)
 
 let refutation_cache_hit ~tick ~source =
   Simple.(emit refutation_cache_hit) (tick, source)

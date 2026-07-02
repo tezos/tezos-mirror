@@ -33,6 +33,8 @@ module type S = sig
 
   val patch_flags_on_eval_successful : Durable.t -> Durable.t Lwt.t
 
+  val patch_flags_on_eval_trapped : Durable.t -> Durable.t Lwt.t
+
   val should_compute : ?reveal_builtins:Builtins.reveals -> pvm_state -> bool
 
   val has_reboot_flag : Durable.t -> bool Lwt.t
@@ -213,6 +215,14 @@ module Make_vm (Params : Params) : S = struct
 
    As a result, the key idea is that any program executing with Wasmer without
    an error could be executing by the WASM PVM. *)
+
+  let patch_flags_on_eval_trapped durable =
+    Durable.write_value_exn
+      ~edit_readonly:true
+      durable
+      Constants.stuck_flag_key
+      0L
+      ""
 
   let patch_flags_on_eval_successful durable =
     let open Lwt_syntax in
@@ -449,14 +459,7 @@ module Make_vm (Params : Params) : S = struct
         return (Init {self; ast_module; init_kont; module_reg})
     | Padding -> return Padding
     | Eval {config = {step_kont = Wasm.Eval.(SK_Trapped _msg); _}; _} ->
-        let* durable =
-          Durable.write_value_exn
-            ~edit_readonly:true
-            durable
-            Constants.stuck_flag_key
-            0L
-            ""
-        in
+        let* durable = patch_flags_on_eval_trapped durable in
         return ~storage:(update_durable storage durable) Padding
     | _ when eval_has_finished tick_state ->
         (* We have an empty set of admin instructions, but need to wait until we can restart *)

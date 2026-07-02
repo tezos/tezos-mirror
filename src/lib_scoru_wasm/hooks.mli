@@ -9,6 +9,7 @@
 type fast_exec = {
   invalid_kernel :
     [`Check_with_hook of (unit -> unit Lwt.t) option | `No_check];
+  wasm_trap : (string -> unit Lwt.t) option;
   panicked : (exn -> unit Lwt.t) option;
   completed : (unit -> unit Lwt.t) option;
   fallback : bool;
@@ -35,6 +36,13 @@ val disable_fast_exec_invalid_kernel_check : t -> t
     when the Fast Execution engine is requested to run a kernel not satisfying
     the WASM PVM constraints. *)
 val on_fast_exec_invalid_kernel : (unit -> unit Lwt.t) -> t -> t
+
+(** [on_fast_exec_wasm_trap k hooks] {b replaces} the hook executed when the
+    Fast Execution engine (WASMER) reports a traps.
+
+    If none is provided, the Wasm PVM is used as fallback when
+    [fast_exec_fallback] is true, or the execution fails with an exception. *)
+val on_fast_exec_wasm_trap : (string -> unit Lwt.t) -> t -> t
 
 (** [on_fast_exec_panicked k hooks] {b replaces b} the hook executed when
     the Fast Execution engine panics by [k] in [hooks]. *)
