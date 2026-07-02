@@ -960,6 +960,13 @@ where
                 .consume(Cost::transaction())
                 .map_err(TransferError::OutOfGas)?;
 
+            // Safety coupling: `Operation::touches_only_accounts` (tezos crate)
+            // treats implicit-destination transfers as account-only and lets the
+            // caller narrow the per-operation SafeStorage snapshot to the accounts
+            // root. That relies on this guard rejecting any implicit transfer that
+            // could execute code or touch another root (non-default entrypoint /
+            // non-Unit parameter). Do not relax it without revisiting that
+            // classifier.
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall.into());
             }

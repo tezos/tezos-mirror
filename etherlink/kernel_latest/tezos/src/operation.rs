@@ -156,6 +156,47 @@ impl Operation {
         let op_hash = digest_256(&serialized_op);
         Ok(OperationHash::from(op_hash))
     }
+
+    /// Returns `true` when every content in the batch only ever reads or
+    /// writes implicit-account state, so the batch touches a single
+    /// durable-storage root (the Tezos accounts root) rather than every
+    /// snapshotted world-state root.
+    ///
+    /// This holds for reveals and for transfers whose destination is an
+    /// implicit account: implicit accounts carry no code, so such a transfer
+    /// triggers no contract execution, big-map, or cross-runtime (EVM) write —
+    /// only balance/counter/manager updates under the accounts root. Transfers
+    /// to originated (KT1) contracts, originations and delegations may touch
+    /// other roots and are conservatively excluded.
+    ///
+    /// This must stay strictly conservative: the caller narrows the
+    /// per-operation `SafeStorage` snapshot to the accounts root only when this
+    /// returns `true`, and under that eager-snapshot model a write to any
+    /// non-snapshotted root is silently dropped — on success as well as on
+    /// rollback. The implicit-transfer case additionally relies on the
+    /// execution layer rejecting non-default-entrypoint, non-Unit-parameter and
+    /// zero-amount transfers before any write (`apply_transaction` in the
+    /// `tezos_execution` crate); revisit this if that guard changes.
+    pub fn touches_only_accounts(&self) -> bool {
+        use tezos_protocol::contract::Contract;
+        self.content.iter().all(|content| match content {
+            ManagerOperationContent::Reveal(_) => true,
+            ManagerOperationContent::Transaction(transfer) => {
+                matches!(transfer.operation.destination, Contract::Implicit(_))
+            }
+            // Originations and delegations may write contract storage or other
+            // roots; the smart-rollup kinds are not handled by the Michelson
+            // runtime at all. Stay conservative (caller keeps the full snapshot
+            // set) so we never snapshot fewer roots than the operation could
+            // touch. The match is exhaustive on purpose: a new protocol
+            // operation kind must be classified deliberately here (a compile
+            // error) rather than silently defaulting to account-only.
+            ManagerOperationContent::Origination(_)
+            | ManagerOperationContent::Delegation(_)
+            | ManagerOperationContent::SmartRollupCement(_)
+            | ManagerOperationContent::SmartRollupPublish(_) => false,
+        })
+    }
 }
 
 impl Decodable for Operation {
@@ -404,6 +445,50 @@ mod tests {
     use tezos_crypto_rs::{hash::UnknownSignature, public_key::PublicKey};
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKeyHash;
+
+    #[test]
+    fn touches_only_accounts_classifies_operations() {
+        // Reveals only write the manager key under the accounts root.
+        assert!(make_dummy_reveal_operation().touches_only_accounts());
+
+        let signature = make_dummy_reveal_operation().signature;
+
+        // A transfer to an implicit account only moves balances: account-only.
+        let to_implicit = make_dummy_operation(
+            OperationContent::Transfer(TransferContent {
+                amount: 1_u64.into(),
+                destination: Contract::from_b58check(
+                    "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+                )
+                .unwrap(),
+                parameters: Parameters::default(),
+            }),
+            signature.clone(),
+        );
+        assert!(to_implicit.touches_only_accounts());
+
+        // A transfer to an originated (KT1) contract may execute code and
+        // touch other roots: must NOT be classified as account-only.
+        let to_originated = make_dummy_operation(
+            OperationContent::Transfer(TransferContent {
+                amount: 1_u64.into(),
+                destination: Contract::from_b58check(
+                    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                )
+                .unwrap(),
+                parameters: Parameters::default(),
+            }),
+            signature,
+        );
+        assert!(!to_originated.touches_only_accounts());
+
+        // A batch is account-only only if EVERY content is (the `.all()`):
+        // a reveal alone qualifies, but a reveal batched with a transfer to an
+        // originated contract must not.
+        let mut batch = make_dummy_reveal_operation();
+        batch.content.push(to_originated.content[0].clone());
+        assert!(!batch.touches_only_accounts());
+    }
 
     #[test]
     fn operation_rlp_roundtrip() {
