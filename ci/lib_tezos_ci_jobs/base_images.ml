@@ -265,13 +265,14 @@ let job_ubuntu_based_images =
 let job_ci_release_based_images =
   base_image_job
     ~image_name:"ci-release"
-    ~base_name:(Upstream "debian")
+    ~base_name:(Pipeline_dep "debian")
     ~matrix:[("RELEASE", ["trixie"])]
     ~compilation:Amd64_only
     "images/base-images/Dockerfile.debian-release"
     ~__POS__
     ~description:"Build ci-release base images"
     ~only_if_changed:Files.(ci_releases @ debian_base)
+    ~needs:[(Cacio.Job, job_debian_based_images)]
     "images.ci-release"
 
 (* ── Cacio: alpine-docker-ci ─────────────────────────────────────────────── *)

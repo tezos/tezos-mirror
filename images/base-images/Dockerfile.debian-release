@@ -6,18 +6,15 @@ FROM ${IMAGE}
 SHELL ["/bin/sh", "-eu", "-c"]
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
-COPY scripts/kiss-fetch.sh /usr/local/bin/
+# This image is built on top of the internal "debian" base image, which already
+# provides ca-certificates, curl, jq, gpg, gcloud, datadog, kiss-fetch and the
+# KISSCACHE environment. Only the release-specific tooling is added here.
 COPY images/scripts/install-release-cli.sh /tmp
-COPY images/scripts/install_datadog_static.sh \
-     images/scripts/install-gcloud.sh /tmp/
-
-ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
 
 # hadolint ignore=DL3008
 RUN apt-get install -y --update --no-install-recommends \
     bash \
     bzip2 \
-    ca-certificates \
     git \
     gnupg \
     make \
@@ -30,11 +27,8 @@ RUN apt-get install -y --update --no-install-recommends \
     awscli \
     gawk \
     tar \
-    curl \
     pandoc && \
     /tmp/install-release-cli.sh && \
-    /tmp/install-gcloud.sh && \
-    /tmp/install_datadog_static.sh && \
     rm -f /tmp/install-*
 
 RUN release-cli --version && \

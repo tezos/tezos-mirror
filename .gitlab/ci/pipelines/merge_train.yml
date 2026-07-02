@@ -834,10 +834,12 @@ images.debian:
     - images/base-images/Dockerfile.debian-build
     - images/base-images/Dockerfile.debian-homebrew
     - images/base-images/Dockerfile.debian-jsonnet
+    - images/base-images/Dockerfile.debian-release
     - images/base-images/Dockerfile.debian-systemd
     - images/base-images/Dockerfile.rust
     - images/base-images/Dockerfile.rust-sdk-bindings
     - images/scripts/install-gcloud.sh
+    - images/scripts/install-release-cli.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
@@ -960,7 +962,8 @@ images.ci-release:
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
     when: on_success
-  needs: []
+  needs:
+  - images.debian
   dependencies: []
   timeout: 60 minutes
   interruptible: true
@@ -979,7 +982,7 @@ images.ci-release:
   variables:
     DOCKER_VERSION: 28.5.1
     DISTRIBUTION: ci-release
-    IMAGE_PATH: debian:$RELEASE
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
   parallel:
     matrix:
