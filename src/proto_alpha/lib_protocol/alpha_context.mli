@@ -4932,7 +4932,10 @@ module Cache : sig
     (module INTERFACE with type cached_value = 'a)
 
   val cache_nonce_from_block_header :
-    Block_header.shell_header -> Block_header.contents -> cache_nonce
+    round:Round.t ->
+    Block_header.shell_header ->
+    Block_header.contents ->
+    cache_nonce
 end
 
 (** This module re-exports definitions from {!Operation_repr.Kind}. *)

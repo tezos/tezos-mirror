@@ -460,6 +460,7 @@ let init chain_id ctxt block_header =
   in
   let cache_nonce =
     Alpha_context.Cache.cache_nonce_from_block_header
+      ~round:Alpha_context.Round.zero
       block_header
       ({
          payload_hash = Block_payload_hash.zero;
