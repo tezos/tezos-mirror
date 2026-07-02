@@ -149,6 +149,7 @@ defprim! {
     now,
     level,
     min_block_time,
+    voting_power,
     source,
     sender,
     big_maps,

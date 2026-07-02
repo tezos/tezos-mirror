@@ -106,6 +106,9 @@ pub struct TztTest<'a> {
     pub level: Option<BigUint>,
     /// Minimal block time in seconds, as defined by the `min_block_time` field.
     pub min_block_time: Option<BigUint>,
+    /// Voting powers of implicit accounts, as defined by the `voting_power`
+    /// field. Controls the result of the VOTING_POWER instruction.
+    pub voting_power: Option<HashMap<PublicKeyHash, BigUint>>,
     /// Address that directly or indirectly initiated the current transaction
     pub source: Option<PublicKeyHash>,
     /// Address that directly initiated the current transaction
@@ -204,6 +207,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_now: Option<BigInt> = None;
         let mut m_level: Option<BigUint> = None;
         let mut m_min_block_time: Option<BigUint> = None;
+        let mut m_voting_power: Option<Micheline> = None;
         let mut m_source: Option<Micheline> = None;
         let mut m_sender: Option<Micheline> = None;
         let mut m_storages: Option<Vec<(Micheline, Micheline, Micheline)>> = None;
@@ -244,6 +248,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 MinBlockTime(t) => {
                     set_tzt_field("min_block_time", &mut m_min_block_time, t)?
                 }
+                VotingPower(v) => set_tzt_field("voting_power", &mut m_voting_power, v)?,
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
                 SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
                 BigMaps(v) => set_tzt_field("big_maps", &mut m_big_maps, v)?,
@@ -415,6 +420,66 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             None => None,
         };
 
+        let voting_power = match m_voting_power {
+            Some(vp) => {
+                let elts =
+                    match vp {
+                        Micheline::Seq(elts) => elts,
+                        _ => return Err(
+                            "`voting_power` must be a sequence of `Elt <key_hash> <nat>`"
+                                .into(),
+                        ),
+                    };
+                let mut map = HashMap::new();
+                for elt in elts {
+                    match elt {
+                        Micheline::App(Prim::Elt, kv, _) if kv.len() == 2 => {
+                            let typed_key = typecheck_value(
+                                &kv[0],
+                                &mut Ctx::default(),
+                                &Type::KeyHash,
+                                AllowForgedLazyStorageId::No,
+                            )?;
+                            let key = match &mut { typed_key } {
+                                TypedValue::KeyHash(kh) => kh.take_out(),
+                                other => {
+                                    return Err(format!(
+                                        "invalid key in `voting_power`: expected key_hash, got {other:?}"
+                                    )
+                                    .into())
+                                }
+                            };
+                            let typed_val = typecheck_value(
+                                &kv[1],
+                                &mut Ctx::default(),
+                                &Type::Nat,
+                                AllowForgedLazyStorageId::No,
+                            )?;
+                            let power = match &mut { typed_val } {
+                                TypedValue::Nat(n) => std::mem::take(n),
+                                other => {
+                                    return Err(format!(
+                                        "invalid value in `voting_power`: expected nat, got {other:?}"
+                                    )
+                                    .into())
+                                }
+                            };
+                            if map.insert(key, power).is_some() {
+                                return Err(
+                                    "key hash cannot repeat in `voting_power`".into()
+                                );
+                            }
+                        }
+                        _ => {
+                            return Err("each `voting_power` element must be of the form `Elt <key_hash> <nat>`".into())
+                        }
+                    }
+                }
+                Some(map)
+            }
+            None => None,
+        };
+
         // Once we have self_addr and parameter, we typecheck the output stack
         // after populating the context's known_contracts with the self address.
         // Later we may add the Tzt specs `other_contracts` fields. At that point
@@ -575,6 +640,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             now: m_now,
             level: m_level,
             min_block_time: m_min_block_time,
+            voting_power,
             source,
             sender,
         })
@@ -675,6 +741,7 @@ pub(crate) enum TztEntity<'a> {
     Now(i64),
     Level(BigUint),
     MinBlockTime(BigUint),
+    VotingPower(Micheline<'a>),
     Source(Micheline<'a>),
     SenderAddr(Micheline<'a>),
     BigMaps(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
@@ -763,6 +830,10 @@ pub fn run_tzt_test<'a>(
         .clone()
         .unwrap_or(Ctx::default().min_block_time);
 
+    if let Some(voting_power) = test.voting_power.clone() {
+        ctx.set_voting_powers(voting_power);
+    }
+
     let execution_result =
         execute_tzt_test_code(test.code, &mut ctx, arena, test.parameter, test.input);
     check_expectation(&mut ctx, test.output, execution_result)
@@ -795,6 +866,16 @@ mod tests {
         parse_and_run(
             "code { MIN_BLOCK_TIME } ; input { } ; \
              output { Stack_elt nat 7 } ; min_block_time 7",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn voting_power() {
+        parse_and_run(
+            "code { PUSH key_hash \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\" ; \
+             VOTING_POWER } ; input { } ; output { Stack_elt nat 5 } ; \
+             voting_power { Elt \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\" 5 }",
         )
         .unwrap();
     }
