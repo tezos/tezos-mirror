@@ -520,7 +520,6 @@ impl TransactionTrait for TezosXTransaction {
 
 pub struct TezosXBlockConstants {
     pub evm_runtime_block_constants: tezos_ethereum::block::BlockConstants,
-    #[allow(dead_code)]
     pub michelson_runtime_block_constants: TezlinkBlockConstants,
 }
 
