@@ -112,14 +112,6 @@ let job_docker_promote_to_latest =
         "./scripts/ci/docker_promote_to_latest.sh";
       ]
 
-let job_build_homebrew_release =
-  add_artifacts
-    ~name:"build-$CI_COMMIT_REF_SLUG"
-    ~expire_in:(Duration (Days 1))
-    ~when_:On_success
-    ["public/homebrew/*"]
-    Homebrew.job_create_homebrew_formula
-
 let job_gitlab_release =
   Cacio.parameterize @@ fun mode ->
   CI.job
@@ -135,8 +127,8 @@ let job_gitlab_release =
         ( Artifacts,
           Build.job_build_static_linux_released_binaries Arm64 `release );
         (Job, job_docker_merge_manifests mode);
+        (Artifacts, Homebrew.job_create_homebrew_formula);
       ]
-    ~needs_legacy:[(Artifacts, job_build_homebrew_release)]
     ~id_tokens:Tezos_ci.id_tokens
     ~script:
       [
@@ -158,8 +150,8 @@ let job_gitlab_publish =
           Build.job_build_static_linux_released_binaries Amd64 `release );
         ( Artifacts,
           Build.job_build_static_linux_released_binaries Arm64 `release );
+        (Artifacts, Homebrew.job_create_homebrew_formula);
       ]
-    ~needs_legacy:[(Artifacts, job_build_homebrew_release)]
     ?variables:
       (match mode with
       | `scheduled_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
@@ -364,13 +356,7 @@ let () =
 (** Create an Octez release tag pipeline of type {!pipeline_type},
     which is expected to be a release pipeline type. *)
 let octez_jobs (pipeline_type : Cacio.global_pipeline) =
-  [
-    (* Stage: start *)
-    job_datadog_pipeline_trace;
-    (* Stage: build *)
-    job_build_homebrew_release;
-  ]
-  @ Cacio.get_jobs pipeline_type
+  job_datadog_pipeline_trace :: Cacio.get_jobs pipeline_type
 
 let job_docker_promote_to_version =
   Cacio.parameterize @@ fun mode ->

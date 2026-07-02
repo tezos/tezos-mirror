@@ -375,7 +375,10 @@ let () =
   register
     "homebrew.daily"
     homebrew_daily
-    ~jobs:(Homebrew.jobs |> List.map (with_interruptible false))
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+       :: Cacio.get_jobs Cacio.Homebrew_daily
+      |> List.map (with_interruptible false))
     ~description:
       "Daily pipeline containing all Homebrew jobs (build and extended tests)." ;
   register

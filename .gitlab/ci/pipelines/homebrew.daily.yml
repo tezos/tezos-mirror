@@ -4,6 +4,7 @@
 stages:
 - start
 - build
+- test
 
 datadog_pipeline_trace:
   image: datadog/ci:v5.18.0@sha256:07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2
@@ -27,9 +28,32 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build-homebrew-formula:
+oc.create-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
   stage: build
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/packaging/homebrew_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - public/homebrew/*
+
+oc.build-homebrew-formula:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
+  stage: test
   tags:
   - gcp_very_high_cpu
   needs:
@@ -54,28 +78,9 @@ oc.build-homebrew-formula:
     HOMEBREW_OPAMFETCH: scripts/kiss-fetch.sh
     CARGO_NET_OFFLINE: "false"
 
-oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
-  stage: build
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/packaging/homebrew_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 oc.build-homebrew-formula-macosx:
   image: $MACOS_IMAGE
-  stage: build
+  stage: test
   tags:
   - $TAGS
   needs:

@@ -88,29 +88,6 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
-  stage: build
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/packaging/homebrew_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    expire_in: 1 day
-    paths:
-    - public/homebrew/*
-    when: on_success
-
 oc.build-data_packages:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
   stage: build
@@ -167,6 +144,29 @@ oc.build-keyring_package:
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
+
+oc.create-homebrew-formula:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
+  stage: build
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/packaging/homebrew_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - public/homebrew/*
 
 oc.build:static-arm64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -599,14 +599,14 @@ gitlab:release:
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.create-homebrew-formula
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
   - docker:merge_manifests
-  dependencies:
   - oc.create-homebrew-formula
+  dependencies:
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
+  - oc.create-homebrew-formula
   timeout: 60 minutes
   interruptible: false
   before_script:
