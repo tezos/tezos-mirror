@@ -170,16 +170,17 @@ impl HttpTrace {
         }
     }
 
-    /// Fill in the response part of a trace from an `http::Response`.
-    pub fn set_response(&mut self, response: http::Response<Vec<u8>>) {
+    /// Fill in the response part of a trace from an `http::Response`. Takes
+    /// the response by reference and clones only the body it keeps, so a
+    /// caller that still needs the response does not clone it up front.
+    pub fn set_response(&mut self, response: &http::Response<Vec<u8>>) {
         self.response_status = response.status().as_u16();
         self.response_headers = response
             .headers()
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
             .collect();
-        let (_, body) = response.into_parts();
-        self.response_body = body;
+        self.response_body = response.body().clone();
     }
 }
 
@@ -203,6 +204,9 @@ pub struct TezosXJournal {
     /// first outgoing gateway call and shared by both runtimes. See
     /// [`OriginalSource`].
     original_source: Option<OriginalSource>,
+    /// When `false` (the default), [`record_request`] / [`record_response`]
+    /// skip the request/response clones so a normal block pays nothing.
+    http_trace_enabled: bool,
 }
 
 impl TezosXJournal {
@@ -235,6 +239,7 @@ impl TezosXJournal {
             pending_http_traces: Vec::new(),
             crac_id,
             original_source: None,
+            http_trace_enabled: false,
         }
     }
 
@@ -330,8 +335,11 @@ impl TezosXJournal {
 
     /// Record an HTTP request. The trace is pushed onto an internal stack;
     /// the matching [record_response] call will pop it and nest it under its
-    /// parent if one exists.
+    /// parent if one exists. No-op when [`http_trace_enabled`] is unset.
     pub fn record_request(&mut self, request: &http::Request<Vec<u8>>) {
+        if !self.http_trace_enabled {
+            return;
+        }
         self.pending_http_traces
             .push(HttpTrace::from_request(request));
     }
@@ -339,7 +347,12 @@ impl TezosXJournal {
     /// Attach the response to the most recent pending trace and finalize it.
     /// If there is a parent trace on the stack, the completed trace becomes
     /// one of its [inner_traces]; otherwise it is added to the root list.
-    pub fn record_response(&mut self, response: http::Response<Vec<u8>>) {
+    /// Takes the response by reference and returns before touching it when
+    /// [`http_trace_enabled`] is unset, so the caller pays no clone at all.
+    pub fn record_response(&mut self, response: &http::Response<Vec<u8>>) {
+        if !self.http_trace_enabled {
+            return;
+        }
         if let Some(mut trace) = self.pending_http_traces.pop() {
             trace.set_response(response);
             match self.pending_http_traces.last_mut() {
@@ -368,6 +381,12 @@ impl TezosXJournal {
     /// outgoing gateway call. See [`OriginalSource`].
     pub fn original_source(&self) -> Option<&OriginalSource> {
         self.original_source.as_ref()
+    }
+
+    /// Enable per-transaction HTTP trace capture: set from the once-per-block
+    /// `http_trace_enabled` flag at apply sites, `true` on trace journals.
+    pub fn set_http_trace_enabled(&mut self, enabled: bool) {
+        self.http_trace_enabled = enabled;
     }
 
     /// First call captures; subsequent calls are no-ops so re-entrant
@@ -563,6 +582,7 @@ mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
+        journal.set_http_trace_enabled(true);
 
         let request = http::Request::builder()
             .method("POST")
@@ -581,7 +601,7 @@ mod tests {
             .body(vec![4, 5, 6])
             .unwrap();
 
-        journal.record_response(response);
+        journal.record_response(&response);
         assert_eq!(journal.http_traces().len(), 1);
         assert_eq!(journal.http_traces()[0].method, "POST");
         assert_eq!(journal.http_traces()[0].url, "http://tezos/KT1abc/transfer");
@@ -600,6 +620,7 @@ mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
+        journal.set_http_trace_enabled(true);
 
         // Outer call: EVM → Tezos
         let req1 = http::Request::builder()
@@ -617,11 +638,11 @@ mod tests {
 
         // Inner response comes first (stack order)
         let resp2 = http::Response::builder().status(200).body(vec![]).unwrap();
-        journal.record_response(resp2);
+        journal.record_response(&resp2);
 
         // Outer response
         let resp1 = http::Response::builder().status(200).body(vec![]).unwrap();
-        journal.record_response(resp1);
+        journal.record_response(&resp1);
 
         // Only one root trace, with the inner call nested
         assert_eq!(journal.http_traces().len(), 1);
@@ -634,6 +655,32 @@ mod tests {
             journal.http_traces()[0].inner_traces[0].url,
             "http://ethereum/0xabc"
         );
+    }
+
+    /// With tracing off (the default), `record_*` must be no-ops so a normal
+    /// block never pays the request/response clone — regression guard L2-1732.
+    #[test]
+    fn test_record_skipped_when_http_trace_disabled() {
+        let mut journal = TezosXJournal::new(
+            test_crac_id(),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        // Left at the default (`false`): no `set_http_trace_enabled`.
+
+        let request = http::Request::builder()
+            .method("POST")
+            .uri("http://tezos/KT1abc/transfer")
+            .body(vec![1, 2, 3])
+            .unwrap();
+        journal.record_request(&request);
+        let response = http::Response::builder()
+            .status(200)
+            .body(vec![4, 5, 6])
+            .unwrap();
+        journal.record_response(&response);
+
+        assert_eq!(journal.http_traces().len(), 0);
     }
 
     #[test]

@@ -782,6 +782,7 @@ impl ChainConfigTrait for TezosXChainConfig {
                     operation_hash,
                     block_constants.evm_runtime_block_constants.clone(),
                 );
+                journal.set_http_trace_enabled(http_trace_enabled);
                 let result = apply_tezos_operation(
                     &self.michelson_chain_id,
                     block_in_progress,

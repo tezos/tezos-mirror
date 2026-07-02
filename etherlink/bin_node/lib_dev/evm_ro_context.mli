@@ -235,6 +235,14 @@ end
 (** {2 HTTP trace operations (replay-based)} *)
 
 module Http_tracer : sig
+  (** [set_http_trace_flag state] writes the durable flag that makes the
+      kernel capture per-call HTTP traces, and returns the updated state.
+      Used before a simulation ([http_traceCall]) or a replay
+      ([http_traceTransaction] / [http_traceBlockByNumber]) so that plain
+      [eth_call] / [eth_estimateGas], which share the same kernel simulate
+      paths, do not pay for trace capture. *)
+  val set_http_trace_flag : Evm_state.t -> Evm_state.t tzresult Lwt.t
+
   (** [trace_transaction ctxt tx_hash] re-executes the block containing the
       transaction [tx_hash] with HTTP trace capture enabled, and returns the
       list of HTTP exchanges performed by that transaction. A transaction
