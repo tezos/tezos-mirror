@@ -136,7 +136,7 @@ pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
     RefPath::assert_from(b"/evm/world_state/maximum_gas_per_transaction");
 
 // Path to the block in progress, used between reboots
-const EVM_BLOCK_IN_PROGRESS: RefPath =
+pub const EVM_BLOCK_IN_PROGRESS: RefPath =
     RefPath::assert_from(b"/evm/world_state/blocks/in_progress");
 
 const EVENTS: RefPath = RefPath::assert_from(b"/base/rollup_events");
