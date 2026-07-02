@@ -953,6 +953,47 @@ mod test {
     }
 
     #[test]
+    fn test_decode_h256_rejects_leading_zero_padded() {
+        // 0x00-prefixed 32-byte payload: a non-minimal encoding of the same
+        // scalar as [test_decode_h256_l31]. It must be rejected, otherwise a
+        // signature scalar (and hence a transaction) has several valid wire
+        // encodings with distinct tx-hashes.
+        let bytes = hex::decode(
+            "a00031313131313131313131313131313131313131313131313131313131313131",
+        )
+        .unwrap();
+        let decoder = Rlp::new(&bytes);
+        assert!(
+            decode_compressed_h256(&decoder).is_err(),
+            "a leading-zero-padded scalar must be rejected as non-minimal"
+        );
+    }
+
+    #[test]
+    fn test_decode_h256_rejects_single_zero_byte() {
+        // 0x00 is a non-minimal encoding of zero (canonical zero is the empty
+        // string, see [test_decode_compressed_h256_l0]).
+        let bytes = hex::decode("00").unwrap();
+        let decoder = Rlp::new(&bytes);
+        assert!(
+            decode_compressed_h256(&decoder).is_err(),
+            "a single zero byte must be rejected (canonical zero is empty)"
+        );
+    }
+
+    #[test]
+    fn test_decode_h256_rejects_list_shape() {
+        // A list must not be accepted: [Rlp::data] would otherwise return the
+        // list payload verbatim, another malleability vector.
+        let bytes = hex::decode("c101").unwrap();
+        let decoder = Rlp::new(&bytes);
+        assert!(
+            decode_compressed_h256(&decoder).is_err(),
+            "a list-shaped scalar must be rejected"
+        );
+    }
+
+    #[test]
     fn test_caller_classic() {
         // setup
         let (_sk, address_from_sk) = string_to_sk_and_address_unsafe(

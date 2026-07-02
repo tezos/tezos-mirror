@@ -1577,7 +1577,7 @@ let test_tx_hash_malleability =
     ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "malleability"]
-    ~title:"Non-canonical r/s yields tx-hash malleability"
+    ~title:"Non-canonical r/s encoding is rejected"
     ~time_between_blocks:Nothing
   @@
   fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
@@ -1627,8 +1627,9 @@ let test_tx_hash_malleability =
   (* ...so their keccak (= the kernel's tx-hash) differ too. *)
   Check.((canonical_hash <> twin_hash) string)
     ~error_msg:"expected the canonical and malleated tx-hashes to differ" ;
-  (* 2. Submit ONLY the malleated encoding, through the (unconditional) delayed
-        inbox. *)
+  (* 2. Submit the malleated encoding through the (unconditional) delayed inbox.
+        Posting the bytes to the L1 bridge always succeeds; what matters is what
+        the kernel does with them. *)
   let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
   let* delayed_hash =
@@ -1639,36 +1640,34 @@ let test_tx_hash_malleability =
       ~sc_rollup_address
       twin_raw
   in
-  (* The delayed inbox keys the tx by keccak(raw bytes) = the malleated hash. *)
+  (* Were it ingested, the delayed inbox would key it by keccak(raw bytes), i.e.
+     the malleated hash. *)
   Check.(("0x" ^ delayed_hash = twin_hash) string)
     ~error_msg:"the delayed-inbox hash %L should be the malleated hash %R" ;
-  let* () =
-    wait_for_delayed_inbox_add_tx_and_injected
-      ~sequencer
-      ~sc_rollup_node
-      ~client
-  in
-  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  (* 3. Regression guard: the kernel fails to decode the non-canonical [s] and
+        drops the transaction while parsing the delayed message, so it is never
+        added to the delayed inbox. On the buggy (pre-fix) kernel the malleated
+        transaction would be ingested here and this assertion would fail. *)
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
-  (* 3. The transaction executed (balances moved): a valid, ordinary transfer. *)
+  (* 4. Consequently nothing executed: balances are untouched and the transaction
+        is retrievable under neither hash. *)
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
-  Check.((sender_balance_prev > sender_balance_next) Wei.typ)
-    ~error_msg:"expected the sender balance to decrease (before %L, after %R)" ;
-  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
-    ~error_msg:"expected the receiver balance to increase (before %R, after %L)" ;
-  (* 4. The bug: it is retrievable under the malleated hash... *)
+  Check.((sender_balance_prev = sender_balance_next) Wei.typ)
+    ~error_msg:
+      "expected the sender balance to be unchanged (before %L, after %R)" ;
+  Check.((receiver_balance_prev = receiver_balance_next) Wei.typ)
+    ~error_msg:
+      "expected the receiver balance to be unchanged (before %L, after %R)" ;
   let*@ receipt_twin =
     Rpc.get_transaction_receipt ~tx_hash:twin_hash sequencer
   in
   (match receipt_twin with
-  | Some _ -> ()
-  | None ->
+  | None -> ()
+  | Some _ ->
       Test.fail
-        "the malleated tx-hash %s should be retrievable on chain"
+        "the malleated tx %s must not have been included (it is non-canonical)"
         twin_hash) ;
-  (* ...but NOT under the hash the signer's wallet computed for its own
-     transaction. *)
   let*@ receipt_canonical =
     Rpc.get_transaction_receipt ~tx_hash:canonical_hash sequencer
   in
@@ -1676,7 +1675,7 @@ let test_tx_hash_malleability =
   | None -> ()
   | Some _ ->
       Test.fail
-        "the canonical tx-hash %s must NOT exist on chain (it was malleated)"
+        "the canonical tx %s was never submitted and must not exist"
         canonical_hash) ;
   unit
 
