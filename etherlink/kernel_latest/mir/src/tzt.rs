@@ -6,7 +6,7 @@
 
 mod expectation;
 
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt;
@@ -102,6 +102,8 @@ pub struct TztTest<'a> {
     pub storages: Option<HashMap<AddressHash, (Type, TypedValue<'a>)>>,
     /// Initial value for "now" in the context.
     pub now: Option<BigInt>,
+    /// Current blockchain level, as defined by the `level` field.
+    pub level: Option<BigUint>,
     /// Address that directly or indirectly initiated the current transaction
     pub source: Option<PublicKeyHash>,
     /// Address that directly initiated the current transaction
@@ -198,6 +200,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_big_maps: Option<Vec<(Micheline, Micheline, Micheline, Micheline)>> =
             None;
         let mut m_now: Option<BigInt> = None;
+        let mut m_level: Option<BigUint> = None;
         let mut m_source: Option<Micheline> = None;
         let mut m_sender: Option<Micheline> = None;
         let mut m_storages: Option<Vec<(Micheline, Micheline, Micheline)>> = None;
@@ -234,6 +237,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                     set_tzt_field("other_contracts", &mut m_other_contracts, v)?
                 }
                 Now(n) => set_tzt_field("now", &mut m_now, n.into())?,
+                Level(l) => set_tzt_field("level", &mut m_level, l)?,
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
                 SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
                 BigMaps(v) => set_tzt_field("big_maps", &mut m_big_maps, v)?,
@@ -563,6 +567,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             storages,
             views,
             now: m_now,
+            level: m_level,
             source,
             sender,
         })
@@ -661,6 +666,7 @@ pub(crate) enum TztEntity<'a> {
     SelfAddr(Micheline<'a>),
     OtherContracts(Vec<(Micheline<'a>, Micheline<'a>)>),
     Now(i64),
+    Level(BigUint),
     Source(Micheline<'a>),
     SenderAddr(Micheline<'a>),
     BigMaps(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
@@ -742,7 +748,32 @@ pub fn run_tzt_test<'a>(
 
     ctx.now = test.now.clone().unwrap_or(Ctx::default().now);
 
+    ctx.level = test.level.clone().unwrap_or(Ctx::default().level);
+
     let execution_result =
         execute_tzt_test_code(test.code, &mut ctx, arena, test.parameter, test.input);
     check_expectation(&mut ctx, test.output, execution_result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::Parser;
+
+    /// Parse and run a TZT test from its textual source, returning the runner's
+    /// result as a `String` on error for easy assertion.
+    fn parse_and_run(src: &str) -> Result<(), String> {
+        let parser = Parser::new();
+        let test = parser.parse_tzt_test(src).map_err(|e| e.to_string())?;
+        let arena = Arena::new();
+        run_tzt_test(test, &arena).map_err(|e| e.to_string())
+    }
+
+    #[test]
+    fn level() {
+        parse_and_run(
+            "code { LEVEL } ; input { } ; output { Stack_elt nat 42 } ; level 42",
+        )
+        .unwrap();
+    }
 }

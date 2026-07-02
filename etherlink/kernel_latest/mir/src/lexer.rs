@@ -147,6 +147,7 @@ defprim! {
     #[token("Gas_exhaustion")]
     OutOfGas,
     now,
+    level,
     source,
     sender,
     big_maps,
