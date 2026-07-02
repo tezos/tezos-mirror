@@ -6713,6 +6713,84 @@ let test_crac_evm_to_tez_receipt () =
   check_crac_brackets ~prefix internals ;
   unit
 
+(** L2-1727: internal-operation receipt nonces are a single block-wide
+    sequence — shared across the block, never reset per operation — so no two
+    internal ops collide. [renumber_nonces] (kernel/src/apply.rs) materializes
+    this at finalization and now rejects, rather than saturating the [u16] into
+    duplicates, if a block ever crosses the 65,535 cap. That exact boundary is
+    gas-bounded and covered by the kernel unit tests; this E2E stresses
+    [renumber_nonces] at scale: a single call to [emit_loop] produces [n]
+    internal Event ops (~150 gas each, well under tezlink's 660k per-operation
+    gas cap), and the whole block's nonces must form the contiguous,
+    duplicate-free set {0, .., N-1}. *)
+let test_internal_nonces_are_block_contiguous_at_scale () =
+  let n = 1500 in
+  let protocol = Michelson_contracts.tezlink_protocol in
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~uses_client:true
+    ~kernel:Latest
+    ~title:
+      "Michelson: block-wide internal-op nonces contiguous at scale (L2-1727)"
+    ~tags:["tezosx"; Tezosx_runtime.(tag Tezos); "nonce"]
+    ~minimum_base_fee_per_gas:crac_minimum_base_fee_per_gas
+    ~with_runtimes:Tezosx_runtime.[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sequencer ->
+  let source = Constant.bootstrap5 in
+  let* client = Client.init_mockup ~protocol () in
+  let* client_tezlink = tezlink_client_from_evm_node sequencer in
+  let* _hex, emitter =
+    TezContract.originate_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["mini_scenarios"; "emit_loop"]
+      ~init_storage_data:"Unit"
+      protocol
+  in
+  let* () =
+    TezContract.call_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:2
+      ~dest:emitter
+      ~arg_data:(string_of_int n)
+      ~gas_limit:650_000
+      ~fee:1_000_000
+      ()
+  in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let nonces =
+    JSON.(ops |> as_list)
+    |> List.concat_map (fun op ->
+           JSON.(op |-> "contents" |> as_list)
+           |> List.concat_map (fun content ->
+                  JSON.(
+                    content |-> "metadata" |-> "internal_operation_results"
+                    |> as_list)
+                  |> List.map (fun iop -> JSON.(iop |-> "nonce" |> as_int))))
+  in
+  Check.(
+    (List.length nonces > 1000)
+      int
+      ~error_msg:"Expected a large internal-op count (>%R), got %L") ;
+  (* Sorted, the multiset must equal {0, .., N-1}: contiguous from 0, no gap,
+     no duplicate — exactly what saturation would violate. *)
+  let sorted = List.sort compare nonces in
+  let expected = List.init (List.length nonces) Fun.id in
+  Check.(
+    (sorted = expected)
+      (list int)
+      ~error_msg:
+        "Block-wide internal-op nonces must be {0, .., N-1} (no reset, no \
+         duplicate)") ;
+  unit
+
 (** Acceptance criterion for the CRAC frame marker contract: user [EMIT]s
     with tags [%cross_runtime_call] and [%cross_runtime_call_end] from a [KT1] contract reached via CRAC
     must not perturb the bracket walk.  The sender filter in
@@ -15331,6 +15409,7 @@ let () =
   test_crac_gas_model_alias_caching () ;
   test_check_crac_brackets_unit () ;
   test_crac_evm_to_tez_receipt () ;
+  test_internal_nonces_are_block_contiguous_at_scale () ;
   test_crac_forged_marker_excluded_by_sender_filter () ;
   test_crac_user_emit_in_reentrant_inner_crac () ;
   test_crac_synthetic_event_survives_failed_inner_with_emit () ;

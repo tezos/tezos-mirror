@@ -1708,6 +1708,175 @@ mod tests {
         )
     }
 
+    /// L2-1727: a delayed-inbox Tezos operation is subject to L1's per-block
+    /// internal-operation cap *cumulatively*. The kernel threads the block's
+    /// prior internal-op count into the delayed `BlockCtx`
+    /// (`apply::apply_transaction`), so a sub-operation crossing the cap fails
+    /// the delayed op *in isolation* (backtracked) instead of being applied.
+    ///
+    /// Fail-on-revert guard: with the base hardcoded back to 0 the call below
+    /// stays `Applied` at base 65_535, so this test goes red.
+    #[test]
+    fn delayed_internal_op_cap_is_cumulative() {
+        use crate::apply::RuntimeExecutionInfo;
+        use mir::gas::Gas;
+        use mir::interpreter::{compute_contract_address, MAX_INTERNAL_OPERATIONS};
+        use tezos_tezlink::operation_result::{
+            ContentResult, OperationDataAndMetadata, OperationResult, OperationResultSum,
+        };
+        use tezosx_tezos_runtime::account::{set_tezos_account_info, TezosAccountInfo};
+
+        // Apply, via the real delayed-inbox path, a call to a contract that
+        // EMITs exactly one internal operation, with the block's prior
+        // internal-op count seeded to `base`. Returns whether the top-level
+        // operation was `Applied`.
+        let run = |base: u128| {
+            let mut host = MockKernelHost::default();
+            storage::store_da_fee(&mut host, U256::zero()).unwrap();
+            store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+
+            // Allocate bootstrap2 so the SafeStorage backup of the Tezos
+            // accounts root succeeds.
+            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .unwrap()
+                .implicit_from_public_key_hash(&bootstrap2().pkh)
+                .unwrap()
+                .allocate(&mut host)
+                .unwrap();
+
+            let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host);
+            let mut config = dummy_configuration();
+
+            let bootstrap = bootstrap1();
+            set_tezos_account_info(
+                &mut host,
+                &bootstrap.pkh,
+                TezosAccountInfo {
+                    balance: U256::from(500_000u64),
+                    nonce: 0,
+                    pub_key: Some(bootstrap.pk.clone()),
+                },
+            )
+            .unwrap();
+
+            // A contract that emits exactly one internal Event operation.
+            let parser = mir::parser::Parser::new();
+            let code = parser
+                .parse_top_level(
+                    "parameter unit; storage unit;
+                     code { CDR; PUSH string \"ping\"; EMIT %ping string;
+                            NIL operation; SWAP; CONS; PAIR }",
+                )
+                .unwrap()
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap();
+            let storage = parser
+                .parse("Unit")
+                .unwrap()
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap();
+
+            // Originate the contract (block 0) through the production pipeline.
+            let origination = make_origination_operation(
+                1,
+                1,
+                5000,
+                500,
+                bootstrap.clone(),
+                0_u64.into(),
+                code,
+                storage,
+            );
+            let emitter = Contract::Originated(compute_contract_address(
+                &origination.hash().unwrap(),
+                0,
+            ));
+            store_blueprints::<_, TezosXChainConfig>(
+                &mut host,
+                vec![tezos_blueprint(vec![origination], Timestamp::from(0i64))],
+            );
+            produce(&mut host, &chain_config, &mut config, None, None)
+                .expect("origination block must be produced");
+
+            // Build the delayed call to the emitter (counter 2: after the
+            // origination at counter 1).
+            let call = make_transaction_operation(
+                1,
+                2,
+                5000,
+                300,
+                bootstrap,
+                0.into(),
+                emitter,
+                Parameters::default(),
+            );
+            let transaction = Transaction {
+                tx_hash: call.hash().unwrap().into(),
+                content: TransactionContent::TezosDelayed(call),
+            };
+
+            let mut block_constants = first_block(&mut host);
+            block_constants.michelson_runtime_block_constants.safe_roots = vec![
+                TEZ_SAFE_STORAGE_ROOT_PATH.into(),
+                TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH.into(),
+            ];
+            let registry = RegistryImpl::default();
+            let outbox_queue =
+                OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap();
+
+            let result = crate::apply::apply_transaction(
+                &mut host,
+                &registry,
+                &outbox_queue,
+                &block_constants.evm_runtime_block_constants,
+                transaction,
+                tezosx_journal::CracId::new(0, 0),
+                0,
+                None,
+                None,
+                &chain_config.spec_id,
+                &chain_config.limits,
+                false,
+                &block_constants.michelson_runtime_block_constants.safe_roots,
+                &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+                base,
+            )
+            .expect("apply_transaction must not raise a kernel error");
+
+            let info = match result {
+                ExecutionResult::Valid(info) => info,
+                ExecutionResult::Invalid => panic!("delayed op must be valid"),
+            };
+            let RuntimeExecutionInfo::Tezos { op, .. } = info else {
+                panic!("delayed op must yield Tezos execution info");
+            };
+            let OperationDataAndMetadata::OperationWithMetadata(batch) =
+                op.op_and_receipt;
+            matches!(
+                batch.operations[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            )
+        };
+
+        // Just below the cap: the EMIT takes a counter under the limit and the
+        // delayed op is applied.
+        assert!(
+            run(MAX_INTERNAL_OPERATIONS - 1),
+            "below the cap the delayed op must be applied"
+        );
+        // At the cap: the EMIT would allocate the limiting counter, so the
+        // delayed op fails in isolation (backtracked), not applied.
+        assert!(
+            !run(MAX_INTERNAL_OPERATIONS),
+            "at the cap the delayed op must fail in isolation"
+        );
+    }
+
     #[test]
     // Test if the invalid transactions are producing receipts
     fn test_invalid_transactions_receipt_status() {

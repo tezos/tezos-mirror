@@ -3145,6 +3145,149 @@ mod tests {
         );
     }
 
+    /// L2-1727: an EVM-origin (inbound) CRAC is subject to L1's per-block
+    /// internal-operation cap *cumulatively*. The kernel seeds the Michelson
+    /// journal counter with the block's prior internal-op count
+    /// (`apply_ethereum_transaction_common`), so a sub-operation that would
+    /// allocate a counter at the cap fails the CRAC *in isolation* (op-level,
+    /// HTTP 400) rather than being applied. Pre-MR the EVM path always started
+    /// at 0, so this never fired. Mirrors the native-path boundary in
+    /// `tezos_execution`'s `internal_operation_cap_is_block_cumulative`.
+    #[test]
+    fn inbound_crac_internal_op_cap_is_cumulative() {
+        use crate::headers::{
+            X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_LIMIT,
+            X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+        };
+        use mir::ast::micheline::Micheline;
+        use mir::interpreter::MAX_INTERNAL_OPERATIONS;
+        use tezos_crypto_rs::blake2b::digest_160;
+        use tezos_crypto_rs::hash::{ContractKt1Hash, OperationHash};
+        use tezosx_journal::CracId;
+
+        const SOURCE_KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
+        const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
+
+        // Drive a single inbound CRAC whose parent emits exactly one internal
+        // transfer, with the journal counter pre-seeded to `base` (the block's
+        // prior internal-op count). Returns the CRAC's HTTP status.
+        let run = |base: u128| {
+            let mut host = MockKernelHost::default();
+            let runtime = test_runtime();
+            let registry = NotWiredRegistry;
+            let context = crate::context::TezosRuntimeContext::from_root(
+                &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+            )
+            .unwrap();
+            let parser = mir::parser::Parser::new();
+
+            let receiver_kt1 = ContractKt1Hash::from(digest_160(b"l2-1727-receiver"));
+            let receiver = context.originated_from_kt1(&receiver_kt1).unwrap();
+            let receiver_script = parser
+                .parse_top_level(
+                    "parameter unit; storage unit; code { CDR; NIL operation; PAIR }",
+                )
+                .unwrap();
+            receiver
+                .init(
+                    &mut host,
+                    Some(
+                        &receiver_script
+                            .encode(&mut Gas::default())
+                            .unwrap()
+                            .unwrap(),
+                    ),
+                    &Micheline::from(())
+                        .encode(&mut Gas::default())
+                        .unwrap()
+                        .unwrap(),
+                    0.into(),
+                )
+                .unwrap();
+
+            let parent_kt1 = ContractKt1Hash::from(digest_160(b"l2-1727-parent"));
+            let parent = context.originated_from_kt1(&parent_kt1).unwrap();
+            let parent_script = parser
+                .parse_top_level(
+                    r#"
+                    parameter address;
+                    storage unit;
+                    code {
+                        CAR;
+                        CONTRACT unit;
+                        IF_NONE { PUSH string "Invalid contract address"; FAILWITH } {};
+                        PUSH mutez 0;
+                        PUSH unit Unit;
+                        TRANSFER_TOKENS;
+                        NIL operation;
+                        SWAP; CONS;
+                        PUSH unit Unit;
+                        SWAP;
+                        PAIR
+                    }"#,
+                )
+                .unwrap();
+            parent
+                .init(
+                    &mut host,
+                    Some(&parent_script.encode(&mut Gas::default()).unwrap().unwrap()),
+                    &Micheline::from(())
+                        .encode(&mut Gas::default())
+                        .unwrap()
+                        .unwrap(),
+                    0.into(),
+                )
+                .unwrap();
+
+            let crac_id = CracId::new(u8::from(RuntimeId::Ethereum), 0);
+            let crac_id_str = crac_id.to_string();
+            let mut journal = TezosXJournal::new(
+                crac_id,
+                OperationHash::default(),
+                BlockConstants::dummy(),
+            );
+            journal.michelson.set_internal_operation_counter(base);
+
+            let body =
+                Micheline::Bytes(Contract::Originated(receiver_kt1).to_bytes().unwrap())
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap();
+            let request = http::Request::builder()
+                .method(http::Method::POST)
+                .uri(format!("http://tezos/{}", parent_kt1.to_base58_check()))
+                .header(X_TEZOS_AMOUNT, "0")
+                .header(X_TEZOS_GAS_LIMIT, "600000000")
+                .header(X_TEZOS_TIMESTAMP, "1000000")
+                .header(X_TEZOS_BLOCK_NUMBER, "1")
+                .header(X_TEZOS_SENDER, SENDER_KT1)
+                .header(X_TEZOS_SOURCE, SOURCE_KT1)
+                .header(X_TEZOS_CRAC_ID, crac_id_str.as_str())
+                .body(body)
+                .unwrap();
+
+            runtime
+                .serve(&registry, &mut host, &mut journal, request)
+                .status()
+        };
+
+        // Just below the cap: the parent's internal transfer takes a counter
+        // under the limit and the CRAC succeeds.
+        assert_eq!(
+            run(MAX_INTERNAL_OPERATIONS - 1),
+            StatusCode::OK,
+            "below the cap the inbound CRAC must succeed"
+        );
+        // At the cap: allocating the counter fails L1's
+        // Too_many_internal_operations, so the CRAC fails op-level (400 — a
+        // catchable revert), not a 500 block abort.
+        assert_eq!(
+            run(MAX_INTERNAL_OPERATIONS),
+            StatusCode::BAD_REQUEST,
+            "at the cap the inbound CRAC must fail in isolation (op-level)"
+        );
+    }
+
     // ── TezosRuntime::read_origin tests ──────────────────────────────────
 
     mod read_origin_tests {
