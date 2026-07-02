@@ -106,6 +106,14 @@ let job_docker_promote_to_latest =
              container_scanning job is added to production release
              pipelines (Major, Minor, Beta/RC; octez_latest_release.ml). *)
           [])
+      (* Docker Hub credentials (CI_DOCKER_AUTH) are scoped to the
+       [docker-publish] environment; only [`real] jobs (CI_DOCKER_HUB=true)
+       authenticate and thus need access. *)
+    ?environment:
+      (match mode with
+      | `real ->
+          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
+      | `test | `test_wait -> None)
     ~script:
       [
         "./scripts/ci/docker_initialize.sh --image-names";
@@ -377,6 +385,14 @@ let job_docker_promote_to_version =
         ("DOCKER_VERSION", Docker.version);
         ("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true");
       ]
+      (* Docker Hub credentials (CI_DOCKER_AUTH) are scoped to the
+       [docker-publish] environment; only [`real] jobs (CI_DOCKER_HUB=true)
+       authenticate and thus need access. *)
+    ?environment:
+      (match mode with
+      | `real ->
+          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
+      | `test -> None)
     ~script:
       [
         "./scripts/ci/docker_initialize.sh --image-names";
