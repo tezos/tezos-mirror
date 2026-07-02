@@ -148,6 +148,7 @@ defprim! {
     OutOfGas,
     now,
     level,
+    min_block_time,
     source,
     sender,
     big_maps,

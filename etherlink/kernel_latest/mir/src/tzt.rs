@@ -104,6 +104,8 @@ pub struct TztTest<'a> {
     pub now: Option<BigInt>,
     /// Current blockchain level, as defined by the `level` field.
     pub level: Option<BigUint>,
+    /// Minimal block time in seconds, as defined by the `min_block_time` field.
+    pub min_block_time: Option<BigUint>,
     /// Address that directly or indirectly initiated the current transaction
     pub source: Option<PublicKeyHash>,
     /// Address that directly initiated the current transaction
@@ -201,6 +203,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             None;
         let mut m_now: Option<BigInt> = None;
         let mut m_level: Option<BigUint> = None;
+        let mut m_min_block_time: Option<BigUint> = None;
         let mut m_source: Option<Micheline> = None;
         let mut m_sender: Option<Micheline> = None;
         let mut m_storages: Option<Vec<(Micheline, Micheline, Micheline)>> = None;
@@ -238,6 +241,9 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 }
                 Now(n) => set_tzt_field("now", &mut m_now, n.into())?,
                 Level(l) => set_tzt_field("level", &mut m_level, l)?,
+                MinBlockTime(t) => {
+                    set_tzt_field("min_block_time", &mut m_min_block_time, t)?
+                }
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
                 SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
                 BigMaps(v) => set_tzt_field("big_maps", &mut m_big_maps, v)?,
@@ -568,6 +574,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             views,
             now: m_now,
             level: m_level,
+            min_block_time: m_min_block_time,
             source,
             sender,
         })
@@ -667,6 +674,7 @@ pub(crate) enum TztEntity<'a> {
     OtherContracts(Vec<(Micheline<'a>, Micheline<'a>)>),
     Now(i64),
     Level(BigUint),
+    MinBlockTime(BigUint),
     Source(Micheline<'a>),
     SenderAddr(Micheline<'a>),
     BigMaps(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
@@ -750,6 +758,11 @@ pub fn run_tzt_test<'a>(
 
     ctx.level = test.level.clone().unwrap_or(Ctx::default().level);
 
+    ctx.min_block_time = test
+        .min_block_time
+        .clone()
+        .unwrap_or(Ctx::default().min_block_time);
+
     let execution_result =
         execute_tzt_test_code(test.code, &mut ctx, arena, test.parameter, test.input);
     check_expectation(&mut ctx, test.output, execution_result)
@@ -773,6 +786,15 @@ mod tests {
     fn level() {
         parse_and_run(
             "code { LEVEL } ; input { } ; output { Stack_elt nat 42 } ; level 42",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn min_block_time() {
+        parse_and_run(
+            "code { MIN_BLOCK_TIME } ; input { } ; \
+             output { Stack_elt nat 7 } ; min_block_time 7",
         )
         .unwrap();
     }
