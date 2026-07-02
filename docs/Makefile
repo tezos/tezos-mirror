@@ -192,7 +192,7 @@ user/default-acl.json: $(RPCDOCEXE)
 
 .PHONY: rpc
 rpc: user/default-acl.json shell/rpc.rst \
-	alpha/rpc.rst ushuaia/rpc.rst
+	alpha/rpc.rst
 
 # To be triggered manually when needed
 .PHONY: rpc-protocols
@@ -318,6 +318,6 @@ fmt: black
 clean:
 	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst ushuaia/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv
 	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html ushuaia/octez-*.html
 	@-rm -Rf ../openapi-tmp
