@@ -38,6 +38,10 @@
 
 ### Execution changes
 
+- Speed-up the blueprints follower catch-up mechanism: the next batch of
+  blueprints is now downloaded from the remote EVM node while the current
+  batch is being applied. (!22372)
+
 ### Storage changes
 
 ### Documentation changes

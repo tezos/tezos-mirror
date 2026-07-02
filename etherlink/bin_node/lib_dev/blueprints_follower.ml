@@ -151,9 +151,12 @@ module Blueprints_sequence = struct
         else return None)
       (None, next_blueprint_number)
 
-  let rec make_with_chunks ?remote_head ~multichain ~next_blueprint_number
-      ~rpc_timeout evm_node_endpoint : t =
-   fun () ->
+  (* Fetch the next chunk of blueprints, starting from
+     [next_blueprint_number]. Returns [`Caught_up] when the local head is
+     close enough to the remote head, and [`Legacy_fallback] when the remote
+     node does not implement the chunked RPC. *)
+  let fetch_chunk ?remote_head ~multichain ~next_blueprint_number ~rpc_timeout
+      evm_node_endpoint =
     let open Lwt_result_syntax in
     let* is_too_old, remote_head =
       local_head_too_old
@@ -178,32 +181,66 @@ module Blueprints_sequence = struct
           (* The node should never return an empty-list. It is expected that it
              will always return at least one element. *)
           assert false
-      | Ok blueprints ->
-          let next_chunks =
-            make_with_chunks
-              ~remote_head
-              ~multichain
-              ~next_blueprint_number:
-                (quantity_add next_blueprint_number (List.length blueprints))
-              ~rpc_timeout
-              evm_node_endpoint
-          in
-          Seq_es.append (Seq_es.of_seq (List.to_seq blueprints)) next_chunks
-          @@ ()
+      | Ok blueprints -> return (`Chunk (blueprints, remote_head))
       | Error
           (( Tezos_rpc.Context.Not_found _
            | RPC_client_errors.Request_failed
                {error = Unauthorized_uri | Forbidden; _} )
           :: _) ->
-          legacy_rpc_fallback := true ;
-          make_legacy_rpc
+          return `Legacy_fallback
+      | Error err -> fail err
+    else return `Caught_up
+
+  let rec make_with_chunks ?prefetched ?remote_head ~multichain
+      ~next_blueprint_number ~rpc_timeout evm_node_endpoint : t =
+   fun () ->
+    let open Lwt_result_syntax in
+    let fetch =
+      match prefetched with
+      | Some fetch -> fetch
+      | None ->
+          fetch_chunk
+            ?remote_head
             ~multichain
             ~next_blueprint_number
             ~rpc_timeout
             evm_node_endpoint
-            ()
-      | Error err -> fail err
-    else return Seq_es.Nil
+    in
+    let* chunk = fetch in
+    match chunk with
+    | `Chunk (blueprints, remote_head) ->
+        let next_blueprint_number =
+          quantity_add next_blueprint_number (List.length blueprints)
+        in
+        (* Start downloading the next chunk now, so that it is fetched from
+           the remote node while the current one is being applied. *)
+        let prefetched =
+          fetch_chunk
+            ~remote_head
+            ~multichain
+            ~next_blueprint_number
+            ~rpc_timeout
+            evm_node_endpoint
+        in
+        let next_chunks =
+          make_with_chunks
+            ~prefetched
+            ~remote_head
+            ~multichain
+            ~next_blueprint_number
+            ~rpc_timeout
+            evm_node_endpoint
+        in
+        Seq_es.append (Seq_es.of_seq (List.to_seq blueprints)) next_chunks @@ ()
+    | `Legacy_fallback ->
+        legacy_rpc_fallback := true ;
+        make_legacy_rpc
+          ~multichain
+          ~next_blueprint_number
+          ~rpc_timeout
+          evm_node_endpoint
+          ()
+    | `Caught_up -> return Seq_es.Nil
 
   let make ~multichain ~next_blueprint_number ~rpc_timeout evm_node_endpoint : t
       =
