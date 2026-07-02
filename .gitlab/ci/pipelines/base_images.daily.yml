@@ -97,7 +97,8 @@ images.ci-release:
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs: []
+  needs:
+  - images.debian
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -116,7 +117,7 @@ images.ci-release:
   variables:
     DOCKER_VERSION: 28.5.1
     DISTRIBUTION: ci-release
-    IMAGE_PATH: debian:$RELEASE
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
   parallel:
     matrix:
