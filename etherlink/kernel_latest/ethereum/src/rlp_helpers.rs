@@ -80,6 +80,9 @@ pub fn decode_array(
     size: usize,
     vec: &mut [u8],
 ) -> Result<(), DecoderError> {
+    if !item.is_data() {
+        return Err(DecoderError::RlpExpectedToBeData);
+    }
     let list = item.data()?;
     if list.len() != size {
         return Err(DecoderError::RlpIncorrectListLen);
@@ -129,24 +132,38 @@ pub fn append_compressed_h256(s: &mut rlp::RlpStream, h256: H256) -> &mut RlpStr
 
 /// Decode H256 compressed must be used for signatures only.
 pub fn decode_compressed_h256(decoder: &Rlp<'_>) -> Result<H256, DecoderError> {
-    let length = decoder.data()?.len();
-    if length == 32 {
-        Ok(H256::from_slice(decoder.data()?))
-    } else if length < 32 && length > 0 {
-        // there were missing 0 that encoding deleted
-        let missing = 32 - length;
-        let mut full = [0u8; 32];
-        full[missing..].copy_from_slice(decoder.data()?);
-        Ok(H256::from(full))
-    } else if decoder.data()?.is_empty() {
-        // considering the case empty allows to decode unsigned transactions
-        Ok(H256::zero())
-    } else {
-        Err(DecoderError::RlpInvalidLength)
+    // A signature scalar is a byte-string, never a list. Guarding against the
+    // list shape prevents `data()` from returning a list's payload verbatim,
+    // which would make the encoding malleable (same scalar, different bytes).
+    if !decoder.is_data() {
+        return Err(DecoderError::RlpExpectedToBeData);
     }
+    let data = decoder.data()?;
+    let length = data.len();
+    if length > 32 {
+        return Err(DecoderError::RlpInvalidLength);
+    }
+    if length == 0 {
+        // considering the case empty allows to decode unsigned transactions
+        return Ok(H256::zero());
+    }
+    // Canonical RLP strips the leading zeros of a scalar, so a non-empty payload
+    // whose first byte is zero is a non-minimal (malleable) encoding of the same
+    // value: reject it so a scalar has a single valid encoding. The remaining
+    // shorter-than-32 payloads are the canonical form of a scalar whose high
+    // bytes were zero, and are zero-extended back below.
+    if data[0] == 0 {
+        return Err(DecoderError::RlpInvalidLength);
+    }
+    let mut full = [0u8; 32];
+    full[32 - length..].copy_from_slice(data);
+    Ok(H256::from(full))
 }
 
 pub fn decode_tx_hash(item: rlp::Rlp<'_>) -> Result<TransactionHash, DecoderError> {
+    if !item.is_data() {
+        return Err(DecoderError::RlpExpectedToBeData);
+    }
     let list = item.data()?;
     if list.len() != TRANSACTION_HASH_SIZE {
         return Err(DecoderError::RlpIncorrectListLen);
