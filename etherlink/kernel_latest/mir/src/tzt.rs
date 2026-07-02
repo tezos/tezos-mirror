@@ -160,11 +160,52 @@ fn typecheck_stack<'a>(
             let t = parse_ty(ctx.gas(), &t)?;
             // TZT stacks may reference big_maps declared in the test's
             // `big_maps` section by their id.
-            let tc_val =
-                typecheck_value(&v, &mut ctx, &t, AllowForgedLazyStorageId::Yes)?;
+            let tc_val = match t {
+                // `operation` values are not pushable, so the generic value
+                // typechecker rejects them. The TZT format nonetheless spells
+                // them out explicitly in `input`/`output` stacks, so build them
+                // here from their Micheline representation.
+                Type::Operation => typecheck_tzt_operation(&v, &mut ctx)?,
+                _ => typecheck_value(&v, &mut ctx, &t, AllowForgedLazyStorageId::Yes)?,
+            };
             Ok((t, tc_val))
         })
         .collect()
+}
+
+/// Typecheck the value of an `operation` stack element in a TZT `input`/`output`
+/// stack. Operations cannot be produced by the ordinary value typechecker (they
+/// are not pushable), so we build the [TypedValue] directly from the Micheline
+/// representation used by the TZT format.
+fn typecheck_tzt_operation<'a>(
+    v: &Micheline<'a>,
+    ctx: &mut Ctx<'a>,
+) -> Result<TypedValue<'a>, TcError> {
+    match v {
+        // `Emit <arg_ty> <value>`, with an optional field annotation carrying
+        // the event tag (e.g. `Emit %tag nat 5`).
+        Micheline::App(Prim::Emit, [arg_ty, value], anns) => {
+            let arg_ty = parse_ty(ctx.gas(), arg_ty)?;
+            let tc_value =
+                typecheck_value(value, ctx, &arg_ty, AllowForgedLazyStorageId::Yes)?;
+            let tag = anns.get_single_field_ann()?;
+            Ok(TypedValue::new_operation(
+                Operation::Emit(Emit {
+                    tag,
+                    value: tc_value,
+                    arg_ty: Or::Left(arg_ty),
+                }),
+                // The operation counter is dropped when an operation is
+                // converted to Micheline for stack comparison, so any value
+                // works as a placeholder here.
+                0,
+            ))
+        }
+        _ => Err(TcError::InvalidValueForType(
+            format!("{v:?}"),
+            Type::Operation,
+        )),
+    }
 }
 
 impl<'a> Parser<'a> {
@@ -902,6 +943,26 @@ mod tests {
              output { Stack_elt nat 100 } ; total_voting_power 100",
         )
         .unwrap();
+    }
+
+    #[test]
+    fn emit() {
+        parse_and_run(
+            "code { EMIT bool } ; input { Stack_elt bool True } ; \
+             output { Stack_elt operation (Emit bool True) }",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn emit_mismatch() {
+        // A wrong emitted value must be reported as a stack mismatch, so the
+        // expectation genuinely constrains the operation's payload.
+        assert!(parse_and_run(
+            "code { EMIT bool } ; input { Stack_elt bool True } ; \
+             output { Stack_elt operation (Emit bool False) }",
+        )
+        .is_err());
     }
 
     #[test]
