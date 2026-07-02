@@ -1,0 +1,3 @@
+code { BYTES } ;
+input { Stack_elt int -100220141610198602081980 } ;
+output { Stack_elt bytes 0xeac70e2402977f501944 }
