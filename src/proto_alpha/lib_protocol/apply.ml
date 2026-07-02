@@ -3517,7 +3517,10 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ~error:(Error_monad.trace_of_error Missing_shell_header)
       in
       let cache_nonce =
-        Cache.cache_nonce_from_block_header shell_header block_data_contents
+        Cache.cache_nonce_from_block_header
+          ~round
+          shell_header
+          block_data_contents
       in
       let locked_round =
         Option.map fst (Consensus.locked_round_evidence ctxt)
@@ -3579,7 +3582,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
       } ->
       let round = Fitness.round fitness in
       let cache_nonce =
-        Cache.cache_nonce_from_block_header shell protocol_data.contents
+        Cache.cache_nonce_from_block_header ~round shell protocol_data.contents
       in
       let* ctxt, receipt =
         finalize_application

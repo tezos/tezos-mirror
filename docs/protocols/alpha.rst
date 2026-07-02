@@ -61,6 +61,11 @@ Protocol parameters
 Bug Fixes
 ---------
 
+- Included the block round in the protocol cache nonce computed by
+  ``cache_nonce_from_block_header``, so that two blocks sharing the same
+  payload but baked at different rounds obtain distinct nonces. (MR
+  :gl:`!22462`)
+
 Minor Changes
 -------------
 

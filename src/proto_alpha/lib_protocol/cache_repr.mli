@@ -241,7 +241,11 @@ val register_exn :
   (module CLIENT with type cached_value = 'a) ->
   (module INTERFACE with type cached_value = 'a)
 
-(** [cache_nonce_from_block_header shell_header contents] computes a
-   {!cache_nonce} from the [shell_header] and its [contents]. *)
+(** [cache_nonce_from_block_header ~round shell_header contents] computes a
+    {!cache_nonce} from the [shell_header], its [contents] and the block
+    [round]. *)
 val cache_nonce_from_block_header :
-  Block_header_repr.shell_header -> Block_header_repr.contents -> cache_nonce
+  round:Round_repr.t ->
+  Block_header_repr.shell_header ->
+  Block_header_repr.contents ->
+  cache_nonce
