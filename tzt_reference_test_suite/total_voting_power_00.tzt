@@ -1,0 +1,4 @@
+code { TOTAL_VOTING_POWER } ;
+input { } ;
+output { Stack_elt nat 100 } ;
+total_voting_power 100

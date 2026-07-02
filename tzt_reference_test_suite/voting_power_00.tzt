@@ -1,0 +1,4 @@
+code { VOTING_POWER } ;
+input { Stack_elt key_hash "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" } ;
+output { Stack_elt nat 5 } ;
+voting_power { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 5 }

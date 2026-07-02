@@ -1,0 +1,4 @@
+code { MIN_BLOCK_TIME } ;
+input { } ;
+output { Stack_elt nat 7 } ;
+min_block_time 7
