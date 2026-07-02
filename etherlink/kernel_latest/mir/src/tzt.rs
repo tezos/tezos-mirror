@@ -109,6 +109,9 @@ pub struct TztTest<'a> {
     /// Voting powers of implicit accounts, as defined by the `voting_power`
     /// field. Controls the result of the VOTING_POWER instruction.
     pub voting_power: Option<HashMap<PublicKeyHash, BigUint>>,
+    /// Total voting power, as defined by the `total_voting_power` field.
+    /// Controls the result of the TOTAL_VOTING_POWER instruction.
+    pub total_voting_power: Option<BigUint>,
     /// Address that directly or indirectly initiated the current transaction
     pub source: Option<PublicKeyHash>,
     /// Address that directly initiated the current transaction
@@ -208,6 +211,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_level: Option<BigUint> = None;
         let mut m_min_block_time: Option<BigUint> = None;
         let mut m_voting_power: Option<Micheline> = None;
+        let mut m_total_voting_power: Option<BigUint> = None;
         let mut m_source: Option<Micheline> = None;
         let mut m_sender: Option<Micheline> = None;
         let mut m_storages: Option<Vec<(Micheline, Micheline, Micheline)>> = None;
@@ -249,6 +253,9 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                     set_tzt_field("min_block_time", &mut m_min_block_time, t)?
                 }
                 VotingPower(v) => set_tzt_field("voting_power", &mut m_voting_power, v)?,
+                TotalVotingPower(t) => {
+                    set_tzt_field("total_voting_power", &mut m_total_voting_power, t)?
+                }
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
                 SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
                 BigMaps(v) => set_tzt_field("big_maps", &mut m_big_maps, v)?,
@@ -641,6 +648,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             level: m_level,
             min_block_time: m_min_block_time,
             voting_power,
+            total_voting_power: m_total_voting_power,
             source,
             sender,
         })
@@ -742,6 +750,7 @@ pub(crate) enum TztEntity<'a> {
     Level(BigUint),
     MinBlockTime(BigUint),
     VotingPower(Micheline<'a>),
+    TotalVotingPower(BigUint),
     Source(Micheline<'a>),
     SenderAddr(Micheline<'a>),
     BigMaps(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
@@ -834,6 +843,12 @@ pub fn run_tzt_test<'a>(
         ctx.set_voting_powers(voting_power);
     }
 
+    // Applied after `set_voting_powers`, which also sets the total, so an
+    // explicit `total_voting_power` field takes precedence over the sum.
+    if let Some(total_voting_power) = test.total_voting_power.clone() {
+        ctx.set_total_voting_power(total_voting_power);
+    }
+
     let execution_result =
         execute_tzt_test_code(test.code, &mut ctx, arena, test.parameter, test.input);
     check_expectation(&mut ctx, test.output, execution_result)
@@ -876,6 +891,27 @@ mod tests {
             "code { PUSH key_hash \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\" ; \
              VOTING_POWER } ; input { } ; output { Stack_elt nat 5 } ; \
              voting_power { Elt \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\" 5 }",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn total_voting_power() {
+        parse_and_run(
+            "code { TOTAL_VOTING_POWER } ; input { } ; \
+             output { Stack_elt nat 100 } ; total_voting_power 100",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn total_voting_power_overrides_sum() {
+        // `total_voting_power` takes precedence over the sum of `voting_power`.
+        parse_and_run(
+            "code { TOTAL_VOTING_POWER } ; input { } ; \
+             output { Stack_elt nat 100 } ; \
+             voting_power { Elt \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\" 5 } ; \
+             total_voting_power 100",
         )
         .unwrap();
     }
