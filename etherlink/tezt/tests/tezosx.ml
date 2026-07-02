@@ -174,6 +174,34 @@ let check_account sandbox (account : Account.key) =
   in
   unit
 
+(** [check_block_op_status ~index ~expected_status client] fetches the
+    operations of the head block through [client], asserts the block holds
+    exactly one manager operation, and checks that its top-level
+    [operation_result] status equals [expected_status] (e.g. ["failed"]).
+    Fails the test otherwise.
+
+    Handy after force-injecting an operation the client predicted would fail:
+    it turns the "the op is indeed [failed]" assertion into a one-liner. *)
+let check_block_op_status ?block ~index ~expected_status client =
+  let* ops =
+    Client.RPC.call client (Node.RPC.get_chain_block_operations ?block ())
+  in
+  match
+    List.nth_opt (JSON.as_list ops |> List.concat_map JSON.as_list) index
+  with
+  | Some op ->
+      let status =
+        JSON.(
+          op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+          |-> "status" |> as_string)
+      in
+      Check.(
+        (status = expected_status)
+          string
+          ~error_msg:"Expected operation status %R but got %L") ;
+      unit
+  | _ -> Test.fail "Expected one operation in the block, got something else"
+
 let account_str_rpc sequencer account key =
   let path =
     sf "/tezlink/chains/main/blocks/head/context/contracts/%s/%s" account key
@@ -202,21 +230,6 @@ let tezosx_michelson_contracts_index = "/tez/tez_accounts/contracts/index"
 let read_michelson_contract_storage sc_rollup_node contract_hex =
   let path =
     sf "%s/%s/data/storage" tezosx_michelson_contracts_index contract_hex
-  in
-  Sc_rollup_node.RPC.call sc_rollup_node
-  @@ Sc_rollup_rpc.get_global_block_durable_state_value
-       ~pvm_kind:"wasm_2_0_0"
-       ~operation:Sc_rollup_rpc.Value
-       ~key:path
-       ()
-
-(** [read_michelson_contract_code sc_rollup_node contract_hex] reads the
-    [/data/code] of an originated Michelson contract from durable storage.
-    Returns [None] when no per-contract code is stored — e.g. a code-less
-    Tezos X alias, whose script is the shared implementation. *)
-let read_michelson_contract_code sc_rollup_node contract_hex =
-  let path =
-    sf "%s/%s/data/code" tezosx_michelson_contracts_index contract_hex
   in
   Sc_rollup_node.RPC.call sc_rollup_node
   @@ Sc_rollup_rpc.get_global_block_durable_state_value
@@ -339,24 +352,6 @@ let originate_michelson_code_via_delayed_inbox ~sc_rollup_address
   Log.info "Originated contract: %s" kt1_address ;
   return (contract_hex, kt1_address)
 
-let originate_michelson_contract_via_delayed_inbox ~sc_rollup_address
-    ~sc_rollup_node ~client ~l1_contracts ~sequencer ~source ~counter
-    ~script_name ~init_storage_data ?(init_balance = 0) protocol =
-  let script_path = Michelson_script.(find script_name protocol |> path) in
-  let* code = Client.convert_script_to_json ~script:script_path client in
-  originate_michelson_code_via_delayed_inbox
-    ~sc_rollup_address
-    ~sc_rollup_node
-    ~client
-    ~l1_contracts
-    ~sequencer
-    ~source
-    ~counter
-    ~code
-    ~init_storage_data
-    ~init_balance
-    ()
-
 (** [call_michelson_contract_via_delayed_inbox] calls a Michelson contract
     via the delayed inbox. Converts the argument from Michelson notation to
     JSON, forges and sends the call operation. *)
@@ -385,28 +380,6 @@ let call_michelson_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node
     ~l1_contracts
     ~sequencer
     call_op
-
-(** [check_michelson_storage_value] reads the storage of a Michelson contract
-    from the durable storage and checks that it matches the expected JSON
-    value. *)
-let check_michelson_storage_value ~sc_rollup_node ~contract_hex ~expected () =
-  let* storage_raw =
-    read_michelson_contract_storage sc_rollup_node contract_hex
-  in
-  match storage_raw with
-  | None ->
-      let kt1 = decode_michelson_contract_address contract_hex in
-      Test.fail "Storage not found for contract %s" kt1
-  | Some hex_str ->
-      let expected =
-        JSON.annotate ~origin:"check_michelson_storage_value" expected
-        |> Option.some
-      in
-      Check.(
-        (decode_micheline_storage hex_str = expected)
-          (option json)
-          ~error_msg:"Expected storage %R but got %L") ;
-      unit
 
 (** EVM precompile address for cross-runtime gateway calls.
     See [revm/src/precompiles/constants.rs:RUNTIME_GATEWAY_PRECOMPILE_ADDRESS]. *)
@@ -510,33 +483,6 @@ let call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination
     ~arguments:[sf "http://tezos/%s" destination; "[]"; "0x"; "1"]
     ?expected_status
     ()
-
-(** [with_check_source_delta_balance ~source ~tez_client ~expected_consumed action]
-    reads the balance of [source] before and after running [action ()], then
-    checks that exactly [expected_consumed] mutez were consumed. The balance
-    check always runs, even if [action] fails. Returns the result of
-    [action]. *)
-let with_check_source_delta_balance ~source ~tez_client ~expected_consumed
-    action =
-  let* balance_before =
-    Client.get_balance_for ~account:source.Account.public_key_hash tez_client
-  in
-  Lwt.finalize action (fun () ->
-      let* balance_after =
-        Client.get_balance_for
-          ~account:source.Account.public_key_hash
-          tez_client
-      in
-      let consumed = Tez.to_mutez balance_before - Tez.to_mutez balance_after in
-      Log.info
-        "Balance consumed: %d mutez (expected %d)"
-        consumed
-        expected_consumed ;
-      Check.(
-        (consumed = expected_consumed)
-          int
-          ~error_msg:"Expected %R mutez consumed but got %L") ;
-      Lwt.return_unit)
 
 let test_bootstrap_kernel_config () =
   let tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts in
@@ -962,22 +908,7 @@ let test_michelson_call_nonexistent_contract () =
       tez_client
   in
   let*@ _ = Rpc.produce_block sandbox in
-  let* ops =
-    Client.RPC.call tez_client (Node.RPC.get_chain_block_operations ())
-  in
-  match JSON.as_list ops |> List.concat_map JSON.as_list with
-  | [op] ->
-      let open JSON in
-      let status =
-        op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
-        |-> "status" |> as_string
-      in
-      Check.(
-        (status = "failed")
-          string
-          ~error_msg:"Expected operation status %R but got %L") ;
-      unit
-  | _ -> Test.fail "Expected one operation in the block, got something else"
+  check_block_op_status ~index:0 ~expected_status:"failed" tez_client
 
 (** Call an existing Michelson contract with a non-existing entrypoint. The
     operation should fail: only fees are consumed. *)
@@ -1019,22 +950,7 @@ let test_michelson_call_wrong_entrypoint () =
       tez_client
   in
   let*@ _ = Rpc.produce_block sandbox in
-  let* ops =
-    Client.RPC.call tez_client (Node.RPC.get_chain_block_operations ())
-  in
-  match JSON.as_list ops |> List.concat_map JSON.as_list with
-  | [op] ->
-      let open JSON in
-      let status =
-        op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
-        |-> "status" |> as_string
-      in
-      Check.(
-        (status = "failed")
-          string
-          ~error_msg:"Expected operation status %R but got %L") ;
-      unit
-  | _ -> Test.fail "Expected one operation in the block, got something else"
+  check_block_op_status ~index:0 ~expected_status:"failed" tez_client
 
 (** Originate a Michelson contract with wrongly-typed initial storage. The
     origination should fail: only fees are consumed, not the initial balance. *)
@@ -1077,22 +993,7 @@ let test_michelson_origination_wrong_storage_type () =
     Operation.inject ~dont_wait:true origination_op tez_client
   in
   let*@ _ = Rpc.produce_block sandbox in
-  let* ops =
-    Client.RPC.call tez_client (Node.RPC.get_chain_block_operations ())
-  in
-  match JSON.as_list ops |> List.concat_map JSON.as_list with
-  | [op] ->
-      let open JSON in
-      let status =
-        op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
-        |-> "status" |> as_string
-      in
-      Check.(
-        (status = "failed")
-          string
-          ~error_msg:"Expected operation status %R but got %L") ;
-      unit
-  | _ -> Test.fail "Expected one operation in the block, got something else"
+  check_block_op_status ~index:0 ~expected_status:"failed" tez_client
 
 (** End-to-end reproduction of the forged-`big_map`-id vulnerability. A
     contract must not be able to read or overwrite another contract's
@@ -1107,17 +1008,15 @@ let test_michelson_origination_wrong_storage_type () =
     and the victim's value remains "genesis-42". Without the fix, the reader
     leaks "genesis-42" and the writer overwrites the victim with
     "Hacked-by-mi". *)
-let test_michelson_forged_big_map_id_rejected =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_michelson_forged_big_map_id_rejected () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Forged big_map id parameter is rejected on tezos X"
     ~tags:["michelson"; "big_map"; "forged"; "security"]
     ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      _protocol
-    ->
+  @@ fun sandbox ->
   let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sandbox in
   (* Victim: owns a `big_map nat string`. On a unit call it materialises
      big_map[0] into its (option string) field, making the content observable
      from durable storage without itself using a forged id. *)
@@ -1136,108 +1035,112 @@ let test_michelson_forged_big_map_id_rejected =
      CAR ; PUSH string \"Hacked-by-mi\" ; SOME ; PUSH nat 0 ; UPDATE ; NIL \
      operation ; PAIR }"
   in
-  let originate ~counter ~code:src ~init_storage_data =
-    let* code = Client.convert_script_to_json ~script:src client in
-    originate_michelson_code_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
-      ~source
-      ~counter
-      ~code
-      ~init_storage_data
-      ()
-  in
-  let storage_json contract_hex =
-    let* raw = read_michelson_contract_storage sc_rollup_node contract_hex in
-    match Option.bind raw decode_micheline_storage with
-    | Some j -> return j
-    | None -> Test.fail "Could not read/decode storage of %s" contract_hex
+  let originate ~code ~init_storage_data ~alias =
+    let* kt1 =
+      Client.originate_contract
+        ~src:source.alias
+        ~prg:code
+        ~init:init_storage_data
+        ~alias
+        ~amount:Tez.zero
+        ~burn_cap:Tez.one
+        tez_client
+    in
+    let*@ _ = Rpc.produce_block sandbox in
+    return kt1
   in
   (* 1. Originate the victim with big_map { 0 -> "genesis-42" }. *)
-  let* victim_hex, victim_kt1 =
+  let* victim_kt1 =
     originate
-      ~counter:1
       ~code:victim_code
       ~init_storage_data:{|Pair None { Elt 0 "genesis-42" }|}
+      ~alias:"victim"
   in
   (* Read the victim's big_map id from its storage `Pair None <id>`. *)
-  let* victim_storage = storage_json victim_hex in
+  let* victim_storage = Client.contract_storage victim_kt1 tez_client in
   let victim_bigmap_id =
-    JSON.(victim_storage |-> "args" |=> 1 |-> "int" |> as_string)
+    match
+      String.trim victim_storage |> String.split_on_char ' ' |> List.rev
+    with
+    | id :: _ -> id
+    | [] ->
+        Test.fail
+          "Could not parse victim big_map id from storage %s"
+          victim_storage
   in
   Log.info "Victim big_map id = %s" victim_bigmap_id ;
   (* 2. Originate the reader and the writer. *)
-  let* reader_hex, reader_kt1 =
-    originate ~counter:2 ~code:reader_code ~init_storage_data:"None"
+  let* reader_kt1 =
+    originate ~code:reader_code ~init_storage_data:"None" ~alias:"reader"
   in
-  let* _writer_hex, writer_kt1 =
-    originate ~counter:3 ~code:writer_code ~init_storage_data:"{}"
+  let* writer_kt1 =
+    originate ~code:writer_code ~init_storage_data:"{}" ~alias:"writer"
   in
-  (* 3. READ attempt: call the reader with the forged victim id. *)
+  (* 3. READ attempt: call the reader with the forged victim id. The forged
+     lazy-storage reference is rejected, so the operation is force-injected
+     (the client predicts failure) and fails without leaking the big_map. *)
   let* () =
-    call_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
-      ~source
-      ~counter:4
-      ~dest:reader_kt1
-      ~arg_data:victim_bigmap_id
-      ()
+    Client.transfer
+      ~force:true
+      ~giver:source.alias
+      ~receiver:reader_kt1
+      ~arg:victim_bigmap_id
+      ~amount:Tez.zero
+      ~gas_limit:500000
+      ~storage_limit:1000
+      ~fee:(Tez.of_int 1)
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  (* The READ op must be included but failed: the forged id is rejected. *)
+  let* () =
+    check_block_op_status ~index:0 ~expected_status:"failed" tez_client
   in
   (* 4. WRITE attempt: call the writer with the forged victim id. *)
   let* () =
-    call_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
-      ~source
-      ~counter:5
-      ~dest:writer_kt1
-      ~arg_data:victim_bigmap_id
-      ()
+    Client.transfer
+      ~force:true
+      ~giver:source.alias
+      ~receiver:writer_kt1
+      ~arg:victim_bigmap_id
+      ~amount:Tez.zero
+      ~gas_limit:500000
+      ~storage_limit:1000
+      ~fee:(Tez.of_int 1)
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  (* The WRITE op must be included but failed: the forged id is rejected. *)
+  let* () =
+    check_block_op_status ~index:0 ~expected_status:"failed" tez_client
   in
   (* 5. Materialise the victim's big_map[0] into its readable storage field. *)
   let* () =
-    call_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
-      ~source
-      ~counter:6
-      ~dest:victim_kt1
-      ~arg_data:"Unit"
-      ()
+    Client.transfer
+      ~giver:source.alias
+      ~receiver:victim_kt1
+      ~arg:"Unit"
+      ~amount:Tez.zero
+      ~burn_cap:Tez.one
+      tez_client
   in
+  let*@ _ = Rpc.produce_block sandbox in
   (* The reader must NOT have read the victim's big_map: storage stays None. *)
-  let* reader_storage = storage_json reader_hex in
+  let* reader_storage = Client.contract_storage reader_kt1 tez_client in
   Check.(
-    (JSON.(reader_storage |-> "prim" |> as_string) = "None")
+    (String.trim reader_storage = "None")
       string
       ~error_msg:
-        "reader read the victim's big_map through a forged id (storage prim = \
-         %L, expected None)") ;
+        "reader read the victim's big_map through a forged id (storage = %L, \
+         expected None)") ;
   (* The writer must NOT have overwritten the victim: big_map[0] is unchanged. *)
-  let* victim_storage = storage_json victim_hex in
-  let materialized = JSON.(victim_storage |-> "args" |=> 0) in
+  let* victim_storage = Client.contract_storage victim_kt1 tez_client in
   Check.(
-    (JSON.(materialized |-> "prim" |> as_string) = "Some")
+    (String.trim victim_storage
+    = sf {|Pair (Some "genesis-42") %s|} victim_bigmap_id)
       string
-      ~error_msg:"victim big_map[0] unexpectedly missing (prim = %L)") ;
-  Check.(
-    (JSON.(materialized |-> "args" |=> 0 |-> "string" |> as_string)
-    = "genesis-42")
-      string
-      ~error_msg:"victim big_map was overwritten through a forged id: got %L") ;
+      ~error_msg:
+        "victim big_map was overwritten/leaked through a forged id: got %L") ;
   unit
 
 (** Call a Michelson contract that always fails (FAILWITH) via the delayed
@@ -1279,22 +1182,7 @@ let test_michelson_call_failwith () =
       tez_client
   in
   let*@ _ = Rpc.produce_block sandbox in
-  let* ops =
-    Client.RPC.call tez_client (Node.RPC.get_chain_block_operations ())
-  in
-  match JSON.as_list ops |> List.concat_map JSON.as_list with
-  | [op] ->
-      let open JSON in
-      let status =
-        op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
-        |-> "status" |> as_string
-      in
-      Check.(
-        (status = "failed")
-          string
-          ~error_msg:"Expected operation status %R but got %L") ;
-      unit
-  | _ -> Test.fail "Expected one operation in the block, got something else"
+  check_block_op_status ~index:0 ~expected_status:"failed" tez_client
 
 (** Test inter-contract calls via TRANSFER_TOKENS.
 
@@ -1694,19 +1582,19 @@ let check_evm_to_michelson_transfer ~sequencer ~sender ~nonce ~tezos_destination
   let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
   unit
 
-let test_cross_runtime_transfer_from_evm_to_tz =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_cross_runtime_transfer_from_evm_to_tz () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:
       "Cross-runtime transfer to an implicit Michelson address via EVM gateway"
     ~tags:["cross_runtime"; "transfer"]
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun sandbox ->
   let tezos_destination = Constant.bootstrap1.public_key_hash in
   let sender = Eth_account.bootstrap_accounts.(0) in
   check_evm_to_michelson_transfer
-    ~sequencer
+    ~sequencer:sandbox
     ~sender
     ~nonce:0
     ~tezos_destination
@@ -1858,10 +1746,14 @@ let michelson_to_evm_transfer ~source ~evm_destination ~transfer_amount
     [source] must be a funded, revealed tez bootstrap account. When [call] is
     [Some (fn_sig, calldata)] the "call_evm" entrypoint is used, otherwise the
     generic "call" entrypoint (HTTP POST to the EVM runtime with an empty
-    body). *)
+    body). [?tez_client] lets callers reuse a client that already has [source]'s
+    key imported (default: a fresh client, which knows the standard bootstrap
+    accounts). *)
 let sandbox_michelson_to_evm_transfer ~source ~evm_destination ~transfer_amount
-    ?call sandbox =
-  let* tez_client = tezos_client sandbox in
+    ?call ?tez_client sandbox =
+  let* tez_client =
+    match tez_client with Some c -> return c | None -> tezos_client sandbox
+  in
   let entrypoint, arg =
     match call with
     | None ->
@@ -2090,21 +1982,9 @@ let test_michelson_gateway_rejects_removed_default_entrypoint () =
   in
   let*@ _ = Rpc.produce_block sandbox in
   (* The operation must be included in the block with a failed status. *)
-  let* ops =
-    Client.RPC.call tez_client (Node.RPC.get_chain_block_operations ())
+  let* () =
+    check_block_op_status ~index:0 ~expected_status:"failed" tez_client
   in
-  (match JSON.as_list ops |> List.concat_map JSON.as_list with
-  | [op] ->
-      let open JSON in
-      let status =
-        op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
-        |-> "status" |> as_string
-      in
-      Check.(
-        (status = "failed")
-          string
-          ~error_msg:"Expected operation status %R but got %L")
-  | _ -> Test.fail "Expected one operation in the block, got something else") ;
   (* The failed operation must not have bridged any funds. *)
   let*@ balance = Rpc.get_balance ~address:evm_destination sandbox in
   Check.((balance = Wei.zero) Wei.typ ~error_msg:"Expected %R but got %L") ;
@@ -2120,13 +2000,15 @@ let test_michelson_gateway_rejects_removed_default_entrypoint () =
 (* This test exercises nested cross-runtime calls:
      Tezos Runtime (tz1 transfer) -> EVM Runtime (CRAC contract) -> Tezos Runtime (KT1 destination).
      The goal is to see a modification in the storage of the KT1 destination in the Tezos runtime. *)
-let test_nested_crac =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_nested_crac () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Cross-runtime call from Tezos to EVM back to Tezos"
     ~tags:["cross_runtime"; "bytecode"; "nested"]
     ~with_runtimes:[Tezos]
-  @@ fun setup protocol ->
+  @@ fun sandbox ->
+  let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sandbox in
   (* Step 1: Deploy the Michelson contract (final destination of the nested
      calls, whose storage we check to verify the full chain worked) and the
      EVM CRAC contract (intermediary that forwards back to Michelson runtime).  *)
@@ -2140,46 +2022,32 @@ let test_nested_crac =
     in
     hex
   in
-  let* contract_hex, kt1_address =
-    let source = Constant.bootstrap5 in
-    let Tezt_etherlink.Setup.
-          {
-            client;
-            l1_contracts;
-            sc_rollup_address;
-            sc_rollup_node;
-            sequencer;
-            _;
-          } =
-      setup
-    in
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* kt1_address =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:1
       ~script_name:["opcodes"; "source"]
       ~init_storage_data:(Format.sprintf "0x%s" contract_storage)
       ~init_balance:0
-      protocol
+      sandbox
   in
-  (* Verify that the contract storage is correctly set *)
+  (* Verify that the contract storage is correctly set. [Client.contract_storage]
+     decompiles the [address] storage to its b58 form. *)
   let* () =
-    check_michelson_storage_value
-      ~sc_rollup_node:setup.sc_rollup_node
-      ~contract_hex
-      ~expected:(`O [("bytes", `String contract_storage)])
-      ()
+    let* storage = Client.contract_storage kt1_address tez_client in
+    Check.(
+      (String.trim storage = sf {|"%s"|} Constant.bootstrap1.public_key_hash)
+        string
+        ~error_msg:"Expected initial storage %R but got %L") ;
+    unit
   in
-  let* crac_contract = Solidity_contracts.transfer_crac setup.evm_version in
+  let* crac_contract =
+    Solidity_contracts.transfer_crac (Kernel.select_evm_version Kernel.Latest)
+  in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let bytecode = Tezt.Base.read_file crac_contract.bin in
   let* evm_crac_address =
     deploy_evm_contract
-      ~sequencer:setup.sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:0
       ~init_code:("0x" ^ bytecode)
@@ -2193,36 +2061,37 @@ let test_nested_crac =
   let* args = Cast.calldata ~args:[kt1_address] selector in
   let args = String.sub args 10 (String.length args - 10) in
   let* () =
-    michelson_to_evm_transfer
+    sandbox_michelson_to_evm_transfer
       ~source:Constant.bootstrap1
       ~evm_destination:evm_crac_address
       ~transfer_amount
       ~call:(selector, args)
-      setup
+      sandbox
   in
   (* Step 3: Verify the CRAC contract balance and the Michelson
      contract storage after the nested cross-runtime call. *)
   let*@ crac_contract_balance =
-    Rpc.get_balance ~address:evm_crac_address setup.sequencer
+    Rpc.get_balance ~address:evm_crac_address sandbox
   in
   Check.(
     (crac_contract_balance = Wei.zero)
       Wei.typ
       ~error_msg:"Expected EVM CRAC balance %R but got %L") ;
-  let* tez_client = tezos_client setup.sequencer in
   let* kt1_balance = Client.get_balance_for ~account:kt1_address tez_client in
   Check.(
     (Tez.to_mutez kt1_balance = Tez.to_mutez transfer_amount)
       int
       ~error_msg:"Expected KT1 balance %R but got %L") ;
-  (* Verify that the contract storage has been changed because of the nested CRAC *)
-  check_michelson_storage_value
-    ~sc_rollup_node:setup.sc_rollup_node
-    ~contract_hex
-    ~expected:
-      (* The source of a CRAC is address zero for now *)
-      (`O [("bytes", `String "00000000000000000000000000000000000000000000")])
-    ()
+  (* Verify that the contract storage has been changed because of the nested
+     CRAC. The source of a CRAC is the zero implicit account, which
+     [Client.contract_storage] decompiles to its b58 form. *)
+  let crac_source = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
+  let* storage = Client.contract_storage kt1_address tez_client in
+  Check.(
+    (String.trim storage = sf {|"%s"|} crac_source)
+      string
+      ~error_msg:"Expected storage %R but got %L") ;
+  unit
 
 let test_cross_runtime_call_executes_evm_bytecode () =
   Setup.register_sandbox_test
@@ -2345,6 +2214,10 @@ let test_cross_runtime_call_get_from_michelson_routes_to_static () =
          path must reject SSTORE), got %L") ;
   (* Sanity: the failed CRAC didn't leave funds on the gateway. *)
   let* tez_client = tezos_client sandbox in
+  (* The %call GET must fail at the op level: static-call rejects the SSTORE. *)
+  let* () =
+    check_block_op_status ~index:0 ~expected_status:"failed" tez_client
+  in
   let* gateway_balance =
     Client.get_balance_for ~account:gateway_address tez_client
   in
@@ -2429,16 +2302,13 @@ let test_cross_runtime_staticcall_evm_from_on_chain_entrypoint () =
     [Registry::serve] back into the EVM runtime, and the response
     bytes propagate through the Michelson view to the EVM caller as
     the precompile's ABI-encoded return value. *)
-let test_cross_runtime_staticcall_evm_nested_view_view =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_cross_runtime_staticcall_evm_nested_view_view () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Nested GET: callMichelsonView → Michelson VIEW staticcall_evm → EVM"
     ~tags:["cross_runtime"; "staticcall_evm"; "get"; "nested"; "view"]
     ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      protocol
-    ->
+  @@ fun sandbox ->
   let source = Constant.bootstrap5 in
   (* EVM contract returning `msg.sender` left-padded to 32 bytes.
      Used to verify that the inner GET reaches the EVM target with
@@ -2454,24 +2324,18 @@ let test_cross_runtime_staticcall_evm_nested_view_view =
   let init_code = "600980600b6000396000f33360005260206000f3" in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* evm_contract_address =
-    deploy_evm_contract ~sequencer ~sender ~nonce:0 ~init_code ()
+    deploy_evm_contract ~sequencer:sandbox ~sender ~nonce:0 ~init_code ()
   in
   (* Originate the Michelson contract whose `read_evm` view bridges
      to `gateway.staticcall_evm`. Storage holds just the EVM target
      address. *)
   let init_storage_data = sf {|"%s"|} evm_contract_address in
-  let* _contract_hex, kt1_address =
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* kt1_address =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:1
       ~script_name:["mini_scenarios"; "staticcall_evm_view"]
       ~init_storage_data
-      protocol
+      sandbox
   in
   (* Drive the outer call via `eth_call` so the precompile's return
      value is surfaced directly (vs. having to dig through a tx
@@ -2488,7 +2352,7 @@ let test_cross_runtime_staticcall_evm_nested_view_view =
     let* response =
       Evm_node.(
         call_evm_rpc
-          sequencer
+          sandbox
           {
             method_ = "eth_call";
             parameters =
@@ -2544,7 +2408,7 @@ let test_cross_runtime_staticcall_evm_nested_view_view =
       string
       ~error_msg:
         "Expected Micheline-encoded `Bytes <KT1 alias>` payload: %R, got %L") ;
-  let* tez_client = tezos_client sequencer in
+  let* tez_client = tezos_client sandbox in
   let* gateway_balance =
     Client.get_balance_for ~account:gateway_address tez_client
   in
@@ -2565,16 +2429,13 @@ let test_cross_runtime_staticcall_evm_nested_view_view =
     the outer call. The originator's native identity is carried on the
     shared cross-runtime journal and re-injected as [X-Tezos-Source], so
     ORIGIN is preserved without depending on any durable alias record. *)
-let test_cross_runtime_staticcall_evm_nested_view_preserves_origin =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_cross_runtime_staticcall_evm_nested_view_preserves_origin () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Nested staticcall_evm view preserves outer EVM tx.origin"
     ~tags:["cross_runtime"; "staticcall_evm"; "get"; "nested"; "view"; "origin"]
     ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      protocol
-    ->
+  @@ fun sandbox ->
   let source = Constant.bootstrap5 in
   (* EVM echo returning CALLER (msg.sender) followed by ORIGIN
      (tx.origin), each left-padded to a 32-byte word (64 bytes total).
@@ -2588,7 +2449,7 @@ let test_cross_runtime_staticcall_evm_nested_view_preserves_origin =
   let outer_originator = Eth_account.bootstrap_accounts.(0) in
   let* evm_contract_address =
     deploy_evm_contract
-      ~sequencer
+      ~sequencer:sandbox
       ~sender:outer_originator
       ~nonce:0
       ~init_code
@@ -2597,18 +2458,12 @@ let test_cross_runtime_staticcall_evm_nested_view_preserves_origin =
   (* Originate the Michelson contract whose `read_evm` view bridges to
      `gateway.staticcall_evm`, targeting the EVM echo above. *)
   let init_storage_data = sf {|"%s"|} evm_contract_address in
-  let* _contract_hex, kt1_address =
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* kt1_address =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:1
       ~script_name:["mini_scenarios"; "staticcall_evm_view"]
       ~init_storage_data
-      protocol
+      sandbox
   in
   (* No alias warm-up: the outer EVM originator's Tezos alias is never
      materialized before the read-only call. Origin preservation must not
@@ -2630,7 +2485,7 @@ let test_cross_runtime_staticcall_evm_nested_view_preserves_origin =
   let* response =
     Evm_node.(
       call_evm_rpc
-        sequencer
+        sandbox
         {
           method_ = "eth_call";
           parameters =
@@ -2881,32 +2736,23 @@ let test_cross_runtime_call_from_evm_to_michelson () =
        (no log emission, no alias-cache write) by checking the outer
        tx succeeds and the forwarder returns the expected Micheline
        bytes. *)
-let test_cross_runtime_view_call_from_evm_to_michelson =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_cross_runtime_view_call_from_evm_to_michelson () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Cross-runtime view call from EVM to Michelson"
     ~tags:["cross_runtime"; "view"; "michelson"]
     ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      protocol
-    ->
+  @@ fun sandbox ->
   let source = Constant.bootstrap5 in
   (* Step 1: Originate view_toplevel_lib.tz with storage = nat 5. The
      "add" view body is `UNPAIR ; ADD` — with the initial stack
      `pair(input, storage)` this computes `input + storage`. *)
-  let* _contract_hex, kt1_address =
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* kt1_address =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:1
       ~script_name:["opcodes"; "view_toplevel_lib"]
       ~init_storage_data:"5"
-      protocol
+      sandbox
   in
   (* Step 2: Micheline binary encoding of nat 7 is `0x00 07` — int tag
      then zarith 7 (fits in the 6 data bits of the first byte, no
@@ -2958,7 +2804,7 @@ let test_cross_runtime_view_call_from_evm_to_michelson =
     let* response =
       Evm_node.(
         call_evm_rpc
-          sequencer
+          sandbox
           {
             method_ = "eth_call";
             parameters =
@@ -2984,7 +2830,7 @@ let test_cross_runtime_view_call_from_evm_to_michelson =
      success (the precompile completes without reverting). *)
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:0
       ~value:Wei.zero
@@ -3004,7 +2850,7 @@ let test_cross_runtime_view_call_from_evm_to_michelson =
      receipt status is `false`. *)
   let* forwarder_address =
     deploy_evm_contract
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:1
       ~init_code:evm_gateway_staticcall_forwarder_init_code
@@ -3016,7 +2862,7 @@ let test_cross_runtime_view_call_from_evm_to_michelson =
   assert_view_returns_nat_12 forwarder_return ;
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:2
       ~value:Wei.zero
@@ -3025,7 +2871,7 @@ let test_cross_runtime_view_call_from_evm_to_michelson =
       ~arguments:[kt1_address; "add"; micheline_nat_7]
       ()
   in
-  let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
+  let* () = assert_evm_balance_zero ~address:evm_gateway_address sandbox in
   unit
 
 (** Same cross-runtime view semantics as
@@ -3040,29 +2886,20 @@ let test_cross_runtime_view_call_from_evm_to_michelson =
     [callMichelsonView] but through a different ABI, and proves the GET
     branch of [call] is STATICCALL-compatible end-to-end (no log, no
     alias-cache write, no value burn). *)
-let test_cross_runtime_view_call_via_low_level_call =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_cross_runtime_view_call_via_low_level_call () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Cross-runtime view call via low-level call entry (method=GET)"
     ~tags:["cross_runtime"; "view"; "michelson"; "low_level_call"]
     ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      protocol
-    ->
+  @@ fun sandbox ->
   let source = Constant.bootstrap5 in
-  let* _contract_hex, kt1_address =
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* kt1_address =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:1
       ~script_name:["opcodes"; "view_toplevel_lib"]
       ~init_storage_data:"5"
-      protocol
+      sandbox
   in
   let url = sf "http://tezos/%s/add" kt1_address in
   let micheline_nat_7 = "0x0007" in
@@ -3099,7 +2936,7 @@ let test_cross_runtime_view_call_via_low_level_call =
     let* response =
       Evm_node.(
         call_evm_rpc
-          sequencer
+          sandbox
           {
             method_ = "eth_call";
             parameters =
@@ -3123,7 +2960,7 @@ let test_cross_runtime_view_call_via_low_level_call =
   assert_view_returns_nat_12 call_return ;
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:0
       ~value:Wei.zero
@@ -3138,7 +2975,7 @@ let test_cross_runtime_view_call_via_low_level_call =
      and the outer tx receipt would be `false`. *)
   let* forwarder_address =
     deploy_evm_contract
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:1
       ~init_code:evm_gateway_staticcall_forwarder_init_code
@@ -3150,7 +2987,7 @@ let test_cross_runtime_view_call_via_low_level_call =
   assert_view_returns_nat_12 forwarder_return ;
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:2
       ~value:Wei.zero
@@ -3159,7 +2996,7 @@ let test_cross_runtime_view_call_via_low_level_call =
       ~arguments:[url; "[]"; micheline_nat_7; "0"]
       ()
   in
-  let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
+  let* () = assert_evm_balance_zero ~address:evm_gateway_address sandbox in
   unit
 
 (** Negative cases for the cross-runtime Michelson view call.
@@ -3173,29 +3010,20 @@ let test_cross_runtime_view_call_via_low_level_call =
       Michelson server's view URL parser rejects the URL shape),
     - DELEGATECALL to the gateway (rejected gateway-wide, all four
       precompile entries refuse delegated frames). *)
-let test_cross_runtime_view_call_negative =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_cross_runtime_view_call_negative () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Cross-runtime view call — negative cases"
     ~tags:["cross_runtime"; "view"; "michelson"; "negative"]
     ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      protocol
-    ->
+  @@ fun sandbox ->
   let source = Constant.bootstrap5 in
-  let* _contract_hex, kt1_address =
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* kt1_address =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:1
       ~script_name:["opcodes"; "view_toplevel_lib"]
       ~init_storage_data:"5"
-      protocol
+      sandbox
   in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let micheline_nat_7 = "0x0007" in
@@ -3203,7 +3031,7 @@ let test_cross_runtime_view_call_negative =
      Michelson side, surfaced as a failing receipt). *)
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:0
       ~value:Wei.zero
@@ -3217,7 +3045,7 @@ let test_cross_runtime_view_call_negative =
      it even builds the GET — views cannot carry value. *)
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:1
       ~value:(Wei.of_tez (Tez.of_int 1))
@@ -3233,7 +3061,7 @@ let test_cross_runtime_view_call_negative =
   let tz1_destination = Constant.bootstrap1.public_key_hash in
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:2
       ~value:Wei.zero
@@ -3251,7 +3079,7 @@ let test_cross_runtime_view_call_negative =
      failing receipt. *)
   let* delegatecall_forwarder =
     deploy_evm_contract
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:3
       ~init_code:evm_gateway_delegatecall_forwarder_init_code
@@ -3259,7 +3087,7 @@ let test_cross_runtime_view_call_negative =
   in
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:4
       ~value:Wei.zero
@@ -3336,61 +3164,42 @@ let test_cross_runtime_call_from_michelson_to_evm () =
     (transfer_amount) and one to a KT1 that always FAILWITHs
     (always_fails_unit). The EVM caller catches the revert and
     continues execution. *)
-let test_evm_gateway_catch_revert =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_evm_gateway_catch_revert () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Michelson revert does not force EVM revert"
     ~tags:["cross_runtime"; "gateway"; "revert"]
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-  @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        evm_version;
-        _;
-      }
-      protocol
-    ->
+  @@ fun sandbox ->
   let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sandbox in
   (* Step 1: Originate transfer_amount.tz — stores AMOUNT in storage *)
-  let* success_hex, success_kt1 =
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* success_kt1 =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:1
       ~script_name:["opcodes"; "transfer_amount"]
       ~init_storage_data:"0"
-      protocol
+      sandbox
   in
   (* Step 2: Originate always_fails_unit.tz — FAILWITHs on any call *)
-  let* _fails_hex, fails_kt1 =
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* fails_kt1 =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:2
       ~script_name:["mini_scenarios"; "always_fails_unit"]
       ~init_storage_data:"Unit"
-      protocol
+      sandbox
   in
   (* Step 3: Compile and deploy the Solidity catch-revert contract *)
-  let* contract = Solidity_contracts.gateway_catch_revert evm_version in
+  let* contract =
+    Solidity_contracts.gateway_catch_revert
+      (Kernel.select_evm_version Kernel.Latest)
+  in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let bytecode = Tezt.Base.read_file contract.bin in
   let* contract_address =
     deploy_evm_contract
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:0
       ~init_code:("0x" ^ bytecode)
@@ -3400,7 +3209,7 @@ let test_evm_gateway_catch_revert =
   let value = Wei.of_tez (Tez.of_int 200) in
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:1
       ~value
@@ -3409,17 +3218,13 @@ let test_evm_gateway_catch_revert =
       ~arguments:[success_kt1; fails_kt1]
       ()
   in
-  (* Step 5: Sync rollup node so Michelson state changes are visible *)
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
-  (* Step 6: Verify results *)
+  (* Step 5: Verify results *)
   (* Storage layout: all three bools are packed in slot 0.
      byte 0 = firstCallSuccess, byte 1 = secondCallSuccess,
      byte 2 = executionCompleted.
      Expected: 0x...00010001 (first=true, second=false, completed=true). *)
   let*@ slot0 =
-    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sequencer
+    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sandbox
   in
   let byte_at hex pos =
     let len = String.length hex in
@@ -3445,29 +3250,27 @@ let test_evm_gateway_catch_revert =
      stores AMOUNT (in mutez) so its storage should contain half the value. *)
   let half_mutez = Tez.to_mutez (Tez.of_int 200) / 2 in
   let* () =
-    check_michelson_storage_value
-      ~sc_rollup_node
-      ~contract_hex:success_hex
-      ~expected:(`O [("int", `String (string_of_int half_mutez))])
-      ()
+    let* storage = Client.contract_storage success_kt1 tez_client in
+    Check.(
+      (String.trim storage = string_of_int half_mutez)
+        string
+        ~error_msg:"Expected success KT1 storage %R but got %L") ;
+    unit
   in
   (* Verify the EVM contract got the 100 XTZ back from the failed subcall. *)
-  let*@ contract_balance =
-    Rpc.get_balance ~address:contract_address sequencer
-  in
+  let*@ contract_balance = Rpc.get_balance ~address:contract_address sandbox in
   let expected_contract_balance = Wei.of_tez (Tez.of_int 100) in
   Check.(
     (contract_balance = expected_contract_balance)
       Wei.typ
       ~error_msg:"Expected EVM contract balance %R but got %L") ;
   (* Verify the failing contract received no funds — the revert was atomic. *)
-  let* tez_client = tezos_client sequencer in
   let* fails_balance = Client.get_balance_for ~account:fails_kt1 tez_client in
   Check.(
     (Tez.to_mutez fails_balance = 0)
       int
       ~error_msg:"Expected failing contract balance 0 but got %L") ;
-  let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
+  let* () = assert_evm_balance_zero ~address:evm_gateway_address sandbox in
   unit
 
 (** Test that EVM REVERT in cross-runtime calls from Michelson properly
@@ -3484,50 +3287,45 @@ let test_evm_gateway_catch_revert =
        signature, calldata and 50 tez → should also fail, only fees
        consumed.
     4. Verify: reverter balance = 0 after both calls. *)
-let test_michelson_gateway_evm_revert =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_michelson_gateway_evm_revert () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"EVM revert is properly handled via Michelson gateway"
     ~tags:["cross_runtime"; "gateway"; "revert"]
     ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      _protocol
-    ->
+  @@ fun sandbox ->
   let source = Constant.bootstrap5 in
-  let* tez_client = tezos_client sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   (* Step 1: Deploy EVM "reverter" — always REVERTs on any call. *)
   let* reverter_address =
     deploy_evm_contract
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:0
       ~init_code:evm_reverter_init_code
       ()
   in
   Log.info "Deployed reverter at %s" reverter_address ;
-  (* Step 2: Transfer to reverter via gateway default entrypoint
-     with 100 tez. The EVM REVERT should cause the Michelson operation
-     to fail, so only the fee (1000 mutez) should be consumed. *)
+  (* Step 2: Transfer to reverter via gateway default entrypoint with 100 tez.
+     The EVM REVERT causes the Michelson operation to fail, so the call is
+     force-injected (the client predicts failure) and no funds reach the
+     reverter. *)
   let* () =
-    with_check_source_delta_balance
+    sandbox_call_michelson_contract
       ~source
-      ~tez_client
-      ~expected_consumed:1000
-      (fun () ->
-        call_michelson_contract_via_delayed_inbox
-          ~sc_rollup_address
-          ~sc_rollup_node
-          ~client
-          ~l1_contracts
-          ~sequencer
-          ~source
-          ~counter:1
-          ~dest:gateway_address
-          ~arg_data:(sf {|"%s"|} reverter_address)
-          ~amount:100_000_000
-          ())
+      ~dest:gateway_address
+      ~arg_data:(sf {|"%s"|} reverter_address)
+      ~amount:100_000_000
+      ~force:true
+      ~gas_limit:500000
+      ~storage_limit:1000
+      ~fee:(Tez.of_int 1)
+      sandbox
+  in
+  let* tez_client = tezos_client sandbox in
+  (* The transfer op must be included but failed: the EVM reverts. *)
+  let* () =
+    check_block_op_status ~index:0 ~expected_status:"failed" tez_client
   in
   (* Step 3: Call reverter via gateway "call_evm" entrypoint with a function
      signature and calldata. This exercises a different code path in the
@@ -3535,33 +3333,28 @@ let test_michelson_gateway_evm_revert =
      The calldata content is irrelevant — the reverter always REVERTs
      regardless of input. *)
   let* () =
-    with_check_source_delta_balance
+    sandbox_call_michelson_contract
       ~source
-      ~tez_client
-      ~expected_consumed:1000
-      (fun () ->
-        call_michelson_contract_via_delayed_inbox
-          ~sc_rollup_address
-          ~sc_rollup_node
-          ~client
-          ~l1_contracts
-          ~sequencer
-          ~source
-          ~counter:2
-          ~dest:gateway_address
-          ~arg_data:
-            (sf
-               {|Pair "%s" (Pair "store(uint256)" (Pair 0x%s None))|}
-               reverter_address
-               abi_encoded_uint256_42)
-          ~entrypoint:"call_evm"
-          ~amount:50_000_000
-          ())
+      ~dest:gateway_address
+      ~entrypoint:"call_evm"
+      ~arg_data:
+        (sf
+           {|Pair "%s" (Pair "store(uint256)" (Pair 0x%s None))|}
+           reverter_address
+           abi_encoded_uint256_42)
+      ~amount:50_000_000
+      ~force:true
+      ~gas_limit:500000
+      ~storage_limit:1000
+      ~fee:(Tez.of_int 1)
+      sandbox
+  in
+  (* The call_evm op must be included but failed: the EVM reverts. *)
+  let* () =
+    check_block_op_status ~index:0 ~expected_status:"failed" tez_client
   in
   (* Step 4: Verify the reverter received no funds from either call. *)
-  let*@ reverter_balance =
-    Rpc.get_balance ~address:reverter_address sequencer
-  in
+  let*@ reverter_balance = Rpc.get_balance ~address:reverter_address sandbox in
   Check.(
     (reverter_balance = Wei.zero)
       Wei.typ
@@ -3976,21 +3769,18 @@ let test_state_root_pure_michelson_divergence () =
     4. Verify EVM storage slot 0 = 42, proving the call went:
        delayed inbox -> Michelson contract -> TRANSFER_TOKENS ->
        enshrined gateway -> cross-runtime bridge -> EVM contract. *)
-let test_cross_runtime_call_from_michelson_contract_to_evm =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_cross_runtime_call_from_michelson_contract_to_evm () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Cross-runtime call from Michelson contract to EVM"
     ~tags:["cross_runtime"; "call"; "calldata"; "internal"]
     ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      protocol
-    ->
+  @@ fun sandbox ->
   (* Step 1: Deploy EVM contract that stores calldataload(4) in slot 0. *)
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* contract_address =
     deploy_evm_contract
-      ~sequencer
+      ~sequencer:sandbox
       ~sender
       ~nonce:0
       ~init_code:evm_storer_init_code
@@ -4006,52 +3796,24 @@ let test_cross_runtime_call_from_michelson_contract_to_evm =
       contract_address
       abi_encoded_uint256_42
   in
-  let* _contract_hex, caller_kt1 =
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* caller_kt1 =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:1
       ~script_name:["mini_scenarios"; "gateway_caller"]
       ~init_storage_data
-      protocol
-  in
-  (* Read balances before the call. *)
-  let* tez_client = tezos_client sequencer in
-  let* source_balance_before =
-    Client.get_balance_for ~account:source.public_key_hash tez_client
+      sandbox
   in
   (* Step 3: Call the Michelson contract with Unit and some amount. *)
-  let amount = 1_000_000 in
   let* () =
-    call_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+    sandbox_call_michelson_contract
       ~source
-      ~counter:2
       ~dest:caller_kt1
       ~arg_data:"Unit"
-      ~amount
-      ()
+      ~amount:1_000_000
+      sandbox
   in
-  (* Step 4a: Check source balance decreased by amount + fee. *)
-  let* source_balance_after =
-    Client.get_balance_for ~account:source.public_key_hash tez_client
-  in
-  let consumed =
-    Tez.to_mutez source_balance_before - Tez.to_mutez source_balance_after
-  in
-  Check.(
-    (consumed = amount + 1000)
-      int
-      ~error_msg:"Expected source to consume %R mutez but consumed %L") ;
-  (* Step 4b: Check that the gateway did not retain any funds. *)
+  (* Step 4a: Check that the gateway did not retain any funds. *)
+  let* tez_client = tezos_client sandbox in
   let* gateway_balance =
     Client.get_balance_for ~account:gateway_address tez_client
   in
@@ -4059,9 +3821,9 @@ let test_cross_runtime_call_from_michelson_contract_to_evm =
     (Tez.to_mutez gateway_balance = 0)
       int
       ~error_msg:"Expected gateway balance 0 but got %L") ;
-  (* Step 4c: Verify EVM storage slot 0 = 42. *)
+  (* Step 4b: Verify EVM storage slot 0 = 42. *)
   let*@ storage =
-    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sequencer
+    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sandbox
   in
   let expected_storage = "0x" ^ abi_encoded_uint256_42 in
   Check.(
@@ -4077,22 +3839,19 @@ let test_cross_runtime_call_from_michelson_contract_to_evm =
     but the EVM contract always reverts. We verify the Michelson transaction
     is fully rolled back: the source loses only the fee (1 000 mutez) and
     the gateway balance is unchanged. *)
-let test_cross_runtime_call_from_michelson_contract_to_evm_revert =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_cross_runtime_call_from_michelson_contract_to_evm_revert () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Cross-runtime call from Michelson contract to reverting EVM"
     ~tags:["cross_runtime"; "call"; "revert"; "internal"]
     ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      protocol
-    ->
+  @@ fun sandbox ->
   (* Step 1: Deploy an EVM contract that always reverts.
      Runtime: 60006000fd = PUSH1 0, PUSH1 0, REVERT *)
   let init_code = "600580600b6000396000f360006000fd" in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* contract_address =
-    deploy_evm_contract ~sequencer ~sender ~nonce:0 ~init_code ()
+    deploy_evm_contract ~sequencer:sandbox ~sender ~nonce:0 ~init_code ()
   in
   (* Step 2: Originate gateway_caller.tz with storage pointing to the
      reverting contract. The method signature and arg are arbitrary since
@@ -4108,52 +3867,34 @@ let test_cross_runtime_call_from_michelson_contract_to_evm_revert =
       contract_address
       abi_encoded_arg
   in
-  let* _contract_hex, caller_kt1 =
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* caller_kt1 =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:1
       ~script_name:["mini_scenarios"; "gateway_caller"]
       ~init_storage_data
-      protocol
+      sandbox
   in
-  (* Read balances before the call. *)
-  let* tez_client = tezos_client sequencer in
-  let* source_balance_before =
-    Client.get_balance_for ~account:source.public_key_hash tez_client
-  in
-  (* Step 3: Call the Michelson contract with Unit and some amount. *)
+  (* Step 3: Call the Michelson contract with Unit and some amount. The EVM
+     contract reverts, so the whole Michelson operation fails: the call is
+     force-injected (the client predicts failure) and the amount is refunded. *)
   let* () =
-    call_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+    sandbox_call_michelson_contract
       ~source
-      ~counter:2
       ~dest:caller_kt1
       ~arg_data:"Unit"
       ~amount:1_000_000
-      ()
+      ~force:true
+      ~gas_limit:500000
+      ~storage_limit:1000
+      ~fee:(Tez.of_int 1)
+      sandbox
   in
-  (* Step 4a: Source loses only the fee (1 000 mutez), amount is refunded. *)
-  let* source_balance_after =
-    Client.get_balance_for ~account:source.public_key_hash tez_client
+  (* Step 4: Gateway balance is 0. *)
+  let* tez_client = tezos_client sandbox in
+  (* The call op must be included but failed: the EVM contract reverts. *)
+  let* () =
+    check_block_op_status ~index:0 ~expected_status:"backtracked" tez_client
   in
-  let consumed =
-    Tez.to_mutez source_balance_before - Tez.to_mutez source_balance_after
-  in
-  Check.(
-    (consumed = 1000)
-      int
-      ~error_msg:
-        "Expected source to consume %R mutez (fee only) but consumed %L") ;
-  (* Step 4b: Gateway balance is 0. *)
   let* gateway_balance =
     Client.get_balance_for ~account:gateway_address tez_client
   in
@@ -5087,65 +4828,42 @@ let test_cross_runtime_michelson_sender_is_alias () =
     from a Tezos KT1 to an EVM address via the TezosXGateway.
     This originates the forwarder contract, sends tez to it,
     and verifies the destination EVM address receives the funds. *)
-let test_alias_forwarder_forwards_to_evm =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_alias_forwarder_forwards_to_evm () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"Alias forwarder contract forwards tez to EVM address"
     ~tags:["alias"; "forwarder"; "cross_runtime"]
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      protocol
-    ->
+  @@ fun sandbox ->
   let source = Constant.bootstrap5 in
   let evm_receiver = Eth_account.bootstrap_accounts.(0) in
   (* Step 1: Originate the alias forwarder contract. *)
   let evm_destination = evm_receiver.address in
-  let* _contract_hex, kt1_address =
-    originate_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+  let* kt1_address =
+    sandbox_originate_michelson_contract
       ~source
-      ~counter:1
       ~script_name:["mini_scenarios"; "alias_forwarder"]
       ~init_storage_data:(sf {|"%s"|} evm_destination)
-      protocol
+      sandbox
   in
   (* Step 2: Record the EVM receiver balance before the transfer. *)
-  let*@ evm_balance_before =
-    Rpc.get_balance ~address:evm_destination sequencer
-  in
+  let*@ evm_balance_before = Rpc.get_balance ~address:evm_destination sandbox in
   (* Step 3: Send tez to the alias forwarder KT1.
      The forwarder contract should forward its BALANCE to the
      TezosXGateway enshrined contract, which routes funds to the EVM address. *)
   let transfer_amount = Tez.of_int 100 in
   let transfer_amount_mutez = Tez.to_mutez transfer_amount in
   let* () =
-    call_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+    sandbox_call_michelson_contract
       ~source
-      ~counter:2
       ~dest:kt1_address
       ~arg_data:"Unit"
       ~amount:transfer_amount_mutez
-      ()
+      sandbox
   in
-  (* Step 4: Sync the rollup node. *)
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
-  (* Step 5: Verify the EVM receiver balance increased. *)
-  let*@ evm_balance_after =
-    Rpc.get_balance ~address:evm_destination sequencer
-  in
+  (* Step 4: Verify the EVM receiver balance increased. *)
+  let*@ evm_balance_after = Rpc.get_balance ~address:evm_destination sandbox in
   let expected_increase = Wei.of_tez transfer_amount in
   Check.(
     (evm_balance_after = Wei.(evm_balance_before + expected_increase))
@@ -5163,18 +4881,15 @@ let test_alias_forwarder_forwards_to_evm =
        — journal.rs passes raw 20-byte address to generate_alias
     2. The alias KT1 is created with the forwarding Michelson contract
     3. Sending tez to the alias forwards it back to the EVM account *)
-let test_alias_forwarder_created_by_evm_cross_runtime_call =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_alias_forwarder_created_by_evm_cross_runtime_call () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:
       "EVM cross-runtime call creates alias forwarder that forwards tez back"
     ~tags:["alias"; "forwarder"; "cross_runtime"; "evm_to_tezos"]
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      _protocol
-    ->
+  @@ fun sandbox ->
   let evm_sender = Eth_account.bootstrap_accounts.(0) in
   let tezos_receiver = Constant.bootstrap1.public_key_hash in
   (* Step 1: Make a cross-runtime transfer from EVM to Tezos.
@@ -5182,7 +4897,7 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
      via journal.rs which passes the address as a string. *)
   let* _receipt =
     check_evm_to_michelson_transfer
-      ~sequencer
+      ~sequencer:sandbox
       ~sender:evm_sender
       ~nonce:0
       ~tezos_destination:tezos_receiver
@@ -5191,7 +4906,7 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
   in
   (* Step 2: Look up the Tezos alias (KT1) for the EVM sender. *)
   let* alias_result =
-    Rpc.Tezosx.tez_getEthereumTezosAddress evm_sender.address sequencer
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_sender.address sandbox
   in
   let alias_kt1 = Result.get_ok alias_result in
   Log.info "EVM sender %s has Tezos alias %s" evm_sender.address alias_kt1 ;
@@ -5205,7 +4920,7 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
      `X-Tezos-Alias-Origination` HTTP header and prepended to the
      CRAC's internal_operation_results. *)
   let tezlink_endpoint =
-    Endpoint.{(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+    Endpoint.{(Evm_node.rpc_endpoint_record sandbox) with path = "/tezlink"}
   in
   let* block_operations =
     RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_operations ()
@@ -5300,32 +5015,23 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
          transfer at position %R, but it did not") ;
   (* Step 3: Record the EVM sender balance before forwarding. *)
   let*@ evm_balance_before =
-    Rpc.get_balance ~address:evm_sender.address sequencer
+    Rpc.get_balance ~address:evm_sender.address sandbox
   in
   (* Step 4: Send tez to the alias KT1. The forwarder contract should
      forward BALANCE to the EVM address via the TezosXGateway. *)
   let forward_amount = Tez.of_int 100 in
   let forward_amount_mutez = Tez.to_mutez forward_amount in
   let* () =
-    call_michelson_contract_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
+    sandbox_call_michelson_contract
       ~source:Constant.bootstrap5
-      ~counter:1
       ~dest:alias_kt1
       ~arg_data:"Unit"
       ~amount:forward_amount_mutez
-      ()
+      sandbox
   in
-  (* Step 5: Sync and verify the EVM sender balance increased. *)
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
+  (* Step 5: Verify the EVM sender balance increased. *)
   let*@ evm_balance_after =
-    Rpc.get_balance ~address:evm_sender.address sequencer
+    Rpc.get_balance ~address:evm_sender.address sandbox
   in
   let expected_increase = Wei.of_tez forward_amount in
   Check.(
@@ -5341,15 +5047,22 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
      shape: no /data/code, but a per-contract /data/storage (the native
      address) is present. *)
   let alias_contract_hex = michelson_contract_hex_of_kt1 alias_kt1 in
-  let* alias_code =
-    read_michelson_contract_code sc_rollup_node alias_contract_hex
+  let*@ alias_code =
+    Rpc.state_value
+      sandbox
+      (sf "%s/%s/data/code" tezosx_michelson_contracts_index alias_contract_hex)
   in
   Check.(
     (alias_code = None)
       (option string)
       ~error_msg:"Expected a code-less alias (no /data/code), got %L") ;
-  let* alias_storage =
-    read_michelson_contract_storage sc_rollup_node alias_contract_hex
+  let*@ alias_storage =
+    Rpc.state_value
+      sandbox
+      (sf
+         "%s/%s/data/storage"
+         tezosx_michelson_contracts_index
+         alias_contract_hex)
   in
   Check.(
     (Option.is_some alias_storage = true)
@@ -5359,7 +5072,7 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
      forwarder (not an enshrined stub): the forwarder declares `storage
      string`, whereas the stub would be `storage unit`. This exercises the
      node-side `get_code` alias resolution end-to-end. *)
-  let* alias_script = get_script sequencer alias_kt1 in
+  let* alias_script = get_script sandbox alias_kt1 in
   let storage_prim =
     JSON.(alias_script |-> "code" |> as_list)
     |> List.find (fun item -> JSON.(item |-> "prim" |> as_string) = "storage")
@@ -5379,25 +5092,27 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
     enclosing synthetic CRAC top-level and any other internal ops are
     backtracked too), while the underlying storage write is rolled
     back so the alias account no longer exists post-revert. *)
-let test_alias_forwarder_backtracked_when_evm_reverts =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_alias_forwarder_backtracked_when_evm_reverts () =
+  Setup.register_sandbox_test
     ~title:
       "Alias origination is Backtracked when the enclosing EVM frame reverts"
     ~tags:["alias"; "forwarder"; "cross_runtime"; "revert"; "backtracked"]
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-  @@ fun {sequencer; evm_version; _} _protocol ->
+  @@ fun sandbox ->
   let evm_sender = Eth_account.bootstrap_accounts.(0) in
   let tezos_destination = Constant.bootstrap1.public_key_hash in
   (* Step 1: Deploy a contract that calls the gateway with a valid
      destination (succeeding inside the gateway) and then reverts
      unconditionally. *)
-  let* contract = Solidity_contracts.gateway_call_then_revert evm_version in
+  let* contract =
+    Solidity_contracts.gateway_call_then_revert
+      (Kernel.select_evm_version Kernel.Latest)
+  in
   let bytecode = Tezt.Base.read_file contract.bin in
   let* contract_address =
     deploy_evm_contract
-      ~sequencer
+      ~sequencer:sandbox
       ~sender:evm_sender
       ~nonce:0
       ~init_code:("0x" ^ bytecode)
@@ -5407,7 +5122,7 @@ let test_alias_forwarder_backtracked_when_evm_reverts =
      (status=false) because the contract's terminal opcode is REVERT. *)
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender:evm_sender
       ~nonce:1
       ~value:(Wei.of_tez (Tez.of_int 1))
@@ -5424,7 +5139,7 @@ let test_alias_forwarder_backtracked_when_evm_reverts =
      reading the alias does NOT fault, and the deterministic KT1 is
      what we look for in the (backtracked) receipt below. *)
   let* alias_result =
-    Rpc.Tezosx.tez_getEthereumTezosAddress evm_sender.address sequencer
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_sender.address sandbox
   in
   let alias_kt1 = Result.get_ok alias_result in
   (* Step 4: Inspect the Michelson head block. Expect exactly one
@@ -5432,7 +5147,7 @@ let test_alias_forwarder_backtracked_when_evm_reverts =
      frame reverted), whose internals contain the alias-forwarder
      origination ALSO Backtracked. *)
   let tezlink_endpoint =
-    Endpoint.{(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+    Endpoint.{(Evm_node.rpc_endpoint_record sandbox) with path = "/tezlink"}
   in
   let* block_operations =
     RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_operations ()
@@ -5502,25 +5217,27 @@ let test_alias_forwarder_backtracked_when_evm_reverts =
     [drain_pending_crac_receipts] / [merge_crac_internals] merge
     into one final top-level operation with both alias originations
     interleaved with their respective synthetic transfers. *)
-let test_alias_forwarders_multi_crac_in_one_evm_tx =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_alias_forwarders_multi_crac_in_one_evm_tx () =
+  Setup.register_sandbox_test
     ~title:
       "Two alias originations in one EVM transaction surface in execution order"
     ~tags:["alias"; "forwarder"; "cross_runtime"; "nested"; "multi"]
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-  @@ fun {sequencer; evm_version; _} _protocol ->
+  @@ fun sandbox ->
   let evm_sender = Eth_account.bootstrap_accounts.(0) in
   let destination_a = Constant.bootstrap1.public_key_hash in
   let destination_b = Constant.bootstrap2.public_key_hash in
   (* Step 1: Deploy the driver, which spawns two proxy contracts in
      its constructor. *)
-  let* contract = Solidity_contracts.gateway_chain_two_aliases evm_version in
+  let* contract =
+    Solidity_contracts.gateway_chain_two_aliases
+      (Kernel.select_evm_version Kernel.Latest)
+  in
   let bytecode = Tezt.Base.read_file contract.bin in
   let* driver_address =
     deploy_evm_contract
-      ~sequencer
+      ~sequencer:sandbox
       ~sender:evm_sender
       ~nonce:0
       ~init_code:("0x" ^ bytecode)
@@ -5532,7 +5249,7 @@ let test_alias_forwarders_multi_crac_in_one_evm_tx =
     let* response =
       Evm_node.(
         call_evm_rpc
-          sequencer
+          sandbox
           {
             method_ = "eth_call";
             parameters =
@@ -5566,7 +5283,7 @@ let test_alias_forwarders_multi_crac_in_one_evm_tx =
      so each proxy forwards half through the gateway. *)
   let* _receipt =
     craft_and_send_evm_transaction
-      ~sequencer
+      ~sequencer:sandbox
       ~sender:evm_sender
       ~nonce:1
       ~value:(Wei.of_tez (Tez.of_int 2))
@@ -5580,10 +5297,10 @@ let test_alias_forwarders_multi_crac_in_one_evm_tx =
      read-only lookup, so calling it post-tx returns the canonical
      KT1 either runtime would compute. *)
   let* alias_a_res =
-    Rpc.Tezosx.tez_getEthereumTezosAddress proxy_a_address sequencer
+    Rpc.Tezosx.tez_getEthereumTezosAddress proxy_a_address sandbox
   in
   let* alias_b_res =
-    Rpc.Tezosx.tez_getEthereumTezosAddress proxy_b_address sequencer
+    Rpc.Tezosx.tez_getEthereumTezosAddress proxy_b_address sandbox
   in
   let alias_a = Result.get_ok alias_a_res in
   let alias_b = Result.get_ok alias_b_res in
@@ -5593,7 +5310,7 @@ let test_alias_forwarders_multi_crac_in_one_evm_tx =
      both proxy aliases as Origination ops, in proxyA-before-proxyB
      order. *)
   let tezlink_endpoint =
-    Endpoint.{(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+    Endpoint.{(Evm_node.rpc_endpoint_record sandbox) with path = "/tezlink"}
   in
   let* block_operations =
     RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_operations ()
@@ -5920,28 +5637,18 @@ let tz3_bootstrap : Account.key =
 (** Test EIP-1271 isValidSignature for a single account: create alias,
     sign a hash, assert valid signature returns the magic value,
     and assert wrong hash returns failure. *)
-let check_eip1271_for_account ~setup ~counter (account : Account.key) =
+let check_eip1271_for_account ~evm_node ~transfer (account : Account.key) =
   let label = account.alias in
-  let evm_destination = "0x1111111111111111111111111111111111111111" in
   let eip1271_magic =
     "0x1626ba7e00000000000000000000000000000000000000000000000000000000"
   in
   let eip1271_failure =
     "0xffffffff00000000000000000000000000000000000000000000000000000000"
   in
-  (* Create alias via cross-runtime transfer *)
-  let* () =
-    michelson_to_evm_transfer
-      ~source:account
-      ~evm_destination
-      ~transfer_amount:(Tez.of_int 1)
-      ~counter
-      setup
-  in
+  (* Create the alias via a cross-runtime transfer from [account]. *)
+  let* () = transfer () in
   let*@ alias_address =
-    Rpc.Tezosx.tez_getTezosEthereumAddress
-      account.public_key_hash
-      setup.sequencer
+    Rpc.Tezosx.tez_getTezosEthereumAddress account.public_key_hash evm_node
   in
   Log.info "[%s] alias EVM address: %s" label alias_address ;
   (* Sign and verify *)
@@ -5960,9 +5667,7 @@ let check_eip1271_for_account ~setup ~counter (account : Account.key) =
       ~args:[hash_hex; sig_with_prefix]
       "isValidSignature(bytes32,bytes)"
   in
-  let*@ call_result =
-    Rpc.call ~to_:alias_address ~data:calldata setup.sequencer
-  in
+  let*@ call_result = Rpc.call ~to_:alias_address ~data:calldata evm_node in
   Check.(
     (call_result = eip1271_magic)
       string
@@ -5977,9 +5682,7 @@ let check_eip1271_for_account ~setup ~counter (account : Account.key) =
       ~args:[wrong_hash; sig_with_prefix]
       "isValidSignature(bytes32,bytes)"
   in
-  let*@ bad_result =
-    Rpc.call ~to_:alias_address ~data:bad_calldata setup.sequencer
-  in
+  let*@ bad_result = Rpc.call ~to_:alias_address ~data:bad_calldata evm_node in
   Check.(
     (bad_result = eip1271_failure)
       string
@@ -6079,98 +5782,96 @@ let test_kernel_upgrade_replaces_alias_forwarder =
   in
   (* Check the upgraded forwarder's signature validation endpoint: a valid
      signature must be accepted and a wrong one rejected on a fresh alias. *)
-  check_eip1271_for_account ~setup ~counter:1 Constant.bootstrap1
+  check_eip1271_for_account
+    ~evm_node:sequencer
+    ~transfer:(fun () ->
+      michelson_to_evm_transfer
+        ~source:Constant.bootstrap1
+        ~evm_destination:"0x1111111111111111111111111111111111111111"
+        ~transfer_amount:(Tez.of_int 1)
+        ~counter:1
+        setup)
+    Constant.bootstrap1
 
 (** EIP-1271 signature verification across tz1, tz2 and tz3 key types *)
-let test_eip1271_signature_verification =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_eip1271_signature_verification () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"EIP-1271 isValidSignature on tz1, tz2 and tz3 aliases"
     ~tags:["eip1271"; "signature"; "alias"; "cross_runtime"]
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-  @@ fun setup _protocol ->
-  let Tezt_etherlink.Setup.
-        {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      =
-    setup
-  in
-  (* Fund and reveal tz2/tz3 accounts via delayed inbox since the
-     config tool only supports Ed25519 bootstrap accounts. *)
-  let fund_and_reveal ~source_counter account =
-    (* Transfer from bootstrap5 to fund the account *)
-    let* transfer =
-      Operation.Manager.(
-        operation
-          [
-            make
-              ~fee:1000
-              ~counter:source_counter
-              ~source:Constant.bootstrap5
-              (transfer ~dest:account ~amount:100_000_000 ());
-          ])
-        client
+  @@ fun sandbox ->
+  let* tez_client = tezos_client sandbox in
+  (* Fund and reveal tz2/tz3 accounts since the config tool only supports
+     Ed25519 bootstrap accounts. Import their keys into the client, fund from
+     bootstrap5, then reveal the manager key. *)
+  let fund_and_reveal (account : Account.key) =
+    let* () =
+      Client.import_secret_key
+        ~force:true
+        tez_client
+        account.secret_key
+        ~alias:account.alias
     in
     let* () =
-      send_tezos_op_to_delayed_inbox_and_wait
-        ~sc_rollup_address
-        ~sc_rollup_node
-        ~client
-        ~l1_contracts
-        ~sequencer
-        transfer
+      Client.transfer
+        ~giver:Constant.bootstrap5.alias
+        ~receiver:account.public_key_hash
+        ~amount:(Tez.of_int 100)
+        ~burn_cap:Tez.one
+        tez_client
     in
-    (* Reveal the account's public key *)
-    let* reveal =
-      Operation.Manager.(
-        operation
-          [make ~fee:1000 ~counter:1 ~source:account (reveal account ())])
-        client
-    in
-    send_tezos_op_to_delayed_inbox_and_wait
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
-      reveal
+    let*@ _ = Rpc.produce_block sandbox in
+    let* () = Client.reveal ~src:account.alias tez_client |> Runnable.run in
+    let*@ _ = Rpc.produce_block sandbox in
+    unit
   in
-  let* () = fund_and_reveal ~source_counter:1 tz2_bootstrap in
-  let* () = fund_and_reveal ~source_counter:2 tz3_bootstrap in
+  let* () = fund_and_reveal tz2_bootstrap in
+  let* () = fund_and_reveal tz3_bootstrap in
+  let check (account : Account.key) =
+    check_eip1271_for_account
+      ~evm_node:sandbox
+      ~transfer:(fun () ->
+        sandbox_michelson_to_evm_transfer
+          ~source:account
+          ~evm_destination:"0x1111111111111111111111111111111111111111"
+          ~transfer_amount:(Tez.of_int 1)
+          ~tez_client
+          sandbox)
+      account
+  in
   (* tz1: Ed25519 *)
-  let* () = check_eip1271_for_account ~setup ~counter:1 Constant.bootstrap1 in
+  let* () = check Constant.bootstrap1 in
   (* tz2: secp256k1 *)
-  let* () = check_eip1271_for_account ~setup ~counter:2 tz2_bootstrap in
+  let* () = check tz2_bootstrap in
   (* tz3: P256 *)
-  check_eip1271_for_account ~setup ~counter:2 tz3_bootstrap
+  check tz3_bootstrap
 
 (** Regression test: a well-formed signature signed over a different hash
     than the one submitted must be rejected by isValidSignature. *)
-let test_eip1271_wrong_signature_rejected =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
+let test_eip1271_wrong_signature_rejected () =
+  Setup.register_sandbox_test
+    ~uses_client:true
     ~title:"EIP-1271 isValidSignature rejects a wrong signature"
     ~tags:["eip1271"; "signature"; "alias"; "wrong_signature"]
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-  @@ fun setup _protocol ->
+  @@ fun sandbox ->
   let account = Constant.bootstrap1 in
   let evm_destination = "0x1111111111111111111111111111111111111111" in
   let eip1271_failure =
     "0xffffffff00000000000000000000000000000000000000000000000000000000"
   in
   let* () =
-    michelson_to_evm_transfer
+    sandbox_michelson_to_evm_transfer
       ~source:account
       ~evm_destination
       ~transfer_amount:(Tez.of_int 1)
-      ~counter:1
-      setup
+      sandbox
   in
   let*@ alias_address =
-    Rpc.Tezosx.tez_getTezosEthereumAddress
-      account.public_key_hash
-      setup.sequencer
+    Rpc.Tezosx.tez_getTezosEthereumAddress account.public_key_hash sandbox
   in
   (* The signature is produced over [signed_hash] but we submit
      [claimed_hash] to [isValidSignature]. The two are distinct so
@@ -6189,9 +5890,7 @@ let test_eip1271_wrong_signature_rejected =
       ~args:[claimed_hash; "0x" ^ wrong_sig_hex]
       "isValidSignature(bytes32,bytes)"
   in
-  let*@ call_result =
-    Rpc.call ~to_:alias_address ~data:calldata setup.sequencer
-  in
+  let*@ call_result = Rpc.call ~to_:alias_address ~data:calldata sandbox in
   Check.(
     (call_result = eip1271_failure)
       string
@@ -6281,7 +5980,7 @@ let () =
   test_deposit [Alpha] ;
   test_reveal () ;
   test_delayed_inbox_transfer () ;
-  test_cross_runtime_transfer_from_evm_to_tz [Alpha] ;
+  test_cross_runtime_transfer_from_evm_to_tz () ;
   test_cross_runtime_transfer_to_evm_via_call () ;
   test_evm_gateway_rejects_removed_transfer_selector () ;
   test_michelson_gateway_rejects_removed_default_entrypoint () ;
@@ -6289,20 +5988,20 @@ let () =
   test_cross_runtime_call_executes_evm_bytecode () ;
   test_cross_runtime_call_get_from_michelson_routes_to_static () ;
   test_cross_runtime_staticcall_evm_from_on_chain_entrypoint () ;
-  test_cross_runtime_staticcall_evm_nested_view_view [Alpha] ;
-  test_cross_runtime_staticcall_evm_nested_view_preserves_origin [Alpha] ;
+  test_cross_runtime_staticcall_evm_nested_view_view () ;
+  test_cross_runtime_staticcall_evm_nested_view_preserves_origin () ;
   test_cross_runtime_transfer_from_evm_to_kt1 () ;
   test_cross_runtime_call_failwith () ;
   test_cross_runtime_call_from_evm_to_michelson () ;
-  test_cross_runtime_view_call_from_evm_to_michelson [Alpha] ;
-  test_cross_runtime_view_call_via_low_level_call [Alpha] ;
-  test_cross_runtime_view_call_negative [Alpha] ;
+  test_cross_runtime_view_call_from_evm_to_michelson () ;
+  test_cross_runtime_view_call_via_low_level_call () ;
+  test_cross_runtime_view_call_negative () ;
   test_cross_runtime_call_from_michelson_to_evm () ;
-  test_michelson_gateway_evm_revert [Alpha] ;
+  test_michelson_gateway_evm_revert () ;
   test_cross_runtime_fa12_approve_from_evm () ;
   test_cross_runtime_erc20_transfer_from_michelson () ;
-  test_cross_runtime_call_from_michelson_contract_to_evm [Alpha] ;
-  test_cross_runtime_call_from_michelson_contract_to_evm_revert [Alpha] ;
+  test_cross_runtime_call_from_michelson_contract_to_evm () ;
+  test_cross_runtime_call_from_michelson_contract_to_evm_revert () ;
   test_cross_runtime_transfer_from_michelson_contract_to_evm () ;
   test_tezos_block_stored_after_deposit [Alpha] ;
   test_michelson_origination_and_call () ;
@@ -6310,11 +6009,11 @@ let () =
   test_michelson_call_nonexistent_contract () ;
   test_michelson_call_wrong_entrypoint () ;
   test_michelson_origination_wrong_storage_type () ;
-  test_michelson_forged_big_map_id_rejected [Alpha] ;
+  test_michelson_forged_big_map_id_rejected () ;
   test_michelson_call_failwith () ;
   test_michelson_inter_contract_call () ;
   test_michelson_internal_call_revert () ;
-  test_evm_gateway_catch_revert [Alpha] ;
+  test_evm_gateway_catch_revert () ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_gas_refund_feature_flag () ;
@@ -6325,7 +6024,7 @@ let () =
   test_instant_confirmations ~runtime:Tezos () ;
   test_state_root_blueprint_uniqueness ~runtime:Tezos () ;
   test_state_root_pure_michelson_divergence () ;
-  test_nested_crac [Alpha] ;
+  test_nested_crac () ;
   test_call_from_evm_to_michelson ~runtime:Tezos () ;
   test_call_from_michelson_to_evm ~runtime:Tezos () ;
   test_tezosx_simulation () ;
@@ -6337,10 +6036,10 @@ let () =
   test_http_trace_replay ~runtime:Tezos () ;
   test_cross_runtime_evm_sender_is_alias () ;
   test_cross_runtime_michelson_sender_is_alias () ;
-  test_alias_forwarder_forwards_to_evm [Alpha] ;
-  test_alias_forwarder_created_by_evm_cross_runtime_call [Alpha] ;
-  test_alias_forwarder_backtracked_when_evm_reverts [Alpha] ;
-  test_alias_forwarders_multi_crac_in_one_evm_tx [Alpha] ;
+  test_alias_forwarder_forwards_to_evm () ;
+  test_alias_forwarder_created_by_evm_cross_runtime_call () ;
+  test_alias_forwarder_backtracked_when_evm_reverts () ;
+  test_alias_forwarders_multi_crac_in_one_evm_tx () ;
   test_kernel_upgrade_replaces_alias_forwarder [Alpha] ;
   test_tez_transfer () ;
   test_michelson_runtime_chain_id_derivation
@@ -6353,7 +6052,7 @@ let () =
     () ;
   test_michelson_chain_id_in_crac ~runtime:Tezos () ;
   test_delayed_michelson_chain_id [Alpha] ;
-  test_eip1271_signature_verification [Alpha] ;
-  test_eip1271_wrong_signature_rejected [Alpha] ;
+  test_eip1271_signature_verification () ;
+  test_eip1271_wrong_signature_rejected () ;
   test_meta_block_rpcs ~runtime:Tezos () ;
   test_meta_block_rpcs_without_michelson_runtime ()
