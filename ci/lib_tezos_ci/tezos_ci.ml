@@ -1596,10 +1596,12 @@ module Base_images = struct
 
   (* [ci-release] *)
   (* Built daily by [images.ci-release] in the [base_images.daily] pipeline.
-     Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
+     Since !22370 this image is built on top of the internal [debian] base
+     image (so it inherits jq, gcloud, datadog, ...).
+     Version created by https://gitlab.com/tezos/tezos/-/pipelines/2646982156
      May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-     https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines *)
-  let ci_release_version = "master-be43e621"
+     https://gitlab.com/tezos/tezos/-/commit/0d951d27/pipelines *)
+  let ci_release_version = "master-0d951d27"
 
   let ci_release = make_img "ci-release:trixie" ci_release_version
 

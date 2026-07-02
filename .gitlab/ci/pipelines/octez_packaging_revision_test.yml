@@ -518,7 +518,7 @@ docker:merge_manifests:
   retry: 0
 
 gitlab:create_package:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-0d951d27
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -549,7 +549,7 @@ gitlab:create_package:
   retry: 0
 
 gitlab:update_release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-0d951d27
   stage: publish
   tags:
   - gcp_not_interruptible

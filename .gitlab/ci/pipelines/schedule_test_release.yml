@@ -551,7 +551,7 @@ docker:container_scanning:
   retry: 0
 
 gitlab:publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-0d951d27
   stage: publish
   tags:
   - gcp_not_interruptible
