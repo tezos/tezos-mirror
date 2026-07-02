@@ -39,7 +39,7 @@ use tezosx_interfaces::{Origin, TezosXRuntimeError};
 /// no `/origin` record: a tz1/2/3 is Tezos-native by construction (see
 /// [`crate::context::read_origin_for_address`]), so only KT1 accounts
 /// (which may be `Native` or an `Alias` forwarder) store a classification.
-pub use crate::context::code::ORIGIN_PATH;
+use crate::context::code::ORIGIN_PATH;
 
 // Path where all the infos of a Tezos contract are stored under the same key.
 // This path must contains balance, nonce and optionally a revealed public key.
