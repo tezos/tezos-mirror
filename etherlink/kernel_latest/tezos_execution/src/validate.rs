@@ -20,8 +20,10 @@ use tezos_tezlink::{
 };
 
 use crate::{
-    account_storage::{Manager, TezlinkAccount, TezosImplicitAccount},
-    context::Context,
+    account_storage::{
+        Manager, TezlinkAccount, TezosImplicitAccount, TezosImplicitAccountTrait,
+    },
+    context,
     gas::TezlinkOperationGas,
     storage_fees::HARD_STORAGE_LIMIT_PER_OPERATION,
     BalanceUpdate,
@@ -98,7 +100,7 @@ fn compute_fees_balance_updates(
 /// making it a special case. In this case, we obtain the public key
 /// from the operation's payload. When processing a batch, the reveal operation is the
 /// first operation on it.
-fn get_revealed_key<Host: StorageV1, A: TezosImplicitAccount>(
+fn get_revealed_key<Host: StorageV1, A: TezosImplicitAccountTrait>(
     host: &Host,
     account: &A,
     first_content: &ManagerOperationContent,
@@ -131,11 +133,10 @@ fn check_storage_limit(
     }
 }
 
-fn validate_source<Host: StorageV1, C: Context>(
+fn validate_source<Host: StorageV1>(
     host: &Host,
-    context: &C,
     content: &[ManagerOperationContent],
-) -> Result<(PublicKey, C::ImplicitAccountType), ValidityError> {
+) -> Result<(PublicKey, TezosImplicitAccount), ValidityError> {
     let source = &content[0].source()?;
 
     for c in content {
@@ -144,8 +145,7 @@ fn validate_source<Host: StorageV1, C: Context>(
         }
     }
 
-    let account = context
-        .implicit_from_public_key_hash(source)
+    let account = context::implicit_from_public_key_hash(source)
         .map_err(|_| ValidityError::FailedToFetchAccount)?;
 
     // Account must exist in the durable storage
@@ -214,7 +214,7 @@ pub struct ValidatedOperation {
     pub content: ManagerOperation<OperationContent>,
 }
 
-pub struct ValidatedBatch<A: TezosImplicitAccount> {
+pub struct ValidatedBatch<A: TezosImplicitAccountTrait> {
     pub source_account: A,
     // Used in TezosX to produce aliases
     pub source_public_key: Vec<u8>,
@@ -244,13 +244,12 @@ pub fn verify_signature(
     Ok(check)
 }
 
-pub fn execute_validation<Host, C: Context>(
+pub fn execute_validation<Host>(
     host: &mut Host,
-    context: &C,
     operation: tezos_tezlink::operation::Operation,
     skip_signature_check: bool,
     required_fees: Option<u64>,
-) -> Result<ValidatedBatch<C::ImplicitAccountType>, ValidityError>
+) -> Result<ValidatedBatch<TezosImplicitAccount>, ValidityError>
 where
     Host: StorageV1,
 {
@@ -263,7 +262,7 @@ where
         TezlinkOperationGas::start(operation.content[0].gas_limit()?)
             .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
 
-    let (pk, source_account) = validate_source(host, context, &operation.content)?;
+    let (pk, source_account) = validate_source(host, &operation.content)?;
 
     match verify_signature(
         &operation.content,

@@ -1891,12 +1891,11 @@ fn is_cross_runtime_oog(status: http::StatusCode) -> bool {
 /// at call time, so it scales with the outer view's remaining
 /// budget rather than a hardcoded magic.
 #[allow(clippy::too_many_arguments)]
-pub fn dispatch_staticcall_evm_get<'a, Host, R, C>(
+pub fn dispatch_staticcall_evm_get<'a, Host, R>(
     host: &mut Host,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     registry: &R,
     journal: &mut TezosXJournal,
-    context: &C,
     calling_kt1: &ContractKt1Hash,
     source: &PublicKeyHash,
     crac_id: &str,
@@ -1909,25 +1908,21 @@ pub fn dispatch_staticcall_evm_get<'a, Host, R, C>(
 where
     Host: StorageV1,
     R: Registry,
-    C: crate::context::Context,
 {
     // Minimal `HasOriginLookup` adapter for the read-only alias
-    // resolution path: needs an immutable host plus the context, no
-    // operation gas / no source public key. Defined locally so the
-    // helper has no extra preconditions on its callers.
-    struct ViewOriginLookup<'a, H, C> {
+    // resolution path: needs only an immutable host, no operation gas / no
+    // source public key. Defined locally so the helper has no extra
+    // preconditions on its callers.
+    struct ViewOriginLookup<'a, H> {
         host: &'a H,
-        context: &'a C,
     }
-    impl<H: StorageV1, C: crate::context::Context> HasOriginLookup
-        for ViewOriginLookup<'_, H, C>
-    {
+    impl<H: StorageV1> HasOriginLookup for ViewOriginLookup<'_, H> {
         fn read_origin_for_address(
             &self,
             address: &AddressHash,
         ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>
         {
-            self.context.read_origin_for_address(self.host, address)
+            crate::context::read_origin_for_address(self.host, address)
         }
     }
 
@@ -1943,10 +1938,7 @@ where
     // reads (`ALIAS_LOOKUP_MILLIGAS`); the read-only path skips only the
     // alias *generation* (write) cost. The target is always Ethereum here,
     // so the read always happens (no Tezos short-circuit to skip).
-    let lookup = ViewOriginLookup {
-        host: &*host,
-        context,
-    };
+    let lookup = ViewOriginLookup { host: &*host };
     operation_gas
         .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
         .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
@@ -3410,7 +3402,6 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let context = crate::context::TezlinkContext::init_context();
         let calling_kt1 = ContractKt1Hash::from([0u8; 20]);
         let source =
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
@@ -3421,7 +3412,6 @@ pub(crate) mod tests {
             &mut operation_gas,
             &registry,
             &mut journal,
-            &context,
             &calling_kt1,
             &source,
             "1",
@@ -3483,7 +3473,6 @@ pub(crate) mod tests {
         if let Some(os) = original_source {
             journal.set_original_source(os);
         }
-        let context = crate::context::TezlinkContext::init_context();
         let mut operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000_000).unwrap();
         let gas_before = operation_gas.remaining.milligas().unwrap();
@@ -3493,7 +3482,6 @@ pub(crate) mod tests {
             &mut operation_gas,
             &registry,
             &mut journal,
-            &context,
             calling_kt1,
             source,
             "1",

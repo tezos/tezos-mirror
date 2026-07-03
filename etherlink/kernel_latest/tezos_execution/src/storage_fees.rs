@@ -525,8 +525,9 @@ mod tests {
         UpdateOrigin,
     };
 
-    use crate::account_storage::{TezlinkImplicitAccount, TezosImplicitAccount};
-    use crate::context::{self, Context};
+    use crate::account_storage::TezosImplicitAccount;
+    use crate::account_storage::TezosImplicitAccountTrait;
+    use crate::context;
 
     const SOURCE_PKH: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
     const ORIGINATED_KT1: &str = "KT1EFxv88KpjxzGNu1ozh9Vta4BaV3psNknp";
@@ -551,10 +552,9 @@ mod tests {
         ContentResult::Applied(success)
     }
 
-    fn init_payer(host: &mut MockKernelHost, balance: u64) -> TezlinkImplicitAccount {
+    fn init_payer(host: &mut MockKernelHost, balance: u64) -> TezosImplicitAccount {
         let pkh = PublicKeyHash::from_b58check(SOURCE_PKH).unwrap();
-        let context = context::TezlinkContext::init_context();
-        let account = context.implicit_from_public_key_hash(&pkh).unwrap();
+        let account = context::implicit_from_public_key_hash(&pkh).unwrap();
         account.allocate(host).unwrap();
         account.set_balance(host, &balance.into()).unwrap();
         account

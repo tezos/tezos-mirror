@@ -43,6 +43,8 @@
 
 use mir::ast::micheline::Micheline;
 use mir::gas::{Gas, OutOfGas};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::TezosXRuntimeError;
 
 /// Micheline-encoded forwarding contract code.
 ///
@@ -80,6 +82,33 @@ pub fn forwarder_storage(
     Micheline::from(native_evm_address).encode(gas)
 }
 
+/// Seed the shared alias implementation slot with the canonical forwarder code
+/// if the slot is empty, leaving an already-populated slot untouched.
+///
+/// Idempotent, so it is safe to call from both seeding points: the Michelson
+/// runtime activation (fresh networks) and the storage migration
+/// (already-deployed networks). The slot itself lives in `tezos_execution`
+/// ([`tezos_execution::account_storage::read_alias_implementation`]); this
+/// wrapper supplies the Michelson-runtime-specific forwarder code, which is why
+/// it lives next to it here rather than in the generic execution layer.
+pub fn init_alias_implementation(
+    host: &mut impl StorageV1,
+) -> Result<(), TezosXRuntimeError> {
+    use tezos_execution::account_storage::{
+        read_alias_implementation, write_alias_implementation,
+    };
+    let seeded = read_alias_implementation(host)?;
+    if seeded.is_none() {
+        let code = forwarder_code().map_err(|e| {
+            TezosXRuntimeError::Custom(format!(
+                "decoding forwarder code from hex failed: {e}"
+            ))
+        })?;
+        write_alias_implementation(host, &code)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,5 +137,117 @@ mod tests {
     fn forwarder_storage_empty_address() {
         let storage = forwarder_storage("", &mut Gas::default()).unwrap().unwrap();
         assert_eq!(storage, vec![0x01, 0x00, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn alias_implementation_seed_and_roundtrip() {
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_execution::account_storage::{
+            read_alias_implementation, write_alias_implementation,
+        };
+
+        let mut host = MockKernelHost::default();
+
+        // Absent before seeding.
+        assert!(read_alias_implementation(&host).unwrap().is_none());
+
+        // Seeding installs the canonical forwarder code.
+        init_alias_implementation(&mut host).unwrap();
+        let forwarder = forwarder_code().unwrap();
+        assert_eq!(
+            read_alias_implementation(&host).unwrap(),
+            Some(forwarder.clone())
+        );
+
+        // Seeding again is a no-op: an already-populated slot is untouched.
+        write_alias_implementation(&mut host, b"already here").unwrap();
+        init_alias_implementation(&mut host).unwrap();
+        assert_eq!(
+            read_alias_implementation(&host).unwrap(),
+            Some(b"already here".to_vec())
+        );
+
+        // An explicit write overwrites: the O(1) upgrade primitive.
+        write_alias_implementation(&mut host, &forwarder).unwrap();
+        assert_eq!(read_alias_implementation(&host).unwrap(), Some(forwarder));
+    }
+
+    /// End-to-end check that the entrypoints RPC (`get_contract_entrypoint`),
+    /// which goes through `code()`, resolves a code-less alias KT1 to the
+    /// *real* shared forwarder and exposes its `default : unit` entrypoint.
+    ///
+    /// Uses `forwarder_code()` rather than a stand-in script, so it pins the
+    /// actual entrypoint surface that ships.
+    #[test]
+    fn alias_entrypoints_resolve_to_real_forwarder() {
+        use mir::ast::{AddressHash, Entrypoint, Type};
+        use mir::gas::Gas;
+        use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_execution::account_storage::write_alias_implementation;
+        use tezos_execution::context::record_origin;
+        use tezos_execution::get_contract_entrypoint;
+        use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+        // Aliases resolve under the production Michelson accounts path
+        // `/tez/tez_accounts`, pinned by the `TEZOS_ACCOUNTS_ROOT` constant the
+        // account helpers use, so this pins the real composition rather than a
+        // mixed layout that never ships.
+
+        // Seed the shared slot with the real forwarder code.
+        write_alias_implementation(&mut host, &forwarder_code().unwrap()).unwrap();
+
+        // A code-less KT1 classified as an alias (no /data/code written).
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"alias-entrypoint-test"));
+        record_origin(
+            &mut host,
+            &kt1,
+            &Origin::Alias(AliasInfo {
+                runtime: RuntimeId::Ethereum,
+                native_address: b"0xabc".to_vec(),
+            }),
+        )
+        .unwrap();
+
+        // The entrypoints RPC resolves through code() to the shared forwarder.
+        let entrypoints =
+            get_contract_entrypoint(&host, &AddressHash::Kt1(kt1), &mut Gas::default())
+                .expect("alias entrypoints resolve to the shared forwarder");
+        assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
+    }
+
+    /// Upgrading the real shipped forwarder to a superset that keeps
+    /// `default : unit` and `storage string` is accepted. Pins the production
+    /// storage type and default surface against the upgrade invariants (the
+    /// `upgrade_*` tests in `tezos_execution` use toy `storage unit` scripts;
+    /// this lives here because `tezos_execution` cannot reach `forwarder_code`).
+    #[test]
+    fn upgrade_real_forwarder_to_superset_is_accepted() {
+        use mir::gas::Gas;
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_execution::account_storage::{
+            read_alias_implementation, write_alias_implementation,
+        };
+        use tezos_execution::upgrade_alias_implementation;
+
+        let mut host = MockKernelHost::default();
+        write_alias_implementation(&mut host, &forwarder_code().unwrap()).unwrap();
+
+        // Keep `default : unit` (annotated `%default`) and `storage string`,
+        // add a `foo` entrypoint.
+        let superset = mir::parser::Parser::new()
+            .parse_top_level(
+                "parameter (or (unit %default) (string %foo)); storage string; \
+                 code { CDR; NIL operation; PAIR }",
+            )
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+
+        upgrade_alias_implementation(&mut host, &superset, &mut Gas::default())
+            .expect("a superset of the real forwarder must be accepted");
+        assert_eq!(read_alias_implementation(&host).unwrap(), Some(superset));
     }
 }

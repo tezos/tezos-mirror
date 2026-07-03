@@ -16,7 +16,6 @@ use crate::{
     chains::{
         ChainConfigTrait, TezlinkBlockConstants, TezosXBlockConstants, TezosXChainConfig,
         TezosXTransaction, TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-        TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
     },
     configuration::{fetch_configuration, fetch_tezosx_configuration},
     error::{Error, StorageError},
@@ -41,14 +40,12 @@ use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_evm_runtime::safe_storage::SafeStorage;
-use tezos_execution::context::Context;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_tezlink::block::OperationsWithReceipts;
 use tezos_tracing::trace_kernel;
-use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 const SINGLE_TX_EXECUTION_INPUT: RefPath =
     RefPath::assert_from(b"/base/instant_confirmation/input_tx");
@@ -170,9 +167,6 @@ where
         .collect();
     let michelson_runtime_block_constants = TezlinkBlockConstants {
         level: number.try_into()?,
-        context: TezosRuntimeContext::from_root(
-            &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-        )?,
         da_fee_per_byte_mutez,
         michelson_to_evm_gas_multiplier,
         safe_roots,

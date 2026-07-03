@@ -5,11 +5,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::account_storage::{
-    Code, TezlinkAccount, TezlinkOriginatedAccount, TezosImplicitAccount,
+    Code, TezlinkAccount, TezlinkOriginatedAccount, TezosImplicitAccountTrait,
     TezosOriginatedAccount,
 };
 use crate::address::OriginationNonce;
-use crate::context::{big_maps::*, Context};
+use crate::context::big_maps::*;
 use crate::get_contract_entrypoint;
 use crate::{consume_storage_read_milligas, consume_storage_write_milligas};
 use mir::parser::Parser;
@@ -87,16 +87,15 @@ impl Default for InterpretContext {
     }
 }
 
-pub struct TcCtx<'operation, Host: StorageV1, C: Context> {
+pub struct TcCtx<'operation, Host: StorageV1> {
     pub host: &'operation mut Host,
-    pub context: &'operation C,
     pub operation_gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub interpret_context: InterpretContext,
     pub next_temporary_id: &'operation mut BigMapId,
 }
 
-pub struct OperationCtx<'operation, A: TezosImplicitAccount> {
+pub struct OperationCtx<'operation, A: TezosImplicitAccountTrait> {
     // In reality, 'source' and 'origination_nonce' have
     // a 'batch lifetime. Downgrade it to an 'operation
     // lifetime is not a problem for the compiler.
@@ -151,16 +150,11 @@ pub struct ExecCtx {
     pub contract_account: TezlinkOriginatedAccount,
 }
 
-pub struct Ctx<
-    'a,
-    'operation,
-    Host: StorageV1,
-    C: Context,
-    R: tezosx_interfaces::Registry,
-> {
-    pub tc_ctx: &'a mut TcCtx<'operation, Host, C>,
+pub struct Ctx<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> {
+    pub tc_ctx: &'a mut TcCtx<'operation, Host>,
     pub exec_ctx: ExecCtx,
-    pub operation_ctx: &'a mut OperationCtx<'operation, C::ImplicitAccountType>,
+    pub operation_ctx:
+        &'a mut OperationCtx<'operation, crate::account_storage::TezosImplicitAccount>,
     pub journal: &'a mut tezosx_journal::TezosXJournal,
     pub registry: &'a R,
 }
@@ -225,7 +219,7 @@ impl ExecCtx {
     }
 }
 
-impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C> {
+impl<'a, Host: StorageV1> TypecheckingCtx<'a> for TcCtx<'a, Host> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         &mut self.operation_gas.remaining
     }
@@ -234,12 +228,7 @@ impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C>
         &mut self,
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
-        get_contract_entrypoint(
-            self.host,
-            self.context,
-            address,
-            &mut self.operation_gas.remaining,
-        )
+        get_contract_entrypoint(self.host, address, &mut self.operation_gas.remaining)
     }
 
     fn big_map_get_type(
@@ -247,8 +236,8 @@ impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C>
         id: &BigMapId,
     ) -> Result<Option<(Type, Type)>, LazyStorageError> {
         let arena = Arena::new();
-        let key_type_path = key_type_path(self.context, id)?;
-        let value_type_path = value_type_path(self.context, id)?;
+        let key_type_path = key_type_path(id)?;
+        let value_type_path = value_type_path(id)?;
 
         let encoded_key_type = match self.host.store_read_all(&key_type_path) {
             Ok(key_type) => Ok(key_type),
@@ -279,8 +268,8 @@ impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C>
     }
 }
 
-impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> TypecheckingCtx<'a>
-    for Ctx<'_, '_, Host, C, R>
+impl<'a, Host: StorageV1, R: tezosx_interfaces::Registry> TypecheckingCtx<'a>
+    for Ctx<'_, '_, Host, R>
 {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
@@ -301,8 +290,8 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> Typechecki
     }
 }
 
-impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'a>
-    for Ctx<'_, 'a, Host, C, R>
+impl<'a, Host: StorageV1, R: tezosx_interfaces::Registry> CtxTrait<'a>
+    for Ctx<'_, 'a, Host, R>
 {
     fn sender(&self) -> AddressHash {
         self.exec_ctx.sender.clone()
@@ -390,10 +379,7 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> CtxTrait<'
         // from the index; it does not check existence. Failures here
         // mean a path/index corruption (or some host-layer issue) and
         // are surfaced as host errors.
-        let account = self
-            .tc_ctx
-            .context
-            .originated_from_kt1(contract)
+        let account = crate::context::originated_from_kt1(contract)
             .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         // L1 VIEW semantics push `None` when the target KT1 does not
         // exist at all (cf. `script_interpreter.ml::iview`). Probe
@@ -584,9 +570,7 @@ pub fn enshrined_synthetic_views(
     }
 }
 
-impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
-    Ctx<'_, 'a, Host, C, R>
-{
+impl<'a, Host: StorageV1, R: tezosx_interfaces::Registry> Ctx<'_, 'a, Host, R> {
     /// Body of the `originOf` arm of
     /// [`try_dispatch_enshrined_view`](CtxTrait::try_dispatch_enshrined_view).
     ///
@@ -744,19 +728,17 @@ impl<'a, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
         let timestamp_str = i64::from(*self.operation_ctx.now).to_string();
         let block_number_str = u32::from(*self.operation_ctx.level).to_string();
         // Distinct-field split borrows on `self`: `tc_ctx.host`,
-        // `tc_ctx.operation_gas`, `tc_ctx.context`, `journal`,
-        // `registry`. The dispatcher consumes them for the call only.
+        // `tc_ctx.operation_gas`, `journal`, `registry`. The dispatcher
+        // consumes them for the call only.
         let host: &mut Host = self.tc_ctx.host;
         let operation_gas: &mut crate::gas::TezlinkOperationGas =
             self.tc_ctx.operation_gas;
-        let context: &C = self.tc_ctx.context;
         let crac_chain_depth = self.operation_ctx.crac_chain_depth;
         let result = crate::enshrined_contracts::dispatch_staticcall_evm_get(
             host,
             operation_gas,
             self.registry,
             self.journal,
-            context,
             &calling_kt1,
             self.operation_ctx.source.pkh(),
             &crac_id_str,
@@ -856,8 +838,8 @@ pub trait HasCrossRuntime<Host: StorageV1>: HasJournal + HasRegistry {
     );
 }
 
-impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
-    HasContractAccount for Ctx<'a, 'operation, Host, C, R>
+impl<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> HasContractAccount
+    for Ctx<'a, 'operation, Host, R>
 {
     type Account = TezlinkOriginatedAccount;
     fn contract_account(&self) -> &Self::Account {
@@ -865,37 +847,35 @@ impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
-    HasHost<Host> for Ctx<'a, 'operation, Host, C, R>
+impl<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> HasHost<Host>
+    for Ctx<'a, 'operation, Host, R>
 {
     fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
-    HasOriginLookup for Ctx<'a, 'operation, Host, C, R>
+impl<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> HasOriginLookup
+    for Ctx<'a, 'operation, Host, R>
 {
     fn read_origin_for_address(
         &self,
         address: &AddressHash,
     ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error> {
-        self.tc_ctx
-            .context
-            .read_origin_for_address(&*self.tc_ctx.host, address)
+        crate::context::read_origin_for_address(&*self.tc_ctx.host, address)
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
-    HasJournal for Ctx<'a, 'operation, Host, C, R>
+impl<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> HasJournal
+    for Ctx<'a, 'operation, Host, R>
 {
     fn journal(&mut self) -> &mut tezosx_journal::TezosXJournal {
         self.journal
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
-    HasRegistry for Ctx<'a, 'operation, Host, C, R>
+impl<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> HasRegistry
+    for Ctx<'a, 'operation, Host, R>
 {
     type R = R;
     fn registry(&self) -> &Self::R {
@@ -903,8 +883,8 @@ impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry>
-    HasCrossRuntime<Host> for Ctx<'a, 'operation, Host, C, R>
+impl<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry>
+    HasCrossRuntime<Host> for Ctx<'a, 'operation, Host, R>
 {
     fn cross_runtime_split(
         &mut self,
@@ -913,35 +893,33 @@ impl<'a, 'operation, Host: StorageV1, C: Context, R: tezosx_interfaces::Registry
     }
 }
 
-impl<'operation, Host: StorageV1, C: Context> HasOriginLookup
-    for TcCtx<'operation, Host, C>
-{
+impl<'operation, Host: StorageV1> HasOriginLookup for TcCtx<'operation, Host> {
     fn read_origin_for_address(
         &self,
         address: &AddressHash,
     ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error> {
-        self.context.read_origin_for_address(&*self.host, address)
+        crate::context::read_origin_for_address(&*self.host, address)
     }
 }
 
-impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasOperationGas
-    for Ctx<'_, '_, Host, C, R>
+impl<Host: StorageV1, R: tezosx_interfaces::Registry> HasOperationGas
+    for Ctx<'_, '_, Host, R>
 {
     fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
         self.tc_ctx.operation_gas
     }
 }
 
-impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasSourcePublicKey
-    for Ctx<'_, '_, Host, C, R>
+impl<Host: StorageV1, R: tezosx_interfaces::Registry> HasSourcePublicKey
+    for Ctx<'_, '_, Host, R>
 {
     fn source_public_key(&self) -> &[u8] {
         self.operation_ctx.source_public_key
     }
 }
 
-impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasCracChainDepth
-    for Ctx<'_, '_, Host, C, R>
+impl<Host: StorageV1, R: tezosx_interfaces::Registry> HasCracChainDepth
+    for Ctx<'_, '_, Host, R>
 {
     fn crac_chain_depth(&self) -> u32 {
         self.operation_ctx.crac_chain_depth
@@ -952,8 +930,8 @@ impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasCracChainDe
     }
 }
 
-impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasDelegatedStorageCost
-    for Ctx<'_, '_, Host, C, R>
+impl<Host: StorageV1, R: tezosx_interfaces::Registry> HasDelegatedStorageCost
+    for Ctx<'_, '_, Host, R>
 {
     fn delegated_storage_cost(&self) -> u64 {
         self.operation_ctx.delegated_storage_cost
@@ -967,7 +945,7 @@ impl<Host: StorageV1, C: Context, R: tezosx_interfaces::Registry> HasDelegatedSt
     }
 }
 
-impl<Host: StorageV1, C: Context> TcCtx<'_, Host, C> {
+impl<Host: StorageV1> TcCtx<'_, Host> {
     /// Insert in the context a big_map diff that represents an allocation
     fn big_map_diff_alloc(&mut self, id: Zarith, key_type: Vec<u8>, value_type: Vec<u8>) {
         let allocation = StorageDiff::Alloc(Alloc {
@@ -1022,7 +1000,7 @@ impl<Host: StorageV1, C: Context> TcCtx<'_, Host, C> {
             self.next_temporary_id.incr();
             Ok(new_id)
         } else {
-            let next_id_path = next_id_path(self.context)?;
+            let next_id_path = next_id_path()?;
             let id: BigMapId =
                 read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
             store_bin(&id.succ(), self.host, &next_id_path)
@@ -1032,24 +1010,23 @@ impl<Host: StorageV1, C: Context> TcCtx<'_, Host, C> {
     }
 }
 
-fn remove_big_map<Host: StorageV1, C: Context>(
+fn remove_big_map<Host: StorageV1>(
     host: &mut Host,
-    context: &C,
     operation_gas: Option<&mut crate::gas::TezlinkOperationGas>,
     id: &BigMapId,
 ) -> Result<(), LazyStorageError> {
     // Remove the key type of the big_map
-    let key_type_path = key_type_path(context, id)?;
+    let key_type_path = key_type_path(id)?;
     host.store_delete(&key_type_path)?;
 
     // Remove the value type of the big_map
-    let value_type_path = value_type_path(context, id)?;
+    let value_type_path = value_type_path(id)?;
     host.store_delete(&value_type_path)?;
 
     // Removing the content of the big_map
-    BigMapKeys::remove_keys_in_storage(host, context, operation_gas, id)?;
+    BigMapKeys::remove_keys_in_storage(host, operation_gas, id)?;
 
-    let total_bytes_path = total_bytes_path(context, id)?;
+    let total_bytes_path = total_bytes_path(id)?;
     host.store_delete_value(&total_bytes_path)?;
 
     Ok(())
@@ -1058,13 +1035,12 @@ fn remove_big_map<Host: StorageV1, C: Context>(
 /// Function to clear temporary big_maps create for an operation
 ///
 /// This function also reset the next temporary id to minus one
-pub fn clear_temporary_big_maps<Host: StorageV1, C: Context>(
+pub fn clear_temporary_big_maps<Host: StorageV1>(
     host: &mut Host,
-    context: &C,
     next_temp_id: &mut BigMapId,
 ) -> Result<(), LazyStorageError> {
     while next_temp_id.dec() {
-        remove_big_map(host, context, None, next_temp_id)?;
+        remove_big_map(host, None, next_temp_id)?;
     }
     Ok(())
 }
@@ -1192,30 +1168,28 @@ struct BigMapKeys {
 
 impl BigMapKeys {
     #[cfg(test)]
-    fn get<C: Context>(host: &mut impl StorageV1, context: &C, id: &BigMapId) -> Self {
-        let path = keys_of_big_map(context, id).unwrap();
+    fn get(host: &mut impl StorageV1, id: &BigMapId) -> Self {
+        let path = keys_of_big_map(id).unwrap();
         read_nom_value(host, &path).unwrap_or(BigMapKeys { keys: vec![] })
     }
 
-    fn add_key<C: Context>(
+    fn add_key(
         host: &mut impl StorageV1,
-        context: &C,
         id: &BigMapId,
         key: &ScriptExprHash,
     ) -> Result<(), LazyStorageError> {
-        let path = keys_of_big_map(context, id)?;
+        let path = keys_of_big_map(id)?;
         let size = host.store_value_size(&path).unwrap_or(0usize);
         host.store_write(&path, key.as_ref(), size)?;
         Ok(())
     }
 
-    fn remove_key<C: Context>(
+    fn remove_key(
         host: &mut impl StorageV1,
-        context: &C,
         id: &BigMapId,
         key: &ScriptExprHash,
     ) -> Result<(), LazyStorageError> {
-        let path = keys_of_big_map(context, id)?;
+        let path = keys_of_big_map(id)?;
         let mut big_map_keys: Self = read_nom_value(host, &path)
             .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
         big_map_keys.keys.retain(|elt| elt != key);
@@ -1223,13 +1197,12 @@ impl BigMapKeys {
         Ok(())
     }
 
-    fn remove_keys_in_storage<C: Context>(
+    fn remove_keys_in_storage(
         host: &mut impl StorageV1,
-        context: &C,
         mut operation_gas: Option<&mut crate::gas::TezlinkOperationGas>,
         id: &BigMapId,
     ) -> Result<(), LazyStorageError> {
-        let path = keys_of_big_map(context, id)?;
+        let path = keys_of_big_map(id)?;
         let big_map_keys_opt: Option<Self> = read_optional_nom_value(host, &path)
             .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
         let big_map_keys = match big_map_keys_opt {
@@ -1241,7 +1214,7 @@ impl BigMapKeys {
             }
         };
         for key in big_map_keys.keys {
-            let value_path = value_path(context, id, &key)?;
+            let value_path = value_path(id, &key)?;
             // Each entry value is L1's carbonated `Big_map.Contents`; charge
             // its removal as one durable write. The `0` is the payload byte
             // count: a delete writes no new bytes, so only the per-write base
@@ -1258,14 +1231,13 @@ impl BigMapKeys {
         Ok(())
     }
 
-    fn copy_keys_in_storage<C: Context>(
+    fn copy_keys_in_storage(
         host: &mut impl StorageV1,
-        context: &C,
         operation_gas: &mut crate::gas::TezlinkOperationGas,
         source: &BigMapId,
         dest: &BigMapId,
     ) -> Result<(), LazyStorageError> {
-        let source_path = keys_of_big_map(context, source)?;
+        let source_path = keys_of_big_map(source)?;
         let big_map_keys_opt: Option<Self> = read_optional_nom_value(host, &source_path)
             .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
         let big_map_keys = match big_map_keys_opt {
@@ -1278,8 +1250,8 @@ impl BigMapKeys {
         };
 
         for key in &big_map_keys.keys {
-            let source_value_path = value_path(context, source, key)?;
-            let dest_value_path = value_path(context, dest, key)?;
+            let source_value_path = value_path(source, key)?;
+            let dest_value_path = value_path(dest, key)?;
 
             let size = host.store_value_size(&source_value_path)? as u64;
             consume_storage_read_milligas(operation_gas, 1, size)?;
@@ -1288,7 +1260,7 @@ impl BigMapKeys {
             host.store_write_all(&dest_value_path, &value)?;
         }
 
-        let dest_path = keys_of_big_map(context, dest)?;
+        let dest_path = keys_of_big_map(dest)?;
         store_bin(&big_map_keys, host, &dest_path).map_err(storage_error_to_lazy)?;
 
         Ok(())
@@ -1311,54 +1283,51 @@ const BYTES_SIZE_FOR_EMPTY: u64 = 33;
 /// before the counter existed. Walks the persisted keys list and
 /// sums `BYTES_SIZE_FOR_BIG_MAP_KEY` plus each value's stored size,
 /// then persists the result so subsequent reads are O(1).
-fn init_total_bytes_from_existing<C: Context>(
+fn init_total_bytes_from_existing(
     host: &mut impl StorageV1,
-    context: &C,
     id: &BigMapId,
 ) -> Result<Zarith, LazyStorageError> {
-    let keys_path = keys_of_big_map(context, id)?;
+    let keys_path = keys_of_big_map(id)?;
     let keys: BigMapKeys = read_optional_nom_value(host, &keys_path)
         .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?
         .unwrap_or(BigMapKeys { keys: vec![] });
     let mut total: u64 = 0;
     for key_hash in &keys.keys {
-        let vp = value_path(context, id, key_hash)?;
+        let vp = value_path(id, key_hash)?;
         let size = host.store_value_size(&vp)? as u64;
         total = total.saturating_add(BYTES_SIZE_FOR_BIG_MAP_KEY + size);
     }
     let migrated = Zarith(total.into());
-    set_total_bytes(host, context, id, &migrated)?;
+    set_total_bytes(host, id, &migrated)?;
     Ok(migrated)
 }
 
 /// Read the `total_bytes` counter persisted for a big-map. Lazily
 /// migrates pre-counter big-maps via `init_total_bytes_from_existing`.
-fn total_bytes<C: Context>(
+fn total_bytes(
     host: &mut impl StorageV1,
-    context: &C,
     id: &BigMapId,
 ) -> Result<Zarith, LazyStorageError> {
-    let path = total_bytes_path(context, id)?;
+    let path = total_bytes_path(id)?;
     match read_optional_nom_value::<Zarith>(host, &path) {
         Ok(Some(total)) => Ok(total),
-        Ok(None) => init_total_bytes_from_existing(host, context, id),
+        Ok(None) => init_total_bytes_from_existing(host, id),
         Err(e) => Err(LazyStorageError::NomReadError(e.to_string())),
     }
 }
 
 /// Write the `total_bytes` counter persisted for a big-map.
-fn set_total_bytes<C: Context>(
+fn set_total_bytes(
     host: &mut impl StorageV1,
-    context: &C,
     id: &BigMapId,
     value: &Zarith,
 ) -> Result<(), LazyStorageError> {
-    let path = total_bytes_path(context, id)?;
+    let path = total_bytes_path(id)?;
     store_bin(value, host, &path).map_err(storage_error_to_lazy)?;
     Ok(())
 }
 
-impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
+impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
     fn big_map_get(
         &mut self,
         arena: &'a Arena<Micheline<'a>>,
@@ -1366,8 +1335,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         key: &TypedValue,
         value_type: &Type,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        let value_path =
-            value_path(self.context, id, &hash_key(key.clone(), self.gas())?)?;
+        let value_path = value_path(id, &hash_key(key.clone(), self.gas())?)?;
         let Some(encoded_value) =
             read_big_map_value_metered(self.operation_gas, self.host, &value_path)?
         else {
@@ -1394,7 +1362,8 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
-        let path = value_path(self.context, id, &hash_key(key.clone(), self.gas())?)?;
+        let key_hashed = hash_key(key.clone(), self.gas())?;
+        let path = value_path(id, &key_hashed)?;
         // Mirrors L1's carbonated `Big_map.Contents.mem`.
         consume_storage_read_milligas(self.operation_gas, 1, 0)?;
         Ok(self.host.store_has(&path)?.is_some())
@@ -1414,7 +1383,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         // key_hashed: hash of packed encoding (with 0x05 prefix), used for storage path
         // See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L5563
         let key_hashed = hash_micheline_expr(&micheline_expr, self.gas())?;
-        let value_path = value_path(self.context, id, &key_hashed)?;
+        let value_path = value_path(id, &key_hashed)?;
         match value {
             None => {
                 consume_storage_write_milligas(self.operation_gas, 1, 0)?;
@@ -1428,15 +1397,15 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                     // entry, so the `-(65 + prev)` subtraction below would drop it
                     // twice. (Once the counter exists this is a plain read, so the
                     // order only matters on the lazy-migration path.)
-                    let current = total_bytes(self.host, self.context, id)?;
+                    let current = total_bytes(self.host, id)?;
                     self.host.store_delete(&value_path)?;
-                    BigMapKeys::remove_key(self.host, self.context, id, &key_hashed)?;
+                    BigMapKeys::remove_key(self.host, id, &key_hashed)?;
 
                     let lazy_storage_size_diff = Zarith(
                         -(BigInt::from(BYTES_SIZE_FOR_BIG_MAP_KEY) + previous_value_size),
                     );
                     let new_total_bytes = Zarith(current.0 + &lazy_storage_size_diff.0);
-                    set_total_bytes(self.host, self.context, id, &new_total_bytes)?;
+                    set_total_bytes(self.host, id, &new_total_bytes)?;
                     self.interpret_context
                         .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
                 }
@@ -1451,12 +1420,12 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                     .into_micheline_optimized_legacy(&arena, self.gas())?
                     .encode(&mut self.operation_gas.remaining)??;
                 let new_value_size: BigInt = encoded.len().into();
-                let current = total_bytes(self.host, self.context, id)?;
+                let current = total_bytes(self.host, id)?;
                 let lazy_storage_size_diff = match self.host.store_value_size(&value_path)
                 {
                     Err(RuntimeError::PathNotFound) => {
                         // We should write the key in the list only if it's an add in the big_map not an update
-                        BigMapKeys::add_key(self.host, self.context, id, &key_hashed)?;
+                        BigMapKeys::add_key(self.host, id, &key_hashed)?;
                         Zarith(BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size)
                     }
                     Ok(previous_value_size) => {
@@ -1466,7 +1435,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
                     Err(err) => return Err(err.into()),
                 };
                 let new_total_bytes = Zarith(current.0 + &lazy_storage_size_diff.0);
-                set_total_bytes(self.host, self.context, id, &new_total_bytes)?;
+                set_total_bytes(self.host, id, &new_total_bytes)?;
                 self.interpret_context
                     .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
 
@@ -1498,8 +1467,8 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
     ) -> Result<BigMapId, LazyStorageError> {
         let arena = Arena::new();
         let id = self.generate_id(temporary)?;
-        let key_type_path = key_type_path(self.context, &id)?;
-        let value_type_path = value_type_path(self.context, &id)?;
+        let key_type_path = key_type_path(&id)?;
+        let value_type_path = value_type_path(&id)?;
         let key_type_encoded = key_type
             .into_micheline_optimized_legacy(&arena, self.gas())?
             .encode(&mut self.operation_gas.remaining)??;
@@ -1529,16 +1498,16 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
         let dest_id = self.generate_id(temporary)?;
 
         // Retrieve the path of the key_type
-        let src_key_type_path = key_type_path(self.context, id)?;
-        let dest_key_type_path = key_type_path(self.context, &dest_id)?;
+        let src_key_type_path = key_type_path(id)?;
+        let dest_key_type_path = key_type_path(&dest_id)?;
 
         // Copy the key type to the destination
         let key_type = self.host.store_read_all(&src_key_type_path)?;
         self.host.store_write_all(&dest_key_type_path, &key_type)?;
 
         // Retrieve the path of the value_type
-        let src_value_type_path = value_type_path(self.context, id)?;
-        let dest_value_type_path = value_type_path(self.context, &dest_id)?;
+        let src_value_type_path = value_type_path(id)?;
+        let dest_value_type_path = value_type_path(&dest_id)?;
 
         // Copy the value type to the destination
         let value_type = self.host.store_read_all(&src_value_type_path)?;
@@ -1546,16 +1515,10 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
             .store_write_all(&dest_value_type_path, &value_type)?;
 
         // Copy the content of the big_map
-        BigMapKeys::copy_keys_in_storage(
-            self.host,
-            self.context,
-            self.operation_gas,
-            id,
-            &dest_id,
-        )?;
+        BigMapKeys::copy_keys_in_storage(self.host, self.operation_gas, id, &dest_id)?;
 
-        let source_total_bytes = total_bytes(self.host, self.context, id)?;
-        set_total_bytes(self.host, self.context, &dest_id, &source_total_bytes)?;
+        let source_total_bytes = total_bytes(self.host, id)?;
+        set_total_bytes(self.host, &dest_id, &source_total_bytes)?;
         self.interpret_context.record_lazy_storage_size_diff(
             &dest_id,
             &Zarith(BigInt::from(BYTES_SIZE_FOR_EMPTY) + source_total_bytes.0),
@@ -1575,12 +1538,12 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
-        let total = total_bytes(self.host, self.context, id)?;
+        let total = total_bytes(self.host, id)?;
         self.interpret_context.record_lazy_storage_size_diff(
             id,
             &Zarith(-(BigInt::from(BYTES_SIZE_FOR_EMPTY) + total.0)),
         );
-        remove_big_map(self.host, self.context, Some(self.operation_gas), id)?;
+        remove_big_map(self.host, Some(self.operation_gas), id)?;
 
         // Write in the diff that there was a remove
         self.big_map_diff_remove(id.value.clone());
@@ -1596,10 +1559,7 @@ impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{
-        context::{Context, TezlinkContext},
-        gas::TezlinkOperationGas,
-    };
+    use crate::gas::TezlinkOperationGas;
     use mir::ast::big_map::{
         apply_deferred_big_map_updates, dump_big_map_updates, dump_big_map_walk,
         remove_unreferenced_big_maps, BigMap, BigMapContent, BigMapFromId, BigMapId,
@@ -1609,11 +1569,10 @@ pub mod tests {
 
     #[macro_export]
     macro_rules! make_default_ctx {
-        ($ctx:ident, $host: expr, $context: expr) => {
+        ($ctx:ident, $host: expr) => {
             let mut operation_gas = TezlinkOperationGas::default();
             let mut $ctx = TcCtx {
                 host: $host,
-                context: $context,
                 operation_gas: &mut operation_gas,
                 big_map_diff: BTreeMap::new(),
                 interpret_context: $crate::mir_ctx::InterpretContext::new(),
@@ -1632,8 +1591,8 @@ pub mod tests {
         };
     }
 
-    pub fn assert_big_map_eq<'a, Host: StorageV1, C: Context>(
-        ctx: &mut TcCtx<'a, Host, C>,
+    pub fn assert_big_map_eq<'a, Host: StorageV1>(
+        ctx: &mut TcCtx<'a, Host>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key_type: Type,
@@ -1649,7 +1608,7 @@ pub mod tests {
         assert_eq!(stored_value_type, value_type);
 
         let nb_passed_keys = content.len();
-        let nb_stored_keys = BigMapKeys::get(ctx.host, ctx.context, id).keys.len();
+        let nb_stored_keys = BigMapKeys::get(ctx.host, id).keys.len();
         // The big_map storage contains the key_type and value_type subkeys followed by the other keys corresponding to values
         assert_eq!(nb_passed_keys, nb_stored_keys);
 
@@ -1662,31 +1621,31 @@ pub mod tests {
         }
     }
 
-    fn assert_big_map_removed<'a, Host: StorageV1, C: Context>(
-        ctx: &TcCtx<'a, Host, C>,
+    fn assert_big_map_removed<'a, Host: StorageV1>(
+        ctx: &TcCtx<'a, Host>,
         id: &BigMapId,
         removed_keys: &BigMapKeys,
     ) {
-        let key_type_path = key_type_path(ctx.context, id).unwrap();
+        let key_type_path = key_type_path(id).unwrap();
         assert!(
             ctx.host.store_has(&key_type_path).unwrap().is_none(),
             "Key type should have been removed",
         );
 
-        let value_type_path = value_type_path(ctx.context, id).unwrap();
+        let value_type_path = value_type_path(id).unwrap();
         assert!(
             ctx.host.store_has(&value_type_path).unwrap().is_none(),
             "Value type should have been removed",
         );
 
-        let keys_path = keys_of_big_map(ctx.context, id).unwrap();
+        let keys_path = keys_of_big_map(id).unwrap();
         assert!(
             ctx.host.store_has(&keys_path).unwrap().is_none(),
             "List of keys of the big_map should have been removed",
         );
 
         for key in &removed_keys.keys {
-            let value_path = value_path(ctx.context, id, key).unwrap();
+            let value_path = value_path(id, key).unwrap();
             assert!(
                 ctx.host.store_has(&value_path).unwrap().is_none(),
                 "{key:?} should have been removed from the storage"
@@ -1697,7 +1656,7 @@ pub mod tests {
     #[test]
     fn test_map_from_memory() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        make_default_ctx!(storage, &mut host);
         let content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("one".into())),
             (TypedValue::int(2), TypedValue::String("two".into())),
@@ -1725,7 +1684,7 @@ pub mod tests {
     #[test]
     fn test_map_updates_to_storage() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        make_default_ctx!(storage, &mut host);
         let map_id = storage
             .big_map_new(&Type::Int, &Type::String, false)
             .unwrap();
@@ -1751,7 +1710,7 @@ pub mod tests {
             )
             .unwrap();
 
-        let big_map_keys_before = BigMapKeys::get(storage.host, storage.context, &map_id);
+        let big_map_keys_before = BigMapKeys::get(storage.host, &map_id);
         assert_eq!(
             big_map_keys_before.keys.len(),
             3usize,
@@ -1769,7 +1728,7 @@ pub mod tests {
             )
             .unwrap();
 
-        let big_map_keys_after = BigMapKeys::get(storage.host, storage.context, &map_id);
+        let big_map_keys_after = BigMapKeys::get(storage.host, &map_id);
         assert_eq!(
             big_map_keys_after.keys.len(),
             2usize,
@@ -1802,7 +1761,7 @@ pub mod tests {
     #[test]
     fn test_copy() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        make_default_ctx!(storage, &mut host);
         let content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("one".into())),
             (TypedValue::int(2), TypedValue::String("two".into())),
@@ -1849,8 +1808,7 @@ pub mod tests {
     #[test]
     fn pre_counter_bigmap_delete_double_decrements_total_bytes() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(storage, &mut host, &context);
+        make_default_ctx!(storage, &mut host);
 
         // 1. Allocate a big_map with a single entry. The Some-branch of
         //    big_map_update writes the total_bytes counter alongside the key.
@@ -1865,8 +1823,7 @@ pub mod tests {
             )
             .unwrap();
 
-        let counter_after_insert =
-            total_bytes(storage.host, storage.context, &map_id).unwrap();
+        let counter_after_insert = total_bytes(storage.host, &map_id).unwrap();
         assert!(
             counter_after_insert.0 > BigInt::from(0),
             "sanity: counter must be positive after one insert, got {counter_after_insert:?}"
@@ -1876,7 +1833,7 @@ pub mod tests {
         //    total_bytes counter while keeping the key in /keys and the value in
         //    Contents. This is exactly the state a kernel predating the counter
         //    leaves behind.
-        let tb_path = total_bytes_path(storage.context, &map_id).unwrap();
+        let tb_path = total_bytes_path(&map_id).unwrap();
         storage.host.store_delete(&tb_path).unwrap();
         assert!(
             storage.host.store_has(&tb_path).unwrap().is_none(),
@@ -1890,8 +1847,7 @@ pub mod tests {
 
         // 4. The big_map is now empty, so its total_bytes counter MUST be 0.
         //    The buggy code persists -(65 + size("a")) instead.
-        let counter_after_delete =
-            total_bytes(storage.host, storage.context, &map_id).unwrap();
+        let counter_after_delete = total_bytes(storage.host, &map_id).unwrap();
         assert_eq!(
             counter_after_delete.0,
             BigInt::from(0),
@@ -1904,7 +1860,7 @@ pub mod tests {
     fn test_remove_big_map() {
         // Setup the context and big_map for the test
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        make_default_ctx!(storage, &mut host);
         let key_type = Type::Int;
         let value_type = Type::Int;
         let map_id = storage.big_map_new(&key_type, &value_type, false).unwrap();
@@ -1936,7 +1892,7 @@ pub mod tests {
     #[test]
     fn test_remove_with_dump() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        make_default_ctx!(storage, &mut host);
         // Arena must outlive `map1` so its `BigMap<'_>` destructor can still
         // borrow from the arena lifetime; values are dropped in reverse
         // declaration order.
@@ -1995,7 +1951,7 @@ pub mod tests {
     #[test]
     fn dump_moves_persisted_big_map_into_operation() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        make_default_ctx!(storage, &mut host);
         let arena = Arena::new();
 
         // Seed the persisted parent big map S (id 0).
@@ -2083,7 +2039,7 @@ pub mod tests {
     #[test]
     fn dump_retained_then_moved_big_map_copies_pre_update_state() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        make_default_ctx!(storage, &mut host);
         let arena = Arena::new();
 
         let p = storage
@@ -2199,7 +2155,7 @@ pub mod tests {
     #[test]
     fn operation_big_maps_sharing_a_source_are_copied_independently() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        make_default_ctx!(storage, &mut host);
 
         let p = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
@@ -2250,7 +2206,7 @@ pub mod tests {
     #[test]
     fn dump_copy_after_source_removed_errors() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
+        make_default_ctx!(storage, &mut host);
 
         let s = storage
             .big_map_new(&Type::Int, &Type::String, false)
@@ -2399,8 +2355,7 @@ pub mod tests {
     #[test]
     fn lazy_storage_diff_updates_sorted_by_key_hash_descending() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         for k in 0i64..=5 {
             ctx.big_map_update(&id, TypedValue::int(k), Some(TypedValue::int(k * 10)))
@@ -2455,14 +2410,14 @@ pub mod tests {
     /// missing-`code` durable read as a `LookupViewError::HostError`.
     #[test]
     fn lookup_view_storage_balance_returns_none_for_unoriginated_kt1() {
-        use crate::account_storage::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
+        use crate::account_storage::TezlinkOriginatedAccount;
+        use crate::account_storage::TezosImplicitAccount;
         use crate::address::OriginationNonce;
         use mir::ast::michelson_address::AddressHash;
         use tezos_smart_rollup_host::path::RefPath;
 
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(tc_ctx, &mut host, &context);
+        make_default_ctx!(tc_ctx, &mut host);
 
         // OperationCtx + ExecCtx are unread by `lookup_view_storage_balance`
         // but the type system requires a fully constructed `Ctx`. Use
@@ -2470,7 +2425,7 @@ pub mod tests {
         let bootstrap_pkh =
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
         let placeholder_kt1 = ContractKt1Hash::from([0u8; 20]);
-        let source = TezlinkImplicitAccount {
+        let source = TezosImplicitAccount {
             path: RefPath::assert_from(b"/mock_source").into(),
             pkh: bootstrap_pkh.clone(),
         };
@@ -2551,29 +2506,27 @@ pub mod tests {
     #[test]
     fn big_map_new_initializes_total_bytes_to_zero() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
 
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
-        assert_eq!(total_bytes(ctx.host, ctx.context, &id).unwrap(), 0.into());
+        assert_eq!(total_bytes(ctx.host, &id).unwrap(), 0.into());
     }
 
     #[test]
     fn big_map_update_insert_adds_key_forfait_plus_value_size() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
-        let old_total_bytes = total_bytes(ctx.host, ctx.context, &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.host, &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(1), Some(value))
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            total_bytes(ctx.host, &id).unwrap(),
             (old_total_bytes.0 + (BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)).into()
         );
     }
@@ -2581,8 +2534,7 @@ pub mod tests {
     #[test]
     fn big_map_update_overwrite_grows_by_value_diff() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let small = TypedValue::String("hi".into());
         let small_size = encoded_size(&small);
@@ -2590,7 +2542,7 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(small))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.host, ctx.context, &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.host, &id).unwrap();
 
         let big = TypedValue::String("hello, world".into());
         let big_size = encoded_size(&big);
@@ -2599,7 +2551,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            total_bytes(ctx.host, &id).unwrap(),
             (old_total_bytes.0 + big_size - small_size).into()
         );
     }
@@ -2607,8 +2559,7 @@ pub mod tests {
     #[test]
     fn big_map_update_overwrite_shrinks_by_value_diff() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let big = TypedValue::String("hello, world".into());
         let big_size = encoded_size(&big);
@@ -2616,7 +2567,7 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(big))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.host, ctx.context, &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.host, &id).unwrap();
 
         let small = TypedValue::String("hi".into());
         let small_size = encoded_size(&small);
@@ -2625,7 +2576,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            total_bytes(ctx.host, &id).unwrap(),
             (old_total_bytes.0 + small_size - big_size).into()
         );
     }
@@ -2633,8 +2584,7 @@ pub mod tests {
     #[test]
     fn big_map_update_delete_existing_subtracts_key_forfait_plus_prev_size() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
@@ -2642,12 +2592,12 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(value))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.host, ctx.context, &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.host, &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
         assert_eq!(
-            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            total_bytes(ctx.host, &id).unwrap(),
             (old_total_bytes.0 - (BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)).into()
         );
     }
@@ -2655,24 +2605,19 @@ pub mod tests {
     #[test]
     fn big_map_update_delete_absent_is_noop() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
-        let old_total_bytes = total_bytes(ctx.host, ctx.context, &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.host, &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(42), None).unwrap();
 
-        assert_eq!(
-            total_bytes(ctx.host, ctx.context, &id).unwrap(),
-            old_total_bytes
-        );
+        assert_eq!(total_bytes(ctx.host, &id).unwrap(), old_total_bytes);
     }
 
     #[test]
     fn big_map_copy_replicates_source_total_bytes() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         ctx.big_map_update(
             &src,
@@ -2686,22 +2631,18 @@ pub mod tests {
             Some(TypedValue::String("bb".into())),
         )
         .unwrap();
-        let src_total = total_bytes(ctx.host, ctx.context, &src).unwrap();
+        let src_total = total_bytes(ctx.host, &src).unwrap();
 
         let dest = ctx.big_map_copy(&src, false).unwrap();
 
-        assert_eq!(
-            total_bytes(ctx.host, ctx.context, &dest).unwrap(),
-            src_total
-        );
+        assert_eq!(total_bytes(ctx.host, &dest).unwrap(), src_total);
     }
 
     #[test]
     fn big_map_copy_charges_gas_per_persisted_entry() {
         fn copy_gas(entries: usize, value: &str) -> u64 {
             let mut host = MockKernelHost::default();
-            let context = TezlinkContext::init_context();
-            make_default_ctx!(ctx, &mut host, &context);
+            make_default_ctx!(ctx, &mut host);
             let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
             for i in 0..entries {
                 ctx.big_map_update(
@@ -2733,8 +2674,7 @@ pub mod tests {
     fn big_map_remove_charges_gas_per_persisted_entry() {
         fn remove_gas(entries: usize) -> u64 {
             let mut host = MockKernelHost::default();
-            let context = TezlinkContext::init_context();
-            make_default_ctx!(ctx, &mut host, &context);
+            make_default_ctx!(ctx, &mut host);
             let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
             for i in 0..entries {
                 ctx.big_map_update(
@@ -2762,8 +2702,7 @@ pub mod tests {
     #[test]
     fn big_map_update_insert_then_delete_returns_to_zero() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
         ctx.big_map_update(
@@ -2774,17 +2713,13 @@ pub mod tests {
         .unwrap();
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
-        assert_eq!(
-            total_bytes(ctx.host, ctx.context, &id).unwrap(),
-            0u64.into()
-        );
+        assert_eq!(total_bytes(ctx.host, &id).unwrap(), 0u64.into());
     }
 
     #[test]
     fn big_map_update_multi_key_cumul_matches_sum() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
         let values = [
@@ -2801,17 +2736,13 @@ pub mod tests {
             expected += BYTES_SIZE_FOR_BIG_MAP_KEY + size;
         }
 
-        assert_eq!(
-            total_bytes(ctx.host, ctx.context, &id).unwrap(),
-            Zarith(expected)
-        );
+        assert_eq!(total_bytes(ctx.host, &id).unwrap(), Zarith(expected));
     }
 
     #[test]
     fn big_map_copy_then_modify_source_leaves_dest_counter_unchanged() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         ctx.big_map_update(
             &src,
@@ -2820,7 +2751,7 @@ pub mod tests {
         )
         .unwrap();
         let dest = ctx.big_map_copy(&src, false).unwrap();
-        let dest_total_after_copy = total_bytes(ctx.host, ctx.context, &dest).unwrap();
+        let dest_total_after_copy = total_bytes(ctx.host, &dest).unwrap();
 
         ctx.big_map_update(
             &src,
@@ -2830,17 +2761,13 @@ pub mod tests {
         .unwrap();
         ctx.big_map_update(&src, TypedValue::int(1), None).unwrap();
 
-        assert_eq!(
-            total_bytes(ctx.host, ctx.context, &dest).unwrap(),
-            dest_total_after_copy
-        );
+        assert_eq!(total_bytes(ctx.host, &dest).unwrap(), dest_total_after_copy);
     }
 
     #[test]
     fn big_map_realistic_cross_hook_sequence_stays_consistent() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
 
         let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let inserts = [
@@ -2852,7 +2779,7 @@ pub mod tests {
             ctx.big_map_update(&src, TypedValue::int(*k), Some(v.clone()))
                 .unwrap();
         }
-        let src_total_after_inserts = total_bytes(ctx.host, ctx.context, &src).unwrap();
+        let src_total_after_inserts = total_bytes(ctx.host, &src).unwrap();
 
         let dest = ctx.big_map_copy(&src, false).unwrap();
 
@@ -2865,7 +2792,7 @@ pub mod tests {
         let extra = encoded_size(&TypedValue::String("xx".into()))
             - encoded_size(&TypedValue::String("x".into()));
         assert_eq!(
-            total_bytes(ctx.host, ctx.context, &src).unwrap(),
+            total_bytes(ctx.host, &src).unwrap(),
             Zarith(src_total_after_inserts.0.clone() + extra)
         );
 
@@ -2878,22 +2805,21 @@ pub mod tests {
         let added =
             BYTES_SIZE_FOR_BIG_MAP_KEY + encoded_size(&TypedValue::String("wwww".into()));
         assert_eq!(
-            total_bytes(ctx.host, ctx.context, &dest).unwrap(),
+            total_bytes(ctx.host, &dest).unwrap(),
             Zarith(src_total_after_inserts.0 + added)
         );
 
         ctx.big_map_remove(&src).unwrap();
-        let src_path = total_bytes_path(ctx.context, &src).unwrap();
+        let src_path = total_bytes_path(&src).unwrap();
         assert!(ctx.host.store_has(&src_path).unwrap().is_none());
 
-        assert!(total_bytes(ctx.host, ctx.context, &dest).unwrap().0 > 0u64.into());
+        assert!(total_bytes(ctx.host, &dest).unwrap().0 > 0u64.into());
     }
 
     #[test]
     fn big_map_update_shrink_then_delete_returns_to_zero() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
         ctx.big_map_update(
@@ -2910,17 +2836,13 @@ pub mod tests {
         .unwrap();
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
-        assert_eq!(
-            total_bytes(ctx.host, ctx.context, &id).unwrap(),
-            0u64.into()
-        );
+        assert_eq!(total_bytes(ctx.host, &id).unwrap(), 0u64.into());
     }
 
     #[test]
     fn big_map_remove_clears_total_bytes_path() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         ctx.big_map_update(
             &id,
@@ -2928,7 +2850,7 @@ pub mod tests {
             Some(TypedValue::String("hello".into())),
         )
         .unwrap();
-        let path = total_bytes_path(ctx.context, &id).unwrap();
+        let path = total_bytes_path(&id).unwrap();
         assert!(ctx.host.store_has(&path).unwrap().is_some());
 
         ctx.big_map_remove(&id).unwrap();
@@ -2939,8 +2861,7 @@ pub mod tests {
     #[test]
     fn total_bytes_lazily_migrates_pre_counter_big_map() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let entries = [
             TypedValue::String("a".into()),
@@ -2956,17 +2877,17 @@ pub mod tests {
 
         // Simulate a pre-counter big-map: drop the `total_bytes` path,
         // leaving the keys list and the values intact.
-        let path = total_bytes_path(ctx.context, &id).unwrap();
+        let path = total_bytes_path(&id).unwrap();
         ctx.host.store_delete(&path).unwrap();
         assert!(ctx.host.store_has(&path).unwrap().is_none());
 
         // First read triggers the lazy migration.
-        let migrated = total_bytes(ctx.host, ctx.context, &id).unwrap();
+        let migrated = total_bytes(ctx.host, &id).unwrap();
         assert_eq!(migrated, Zarith(expected_sum.into()));
 
         // Migration persisted the counter so subsequent reads are O(1).
         assert!(ctx.host.store_has(&path).unwrap().is_some());
-        assert_eq!(total_bytes(ctx.host, ctx.context, &id).unwrap(), migrated);
+        assert_eq!(total_bytes(ctx.host, &id).unwrap(), migrated);
 
         // Maintenance hooks now operate from the correct baseline: an
         // overwrite produces the expected delta against the migrated value.
@@ -2976,7 +2897,7 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(0), Some(new_value))
             .unwrap();
         assert_eq!(
-            total_bytes(ctx.host, ctx.context, &id).unwrap(),
+            total_bytes(ctx.host, &id).unwrap(),
             Zarith((expected_sum + new_size - old_size).into()),
         );
     }
@@ -2984,8 +2905,7 @@ pub mod tests {
     #[test]
     fn clear_temporary_big_maps_removes_total_bytes_paths() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let temp1 = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         let temp2 = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         ctx.big_map_update(
@@ -3000,12 +2920,12 @@ pub mod tests {
             Some(TypedValue::String("world".into())),
         )
         .unwrap();
-        let path1 = total_bytes_path(ctx.context, &temp1).unwrap();
-        let path2 = total_bytes_path(ctx.context, &temp2).unwrap();
+        let path1 = total_bytes_path(&temp1).unwrap();
+        let path2 = total_bytes_path(&temp2).unwrap();
         assert!(ctx.host.store_has(&path1).unwrap().is_some());
         assert!(ctx.host.store_has(&path2).unwrap().is_some());
 
-        clear_temporary_big_maps(ctx.host, ctx.context, ctx.next_temporary_id).unwrap();
+        clear_temporary_big_maps(ctx.host, ctx.next_temporary_id).unwrap();
 
         assert!(ctx.host.store_has(&path1).unwrap().is_none());
         assert!(ctx.host.store_has(&path2).unwrap().is_none());
@@ -3075,7 +2995,8 @@ pub mod tests {
     /// into a hard test failure.
     #[test]
     fn enshrined_synthetic_views_dispatch_in_sync() {
-        use crate::account_storage::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
+        use crate::account_storage::TezlinkOriginatedAccount;
+        use crate::account_storage::TezosImplicitAccount;
         use crate::address::OriginationNonce;
         use crate::enshrined_contracts::EnshrinedContracts;
         use mir::ast::michelson_address::AddressHash;
@@ -3083,8 +3004,7 @@ pub mod tests {
         use tezos_smart_rollup_host::path::RefPath;
 
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(tc_ctx, &mut host, &context);
+        make_default_ctx!(tc_ctx, &mut host);
 
         // OperationCtx + ExecCtx fields are unread by the
         // `return_type = Unit` early-exit path. Use placeholder
@@ -3092,7 +3012,7 @@ pub mod tests {
         let bootstrap_pkh =
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
         let placeholder_kt1 = ContractKt1Hash::from([0u8; 20]);
-        let source = TezlinkImplicitAccount {
+        let source = TezosImplicitAccount {
             path: RefPath::assert_from(b"/mock_source").into(),
             pkh: bootstrap_pkh.clone(),
         };
@@ -3180,8 +3100,7 @@ pub mod tests {
     #[test]
     fn interpret_context_alloc_permanent_adds_33() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let _ = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         assert_eq!(
             ctx.interpret_context.lazy_storage_size_diff,
@@ -3192,8 +3111,7 @@ pub mod tests {
     #[test]
     fn interpret_context_alloc_temporary_is_zero() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let _ = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         assert_eq!(ctx.interpret_context.lazy_storage_size_diff, 0.into());
     }
@@ -3201,8 +3119,7 @@ pub mod tests {
     #[test]
     fn interpret_context_insert_permanent_adds_65_plus_value_size() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
@@ -3217,8 +3134,7 @@ pub mod tests {
     #[test]
     fn interpret_context_overwrite_permanent_adds_value_size_diff() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let small = TypedValue::String("hi".into());
         let big = TypedValue::String("hello, world".into());
@@ -3242,8 +3158,7 @@ pub mod tests {
     #[test]
     fn interpret_context_delete_permanent_subtracts_65_plus_prev_size() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
@@ -3262,8 +3177,7 @@ pub mod tests {
     #[test]
     fn interpret_context_copy_permanent_adds_33_plus_source_total() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let v1 = TypedValue::String("a".into());
         let v2 = TypedValue::String("bb".into());
@@ -3285,8 +3199,7 @@ pub mod tests {
     #[test]
     fn interpret_context_copy_promotes_temp_to_perm_adds_33_plus_total() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         // Create a temporary big-map and fill it — no accumulator activity
         // for the alloc nor the updates (the id is in the temp range).
         let temp_src = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
@@ -3320,8 +3233,7 @@ pub mod tests {
     #[test]
     fn interpret_context_copy_temporary_is_zero() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         ctx.interpret_context.lazy_storage_size_diff = 0.into();
         let _dest = ctx.big_map_copy(&src, true).unwrap();
@@ -3334,8 +3246,7 @@ pub mod tests {
     #[test]
     fn interpret_context_remove_permanent_subtracts_33_plus_total() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
@@ -3355,8 +3266,7 @@ pub mod tests {
     #[test]
     fn interpret_context_update_on_temporary_skipped() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         ctx.big_map_update(
             &id,
@@ -3373,8 +3283,7 @@ pub mod tests {
     #[test]
     fn interpret_context_clear_temporaries_does_not_touch_accumulator() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let perm = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         ctx.big_map_update(
             &perm,
@@ -3384,7 +3293,7 @@ pub mod tests {
         .unwrap();
         let _ = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         let before_clear = ctx.interpret_context.lazy_storage_size_diff.clone();
-        clear_temporary_big_maps(ctx.host, ctx.context, ctx.next_temporary_id).unwrap();
+        clear_temporary_big_maps(ctx.host, ctx.next_temporary_id).unwrap();
         assert_eq!(
             ctx.interpret_context.lazy_storage_size_diff, before_clear,
             "clear_temporary_big_maps must not touch the accumulator",
@@ -3394,8 +3303,7 @@ pub mod tests {
     #[test]
     fn interpret_context_take_resets_to_zero() {
         let mut host = MockKernelHost::default();
-        let context = TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let _ = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let first = ctx.interpret_context.take_lazy_storage_size_diff();
         assert!(first.0 > BigInt::from(0));
@@ -3432,7 +3340,6 @@ pub(crate) mod mock {
         pub operation_gas: crate::gas::TezlinkOperationGas,
         pub contract_account: TezlinkOriginatedAccount,
         pub operation_counter: u128,
-        pub context: crate::context::TezlinkContext,
         pub crac_chain_depth: u32,
         pub crac_origin: Option<Contract>,
         pub delegated_storage_cost: u64,
@@ -3463,7 +3370,6 @@ pub(crate) mod mock {
                     path: RefPath::assert_from(b"/mock").into(),
                     kt1: ContractKt1Hash::from([0u8; 20]),
                 },
-                context: crate::context::TezlinkContext::init_context(),
                 crac_chain_depth: 0,
                 crac_origin: None,
                 delegated_storage_cost: 0,
@@ -3530,7 +3436,7 @@ pub(crate) mod mock {
             address: &AddressHash,
         ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>
         {
-            self.context.read_origin_for_address(&*self.host, address)
+            crate::context::read_origin_for_address(&*self.host, address)
         }
     }
 

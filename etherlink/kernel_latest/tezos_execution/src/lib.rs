@@ -55,10 +55,10 @@ use tezosx_interfaces::{Origin, Registry};
 use tezosx_journal::TezosXJournal;
 
 use crate::account_storage::{
-    OriginatedContractInfo, StorageSpace, TezosImplicitAccount, TezosOriginatedAccount,
+    OriginatedContractInfo, StorageSpace, TezosImplicitAccount,
+    TezosImplicitAccountTrait, TezosOriginatedAccount,
 };
 pub use crate::address::OriginationNonce;
-use crate::context::Context;
 use crate::gas::Cost;
 pub use crate::gas::TezlinkOperationGas;
 use crate::mir_ctx::{
@@ -426,9 +426,9 @@ pub(crate) fn consume_storage_read_milligas(
 /// charging gas for these operations, we use an upper-bound of their size.
 const COUNTER_SIZE: u64 = 32;
 
-fn reveal<Host, C: Context>(
-    tc_ctx: &mut TcCtx<'_, Host, C>,
-    source_account: &C::ImplicitAccountType,
+fn reveal<Host>(
+    tc_ctx: &mut TcCtx<'_, Host>,
+    source_account: &TezosImplicitAccount,
     public_key: &PublicKey,
 ) -> Result<RevealSuccess, RevealError>
 where
@@ -608,13 +608,13 @@ enum Disposition {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn execute_internal_operations<'a, Host, C: Context>(
-    tc_ctx: &mut TcCtx<'a, Host, C>,
-    operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
+fn execute_internal_operations<'a, Host>(
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
-    sender_account: &C::OriginatedAccountType,
+    sender_account: &crate::account_storage::TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     nonce_counter: &mut u16,
@@ -932,9 +932,9 @@ where
 /// debiting the sender. This is used for cross-runtime calls (e.g. EVM gateway)
 /// where the sender's balance was already debited by the calling runtime.
 #[allow(clippy::too_many_arguments)]
-fn transfer<'a, Host, C: Context>(
-    tc_ctx: &mut TcCtx<'a, Host, C>,
-    operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
+fn transfer<'a, Host>(
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     sender_account: &impl TezlinkAccount,
@@ -975,9 +975,7 @@ where
                 return Err(TransferError::EmptyImplicitTransfer.into());
             };
 
-            let dest_account = tc_ctx
-                .context
-                .implicit_from_public_key_hash(pkh)
+            let dest_account = context::implicit_from_public_key_hash(pkh)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             let already_allocated = dest_account
                 .allocate(tc_ctx.host)
@@ -1004,9 +1002,7 @@ where
             ))
         }
         Contract::Originated(kt1) => {
-            let dest_account = tc_ctx
-                .context
-                .originated_from_kt1(kt1)
+            let dest_account = context::originated_from_kt1(kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             // Reject transfers to a never-originated KT1 before any state
             // write. Without this check, `transfer_tez` would create a
@@ -1256,14 +1252,13 @@ fn get_originated_contract_entrypoint(
     typecheck_originated_script(&code, gas).map(|(entrypoints, _)| entrypoints)
 }
 
-pub fn get_contract_entrypoint<C: Context>(
+pub fn get_contract_entrypoint(
     host: &impl StorageV1,
-    context: &C,
     address: &AddressHash,
     gas: &mut Gas,
 ) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
     let contract = contract_from_address(address.clone()).ok()?;
-    let contract_account = context.originated_from_contract(&contract).ok()?;
+    let contract_account = context::originated_from_contract(&contract).ok()?;
     let code = contract_account.code(host).ok()?;
     match code {
         Code::Code(code) => get_originated_contract_entrypoint(code, gas),
@@ -1383,13 +1378,12 @@ pub fn upgrade_alias_implementation<Host: StorageV1>(
 /// directly. See
 /// [`crate::mir_ctx::enshrined_synthetic_views`] for the source of
 /// truth.
-pub fn get_enshrined_contract_views<C: Context>(
+pub fn get_enshrined_contract_views(
     host: &impl StorageV1,
-    context: &C,
     address: &AddressHash,
 ) -> Option<Vec<(&'static str, mir::ast::Type, mir::ast::Type)>> {
     let contract = contract_from_address(address.clone()).ok()?;
-    let contract_account = context.originated_from_contract(&contract).ok()?;
+    let contract_account = context::originated_from_contract(&contract).ok()?;
     let code = contract_account.code(host).ok()?;
     match code {
         Code::Code(_) => None,
@@ -1401,9 +1395,9 @@ pub fn get_enshrined_contract_views<C: Context>(
 
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
-fn transfer_external<'a, Host, C: Context>(
-    tc_ctx: &mut TcCtx<'a, Host, C>,
-    operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
+fn transfer_external<'a, Host>(
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     amount: &Narith,
@@ -1505,9 +1499,9 @@ impl From<TransferError> for CracTransferError {
 /// (e.g. Michelson `FAILWITH`).
 // TODO: L2-888 replace the low level revert mechanism by more general one
 #[allow(clippy::too_many_arguments)]
-pub fn cross_runtime_transfer<'a, Host, C: Context>(
-    tc_ctx: &mut TcCtx<'a, Host, C>,
-    operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
+pub fn cross_runtime_transfer<'a, Host>(
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     sender: &impl TezlinkAccount,
@@ -1525,7 +1519,8 @@ where
         .map_err(|oog: OutOfGas| CracTransferError::from(TransferError::from(oog)))?
         .map_err(|e| CracTransferError::from(TransferError::from(e)))?;
 
-    let world_state = tc_ctx.context.path();
+    let world_state =
+        tezos_smart_rollup_host::path::OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT);
     let checkpoint_index = journal
         .michelson
         .checkpoint(tc_ctx.host, &world_state)
@@ -1674,8 +1669,8 @@ fn bounded_tc_error(e: &mir::typechecker::TcError) -> String {
 
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
-pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
-    ctx: &mut TcCtx<'a, Host, C>,
+pub fn typecheck_code_and_storage<'a, Host: StorageV1>(
+    ctx: &mut TcCtx<'a, Host>,
     parser: &'a Parser<'a>,
     script: &Script,
 ) -> Result<TypedValue<'a>, OriginationError> {
@@ -1732,8 +1727,8 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
         })
 }
 
-fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
-    ctx: &mut TcCtx<'a, Host, C>,
+fn handle_storage_with_big_maps<'a, Host: StorageV1>(
+    ctx: &mut TcCtx<'a, Host>,
     mut storage: TypedValue<'a>,
 ) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
     let parser = Parser::new();
@@ -1763,8 +1758,8 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
 /// success body that the post-execution burn pass will charge. User-
 /// issued and internal MIR originations pass [`Origin::Native`]; the
 /// alias-forwarder materialization path passes [`Origin::Alias`].
-pub fn originate_contract<'a, Host, C: Context>(
-    ctx: &mut TcCtx<'a, Host, C>,
+pub fn originate_contract<'a, Host>(
+    ctx: &mut TcCtx<'a, Host>,
     contract: ContractKt1Hash,
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
@@ -1792,9 +1787,7 @@ where
     let lazy_storage_size_diff = ctx.interpret_context.take_lazy_storage_size_diff();
 
     // Set the storage of the contract
-    let smart_contract = ctx
-        .context
-        .originated_from_kt1(&contract)
+    let smart_contract = context::originated_from_kt1(&contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
     // Charge gas for the durable writes `smart_contract.init` performs: the
@@ -1868,10 +1861,8 @@ where
     )
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
-    // Record the classification of the new contract. Default trait
-    // impl is a no-op for runtimes without classification storage.
-    ctx.context
-        .record_origin(ctx.host, &contract, origin)
+    // Record the classification of the new contract.
+    context::record_origin(ctx.host, &contract, origin)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     let origination_success = OriginationSuccess {
@@ -2008,11 +1999,10 @@ pub fn get_required_da_fees(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn validate_and_apply_operation<Host, C: Context>(
+pub fn validate_and_apply_operation<Host>(
     host: &mut Host,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    context: &C,
     hash: OperationHash,
     operation: Operation,
     block_ctx: &BlockCtx,
@@ -2052,7 +2042,6 @@ where
 
     let validation_info = match validate::execute_validation(
         &mut safe_host,
-        context,
         operation,
         skip_signature_check,
         required_fees,
@@ -2088,7 +2077,6 @@ where
         &mut safe_host,
         registry,
         journal,
-        context,
         &mut origination_nonce,
         validation_info,
         block_ctx,
@@ -2132,7 +2120,7 @@ where
     // Uses safe_host.host directly since the transactional phase is complete.
     if let Some((config, total_fees)) = fee_refund_config {
         let fee_refund = compute_fee_refund(total_fees, &processed_ops, &config);
-        apply_fee_refund(safe_host.host, context, &mut processed_ops, fee_refund)
+        apply_fee_refund(safe_host.host, &mut processed_ops, fee_refund)
             .map_err(|e| OperationError::BlockAbort(format!("Fee refund: {e}")))?;
     }
 
@@ -2142,15 +2130,13 @@ where
 /// Credit the source with a fee refund and record balance updates in the receipt.
 ///
 /// Returns Ok(()) with no effect when `fee_refund == 0`.
-fn apply_fee_refund<Host, C>(
+fn apply_fee_refund<Host>(
     host: &mut Host,
-    context: &C,
     processed_operations: &mut [ProcessedOperation],
     fee_refund: u64,
 ) -> Result<(), anyhow::Error>
 where
     Host: StorageV1,
-    C: Context,
 {
     if fee_refund == 0 {
         return Ok(());
@@ -2168,7 +2154,7 @@ where
     let source_pkh = first_op.operation_with_metadata.content.source()?.clone();
 
     // Credit source account with the refund.
-    let source_account = context.implicit_from_public_key_hash(&source_pkh)?;
+    let source_account = context::implicit_from_public_key_hash(&source_pkh)?;
     source_account.add_balance(host, fee_refund)?;
 
     log!(
@@ -2197,13 +2183,12 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_batch<Host, C: Context>(
+fn apply_batch<Host>(
     host: &mut Host,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    context: &C,
     origination_nonce: &mut OriginationNonce,
-    validation_info: validate::ValidatedBatch<C::ImplicitAccountType>,
+    validation_info: validate::ValidatedBatch<TezosImplicitAccount>,
     block_ctx: &BlockCtx,
     nonce_counter: &mut u16,
 ) -> Result<(Vec<ProcessedOperation>, bool), String>
@@ -2242,7 +2227,6 @@ where
                 host,
                 registry,
                 journal,
-                context,
                 origination_nonce,
                 &source_account,
                 &source_public_key,
@@ -2263,7 +2247,7 @@ where
     }
 
     // Clear all the temporaries big_map after the application of the batch
-    let cleared = clear_temporary_big_maps(host, context, &mut next_temporary_id);
+    let cleared = clear_temporary_big_maps(host, &mut next_temporary_id);
 
     if let Err(lazy_storage_err) = cleared {
         log!(
@@ -2296,13 +2280,12 @@ fn log_on_operation_failure<T, E: std::fmt::Debug>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_operation<Host, C: Context>(
+fn apply_operation<Host>(
     host: &mut Host,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    context: &C,
     origination_nonce: &mut OriginationNonce,
-    source_account: &C::ImplicitAccountType,
+    source_account: &TezosImplicitAccount,
     source_public_key: &[u8],
     validated_operation: validate::ValidatedOperation,
     next_temporary_id: &mut BigMapId,
@@ -2316,7 +2299,6 @@ where
     let mut gas = validated_operation.gas;
     let mut tc_ctx = TcCtx {
         host,
-        context,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
         interpret_context: InterpretContext::new(),
@@ -2488,10 +2470,11 @@ pub(crate) mod test_utils {
 
 #[cfg(test)]
 mod tests {
+    use crate::account_storage::TezosImplicitAccount;
     use crate::account_storage::{
-        Code, TezlinkImplicitAccount, TezosImplicitAccount, TezosOriginatedAccount,
+        self, Code, TezosImplicitAccountTrait, TezosOriginatedAccount,
     };
-    use crate::context::Context;
+    use crate::context;
     use crate::{
         account_storage::TezlinkOriginatedAccount, address::OriginationNonce,
         mir_ctx::BlockCtx,
@@ -2543,19 +2526,25 @@ mod tests {
     use crate::storage_read_cost_milligas;
     use crate::{
         account_storage::{Manager, TezlinkAccount},
-        burn_pass, context, cross_runtime_transfer, validate_and_apply_operation,
+        burn_pass, cross_runtime_transfer, validate_and_apply_operation,
         CracTransferError, FeeRefundConfig, OperationError, ProcessedOperation,
         TaggedInternalOp,
     };
     use tezos_smart_rollup::types::Timestamp;
-    use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+    use tezos_smart_rollup_host::path::OwnedPath;
     use tezos_tezlink::enc_wrappers::BlockNumber;
 
-    /// Test-only SafeStorage roots matching the `TezlinkContext::init_context`
-    /// root path, so the inner SafeStorage wrap inside
-    /// `validate_and_apply_operation` covers the test account subtree.
+    /// Test-only SafeStorage root matching the production Michelson accounts
+    /// root, used to build the account/big-map paths in tests.
+    fn test_root() -> OwnedPath {
+        OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT)
+    }
+
+    /// Test-only SafeStorage roots matching [`test_root`], so the inner
+    /// SafeStorage wrap inside `validate_and_apply_operation` covers the
+    /// test account subtree.
     fn test_safe_roots() -> Vec<OwnedPath> {
-        vec![OwnedPath::from(&RefPath::assert_from(b"/tez/tez_accounts"))]
+        vec![test_root()]
     }
     use crate::{get_required_da_fees, TcCtx};
     use primitive_types::U256;
@@ -2659,13 +2648,12 @@ mod tests {
     #[test]
     fn alias_entrypoints_resolve_via_shared_implementation() {
         use crate::account_storage::write_alias_implementation;
-        use crate::context::{code::origin_path, Context};
+        use crate::context::code::origin_path;
         use crate::get_contract_entrypoint;
         use mir::ast::{AddressHash, Entrypoint, Type};
         use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
 
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let parser = mir::parser::Parser::new();
 
         // Seed the shared implementation with a real Michelson script.
@@ -2679,7 +2667,7 @@ mod tests {
 
         // A code-less KT1 classified as an alias.
         let kt1 = ContractKt1Hash::from_b58check(CONTRACT_1).unwrap();
-        let account = context.originated_from_kt1(&kt1).unwrap();
+        let account = context::originated_from_kt1(&kt1).unwrap();
         let origin = Origin::Alias(AliasInfo {
             runtime: RuntimeId::Ethereum,
             native_address: b"0xabc".to_vec(),
@@ -2689,17 +2677,13 @@ mod tests {
         host.store_write_all(&origin_path(&account).unwrap(), &buf)
             .unwrap();
 
-        let entrypoints = get_contract_entrypoint(
-            &host,
-            &context,
-            &AddressHash::Kt1(kt1),
-            &mut Gas::default(),
-        )
-        .expect("alias entrypoints resolve to the shared implementation");
+        let entrypoints =
+            get_contract_entrypoint(&host, &AddressHash::Kt1(kt1), &mut Gas::default())
+                .expect("alias entrypoints resolve to the shared implementation");
         assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
     }
 
-    use crate::{account_storage, upgrade_alias_implementation, AliasUpgradeError};
+    use crate::{upgrade_alias_implementation, AliasUpgradeError};
 
     /// Encode a Michelson script source into the Micheline bytes the alias
     /// implementation slot holds.
@@ -3076,15 +3060,12 @@ mod tests {
         host: &mut impl StorageV1,
         src: &PublicKeyHash,
         amount: u64,
-    ) -> TezlinkImplicitAccount {
-        // Setting the account in TezlinkImplicitAccount
+    ) -> TezosImplicitAccount {
+        // Setting the account in TezosImplicitAccount
         let contract = Contract::from_b58check(&src.to_b58check())
             .expect("Contract b58 conversion should have succeed");
 
-        let context = context::TezlinkContext::init_context();
-
-        let account = context
-            .implicit_from_contract(&contract)
+        let account = context::implicit_from_contract(&contract)
             .expect("Account creation should have succeed");
 
         // Allocate the account
@@ -3101,9 +3082,7 @@ mod tests {
     }
 
     fn reveal_account(host: &mut impl StorageV1, source: &Bootstrap) {
-        let context = context::TezlinkContext::init_context();
-        let account = context
-            .implicit_from_public_key_hash(&source.pkh)
+        let account = context::implicit_from_public_key_hash(&source.pkh)
             .expect("Account creation should have succeed");
         account.set_manager_public_key(host, &source.pk).unwrap()
     }
@@ -3116,13 +3095,10 @@ mod tests {
         storage_micheline: &Micheline,
         balance: &Narith,
     ) -> TezlinkOriginatedAccount {
-        // Setting the account in TezlinkImplicitAccount
+        // Setting the account in TezosImplicitAccount
         let contract = Contract::Originated(src.clone());
 
-        let context = context::TezlinkContext::init_context();
-
-        let account = context
-            .originated_from_contract(&contract)
+        let account = context::originated_from_contract(&contract)
             .expect("Account creation should have succeeded");
 
         let parser = mir::parser::Parser::new();
@@ -3187,7 +3163,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -3225,7 +3200,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -3263,7 +3237,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -3315,7 +3288,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -3361,17 +3333,24 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
     }
 
-    // Test an invalid reveal operation where the manager is inconsistent for source
-    // (where source is different of the manager field)
+    // The live RLP `TezosImplicitAccount` derives an unrevealed account's
+    // manager from the account's own public-key hash (it stores only a
+    // *revealed* public key, never a separate manager pkh). It therefore
+    // cannot represent the standalone layout's "inconsistent manager" state:
+    // `set_manager_pk_hash_internal` is a no-op, so `force_set_manager_public_key_hash`
+    // leaves the manager consistent and the reveal succeeds. This pins that
+    // invariant (the `InconsistentHash` branch of `reveal` is unreachable for
+    // the live account) rather than the standalone-only failure path.
     #[test]
-    fn apply_reveal_operation_with_an_inconsistent_manager() {
+    fn reveal_manager_is_always_consistent_on_live_account() {
         let mut host = MockKernelHost::default();
 
         let source = bootstrap1();
 
         let account = init_account(&mut host, &source.pkh, 50);
 
-        // Set the an inconsistent manager with the source
+        // Attempting to plant an inconsistent manager pkh is a no-op on the
+        // live account: the manager stays `NotRevealed(source.pkh)`.
         let inconsistent_pkh =
             PublicKeyHash::from_b58check("tz1UEQcU7M43yUECMpKGJcxCVwHRaP819qhN")
                 .expect("PublicKeyHash b58 conversion should have succeed");
@@ -3380,13 +3359,18 @@ mod tests {
             .force_set_manager_public_key_hash(&mut host, &inconsistent_pkh)
             .expect("Setting manager field should have succeed");
 
+        assert_eq!(
+            account.manager(&host).unwrap(),
+            Manager::NotRevealed(source.pkh.clone()),
+            "live account manager is derived from its own pkh, stays consistent"
+        );
+
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
 
         let processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -3405,7 +3389,7 @@ mod tests {
             receipt: OperationResultSum::Reveal(OperationResult {
                 balance_updates: vec![
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(source.pkh)),
+                        balance: Balance::Account(Contract::Implicit(source.pkh.clone())),
                         changes: -15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
@@ -3415,14 +3399,19 @@ mod tests {
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                result: ContentResult::Failed(
-                    vec![RevealError::InconsistentHash(inconsistent_pkh).into()].into(),
-                ),
+                result: ContentResult::Applied(RevealSuccess {
+                    consumed_milligas: 148496_u64.into(),
+                }),
                 internal_operation_results: vec![],
             }),
         }];
 
         assert_eq!(receipt, expected_receipt);
+        assert_eq!(
+            account.manager(&host).unwrap(),
+            Manager::Revealed(source.pk),
+            "reveal records the source's public key as the manager"
+        );
         assert_eq!(
             account.counter(&host).unwrap(),
             1.into(),
@@ -3452,7 +3441,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -3499,7 +3487,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -3580,7 +3567,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -3665,7 +3651,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -3764,7 +3749,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -3838,7 +3822,6 @@ mod tests {
     #[test]
     fn apply_transfer_to_originated_faucet_with_success_receipt() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let (requester_balance, faucet_balance, fees) = (50, 1000, 15);
         let src = bootstrap1();
         let desthash =
@@ -3891,7 +3874,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context,
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -4044,7 +4026,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -4079,9 +4060,7 @@ mod tests {
         // No balance entry should have been written under the bogus
         // contract path. The guard runs before `transfer_tez`, so the
         // never-originated KT1 must remain absent from durable storage.
-        let context = context::TezlinkContext::init_context();
-        let dest_account = context
-            .originated_from_kt1(&desthash)
+        let dest_account = context::originated_from_kt1(&desthash)
             .expect("originated_from_kt1 should have succeeded");
         let balance_path = context::account::balance_path(&dest_account)
             .expect("balance_path should have succeeded");
@@ -4140,7 +4119,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -4280,7 +4258,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -4347,7 +4324,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -4458,7 +4434,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation.clone(),
                 &block_ctx!(),
@@ -4534,10 +4509,8 @@ mod tests {
 
         assert_eq!(receipts, expected_receipts);
 
-        let context = context::TezlinkContext::init_context();
-        let dest_account = context
-            .implicit_from_public_key_hash(&dest.pkh)
-            .expect("dest account");
+        let dest_account =
+            context::implicit_from_public_key_hash(&dest.pkh).expect("dest account");
         assert_eq!(dest_account.balance(&host).unwrap(), 30_u64.into());
         // Source: 307 - 15 fee - 30 transfer - 257 slot burn = 5.
         assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
@@ -4569,7 +4542,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation.clone(),
                 &block_ctx!(),
@@ -4646,10 +4618,8 @@ mod tests {
         // SafeStorage rolled back the allocation: the destination
         // account is gone again, and the source paid only the fee.
         assert_eq!(source.balance(&host).unwrap(), (50_u64 - 15).into());
-        let context = context::TezlinkContext::init_context();
-        let dest_account = context
-            .implicit_from_public_key_hash(&dest.pkh)
-            .expect("dest account");
+        let dest_account =
+            context::implicit_from_public_key_hash(&dest.pkh).expect("dest account");
         assert!(
             !dest_account.allocated(&host).unwrap(),
             "implicit allocation must be rolled back"
@@ -4699,7 +4669,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -4792,7 +4761,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -4867,7 +4835,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -4912,7 +4879,6 @@ mod tests {
     #[test]
     fn apply_three_valid_operations() {
         let mut host = MockKernelHost::default();
-        let ctx = context::TezlinkContext::init_context();
 
         let src = bootstrap1();
         let dest = bootstrap2();
@@ -4957,7 +4923,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &ctx,
                 OperationHash::default(),
                 batch.clone(),
                 &block_ctx!(),
@@ -5112,7 +5077,6 @@ mod tests {
     #[test]
     fn apply_valid_then_invalid_operation_is_atomic() {
         let mut host = MockKernelHost::default();
-        let ctx = context::TezlinkContext::init_context();
 
         let src = bootstrap1();
         let dest = bootstrap2();
@@ -5147,7 +5111,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &ctx,
             OperationHash::default(),
             batch,
             &block_ctx!(),
@@ -5163,7 +5126,7 @@ mod tests {
         assert_eq!(receipts, Err(expected_error));
 
         assert_eq!(
-            ctx.implicit_from_public_key_hash(&src.pkh)
+            context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
                 .balance(&host)
                 .unwrap(),
@@ -5171,7 +5134,7 @@ mod tests {
         );
 
         assert_eq!(
-            ctx.implicit_from_public_key_hash(&src.pkh)
+            context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
                 .manager(&host)
                 .unwrap(),
@@ -5257,7 +5220,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 batch,
                 &block_ctx!(),
@@ -5336,10 +5298,7 @@ mod tests {
         init_account(&mut host, &src.pkh, 1000000_u64);
         reveal_account(&mut host, &src);
 
-        let context = context::TezlinkContext::init_context();
-
-        let src_account = context
-            .implicit_from_public_key_hash(&src.pkh)
+        let src_account = context::implicit_from_public_key_hash(&src.pkh)
             .expect("Should have succeeded to create an account");
 
         // Retrieve initial balance for the end of the test
@@ -5382,7 +5341,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context,
             OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
@@ -5495,9 +5453,9 @@ mod tests {
             "Source current balance doesn't match the expected one"
         );
 
-        let smart_contract_account = context
-            .originated_from_contract(&Contract::Originated(expected_kt1))
-            .expect("Should have been able to create an account from the KT1");
+        let smart_contract_account =
+            context::originated_from_contract(&Contract::Originated(expected_kt1))
+                .expect("Should have been able to create an account from the KT1");
 
         // Balance of the smart contract
         let current_kt1_balance = smart_contract_account
@@ -5607,13 +5565,11 @@ mod tests {
                 }),
             ],
         );
-        let context = context::TezlinkContext::init_context();
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -5809,13 +5765,11 @@ mod tests {
             },
         );
 
-        let context = context::TezlinkContext::init_context();
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -5935,13 +5889,11 @@ mod tests {
             },
         );
 
-        let context = context::TezlinkContext::init_context();
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -6056,13 +6008,11 @@ mod tests {
             },
         );
 
-        let context = context::TezlinkContext::init_context();
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -6176,7 +6126,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
             &block_ctx!(),
@@ -6252,7 +6201,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
             &block_ctx!(),
@@ -6330,7 +6278,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
             &block_ctx!(),
@@ -6407,7 +6354,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation.clone(),
                 &block_ctx!(),
@@ -6486,16 +6432,13 @@ mod tests {
         // Source paid only the fee; SafeStorage rolled back the
         // initial-balance transfer, the variable burn, and the
         // pre-burn smart-contract setup.
-        let context = context::TezlinkContext::init_context();
-        let src_account = context
-            .implicit_from_public_key_hash(&src.pkh)
-            .expect("source account");
+        let src_account =
+            context::implicit_from_public_key_hash(&src.pkh).expect("source account");
         assert_eq!(src_account.balance(&host).unwrap(), (funded - fee).into());
 
         // SafeStorage rolled back the origination: the smart contract is
         // nowhere to be found in durable storage.
-        let originated_account = context
-            .originated_from_kt1(&expected_kt1)
+        let originated_account = context::originated_from_kt1(&expected_kt1)
             .expect("originated account handle");
         assert!(
             !originated_account.exists(&host).unwrap(),
@@ -6519,7 +6462,6 @@ mod tests {
         let expected_init_contract_balance = 1000000;
         init_account(&mut host, &src.pkh, 100000);
         reveal_account(&mut host, &src);
-        let context = context::TezlinkContext::init_context();
         let mut gas = Gas::default();
 
         let originated_code = "CDR;
@@ -6566,7 +6508,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation.clone(),
                 &block_ctx!(),
@@ -6678,15 +6619,14 @@ mod tests {
         );
 
         // Check Balances of everything is correct
-        let src_account = context
-            .implicit_from_public_key_hash(&src.pkh)
+        let src_account = context::implicit_from_public_key_hash(&src.pkh)
             .expect("Should have succeeded to create an account");
-        let init_contract_account = context
-            .originated_from_contract(&Contract::Originated(contract_chapo_hash))
-            .expect("Should have succeeded to create an account");
-        let originated_account = context
-            .originated_from_contract(&Contract::Originated(expected_address))
-            .expect("Should have succeeded to create an account");
+        let init_contract_account =
+            context::originated_from_contract(&Contract::Originated(contract_chapo_hash))
+                .expect("Should have succeeded to create an account");
+        let originated_account =
+            context::originated_from_contract(&Contract::Originated(expected_address))
+                .expect("Should have succeeded to create an account");
         let expected_src_balance = init_src_balance
             - 10 // fee for the operation
             - 30 // origination cost paid by the contract (30 bytes × COST_PER_BYTES)
@@ -6723,7 +6663,6 @@ mod tests {
             let src = bootstrap1();
             init_account(&mut host, &src.pkh, 100000);
             reveal_account(&mut host, &src);
-            let context = context::TezlinkContext::init_context();
             let mut gas = Gas::default();
             let originated_script =
                 make_create_contract_block("unit", "unit", "CDR; NIL operation; PAIR;");
@@ -6759,7 +6698,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &BlockCtx {
@@ -6809,7 +6747,6 @@ mod tests {
         let src = bootstrap1();
         init_account(&mut host, &src.pkh, 100000);
         reveal_account(&mut host, &src);
-        let context = context::TezlinkContext::init_context();
         let mut gas = Gas::default();
 
         // A contract whose code performs exactly one CREATE_CONTRACT.
@@ -6854,7 +6791,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 op_hash.clone(),
                 operation,
                 &block_ctx!(),
@@ -6919,8 +6855,7 @@ mod tests {
         );
 
         // The contract is actually stored at the L1-canonical KT1.
-        let originated_account = context
-            .originated_from_kt1(&l1_canonical)
+        let originated_account = context::originated_from_kt1(&l1_canonical)
             .expect("originated account handle");
         assert!(
             originated_account.exists(&host).unwrap(),
@@ -6941,7 +6876,6 @@ mod tests {
         let src = bootstrap1();
         init_account(&mut host, &src.pkh, 1000000);
         reveal_account(&mut host, &src);
-        let context = context::TezlinkContext::init_context();
 
         let originated_code = "CDR;
                         NIL operation;
@@ -6998,7 +6932,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation.clone(),
                 &block_ctx!(),
@@ -7173,7 +7106,6 @@ mod tests {
     #[test]
     fn test_try_apply_three_origination_batch() {
         let mut host = MockKernelHost::default();
-        let ctx = context::TezlinkContext::init_context();
         let parser = mir::parser::Parser::new();
 
         let src = bootstrap1();
@@ -7270,7 +7202,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &ctx,
                 OperationHash::default(),
                 batch.clone(),
                 &block_ctx!(),
@@ -7512,9 +7443,10 @@ mod tests {
         // Check the originated contracts
         let expected_contracts = [expected_kt1_1, expected_kt1_2];
         for (i, expected_kt1) in expected_contracts.iter().enumerate() {
-            let account = ctx
-                .originated_from_contract(&Contract::Originated(expected_kt1.clone()))
-                .unwrap();
+            let account = context::originated_from_contract(&Contract::Originated(
+                expected_kt1.clone(),
+            ))
+            .unwrap();
             assert!(
                 account.code(&host).is_err(),
                 "Account {i} for KT1{expected_kt1} should not exist"
@@ -7531,7 +7463,6 @@ mod tests {
         init_account(&mut host, &src.pkh, 50000);
         reveal_account(&mut host, &src);
 
-        let context = context::TezlinkContext::init_context();
         let balance = 10.into();
 
         let code = mir::parser::Parser::new()
@@ -7562,7 +7493,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -7602,8 +7532,6 @@ mod tests {
         init_account(&mut host, &src.pkh, 50000);
         reveal_account(&mut host, &src);
 
-        let context = context::TezlinkContext::init_context();
-
         let code = vec![1u8; crate::MICHELSON_MAXIMUM_SCRIPT_SIZE + 1];
         let storage = vec![];
         let origination_content = OriginationContent {
@@ -7624,7 +7552,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -7669,8 +7596,6 @@ mod tests {
         init_account(&mut host, &src.pkh, 50000);
         reveal_account(&mut host, &src);
 
-        let context = context::TezlinkContext::init_context();
-
         // 1001 `or` levels => 2003 type nodes > 2001 cap, but only ~8 kB.
         let mut param = String::from("unit");
         for _ in 0..1001 {
@@ -7711,7 +7636,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -7746,7 +7670,6 @@ mod tests {
     // succeed.
     fn test_empty_transfers() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
         let src = bootstrap1();
         let dst = bootstrap2();
         let kt1_addr =
@@ -7793,7 +7716,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -7844,7 +7766,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -7896,7 +7817,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -7956,7 +7876,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -7992,7 +7911,6 @@ mod tests {
     fn test_view_instruction() {
         let mut host = MockKernelHost::default();
         let mut gas = Gas::default();
-        let context = context::TezlinkContext::init_context();
         let src = bootstrap1();
         let mut orignation_nonce = OriginationNonce::initial(OperationHash::default());
         let view_addr = orignation_nonce.generate_kt1();
@@ -8058,7 +7976,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -8092,7 +8009,6 @@ mod tests {
     fn test_view_balance() {
         let mut host = MockKernelHost::default();
         let mut gas = Gas::default();
-        let context = context::TezlinkContext::init_context();
         let src = bootstrap1();
         let mut orignation_nonce = OriginationNonce::initial(OperationHash::default());
         let view_addr = orignation_nonce.generate_kt1();
@@ -8159,7 +8075,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -8196,10 +8111,7 @@ mod tests {
             .unwrap_or_else(|_| panic!("Contract source code not found for {file}"))
     }
 
-    fn big_map_was_removed<Host: StorageV1, C: Context>(
-        ctx: &mut TcCtx<'_, Host, C>,
-        id: BigMapId,
-    ) {
+    fn big_map_was_removed<Host: StorageV1>(ctx: &mut TcCtx<'_, Host>, id: BigMapId) {
         let types = ctx
             .big_map_get_type(&id)
             .expect("Get big_map type should not panic");
@@ -8212,8 +8124,8 @@ mod tests {
         receipts: Vec<OperationWithMetadata>,
     }
 
-    fn transfer_big_map<Host, C: Context>(
-        ctx: &mut TcCtx<'_, Host, C>,
+    fn transfer_big_map<Host>(
+        ctx: &mut TcCtx<'_, Host>,
         tz1: &Bootstrap,
         script_sender: &str,
         init_sender: &str,
@@ -8274,7 +8186,6 @@ mod tests {
                 ctx.host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                ctx.context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -8304,8 +8215,7 @@ mod tests {
         expected_receiver_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
     ) {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let tz1 = bootstrap1();
 
         let result = transfer_big_map(
@@ -8548,8 +8458,7 @@ mod tests {
     #[test]
     fn big_map_transfer_with_creation() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let tz1 = bootstrap1();
 
         let originator_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
@@ -8587,7 +8496,6 @@ mod tests {
                 ctx.host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -8634,25 +8542,19 @@ mod tests {
         let Originated {
             contract: created_addr_0,
         } = &contracts[0];
-        let created_acount_0 = ctx
-            .context
-            .originated_from_kt1(created_addr_0)
+        let created_acount_0 = context::originated_from_kt1(created_addr_0)
             .expect("Failed to retrieve generated account");
 
         let Originated {
             contract: created_addr_1,
         } = &contracts[1];
-        let created_acount_1 = ctx
-            .context
-            .originated_from_kt1(created_addr_1)
+        let created_acount_1 = context::originated_from_kt1(created_addr_1)
             .expect("Failed to retrieve generated account");
 
         let Originated {
             contract: created_addr_2,
         } = &contracts[2];
-        let created_acount_2 = ctx
-            .context
-            .originated_from_kt1(created_addr_2)
+        let created_acount_2 = context::originated_from_kt1(created_addr_2)
             .expect("Failed to retrieve generated account");
 
         let storage_originator = originator_contract
@@ -8798,8 +8700,7 @@ mod tests {
         use mir::ast::big_map::LazyStorage;
 
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
 
         let tz1 = bootstrap1();
         init_account(ctx.host, &tz1.pkh, 10_000_000);
@@ -8866,7 +8767,6 @@ mod tests {
                 ctx.host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                ctx.context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -8913,8 +8813,7 @@ mod tests {
         use mir::ast::big_map::LazyStorage;
 
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
 
         let tz1 = bootstrap1();
         init_account(ctx.host, &tz1.pkh, 10_000_000);
@@ -8974,7 +8873,6 @@ mod tests {
                 ctx.host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                ctx.context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -9021,8 +8919,7 @@ mod tests {
     #[test]
     fn verify_temp_big_map_content_is_cleaned() {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
+        make_default_ctx!(ctx, &mut host);
         let tz1 = bootstrap1();
         let parser = Parser::new();
 
@@ -9109,7 +9006,6 @@ mod tests {
                 ctx.host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                ctx.context,
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -9212,7 +9108,6 @@ mod tests {
             &mut host,
             &registry,
             &mut journal,
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -9253,9 +9148,7 @@ mod tests {
         assert_eq!(serve_calls.len(), 1, "Serve should have been called once");
 
         // Verify that the gateway balance is 0 (funds were forwarded, not locked)
-        let context = context::TezlinkContext::init_context();
-        let gateway_account = context
-            .originated_from_kt1(&gateway_kt1)
+        let gateway_account = context::originated_from_kt1(&gateway_kt1)
             .expect("Gateway account should exist");
         assert_eq!(
             gateway_account.balance(&host).unwrap(),
@@ -9292,7 +9185,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -9346,7 +9238,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             batch,
             &block_ctx!(),
@@ -9401,7 +9292,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -9457,7 +9347,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -9521,7 +9410,6 @@ mod tests {
                 &mut host,
                 &registry,
                 &mut journal,
-                &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -9612,7 +9500,6 @@ mod tests {
                 &mut host,
                 &registry,
                 &mut journal,
-                &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -9681,7 +9568,6 @@ mod tests {
                 &mut host,
                 &registry,
                 &mut journal,
-                &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -9718,7 +9604,7 @@ mod tests {
 
         let evm_address = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 
-        // Deploy the forwarder contract in the TezlinkContext path
+        // Deploy the forwarder contract under the Michelson accounts root
         // (which is where validate_and_apply_operation reads from)
         let forwarder_script = r#"
             parameter unit ;
@@ -9789,7 +9675,6 @@ mod tests {
             &mut host,
             &registry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -9834,12 +9719,10 @@ mod tests {
         );
 
         // Verify the gateway balance is 0 (funds were forwarded, not locked)
-        let tezlink_ctx = context::TezlinkContext::init_context();
         let gateway_kt1 =
             ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap();
-        let gateway_account = tezlink_ctx
-            .originated_from_kt1(&gateway_kt1)
+        let gateway_account = context::originated_from_kt1(&gateway_kt1)
             .expect("Gateway account should exist");
         assert_eq!(
             gateway_account.balance(&host).unwrap(),
@@ -9867,7 +9750,6 @@ mod tests {
     #[test]
     fn gas_tracking_with_internal_operations() {
         let mut host = MockKernelHost::default();
-        let ctx = context::TezlinkContext::init_context();
         let src = bootstrap1();
         init_account(&mut host, &src.pkh, 100_000);
         reveal_account(&mut host, &src);
@@ -9921,8 +9803,7 @@ mod tests {
                    content: Vec<OperationContent>,
                    gas_limit: u64|
          -> Vec<ProcessedOperation> {
-            let counter = ctx
-                .implicit_from_public_key_hash(&src.pkh)
+            let counter = context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
                 .counter(host)
                 .unwrap()
@@ -9935,7 +9816,6 @@ mod tests {
                 host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &ctx,
                 OperationHash::default(),
                 op,
                 &block_ctx!(),
@@ -10154,7 +10034,6 @@ mod tests {
         milligas_limit: u64,
     ) -> (CracTransferError, u64 /* consumed milligas */) {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
 
         // Sender: an implicit account (tz1).
         let src = bootstrap1();
@@ -10184,7 +10063,6 @@ mod tests {
             .expect("milligas within limit");
         let mut tc_ctx = TcCtx {
             host: &mut host,
-            context: &context,
             operation_gas: &mut operation_gas,
             big_map_diff: std::collections::BTreeMap::new(),
             interpret_context: crate::mir_ctx::InterpretContext::new(),
@@ -10372,7 +10250,6 @@ mod tests {
         milligas_limit: u64,
     ) -> (CracTransferError, u64 /* consumed milligas */) {
         let mut host = MockKernelHost::default();
-        let context = context::TezlinkContext::init_context();
 
         // Sender: implicit account.
         let src = bootstrap1();
@@ -10421,7 +10298,6 @@ mod tests {
             .expect("milligas within limit");
         let mut tc_ctx = TcCtx {
             host: &mut host,
-            context: &context,
             operation_gas: &mut operation_gas,
             big_map_diff: std::collections::BTreeMap::new(),
             interpret_context: crate::mir_ctx::InterpretContext::new(),
@@ -10629,8 +10505,8 @@ mod tests {
     struct RefundTestCtx {
         host: MockKernelHost,
         src: Bootstrap,
-        source: TezlinkImplicitAccount,
-        destination: TezlinkImplicitAccount,
+        source: TezosImplicitAccount,
+        destination: TezosImplicitAccount,
         receipt: Vec<OperationWithMetadata>,
         total_consumed_milligas: u64,
     }
@@ -10696,7 +10572,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
             &block_ctx!(),
@@ -10923,7 +10798,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation,
                 &block_ctx!(),
@@ -10968,7 +10842,6 @@ mod tests {
                 &mut host2,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 operation2,
                 &block_ctx!(),
@@ -11053,7 +10926,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                &context::TezlinkContext::init_context(),
                 OperationHash::default(),
                 batch,
                 &block_ctx!(),

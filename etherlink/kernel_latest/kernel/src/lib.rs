@@ -401,16 +401,12 @@ where
 
     let tez_tez_accounts_subkeys = host
         .host
-        .store_count_subkeys(&chains::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+        .store_count_subkeys(&chains::TEZOS_ACCOUNTS_ROOT)
         .expect("The kernel failed to read the number of /tez/tez_accounts subkeys");
 
     if tez_tez_accounts_subkeys == 0 {
         host.host
-            .store_write(
-                &chains::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-                b"Un carnaval de foncteur",
-                0,
-            )
+            .store_write(&chains::TEZOS_ACCOUNTS_ROOT, b"Un carnaval de foncteur", 0)
             .unwrap();
     }
 

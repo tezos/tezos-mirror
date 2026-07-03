@@ -30,10 +30,8 @@ use mir::typechecker::{
 };
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_data_encoding::types::{Narith, Zarith};
-use tezos_execution::account_storage::{
-    TezlinkAccount, TezlinkOriginatedAccount, TezosOriginatedAccount,
-};
-use tezos_execution::context::Context;
+use tezos_execution::account_storage::TezlinkAccount;
+use tezos_execution::context;
 use tezos_execution::mir_ctx::{Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx};
 use tezos_execution::{OriginationNonce, TezlinkOperationGas};
 use tezos_protocol::contract::Contract;
@@ -42,11 +40,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::TezosXRuntimeError;
 use tezosx_journal::TezosXJournal;
 
-use crate::context::TezosRuntimeContext;
-use crate::{
-    headers, url, ExecuteRequestOutcome, RequestFailure, NULL_PKH,
-    TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-};
+use crate::{headers, url, ExecuteRequestOutcome, RequestFailure, NULL_PKH};
 
 /// Resource-exhaustion `TcError`s that must route to
 /// [`TezosXRuntimeError::OutOfGas`]: direct budget exhaustion, a
@@ -200,9 +194,7 @@ where
     let destination_kt1 = parsed.destination;
     let view_name = parsed.view_name;
 
-    let context =
-        TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
-    let dest_account = context.originated_from_kt1(&destination_kt1).map_err(|e| {
+    let dest_account = context::originated_from_kt1(&destination_kt1).map_err(|e| {
         TezosXRuntimeError::NotFound(format!(
             "destination contract {destination_kt1:?} not found: {e:?}"
         ))
@@ -225,13 +217,9 @@ where
         TezosXRuntimeError::ConversionError(format!("failed to parse null address: {e}"))
     })?;
     let source_account =
-        context
-            .implicit_from_public_key_hash(&source_pkh)
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "failed to fetch source account: {e:?}"
-                ))
-            })?;
+        context::implicit_from_public_key_hash(&source_pkh).map_err(|e| {
+            TezosXRuntimeError::Custom(format!("failed to fetch source account: {e:?}"))
+        })?;
 
     // Any error here comes from an invalid `X-Tezos-Gas-Limit` header
     // (value above `MAX_LIMIT` or not a valid u32), i.e. a caller
@@ -245,7 +233,6 @@ where
     };
     let mut tc_ctx = TcCtx {
         host,
-        context: &context,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
         interpret_context: InterpretContext::new(),
@@ -304,10 +291,7 @@ where
         amount: 0,
         self_address: AddressHash::Kt1(destination_kt1.clone()),
         balance,
-        contract_account: TezlinkOriginatedAccount {
-            path: dest_account.path().clone(),
-            kt1: dest_account.kt1().clone(),
-        },
+        contract_account: dest_account,
     };
 
     let mut mir_ctx = Ctx {
