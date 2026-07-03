@@ -1791,8 +1791,41 @@ impl<'a> TypedValue<'a> {
 /// `pub(crate)`: the sentinel `replace` it performs assumes the caller is
 /// about to drop `v`, so it must not be exposed to callers that might hold the
 /// value aliased.
+/// A node on the unified drop worklist. Dropping a [`TypedValue`] and dropping
+/// an [`Instruction`] are mutually recursive across the `TypedValue` <->
+/// `Instruction` boundary: a `Closure::Lambda`'s body is `Rc<[Instruction]>`,
+/// and an `Instruction::Push` carries an `Rc<TypedValue>`. Draining each kind
+/// on its own worklist still crosses that boundary on the native stack — an
+/// alternating `Pair … (lambda { PUSH (pair … (lambda …)) … ; DROP })` value
+/// (which the iterative typecheck of L2-1663 now accepts up to the 10000-deep
+/// guard) overflows the kernel's WASM stack on drop. Holding both kinds on one
+/// worklist lets the drain span the boundary (L2-1672).
+enum DropNode<'a> {
+    Value(TypedValue<'a>),
+    Instr(Instruction<'a>),
+}
+
+/// Drain everything reachable from a seeded worklist of [`DropNode`]s on the
+/// heap, spanning the `TypedValue` <-> `Instruction` boundary so neither the
+/// value spine, the instruction spine, nor the alternation between them
+/// recurses on the native stack (L2-1672). Each popped node has its children
+/// extracted onto the shared worklist and then drops shallow — its remaining
+/// payload is either trivial or a `Type`, whose own iterative `Drop` is
+/// stack-safe — so the shallow drop neither recurses nor re-enters this drain
+/// with work to do.
+fn drain_value_and_instructions(mut stack: Vec<DropNode<'_>>) {
+    while let Some(node) = stack.pop() {
+        match node {
+            DropNode::Value(mut v) => extract_tv_children(&mut v, &mut stack),
+            DropNode::Instr(mut i) => extract_instr_children(&mut i, &mut stack),
+        }
+    }
+}
+
 pub(crate) fn drain_deep_typed_value(v: &mut TypedValue<'_>) {
-    drain_iteratively(v, extract_tv_children);
+    let mut stack = Vec::new();
+    extract_tv_children(v, &mut stack);
+    drain_value_and_instructions(stack);
 }
 
 /// Iterative `Drop` so dropping a deeply nested value (a comb of
@@ -1811,7 +1844,9 @@ pub(crate) fn drain_deep_typed_value(v: &mut TypedValue<'_>) {
 /// the generic `pop!` macros).
 impl Drop for TypedValue<'_> {
     fn drop(&mut self) {
-        drain_iteratively(self, extract_tv_children);
+        let mut stack = Vec::new();
+        extract_tv_children(self, &mut stack);
+        drain_value_and_instructions(stack);
     }
 }
 
@@ -1906,12 +1941,12 @@ take_out_via_default_generic!(
     Box<OperationInfo<'a>>,
 );
 
-fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue<'a>>) {
+fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'a>>) {
     use std::mem::{replace, take};
     use TypedValue as TV;
-    let push_rc = |rc: Rc<TV<'a>>, stack: &mut Vec<TV<'a>>| {
+    let push_rc = |rc: Rc<TV<'a>>, stack: &mut Vec<DropNode<'a>>| {
         if let Ok(v) = Rc::try_unwrap(rc) {
-            stack.push(v);
+            stack.push(DropNode::Value(v));
         }
     };
     match node {
@@ -1955,9 +1990,7 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue
             // drop. When we hold the last reference to a captured value, drain
             // it onto the worklist (it too may be a deep value); when the
             // capture is still shared, the holder that drops it last reaches
-            // this same path. The final `Closure::Lambda` drops trivially: its
-            // `Type` fields and `Rc<[Instruction]>` code have their own
-            // iterative `Drop`.
+            // this same path.
             let dummy = Closure::Lambda(Lambda::Lambda {
                 micheline_code: Micheline::Seq(&[]),
                 code: Vec::new().into(),
@@ -1973,22 +2006,45 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue
                 }
                 cur = Closure::unwrap_rc(inner);
             }
+            // `cur` is now the terminal `Closure::Lambda`. Its body code is an
+            // `Rc<[Instruction]>` which, on drop, re-enters `Drop for
+            // Instruction` -> `Push` -> a value drain: that boundary crossing
+            // recurses on the native stack one frame per alternating
+            // value/instruction level (L2-1672). Push the body instructions
+            // onto the shared worklist instead, so the alternation stays on the
+            // heap. (When the `Rc` is shared, `get_mut` returns `None` and the
+            // body is left for the other owner — no deep drop happens here.)
+            if let Closure::Lambda(lam) = &mut cur {
+                let code = match lam {
+                    Lambda::Lambda { code, .. } | Lambda::LambdaRec { code, .. } => code,
+                };
+                if let Some(slice) = Rc::get_mut(code) {
+                    for slot in slice.iter_mut() {
+                        stack.push(DropNode::Instr(replace(
+                            slot,
+                            Instruction::Drop(None),
+                        )));
+                    }
+                }
+            }
         }
         TV::Ticket(t) => {
             // Move the ticket payload out so it is drained via the worklist
             // rather than recursing through the default `TypedValue` destructor.
-            stack.push(replace(&mut t.content, TV::Unit));
+            stack.push(DropNode::Value(replace(&mut t.content, TV::Unit)));
         }
         TV::Operation(info) => {
             // Operations carry `TypedValue` payloads (transfer parameter, emit
             // value, originated storage) that may be deep; drain them.
             match &mut info.operation {
                 Operation::TransferTokens(tt) => {
-                    stack.push(replace(&mut tt.param, TV::Unit))
+                    stack.push(DropNode::Value(replace(&mut tt.param, TV::Unit)))
                 }
-                Operation::Emit(e) => stack.push(replace(&mut e.value, TV::Unit)),
+                Operation::Emit(e) => {
+                    stack.push(DropNode::Value(replace(&mut e.value, TV::Unit)))
+                }
                 Operation::CreateContract(c) => {
-                    stack.push(replace(&mut c.storage, TV::Unit))
+                    stack.push(DropNode::Value(replace(&mut c.storage, TV::Unit)))
                 }
                 Operation::SetDelegate(_) => {}
             }
@@ -1999,15 +2055,15 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<TypedValue
             match &mut m.content {
                 big_map::BigMapContent::InMemory(map) => {
                     for (k, v) in take(map) {
-                        stack.push(k);
-                        stack.push(v);
+                        stack.push(DropNode::Value(k));
+                        stack.push(DropNode::Value(v));
                     }
                 }
                 big_map::BigMapContent::FromId(from_id) => {
                     for (k, v) in take(&mut from_id.overlay) {
-                        stack.push(k);
+                        stack.push(DropNode::Value(k));
                         if let Some(v) = v {
-                            stack.push(v);
+                            stack.push(DropNode::Value(v));
                         }
                     }
                 }
@@ -2159,14 +2215,13 @@ pub enum Instruction<'a> {
 /// drops trivially without re entering this function.
 impl<'a> Drop for Instruction<'a> {
     fn drop(&mut self) {
-        drain_iteratively(self, extract_instr_children);
+        let mut stack = Vec::new();
+        extract_instr_children(self, &mut stack);
+        drain_value_and_instructions(stack);
     }
 }
 
-fn extract_instr_children<'a>(
-    node: &mut Instruction<'a>,
-    stack: &mut Vec<Instruction<'a>>,
-) {
+fn extract_instr_children<'a>(node: &mut Instruction<'a>, stack: &mut Vec<DropNode<'a>>) {
     use std::mem::{replace, take};
     match node {
         Instruction::Dip(_, body)
@@ -2176,7 +2231,7 @@ fn extract_instr_children<'a>(
         | Instruction::Map(_, body)
         | Instruction::Seq(body) => {
             for instr in take(body) {
-                stack.push(instr);
+                stack.push(DropNode::Instr(instr));
             }
         }
         Instruction::If(t, f)
@@ -2184,19 +2239,22 @@ fn extract_instr_children<'a>(
         | Instruction::IfCons(t, f)
         | Instruction::IfLeft(t, f) => {
             for instr in take(t) {
-                stack.push(instr);
+                stack.push(DropNode::Instr(instr));
             }
             for instr in take(f) {
-                stack.push(instr);
+                stack.push(DropNode::Instr(instr));
             }
         }
         Instruction::Push(rc) => {
-            // The pushed constant may be a deep value. It is a `TypedValue`,
-            // not an `Instruction`, so it cannot go on this worklist; drain it
-            // with its own iterative routine instead (when solely owned here).
+            // The pushed constant is a (possibly deep) `TypedValue`. Push it
+            // onto the shared worklist as a value node instead of draining it
+            // with a nested call, so an alternating value/instruction nesting
+            // stays on the heap rather than recursing across the boundary one
+            // native frame per level (L2-1672). Only owned when the `Rc` is not
+            // shared.
             let old = replace(rc, Rc::new(TypedValue::Unit));
-            if let Ok(mut tv) = Rc::try_unwrap(old) {
-                drain_deep_typed_value(&mut tv);
+            if let Ok(tv) = Rc::try_unwrap(old) {
+                stack.push(DropNode::Value(tv));
             }
         }
         Instruction::Lambda(lambda) => {
@@ -2208,7 +2266,7 @@ fn extract_instr_children<'a>(
             };
             if let Some(slice) = Rc::get_mut(code) {
                 for slot in slice.iter_mut() {
-                    stack.push(replace(slot, Instruction::Drop(None)));
+                    stack.push(DropNode::Instr(replace(slot, Instruction::Drop(None))));
                 }
             }
         }

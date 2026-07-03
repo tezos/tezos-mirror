@@ -239,6 +239,29 @@
   rather than restarting at zero for each `EVM → Michelson` frame —
   matching L1's single internal-nonce namespace for a manager
   operation's internal-op tree. (!22219)
+- MIR: prevent kernel stack overflow when typechecking a lambda literal
+  hidden inside a container value (e.g. `Pair … (lambda …)` in storage,
+  parameter, or `PUSH` data). The earlier top-level `PUSH (lambda …)` fix
+  did not cover container-hidden lambdas, which still re-entered
+  `typecheck_lambda` synchronously and grew the kernel's ~1 MiB WASM stack
+  one round-trip per nesting level — overflowing (a native abort) well
+  below the L1-parity 10 000-deep typecheck guard. The value and
+  instruction typecheckers now share a single explicit worklist, so a
+  container-hidden lambda body is scheduled on the heap worklist instead of
+  the Rust call stack; depth is bounded by gas and the existing 10 000-deep
+  guard, which now returns `TypecheckingTooManyRecursiveCalls` instead of
+  crashing the kernel. (!22272)
+- MIR: prevent a kernel stack overflow when *dropping* a deeply-nested
+  container-hidden lambda value. Because the previous change makes such a
+  value typecheck (so it is accepted and then dropped — e.g. typechecked
+  origination storage falling out of scope), dropping it mattered: a
+  typechecked value and instruction own each other across the
+  `TypedValue`/`Instruction` boundary (a lambda's body is `Rc<[Instruction]>`,
+  a `PUSH` carries an `Rc<TypedValue>`), and the two iterative drop drainers
+  crossed that boundary by native recursion — one Rust frame per nesting
+  level, overflowing the kernel's WASM stack on a size-legal value (~depth
+  1150, under the 32 KB operation-size limit). The drop now drains both kinds
+  on a single heap worklist that spans the boundary. (!22272)
 - The Michelson storage-fees burn is now rendered on the CRAC-triggering
   operation: an Applied content that delegates storage cost to its
   callee carries the dual `(payer −V, storage fees +V)` balance-updates
