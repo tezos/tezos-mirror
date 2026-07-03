@@ -20,6 +20,7 @@ SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml \
        product_teztale.ml \
        product_tezt_cloud_tests.ml \
        product_ciao.ml \
+       product_release_site.ml \
        product_tobi.ml \
        main.mli main.ml
 

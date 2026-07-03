@@ -35,6 +35,7 @@ open Octez
 module Tooling = Product_tooling
 module Etherlink = Product_etherlink
 module CIAO = Product_ciao
+module Release_site = Product_release_site
 module Teztale = Product_teztale
 module Tobi = Product_tobi
 module Tezt_cloud_tests = Product_tezt_cloud_tests
