@@ -8,7 +8,7 @@ use crate::blueprint_storage::{
     clear_all_blueprints, read_current_blueprint_header, store_forced_blueprint,
     store_inbox_blueprint,
 };
-use crate::chains::{ChainConfigTrait, TezosXChainConfig, TezosXTransaction};
+use crate::chains::{TezosXChainConfig, TezosXTransaction};
 use crate::configuration::{
     Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
 };
@@ -118,7 +118,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn fetch_sequencer_blueprints<Host, ChainConfig: ChainConfigTrait>(
+fn fetch_sequencer_blueprints<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
@@ -128,7 +128,7 @@ fn fetch_sequencer_blueprints<Host, ChainConfig: ChainConfigTrait>(
     dal: Option<DalConfiguration>,
     maximum_allowed_ticks: u64,
     enable_fa_bridge: bool,
-    chain_configuration: &ChainConfig,
+    chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
@@ -207,9 +207,7 @@ where
 mod tests {
     use crate::{
         blueprint_storage::EVMBlockHeader,
-        chains::{
-            test_tezosx_chain_config, ChainHeaderTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-        },
+        chains::{test_tezosx_chain_config, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
             UnsignedDalSlotSignals,
@@ -539,7 +537,7 @@ mod tests {
         .expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
-        if read_blueprint::<_, TezosXChainConfig>(
+        if read_blueprint(
             &mut host,
             &mut conf,
             U256::from(10),

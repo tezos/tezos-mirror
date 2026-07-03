@@ -212,7 +212,7 @@ pub const SIMULATION_HTTP_TRACES: RefPath =
 /// just before the replay and the kernel reads it exactly once at the top
 /// of `block::produce` (outside the `SafeStorage` wrapper), then threads
 /// the resulting boolean through `compute_bip` → `compute` →
-/// `ChainConfigTrait::apply_transaction` → the three apply sites. The
+/// `TezosXChainConfig::apply_transaction` → the three apply sites. The
 /// flag therefore has no lifetime beyond a single replay and nothing
 /// else in the kernel touches this path.
 pub const HTTP_TRACE_ENABLED: RefPath =

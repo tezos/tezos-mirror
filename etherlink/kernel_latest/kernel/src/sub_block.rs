@@ -14,8 +14,8 @@ use crate::{
     block_in_progress::BlockInProgress,
     block_storage,
     chains::{
-        ChainConfigTrait, TezlinkBlockConstants, TezosXBlockConstants, TezosXChainConfig,
-        TezosXTransaction, TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        TezlinkBlockConstants, TezosXBlockConstants, TezosXChainConfig,
+        TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
     },
     configuration::{fetch_configuration, fetch_tezosx_configuration},
     error::{Error, StorageError},

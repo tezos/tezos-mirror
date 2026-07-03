@@ -7,9 +7,7 @@
 
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
-use crate::chains::{
-    ChainConfigTrait, ExperimentalFeatures, TezosXChainConfig, TezosXTransaction,
-};
+use crate::chains::{ExperimentalFeatures, TezosXChainConfig, TezosXTransaction};
 use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
@@ -531,7 +529,7 @@ enum ReadStatus {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn read_and_dispatch_input<Host, Mode, ChainConfig>(
+fn read_and_dispatch_input<Host, Mode>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
@@ -539,12 +537,11 @@ fn read_and_dispatch_input<Host, Mode, ChainConfig>(
     inbox_is_empty: &mut bool,
     res: &mut Mode::Inbox,
     enable_fa_bridge: bool,
-    chain_configuration: &ChainConfig,
+    chain_configuration: &TezosXChainConfig,
 ) -> anyhow::Result<ReadStatus>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
     Mode: Parsable + InputHandler,
-    ChainConfig: ChainConfigTrait,
 {
     let input: InputResult<Mode> = read_input(
         host,
@@ -604,7 +601,7 @@ where
     // during this kernel run.
     let mut inbox_is_empty = true;
     loop {
-        match read_and_dispatch_input::<Host, ProxyInput, TezosXChainConfig>(
+        match read_and_dispatch_input::<Host, ProxyInput>(
             host,
             smart_rollup_address,
             tezos_contracts,
@@ -653,7 +650,7 @@ pub enum StageOneStatus {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn read_sequencer_inbox<Host, ChainConfig>(
+pub fn read_sequencer_inbox<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
@@ -663,11 +660,10 @@ pub fn read_sequencer_inbox<Host, ChainConfig>(
     enable_fa_bridge: bool,
     maximum_allowed_ticks: u64,
     dal: Option<DalConfiguration>,
-    chain_configuration: &ChainConfig,
+    chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
-    ChainConfig: ChainConfigTrait,
 {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -704,7 +700,7 @@ where
             );
             return Ok(StageOneStatus::Reboot);
         };
-        match read_and_dispatch_input::<Host, SequencerInput, ChainConfig>(
+        match read_and_dispatch_input::<Host, SequencerInput>(
             host,
             smart_rollup_address,
             tezos_contracts,

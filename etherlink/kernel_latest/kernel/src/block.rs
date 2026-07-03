@@ -11,11 +11,9 @@ use crate::block_storage;
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
-    store_current_block_header, BlockHeader, ChainHeader,
+    store_current_block_header, BlockHeader, ChainHeader, EVMBlockHeader,
 };
-use crate::chains::{
-    ChainConfigTrait, ChainHeaderTrait, EvmLimits, TezosXChainConfig, TransactionTrait,
-};
+use crate::chains::{EvmLimits, TezosXBlockConstants, TezosXChainConfig};
 use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
@@ -105,13 +103,13 @@ pub fn can_fit_in_reboot(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute<Host, ChainConfig: ChainConfigTrait>(
+pub fn compute<Host>(
     host: &mut Host,
     registry: &impl Registry,
-    chain_config: &ChainConfig,
+    chain_config: &TezosXChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: &mut BlockInProgress,
-    block_constants: &ChainConfig::BlockConstants,
+    block_constants: &TezosXBlockConstants,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
     // Per-replay flag threaded down from [produce] / [handle_run_transaction]:
@@ -232,9 +230,9 @@ enum BlueprintParsing<BIP> {
     None,
 }
 
-pub fn bip_from_blueprint<Host, ChainConfig: ChainConfigTrait>(
+pub fn bip_from_blueprint<Host>(
     host: &Host,
-    chain_config: &ChainConfig,
+    chain_config: &TezosXChainConfig,
     next_bip_number: U256,
     hash: H256,
     tezos_parent_hash: H256,
@@ -257,9 +255,7 @@ where
     bip
 }
 
-fn get_next_bip_info<Host, ChainConfig: ChainConfigTrait>(
-    host: &mut Host,
-) -> (U256, Timestamp, ChainConfig::ChainHeader)
+fn get_next_bip_info<Host>(host: &mut Host) -> (U256, Timestamp, EVMBlockHeader)
 where
     Host: StorageV1,
 {
@@ -267,7 +263,7 @@ where
         Err(_) => (
             U256::zero(),
             Timestamp::from(0),
-            ChainConfig::ChainHeader::genesis_header(),
+            EVMBlockHeader::genesis_header(),
         ),
         Ok(BlockHeader {
             blueprint_header,
@@ -281,12 +277,12 @@ where
 }
 
 #[cfg_attr(feature = "benchmark", inline(never))]
-fn build_next_bip_from_blueprints<Host, ChainConfig: ChainConfigTrait>(
+fn build_next_bip_from_blueprints<Host>(
     host: &mut Host,
-    chain_config: &ChainConfig,
+    chain_config: &TezosXChainConfig,
     next_bip_number: U256,
     timestamp: Timestamp,
-    chain_header: &ChainConfig::ChainHeader,
+    chain_header: &EVMBlockHeader,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> anyhow::Result<BlueprintParsing<BlockInProgress>>
@@ -294,13 +290,8 @@ where
     Host: HostReveal + StorageV1 + WasmHost,
 {
     log!(Debug, "Next blueprint number: {:?}", next_bip_number);
-    let (blueprint, size) = read_blueprint::<_, ChainConfig>(
-        host,
-        config,
-        next_bip_number,
-        timestamp,
-        chain_header,
-    )?;
+    let (blueprint, size) =
+        read_blueprint(host, config, next_bip_number, timestamp, chain_header)?;
     log!(Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
         Some(blueprint) => {
@@ -332,23 +323,23 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute_bip<Host, ChainConfig: ChainConfigTrait>(
+pub fn compute_bip<Host>(
     host: &mut Host,
     registry: &impl Registry,
-    chain_config: &ChainConfig,
+    chain_config: &TezosXChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
     da_fee_per_byte: U256,
     coinbase: H160,
-    chain_header: ChainConfig::ChainHeader,
+    chain_header: EVMBlockHeader,
     http_trace_enabled: bool,
 ) -> anyhow::Result<BlockComputationResult>
 where
     Host: StorageV1 + WithGas,
 {
-    let constants: ChainConfig::BlockConstants =
+    let constants =
         chain_config.constants(host, &block_in_progress, da_fee_per_byte, coinbase)?;
     let result = compute(
         host,
@@ -430,7 +421,7 @@ where
         allow_path_not_found(host.store_delete(&TMP_PATH))?;
         allow_path_not_found(host.store_delete(&EVM_BLOCK_IN_PROGRESS))?;
 
-        let (next_bip_number, _, _) = get_next_bip_info::<Host, TezosXChainConfig>(host);
+        let (next_bip_number, _, _) = get_next_bip_info::<Host>(host);
         drop_blueprint(host, next_bip_number)?;
 
         return Ok(());
@@ -490,9 +481,9 @@ where
 }
 
 #[trace_kernel("stage_two")]
-pub fn produce<Host, ChainConfig: ChainConfigTrait>(
+pub fn produce<Host>(
     host: &mut Host,
-    chain_config: &ChainConfig,
+    chain_config: &TezosXChainConfig,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
@@ -516,8 +507,7 @@ where
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
-    let (next_bip_number, timestamp, chain_header) =
-        get_next_bip_info::<Host, ChainConfig>(host);
+    let (next_bip_number, timestamp, chain_header) = get_next_bip_info(host);
 
     let mut safe_host = SafeStorage {
         host,
@@ -545,25 +535,24 @@ where
 
                 log!(Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
-                let block_in_progress =
-                    match build_next_bip_from_blueprints::<Host, ChainConfig>(
-                        safe_host.host,
-                        chain_config,
-                        next_bip_number,
-                        timestamp,
-                        &chain_header,
-                        config,
-                        &kernel_upgrade,
-                    )? {
-                        BlueprintParsing::Next(bip) => {
-                            log!(Debug, "Creating BIP from Blueprint: Success.");
-                            bip
-                        }
-                        BlueprintParsing::None => {
-                            log!(Debug, "Creating BIP from Blueprint: Failure.");
-                            return Ok(ComputationResult::Finished);
-                        }
-                    };
+                let block_in_progress = match build_next_bip_from_blueprints(
+                    safe_host.host,
+                    chain_config,
+                    next_bip_number,
+                    timestamp,
+                    &chain_header,
+                    config,
+                    &kernel_upgrade,
+                )? {
+                    BlueprintParsing::Next(bip) => {
+                        log!(Debug, "Creating BIP from Blueprint: Success.");
+                        bip
+                    }
+                    BlueprintParsing::None => {
+                        log!(Debug, "Creating BIP from Blueprint: Failure.");
+                        return Ok(ComputationResult::Finished);
+                    }
+                };
 
                 // We are going to execute a new block, we copy the storage to allow
                 // to revert if the block fails.
@@ -1086,7 +1075,7 @@ mod tests {
         )
     }
 
-    fn store_blueprints_from_number<Host, ChainConfig: ChainConfigTrait>(
+    fn store_blueprints_from_number<Host>(
         host: &mut Host,
         start_number: U256,
         blueprints: Vec<Blueprint>,
@@ -1103,13 +1092,11 @@ mod tests {
         }
     }
 
-    fn store_blueprints<Host, ChainConfig: ChainConfigTrait>(
-        host: &mut Host,
-        blueprints: Vec<Blueprint>,
-    ) where
+    fn store_blueprints<Host>(host: &mut Host, blueprints: Vec<Blueprint>)
+    where
         Host: StorageV1,
     {
-        store_blueprints_from_number::<Host, ChainConfig>(host, U256::zero(), blueprints)
+        store_blueprints_from_number::<Host>(host, U256::zero(), blueprints)
     }
 
     fn store_block_fees(
@@ -1142,7 +1129,7 @@ mod tests {
             },
         ];
 
-        store_blueprints::<_, TezosXChainConfig>(host, vec![blueprint(transactions)]);
+        store_blueprints(host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
         set_balance(host, &sender, U256::from(10000000000000000000u64));
@@ -1222,10 +1209,7 @@ mod tests {
             content: TransactionContent::TezosDelayed(reveal),
         };
 
-        store_blueprints::<_, TezosXChainConfig>(
-            &mut host,
-            vec![blueprint(vec![tezos_tx])],
-        );
+        store_blueprints(&mut host, vec![blueprint(vec![tezos_tx])]);
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         // Produce the block
@@ -1284,10 +1268,7 @@ mod tests {
             content: TransactionContent::TezosDelayed(reveal),
         };
 
-        store_blueprints::<_, TezosXChainConfig>(
-            &mut host,
-            vec![blueprint(vec![tezos_tx])],
-        );
+        store_blueprints(&mut host, vec![blueprint(vec![tezos_tx])]);
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(&mut host, &chain_config, &mut config, None, None)
@@ -1435,7 +1416,7 @@ mod tests {
         );
 
         let reveal = make_reveal_operation(1000, 1, 500, 0, bootstrap);
-        store_blueprints::<_, TezosXChainConfig>(
+        store_blueprints(
             &mut host,
             vec![tezos_blueprint(vec![reveal], Timestamp::from(0i64))],
         );
@@ -1541,7 +1522,7 @@ mod tests {
             Parameters::default(),
         );
 
-        store_blueprints::<_, TezosXChainConfig>(
+        store_blueprints(
             &mut host,
             vec![tezos_blueprint(
                 vec![reveal, transfer],
@@ -1682,7 +1663,7 @@ mod tests {
         );
 
         let timestamp_of_call = 10i64;
-        store_blueprints::<_, TezosXChainConfig>(
+        store_blueprints(
             &mut host,
             vec![
                 tezos_blueprint(vec![origination], Timestamp::from(0i64)),
@@ -1822,7 +1803,7 @@ mod tests {
                 &origination.hash().unwrap(),
                 0,
             ));
-            store_blueprints::<_, TezosXChainConfig>(
+            store_blueprints(
                 &mut host,
                 vec![tezos_blueprint(vec![origination], Timestamp::from(0i64))],
             );
@@ -1942,10 +1923,7 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![invalid_tx];
-        store_blueprints::<_, TezosXChainConfig>(
-            &mut host,
-            vec![blueprint(transactions)],
-        );
+        store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
         set_balance(&mut host, &sender, U256::from(30000u64));
@@ -1983,10 +1961,7 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![valid_tx];
-        store_blueprints::<_, TezosXChainConfig>(
-            &mut host,
-            vec![blueprint(transactions)],
-        );
+        store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
         set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
@@ -2023,10 +1998,7 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![valid_tx];
-        store_blueprints::<_, TezosXChainConfig>(
-            &mut host,
-            vec![blueprint(transactions)],
-        );
+        store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         set_balance(&mut host, &sender, U256::from(5000000000000000u64));
@@ -2095,7 +2067,7 @@ mod tests {
             content: Ethereum(dummy_eth_transaction_one()),
         }];
 
-        store_blueprints::<_, TezosXChainConfig>(
+        store_blueprints(
             &mut host,
             vec![blueprint(transaction_0), blueprint(transaction_1)],
         );
@@ -2160,10 +2132,7 @@ mod tests {
             },
         ];
 
-        store_blueprints::<_, TezosXChainConfig>(
-            &mut host,
-            vec![blueprint(transactions)],
-        );
+        store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
         set_balance(&mut host, &sender, U256::from(10000000000000000000u64));
@@ -2211,7 +2180,7 @@ mod tests {
         };
 
         let transactions = vec![tx.clone(), tx];
-        store_blueprints::<_, TezosXChainConfig>(
+        store_blueprints(
             &mut host,
             vec![blueprint(transactions.clone()), blueprint(transactions)],
         );
@@ -2518,10 +2487,7 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         };
-        store_blueprints::<_, TezosXChainConfig>(
-            &mut host,
-            vec![blueprint(vec![transaction])],
-        );
+        store_blueprints(&mut host, vec![blueprint(vec![transaction])]);
 
         // Apply the transaction
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
@@ -2717,7 +2683,7 @@ mod tests {
             wrap_transaction(2, loop_300_tx2),
         ];
 
-        store_blueprints::<_, TezosXChainConfig>(&mut host, vec![blueprint(proposals)]);
+        store_blueprints(&mut host, vec![blueprint(proposals)]);
 
         host.reboot_left().expect("should be some reboot left");
 
@@ -2814,7 +2780,7 @@ mod tests {
             ]),
         ];
 
-        store_blueprints::<_, TezosXChainConfig>(&mut host, proposals);
+        store_blueprints(&mut host, proposals);
 
         let mut chain_config = dummy_tezosx_config(SpecId::default());
         chain_config.limits_mut().maximum_gas_limit = 560_000;
@@ -2910,10 +2876,7 @@ mod tests {
 
         let transactions: Vec<Transaction> = vec![tx];
 
-        store_blueprints::<_, TezosXChainConfig>(
-            &mut host,
-            vec![blueprint(transactions)],
-        );
+        store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let sender = H160::from_str("05f32b3cc3888453ff71b01135b34ff8e41263f2").unwrap();
         set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
@@ -2964,10 +2927,7 @@ mod tests {
             content: EthereumDelayed(dummy_eip7702_empty_authorization_list_tx()),
         };
 
-        store_blueprints::<_, TezosXChainConfig>(
-            &mut host,
-            vec![blueprint(vec![poison_tx])],
-        );
+        store_blueprints(&mut host, vec![blueprint(vec![poison_tx])]);
 
         let sender = dummy_eth_caller();
         set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
@@ -3040,10 +3000,7 @@ mod tests {
 
         let transactions: Vec<Transaction> =
             vec![valid_tx, valid_tx_eip1559, valid_tx_eip2930];
-        store_blueprints::<_, TezosXChainConfig>(
-            &mut host,
-            vec![blueprint(transactions)],
-        );
+        store_blueprints(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
         set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
@@ -3099,7 +3056,7 @@ mod tests {
 
         // First block: protocol = previous (from stored header),
         // next_protocol = current (TARGET_TEZOS_PROTOCOL)
-        store_blueprints::<_, TezosXChainConfig>(&mut host, vec![blueprint(vec![])]);
+        store_blueprints(&mut host, vec![blueprint(vec![])]);
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(&mut host, &chain_config, &mut config, None, None)
