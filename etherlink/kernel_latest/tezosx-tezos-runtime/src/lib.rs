@@ -19,7 +19,7 @@ use tezos_data_encoding::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_execution::{
-    account_storage::{TezlinkAccount, TezosOriginatedAccount},
+    account_storage::TezosAccount,
     context, cross_runtime_transfer,
     enshrined_contracts::CracError,
     mir_ctx::{clear_temporary_big_maps, InterpretContext, OperationCtx, TcCtx},
@@ -63,8 +63,7 @@ use tezos_smart_rollup_host::path::OwnedPath;
 pub(crate) use tezos_execution::NULL_PKH;
 
 use tezos_execution::account_storage::{
-    get_origin_at, get_tezos_account_info_or_init, narith_to_u256, set_origin_at,
-    set_tezos_account_info,
+    get_tezos_account_info_or_init, narith_to_u256, set_tezos_account_info,
 };
 
 pub struct TezosRuntime(pub ChainId);
@@ -1187,11 +1186,10 @@ impl RuntimeInterface for TezosRuntime {
         let kt1_str = kt1.to_base58_check();
 
         let account = context::originated_from_kt1(&kt1)?;
-        let account_path = account.path().clone();
 
         // Branch 1: already classified as alias. Returning early
         // preserves the gas budget and performs no durable writes.
-        match get_origin_at(host, &account_path)? {
+        match account.origin(host)? {
             Some(Origin::Alias(_)) => {
                 return Ok((kt1_str, AliasResolution::build(remaining)));
             }
@@ -1221,7 +1219,7 @@ impl RuntimeInterface for TezosRuntime {
         })? {
             consume(&mut remaining, STORAGE_WRITE_BASE_MILLIGAS)?;
             let new_origin = Origin::Alias(alias_info);
-            set_origin_at(host, &account_path, &new_origin)?;
+            account.set_origin(host, &new_origin)?;
             return Ok((kt1_str, AliasResolution::build(remaining)));
         }
 
@@ -1835,7 +1833,6 @@ mod tests {
     // Seed the Michelson world state so the alias snapshot has a subtree
     // to copy, as in production where migration creates it.
     fn test_host() -> MockKernelHost {
-        use tezos_execution::account_storage::TezosImplicitAccountTrait;
         let mut host = MockKernelHost::default();
         let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
         let account = context::implicit_from_public_key_hash(&null_pkh).unwrap();
@@ -1904,12 +1901,7 @@ mod tests {
         // code is not charged per alias), and used/paid bytes account for the
         // per-alias storage only. This also pins the receipt's
         // `paid_storage_size_diff`, which derives from these watermarks.
-        let storage_len =
-            tezos_execution::account_storage::TezosOriginatedAccount::storage(
-                &account, &host,
-            )
-            .unwrap()
-            .len() as u64;
+        let storage_len = account.storage(&host).unwrap().len() as u64;
         assert_eq!(account.code_size(&host).unwrap(), Zarith::from(0u64));
         assert_eq!(
             account.used_bytes(&host).unwrap(),
@@ -1923,7 +1915,7 @@ mod tests {
         // It is classified as an alias, so once the shared slot is seeded its
         // code resolves to the forwarder.
         assert!(matches!(
-            get_origin_at(&host, &account.path().clone()).unwrap(),
+            account.origin(&host).unwrap(),
             Some(Origin::Alias(_))
         ));
         crate::alias_forwarder::init_alias_implementation(&mut host).unwrap();
@@ -2114,7 +2106,6 @@ mod tests {
         // ensure_alias once, then deleting the origin path, then
         // running it again. The second call should restore the
         // classification without redeploying.
-        use tezos_execution::account_storage::get_origin_at;
         use tezos_execution::context::code::ORIGIN_PATH;
         use tezos_smart_rollup_host::path::concat;
 
@@ -2141,9 +2132,7 @@ mod tests {
         let account = context::originated_from_kt1(&kt1).unwrap();
         let origin_path = concat(account.path(), &ORIGIN_PATH).unwrap();
         host.store_delete(&origin_path).unwrap();
-        assert!(get_origin_at(&host, &account.path().clone())
-            .unwrap()
-            .is_none());
+        assert!(account.origin(&host).unwrap().is_none());
 
         // Run again. The patch branch must re-record the classification.
         runtime
@@ -2158,7 +2147,7 @@ mod tests {
             )
             .unwrap();
 
-        match get_origin_at(&host, &account.path().clone()).unwrap() {
+        match account.origin(&host).unwrap() {
             Some(Origin::Alias(info)) => {
                 assert_eq!(info.runtime, RuntimeId::Ethereum);
                 assert_eq!(info.native_address, evm_address.as_bytes().to_vec());
@@ -2172,8 +2161,6 @@ mod tests {
         // The kernel must never reach an alias address that has been
         // classified as Native. If it does, the call returns an error
         // rather than overwriting the classification.
-        use tezos_execution::account_storage::set_origin_at;
-
         let mut host = MockKernelHost::default();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
@@ -2181,7 +2168,7 @@ mod tests {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let account = context::originated_from_kt1(&kt1).unwrap();
 
-        set_origin_at(&mut host, &account.path().clone(), &Origin::Native).unwrap();
+        account.set_origin(&mut host, &Origin::Native).unwrap();
 
         let res = runtime.ensure_alias(
             &NotWiredRegistry,
@@ -3481,8 +3468,6 @@ mod tests {
             Classification, Origin, RuntimeInterface, ALIAS_LOOKUP_MILLIGAS,
         };
 
-        use tezos_execution::account_storage::set_origin_at;
-
         fn test_runtime() -> TezosRuntime {
             TezosRuntime::new(ChainId::default())
         }
@@ -3530,8 +3515,7 @@ mod tests {
             ));
             let kt1_b58 = kt1.to_base58_check();
             let account = context::originated_from_kt1(&kt1).unwrap();
-            let account_path = account.path().clone();
-            set_origin_at(&mut host, &account_path, &Origin::Native).unwrap();
+            account.set_origin(&mut host, &Origin::Native).unwrap();
 
             let budget = 1_000_000;
             let (class, consumed) = runtime.read_origin(&host, &kt1_b58, budget).unwrap();

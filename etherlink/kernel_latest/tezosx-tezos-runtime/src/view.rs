@@ -30,7 +30,7 @@ use mir::typechecker::{
 };
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_data_encoding::types::{Narith, Zarith};
-use tezos_execution::account_storage::TezlinkAccount;
+use tezos_execution::account_storage::TezosAccount;
 use tezos_execution::context;
 use tezos_execution::mir_ctx::{Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx};
 use tezos_execution::{OriginationNonce, TezlinkOperationGas};

@@ -7,8 +7,7 @@
 //! Account addressing, construction, and origin classification helpers.
 
 use crate::account_storage::{
-    get_origin_at, path_to_tezos_account, set_origin_at, TezlinkAccount,
-    TezlinkOriginatedAccount, TezosImplicitAccount, TezosOriginatedAccount,
+    path_to_tezos_account, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
 use mir::ast::{big_map::BigMapId, AddressHash};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -50,11 +49,11 @@ pub fn implicit_from_contract(
 /// Resolve the originated (`KT1`) account under the Tezos accounts root.
 pub fn originated_from_kt1(
     kt1: &ContractKt1Hash,
-) -> Result<TezlinkOriginatedAccount, tezos_storage::error::Error> {
+) -> Result<TezosOriginatedAccount, tezos_storage::error::Error> {
     let index = contracts::index()?;
     let contract = Contract::Originated(kt1.clone());
-    let path = concat(&index, &account::account_path(&contract)?)?;
-    Ok(TezlinkOriginatedAccount {
+    let path = concat(&index, &contracts::account_path(&contract)?)?;
+    Ok(TezosOriginatedAccount {
         path,
         kt1: kt1.clone(),
     })
@@ -64,25 +63,11 @@ pub fn originated_from_kt1(
 /// accounts root. Errors on an implicit contract.
 pub fn originated_from_contract(
     contract: &Contract,
-) -> Result<TezlinkOriginatedAccount, tezos_storage::error::Error> {
+) -> Result<TezosOriginatedAccount, tezos_storage::error::Error> {
     match contract {
         Contract::Originated(kt1) => originated_from_kt1(kt1),
         _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
     }
-}
-
-/// Record the origin classification of an originated account. Origination is
-/// the only writer of the origin path for a freshly created KT1, so write the
-/// given origin unconditionally.
-pub fn record_origin(
-    host: &mut impl StorageV1,
-    kt1: &ContractKt1Hash,
-    origin: &Origin,
-) -> Result<(), tezos_storage::error::Error> {
-    let originated = originated_from_kt1(kt1)?;
-    let path = originated.path().clone();
-    set_origin_at(host, &path, origin)
-        .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
 }
 
 /// Read the origin classification (native / alias) for the given address.
@@ -98,15 +83,15 @@ pub fn read_origin_for_address(
         AddressHash::Implicit(_) => Ok(Some(Origin::Native)),
         AddressHash::Kt1(kt1) => {
             let originated = originated_from_kt1(kt1)?;
-            let path = originated.path().clone();
-            get_origin_at(host, &path)
-                .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
+            originated.origin(host)
         }
         AddressHash::Sr1(_) => Ok(None),
     }
 }
 
 pub mod contracts {
+    use mir::ast::BinWriter;
+
     use super::*;
 
     const ROOT: RefPath = RefPath::assert_from(b"/contracts");
@@ -114,6 +99,8 @@ pub mod contracts {
     const INDEX: RefPath = RefPath::assert_from(b"/index");
 
     const GLOBAL_COUNTER: RefPath = RefPath::assert_from(b"/global_counter");
+
+    const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
 
     pub fn root() -> Result<OwnedPath, PathError> {
         concat(&TEZOS_ACCOUNTS_ROOT, &ROOT)
@@ -125,6 +112,30 @@ pub mod contracts {
 
     pub fn global_counter() -> Result<OwnedPath, PathError> {
         concat(&root()?, &GLOBAL_COUNTER)
+    }
+
+    /// Path segment identifying a contract under [`index`], using the same
+    /// encoding as the octez node's context (see
+    /// `octez-codec describe alpha.contract binary schema`).
+    pub fn account_path(
+        contract: &Contract,
+    ) -> Result<OwnedPath, tezos_storage::error::Error> {
+        let mut contract_encoded = Vec::new();
+        contract
+            .bin_write(&mut contract_encoded)
+            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
+
+        let path_string = alloc::format!("/{}", hex::encode(&contract_encoded));
+        Ok(OwnedPath::try_from(path_string)?)
+    }
+
+    /// Path of an originated account's mutez balance. (Implicit accounts keep
+    /// their balance in the RLP `/info` record, so only originated accounts
+    /// use this path.)
+    pub fn balance_path(
+        account: &TezosOriginatedAccount,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &BALANCE_PATH)
     }
 }
 
@@ -194,9 +205,9 @@ pub mod code {
 
     /// Classification record (`Origin`) of an originated account, read here to
     /// resolve a code-less alias to the shared implementation. This is the
-    /// canonical `/origin` segment: the `get_origin_at` / `set_origin_at`
-    /// helpers in [`crate::account_storage`] build on it, so the reader and the
-    /// writer of the record share a single source of truth.
+    /// canonical `/origin` segment: the `TezosOriginatedAccount::origin` /
+    /// `set_origin` methods build on it, so the reader and the writer of the
+    /// record share a single source of truth.
     pub const ORIGIN_PATH: RefPath = RefPath::assert_from(b"/origin");
 
     /// Aggregated storage-accounting record: holds [code_size],
@@ -205,72 +216,22 @@ pub mod code {
     /// *blobs* (`/data/code`, `/data/storage`) stay separate.
     const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
-    pub fn info_path<A: TezosOriginatedAccount>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
+    pub fn info_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
         concat(account.path(), &INFO_PATH)
     }
 
-    pub fn code_path<A: TezosOriginatedAccount>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
+    pub fn code_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
         concat(account.path(), &CODE_PATH)
     }
 
-    pub fn storage_path<A: TezosOriginatedAccount>(
-        account: &A,
+    pub fn storage_path(
+        account: &TezosOriginatedAccount,
     ) -> Result<OwnedPath, PathError> {
         concat(account.path(), &STORAGE_PATH)
     }
 
-    pub fn origin_path<A: TezosOriginatedAccount>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
+    pub fn origin_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
         concat(account.path(), &ORIGIN_PATH)
-    }
-}
-
-pub mod account {
-    use mir::ast::BinWriter;
-
-    use super::*;
-
-    const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
-
-    const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
-
-    const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
-
-    pub fn account_path(
-        contract: &Contract,
-    ) -> Result<OwnedPath, tezos_storage::error::Error> {
-        // uses the same encoding as in the octez node's representation of the context
-        // see `octez-codec describe alpha.contract binary schema`
-        let mut contract_encoded = Vec::new();
-        contract
-            .bin_write(&mut contract_encoded)
-            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
-
-        let path_string = alloc::format!("/{}", hex::encode(&contract_encoded));
-        Ok(OwnedPath::try_from(path_string)?)
-    }
-
-    pub fn balance_path<A: TezlinkAccount + ?Sized>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &BALANCE_PATH)
-    }
-
-    pub fn counter_path<A: TezlinkAccount + ?Sized>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &COUNTER_PATH)
-    }
-
-    pub fn manager_path<A: TezlinkAccount + ?Sized>(
-        account: &A,
-    ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &MANAGER_PATH)
     }
 }
 
@@ -279,32 +240,6 @@ mod tests {
     use super::*;
     use tezos_crypto_rs::blake2b;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezosx_interfaces::{AliasInfo, RuntimeId};
-
-    #[test]
-    fn record_origin_writes_given_origin_for_kt1() {
-        let mut host = MockKernelHost::default();
-        let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"some-test-seed"));
-
-        let originated = originated_from_kt1(&kt1).unwrap();
-        let path = originated.path().clone();
-
-        // Before origination, no classification.
-        assert!(get_origin_at(&host, &path).unwrap().is_none());
-
-        record_origin(&mut host, &kt1, &Origin::Native).unwrap();
-
-        // After origination, Native.
-        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(Origin::Native));
-
-        // record_origin with Alias overwrites with Alias.
-        let alias = Origin::Alias(AliasInfo {
-            runtime: RuntimeId::Ethereum,
-            native_address: b"0xfeedface".to_vec(),
-        });
-        record_origin(&mut host, &kt1, &alias).unwrap();
-        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(alias));
-    }
 
     #[test]
     fn read_origin_for_address_implicit_is_native_by_construction() {
@@ -331,7 +266,10 @@ mod tests {
         assert!(read_origin_for_address(&host, &address).unwrap().is_none());
 
         // Native: returns Native.
-        record_origin(&mut host, &kt1, &Origin::Native).unwrap();
+        originated_from_kt1(&kt1)
+            .unwrap()
+            .set_origin(&mut host, &Origin::Native)
+            .unwrap();
         assert_eq!(
             read_origin_for_address(&host, &address).unwrap(),
             Some(Origin::Native),

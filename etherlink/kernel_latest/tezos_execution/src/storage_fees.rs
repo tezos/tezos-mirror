@@ -18,7 +18,7 @@ use tezos_tezlink::operation_result::{
     OriginationSuccess, RevealSuccess, TransferError, TransferTarget, UpdateOrigin,
 };
 
-use crate::account_storage::TezlinkAccount;
+use crate::account_storage::TezosAccount;
 use crate::burn_tez;
 
 pub const COST_PER_BYTES: u64 = 1;
@@ -41,7 +41,7 @@ impl From<StorageFee> for BigUint {
 /// `storage_limit_remaining`, refusing to go negative.
 fn burn_storage_fee<Host: StorageV1>(
     host: &mut Host,
-    payer: &impl TezlinkAccount,
+    payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     nb_consumed_bytes: &Zarith,
 ) -> Result<StorageFee, ApplyOperationError> {
@@ -104,7 +104,7 @@ fn compute_storage_balance_updates(
 /// success carries no `balance_updates` field ([`RevealSuccess`],
 /// [`EventSuccess`]).
 pub fn add_delegated_storage_fee_balance_updates_to_content<M: OperationStorageFees>(
-    payer: &impl TezlinkAccount,
+    payer: &impl TezosAccount,
     content: &mut ContentResult<M>,
     mutez_cost: u64,
 ) -> Result<(), ApplyOperationError> {
@@ -131,7 +131,7 @@ pub fn add_delegated_storage_fee_balance_updates_to_content<M: OperationStorageF
 /// whose success carries no `balance_updates` field
 /// ([`EventSuccess`]).
 pub fn add_delegated_storage_fee_balance_updates(
-    payer: &impl TezlinkAccount,
+    payer: &impl TezosAccount,
     op: &mut InternalOperationSum,
     mutez_cost: u64,
 ) -> Result<(), ApplyOperationError> {
@@ -181,7 +181,7 @@ fn storage_fee_for_bytes(nb_consumed_bytes: &Zarith) -> Result<BigUint, Transfer
 /// No-op on `mutez_cost == 0`.
 pub fn burn_storage_cost<Host: StorageV1>(
     host: &mut Host,
-    payer: &impl TezlinkAccount,
+    payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     mutez_cost: u64,
 ) -> Result<(), ApplyOperationError> {
@@ -219,7 +219,7 @@ pub fn burn_storage_fees<Host, M, A>(
 where
     Host: StorageV1,
     M: OperationStorageFees,
-    A: TezlinkAccount,
+    A: TezosAccount,
 {
     let storage_fees = M::build_storage_fees(success, |bytes| {
         burn_storage_fee(host, payer, storage_limit_remaining, bytes)
@@ -240,7 +240,7 @@ where
 /// Skipped) or that has been rolled back (BackTracked).
 pub fn burn_content_storage_fees<Host: StorageV1, M: OperationStorageFees>(
     host: &mut Host,
-    payer: &impl TezlinkAccount,
+    payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     content: &mut ContentResult<M>,
 ) -> Result<(), ApplyOperationError> {
@@ -254,7 +254,7 @@ pub fn burn_content_storage_fees<Host: StorageV1, M: OperationStorageFees>(
 
 fn burn_internal_meta_storage_fees<Host: StorageV1, M: OperationStorageFees>(
     host: &mut Host,
-    payer: &impl TezlinkAccount,
+    payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     meta: &mut InternalContentWithMetadata<M>,
 ) -> Result<(), ApplyOperationError> {
@@ -265,7 +265,7 @@ fn burn_internal_meta_storage_fees<Host: StorageV1, M: OperationStorageFees>(
 /// operation, dispatching on its [`InternalOperationSum`] variant.
 pub fn burn_internal_op_storage_fees<Host: StorageV1>(
     host: &mut Host,
-    payer: &impl TezlinkAccount,
+    payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     op: &mut InternalOperationSum,
 ) -> Result<(), ApplyOperationError> {
@@ -526,7 +526,6 @@ mod tests {
     };
 
     use crate::account_storage::TezosImplicitAccount;
-    use crate::account_storage::TezosImplicitAccountTrait;
     use crate::context;
 
     const SOURCE_PKH: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
@@ -564,7 +563,7 @@ mod tests {
     /// the `storage_limit_remaining` accumulator from a `u64`.
     fn burn_content<M: OperationStorageFees>(
         host: &mut MockKernelHost,
-        payer: &impl TezlinkAccount,
+        payer: &impl TezosAccount,
         storage_limit: u64,
         content: &mut ContentResult<M>,
     ) -> Result<(), ApplyOperationError> {
@@ -577,7 +576,7 @@ mod tests {
     /// the legacy `Vec<BalanceUpdate>` shape these tests assert on.
     fn burn_storage_fee<Host: StorageV1>(
         host: &mut Host,
-        payer: &impl TezlinkAccount,
+        payer: &impl TezosAccount,
         storage_limit_remaining: &mut BigUint,
         nb_consumed_bytes: &Zarith,
     ) -> Result<Vec<BalanceUpdate>, ApplyOperationError> {
@@ -598,7 +597,7 @@ mod tests {
     /// builds the `storage_limit_remaining` accumulator from a `u64`.
     fn burn_internal_op(
         host: &mut MockKernelHost,
-        payer: &impl TezlinkAccount,
+        payer: &impl TezosAccount,
         storage_limit: u64,
         op: &mut InternalOperationSum,
     ) -> Result<(), ApplyOperationError> {

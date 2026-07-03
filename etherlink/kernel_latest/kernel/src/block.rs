@@ -695,7 +695,6 @@ mod tests {
     use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
     use tezos_execution::context;
 
-    use tezos_execution::account_storage::TezosImplicitAccountTrait;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKey;
     use tezos_smart_rollup::types::PublicKeyHash;
@@ -1578,7 +1577,6 @@ mod tests {
     #[test]
     fn test_tezosx_michelson_chain_id_now_level() {
         use mir::gas::Gas;
-        use tezos_execution::account_storage::TezosOriginatedAccount;
         use tezos_execution::account_storage::{
             set_tezos_account_info, TezosAccountInfo,
         };

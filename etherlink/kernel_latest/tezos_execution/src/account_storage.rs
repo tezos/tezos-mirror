@@ -6,7 +6,7 @@
 
 //! Tezos account state and storage
 
-use crate::context::{self, account, code};
+use crate::context::{self, code, contracts};
 use crate::enshrined_contracts::{self, EnshrinedContracts};
 use num_bigint::BigInt;
 use primitive_types::U256;
@@ -28,18 +28,10 @@ use tezos_smart_rollup::{
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{
-    read_nom_value_bounded, read_optional_nom_value, read_optional_nom_value_bounded,
+    read_optional_nom_value, read_optional_nom_value_bounded,
     read_optional_nom_value_bounded_with_len, store_bin,
 };
 use tezosx_interfaces::{Origin, TezosXRuntimeError};
-
-/// Sibling path that holds the classification record of an originated KT1
-/// account: the segment is appended to the account prefix and the resulting
-/// path lives next to the rest of the account state. Implicit accounts carry
-/// no `/origin` record: a tz1/2/3 is Tezos-native by construction (see
-/// [`crate::context::read_origin_for_address`]), so only KT1 accounts
-/// (which may be `Native` or an `Alias` forwarder) store a classification.
-use crate::context::code::ORIGIN_PATH;
 
 // Path where all the infos of a Tezos contract are stored under the same key.
 // This path must contains balance, nonce and optionally a revealed public key.
@@ -55,12 +47,6 @@ const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 /// the `store_value_size` + `store_read` pair that `store_read_all`
 /// performs. See [`read_optional_nom_value_bounded`].
 const NARITH_FIELD_MAX_BYTES: usize = 32;
-
-/// Upper bound, in bytes, on an encoded [`Manager`]. The largest variant
-/// is `Revealed(PublicKey)`: 1 byte for the manager tag plus a public
-/// key whose largest variant is BLS, at 1 (algorithm tag) + 48 bytes.
-/// 64 leaves headroom over that 50-byte maximum.
-const MANAGER_MAX_BYTES: usize = 64;
 
 /// Upper bound, in bytes, on an encoded [`OriginatedContractInfo`]. The
 /// record is `tup4(n, n, z, z)`: `code_size` and `storage_size` as
@@ -89,37 +75,31 @@ pub enum Manager {
     Revealed(PublicKey),
 }
 
-pub trait TezlinkAccount {
+pub trait TezosAccount {
     fn path(&self) -> &OwnedPath;
     fn contract(&self) -> Contract;
 
     /// Get the **balance** of an account in Mutez held by the account.
+    /// Each account kind reads it from its own storage layout (RLP `/info`
+    /// for implicit accounts, the `/balance` path for originated ones), so
+    /// there is no shared default.
     fn balance(
         &self,
         host: &impl StorageV1,
-    ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = account::balance_path(self)?;
-        Ok(
-            read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
-                .unwrap_or(0_u64.into()),
-        )
-    }
+    ) -> Result<Narith, tezos_storage::error::Error>;
 
     /// Set the **balance** of an account in Mutez held by the account.
     fn set_balance(
         &self,
         host: &mut impl StorageV1,
         balance: &Narith,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = account::balance_path(self)?;
-        store_bin(balance, host, &path)
-    }
+    ) -> Result<(), tezos_storage::error::Error>;
 
     /// Add amount (in Mutez) to the **balance** held by the account.
     ///
-    /// Delegates to `self.balance()` and `self.set_balance()` so that
-    /// implementations overriding those methods (e.g. TezosX RLP storage)
-    /// get correct behavior without needing to override `add_balance` too.
+    /// Delegates to `self.balance()` and `self.set_balance()`, so each account
+    /// kind's own implementation of those (e.g. the implicit account's RLP
+    /// `/info` storage) is used without needing to provide `add_balance` too.
     ///
     /// TODO: In TezosX, this causes two storage reads + two RLP decodes
     /// (one in balance(), one in set_balance()). If add_balance becomes
@@ -135,147 +115,39 @@ pub trait TezlinkAccount {
     }
 }
 
-pub trait TezosImplicitAccountTrait: TezlinkAccount + Sized {
-    fn pkh(&self) -> &PublicKeyHash;
-
-    /// Get the **counter** for the Tezlink account.
-    fn counter(
-        &self,
-        host: &impl StorageV1,
-    ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = account::counter_path(self)?;
-        Ok(
-            read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
-                .unwrap_or(0_u64.into()),
-        )
-    }
-
-    /// Set the **counter** for the Tezlink account.
-    fn set_counter(
-        &self,
-        host: &mut impl StorageV1,
-        counter: &Narith,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = account::counter_path(self)?;
-        store_bin(counter, host, &path)
-    }
-
-    /// Set the **counter** for the Tezlink account to the successor of the current value.
-    fn increment_counter(
-        &self,
-        host: &mut impl StorageV1,
-        validated_operations_count: usize,
-    ) -> Result<(), tezos_storage::error::Error> {
-        self.set_counter(
-            host,
-            &Narith(self.counter(host)?.0 + validated_operations_count),
-        )
-    }
-
-    fn manager(
-        &self,
-        host: &impl StorageV1,
-    ) -> Result<Manager, tezos_storage::error::Error> {
-        let path = account::manager_path(self)?;
-        let manager: Manager = read_nom_value_bounded(host, &path, MANAGER_MAX_BYTES)?;
-        Ok(manager)
-    }
-
-    fn set_manager_public_key_hash(
-        &self,
-        host: &mut impl StorageV1,
-    ) -> Result<(), tezos_storage::error::Error> {
-        self.set_manager_pk_hash_internal(host, self.pkh())
-    }
-
-    /// This function updates the manager with a public key hash in parameter.
-    /// Most of the time, we're dealing with references so this function is here to avoid cloning
-    /// the public key hash to build a [Manager] object
-    fn set_manager_pk_hash_internal(
-        &self,
-        host: &mut impl StorageV1,
-        public_key_hash: &PublicKeyHash,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = account::manager_path(self)?;
-        // The tag for public key hash is 0 (see the Manager enum above)
-        let mut buffer = vec![0_u8];
-        public_key_hash
-            .bin_write(&mut buffer)
-            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
-        host.store_write_all(&path, &buffer)?;
-        Ok(())
-    }
-
-    /// This function is used to test a situation in which we have an
-    /// inconsistent manager pkh for an implicit account.
-    #[cfg(test)]
-    fn force_set_manager_public_key_hash(
-        &self,
-        host: &mut impl StorageV1,
-        pkh: &PublicKeyHash,
-    ) -> Result<(), tezos_storage::error::Error> {
-        self.set_manager_pk_hash_internal(host, pkh)
-    }
-
-    /// This function updates the manager with the public key in parameter.
-    /// Most of the time, we're dealing with references so this function is here to avoid cloning
-    /// the public key hash to build a [Manager] object
-    fn set_manager_public_key(
-        &self,
-        host: &mut impl StorageV1,
-        public_key: &PublicKey,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = account::manager_path(self)?;
-        // The tag for public key is 2 (see the Manager enum above)
-        let mut buffer = vec![2_u8];
-        public_key
-            .bin_write(&mut buffer)
-            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
-        host.store_write_all(&path, &buffer)?;
-        Ok(())
-    }
-
-    /// Allocate an account in the durable storage. Does nothing if account was
-    /// already allocated.
-    fn allocate(
-        &self,
-        host: &mut impl StorageV1,
-    ) -> Result<bool, tezos_storage::error::Error> {
-        if self.allocated(host)? {
-            return Ok(true);
-        }
-        self.set_balance(host, &0_u64.into())?;
-        // TODO: use a global counter instead of initializing counter at 0
-        self.set_counter(host, &0u64.into())?;
-        self.set_manager_public_key_hash(host)?;
-        Ok(false)
-    }
-
-    // Below this comment is multiple functions useful for validate an operation
-
-    /// Verify if an account is allocated by attempting to read its balance
-    fn allocated(
-        &self,
-        host: &impl StorageV1,
-    ) -> Result<bool, tezos_storage::error::Error> {
-        let path = account::balance_path(self)?;
-        Ok(Some(ValueType::Value) == host.store_has(&path)?)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
-pub struct TezlinkOriginatedAccount {
+pub struct TezosOriginatedAccount {
     pub(crate) path: OwnedPath,
     pub(crate) kt1: ContractKt1Hash,
 }
 
-impl TezlinkAccount for TezlinkOriginatedAccount {
+impl TezosAccount for TezosOriginatedAccount {
     #[inline]
     fn path(&self) -> &OwnedPath {
         &self.path
     }
     fn contract(&self) -> Contract {
         Contract::Originated(self.kt1.clone())
+    }
+
+    fn balance(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Narith, tezos_storage::error::Error> {
+        let path = contracts::balance_path(self)?;
+        Ok(
+            read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
+                .unwrap_or(0_u64.into()),
+        )
+    }
+
+    fn set_balance(
+        &self,
+        host: &mut impl StorageV1,
+        balance: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = contracts::balance_path(self)?;
+        store_bin(balance, host, &path)
     }
 }
 #[derive(Debug, PartialEq)]
@@ -446,10 +318,15 @@ impl OriginatedContractInfo {
     }
 }
 
-pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
-    fn kt1(&self) -> &ContractKt1Hash;
+impl TezosOriginatedAccount {
+    pub fn kt1(&self) -> &ContractKt1Hash {
+        &self.kt1
+    }
 
-    fn code(&self, host: &impl StorageV1) -> Result<Code, tezos_storage::error::Error> {
+    pub fn code(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Code, tezos_storage::error::Error> {
         if let Some(c) = enshrined_contracts::from_kt1(self.kt1()) {
             return Ok(Code::Enshrined(c));
         }
@@ -461,7 +338,8 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
             // missing contract. Resolving on the code-miss keeps the common
             // path at one read and never reads `/origin` for ordinary
             // contracts; the gate on `is_alias` also means implicit `tz1`
-            // accounts (which never reach this trait) are untouched.
+            // accounts (which are never `TezosOriginatedAccount` values) are
+            // untouched.
             Err(RuntimeError::PathNotFound) => {
                 if self.is_alias(host)? {
                     // The slot is guaranteed seeded before any code-less alias
@@ -487,22 +365,28 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     /// Read the classification record (`Origin`) at the account's `/origin`
     /// path. `None` when the account carries no classification.
-    ///
-    /// This is the same decode as [`get_origin_at`] /
-    /// [`crate::context::read_origin_for_address`]: if the on-disk `Origin`
-    /// encoding ever changes, all of them move together.
-    /// `read_optional_nom_value` already maps a missing path to `None` and
-    /// rejects incomplete / trailing bytes.
-    fn origin(
+    /// `read_optional_nom_value` maps a missing path to `None` and rejects
+    /// incomplete / trailing bytes.
+    pub fn origin(
         &self,
         host: &impl StorageV1,
     ) -> Result<Option<Origin>, tezos_storage::error::Error> {
         read_optional_nom_value(host, &code::origin_path(self)?)
     }
 
+    /// Write the classification record (`Origin`) at the account's `/origin`
+    /// path.
+    pub fn set_origin(
+        &self,
+        host: &mut impl StorageV1,
+        origin: &Origin,
+    ) -> Result<(), tezos_storage::error::Error> {
+        store_bin(origin, host, &code::origin_path(self)?)
+    }
+
     /// Whether this originated account is a Tezos X alias (classified
     /// [`Origin::Alias`]), whose script resolves to the shared implementation.
-    fn is_alias(
+    pub fn is_alias(
         &self,
         host: &impl StorageV1,
     ) -> Result<bool, tezos_storage::error::Error> {
@@ -519,7 +403,10 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// so a Transaction to a never-originated KT1 produces a typed
     /// user-level error instead of falling through to a kernel-internal
     /// `code()` failure.
-    fn exists(&self, host: &impl StorageV1) -> Result<bool, tezos_storage::error::Error> {
+    pub fn exists(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<bool, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(true);
         }
@@ -536,7 +423,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// [INFO_MAX_BYTES]); a contract with no record yet (never originated)
     /// reads as an all-zero record. The individual getters use it so they
     /// keep their `&self, &host` signature and can run on read-only hosts.
-    fn read_info(
+    pub fn read_info(
         &self,
         host: &impl StorageV1,
     ) -> Result<OriginatedContractInfo, tezos_storage::error::Error> {
@@ -548,7 +435,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// the exact bytes the store returned instead of re-encoding the
     /// record. A contract with no record yet reads as an all-zero record
     /// of length `0`.
-    fn read_info_with_len(
+    pub fn read_info_with_len(
         &self,
         host: &impl StorageV1,
     ) -> Result<(OriginatedContractInfo, u64), tezos_storage::error::Error> {
@@ -573,7 +460,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     }
 
     /// Persist the aggregated record in a single host write.
-    fn write_info(
+    pub fn write_info(
         &self,
         host: &mut impl StorageV1,
         info: &OriginatedContractInfo,
@@ -587,7 +474,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// record in one shot, so there is no production caller. Gated to
     /// `test` so it doesn't masquerade as production API.
     #[cfg(test)]
-    fn set_code(
+    pub fn set_code(
         &self,
         host: &mut impl StorageV1,
         data: &[u8],
@@ -601,7 +488,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         Ok(code_size.into())
     }
 
-    fn storage(
+    pub fn storage(
         &self,
         host: &impl StorageV1,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
@@ -613,14 +500,14 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         Ok(storage)
     }
 
-    fn code_size(
+    pub fn code_size(
         &self,
         host: &impl StorageV1,
     ) -> Result<Zarith, tezos_storage::error::Error> {
         Ok(self.read_info(host)?.code_size.into())
     }
 
-    fn storage_size(
+    pub fn storage_size(
         &self,
         host: &mut impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
@@ -629,7 +516,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     /// Returns the contract's `used_bytes` watermark, or `0` if nothing
     /// has been written yet.
-    fn used_bytes(
+    pub fn used_bytes(
         &self,
         host: &impl StorageV1,
     ) -> Result<Zarith, tezos_storage::error::Error> {
@@ -638,7 +525,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     /// Returns the contract's `paid_bytes` watermark, or `0` if nothing
     /// has been written yet.
-    fn paid_bytes(
+    pub fn paid_bytes(
         &self,
         host: &impl StorageV1,
     ) -> Result<Zarith, tezos_storage::error::Error> {
@@ -659,7 +546,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// [Self::write_storage_and_info]. Gated to `test` so it doesn't
     /// masquerade as production API.
     #[cfg(test)]
-    fn set_storage(
+    pub fn set_storage(
         &self,
         host: &mut impl StorageV1,
         data: &[u8],
@@ -685,7 +572,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// single shared alias implementation. A zero code size is still recorded
     /// in the aggregated `/info` record so storage-space accounting reads a
     /// definite code size of `0` — the shared code is not charged per alias.
-    fn init(
+    pub fn init(
         &self,
         host: &mut impl StorageV1,
         code: Option<&[u8]>,
@@ -744,7 +631,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// which already refreshes it), so it intentionally does not route
     /// through `with_storage_size` — that would re-apply the storage delta.
     #[cfg(test)]
-    fn update_storage_space(
+    pub fn update_storage_space(
         &self,
         host: &mut impl StorageV1,
         storage_size_diff: StorageDelta,
@@ -784,7 +671,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     /// [OriginatedContractInfo::with_storage_size] and charges gas for the
     /// blob and the record *before* calling this, so the durable writes
     /// happen only once their cost is secured.
-    fn write_storage_and_info(
+    pub fn write_storage_and_info(
         &self,
         host: &mut impl StorageV1,
         data: &[u8],
@@ -796,12 +683,6 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         let path = code::storage_path(self)?;
         host.store_write_all(&path, data)?;
         self.write_info(host, info)
-    }
-}
-
-impl TezosOriginatedAccount for TezlinkOriginatedAccount {
-    fn kt1(&self) -> &ContractKt1Hash {
-        &self.kt1
     }
 }
 
@@ -936,52 +817,12 @@ pub fn set_tezos_account_info(
     Ok(host.store_write(&path, value, 0)?)
 }
 
-/// Read the classification record stored at the origin path under the
-/// given KT1 account path. Only originated accounts store a classification:
-/// the record sits next to the rest of the contract's state. Implicit
-/// accounts are `Native` by construction and keep no `/origin` record.
-pub fn get_origin_at(
-    host: &impl StorageV1,
-    account_path: &OwnedPath,
-) -> Result<Option<Origin>, TezosXRuntimeError> {
-    let path = concat(account_path, &ORIGIN_PATH)?;
-    match host.store_read_all(&path) {
-        Ok(bytes) => {
-            let (rest, origin) = Origin::nom_read(&bytes).map_err(|_| {
-                TezosXRuntimeError::ConversionError("Invalid origin encoding".to_string())
-            })?;
-            if !rest.is_empty() {
-                return Err(TezosXRuntimeError::ConversionError(
-                    "Trailing bytes after origin encoding".to_string(),
-                ));
-            }
-            Ok(Some(origin))
-        }
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(TezosXRuntimeError::Runtime(err)),
-    }
-}
-
-/// Write the classification record at the origin path under the given account path.
-pub fn set_origin_at(
-    host: &mut impl StorageV1,
-    account_path: &OwnedPath,
-    origin: &Origin,
-) -> Result<(), TezosXRuntimeError> {
-    let path = concat(account_path, &ORIGIN_PATH)?;
-    let mut buf = Vec::new();
-    origin.bin_write(&mut buf).map_err(|e| {
-        TezosXRuntimeError::ConversionError(format!("encoding Origin failed: {e}"))
-    })?;
-    Ok(host.store_write(&path, &buf, 0)?)
-}
-
 pub struct TezosImplicitAccount {
     pub(crate) pkh: PublicKeyHash,
     pub(crate) path: OwnedPath,
 }
 
-impl TezlinkAccount for TezosImplicitAccount {
+impl TezosAccount for TezosImplicitAccount {
     fn path(&self) -> &OwnedPath {
         &self.path
     }
@@ -1015,12 +856,12 @@ impl TezlinkAccount for TezosImplicitAccount {
     }
 }
 
-impl TezosImplicitAccountTrait for TezosImplicitAccount {
-    fn pkh(&self) -> &PublicKeyHash {
+impl TezosImplicitAccount {
+    pub fn pkh(&self) -> &PublicKeyHash {
         &self.pkh
     }
 
-    fn counter(
+    pub fn counter(
         &self,
         host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
@@ -1031,7 +872,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
         }
     }
 
-    fn set_counter(
+    pub fn set_counter(
         &self,
         host: &mut impl StorageV1,
         counter: &Narith,
@@ -1047,7 +888,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))
     }
 
-    fn manager(
+    pub fn manager(
         &self,
         host: &impl StorageV1,
     ) -> Result<Manager, tezos_storage::error::Error> {
@@ -1062,7 +903,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
         }
     }
 
-    fn set_manager_pk_hash_internal(
+    pub fn set_manager_pk_hash_internal(
         &self,
         _host: &mut impl StorageV1,
         _public_key_hash: &PublicKeyHash,
@@ -1072,7 +913,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
         Ok(())
     }
 
-    fn set_manager_public_key(
+    pub fn set_manager_public_key(
         &self,
         host: &mut impl StorageV1,
         public_key: &tezos_smart_rollup::types::PublicKey,
@@ -1085,7 +926,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
         Ok(())
     }
 
-    fn allocated(
+    pub fn allocated(
         &self,
         host: &impl StorageV1,
     ) -> Result<bool, tezos_storage::error::Error> {
@@ -1094,6 +935,52 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
             Ok(None) => Ok(false),
             Err(e) => Err(tezos_storage::error::Error::NomReadError(format!("{e}"))),
         }
+    }
+
+    /// Set the **counter** for the Tezos account to the successor of the current value.
+    pub fn increment_counter(
+        &self,
+        host: &mut impl StorageV1,
+        validated_operations_count: usize,
+    ) -> Result<(), tezos_storage::error::Error> {
+        self.set_counter(
+            host,
+            &Narith(self.counter(host)?.0 + validated_operations_count),
+        )
+    }
+
+    pub fn set_manager_public_key_hash(
+        &self,
+        host: &mut impl StorageV1,
+    ) -> Result<(), tezos_storage::error::Error> {
+        self.set_manager_pk_hash_internal(host, self.pkh())
+    }
+
+    /// This function is used to test a situation in which we have an
+    /// inconsistent manager pkh for an implicit account.
+    #[cfg(test)]
+    pub fn force_set_manager_public_key_hash(
+        &self,
+        host: &mut impl StorageV1,
+        pkh: &PublicKeyHash,
+    ) -> Result<(), tezos_storage::error::Error> {
+        self.set_manager_pk_hash_internal(host, pkh)
+    }
+
+    /// Allocate an account in the durable storage. Does nothing if account was
+    /// already allocated.
+    pub fn allocate(
+        &self,
+        host: &mut impl StorageV1,
+    ) -> Result<bool, tezos_storage::error::Error> {
+        if self.allocated(host)? {
+            return Ok(true);
+        }
+        self.set_balance(host, &0_u64.into())?;
+        // TODO: use a global counter instead of initializing counter at 0
+        self.set_counter(host, &0u64.into())?;
+        self.set_manager_public_key_hash(host)?;
+        Ok(false)
     }
 }
 
@@ -1131,35 +1018,8 @@ mod tests {
     }
 
     #[test]
-    fn origin_at_path_roundtrip() {
-        use super::{get_origin_at, set_origin_at};
-        use tezos_evm_runtime::runtime::MockKernelHost;
-        use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
-        use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
-
-        let mut host = MockKernelHost::default();
-        let path: OwnedPath =
-            RefPath::assert_from(b"/test/some/originated/account").into();
-
-        // An absent path returns no value.
-        assert!(get_origin_at(&host, &path).unwrap().is_none());
-
-        // The native variant round-trips.
-        set_origin_at(&mut host, &path, &Origin::Native).unwrap();
-        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(Origin::Native));
-
-        // The alias variant round-trips.
-        let alias = Origin::Alias(AliasInfo {
-            runtime: RuntimeId::Tezos,
-            native_address: b"tz1...".to_vec(),
-        });
-        set_origin_at(&mut host, &path, &alias).unwrap();
-        assert_eq!(get_origin_at(&host, &path).unwrap(), Some(alias));
-    }
-
-    #[test]
     fn set_manager_public_key_reveals_manager() {
-        use super::{Manager, TezosImplicitAccount, TezosImplicitAccountTrait};
+        use super::{Manager, TezosImplicitAccount};
         use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
         use tezos_evm_runtime::runtime::MockKernelHost;
 
@@ -1213,7 +1073,7 @@ mod test {
     }
 
     /// Build the originated account for `contract` under the test root.
-    fn originated(contract: &Contract) -> TezlinkOriginatedAccount {
+    fn originated(contract: &Contract) -> TezosOriginatedAccount {
         originated_from_contract(contract).expect("originated account resolution")
     }
 
@@ -1688,7 +1548,7 @@ mod test {
     fn init_with_storage(
         host: &mut MockKernelHost,
         storage_len: usize,
-    ) -> TezlinkOriginatedAccount {
+    ) -> TezosOriginatedAccount {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
         let code = vec![0xab_u8; 30];
@@ -1863,19 +1723,40 @@ mod test {
             .starts_with(b"/tez/tez_accounts"));
     }
 
-    fn classify_as_alias(
-        host: &mut impl StorageV1,
-        account: &impl TezosOriginatedAccount,
-    ) {
+    fn classify_as_alias(host: &mut impl StorageV1, account: &TezosOriginatedAccount) {
         use tezosx_interfaces::{AliasInfo, RuntimeId};
         let origin = Origin::Alias(AliasInfo {
             runtime: RuntimeId::Ethereum,
             native_address: b"0xabc".to_vec(),
         });
-        let mut buf = vec![];
-        origin.bin_write(&mut buf).unwrap();
-        host.store_write_all(&code::origin_path(account).unwrap(), &buf)
-            .unwrap();
+        account.set_origin(host, &origin).unwrap();
+    }
+
+    /// The `Origin` classification round-trips through `set_origin` / `origin`:
+    /// an account with no record reads as `None`, and both variants survive a
+    /// write/read cycle.
+    #[test]
+    fn origin_roundtrip() {
+        use tezosx_interfaces::{AliasInfo, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = originated(&contract);
+
+        // An account with no `/origin` record carries no classification.
+        assert!(account.origin(&host).unwrap().is_none());
+
+        // The native variant round-trips.
+        account.set_origin(&mut host, &Origin::Native).unwrap();
+        assert_eq!(account.origin(&host).unwrap(), Some(Origin::Native));
+
+        // The alias variant round-trips.
+        let alias = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: b"tz1...".to_vec(),
+        });
+        account.set_origin(&mut host, &alias).unwrap();
+        assert_eq!(account.origin(&host).unwrap(), Some(alias));
     }
 
     /// A KT1 classified `Origin::Alias` and carrying no `/data/code` resolves to
@@ -1944,10 +1825,7 @@ mod test {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        let mut buf = vec![];
-        Origin::Native.bin_write(&mut buf).unwrap();
-        host.store_write_all(&code::origin_path(&account).unwrap(), &buf)
-            .unwrap();
+        account.set_origin(&mut host, &Origin::Native).unwrap();
 
         assert!(matches!(
             account.code(&host),

@@ -3,7 +3,7 @@
 
 use account_storage::Code;
 use account_storage::Manager;
-use account_storage::TezlinkAccount;
+use account_storage::TezosAccount;
 use enshrined_contracts::charge_internal_receipt_bodies;
 use enshrined_contracts::charge_persisted_error;
 use enshrined_contracts::get_enshrined_contract_entrypoint;
@@ -56,7 +56,6 @@ use tezosx_journal::TezosXJournal;
 
 use crate::account_storage::{
     OriginatedContractInfo, StorageSpace, TezosImplicitAccount,
-    TezosImplicitAccountTrait, TezosOriginatedAccount,
 };
 pub use crate::address::OriginationNonce;
 use crate::gas::Cost;
@@ -274,7 +273,7 @@ fn burn_pass<Host, M, A>(
 where
     Host: StorageV1,
     M: storage_fees::OperationStorageFees,
-    A: TezlinkAccount,
+    A: TezosAccount,
 {
     let parent_outcome = storage_fees::burn_content_storage_fees::<_, M>(
         host,
@@ -340,7 +339,7 @@ fn finalize_and_burn<Host, M, A>(
 where
     Host: StorageV1,
     M: storage_fees::OperationStorageFees,
-    A: TezlinkAccount,
+    A: TezosAccount,
 {
     let mut content = finalize_statuses::<M>(result, &mut internal_operation_results);
     let mut storage_limit_remaining: BigUint = storage_limit.0.clone();
@@ -480,9 +479,9 @@ fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError
 
 fn transfer_tez<Host>(
     host: &mut Host,
-    giver_account: &impl TezlinkAccount,
+    giver_account: &impl TezosAccount,
     amount: &Narith,
-    receiver_account: &impl TezlinkAccount,
+    receiver_account: &impl TezosAccount,
 ) -> Result<TransferSuccess, TransferError>
 where
     Host: StorageV1,
@@ -515,7 +514,7 @@ where
 fn credit_destination_without_debiting_sender(
     host: &mut impl StorageV1,
     amount: &Narith,
-    receiver_account: &impl TezlinkAccount,
+    receiver_account: &impl TezosAccount,
 ) -> Result<TransferSuccess, TransferError> {
     if amount.eq(&0_u64.into()) {
         return Ok(TransferSuccess {
@@ -565,7 +564,7 @@ fn credit_destination_without_debiting_sender(
 
 fn burn_tez(
     host: &mut impl StorageV1,
-    account: &impl TezlinkAccount,
+    account: &impl TezosAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
     let balance = account
@@ -610,11 +609,11 @@ enum Disposition {
 #[allow(clippy::too_many_arguments)]
 fn execute_internal_operations<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
+    operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
-    sender_account: &crate::account_storage::TezlinkOriginatedAccount,
+    sender_account: &crate::account_storage::TezosOriginatedAccount,
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     nonce_counter: &mut u16,
@@ -934,10 +933,10 @@ where
 #[allow(clippy::too_many_arguments)]
 fn transfer<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
+    operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    sender_account: &impl TezlinkAccount,
+    sender_account: &impl TezosAccount,
     amount: &Narith,
     dest_contract: &Contract,
     entrypoint: &Entrypoint,
@@ -1397,7 +1396,7 @@ pub fn get_enshrined_contract_views(
 #[allow(clippy::too_many_arguments)]
 fn transfer_external<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
+    operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     amount: &Narith,
@@ -1501,10 +1500,10 @@ impl From<TransferError> for CracTransferError {
 #[allow(clippy::too_many_arguments)]
 pub fn cross_runtime_transfer<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a, TezosImplicitAccount>,
+    operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    sender: &impl TezlinkAccount,
+    sender: &impl TezosAccount,
     amount: &Narith,
     dest: &Contract,
     parameters: &Parameters,
@@ -1761,7 +1760,7 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1>(
 pub fn originate_contract<'a, Host>(
     ctx: &mut TcCtx<'a, Host>,
     contract: ContractKt1Hash,
-    sender_account: &impl TezlinkAccount,
+    sender_account: &impl TezosAccount,
     initial_balance: &Narith,
     script_code: Option<&[u8]>,
     script_storage: TypedValue<'a>,
@@ -1861,8 +1860,11 @@ where
     )
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
-    // Record the classification of the new contract.
-    context::record_origin(ctx.host, &contract, origin)
+    // Record the classification of the new contract. Origination is the only
+    // writer of the origin path for a freshly created KT1, so write it
+    // unconditionally.
+    smart_contract
+        .set_origin(ctx.host, origin)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     let origination_success = OriginationSuccess {
@@ -1878,8 +1880,8 @@ where
 
 /// Prepares balance updates in the format expected by the Tezos operation.
 fn compute_balance_updates(
-    giver: &impl TezlinkAccount,
-    receiver: &impl TezlinkAccount,
+    giver: &impl TezosAccount,
+    receiver: &impl TezosAccount,
     amount: &Narith,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     if amount.eq(&0_u64.into()) {
@@ -1907,8 +1909,8 @@ fn compute_balance_updates(
 /// Applies balance changes by updating both source and destination accounts.
 fn apply_balance_changes<Host>(
     host: &mut Host,
-    giver_account: &impl TezlinkAccount,
-    receiver_account: &impl TezlinkAccount,
+    giver_account: &impl TezosAccount,
+    receiver_account: &impl TezosAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<(), TransferError>
 where
@@ -2188,7 +2190,7 @@ fn apply_batch<Host>(
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     origination_nonce: &mut OriginationNonce,
-    validation_info: validate::ValidatedBatch<TezosImplicitAccount>,
+    validation_info: validate::ValidatedBatch,
     block_ctx: &BlockCtx,
     nonce_counter: &mut u16,
 ) -> Result<(Vec<ProcessedOperation>, bool), String>
@@ -2471,12 +2473,10 @@ pub(crate) mod test_utils {
 #[cfg(test)]
 mod tests {
     use crate::account_storage::TezosImplicitAccount;
-    use crate::account_storage::{
-        self, Code, TezosImplicitAccountTrait, TezosOriginatedAccount,
-    };
+    use crate::account_storage::{self, Code};
     use crate::context;
     use crate::{
-        account_storage::TezlinkOriginatedAccount, address::OriginationNonce,
+        account_storage::TezosOriginatedAccount, address::OriginationNonce,
         mir_ctx::BlockCtx,
     };
     use mir::ast::big_map::BigMapId;
@@ -2525,7 +2525,7 @@ mod tests {
     use crate::storage_fees::{COST_PER_BYTES, ORIGINATION_SIZE};
     use crate::storage_read_cost_milligas;
     use crate::{
-        account_storage::{Manager, TezlinkAccount},
+        account_storage::{Manager, TezosAccount},
         burn_pass, cross_runtime_transfer, validate_and_apply_operation,
         CracTransferError, FeeRefundConfig, OperationError, ProcessedOperation,
         TaggedInternalOp,
@@ -3094,7 +3094,7 @@ mod tests {
         script: &str,
         storage_micheline: &Micheline,
         balance: &Narith,
-    ) -> TezlinkOriginatedAccount {
+    ) -> TezosOriginatedAccount {
         // Setting the account in TezosImplicitAccount
         let contract = Contract::Originated(src.clone());
 
@@ -4062,7 +4062,7 @@ mod tests {
         // never-originated KT1 must remain absent from durable storage.
         let dest_account = context::originated_from_kt1(&desthash)
             .expect("originated_from_kt1 should have succeeded");
-        let balance_path = context::account::balance_path(&dest_account)
+        let balance_path = context::contracts::balance_path(&dest_account)
             .expect("balance_path should have succeeded");
         assert_eq!(
             host.store_has(&balance_path).unwrap(),
@@ -8119,8 +8119,8 @@ mod tests {
     }
 
     struct BigMapTransfer {
-        sender: TezlinkOriginatedAccount,
-        receiver: TezlinkOriginatedAccount,
+        sender: TezosOriginatedAccount,
+        receiver: TezosOriginatedAccount,
         receipts: Vec<OperationWithMetadata>,
     }
 
