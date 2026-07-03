@@ -192,6 +192,11 @@ impl WasmHost for EvalHost {
     }
 
     #[inline(always)]
+    fn clear_reboot_mark(&mut self) -> Result<(), RuntimeError> {
+        self.host.clear_reboot_mark()
+    }
+
+    #[inline(always)]
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
         self.host.last_run_aborted()
     }

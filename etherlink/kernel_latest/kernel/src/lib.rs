@@ -231,6 +231,34 @@ pub fn run<Host>(host: &mut Host) -> Result<(), anyhow::Error>
 where
     Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
 {
+    // Reboot by default, to ensure the health check implemented before the stage 2 is executed in
+    // the same L1 level
+    host.mark_for_reboot()
+        .expect("This function should never fail");
+    match single_run(host) {
+        Ok(SingleRunStatus::Reboot) => Ok(()),
+        Ok(SingleRunStatus::Finished) => {
+            host.clear_reboot_mark()
+                .expect("This function should never fail");
+            Ok(())
+        }
+        Err(err) => {
+            host.clear_reboot_mark()
+                .expect("This function should never fail");
+            Err(err)
+        }
+    }
+}
+
+pub enum SingleRunStatus {
+    Reboot,
+    Finished,
+}
+
+pub fn single_run<Host>(host: &mut Host) -> Result<SingleRunStatus, anyhow::Error>
+where
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+{
     // We always start by doing the migration if needed.
     match stage_zero(host) {
         Ok(MigrationStatus::None) => {
@@ -244,24 +272,21 @@ where
         // If the migration is still in progress or was finished, we abort the
         // current kernel run.
         Ok(MigrationStatus::InProgress) => {
-            host.mark_for_reboot()?;
-            return Ok(());
+            return Ok(SingleRunStatus::Reboot);
         }
         Ok(MigrationStatus::Done) => {
             // If a migration was finished, we update the kernel version
             // in the storage.
             set_kernel_version(host)?;
-            host.mark_for_reboot()?;
             let configuration = fetch_configuration(host);
             log!(Info, "Configuration after migration: {}", configuration);
-            return Ok(());
+            return Ok(SingleRunStatus::Reboot);
         }
         Err(Error::UpgradeError(Fallback)) => {
             // If the migration failed we backup to the previous kernel
             // and force a reboot to reload the kernel.
             fallback_backup_kernel(host)?;
-            host.mark_for_reboot()?;
-            return Ok(());
+            return Ok(SingleRunStatus::Reboot);
         }
         Err(err) => return Err(err.into()),
     };
@@ -308,9 +333,8 @@ where
     )
     .context("Failed during stage 1")?
     {
-        host.mark_for_reboot()?;
         #[cfg(not(target_arch = "riscv64"))]
-        return Ok(());
+        return Ok(SingleRunStatus::Reboot);
     };
 
     let trace_input = read_tracer_input(host)?;
@@ -319,7 +343,7 @@ where
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
         log!(Debug, "Entering stage two.");
-        if let block::ComputationResult::RebootNeeded = block::produce(
+        if let block::ComputationResult::Finished = block::produce(
             host,
             &chain_configuration,
             &mut configuration,
@@ -328,7 +352,7 @@ where
         )
         .context("Failed during stage 2")?
         {
-            host.mark_for_reboot()?;
+            return Ok(SingleRunStatus::Finished);
         }
     }
 
@@ -336,11 +360,11 @@ where
     {
         log!(Benchmarking, "Shortcircuiting computation");
         #[cfg(not(target_arch = "riscv64"))]
-        return Ok(());
+        return Ok(SingleRunStatus::Finished);
     }
 
     log!(Debug, "End of kernel run.");
-    Ok(())
+    Ok(SingleRunStatus::Reboot)
 }
 
 // `kernel_loop` shouldn't be called in tests, as it won't use `MockInternal` for the

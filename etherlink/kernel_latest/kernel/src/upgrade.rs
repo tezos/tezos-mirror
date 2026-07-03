@@ -134,11 +134,6 @@ where
     host.store_write_all(&KERNEL_ROOT_HASH, &root_hash)?;
     host.store_delete(&KERNEL_UPGRADE)?;
 
-    // Mark for reboot, the upgrade/migration will happen at next
-    // kernel run, it doesn't matter if it is within the Tezos level
-    // or not.
-    host.mark_for_reboot()?;
-
     log!(Info, "Kernel is ready to be upgraded.");
     Ok(())
 }
