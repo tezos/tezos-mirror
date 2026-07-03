@@ -12,17 +12,26 @@ module CI = Cacio.Shared
    During the migration to Cacio however, those other instances will continue to exist. *)
 let version = Tezos_ci.Images.Base_images.docker_version
 
-(* [docker_release.sh] invocation. For with-EVM builds the L2 builder image the
-   distribution is built FROM is stated explicitly: the [debian-rust:trixie]
-   base image, used directly. Builds without EVM artifacts do not use it. *)
-let docker_release_script contents =
+(* The CI image tags are resolved at runtime by the job's shell from the
+   [Images.CI.runtime] dependency dotenv, exactly as the jobs' [image:] fields
+   already reference them. *)
+let docker_release_script =
+  "./scripts/ci/docker_release.sh --runtime-image \
+   ${ci_image_name}/runtime:${ci_image_tag} --build-deps-image \
+   ${ci_image_name}/build:${ci_image_tag}"
+
+(* [docker_release_script] extended for with-EVM builds with the L2 builder
+   image: the [debian-rust:trixie] base image, used directly. Builds without
+   EVM artifacts do not use it. *)
+let release_script contents =
   match contents with
   | `experimental_with_evm ->
       Format.asprintf
-        "./scripts/ci/docker_release.sh --rust-toolchain-image %a"
+        "%s --rust-toolchain-image %a"
+        docker_release_script
         Tezos_ci.Image.pp
         Tezos_ci.Images.Base_images.debian_rust_trixie
-  | `released | `experimental -> "./scripts/ci/docker_release.sh"
+  | `released | `experimental -> docker_release_script
 
 let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
   let arch_str = Tezos_ci.Runner.Arch.show_uniform arch in
@@ -97,7 +106,7 @@ let job_docker_snapshot =
         (* Override the image tag computed by [docker_initialize.sh --image-names]
            (which defaults to the branch name) with a dated master tag. *)
         "./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)";
-        docker_release_script contents;
+        release_script contents;
       ]
     contents
     `real
@@ -116,7 +125,7 @@ let job_docker =
     ~scripts:
       [
         "./scripts/ci/docker_initialize.sh --image-names";
-        docker_release_script contents;
+        release_script contents;
       ]
     contents
     mode

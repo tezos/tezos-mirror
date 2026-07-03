@@ -8,9 +8,10 @@ set -eu
 
 # Full image references (name:tag) for the runtime and build-dependencies images
 # the Octez distribution is built FROM. The distribution jobs pass them
-# explicitly (see the --runtime-image / --build-deps-image arguments below); they
-# default to the images matching the current checkout when a caller omits them
-# (e.g. a local invocation).
+# explicitly via --runtime-image / --build-deps-image; both are required. This
+# script only runs in CI (docker.env, CI_PROJECT_DIR, DOCKER_IMAGE_NAME,
+# EXECUTABLE_FILES are all CI-provided), so there is no local-invocation
+# default: for local builds, see scripts/create_docker_image.sh.
 runtime_image=""
 build_deps_image=""
 # The rust-toolchain image (L2 builder) used for with-EVM builds is passed
@@ -46,16 +47,8 @@ while true; do
   shift
 done
 
-# Fall back to the images matching the current checkout when the caller did not
-# pass an explicit reference. 'ci_image_name' is set in the variables section of
-# the top-level .gitlab-ci.yml; 'ci_image_tag' is set by an incoming dotenv file
-# from the job that produces those images (currently: 'oc.docker:ci:*').
-if [ -z "${runtime_image}" ] || [ -z "${build_deps_image}" ]; then
-  ci_image_name=${ci_image_name:?"ci_image_name: is unset"}
-  ci_image_version=${ci_image_tag:?"ci_image_tag: is unset"}
-  runtime_image="${runtime_image:-${ci_image_name}/runtime:${ci_image_version}}"
-  build_deps_image="${build_deps_image:-${ci_image_name}/build:${ci_image_version}}"
-fi
+runtime_image=${runtime_image:?"--runtime-image is required"}
+build_deps_image=${build_deps_image:?"--build-deps-image is required"}
 
 cd "${CI_PROJECT_DIR}" || exit 1
 
