@@ -40,6 +40,14 @@ let job_docker_build =
         ("EXECUTABLE_FILES", "script-inputs/smart-rollup-node-executable");
       ]
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+      (* Docker Hub credentials (CI_DOCKER_AUTH) are scoped to the
+       [docker-publish] environment; only [`real] jobs (CI_DOCKER_HUB=true)
+       authenticate and thus need access. *)
+    ?environment:
+      (match test with
+      | `real ->
+          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
+      | `test -> None)
     ~description:
       (sf "Build Octez Smart Rollup docker image for %s." arch_string)
     ~script:
@@ -97,6 +105,14 @@ let job_docker_merge_manifests =
         ("DOCKER_VERSION", "24.0.7");
         ("CI_DOCKER_HUB", match test with `real -> "true" | `test -> "false");
       ]
+      (* Docker Hub credentials (CI_DOCKER_AUTH) are scoped to the
+       [docker-publish] environment; only [`real] jobs (CI_DOCKER_HUB=true)
+       authenticate and thus need access. *)
+    ?environment:
+      (match test with
+      | `real ->
+          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
+      | `test -> None)
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~description:"Merge manifest for arm64 and arm64 docker images."

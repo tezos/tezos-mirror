@@ -251,6 +251,9 @@ oc.docker:arm64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables
+  environment:
+    name: docker-publish
+    action: access
   retry:
     max: 1
     when:
@@ -290,6 +293,9 @@ oc.docker:amd64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables
+  environment:
+    name: docker-publish
+    action: access
   retry:
     max: 1
     when:
@@ -322,6 +328,9 @@ docker:merge_manifests:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
+  environment:
+    name: docker-publish
+    action: access
   retry: 0
 
 oc.build-ubuntu:
@@ -607,4 +616,7 @@ oc.docker:promote_revision_to_version:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
+  environment:
+    name: docker-publish
+    action: access
   retry: 0
