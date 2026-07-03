@@ -821,80 +821,12 @@ let declared_jobs = ref String_map.empty
 
 let get_declared_jobs () = !declared_jobs
 
-let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
-    ?artifacts ?(before_script = []) ?cache ?id_tokens ?interruptible
-    ?(dependencies = Dependent []) ?(image_dependencies = []) ?services
-    ?variables ?(rules : Gitlab_ci.Types.job_rule list option)
-    ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
-    ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
-    ?interruptible_runner ?git_strategy ?retry ?parallel ?environment
-    ?description ?(dev_infra = false) ~__POS__ ?image ?template
-    ?(datadog = true) ~stage ~name script : tezos_job =
-  declared_jobs := String_map.add name __POS__ !declared_jobs ;
-  (* The tezos/tezos CI uses singleton tags for its runners. *)
-  let tag : Runner.Tag.t =
-    let provider : Runner.Provider.t = if dev_infra then GCP_dev else GCP in
-    let show show_fun = function
-      | None -> "(unspecified)"
-      | Some x -> show_fun x
-    in
-    let provider_string = Runner.Provider.show provider in
-    let arch_string = show Runner.Arch.show_uniform arch in
-    let cpu_string = show Runner.CPU.show cpu in
-    let storage_string = show Runner.Storage.show storage in
-    let interruptible_runner_string =
-      show string_of_bool interruptible_runner
-    in
-    match tag with
-    | None -> (
-        match
-          Runner.Tag.choose
-            ~provider
-            ?arch
-            ?cpu
-            ?storage
-            ?interruptible:interruptible_runner
-            ()
-        with
-        | None ->
-            failwith
-              "job %S: no suitable runner tag found for provider = %s, arch = \
-               %s, cpu = %s, storage = %s, interruptible_runner = %s"
-              name
-              provider_string
-              arch_string
-              cpu_string
-              storage_string
-              interruptible_runner_string
-        | Some tag -> tag)
-    | Some Dynamic ->
-        (* Cannot check, assume the user knows what they are doing. *)
-        Dynamic
-    | Some tag ->
-        if
-          not
-            (Runner.Tag.has
-               ~provider
-               ?arch
-               ?cpu
-               ?storage
-               ?interruptible:interruptible_runner
-               tag)
-        then
-          failwith
-            "job %S: requested tag %s is not compatible with provider = %s, \
-             arch = %s, cpu = %s, storage = %s, interruptible_runner = %s"
-            name
-            (Runner.Tag.show tag)
-            provider_string
-            arch_string
-            cpu_string
-            storage_string
-            interruptible_runner_string ;
-        tag
-  in
-  (* Check [rules]. *)
-  (match rules with
+(** {1 Validation Helpers} *)
+
+(** Reject an empty [~rules] and any rule whose changeset exceeds GitLab's
+    50-entry limit. *)
+let validate_rules ~name (rules : Gitlab_ci.Types.job_rule list option) =
+  match rules with
   | None -> ()
   | Some [] ->
       failwith
@@ -911,20 +843,11 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
         failwith
           "In job '%s', one of the ~rules has more than 50 entries in its \
            changeset. This is not allowed by GitLab."
-          name) ;
-  let arch = if Option.is_some arch then arch else Runner.Tag.arch tag in
-  (match (image, arch) with
-  | Some (Internal {image = Image image_path; _}), None ->
-      failwith
-        "[job] the job '%s' has tag '%s' whose architecture is not statically \
-         known cannot use the image '%s' since it is Internal. Set a static \
-         tag or use an external image."
-        name
-        (Runner.Tag.show tag)
-        image_path
-  | _ -> ()) ;
-  let tags = Some [Runner.Tag.show tag] in
-  (match (parallel : Gitlab_ci.Types.parallel option) with
+          name
+
+(** Reject a [~parallel] vector below 2 and an empty [matrix]. *)
+let validate_parallel ~name (parallel : Gitlab_ci.Types.parallel option) =
+  match parallel with
   | Some (Vector n) when n < 2 ->
       failwith
         "[job] the argument [parallel] must be at least 2 or omitted, in job \
@@ -935,20 +858,157 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
         "[job] the argument [matrix] must be at a non empty list of variables, \
          in job '%s'."
         name
-  | _ -> ()) ;
+  | _ -> ()
+
+(** Reject a [retry:max] outside the 0-2 range allowed by GitLab. *)
+let validate_retry ~name retry =
+  match retry with
+  | Some Gitlab_ci.Types.{max; when_ = _} when max < 0 || max > 2 ->
+      failwith
+        "Invalid [retry:max] value '%d' for job '%s': must be 0, 1 or 2."
+        max
+        name
+  | _ -> ()
+
+(** Reject specifying both [image] and [template], which would conflict. *)
+let validate_template_image ~name template image =
+  match (template, image) with
+  | Some _, Some _ ->
+      failwith
+        "[job] cannot specify both [image] and [template] in job '%s' as it \
+         would override the image defined in the template."
+        name
+  | None, _ | _, None -> ()
+
+(** Reject an [Internal] image on a tag whose architecture is not statically
+    known. *)
+let validate_image_arch ~name (image : tezos_image option)
+    (arch : Runner.Arch.t option) (tag : Runner.Tag.t) =
+  match (image, arch) with
+  | Some (Internal {image = Image image_path; _}), None ->
+      failwith
+        "[job] the job '%s' has tag '%s' whose architecture is not statically \
+         known cannot use the image '%s' since it is Internal. Set a static \
+         tag or use an external image."
+        name
+        (Runner.Tag.show tag)
+        image_path
+  | _ -> ()
+
+(** Reject margebot merging a configuration that relies on development
+    runners. *)
+let validate_margebot ~name tag =
+  match
+    (Sys.getenv_opt Gitlab_ci.Predefined_vars.(show gitlab_user_login), tag)
+  with
+  | ( Some "nomadic-margebot",
+      ( Runner.Tag.Gcp_dev | Runner.Tag.Gcp_dev_arm64
+      | Runner.Tag.Gcp_not_interruptible_dev | Runner.Tag.Gcp_tezt_dev
+      | Runner.Tag.Gcp_high_cpu_dev | Runner.Tag.Gcp_very_high_cpu_dev
+      | Runner.Tag.Gcp_very_high_cpu_ramfs_dev ) ) ->
+      failwith
+        "[job] Attempting to merge a CI configuration using development \
+         runners (job: %s)"
+        name
+  | _ -> ()
+
+(** Select the runner tag for a job: pick a compatible tag when none is given,
+    otherwise check the requested tag is compatible with the constraints. *)
+let select_runner_tag ~name ~dev_infra ~arch ~cpu ~storage
+    ~(interruptible_runner : bool option) (tag : Runner.Tag.t option) =
+  let provider : Runner.Provider.t =
+    if dev_infra then Runner.Provider.GCP_dev else Runner.Provider.GCP
+  in
+  let show show_fun = function
+    | None -> "(unspecified)"
+    | Some x -> show_fun x
+  in
+  let provider_string = Runner.Provider.show provider in
+  let arch_string = show Runner.Arch.show_uniform arch in
+  let cpu_string = show Runner.CPU.show cpu in
+  let storage_string = show Runner.Storage.show storage in
+  let interruptible_runner_string = show string_of_bool interruptible_runner in
+  match tag with
+  | None -> (
+      match
+        Runner.Tag.choose
+          ~provider
+          ?arch
+          ?cpu
+          ?storage
+          ?interruptible:interruptible_runner
+          ()
+      with
+      | None ->
+          failwith
+            "job %S: no suitable runner tag found for provider = %s, arch = \
+             %s, cpu = %s, storage = %s, interruptible_runner = %s"
+            name
+            provider_string
+            arch_string
+            cpu_string
+            storage_string
+            interruptible_runner_string
+      | Some tag -> tag)
+  | Some Dynamic ->
+      (* Cannot check, assume the user knows what they are doing. *)
+      Dynamic
+  | Some tag ->
+      if
+        not
+          (Runner.Tag.has
+             ~provider
+             ?arch
+             ?cpu
+             ?storage
+             ?interruptible:interruptible_runner
+             tag)
+      then
+        failwith
+          "job %S: requested tag %s is not compatible with provider = %s, arch \
+           = %s, cpu = %s, storage = %s, interruptible_runner = %s"
+          name
+          (Runner.Tag.show tag)
+          provider_string
+          arch_string
+          cpu_string
+          storage_string
+          interruptible_runner_string ;
+      tag
+
+let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
+    ?artifacts ?(before_script = []) ?cache ?id_tokens ?interruptible
+    ?(dependencies = Dependent []) ?(image_dependencies = []) ?services
+    ?variables ?(rules : Gitlab_ci.Types.job_rule list option)
+    ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
+    ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
+    ?interruptible_runner ?git_strategy ?retry ?parallel ?environment
+    ?description ?(dev_infra = false) ~__POS__ ?image ?template
+    ?(datadog = true) ~stage ~name script : tezos_job =
+  declared_jobs := String_map.add name __POS__ !declared_jobs ;
+  (* The tezos/tezos CI uses singleton tags for its runners. *)
+  let tag : Runner.Tag.t =
+    select_runner_tag
+      ~name
+      ~dev_infra
+      ~arch
+      ~cpu
+      ~storage
+      ~interruptible_runner
+      tag
+  in
+  validate_rules ~name rules ;
+  let arch = if Option.is_some arch then arch else Runner.Tag.arch tag in
+  validate_image_arch ~name image arch tag ;
+  let tags = Some [Runner.Tag.show tag] in
+  validate_parallel ~name parallel ;
   let image_dependencies =
     (match image with
     | Some (Internal image) -> [Internal image]
     | Some (External _) | None -> [])
     @ image_dependencies
   in
-  (match (template, image) with
-  | Some _, Some _ ->
-      failwith
-        "[job] cannot specify both [image] and [template] in job '%s' as it \
-         would override the image defined in the template."
-        name
-  | None, _ | _, None -> ()) ;
+  validate_template_image ~name template image ;
   let dependencies, image_builders =
     ( Fun.flip List.iter image_dependencies @@ function
       | External (Image image_path) ->
@@ -990,25 +1050,8 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
           :: Option.value ~default:[] variables)
     | None -> variables
   in
-  (match retry with
-  | Some Gitlab_ci.Types.{max; when_ = _} when max < 0 || max > 2 ->
-      failwith
-        "Invalid [retry:max] value '%d' for job '%s': must be 0, 1 or 2."
-        max
-        name
-  | _ -> ()) ;
-  (match
-     (Sys.getenv_opt Gitlab_ci.Predefined_vars.(show gitlab_user_login), tag)
-   with
-  | ( Some "nomadic-margebot",
-      ( Gcp_dev | Gcp_dev_arm64 | Gcp_not_interruptible_dev | Gcp_tezt_dev
-      | Gcp_high_cpu_dev | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs_dev
-        ) ) ->
-      failwith
-        "[job] Attempting to merge a CI configuration using development \
-         runners (job: %s)"
-        name
-  | _ -> ()) ;
+  validate_retry ~name retry ;
+  validate_margebot ~name tag ;
   let job : Gitlab_ci.Types.job =
     {
       name;
