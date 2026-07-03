@@ -503,6 +503,13 @@
   Michelson operation's `internal_operation_results`. Previously the
   callback and its sub-operations appeared before the frame that produced
   the payload they consume, inverting execution order in the receipt. (!22344)
+- A cross-runtime call into the Michelson runtime no longer reports a
+  maximum value as its consumed gas when it fails. A failure that has begun
+  metering reports the gas it consumed; a failure before metering reports
+  the granted operation limit. The EVM gateway classifies the response
+  status before charging, so both are charged their reported gas and stay a
+  catchable revert, with the unmetered case draining the granted budget.
+  (!22340)
 
 ### Storage versions
 

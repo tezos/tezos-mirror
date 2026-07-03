@@ -229,14 +229,14 @@ fn build_http_request(
 
 /// Classify a CRAC HTTP response, charge gas, and return the body on success.
 ///
-/// Gas is charged on a best-effort basis for all statuses, on block
-/// aborts the block is reverted anyway, so a missing header is harmless.
-/// On 2xx the header is mandatory.
+/// Status is classified before any charge, so a bad gas value on a failure
+/// cannot flip a catchable revert into an out-of-gas.
 ///
-/// - 2xx/4xx: charge callee gas, then:
-///   - out of gas from charging: return `Ok(None)`.
-///   - 2xx: return `Ok(Some(body))`.
-///   - 4xx (incl. 429 OOG): catchable revert.
+/// - 2xx: the header is mandatory; charge callee gas and the storage cost,
+///   then return the body.
+/// - 4xx (incl. 429): catchable revert; the callee gas and body surcharge
+///   are charged best-effort, so charging never escalates to an out-of-gas.
+///   An unmetered failure reports the op limit, which drains the budget here.
 /// - anything else: block abort.
 fn classify_and_charge_crac_response(
     response: http::Response<Vec<u8>>,
@@ -251,17 +251,14 @@ fn classify_and_charge_crac_response(
         .and_then(|s| s.parse::<u64>().ok())
         .and_then(|c| gas::convert_ceil(target_runtime, RuntimeId::Ethereum, c));
 
-    if let Some(evm_consumed) = callee_gas {
-        charge(gas, evm_consumed)?;
-    }
-
     if response.status().is_success() {
-        if callee_gas.is_none() {
+        let Some(evm_consumed) = callee_gas else {
             return Err(CustomPrecompileError::Revert(
                 "X-Tezos-Gas-Consumed header missing or invalid in cross-runtime call response".into(),
                 *gas,
             ));
-        }
+        };
+        charge(gas, evm_consumed)?;
         let delegated_storage_cost_mutez =
             parse_u64_opt(response.headers(), X_TEZOS_STORAGE_COST)
                 .map_err(|e| CustomPrecompileError::Revert(e.to_string(), *gas))?;
@@ -274,15 +271,12 @@ fn classify_and_charge_crac_response(
     } else if response.status().is_client_error() {
         let status = response.status();
         let decoded_body = String::from_utf8_lossy(response.body()).into_owned();
-        // The gateway charges a per-word transport surcharge on every payload
-        // crossing the runtime boundary (calldata, request body, and the
-        // response body on the success path) to price the precompile's
-        // per-byte marshalling, which native EVM gas does not meter.  The
-        // failure path skipped it on the response body, so charge it here on
-        // the decoded 4xx body before building the revert, mirroring
-        // `charge_and_encode_crac_response`.  Best-effort: on OOG the revert
-        // is still produced so the EVM caller can catch the error rather than
-        // aborting the block.
+        // Charge callee gas and the body surcharge best-effort: the status is
+        // already a catchable revert, so charging must never escalate it into
+        // an out-of-gas; on shortfall the revert still goes out.
+        if let Some(evm_consumed) = callee_gas {
+            let _ = charge(gas, evm_consumed);
+        }
         let _ = charge_payload(gas, decoded_body.len());
         Err(CustomPrecompileError::Revert(
             format!("Cross-runtime call failed with status {status}: {decoded_body}"),
@@ -1388,6 +1382,42 @@ mod tests {
     use tezosx_interfaces::{AliasInfo, Classification, RuntimeId};
 
     use super::*;
+
+    // A failure with an oversized gas header stays a catchable revert:
+    // charging the value is best-effort and never escalates to an
+    // out-of-gas.
+    #[test]
+    fn classify_4xx_with_oversized_header_still_reverts() {
+        let response = http::Response::builder()
+            .status(http::StatusCode::BAD_REQUEST)
+            .header(X_TEZOS_GAS_CONSUMED, u64::MAX.to_string())
+            .body(b"revert reason".to_vec())
+            .unwrap();
+        let mut gas = Gas::new(100_000);
+        let result =
+            classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas, 1);
+        assert!(matches!(result, Err(CustomPrecompileError::Revert(_, _))));
+    }
+
+    // An unmetered failure reports the op limit as its consumed gas. The
+    // value round-trips to the caller's remaining budget, so charging it
+    // drains the budget and the call stays a catchable revert.
+    #[test]
+    fn classify_4xx_with_op_limit_header_drains_and_reverts() {
+        let remaining = 100_000u64;
+        let op_limit_milligas =
+            gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, remaining).unwrap();
+        let response = http::Response::builder()
+            .status(http::StatusCode::BAD_REQUEST)
+            .header(X_TEZOS_GAS_CONSUMED, op_limit_milligas.to_string())
+            .body(b"revert reason".to_vec())
+            .unwrap();
+        let mut gas = Gas::new(remaining);
+        let result =
+            classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas, 1);
+        assert!(matches!(result, Err(CustomPrecompileError::Revert(_, _))));
+        assert_eq!(gas.remaining(), 0, "the op limit must drain the budget");
+    }
 
     // These tests call the dispatch helpers (dispatch_origin_of /
     // dispatch_resolve_address) directly. Going through

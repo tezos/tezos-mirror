@@ -51,7 +51,7 @@ use tezos_tezlink::{
 use tezosx_interfaces::{
     AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Origin, Registry,
     RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_MILLIGAS, X_TEZOS_GAS_CONSUMED,
-    X_TEZOS_STORAGE_COST,
+    X_TEZOS_GAS_LIMIT, X_TEZOS_STORAGE_COST,
 };
 use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
@@ -125,12 +125,20 @@ pub fn crac_top_level_failed_result() -> ContentResult<TransferContent> {
 // structured variants (and corresponding HTTP status codes) where
 // possible.
 fn build_response(
-    result: Result<ExecuteRequestOutcome, TezosXRuntimeError>,
-    consumed_milligas: u64,
+    result: Result<ExecuteRequestOutcome, RequestFailure>,
     frame_result: Option<Vec<u8>>,
 ) -> http::Response<Vec<u8>> {
-    let gas_header = consumed_milligas.to_string();
-    let mut builder = http::Response::builder().header(X_TEZOS_GAS_CONSUMED, &gas_header);
+    // Success carries a measured value; a failure carries Some when it
+    // metered or when finalize substituted the op limit. None omits the
+    // header, reached only when the op limit is unknown.
+    let consumed_milligas = match &result {
+        Ok(outcome) => Some(outcome.consumed_milligas),
+        Err(failure) => failure.consumed_milligas,
+    };
+    let mut builder = http::Response::builder();
+    if let Some(gas) = consumed_milligas {
+        builder = builder.header(X_TEZOS_GAS_CONSUMED, gas.to_string());
+    }
     let (status, body) = match result {
         Ok(outcome) => {
             builder =
@@ -143,22 +151,24 @@ fn build_response(
             }
             (StatusCode::OK, frame_result.unwrap_or_default())
         }
-        Err(TezosXRuntimeError::BadRequest(msg)) => {
-            (StatusCode::BAD_REQUEST, msg.into_bytes())
-        }
-        Err(TezosXRuntimeError::NotFound(msg)) => {
-            (StatusCode::NOT_FOUND, msg.into_bytes())
-        }
-        Err(TezosXRuntimeError::MethodNotAllowed(msg)) => {
-            (StatusCode::METHOD_NOT_ALLOWED, msg.into_bytes())
-        }
-        Err(TezosXRuntimeError::OutOfGas) => {
-            (StatusCode::TOO_MANY_REQUESTS, b"OOG".to_vec())
-        }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("{e:?}").into_bytes(),
-        ),
+        Err(RequestFailure { error, .. }) => match error {
+            TezosXRuntimeError::BadRequest(msg) => {
+                (StatusCode::BAD_REQUEST, msg.into_bytes())
+            }
+            TezosXRuntimeError::NotFound(msg) => {
+                (StatusCode::NOT_FOUND, msg.into_bytes())
+            }
+            TezosXRuntimeError::MethodNotAllowed(msg) => {
+                (StatusCode::METHOD_NOT_ALLOWED, msg.into_bytes())
+            }
+            TezosXRuntimeError::OutOfGas => {
+                (StatusCode::TOO_MANY_REQUESTS, b"OOG".to_vec())
+            }
+            e => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{e:?}").into_bytes(),
+            ),
+        },
     };
     // Safe to unwrap: status is a predefined constant, header names are
     // static ASCII strings, and the values are ASCII-only.
@@ -176,18 +186,34 @@ fn build_response(
 /// request error takes precedence and the dispatch payload (if any)
 /// is dropped on the floor, as it would be for any non-2xx.
 fn finalize_response(
-    result: Result<ExecuteRequestOutcome, TezosXRuntimeError>,
-    consumed_milligas: u64,
+    result: Result<ExecuteRequestOutcome, RequestFailure>,
+    op_gas: Option<u64>,
     dispatch: Result<Option<Vec<u8>>, DispatchSlotError>,
 ) -> http::Response<Vec<u8>> {
     let result = match (result, &dispatch) {
-        (Ok(_), Err(e)) => Err(TezosXRuntimeError::Custom(format!(
-            "dispatch slot inconsistency: {e}"
-        ))),
+        (Ok(outcome), Err(e)) => Err(RequestFailure {
+            error: TezosXRuntimeError::Custom(format!(
+                "dispatch slot inconsistency: {e}"
+            )),
+            consumed_milligas: Some(outcome.consumed_milligas),
+        }),
         (other, _) => other,
     };
+    // A failure that never started metering carries no figure; report the
+    // op limit for it so the caller charges the granted budget rather than
+    // nothing.
+    let result = result.map_err(|mut failure| {
+        if failure.consumed_milligas.is_none() {
+            log!(
+                Info,
+                "Cross-runtime call failed before metering; reporting the op limit as consumed gas: {op_gas:?}"
+            );
+            failure.consumed_milligas = op_gas;
+        }
+        failure
+    });
     let frame_result = dispatch.ok().flatten();
-    build_response(result, consumed_milligas, frame_result)
+    build_response(result, frame_result)
 }
 
 /// Build a synthetic kernel-emitted CRAC frame marker event.
@@ -570,8 +596,37 @@ fn build_alias_origination_internal(
 }
 
 #[derive(Default)]
-struct ExecuteRequestOutcome {
+pub(crate) struct ExecuteRequestOutcome {
     delegated_storage_cost: u64,
+    /// Milligas metered by this request, reported back to the caller.
+    consumed_milligas: u64,
+}
+
+/// A request failure carrying the milligas metered before it occurred.
+///
+/// `Some(n)` means metering had started and charged `n`. `None` means the
+/// failure preceded metering, so no figure was taken; the caller charges
+/// the op limit for it. A bare `?` yields `None` through the [`From`] below.
+//
+// TODO https://linear.app/tezos/issue/L2-1787
+// Making this a plain `u64` (op-limit fallback done in `build_response`)
+// is blocked on generalizing parsing and splitting the pre-metering
+// failure type, since `op_gas` is itself an `Option`. Deferred; see issue.
+pub(crate) struct RequestFailure {
+    error: TezosXRuntimeError,
+    consumed_milligas: Option<u64>,
+}
+
+impl<E> From<E> for RequestFailure
+where
+    E: Into<TezosXRuntimeError>,
+{
+    fn from(error: E) -> Self {
+        Self {
+            error: error.into(),
+            consumed_milligas: None,
+        }
+    }
 }
 
 /// Execute a cross-runtime request: dispatches on the HTTP method.
@@ -583,30 +638,22 @@ struct ExecuteRequestOutcome {
 /// This is the core logic behind [`TezosRuntime::serve`], separated so
 /// that `serve` only handles the error-to-HTTP-status mapping.
 ///
-/// `consumed_milligas` is an output parameter rather than part of the
-/// return type so that early `?` returns keep their ergonomics, since
-/// this result is used as-is to build the http reponse.
+/// The consumed milligas rides in the return type, in
+/// [`ExecuteRequestOutcome`] on success or [`RequestFailure`] on error;
+/// a failure before metering carries no value and reports as unset.
 fn execute_request<Host>(
     chain_id: &ChainId,
     registry: &impl Registry,
     host: &mut Host,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
-    consumed_milligas: &mut u64,
-) -> Result<ExecuteRequestOutcome, TezosXRuntimeError>
+) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
     Host: StorageV1,
 {
     match *request.method() {
         http::Method::POST => {
-            execute_entrypoint_call(
-                chain_id,
-                registry,
-                host,
-                journal,
-                request,
-                consumed_milligas,
-            )
+            execute_entrypoint_call(chain_id, registry, host, journal, request)
         }
         http::Method::GET => {
             // The view path doesn't mutate storage or push a CRAC
@@ -617,19 +664,12 @@ where
             // too so the view can issue nested cross-runtime reads
             // through the gateway's `staticcall_evm` synthetic view
             // (L2-1259).
-            view::execute_view_call(
-                chain_id,
-                registry,
-                host,
-                journal,
-                request,
-                consumed_milligas,
-            )
-            .map(|()| ExecuteRequestOutcome::default())
+            view::execute_view_call(chain_id, registry, host, journal, request)
         }
         ref other => Err(TezosXRuntimeError::MethodNotAllowed(format!(
             "HTTP method {other} not allowed (use POST for entrypoint calls or GET for views)"
-        ))),
+        ))
+        .into()),
     }
 }
 
@@ -644,8 +684,7 @@ fn execute_entrypoint_call<Host>(
     host: &mut Host,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
-    consumed_milligas: &mut u64,
-) -> Result<ExecuteRequestOutcome, TezosXRuntimeError>
+) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
     Host: StorageV1,
 {
@@ -969,11 +1008,13 @@ where
                     }
                 }
             }
-            // Report consumed gas even on failure so the caller doesn't
-            // see u64::MAX (which would exhaust the EVM gas budget and
-            // prevent try/catch from working).
-            *consumed_milligas = gas.total_milligas_consumed().into();
-            return Err(rt_err);
+            // Metering had started, so report the real consumed gas. This
+            // is a metered failure, not an unset one, so the caller charges
+            // this figure rather than the op limit.
+            return Err(RequestFailure {
+                error: rt_err,
+                consumed_milligas: Some(gas.total_milligas_consumed().into()),
+            });
         }
     };
 
@@ -1020,7 +1061,7 @@ where
         assert_receipt_markers_balanced(&receipt);
         journal.michelson.push_pending_crac_receipt(receipt);
     };
-    *consumed_milligas = gas.total_milligas_consumed().into();
+    let consumed_milligas = gas.total_milligas_consumed().into();
 
     let delegated_storage_cost =
         result.own_storage_cost + received_delegated_storage_cost;
@@ -1033,6 +1074,7 @@ where
 
     Ok(ExecuteRequestOutcome {
         delegated_storage_cost,
+        consumed_milligas,
     })
 }
 
@@ -1379,23 +1421,16 @@ impl RuntimeInterface for TezosRuntime {
         // handled separately by `cross_runtime_transfer`'s own
         // snapshot mechanism.
         journal.michelson.push_dispatch_slot();
-        // Default to max: if execute_request fails before writing the
-        // actual value (early setup error), the caller sees full gas
-        // consumption rather than a free call.
-        let mut consumed_milligas = u64::MAX;
-        let result = execute_request(
-            &self.0,
-            registry,
-            host,
-            journal,
-            request,
-            &mut consumed_milligas,
-        );
-        finalize_response(
-            result,
-            consumed_milligas,
-            journal.michelson.take_dispatch_result(),
-        )
+        // The gas budget granted to this call. A failure that never started
+        // metering reports it as consumed, so the caller charges the op
+        // limit rather than nothing.
+        let op_gas = request
+            .headers()
+            .get(X_TEZOS_GAS_LIMIT)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<u64>().ok());
+        let result = execute_request(&self.0, registry, host, journal, request);
+        finalize_response(result, op_gas, journal.michelson.take_dispatch_result())
     }
 
     fn host(&self) -> &'static str {
@@ -1517,7 +1552,6 @@ mod tests {
     fn build_response_success_uses_frame_result() {
         let resp = build_response(
             Ok(ExecuteRequestOutcome::default()),
-            0,
             Some(b"collected".to_vec()),
         );
         assert_eq!(resp.status(), StatusCode::OK);
@@ -1532,7 +1566,7 @@ mod tests {
 
     #[test]
     fn build_response_success_no_frame_result() {
-        let resp = build_response(Ok(ExecuteRequestOutcome::default()), 0, None);
+        let resp = build_response(Ok(ExecuteRequestOutcome::default()), None);
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(resp.body().is_empty());
         assert_eq!(
@@ -1545,7 +1579,7 @@ mod tests {
 
     #[test]
     fn build_response_success_empty_frame_result() {
-        let resp = build_response(Ok(ExecuteRequestOutcome::default()), 0, Some(vec![]));
+        let resp = build_response(Ok(ExecuteRequestOutcome::default()), Some(vec![]));
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(resp.body().is_empty());
         assert_eq!(
@@ -1560,8 +1594,7 @@ mod tests {
     fn build_response_error_discards_frame_result() {
         // On revert, the %collect_result payload must not surface.
         let resp = build_response(
-            Err(TezosXRuntimeError::BadRequest("invalid URL".into())),
-            0,
+            Err(TezosXRuntimeError::BadRequest("invalid URL".into()).into()),
             Some(b"leaked".to_vec()),
         );
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
@@ -1579,8 +1612,7 @@ mod tests {
     #[test]
     fn build_response_bad_request() {
         let resp = build_response(
-            Err(TezosXRuntimeError::BadRequest("invalid URL".into())),
-            0,
+            Err(TezosXRuntimeError::BadRequest("invalid URL".into()).into()),
             None,
         );
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
@@ -1590,8 +1622,7 @@ mod tests {
     #[test]
     fn build_response_not_found() {
         let resp = build_response(
-            Err(TezosXRuntimeError::NotFound("KT1 not found".into())),
-            0,
+            Err(TezosXRuntimeError::NotFound("KT1 not found".into()).into()),
             None,
         );
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -1601,10 +1632,7 @@ mod tests {
     #[test]
     fn build_response_method_not_allowed() {
         let resp = build_response(
-            Err(TezosXRuntimeError::MethodNotAllowed(
-                "PUT not allowed".into(),
-            )),
-            0,
+            Err(TezosXRuntimeError::MethodNotAllowed("PUT not allowed".into()).into()),
             None,
         );
         assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
@@ -1614,7 +1642,7 @@ mod tests {
     #[test]
     fn build_response_success_has_gas_consumed_header() {
         // consumed_milligas = 0 → reported as 0
-        let resp = build_response(Ok(ExecuteRequestOutcome::default()), 0, None);
+        let resp = build_response(Ok(ExecuteRequestOutcome::default()), None);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -1626,7 +1654,13 @@ mod tests {
     #[test]
     fn build_response_gas_consumed_reports_milligas() {
         // 5000 milligas → reported as 5000
-        let resp = build_response(Ok(ExecuteRequestOutcome::default()), 5000, None);
+        let resp = build_response(
+            Ok(ExecuteRequestOutcome {
+                delegated_storage_cost: 0,
+                consumed_milligas: 5000,
+            }),
+            None,
+        );
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -1635,15 +1669,38 @@ mod tests {
         );
     }
 
+    // A metered failure carries its figure: the 4xx response reports that
+    // value in the gas-consumed header.
     #[test]
-    fn build_response_error_has_no_gas_consumed_header() {
-        let resp =
-            build_response(Err(TezosXRuntimeError::BadRequest("err".into())), 0, None);
+    fn build_response_metered_error_reports_carried_gas() {
+        let resp = build_response(
+            Err(RequestFailure {
+                error: TezosXRuntimeError::BadRequest("err".into()),
+                consumed_milligas: Some(5000),
+            }),
+            None,
+        );
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
                 .and_then(|v| v.to_str().ok()),
-            Some("0")
+            Some("5000")
+        );
+    }
+
+    // A failure raised before the gas counter exists is unset: the header
+    // is omitted, which tells the caller to charge the op limit.
+    #[test]
+    fn build_response_unset_error_omits_gas_header() {
+        let resp = build_response(
+            Err(TezosXRuntimeError::BadRequest("err".into()).into()),
+            None,
+        );
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert!(
+            resp.headers().get(X_TEZOS_GAS_CONSUMED).is_none(),
+            "an unset failure must omit the gas-consumed header"
         );
     }
 
@@ -1651,7 +1708,7 @@ mod tests {
     /// omitted entirely. Absence signals "nothing to delegate".
     #[test]
     fn build_response_no_storage_cost_header_when_zero() {
-        let resp = build_response(Ok(ExecuteRequestOutcome::default()), 0, None);
+        let resp = build_response(Ok(ExecuteRequestOutcome::default()), None);
         assert!(
             resp.headers().get(X_TEZOS_STORAGE_COST).is_none(),
             "X-Tezos-Storage-Cost must be absent when delegated cost is 0"
@@ -1666,8 +1723,8 @@ mod tests {
         let resp = build_response(
             Ok(ExecuteRequestOutcome {
                 delegated_storage_cost: 12345,
+                consumed_milligas: 0,
             }),
-            0,
             None,
         );
         assert_eq!(
@@ -1692,7 +1749,7 @@ mod tests {
     fn finalize_response_success_with_payload() {
         let resp = finalize_response(
             Ok(ExecuteRequestOutcome::default()),
-            42,
+            None,
             Ok(Some(b"collected".to_vec())),
         );
         assert_eq!(resp.status(), StatusCode::OK);
@@ -1711,8 +1768,8 @@ mod tests {
     #[test]
     fn finalize_response_error_discards_payload() {
         let resp = finalize_response(
-            Err(TezosXRuntimeError::BadRequest("nope".into())),
-            0,
+            Err(TezosXRuntimeError::BadRequest("nope".into()).into()),
+            None,
             Ok(Some(b"leaked".to_vec())),
         );
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
@@ -1733,7 +1790,7 @@ mod tests {
     fn finalize_response_success_with_unbalanced_slot_escalates_to_500() {
         let resp = finalize_response(
             Ok(ExecuteRequestOutcome::default()),
-            7,
+            None,
             Err(DispatchSlotError::NoSlot),
         );
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
@@ -1752,14 +1809,32 @@ mod tests {
     #[test]
     fn finalize_response_error_with_unbalanced_slot_preserves_request_error() {
         let resp = finalize_response(
-            Err(TezosXRuntimeError::NotFound("KT1 missing".into())),
-            0,
+            Err(TezosXRuntimeError::NotFound("KT1 missing".into()).into()),
+            None,
             Err(DispatchSlotError::NoSlot),
         );
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         assert!(
             String::from_utf8_lossy(resp.body()).contains("KT1 missing"),
             "original request error must dominate"
+        );
+    }
+
+    // An unset failure reports the op limit: finalize substitutes the
+    // granted budget so the gas-consumed header carries it.
+    #[test]
+    fn finalize_response_unset_error_reports_op_limit() {
+        let resp = finalize_response(
+            Err(TezosXRuntimeError::BadRequest("nope".into()).into()),
+            Some(4242),
+            Ok(None),
+        );
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            resp.headers()
+                .get(X_TEZOS_GAS_CONSUMED)
+                .and_then(|v| v.to_str().ok()),
+            Some("4242")
         );
     }
 
@@ -2848,6 +2923,174 @@ mod tests {
         assert_eq!(
             journal.michelson.take_dispatch_result(),
             Ok(Some(b"TOP-SECRET".to_vec()))
+        );
+    }
+
+    // Regression test: an early 4xx fails before metering, so the runtime
+    // reports the granted op limit as consumed. The caller then charges the
+    // op limit. Reverting the fix omits or misreports it.
+    #[test]
+    fn serve_early_4xx_reports_op_limit() {
+        use crate::headers::X_TEZOS_GAS_LIMIT;
+
+        let mut host = MockKernelHost::default();
+        let runtime = test_runtime();
+        let registry = NotWiredRegistry;
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+
+        // Wrong-authority URL: parsing fails before metering starts.
+        let request = http::Request::builder()
+            .uri("http://evm/KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+            .header(X_TEZOS_GAS_LIMIT, "150")
+            .body(vec![])
+            .unwrap();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            resp.headers()
+                .get(X_TEZOS_GAS_CONSUMED)
+                .and_then(|v| v.to_str().ok()),
+            Some("150"),
+            "an unmetered early 4xx must report the granted op limit"
+        );
+    }
+
+    // A failure after metering has begun must report the gas it metered,
+    // not zero. The destination exists and runs to a failure, so real gas
+    // is charged before the catchable 400.
+    #[test]
+    fn serve_metered_failure_reports_consumed_gas() {
+        use crate::headers::{
+            X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+            X_TEZOS_TIMESTAMP,
+        };
+        use mir::ast::micheline::Micheline;
+        use tezos_crypto_rs::blake2b::digest_160;
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+
+        const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
+        const GAS_LIMIT: u64 = 600_000_000;
+
+        let mut host = test_host();
+        let runtime = test_runtime();
+        let registry = NotWiredRegistry;
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+
+        let context =
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .unwrap();
+        let parser = mir::parser::Parser::new();
+        let dest_kt1 = ContractKt1Hash::from(digest_160(b"l2-1439-failwith"));
+        let dest = context.originated_from_kt1(&dest_kt1).unwrap();
+        let script = parser
+            .parse_top_level(
+                r#"parameter unit; storage unit;
+                   code { DROP; PUSH string "boom"; FAILWITH }"#,
+            )
+            .unwrap();
+        dest.init(
+            &mut host,
+            Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
+            &Micheline::from(())
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+            0.into(),
+        )
+        .unwrap();
+
+        let request = http::Request::builder()
+            .method(http::Method::POST)
+            .uri(format!("http://tezos/{}", dest_kt1.to_base58_check()))
+            .header(X_TEZOS_AMOUNT, "0")
+            .header(X_TEZOS_GAS_LIMIT, GAS_LIMIT.to_string())
+            .header(X_TEZOS_TIMESTAMP, "1000000")
+            .header(X_TEZOS_BLOCK_NUMBER, "1")
+            .header(X_TEZOS_SENDER, SENDER_KT1)
+            .body(vec![])
+            .unwrap();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let consumed: u64 = resp
+            .headers()
+            .get(X_TEZOS_GAS_CONSUMED)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse().ok())
+            .expect("gas-consumed header must parse");
+        assert!(
+            consumed > 0 && consumed < GAS_LIMIT,
+            "metered failure must report a nonzero count within budget, got {consumed}"
+        );
+    }
+
+    // A view that fails after metering must report the gas it metered,
+    // not zero.
+    #[test]
+    fn serve_view_failure_reports_consumed_gas() {
+        use crate::headers::{
+            X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+            X_TEZOS_TIMESTAMP,
+        };
+        use mir::ast::micheline::Micheline;
+        use tezos_crypto_rs::blake2b::digest_160;
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+
+        const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
+        const GAS_LIMIT: u64 = 600_000_000;
+
+        let mut host = test_host();
+        let runtime = test_runtime();
+        let registry = NotWiredRegistry;
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+
+        let context =
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .unwrap();
+        let parser = mir::parser::Parser::new();
+        let dest_kt1 = ContractKt1Hash::from(digest_160(b"l2-1439-view-failwith"));
+        let dest = context.originated_from_kt1(&dest_kt1).unwrap();
+        let script = parser
+            .parse_top_level(
+                r#"parameter unit; storage unit;
+                   code { CDR; NIL operation; PAIR };
+                   view "boom" unit unit { DROP; PUSH string "boom"; FAILWITH }"#,
+            )
+            .unwrap();
+        dest.init(
+            &mut host,
+            Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
+            &Micheline::from(())
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+            0.into(),
+        )
+        .unwrap();
+
+        let request = http::Request::builder()
+            .method(http::Method::GET)
+            .uri(format!("http://tezos/{}/boom", dest_kt1.to_base58_check()))
+            .header(X_TEZOS_AMOUNT, "0")
+            .header(X_TEZOS_GAS_LIMIT, GAS_LIMIT.to_string())
+            .header(X_TEZOS_TIMESTAMP, "1000000")
+            .header(X_TEZOS_BLOCK_NUMBER, "1")
+            .header(X_TEZOS_SENDER, SENDER_KT1)
+            .body(vec![])
+            .unwrap();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let consumed: u64 = resp
+            .headers()
+            .get(X_TEZOS_GAS_CONSUMED)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse().ok())
+            .expect("gas-consumed header must parse");
+        assert!(
+            consumed > 0 && consumed < GAS_LIMIT,
+            "view failure must report a nonzero count within budget, got {consumed}"
         );
     }
 

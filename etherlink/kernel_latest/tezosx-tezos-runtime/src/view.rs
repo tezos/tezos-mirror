@@ -43,7 +43,10 @@ use tezosx_interfaces::TezosXRuntimeError;
 use tezosx_journal::TezosXJournal;
 
 use crate::context::TezosRuntimeContext;
-use crate::{headers, url, NULL_PKH, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH};
+use crate::{
+    headers, url, ExecuteRequestOutcome, RequestFailure, NULL_PKH,
+    TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+};
 
 /// Resource-exhaustion `TcError`s that must route to
 /// [`TezosXRuntimeError::OutOfGas`]: direct budget exhaustion, a
@@ -170,17 +173,16 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
 /// through the journal) rather than reading out of the
 /// operation-start snapshot.
 ///
-/// `consumed_milligas` is updated with the gas consumed during
-/// typechecking and interpretation, so the caller can report it back
-/// in `X-Tezos-Gas-Consumed`.
-pub fn execute_view_call<Host>(
+/// The returned [`ExecuteRequestOutcome`] carries the gas consumed during
+/// typechecking and interpretation, and [`RequestFailure`] does the same
+/// on failure, so the caller can report it to the gateway.
+pub(crate) fn execute_view_call<Host>(
     chain_id: &tezos_crypto_rs::hash::ChainId,
     registry: &impl tezosx_interfaces::Registry,
     host: &mut Host,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
-    consumed_milligas: &mut u64,
-) -> Result<(), TezosXRuntimeError>
+) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
     Host: StorageV1,
 {
@@ -191,7 +193,8 @@ where
     if hdrs.amount != Narith(0u64.into()) {
         return Err(TezosXRuntimeError::BadRequest(
             "views cannot receive value (X-Tezos-Amount must be 0)".into(),
-        ));
+        )
+        .into());
     }
 
     let destination_kt1 = parsed.destination;
@@ -315,12 +318,9 @@ where
         registry,
     };
 
-    // Wrap the MIR-consuming work in an IIFE so that `consumed_milligas`
-    // is always refreshed from the gas counter after it runs — success or
-    // failure. Without this, an early `?` (OOG, BadRequest, ...) would
-    // leave `consumed_milligas` at the `u64::MAX` sentinel set by
-    // [`TezosRuntime::serve`], burning the caller's entire gas budget on
-    // what is otherwise a catchable revert.
+    // Wrap the metered work so its gas can be read once after it runs. On
+    // failure the metered figure is attached to the RequestFailure below,
+    // so a fault after metering reports its real gas rather than unset.
     let mir_result: Result<Vec<u8>, TezosXRuntimeError> = (|| {
         let (view, storage_ty_mich, storage_bytes, _) = mir_ctx
             .lookup_view_storage_balance(&destination_kt1, &view_name, &parser.arena)
@@ -430,9 +430,12 @@ where
     // through it on `journal`) before reading gas back from `tc_ctx`
     // and before the outer caller writes to `journal`.
     drop(mir_ctx);
-    *consumed_milligas = tc_ctx.operation_gas.total_milligas_consumed().into();
+    let consumed_milligas: u64 = tc_ctx.operation_gas.total_milligas_consumed().into();
 
-    let encoded = mir_result?;
+    let encoded = mir_result.map_err(|error| RequestFailure {
+        error,
+        consumed_milligas: Some(consumed_milligas),
+    })?;
 
     // Deposit the encoded view result on the dispatch slot that
     // `TezosRuntime::serve` opened for this call — the same slot the
@@ -450,7 +453,10 @@ where
                 "failed to deposit view result into journal: {e}"
             ))
         })?;
-    Ok(())
+    Ok(ExecuteRequestOutcome {
+        delegated_storage_cost: 0,
+        consumed_milligas,
+    })
 }
 
 #[cfg(test)]
