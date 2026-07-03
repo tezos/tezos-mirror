@@ -256,28 +256,6 @@ impl Decodable for TezlinkContent {
     }
 }
 
-pub trait TransactionTrait: Into<TezosXTransaction> + TryFrom<TezosXTransaction> {
-    fn is_delayed(&self) -> bool;
-
-    fn tx_hash(&self) -> TransactionHash;
-
-    fn data_size(&self) -> u64;
-}
-
-impl TransactionTrait for crate::transaction::Transaction {
-    fn is_delayed(&self) -> bool {
-        self.is_delayed()
-    }
-
-    fn tx_hash(&self) -> TransactionHash {
-        self.tx_hash
-    }
-
-    fn data_size(&self) -> u64 {
-        self.data_size()
-    }
-}
-
 impl From<crate::transaction::Transaction> for TezosXTransaction {
     fn from(tx: crate::transaction::Transaction) -> Self {
         Self::Ethereum(Box::new(tx))
@@ -295,19 +273,15 @@ impl TryFrom<TezosXTransaction> for crate::transaction::Transaction {
     }
 }
 
-impl TransactionTrait for TezlinkOperation {
-    fn is_delayed(&self) -> bool {
+impl TezlinkOperation {
+    pub fn is_delayed(&self) -> bool {
         match self.content {
             TezlinkContent::Tezos(_) => false,
             TezlinkContent::Deposit(_) => true,
         }
     }
 
-    fn tx_hash(&self) -> TransactionHash {
-        self.tx_hash
-    }
-
-    fn data_size(&self) -> u64 {
+    pub fn data_size(&self) -> u64 {
         0
     }
 }
@@ -329,110 +303,18 @@ impl TryFrom<TezosXTransaction> for TezlinkOperation {
     }
 }
 
-pub trait ChainHeaderTrait {
-    fn hash(&self) -> H256;
-
-    fn genesis_header() -> Self;
-}
-
-impl ChainHeaderTrait for crate::blueprint_storage::EVMBlockHeader {
-    fn hash(&self) -> H256 {
+impl crate::blueprint_storage::EVMBlockHeader {
+    pub fn hash(&self) -> H256 {
         self.hash
     }
-    fn genesis_header() -> Self {
+
+    pub fn genesis_header() -> Self {
         EVMBlockHeader {
             hash: crate::block::GENESIS_PARENT_HASH,
             receipts_root: vec![0; 32],
             transactions_root: vec![0; 32],
         }
     }
-}
-
-pub trait ChainConfigTrait: Debug {
-    type BlockConstants;
-
-    type ChainHeader: ChainHeaderTrait + Decodable;
-
-    fn get_evm_chain_id(&self) -> U256;
-
-    fn init_registry(&self) -> RegistryImpl;
-
-    fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool;
-
-    fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath>;
-
-    fn constants(
-        &self,
-        host: &mut impl StorageV1,
-        block_in_progress: &BlockInProgress,
-        da_fee_per_byte: U256,
-        coinbase: H160,
-    ) -> anyhow::Result<Self::BlockConstants>;
-
-    fn michelson_to_evm_gas_multiplier(&self, constants: &Self::BlockConstants) -> u64;
-
-    fn fetch_hashes_from_delayed_inbox<Host>(
-        host: &mut Host,
-        delayed_hashes: Vec<crate::delayed_inbox::Hash>,
-        delayed_inbox: &mut DelayedInbox,
-        current_blueprint_size: usize,
-        block_number: U256,
-    ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
-    where
-        Host: StorageV1;
-    fn transaction_from_bytes(
-        bytes: &[u8],
-        blueprint_version: u8,
-    ) -> anyhow::Result<TezosXTransaction>;
-    fn base_fee_per_gas(&self, host: &impl StorageV1, timestamp: Timestamp) -> U256;
-    fn can_fit_in_reboot(
-        &self,
-        executed_gas: U256,
-        tx: &TezosXTransaction,
-        block_constants: &Self::BlockConstants,
-    ) -> anyhow::Result<bool>;
-    #[allow(clippy::too_many_arguments)]
-    fn apply_transaction<Host>(
-        &self,
-        block_in_progress: &BlockInProgress,
-        host: &mut Host,
-        registry: &impl Registry,
-        outbox_queue: &OutboxQueue<'_, impl Path>,
-        block_constants: &Self::BlockConstants,
-        transaction: TezosXTransaction,
-        index: u32,
-        sequencer_pool_address: Option<H160>,
-        tracer_input: Option<TracerInput>,
-        // skip_signature_check can be used to simulate the application of
-        // ill-signed Tezos operations, it has no effect in the EVM case.
-        skip_signature_check: bool,
-        // skip_fees_check can be used to simulate the application of Tezos
-        // operations with no fees, it has no effect in the EVM case.
-        skip_fees_check: bool,
-        // Per-replay flag (from `block::produce` / `handle_run_transaction`)
-        // asking the apply sites to persist HTTP CRAC traces. Plumbed as a
-        // bool so the apply path never needs to probe durable storage for
-        // the flag on its own.
-        http_trace_enabled: bool,
-    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
-    where
-        Host: StorageV1;
-    fn finalize_and_store<Host>(
-        &self,
-        host: &mut Host,
-        block_in_progress: BlockInProgress,
-        block_constants: &Self::BlockConstants,
-        chain_header: Self::ChainHeader,
-    ) -> anyhow::Result<L2Block>
-    where
-        Host: StorageV1;
-    fn start_simulation_mode<Host>(
-        &self,
-        host: &mut Host,
-        registry: &impl Registry,
-    ) -> anyhow::Result<()>
-    where
-        Host: StorageV1 + WasmHost;
 }
 
 fn ethereum_transaction_from_bytes(
@@ -495,22 +377,22 @@ impl Encodable for TezosXTransaction {
     }
 }
 
-impl TransactionTrait for TezosXTransaction {
-    fn is_delayed(&self) -> bool {
+impl TezosXTransaction {
+    pub fn is_delayed(&self) -> bool {
         match self {
             Self::Ethereum(tx) => tx.is_delayed(),
             Self::Tezos(op) => op.is_delayed(),
         }
     }
 
-    fn tx_hash(&self) -> TransactionHash {
+    pub fn tx_hash(&self) -> TransactionHash {
         match self {
-            Self::Ethereum(tx) => tx.tx_hash(),
-            Self::Tezos(op) => op.tx_hash(),
+            Self::Ethereum(tx) => tx.tx_hash,
+            Self::Tezos(op) => op.tx_hash,
         }
     }
 
-    fn data_size(&self) -> u64 {
+    pub fn data_size(&self) -> u64 {
         match self {
             Self::Ethereum(tx) => tx.data_size(),
             Self::Tezos(op) => op.data_size(),
@@ -536,31 +418,27 @@ fn read_or_init_michelson_to_evm_gas_multiplier(host: &mut impl StorageV1) -> u6
     }
 }
 
-impl ChainConfigTrait for TezosXChainConfig {
-    type BlockConstants = TezosXBlockConstants;
-
-    type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
-
-    fn get_evm_chain_id(&self) -> U256 {
+impl TezosXChainConfig {
+    pub fn get_evm_chain_id(&self) -> U256 {
         self.evm_chain_id
     }
 
-    fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool {
+    pub fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool {
         self.experimental_features
             .is_tezos_runtime_enabled(current_level)
     }
 
-    fn init_registry(&self) -> RegistryImpl {
+    pub fn init_registry(&self) -> RegistryImpl {
         RegistryImpl::new(self.evm_chain_id, self.michelson_chain_id.clone())
     }
 
-    fn constants(
+    pub fn constants(
         &self,
         host: &mut impl StorageV1,
         block_in_progress: &BlockInProgress,
         da_fee_per_byte: U256,
         coinbase: H160,
-    ) -> anyhow::Result<Self::BlockConstants> {
+    ) -> anyhow::Result<TezosXBlockConstants> {
         let level: BlockNumber = block_in_progress.number.try_into()?;
         let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
             .map_err(|_| crate::Error::InvalidConversion)?;
@@ -589,13 +467,16 @@ impl ChainConfigTrait for TezosXChainConfig {
         })
     }
 
-    fn michelson_to_evm_gas_multiplier(&self, constants: &Self::BlockConstants) -> u64 {
+    pub fn michelson_to_evm_gas_multiplier(
+        &self,
+        constants: &TezosXBlockConstants,
+    ) -> u64 {
         constants
             .michelson_runtime_block_constants
             .michelson_to_evm_gas_multiplier
     }
 
-    fn base_fee_per_gas(&self, host: &impl StorageV1, timestamp: Timestamp) -> U256 {
+    pub fn base_fee_per_gas(&self, host: &impl StorageV1, timestamp: Timestamp) -> U256 {
         crate::gas_price::base_fee_per_gas(
             host,
             timestamp,
@@ -603,7 +484,7 @@ impl ChainConfigTrait for TezosXChainConfig {
         )
     }
 
-    fn transaction_from_bytes(
+    pub fn transaction_from_bytes(
         bytes: &[u8],
         blueprint_version: u8,
     ) -> anyhow::Result<TezosXTransaction> {
@@ -645,7 +526,7 @@ impl ChainConfigTrait for TezosXChainConfig {
         }
     }
 
-    fn fetch_hashes_from_delayed_inbox<Host>(
+    pub fn fetch_hashes_from_delayed_inbox<Host>(
         host: &mut Host,
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
@@ -664,11 +545,11 @@ impl ChainConfigTrait for TezosXChainConfig {
         )
     }
 
-    fn can_fit_in_reboot(
+    pub fn can_fit_in_reboot(
         &self,
         executed_gas: U256,
         transaction: &TezosXTransaction,
-        block_constants: &Self::BlockConstants,
+        block_constants: &TezosXBlockConstants,
     ) -> anyhow::Result<bool> {
         let evm_gas_limit = match transaction {
             TezosXTransaction::Ethereum(transaction) => transaction.execution_gas_limit(
@@ -689,13 +570,13 @@ impl ChainConfigTrait for TezosXChainConfig {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn apply_transaction<Host>(
+    pub fn apply_transaction<Host>(
         &self,
         block_in_progress: &BlockInProgress,
         host: &mut Host,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
-        block_constants: &Self::BlockConstants,
+        block_constants: &TezosXBlockConstants,
         transaction: TezosXTransaction,
         index: u32,
         sequencer_pool_address: Option<H160>,
@@ -778,12 +659,12 @@ impl ChainConfigTrait for TezosXChainConfig {
         }
     }
 
-    fn finalize_and_store<Host>(
+    pub fn finalize_and_store<Host>(
         &self,
         host: &mut Host,
         block_in_progress: BlockInProgress,
-        block_constants: &Self::BlockConstants,
-        _chain_header: Self::ChainHeader,
+        block_constants: &TezosXBlockConstants,
+        _chain_header: EVMBlockHeader,
     ) -> anyhow::Result<L2Block>
     where
         Host: StorageV1,
@@ -796,7 +677,7 @@ impl ChainConfigTrait for TezosXChainConfig {
         )
     }
 
-    fn start_simulation_mode<Host>(
+    pub fn start_simulation_mode<Host>(
         &self,
         host: &mut Host,
         registry: &impl Registry,
@@ -807,7 +688,7 @@ impl ChainConfigTrait for TezosXChainConfig {
         start_simulation_mode(host, registry, &self.spec_id)
     }
 
-    fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath> {
+    pub fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath> {
         if self.is_tezos_runtime_enabled(block_number) {
             vec![
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,
@@ -934,10 +815,6 @@ impl TezosXChainConfig {
         &mut self.limits
     }
 
-    pub fn get_spec_id(&self) -> &SpecId {
-        &self.spec_id
-    }
-
     pub fn michelson_chain_id(&self) -> &ChainId {
         &self.michelson_chain_id
     }
@@ -963,7 +840,7 @@ pub struct TezlinkBlockConstants {
     /// start from durable storage (falls back to the compile-time constant).
     pub michelson_to_evm_gas_multiplier: u64,
     /// SafeStorage roots to snapshot when validating/applying a Tezos
-    /// operation. Mirrors `ChainConfigTrait::storage_root_paths` so the
+    /// operation. Mirrors `TezosXChainConfig::storage_root_paths` so the
     /// inner transactional wrap covers every subtree that a Tezos operation
     /// may read or write.
     pub safe_roots: Vec<OwnedPath>,

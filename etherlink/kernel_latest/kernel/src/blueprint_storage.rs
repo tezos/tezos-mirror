@@ -4,9 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Blueprint;
-use crate::chains::{
-    ChainConfigTrait, ChainHeaderTrait, ExperimentalFeatures, TezosXTransaction,
-};
+use crate::chains::{ExperimentalFeatures, TezosXChainConfig, TezosXTransaction};
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::l2block::L2Block;
@@ -631,20 +629,20 @@ where
     ))
 }
 
-fn transactions_from_bytes<ChainConfig: ChainConfigTrait>(
+fn transactions_from_bytes(
     transactions: Vec<Vec<u8>>,
     blueprint_version: u8,
 ) -> anyhow::Result<Vec<TezosXTransaction>> {
     let mut result = vec![];
     for tx_common in transactions.iter() {
         let transaction =
-            ChainConfig::transaction_from_bytes(tx_common, blueprint_version)?;
+            TezosXChainConfig::transaction_from_bytes(tx_common, blueprint_version)?;
         result.push(transaction)
     }
     Ok(result)
 }
 
-pub fn fetch_delayed_txs<Host, ChainConfig: ChainConfigTrait>(
+pub fn fetch_delayed_txs<Host>(
     host: &mut Host,
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &mut DelayedInbox,
@@ -655,7 +653,7 @@ where
     Host: StorageV1,
 {
     let (mut delayed_txs, total_size) =
-        match ChainConfig::fetch_hashes_from_delayed_inbox(
+        match TezosXChainConfig::fetch_hashes_from_delayed_inbox(
             host,
             blueprint_with_hashes.delayed_hashes,
             delayed_inbox,
@@ -673,7 +671,7 @@ where
             }
         };
 
-    let transactions_with_hashes = transactions_from_bytes::<ChainConfig>(
+    let transactions_with_hashes = transactions_from_bytes(
         blueprint_with_hashes.transactions,
         blueprint_with_hashes.version,
     )?;
@@ -696,14 +694,14 @@ where
 pub const DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: i64 = 300i64;
 
 #[allow(clippy::too_many_arguments)]
-fn parse_and_validate_blueprint<Host, ChainConfig: ChainConfigTrait>(
+fn parse_and_validate_blueprint<Host>(
     host: &mut Host,
     bytes: &[u8],
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
     evm_node_flag: bool,
     max_blueprint_lookahead_in_seconds: i64,
-    parent_chain_header: &ChainConfig::ChainHeader,
+    parent_chain_header: &EVMBlockHeader,
     head_timestamp: Timestamp,
     block_number: U256,
 ) -> anyhow::Result<(BlueprintValidity, usize)>
@@ -777,7 +775,7 @@ where
             }
 
             // Fetch delayed transactions
-            fetch_delayed_txs::<_, ChainConfig>(
+            fetch_delayed_txs(
                 host,
                 blueprint_with_hashes,
                 delayed_inbox,
@@ -806,12 +804,12 @@ where
     delete_blueprint(host, blueprint_path)
 }
 
-fn read_all_chunks_and_validate<Host, ChainConfig: ChainConfigTrait>(
+fn read_all_chunks_and_validate<Host>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
     nb_chunks: u16,
     config: &mut Configuration,
-    previous_chain_header: &ChainConfig::ChainHeader,
+    previous_chain_header: &EVMBlockHeader,
     previous_timestamp: Timestamp,
     block_number: U256,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
@@ -857,18 +855,17 @@ where
             max_blueprint_lookahead_in_seconds,
             ..
         } => {
-            let validity: (BlueprintValidity, usize) =
-                parse_and_validate_blueprint::<_, ChainConfig>(
-                    host,
-                    chunks.concat().as_slice(),
-                    delayed_inbox,
-                    size,
-                    *evm_node_flag,
-                    *max_blueprint_lookahead_in_seconds,
-                    previous_chain_header,
-                    previous_timestamp,
-                    block_number,
-                )?;
+            let validity: (BlueprintValidity, usize) = parse_and_validate_blueprint(
+                host,
+                chunks.concat().as_slice(),
+                delayed_inbox,
+                size,
+                *evm_node_flag,
+                *max_blueprint_lookahead_in_seconds,
+                previous_chain_header,
+                previous_timestamp,
+                block_number,
+            )?;
             if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
                 validity
             {
@@ -886,12 +883,12 @@ where
     }
 }
 
-pub fn read_blueprint<Host, ChainConfig: ChainConfigTrait>(
+pub fn read_blueprint<Host>(
     host: &mut Host,
     config: &mut Configuration,
     number: U256,
     previous_timestamp: Timestamp,
-    previous_chain_header: &ChainConfig::ChainHeader,
+    previous_chain_header: &EVMBlockHeader,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
     Host: StorageV1,
@@ -914,7 +911,7 @@ where
         }
         log!(Benchmarking, "Number of chunks in blueprint: {}", nb_chunks);
         // All chunks are available
-        let (blueprint, size) = read_all_chunks_and_validate::<_, ChainConfig>(
+        let (blueprint, size) = read_all_chunks_and_validate(
             host,
             &blueprint_path,
             nb_chunks,
@@ -955,13 +952,7 @@ where
                 EVMBlockHeader::genesis_header(),
             ),
         };
-    read_blueprint::<_, crate::chains::TezosXChainConfig>(
-        host,
-        config,
-        number,
-        previous_timestamp,
-        &block_header,
-    )
+    read_blueprint(host, config, number, previous_timestamp, &block_header)
 }
 
 pub fn drop_blueprint<Host>(host: &mut Host, number: U256) -> Result<(), Error>
@@ -1018,7 +1009,6 @@ mod tests {
 
     use super::*;
     use crate::block::GENESIS_PARENT_HASH;
-    use crate::chains::TezosXChainConfig;
     use crate::configuration::{DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::{
@@ -1097,7 +1087,7 @@ mod tests {
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
-        let validity = parse_and_validate_blueprint::<_, TezosXChainConfig>(
+        let validity = parse_and_validate_blueprint(
             &mut host,
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,
@@ -1165,7 +1155,7 @@ mod tests {
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
-        let validity = parse_and_validate_blueprint::<_, TezosXChainConfig>(
+        let validity = parse_and_validate_blueprint(
             &mut host,
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,

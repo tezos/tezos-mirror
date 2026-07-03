@@ -14,7 +14,7 @@ use crate::{
     block::bip_from_blueprint,
     blueprint::Blueprint,
     blueprint_storage::read_current_blueprint_header,
-    chains::{self, ChainConfigTrait, TezosXChainConfig},
+    chains::{self, TezosXChainConfig},
     configuration::fetch_tezosx_configuration,
     delayed_inbox::DelayedInbox,
     sub_block,
