@@ -49,9 +49,9 @@ fi
 # The S3 directory name for this version, e.g. "octez-v20.0"
 version_dir="octez-v${gitlab_release_major_version}.${gitlab_release_minor_version}"
 
-dune build ci/bin_release_page/src/
+dune build release_site/src/
 
-VM="_build/default/ci/bin_release_page/src/version_manager.exe"
+VM="_build/default/release_site/src/version_manager.exe"
 S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}"
 
 echo "Processing packaging revision ${gitlab_packaging_revision_version} for ${version_dir}..."

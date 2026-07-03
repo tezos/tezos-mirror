@@ -27,9 +27,9 @@ if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
   exit 1
 fi
 
-dune build ci/bin_release_page/src/
+dune build release_site/src/
 
-VM="_build/default/ci/bin_release_page/src/version_manager.exe"
+VM="_build/default/release_site/src/version_manager.exe"
 S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}/grafazos"
 
 # Download the published versions.json so the page reflects what is published.
@@ -37,7 +37,7 @@ echo "Downloading versions.json..."
 $VM download --path "${S3_PATH}"
 
 echo "Building release page"
-dune exec ./ci/bin_release_page/src/release_page.exe -- --component 'grafazos' \
+dune exec ./release_site/src/release_page.exe -- --component 'grafazos' \
   --title 'Grafazos releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
   "${BUCKET_PATH:-}" dashboards
 

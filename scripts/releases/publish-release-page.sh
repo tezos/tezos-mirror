@@ -27,9 +27,9 @@ if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
   exit 1
 fi
 
-dune build ci/bin_release_page/src/
+dune build release_site/src/
 
-VM="_build/default/ci/bin_release_page/src/version_manager.exe"
+VM="_build/default/release_site/src/version_manager.exe"
 S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}"
 
 # Download the published versions.json so the page reflects what is published.
