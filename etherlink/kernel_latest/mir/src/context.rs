@@ -322,6 +322,14 @@ impl<'a> Ctx<'a> {
         self.voting_powers = map;
     }
 
+    /// Forcibly set [Self::total_voting_power], overriding the value derived
+    /// from [Self::set_voting_powers]. In a real chain the total voting power
+    /// is the network-wide total, which need not equal the sum of the
+    /// individually specified voting powers.
+    pub fn set_total_voting_power(&mut self, v: BigUint) {
+        self.total_voting_power = v;
+    }
+
     /// Forcibly set an origination counter. Mostly useful in tests.
     pub fn set_origination_counter(&mut self, v: u32) {
         self.origination_counter = v;

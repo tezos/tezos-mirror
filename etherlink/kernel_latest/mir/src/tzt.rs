@@ -6,7 +6,7 @@
 
 mod expectation;
 
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt;
@@ -102,6 +102,16 @@ pub struct TztTest<'a> {
     pub storages: Option<HashMap<AddressHash, (Type, TypedValue<'a>)>>,
     /// Initial value for "now" in the context.
     pub now: Option<BigInt>,
+    /// Current blockchain level, as defined by the `level` field.
+    pub level: Option<BigUint>,
+    /// Minimal block time in seconds, as defined by the `min_block_time` field.
+    pub min_block_time: Option<BigUint>,
+    /// Voting powers of implicit accounts, as defined by the `voting_power`
+    /// field. Controls the result of the VOTING_POWER instruction.
+    pub voting_power: Option<HashMap<PublicKeyHash, BigUint>>,
+    /// Total voting power, as defined by the `total_voting_power` field.
+    /// Controls the result of the TOTAL_VOTING_POWER instruction.
+    pub total_voting_power: Option<BigUint>,
     /// Address that directly or indirectly initiated the current transaction
     pub source: Option<PublicKeyHash>,
     /// Address that directly initiated the current transaction
@@ -150,11 +160,52 @@ fn typecheck_stack<'a>(
             let t = parse_ty(ctx.gas(), &t)?;
             // TZT stacks may reference big_maps declared in the test's
             // `big_maps` section by their id.
-            let tc_val =
-                typecheck_value(&v, &mut ctx, &t, AllowForgedLazyStorageId::Yes)?;
+            let tc_val = match t {
+                // `operation` values are not pushable, so the generic value
+                // typechecker rejects them. The TZT format nonetheless spells
+                // them out explicitly in `input`/`output` stacks, so build them
+                // here from their Micheline representation.
+                Type::Operation => typecheck_tzt_operation(&v, &mut ctx)?,
+                _ => typecheck_value(&v, &mut ctx, &t, AllowForgedLazyStorageId::Yes)?,
+            };
             Ok((t, tc_val))
         })
         .collect()
+}
+
+/// Typecheck the value of an `operation` stack element in a TZT `input`/`output`
+/// stack. Operations cannot be produced by the ordinary value typechecker (they
+/// are not pushable), so we build the [TypedValue] directly from the Micheline
+/// representation used by the TZT format.
+fn typecheck_tzt_operation<'a>(
+    v: &Micheline<'a>,
+    ctx: &mut Ctx<'a>,
+) -> Result<TypedValue<'a>, TcError> {
+    match v {
+        // `Emit <arg_ty> <value>`, with an optional field annotation carrying
+        // the event tag (e.g. `Emit %tag nat 5`).
+        Micheline::App(Prim::Emit, [arg_ty, value], anns) => {
+            let arg_ty = parse_ty(ctx.gas(), arg_ty)?;
+            let tc_value =
+                typecheck_value(value, ctx, &arg_ty, AllowForgedLazyStorageId::Yes)?;
+            let tag = anns.get_single_field_ann()?;
+            Ok(TypedValue::new_operation(
+                Operation::Emit(Emit {
+                    tag,
+                    value: tc_value,
+                    arg_ty: Or::Left(arg_ty),
+                }),
+                // The operation counter is dropped when an operation is
+                // converted to Micheline for stack comparison, so any value
+                // works as a placeholder here.
+                0,
+            ))
+        }
+        _ => Err(TcError::InvalidValueForType(
+            format!("{v:?}"),
+            Type::Operation,
+        )),
+    }
 }
 
 impl<'a> Parser<'a> {
@@ -198,6 +249,10 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_big_maps: Option<Vec<(Micheline, Micheline, Micheline, Micheline)>> =
             None;
         let mut m_now: Option<BigInt> = None;
+        let mut m_level: Option<BigUint> = None;
+        let mut m_min_block_time: Option<BigUint> = None;
+        let mut m_voting_power: Option<Micheline> = None;
+        let mut m_total_voting_power: Option<BigUint> = None;
         let mut m_source: Option<Micheline> = None;
         let mut m_sender: Option<Micheline> = None;
         let mut m_storages: Option<Vec<(Micheline, Micheline, Micheline)>> = None;
@@ -234,6 +289,14 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                     set_tzt_field("other_contracts", &mut m_other_contracts, v)?
                 }
                 Now(n) => set_tzt_field("now", &mut m_now, n.into())?,
+                Level(l) => set_tzt_field("level", &mut m_level, l)?,
+                MinBlockTime(t) => {
+                    set_tzt_field("min_block_time", &mut m_min_block_time, t)?
+                }
+                VotingPower(v) => set_tzt_field("voting_power", &mut m_voting_power, v)?,
+                TotalVotingPower(t) => {
+                    set_tzt_field("total_voting_power", &mut m_total_voting_power, t)?
+                }
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
                 SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
                 BigMaps(v) => set_tzt_field("big_maps", &mut m_big_maps, v)?,
@@ -405,6 +468,66 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             None => None,
         };
 
+        let voting_power = match m_voting_power {
+            Some(vp) => {
+                let elts =
+                    match vp {
+                        Micheline::Seq(elts) => elts,
+                        _ => return Err(
+                            "`voting_power` must be a sequence of `Elt <key_hash> <nat>`"
+                                .into(),
+                        ),
+                    };
+                let mut map = HashMap::new();
+                for elt in elts {
+                    match elt {
+                        Micheline::App(Prim::Elt, kv, _) if kv.len() == 2 => {
+                            let typed_key = typecheck_value(
+                                &kv[0],
+                                &mut Ctx::default(),
+                                &Type::KeyHash,
+                                AllowForgedLazyStorageId::No,
+                            )?;
+                            let key = match &mut { typed_key } {
+                                TypedValue::KeyHash(kh) => kh.take_out(),
+                                other => {
+                                    return Err(format!(
+                                        "invalid key in `voting_power`: expected key_hash, got {other:?}"
+                                    )
+                                    .into())
+                                }
+                            };
+                            let typed_val = typecheck_value(
+                                &kv[1],
+                                &mut Ctx::default(),
+                                &Type::Nat,
+                                AllowForgedLazyStorageId::No,
+                            )?;
+                            let power = match &mut { typed_val } {
+                                TypedValue::Nat(n) => std::mem::take(n),
+                                other => {
+                                    return Err(format!(
+                                        "invalid value in `voting_power`: expected nat, got {other:?}"
+                                    )
+                                    .into())
+                                }
+                            };
+                            if map.insert(key, power).is_some() {
+                                return Err(
+                                    "key hash cannot repeat in `voting_power`".into()
+                                );
+                            }
+                        }
+                        _ => {
+                            return Err("each `voting_power` element must be of the form `Elt <key_hash> <nat>`".into())
+                        }
+                    }
+                }
+                Some(map)
+            }
+            None => None,
+        };
+
         // Once we have self_addr and parameter, we typecheck the output stack
         // after populating the context's known_contracts with the self address.
         // Later we may add the Tzt specs `other_contracts` fields. At that point
@@ -563,6 +686,10 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             storages,
             views,
             now: m_now,
+            level: m_level,
+            min_block_time: m_min_block_time,
+            voting_power,
+            total_voting_power: m_total_voting_power,
             source,
             sender,
         })
@@ -661,6 +788,10 @@ pub(crate) enum TztEntity<'a> {
     SelfAddr(Micheline<'a>),
     OtherContracts(Vec<(Micheline<'a>, Micheline<'a>)>),
     Now(i64),
+    Level(BigUint),
+    MinBlockTime(BigUint),
+    VotingPower(Micheline<'a>),
+    TotalVotingPower(BigUint),
     Source(Micheline<'a>),
     SenderAddr(Micheline<'a>),
     BigMaps(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
@@ -742,7 +873,107 @@ pub fn run_tzt_test<'a>(
 
     ctx.now = test.now.clone().unwrap_or(Ctx::default().now);
 
+    ctx.level = test.level.clone().unwrap_or(Ctx::default().level);
+
+    ctx.min_block_time = test
+        .min_block_time
+        .clone()
+        .unwrap_or(Ctx::default().min_block_time);
+
+    if let Some(voting_power) = test.voting_power.clone() {
+        ctx.set_voting_powers(voting_power);
+    }
+
+    // Applied after `set_voting_powers`, which also sets the total, so an
+    // explicit `total_voting_power` field takes precedence over the sum.
+    if let Some(total_voting_power) = test.total_voting_power.clone() {
+        ctx.set_total_voting_power(total_voting_power);
+    }
+
     let execution_result =
         execute_tzt_test_code(test.code, &mut ctx, arena, test.parameter, test.input);
     check_expectation(&mut ctx, test.output, execution_result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::Parser;
+
+    /// Parse and run a TZT test from its textual source, returning the runner's
+    /// result as a `String` on error for easy assertion.
+    fn parse_and_run(src: &str) -> Result<(), String> {
+        let parser = Parser::new();
+        let test = parser.parse_tzt_test(src).map_err(|e| e.to_string())?;
+        let arena = Arena::new();
+        run_tzt_test(test, &arena).map_err(|e| e.to_string())
+    }
+
+    #[test]
+    fn level() {
+        parse_and_run(
+            "code { LEVEL } ; input { } ; output { Stack_elt nat 42 } ; level 42",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn min_block_time() {
+        parse_and_run(
+            "code { MIN_BLOCK_TIME } ; input { } ; \
+             output { Stack_elt nat 7 } ; min_block_time 7",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn voting_power() {
+        parse_and_run(
+            "code { PUSH key_hash \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\" ; \
+             VOTING_POWER } ; input { } ; output { Stack_elt nat 5 } ; \
+             voting_power { Elt \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\" 5 }",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn total_voting_power() {
+        parse_and_run(
+            "code { TOTAL_VOTING_POWER } ; input { } ; \
+             output { Stack_elt nat 100 } ; total_voting_power 100",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn emit() {
+        parse_and_run(
+            "code { EMIT bool } ; input { Stack_elt bool True } ; \
+             output { Stack_elt operation (Emit bool True) }",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn emit_mismatch() {
+        // A wrong emitted value must be reported as a stack mismatch, so the
+        // expectation genuinely constrains the operation's payload.
+        assert!(parse_and_run(
+            "code { EMIT bool } ; input { Stack_elt bool True } ; \
+             output { Stack_elt operation (Emit bool False) }",
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn total_voting_power_overrides_sum() {
+        // `total_voting_power` takes precedence over the sum of `voting_power`.
+        parse_and_run(
+            "code { TOTAL_VOTING_POWER } ; input { } ; \
+             output { Stack_elt nat 100 } ; \
+             voting_power { Elt \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\" 5 } ; \
+             total_voting_power 100",
+        )
+        .unwrap();
+    }
 }
