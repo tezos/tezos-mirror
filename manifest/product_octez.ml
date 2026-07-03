@@ -6156,7 +6156,7 @@ let octez_smart_rollup_node_lib =
    library so the rocksdb NDS FFI ([octez_smart_rollup_nds_on_disk]) is linked
    only by binaries that exercise dual-state activation, not by every consumer
    of [octez_smart_rollup_node]. *)
-let _octez_smart_rollup_node_dual_lib =
+let octez_smart_rollup_node_dual_lib =
   public_lib
     "octez-smart-rollup-node-lib.dual"
     ~internal_name:"octez_smart_rollup_node_dual"
@@ -9917,7 +9917,13 @@ let _octez_smart_rollup_node_lib_tests =
         @ protocol_deps)
   in
   tezt
-    ["canary"; "test_context_gc"; "test_operation_priority"; "test_store"]
+    [
+      "canary";
+      "test_context_gc";
+      "test_operation_priority";
+      "test_store";
+      "test_wasm_2_0_0_dual_state";
+    ]
     ~path:"src/lib_smart_rollup_node/test/"
     ~opam:"tezos-smart-rollup-node-lib-test"
     ~synopsis:"Tests for the smart rollup node library"
@@ -9933,6 +9939,8 @@ let _octez_smart_rollup_node_lib_tests =
         octez_smart_rollup_lib |> open_;
         octez_smart_rollup_node_store_lib |> open_;
         octez_smart_rollup_node_lib |> open_;
+        octez_smart_rollup_node_dual_lib |> open_;
+        octez_riscv_nds_common;
         helpers |> open_;
         alcotezt;
       ]
