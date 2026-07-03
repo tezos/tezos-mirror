@@ -7,8 +7,6 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
-use anyhow::anyhow;
-use mir::ast::ChainId;
 use primitive_types::{H160, U256};
 use revm::primitives::alloy_primitives::IntoLogData;
 use revm::primitives::hardfork::SpecId;
@@ -17,7 +15,6 @@ use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithPro
 use revm_etherlink::inspectors::call_tracer::CallTracerInput;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
 use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
-use revm_etherlink::journal::commit_evm_journal_from_external;
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
     RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
@@ -39,26 +36,19 @@ use tezos_ethereum::tx_common::{
     signed_authorization, AuthorizationList, EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
-use tezos_execution::context::Context;
-use tezos_execution::mir_ctx::BlockCtx;
-use tezos_execution::ProcessedOperation;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
-use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
-use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::operation_result::{
-    ApplyOperationError, ContentResult, OperationBatchWithMetadata,
-    OperationDataAndMetadata, OperationError, OperationResultSum,
+    ApplyOperationError, ContentResult, OperationDataAndMetadata, OperationResultSum,
 };
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::{CracId, TezosXJournal};
-use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
-use crate::chains::{EvmLimits, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH};
+use crate::chains::EvmLimits;
 use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
 use crate::transaction::{Transaction, TransactionContent};
@@ -1272,20 +1262,7 @@ pub fn apply_transaction<Host>(
     spec_id: &SpecId,
     limits: &EvmLimits,
     http_trace_enabled: bool,
-    // SafeStorage roots to snapshot around a [TezosDelayed] operation.
-    // Mirrors [TezlinkBlockConstants::safe_roots]; threaded in from the
-    // caller because [BlockConstants] is EVM-flavored and doesn't carry
-    // Tezos-side storage boundaries.
-    tezos_safe_roots: &[tezos_smart_rollup_host::path::OwnedPath],
-    // Configured Michelson runtime chain id.  All ingress lanes (sequenced,
-    // gateway, delayed) must present the same value so that a Michelson
-    // contract reading CHAIN_ID sees a consistent domain regardless of how
-    // the operation arrived.
-    // TODO: https://linear.app/tezos/issue/L2-1765
-    // Fold into the Michelson runtime block constants so the chain id travels
-    // with that runtime's per-block context instead of a separate parameter.
-    michelson_chain_id: &ChainId,
-    // Block's prior internal-op count, threaded so the delayed and EVM-origin
+    // Block's prior internal-op count, threaded so the EVM-origin delayed and
     // CRAC paths enforce the per-block cap cumulatively (like the native path).
     internal_operations_base: u128,
 ) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
@@ -1351,141 +1328,14 @@ where
                 limits,
             )?
         }
-        TransactionContent::TezosDelayed(op) => {
-            // TODO: If we need to use storage root of tezlink pass it as parameter.
-            let context =
-                TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
-            let skip_signature_check = false;
-            let i128_timestamp: i128 = block_constants
-                .timestamp
-                .try_into()
-                .map_err(|e| anyhow!("Failed to convert timestamp: {e}"))?;
-            let i64_timestamp: i64 = i128_timestamp
-                .try_into()
-                .map_err(|e| anyhow!("Failed to convert timestamp to i64: {e}"))?;
-            let op_hash = op.hash()?;
-            // Delayed operations already paid L1 fees through the delayed inbox,
-            // so DA fee check is not applicable.
-            //
-            // The seed must NOT be the operation's real hash: the
-            // normal Michelson path inside `validate_and_apply_operation`
-            // builds its own `OriginationNonce::initial(op_hash)`
-            // starting at index 0, and if the journal's CRAC nonce
-            // shared the same seed both nonces would derive colliding
-            // KT1s at index 1.  Use a synthetic seed so the two nonce
-            // universes stay disjoint.
-            let synthetic_op_hash = TezosXJournal::synthetic_operation_hash(
-                &crac_id,
-                block_constants.chain_id.low_u64(),
-                block_constants.number.low_u64(),
-            );
-            // Seed the journal with this block's EVM environment so an
-            // inbound CRAC the Michelson operation dispatches exposes the
-            // live block observables instead of zero (see chains.rs).
-            let mut tezosx_journal =
-                TezosXJournal::new(crac_id, synthetic_op_hash, block_constants.clone());
-            tezosx_journal.set_http_trace_enabled(http_trace_enabled);
-            let validation_result = tezos_execution::validate_and_apply_operation(
-                host,
-                registry,
-                &mut tezosx_journal,
-                &context,
-                op_hash.clone(),
-                // TODO: !20198 avoid this clone.
-                op.clone(),
-                &BlockCtx {
-                    level: &BlockNumber {
-                        block_number: block_constants
-                            .number
-                            .try_into()
-                            .map_err(|e| anyhow!("{e}"))?,
-                    },
-                    now: &Timestamp::from(i64_timestamp),
-                    chain_id: michelson_chain_id,
-                    // Folded into the block's cumulative cap, like the native path.
-                    internal_operations_base,
-                    // Delayed-inbox path: preserve the existing always-promote
-                    // trace behavior (not on the block-production hot path).
-                    tracing_enabled: true,
-                    http_trace_enabled: true,
-                },
-                skip_signature_check,
-                None,
-                None, // No fee refund for delayed inbox operations
-                tezos_safe_roots,
-            );
-
-            // Persist HTTP traces collected in [tezosx_journal] regardless of
-            // the validation outcome so that operations that failed
-            // mid-execution still expose their captured CRAC exchanges.
-            // Matches the Tezos / Ethereum apply sites.
-            crate::storage::maybe_store_http_traces_for_tx(
-                host,
-                http_trace_enabled,
-                &transaction.tx_hash,
-                &tezosx_journal,
-            );
-
-            match validation_result {
-                Ok(processed_operations) => {
-                    log!(
-                        Debug,
-                        "Delayed Tezos operation status: SUCCESS - {:?}",
-                        processed_operations
-                    );
-                    let consumed_milligas = ProcessedOperation::total_consumed_milligas(
-                        &processed_operations,
-                    );
-                    let operations =
-                        ProcessedOperation::into_receipts(processed_operations);
-                    let operation_and_receipt = AppliedOperation {
-                        hash: op_hash,
-                        branch: op.branch.clone(),
-                        op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                            OperationBatchWithMetadata {
-                                operations,
-                                signature: op.signature.clone(),
-                            },
-                        ),
-                    };
-                    // Extract cross-runtime side effects accumulated
-                    // during the Michelson execution (e.g. CRAC into EVM)
-                    // BEFORE the commit: `commit_evm_journal_from_external`
-                    // runs `JournalInner::finalize()` which clears
-                    // `inner.logs` as part of revm's standard cleanup, so
-                    // reading them after gives an empty buffer.
-                    let cross_runtime_effects = extract_cross_runtime_effects(
-                        &mut tezosx_journal,
-                        consumed_milligas,
-                    );
-                    let etherlink_withdrawals = commit_evm_journal_from_external(
-                        host,
-                        registry,
-                        block_constants,
-                        &mut tezosx_journal,
-                    )?;
-                    Ok::<_, anyhow::Error>(ExecutionResult::Valid(
-                        RuntimeTransactionResult::Tezos {
-                            op: operation_and_receipt,
-                            etherlink_withdrawals,
-                            cross_runtime_effects,
-                            consumed_milligas,
-                        },
-                    ))
-                }
-                Err(OperationError::Validation(err)) => {
-                    log!(Info, "Delayed Tezos operation status: ERROR - {:?}", err);
-                    Ok::<_, anyhow::Error>(ExecutionResult::Invalid)
-                }
-                Err(OperationError::RuntimeError(err)) => {
-                    log!(Info, "Delayed Tezos operation runtime error: {:?}", err);
-                    return Err(err.into());
-                }
-                Err(OperationError::BlockAbort(msg)) => {
-                    log!(Error, "cross-runtime call block abort: {msg}");
-                    return Err(anyhow::anyhow!("cross-runtime call block abort: {msg}"));
-                }
-            }?
+        TransactionContent::TezosDelayed(_op) => {
+            // TezosDelayed operations are applied through the Michelson
+            // runtime path, never here, so this branch is an invariant
+            // violation rather than a recoverable condition.
+            return Err(Error::Internal(String::from(
+                "Unreachable case that should have been handled by the caller function",
+            ))
+            .into());
         }
     };
 
@@ -1508,7 +1358,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
 
     use crate::{
         apply::{is_valid_ethereum_transaction_common, Validity},
@@ -1838,7 +1688,7 @@ mod tests {
     }
 
     /// Build a dummy CRAC receipt with the given internal operations.
-    fn dummy_crac_receipt(
+    pub(crate) fn dummy_crac_receipt(
         internals: Vec<tezos_tezlink::operation_result::InternalOperationSum>,
     ) -> tezos_tezlink::block::AppliedOperation {
         use tezos_crypto_rs::hash::{BlockHash, OperationHash, UnknownSignature};
@@ -1897,7 +1747,7 @@ mod tests {
         }
     }
 
-    fn make_transfer(
+    pub(crate) fn make_transfer(
         nonce: u16,
         amount: u64,
     ) -> tezos_tezlink::operation_result::InternalOperationSum {

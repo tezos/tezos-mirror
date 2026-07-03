@@ -96,7 +96,7 @@ module Setup = struct
 
   let register_fullstack_test ~title ~tags ~with_runtimes
       ?(kernel = Kernel.Latest) ?additional_uses ?tez_bootstrap_accounts
-      ?time_between_blocks ?michelson_runtime_chain_id =
+      ?time_between_blocks ?michelson_runtime_chain_id ?da_fee =
     Setup.register_test
       ~__FILE__
       ~rpc_server:Evm_node.Resto
@@ -109,6 +109,7 @@ module Setup = struct
       ?tez_bootstrap_accounts
       ?time_between_blocks
       ?michelson_runtime_chain_id
+      ?da_fee
 end
 
 let test_runtime_feature_flag ~runtime () =
@@ -224,28 +225,6 @@ let account_rpc sequencer account key =
     Michelson contract. *)
 let tezosx_michelson_contracts_index = "/tez/tez_accounts/contracts/index"
 
-(** [read_michelson_contract_storage sc_rollup_node contract_hex] reads the
-    storage of an originated Michelson contract from the durable storage,
-    given its hex-encoded [Contract_repr.t] key. *)
-let read_michelson_contract_storage sc_rollup_node contract_hex =
-  let path =
-    sf "%s/%s/data/storage" tezosx_michelson_contracts_index contract_hex
-  in
-  Sc_rollup_node.RPC.call sc_rollup_node
-  @@ Sc_rollup_rpc.get_global_block_durable_state_value
-       ~pvm_kind:"wasm_2_0_0"
-       ~operation:Sc_rollup_rpc.Value
-       ~key:path
-       ()
-
-(** [decode_michelson_contract_address hex] decodes a hex-encoded
-    [Contract_repr.t] into a b58check KT1 address string. *)
-let decode_michelson_contract_address hex =
-  let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
-  Hex.to_bytes (`Hex hex)
-  |> Data_encoding.Binary.of_bytes_exn C.encoding
-  |> C.to_b58check
-
 (** [michelson_contract_hex_of_kt1 kt1] is the hex-encoded [Contract_repr.t]
     durable-storage key for [kt1] (inverse of
     [decode_michelson_contract_address]). *)
@@ -296,62 +275,6 @@ let send_tezos_op_to_delayed_inbox_and_wait ~sc_rollup_address ~sc_rollup_node
   in
   Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node)
 
-(** [originate_michelson_contract_via_delayed_inbox] originates a Michelson
-    contract via the delayed inbox. Loads the script from
-    [michelson_test_scripts], converts code and initial storage to JSON,
-    forges and sends the origination operation, then returns the hex key and
-    KT1 address of the new contract. *)
-let originate_michelson_code_via_delayed_inbox ~sc_rollup_address
-    ~sc_rollup_node ~client ~l1_contracts ~sequencer ~source ~counter ~code
-    ~init_storage_data ?(init_balance = 0) () =
-  let* contracts_before =
-    Delayed_inbox.subkeys
-      tezosx_michelson_contracts_index
-      (Sc_rollup_node sc_rollup_node)
-  in
-  let* init_storage =
-    Client.convert_data_to_json ~data:init_storage_data client
-  in
-  let* origination_op =
-    Operation.Manager.(
-      operation
-        [
-          make
-            ~fee:1000
-            ~counter
-            ~gas_limit:10000
-            ~storage_limit:60000
-            ~source
-            (origination ~code ~init_storage ~init_balance ());
-        ])
-      client
-  in
-  let* () =
-    send_tezos_op_to_delayed_inbox_and_wait
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
-      origination_op
-  in
-  let* contracts_after =
-    Delayed_inbox.subkeys
-      tezosx_michelson_contracts_index
-      (Sc_rollup_node sc_rollup_node)
-  in
-  let new_contracts =
-    List.filter (fun c -> not (List.mem c contracts_before)) contracts_after
-  in
-  Check.(
-    (List.length new_contracts = 1)
-      int
-      ~error_msg:"Expected %R new contract but got %L") ;
-  let contract_hex = List.hd new_contracts in
-  let kt1_address = decode_michelson_contract_address contract_hex in
-  Log.info "Originated contract: %s" kt1_address ;
-  return (contract_hex, kt1_address)
-
 (** [call_michelson_contract_via_delayed_inbox] calls a Michelson contract
     via the delayed inbox. Converts the argument from Michelson notation to
     JSON, forges and sends the call operation. *)
@@ -364,7 +287,7 @@ let call_michelson_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node
       operation
         [
           make
-            ~fee:1000
+            ~fee:1000000
             ~counter
             ~gas_limit
             ~storage_limit:1000
@@ -671,6 +594,93 @@ let test_delayed_inbox_transfer () =
     (Tez.to_mutez balance = 1_000_000_000)
       int
       ~error_msg:"Expected %R mutez but got %L") ;
+  unit
+
+(** A Tezos manager operation whose fee does not cover the configured DA fee is
+    refused by the sequencer's tezlink prevalidator ([insufficient_fees]) when
+    injected directly, but the delayed inbox force-includes it without charging
+    the DA fee (the kernel's delayed-inbox path skips the DA fee; see also
+    [arb_da_fee_for_delayed_inbox] in evm_sequencer.ml). This demonstrates the
+    delayed inbox as a censorship-resistant ingress: an operation the sequencer
+    rejects on fees still gets in. *)
+let test_low_fee_op_refused_by_sequencer_accepted_via_delayed_inbox =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+      (* Any DA fee > 0 makes a zero-fee operation insufficient. *)
+    ~da_fee:(Wei.of_eth_int 4)
+    ~title:
+      "Low-fee Tezos op is refused by the sequencer but accepted via the \
+       delayed inbox"
+    ~tags:["delayed_inbox"; "fee"; "prevalidation"; "censorship"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let source = Constant.bootstrap1 in
+  let receiver = Constant.bootstrap2 in
+  let amount = Tez.of_int 10 in
+  (* Enough to pay execution fees, but not enough to pay inclusion fees *)
+  let fee = Tez.of_mutez_int 500 in
+  let* tez_client = tezos_client sequencer in
+  (* Part 1: injecting directly into the sequencer's tezlink tx pool with a
+     zero fee is refused by prevalidation. *)
+  let process =
+    Client.spawn_transfer
+      ~fee
+      ~gas_limit:10000
+      ~storage_limit:0
+      ~burn_cap:Tez.one
+      ~amount
+      ~giver:source.alias
+      ~receiver:receiver.public_key_hash
+      tez_client
+  in
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  Check.(err =~ rex "evm_node.dev.insufficient_fees")
+    ~error_msg:
+      "Direct injection should be refused by prevalidation with %R but got %L" ;
+  (* Part 2: the same zero-fee transfer, sent through the delayed inbox, is
+     force-included without a DA fee and applied — the receiver is credited. *)
+  let* receiver_balance_before =
+    Client.get_balance_for ~account:receiver.public_key_hash tez_client
+  in
+  let* transfer_op =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:(Tez.to_mutez fee)
+            ~counter:1
+            ~gas_limit:10000
+            ~storage_limit:0
+            ~source
+            (transfer ~dest:receiver ~amount:(Tez.to_mutez amount) ());
+        ])
+      client
+  in
+  let* () =
+    send_tezos_op_to_delayed_inbox_and_wait
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      transfer_op
+  in
+  let* () =
+    check_block_op_status ~index:0 ~expected_status:"applied" tez_client
+  in
+  let* receiver_balance_after =
+    Client.get_balance_for ~account:receiver.public_key_hash tez_client
+  in
+  Check.(
+    (Tez.to_mutez receiver_balance_after
+    = Tez.to_mutez receiver_balance_before + Tez.to_mutez amount)
+      int
+      ~error_msg:
+        "Delayed-inbox transfer should have credited the receiver by the full \
+         amount (DA fee waived): expected %R but got %L") ;
   unit
 
 let test_deposit =
@@ -5547,32 +5557,27 @@ let test_delayed_michelson_chain_id =
   fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
+  let* tez_client = tezos_client sequencer in
   (* Inline the chain_id_store script: parameter unit, stores the result of
      CHAIN_ID as (option chain_id). *)
   let chain_id_store_code =
     "parameter unit ; storage (option chain_id) ; code { DROP ; CHAIN_ID ; \
      SOME ; NIL operation ; PAIR }"
   in
-  let* code =
-    Client.convert_script_to_json ~script:chain_id_store_code client
-  in
   let source = Constant.bootstrap5 in
   (* Step 1: Originate the contract via the delayed inbox. *)
-  let* contract_hex, _kt1_address =
-    originate_michelson_code_via_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~sequencer
-      ~source
-      ~counter:1
-      ~code
-      ~init_storage_data:"None"
-      ()
+  let* kt1_address =
+    Client.originate_contract
+      ~alias:"chain_id_record"
+      ~amount:Tez.zero
+      ~src:source.alias
+      ~prg:chain_id_store_code
+      ~init:"None"
+      ~burn_cap:Tez.one
+      tez_client
   in
+  let*@ _ = Rpc.produce_block sequencer in
   (* Step 2: Call the contract via the delayed inbox to trigger CHAIN_ID. *)
-  let kt1_address = decode_michelson_contract_address contract_hex in
   let* () =
     call_michelson_contract_via_delayed_inbox
       ~sc_rollup_address
@@ -5589,22 +5594,9 @@ let test_delayed_michelson_chain_id =
   (* Step 3: Read the stored chain_id and assert it equals the configured
      value.  On the buggy path the contract would see the EVM chain id's low
      4 bytes instead of the configured Michelson runtime chain id. *)
-  let* raw = read_michelson_contract_storage sc_rollup_node contract_hex in
-  let storage_json =
-    match Option.bind raw decode_micheline_storage with
-    | Some j -> j
-    | None -> Test.fail "Could not read or decode storage of %s" kt1_address
-  in
-  let stored_hex =
-    JSON.(storage_json |-> "args" |=> 0 |-> "bytes" |> as_string)
-  in
-  let stored_chain_id =
-    Hex.to_bytes (`Hex stored_hex)
-    |> Tezos_crypto.Hashed.Chain_id.of_bytes_exn
-    |> Tezos_crypto.Hashed.Chain_id.to_b58check
-  in
+  let* stored_chain_id = Client.contract_storage kt1_address tez_client in
   Check.(
-    (stored_chain_id = delayed_chain_id_test_value)
+    (String.trim stored_chain_id = sf {|Some "%s"|} delayed_chain_id_test_value)
       string
       ~error_msg:
         "Expected delayed-inbox CHAIN_ID to equal the configured Michelson \
@@ -5977,6 +5969,7 @@ let test_meta_block_rpcs_without_michelson_runtime () =
 
 let () =
   test_bootstrap_kernel_config () ;
+  test_low_fee_op_refused_by_sequencer_accepted_via_delayed_inbox [Alpha] ;
   test_deposit [Alpha] ;
   test_reveal () ;
   test_delayed_inbox_transfer () ;
