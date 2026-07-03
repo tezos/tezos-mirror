@@ -186,20 +186,43 @@ let release_page_variables ~mode =
         ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
       ]
 
-let job_release_page =
+let job_deploy_release_page_assets =
   Cacio.parameterize @@ fun mode ->
-  Cacio.parameterize @@ fun wait_for ->
   CI.job
-    "publish:release-page"
+    "release_page.deploy-assets"
     ~__POS__
     ~image:Images.CI.release_page
     ~stage:Publish
     ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:
-      "A job to update the Octez release page. If running in a test pipleine, \
-       the assets are pushed in the [release-page-test.nomadic-labs.com] \
-       bucket. Otherwise they are pushed in [site.prod.octez.tezos.com]. Then \
-       its [index.html] is updated accordingly."
+      "Deploy the Octez release assets and versions.json. If running in a test \
+       pipeline, the assets are pushed in the \
+       [release-page-test.nomadic-labs.com] bucket. Otherwise they are pushed \
+       in [site.prod.octez.tezos.com]."
+    ~needs:
+      [
+        ( Artifacts,
+          Build.job_build_static_linux_released_binaries Amd64 `release );
+        ( Artifacts,
+          Build.job_build_static_linux_released_binaries Arm64 `release );
+      ]
+    ~variables:(release_page_variables ~mode)
+    ~script:
+      ["eval $(opam env)"; "./scripts/releases/deploy-release-page-assets.sh"]
+
+let job_release_page =
+  Cacio.parameterize @@ fun mode ->
+  Cacio.parameterize @@ fun wait_for ->
+  CI.job
+    "release_page.publish"
+    ~__POS__
+    ~image:Images.CI.release_page
+    ~stage:Publish
+    ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
+    ~description:
+      "Publish the Octez release page: regenerate [index.html] and the RSS \
+       feed from the published versions.json and upload them. Reflects what \
+       has been deployed by [release_page.deploy-assets]."
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Days 1))
@@ -207,14 +230,7 @@ let job_release_page =
     ?needs:
       (match wait_for with
       | `wait_for_nothing -> None
-      | `wait_for_build ->
-          Some
-            [
-              ( Artifacts,
-                Build.job_build_static_linux_released_binaries Amd64 `release );
-              ( Artifacts,
-                Build.job_build_static_linux_released_binaries Arm64 `release );
-            ])
+      | `wait_for_deploy -> Some [(Job, job_deploy_release_page_assets mode)])
     ~variables:(release_page_variables ~mode)
     ~script:["eval $(opam env)"; "./scripts/releases/publish-release-page.sh"]
 
@@ -232,7 +248,7 @@ let job_dispatch_call =
     ~needs:
       [
         (Job, job_gitlab_release `real);
-        (Job, job_release_page `real `wait_for_build);
+        (Job, job_release_page `real `wait_for_deploy);
       ]
     ~environment:
       Gitlab_ci.Types.{name = "tezcapital-dispatch"; action = Some Access}
@@ -250,7 +266,8 @@ let () =
     [
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
-      (Manual, job_release_page `real `wait_for_build);
+      (Manual, job_deploy_release_page_assets `real);
+      (Auto, job_release_page `real `wait_for_deploy);
       (Auto, job_dispatch_call);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -261,7 +278,8 @@ let () =
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
-      (Manual, job_release_page `test `wait_for_build);
+      (Manual, job_deploy_release_page_assets `test);
+      (Auto, job_release_page `test `wait_for_deploy);
       (Auto, job_docker_promote_to_latest `test_wait);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -272,7 +290,8 @@ let () =
     [
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
-      (Manual, job_release_page `real `wait_for_build);
+      (Manual, job_deploy_release_page_assets `real);
+      (Auto, job_release_page `real `wait_for_deploy);
       (Auto, job_dispatch_call);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -283,7 +302,8 @@ let () =
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
-      (Manual, job_release_page `test `wait_for_build);
+      (Manual, job_deploy_release_page_assets `test);
+      (Auto, job_release_page `test `wait_for_deploy);
       (Auto, job_docker_promote_to_latest `test_wait);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -294,7 +314,8 @@ let () =
     [
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
-      (Manual, job_release_page `real `wait_for_build);
+      (Manual, job_deploy_release_page_assets `real);
+      (Auto, job_release_page `real `wait_for_deploy);
       (Auto, job_dispatch_call);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -305,7 +326,8 @@ let () =
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
-      (Manual, job_release_page `test `wait_for_build);
+      (Manual, job_deploy_release_page_assets `test);
+      (Auto, job_release_page `test `wait_for_deploy);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;

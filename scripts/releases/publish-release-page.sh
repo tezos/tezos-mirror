@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 
+# Publishes the Octez release page: renders the HTML page and RSS feed from the
+# published versions.json, then uploads them to S3 and invalidates the CDN.
+#
+# The release assets and versions.json are deployed beforehand by
+# [deploy-release-page-assets.sh]. This script only reflects what is already
+# published, so it can be re-run at any time to regenerate the page without
+# re-running a release.
+
 set -eu
 
 REGION="${REGION:-eu-west-1}"
 
 if [ -z "${S3_BUCKET:-}" ]; then
-  echo "S3_BUCKET variable is not set, impossible to publish assets and release page."
+  echo "S3_BUCKET variable is not set, impossible to publish the release page."
   exit 1
 fi
 
@@ -24,100 +32,9 @@ dune build ci/bin_release_page/src/
 VM="_build/default/ci/bin_release_page/src/version_manager.exe"
 S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}"
 
-# Download versions.json from remote storage
+# Download the published versions.json so the page reflects what is published.
 echo "Downloading versions.json..."
 $VM download --path "${S3_PATH}"
-
-# If it's a release, we actually push the assets to the s3 bucket
-if [ -n "${CI_COMMIT_TAG}" ]; then
-
-  # Initialize octez release variables needed later to determine relevant version information:
-  # - major and minor version numbers (resp. [gitlab_release_major_version], [gitlab_release_minor_version])
-  # - and, optionally, release candidate version number ([gitlab_release_rc_version]).
-  # shellcheck source=./scripts/releases/octez-release.sh
-  . ./scripts/releases/octez-release.sh
-
-  if [ -z "${gitlab_release}" ]; then
-    echo "This is not an Octez release. No assets will be added to the release page."
-  else
-
-    announcement="https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html"
-
-    # Add the new version using version_manager
-    # [gitlab_release_rc_version], [gitlab_release_beta_version], [gitlab_release_major_version] and [gitlab_release_minor_version] defined in [./scripts/releases/octez-release.sh]
-    echo "Adding version ${gitlab_release} to release page..."
-    $VM \
-      add \
-      --major "${gitlab_release_major_version}" \
-      --minor "${gitlab_release_minor_version}" \
-      ${gitlab_release_rc_version:+--rc "${gitlab_release_rc_version}"} \
-      ${gitlab_release_beta_version:+--beta "${gitlab_release_beta_version}"} \
-      --announcement "${announcement}"
-
-    # Set as latest only if not an RC or beta
-    if [ -z "${gitlab_release_rc_version}" ] && [ -z "${gitlab_release_beta_version}" ]; then
-      echo "Setting version as latest..."
-      $VM \
-        set-latest \
-        --major "${gitlab_release_major_version}" \
-        --minor "${gitlab_release_minor_version}"
-    fi
-
-    # Active versions logic: only for stable major releases (not RC, not beta)
-    if [ -z "${gitlab_release_rc_version}" ] && [ -z "${gitlab_release_beta_version}" ] && [ "${gitlab_release_minor_version}" = "0" ]; then
-
-      echo "Major release (${gitlab_release_major_version}.0), set all previous versions as not active..."
-
-      prev_major=$((gitlab_release_major_version - 1))
-      if [ "$prev_major" -ge 0 ]; then
-        $VM \
-          set-inactive \
-          --major "${prev_major}" || true
-      fi
-    fi
-
-    echo "Set versions ${gitlab_release_major_version} as active..."
-    $VM \
-      set-active \
-      --major "${gitlab_release_major_version}"
-
-    # Upload binaries to S3 bucket
-    echo "Uploading binaries..."
-    aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
-    aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
-
-    # Create and push archives
-    tar -czf "${gitlab_release}.tar.gz" --transform 's|^octez-binaries/x86_64/|octez/|' octez-binaries/x86_64/*
-    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
-    sha256sum "${gitlab_release}.tar.gz" >> "./x86_64_sha256sums.txt"
-    tar -czf "${gitlab_release}.tar.gz" --transform 's|^octez-binaries/arm64/|octez/|' octez-binaries/arm64/*
-    sha256sum "${gitlab_release}.tar.gz" >> "./arm64_sha256sums.txt"
-    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
-
-    # Push checksums for x86_64 binaries
-    echo "Generating checksums for x86_64 binaries"
-    for binary in ./octez-binaries/x86_64/*; do
-      filename=$(basename "$binary")
-      [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./x86_64_sha256sums.txt"
-    done
-    aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/x86_64/sha256sums.txt"
-
-    # Push checksums for arm64 binaries
-    echo "Generating checksums for arm64 binaries"
-    for binary in ./octez-binaries/arm64/*; do
-      filename=$(basename "$binary")
-      [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./arm64_sha256sums.txt"
-    done
-    aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/arm64/sha256sums.txt"
-
-  fi
-else
-  echo "No tag found. No asset will be added to the release page."
-fi
-
-# Upload versions.json back to remote storage
-echo "Uploading versions.json..."
-$VM upload --path "${S3_PATH}"
 
 # Generate the release page HTML and RSS feed
 ./scripts/releases/generate-release-page.sh
