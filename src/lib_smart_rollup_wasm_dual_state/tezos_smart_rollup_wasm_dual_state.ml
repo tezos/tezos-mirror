@@ -16,6 +16,8 @@ module type NDS_BACKEND = sig
   val produce_proof : prove_session -> Proof.t
 
   val open_verify_session : Proof.t -> Octez_riscv_nds_common.Nds.t
+
+  val copy : Octez_riscv_nds_common.Nds.t -> Octez_riscv_nds_common.Nds.t
 end
 
 (* Documented in the .mli.  Hardcoded as a literal — rather than
@@ -45,7 +47,7 @@ struct
   module Dual_state = struct
     type nds_state = Inactive | Active of Octez_riscv_nds_common.Nds.t
 
-    type state = Irmin.state * nds_state
+    type state = {irmin : Irmin.state; nds : nds_state}
 
     type context = Irmin.context
 
@@ -119,9 +121,9 @@ struct
     let write_nds_hash_marker irmin_state hash =
       Irmin.set_value irmin_state nds_hash_path hash
 
-    let empty_state () = (Irmin.empty_state (), Inactive)
+    let empty_state () = {irmin = Irmin.empty_state (); nds = Inactive}
 
-    let state_hash (irmin, _) = Irmin.state_hash irmin
+    let state_hash {irmin; _} = Irmin.state_hash irmin
 
     let proof_start_state = function
       | Irmin_only p -> Irmin.proof_start_state p
@@ -179,7 +181,7 @@ struct
          durable and PVM metadata.  Pre-activation states write no
          marker, so their state hash stays Irmin-only. *)
       let stamp_marker irmin_state = function
-        | Inactive -> Lwt.return (irmin_state, Inactive)
+        | Inactive -> Lwt.return {irmin = irmin_state; nds = Inactive}
         | Active nds ->
             let open Lwt.Syntax in
             let+ irmin_state =
@@ -187,7 +189,7 @@ struct
                 irmin_state
                 (Octez_riscv_nds_common.Nds.registry_hash nds)
             in
-            (irmin_state, Active nds)
+            {irmin = irmin_state; nds = Active nds}
 
       (* Derive the output [nds_state] from the encoded [storage]: a
          coherent pair passes through unchanged; the activation tick
@@ -209,7 +211,7 @@ struct
                Active — deactivation is not part of the kernel contract"
         | Dual {nds; _}, Inactive -> Active nds
 
-      let encode pvm_state (irmin_state, nds_state) =
+      let encode pvm_state {irmin = irmin_state; nds = nds_state} =
         let open Lwt.Syntax in
         let nds_state' =
           nds_state_of_storage
@@ -219,7 +221,7 @@ struct
         let* irmin_state = Irmin.Encoding_runner.encode pvm_state irmin_state in
         stamp_marker irmin_state nds_state'
 
-      let decode (irmin_state, nds_state) =
+      let decode {irmin = irmin_state; nds = nds_state} =
         let open Lwt.Syntax in
         let* pvm_state = Irmin.Encoding_runner.decode irmin_state in
         let durable =
@@ -232,10 +234,10 @@ struct
           storage = reconstruct_pvm_storage_of_marker durable marker nds_state;
         }
 
-      let decode_durable_storage (irmin_state, _) =
+      let decode_durable_storage {irmin = irmin_state; _} =
         Irmin.Encoding_runner.decode_durable_storage irmin_state
 
-      let encode_storage storage (irmin_state, nds_state) =
+      let encode_storage storage {irmin = irmin_state; nds = nds_state} =
         let open Lwt.Syntax in
         let nds_state' = nds_state_of_storage storage nds_state in
         let* irmin' =
@@ -243,7 +245,7 @@ struct
         in
         stamp_marker irmin' nds_state'
 
-      let decode_storage (irmin_state, nds_state) =
+      let decode_storage {irmin = irmin_state; nds = nds_state} =
         let open Lwt.Syntax in
         let* durable =
           Irmin.Encoding_runner.decode_durable_storage irmin_state
@@ -251,7 +253,7 @@ struct
         let+ marker = read_nds_hash_marker irmin_state in
         reconstruct_pvm_storage_of_marker durable marker nds_state
 
-      let decode_buffers (irmin_state, _) =
+      let decode_buffers {irmin = irmin_state; _} =
         Irmin.Encoding_runner.decode_buffers irmin_state
     end
 
@@ -263,10 +265,10 @@ struct
       && Bytes.equal (Backend.Proof.stop_state nds_proof) expected_post
 
     module Internal_for_tests = struct
-      let insert_failure (irmin_state, nds_state) =
+      let insert_failure {irmin = irmin_state; nds = nds_state} =
         let open Lwt.Syntax in
         let+ irmin' = Irmin.Internal_for_tests.insert_failure irmin_state in
-        (irmin', nds_state)
+        {irmin = irmin'; nds = nds_state}
 
       let make_dual_proof ~irmin_proof ~nds_proof =
         Dual {irmin_proof; nds_proof}
@@ -283,7 +285,7 @@ struct
         minted NDS proof with the Irmin proof, and emit [Dual] only if the
         proof's endpoints match the durable marker
         ({!nds_proof_endpoints_match}); otherwise [None]. *)
-    let produce_dual_proof context (irmin_state, nds) step =
+    let produce_dual_proof context ~irmin:irmin_state ~nds step =
       let open Lwt.Syntax in
       let prove_session, prove_nds = Backend.open_prove_session nds in
       let* pre_nds_hash = read_nds_hash_marker irmin_state in
@@ -292,7 +294,9 @@ struct
            forbidden by the kernel contract and rejected one layer
            up in {!Encoding_runner.encode}, so a step reaching here
            can only return [Active _]. *)
-        let* (irmin', nds'), a = step (irmin_state, Active prove_nds) in
+        let* {irmin = irmin'; nds = nds'}, a =
+          step {irmin = irmin_state; nds = Active prove_nds}
+        in
         let+ post_nds_hash = read_nds_hash_marker irmin' in
         (irmin', (nds', post_nds_hash, a))
       in
@@ -330,7 +334,9 @@ struct
          through ['a] so the dispatch below can branch on them
          without ref cells. *)
       let irmin_step irmin_state =
-        let* (irmin', nds'), a = step (irmin_state, Inactive) in
+        let* {irmin = irmin'; nds = nds'}, a =
+          step {irmin = irmin_state; nds = Inactive}
+        in
         let+ post_nds_hash = read_nds_hash_marker irmin' in
         (irmin', (nds', post_nds_hash, a))
       in
@@ -364,9 +370,9 @@ struct
     (** Proof-production entry point ({!STATE_PROOF.produce_proof}):
         dispatch on the pre-state's tag — [Active] to
         {!produce_dual_proof}, [Inactive] to {!produce_irmin_only_proof}. *)
-    let produce_proof context (irmin_state, nds_state) step =
+    let produce_proof context {irmin = irmin_state; nds = nds_state} step =
       match nds_state with
-      | Active nds -> produce_dual_proof context (irmin_state, nds) step
+      | Active nds -> produce_dual_proof context ~irmin:irmin_state ~nds step
       | Inactive -> produce_irmin_only_proof context irmin_state step
 
     (** Verify a [Dual] proof, mirroring {!produce_dual_proof}: open a
@@ -387,7 +393,9 @@ struct
         (* Step's returned [nds_state] is discarded: deactivation is
            forbidden by the execution, so a step reaching here can only
            return [Active _]. *)
-        let* (irmin', _), a = step (irmin_state, Active verify_nds) in
+        let* {irmin = irmin'; _}, a =
+          step {irmin = irmin_state; nds = Active verify_nds}
+        in
         let+ post = read_nds_hash_marker irmin' in
         (irmin', (pre, post, a))
       in
@@ -411,7 +419,7 @@ struct
                   ~expected_pre:pre
                   ~expected_post:post
                   nds_proof
-              then Lwt.return_some ((irmin', Active verify_nds), a)
+              then Lwt.return_some ({irmin = irmin'; nds = Active verify_nds}, a)
               else Lwt.return_none)
 
     (** Verify an [Irmin_only] proof: replay [step] from [Inactive] and
@@ -425,7 +433,9 @@ struct
          traces the same path as the prover's
          [produce_irmin_only_proof]. *)
       let irmin_step irmin_state =
-        let* (irmin', nds_state'), v = step (irmin_state, Inactive) in
+        let* {irmin = irmin'; nds = nds_state'}, v =
+          step {irmin = irmin_state; nds = Inactive}
+        in
         let+ post_nds_hash = read_nds_hash_marker irmin' in
         (irmin', (nds_state', post_nds_hash, v))
       in
@@ -435,14 +445,14 @@ struct
       | Some (irmin', (Inactive, None, v)) ->
           (* Pre-activation tick that stayed pre-activation: step's
              tag and the durable agree on [Inactive].  Accept. *)
-          Lwt.return_some ((irmin', Inactive), v)
+          Lwt.return_some ({irmin = irmin'; nds = Inactive}, v)
       | Some (irmin', ((Active _ as nds_state'), Some post_nds_hash, v))
         when Bytes.equal post_nds_hash empty_registry_hash ->
           (* Activation tick: step minted a fresh [Active] handle via
              the verifier-configured factory and the encoder wrote
              the canonical empty-registry hash to [/pvm/nds_hash].
              Reuse the step's handle. *)
-          Lwt.return_some ((irmin', nds_state'), v)
+          Lwt.return_some ({irmin = irmin'; nds = nds_state'}, v)
       | Some (_, (Inactive, Some _, _)) ->
           (* Step says [Inactive] but the durable carries
              [/pvm/nds_hash] — the encoder wrote a marker without a
@@ -468,6 +478,42 @@ struct
       match p with
       | Irmin_only irmin_p -> verify_irmin_only_proof irmin_p step
       | Dual dual -> verify_dual_proof dual step
+
+    (* Mutable counterpart of [state], for in-place PVM evaluation.
+       The [irmin] slot is replaced whole (the tree is persistent); the
+       [nds] slot is replaced on the activation flip and mutated
+       through the live handle during kernel execution.
+
+       Declared after the [state]-consuming code above so its labels —
+       deliberately the same as [state]'s — don't shadow them there. *)
+    type mut_state = {mutable irmin : Irmin.state; mutable nds : nds_state}
+
+    let copy_nds = function
+      | Inactive -> Inactive
+      | Active nds -> Active (Backend.copy nds)
+
+    (* [to_imm] / [from_imm] are the snapshot boundary: the [Active]
+       handle is intrinsically mutable, so both directions sever it
+       with {!Backend.copy} — otherwise a "snapshot" would keep
+       mutating under later evaluation of the source (or vice versa).
+       The eval loop itself goes through {!read} / {!write}, which
+       alias, so per-step evaluation never pays a copy. *)
+    let to_imm (m : mut_state) : state = {irmin = m.irmin; nds = copy_nds m.nds}
+
+    let from_imm (s : state) : mut_state =
+      {irmin = s.irmin; nds = copy_nds s.nds}
+
+    (* Alias-preserving conversions for the PVM's mutable-state
+       wrapper: [read] exposes the current state without severing the
+       NDS handle (kernel execution is meant to mutate it in place);
+       [write] installs a step's result, including the
+       [Inactive -> Active] activation flip, which cannot propagate
+       through the handle since [Inactive] carries none. *)
+    let read (m : mut_state) : state = {irmin = m.irmin; nds = m.nds}
+
+    let write (m : mut_state) (s : state) =
+      m.irmin <- s.irmin ;
+      m.nds <- s.nds
   end
 
   let wasm_pvm_machine_dual ~config ~make_empty_nds =

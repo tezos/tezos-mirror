@@ -73,6 +73,10 @@ struct
   let bytes_typ =
     Check.equalable (fun fmt b -> Hex.pp fmt (Hex.of_bytes b)) Bytes.equal
 
+  (** Shorthand {!Dual.state} constructor, keeping call sites concise
+      now that the dual state is a record. *)
+  let dual irmin nds : Dual.state = {irmin; nds}
+
   (** Persist a bare [durable] into the state.  [encode_storage] on a
       [Durable_only] variant is the exact equivalent — both encode the
       same [durable_storage_encoding]. *)
@@ -115,7 +119,7 @@ struct
     let open Lwt_result_syntax in
     let irmin = Irmin.empty_state () in
     let*! irmin_hash = Irmin.state_hash irmin in
-    let*! dual_hash = Dual.state_hash (irmin, Dual.Inactive) in
+    let*! dual_hash = Dual.state_hash (dual irmin Dual.Inactive) in
     Check.(
       (irmin_hash = dual_hash)
         state_hash_typ
@@ -130,12 +134,12 @@ struct
     let open Lwt_result_syntax in
     let irmin_state_inactive = Irmin.empty_state () in
     let*! inactive_hash =
-      Dual.state_hash (irmin_state_inactive, Dual.Inactive)
+      Dual.state_hash (dual irmin_state_inactive Dual.Inactive)
     in
     let nds = make_empty_nds () in
     let*! irmin_state_active = stamp_nds_marker irmin_state_inactive nds in
     let*! activated_hash =
-      Dual.state_hash (irmin_state_active, Dual.Active nds)
+      Dual.state_hash (dual irmin_state_active (Dual.Active nds))
     in
     Check.(
       (inactive_hash <> activated_hash)
@@ -156,7 +160,7 @@ struct
   let test_e2e_encode_writes_path_and_decode_restores_dual () =
     let open Lwt_result_syntax in
     let irmin = Irmin.empty_state () in
-    let state = (irmin, Dual.Inactive) in
+    let state = dual irmin Dual.Inactive in
     let*! durable = Irmin.Encoding_runner.decode_durable_storage irmin in
     let dual_storage =
       Wasm_pvm_state.Internal_state.Dual {durable; nds = make_empty_nds ()}
@@ -164,7 +168,7 @@ struct
     let*! state' =
       Dual.Encoding_runner.encode_storage
         dual_storage
-        (irmin, Dual.Active (make_empty_nds ()))
+        (dual irmin (Dual.Active (make_empty_nds ())))
     in
     (* The encoded state's hash now reflects the NDS hash via the
      [/pvm/nds_hash] path. *)
@@ -225,7 +229,7 @@ struct
   let test_property_activation_changes_hash () =
     let open Lwt_result_syntax in
     let inactive = Irmin.empty_state () in
-    let*! inactive_hash = Dual.state_hash (inactive, Dual.Inactive) in
+    let*! inactive_hash = Dual.state_hash (dual inactive Dual.Inactive) in
     let sizes = [0L; 1L; 2L; 3L; 5L; 8L] in
     let*! _seen =
       Lwt_list.fold_left_s
@@ -241,7 +245,7 @@ struct
           let* activated =
             Dual.Encoding_runner.encode_storage
               dual_storage
-              (inactive, Dual.Active nds)
+              (dual inactive (Dual.Active nds))
           in
           let+ activated_hash = Dual.state_hash activated in
           Check.list_not_mem
@@ -282,8 +286,8 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_inactive_state () in
-    let state = (irmin, Dual.Inactive) in
-    let step st =
+    let state = dual irmin Dual.Inactive in
+    let step (st : Dual.state) =
       let open Lwt.Syntax in
       let* storage = Dual.Encoding_runner.decode_storage st in
       let* st' = Dual.Encoding_runner.encode_storage storage st in
@@ -318,8 +322,8 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_inactive_state () in
-    let state = (irmin, Dual.Inactive) in
-    let step st =
+    let state = dual irmin Dual.Inactive in
+    let step (st : Dual.state) =
       let open Lwt.Syntax in
       let* storage = Dual.Encoding_runner.decode_storage st in
       let* st' = Dual.Encoding_runner.encode_storage storage st in
@@ -372,7 +376,7 @@ struct
     let* irmin = make_seeded_inactive_state () in
     let no_op_step state = Lwt.return (state, ()) in
     let* proof_opt =
-      Dual.produce_proof context (irmin, Dual.Inactive) no_op_step
+      Dual.produce_proof context (dual irmin Dual.Inactive) no_op_step
     in
     match proof_opt with
     | Some ((Dual.Irmin_only irmin_proof as proof), ()) ->
@@ -504,18 +508,18 @@ struct
     (* The stamped marker must agree with the live handle's registry
        hash before we feed the state to [produce_proof]. *)
     let*! () = check_nds_hash_marker activated_irmin nds in
-    let state = (activated_irmin, Dual.Active nds) in
+    let state = dual activated_irmin (Dual.Active nds) in
     (* Real storage decode/encode round-trip: [decode_storage]
      reattaches the (prove-mode) NDS handle from the [Active] tag and
      [encode_storage] writes its registry hash back to
      [/pvm/nds_hash], exactly as the production [compute_step]
      pipeline does each tick. *)
-    let step st =
+    let step (st : Dual.state) =
       (* Read the entry back through the (prove/verify-mode) NDS handle so
          the database index is recorded as accessed during the proof. *)
       let*! value =
         match st with
-        | _, Dual.Active nds -> (
+        | {Dual.nds = Dual.Active nds; _} -> (
             match
               Octez_riscv_nds_common.Nds.read
                 nds
@@ -526,7 +530,7 @@ struct
             with
             | Ok value -> Lwt.return value
             | _ -> Test.fail ~__LOC__ "missing value in nds")
-        | _, Dual.Inactive -> Test.fail ~__LOC__ "Nds is inactive"
+        | {Dual.nds = Dual.Inactive; _} -> Test.fail ~__LOC__ "Nds is inactive"
       in
       Check.(
         (value = Bytes.of_string "value")
@@ -582,7 +586,7 @@ struct
     let*! activated_irmin =
       Dual.Internal_for_tests.write_nds_hash (Irmin.empty_state ()) bogus_hash
     in
-    let state = (activated_irmin, Dual.Active (make_empty_nds ())) in
+    let state = dual activated_irmin (Dual.Active (make_empty_nds ())) in
     let step state = Lwt.return (state, ()) in
     let*! proof_opt = Dual.produce_proof context state step in
     match proof_opt with
@@ -601,7 +605,7 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_inactive_state () in
-    let state = (irmin, Dual.Inactive) in
+    let state = dual irmin Dual.Inactive in
     let no_op_step state = Lwt.return (state, ()) in
     let*! proof_opt = Dual.produce_proof context state no_op_step in
     let proof =
@@ -609,7 +613,7 @@ struct
       | Some (p, ()) -> p
       | None -> Test.fail ~__LOC__ "produce_proof returned None"
     in
-    let mutating_step (irmin, nds_state) =
+    let mutating_step ({irmin; nds = nds_state} : Dual.state) =
       let open Lwt.Syntax in
       let* durable = Irmin.Encoding_runner.decode_durable_storage irmin in
       let* durable =
@@ -619,7 +623,7 @@ struct
           "x"
       in
       let+ irmin' = encode_durable_storage durable irmin in
-      ((irmin', nds_state), ())
+      (dual irmin' nds_state, ())
     in
     let*! verify_opt = Dual.verify_proof proof mutating_step in
     match verify_opt with
@@ -649,10 +653,10 @@ struct
     let+ irmin' = encode_durable_storage durable irmin_state in
     (irmin', ())
 
-  let dual_cross_step (irmin_state, nds_state) =
+  let dual_cross_step ({irmin = irmin_state; nds = nds_state} : Dual.state) =
     let open Lwt.Syntax in
     let+ irmin', () = irmin_cross_step irmin_state in
-    ((irmin', nds_state), ())
+    (dual irmin' nds_state, ())
 
   (** Pre-activation interop, legacy -> dual: a single-state proof's
       bare bytes decode as-is with [Dual.proof_encoding] and pass the
@@ -687,8 +691,8 @@ struct
         in
         let*! verify_opt = Dual.verify_proof proof dual_cross_step in
         match verify_opt with
-        | Some ((_, Dual.Inactive), ()) -> return_unit
-        | Some ((_, Dual.Active _), ()) ->
+        | Some ({Dual.nds = Dual.Inactive; _}, ()) -> return_unit
+        | Some ({Dual.nds = Dual.Active _; _}, ()) ->
             Test.fail
               ~__LOC__
               "dual verify_proof promoted a pre-activation single-state proof \
@@ -707,7 +711,7 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_inactive_state () in
-    let state = (irmin, Dual.Inactive) in
+    let state = dual irmin Dual.Inactive in
     let*! proof_opt = Dual.produce_proof context state dual_cross_step in
     match proof_opt with
     | None ->
@@ -759,11 +763,11 @@ struct
   (** The kernel's [Padding -> Snapshot] activation step: write
       [/pvm/nds_hash] with a fresh empty NDS's hash and flip the tag to
       [Active fresh_nds] (the input [nds_state] is ignored). *)
-  let activation_step (irmin_state, _) =
+  let activation_step ({irmin = irmin_state; _} : Dual.state) =
     let open Lwt.Syntax in
     let fresh_nds = make_empty_nds () in
     let+ irmin' = stamp_nds_marker irmin_state fresh_nds in
-    ((irmin', Dual.Active fresh_nds), ())
+    (dual irmin' (Dual.Active fresh_nds), ())
 
   (** Activation tick produce + verify: from [Inactive], the step
       writes the canonical empty-registry hash and flips to [Active].
@@ -774,7 +778,7 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_inactive_state () in
-    let state = (irmin, Dual.Inactive) in
+    let state = dual irmin Dual.Inactive in
     let*! proof_opt = Dual.produce_proof context state activation_step in
     match proof_opt with
     | None ->
@@ -796,8 +800,8 @@ struct
               ~__LOC__
               "verify_proof rejected an honest activation proof produced by \
                the same step"
-        | Some ((_, Dual.Active _), ()) -> return_unit
-        | Some ((_, Dual.Inactive), ()) ->
+        | Some ({Dual.nds = Dual.Active _; _}, ()) -> return_unit
+        | Some ({Dual.nds = Dual.Inactive; _}, ()) ->
             Test.fail
               ~__LOC__
               "verify_proof returned Inactive for an activation tick — the \
@@ -812,8 +816,8 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_inactive_state () in
-    let state = (irmin, Dual.Inactive) in
-    let bogus_step (irmin_state, _) =
+    let state = dual irmin Dual.Inactive in
+    let bogus_step ({irmin = irmin_state; _} : Dual.state) =
       let open Lwt.Syntax in
       let fresh_nds = make_empty_nds () in
       let+ irmin' =
@@ -821,7 +825,7 @@ struct
           irmin_state
           (Bytes.make 32 '\xff')
       in
-      ((irmin', Dual.Active fresh_nds), ())
+      (dual irmin' (Dual.Active fresh_nds), ())
     in
     let*! proof_opt = Dual.produce_proof context state bogus_step in
     match proof_opt with
@@ -847,7 +851,7 @@ struct
     (* don't touch NDS at all during the proof *)
     let step st = Lwt.return (st, ()) in
     let*! proof_empty_opt =
-      Dual.produce_proof context (irmin_empty, Dual.Active nds_empty) step
+      Dual.produce_proof context (dual irmin_empty (Dual.Active nds_empty)) step
     in
     let dual_empty =
       match proof_empty_opt with
@@ -858,7 +862,10 @@ struct
             "produce_proof for empty-NDS state did not emit a Dual proof"
     in
     let*! proof_size_1_opt =
-      Dual.produce_proof context (irmin_size_1, Dual.Active nds_size_1) step
+      Dual.produce_proof
+        context
+        (dual irmin_size_1 (Dual.Active nds_size_1))
+        step
     in
     let dual_size_1 =
       match proof_size_1_opt with
@@ -890,9 +897,9 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_active_state () in
-    let state = (irmin, Dual.Active (make_empty_nds ())) in
+    let state = dual irmin (Dual.Active (make_empty_nds ())) in
     let step_noop state = Lwt.return (state, ()) in
-    let step_mutate (irmin_state, nds_state) =
+    let step_mutate ({irmin = irmin_state; nds = nds_state} : Dual.state) =
       let open Lwt.Syntax in
       let* durable = Irmin.Encoding_runner.decode_durable_storage irmin_state in
       let* durable =
@@ -902,7 +909,7 @@ struct
           "1"
       in
       let+ irmin' = encode_durable_storage durable irmin_state in
-      ((irmin', nds_state), ())
+      (dual irmin' nds_state, ())
     in
     let*! noop_opt = Dual.produce_proof context state step_noop in
     let dual_noop =
@@ -947,11 +954,11 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_inactive_state () in
-    let pre_state = (irmin, Dual.Inactive) in
+    let pre_state = dual irmin Dual.Inactive in
     let*! pre_hash = Dual.state_hash pre_state in
     (* Mutating step so start_state <> stop_state — otherwise the
      stop_state assertion would be satisfied vacuously by [pre_hash]. *)
-    let step (irmin_state, nds_state) =
+    let step ({irmin = irmin_state; nds = nds_state} : Dual.state) =
       let open Lwt.Syntax in
       let* durable = Irmin.Encoding_runner.decode_durable_storage irmin_state in
       let* durable =
@@ -961,7 +968,7 @@ struct
           "1"
       in
       let+ irmin' = encode_durable_storage durable irmin_state in
-      ((irmin', nds_state), ())
+      (dual irmin' nds_state, ())
     in
     let*! post_state, () = step pre_state in
     let*! post_hash = Dual.state_hash post_state in
@@ -994,11 +1001,11 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_active_state () in
-    let pre_state = (irmin, Dual.Active (make_empty_nds ())) in
+    let pre_state = dual irmin (Dual.Active (make_empty_nds ())) in
     let*! pre_hash = Dual.state_hash pre_state in
     (* Mutating step so start_state <> stop_state — otherwise the
      stop_state assertion would be satisfied vacuously by [pre_hash]. *)
-    let step (irmin_state, nds_state) =
+    let step ({irmin = irmin_state; nds = nds_state} : Dual.state) =
       let open Lwt.Syntax in
       let* durable = Irmin.Encoding_runner.decode_durable_storage irmin_state in
       let* durable =
@@ -1008,7 +1015,7 @@ struct
           "1"
       in
       let+ irmin' = encode_durable_storage durable irmin_state in
-      ((irmin', nds_state), ())
+      (dual irmin' nds_state, ())
     in
     let*! post_state, () = step pre_state in
     let*! post_hash = Dual.state_hash post_state in
@@ -1041,11 +1048,11 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_inactive_state () in
-    let pre_state = (irmin, Dual.Inactive) in
+    let pre_state = dual irmin Dual.Inactive in
     (* Mutating step so the honest proof's stop_state differs from its
      start_state — otherwise [cast_read_only]'s stop->start collapse
      would be satisfied vacuously by a no-op proof. *)
-    let step (irmin_state, nds_state) =
+    let step ({irmin = irmin_state; nds = nds_state} : Dual.state) =
       let open Lwt.Syntax in
       let* durable = Irmin.Encoding_runner.decode_durable_storage irmin_state in
       let* durable =
@@ -1055,7 +1062,7 @@ struct
           "1"
       in
       let+ irmin' = encode_durable_storage durable irmin_state in
-      ((irmin', nds_state), ())
+      (dual irmin' nds_state, ())
     in
     let*! proof_opt = Dual.produce_proof context pre_state step in
     let proof =
@@ -1093,11 +1100,11 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_active_state () in
-    let pre_state = (irmin, Dual.Active (make_empty_nds ())) in
+    let pre_state = dual irmin (Dual.Active (make_empty_nds ())) in
     (* Mutating step so the honest proof's stop_state differs from its
      start_state — otherwise [cast_read_only]'s stop->start collapse
      would be satisfied vacuously by a no-op proof. *)
-    let step (irmin_state, nds_state) =
+    let step ({irmin = irmin_state; nds = nds_state} : Dual.state) =
       let open Lwt.Syntax in
       let* durable = Irmin.Encoding_runner.decode_durable_storage irmin_state in
       let* durable =
@@ -1107,7 +1114,7 @@ struct
           "1"
       in
       let+ irmin' = encode_durable_storage durable irmin_state in
-      ((irmin', nds_state), ())
+      (dual irmin' nds_state, ())
     in
     let*! proof_opt = Dual.produce_proof context pre_state step in
     let proof =
@@ -1148,7 +1155,7 @@ struct
     let open Lwt_result_syntax in
     let context = make_empty_context () in
     let*! irmin = make_seeded_inactive_state () in
-    let pre_state = (irmin, Dual.Inactive) in
+    let pre_state = dual irmin Dual.Inactive in
     let noop_step state = Lwt.return (state, ()) in
     let*! proof_opt = Dual.produce_proof context pre_state noop_step in
     let proof =
@@ -1159,20 +1166,20 @@ struct
     (* Step claims [Active] in its return tag but does not touch
      [/pvm/nds_hash].  Marker is absent in the post-tree — the
      verifier must reject. *)
-    let activating_hint_step (irmin_state, _) =
+    let activating_hint_step ({irmin = irmin_state; _} : Dual.state) =
       let fresh_nds = make_empty_nds () in
-      Lwt.return ((irmin_state, Dual.Active fresh_nds), ())
+      Lwt.return (dual irmin_state (Dual.Active fresh_nds), ())
     in
     let*! verify_opt = Dual.verify_proof proof activating_hint_step in
     match verify_opt with
     | None -> return_unit
-    | Some ((_, Dual.Inactive), ()) ->
+    | Some ({Dual.nds = Dual.Inactive; _}, ()) ->
         Test.fail
           ~__LOC__
           "verify_proof on Irmin_only silently demoted to Inactive — the \
            contract now requires outright rejection of step tag / marker \
            disagreement"
-    | Some ((_, Dual.Active _), ()) ->
+    | Some ({Dual.nds = Dual.Active _; _}, ()) ->
         Test.fail
           ~__LOC__
           "verify_proof on Irmin_only accepted Active without the durable's \
@@ -1205,7 +1212,7 @@ struct
           {validity_period = 0l; message_limit = Z.zero};
       }
     in
-    let storage_state = (irmin, Dual.Active (make_empty_nds ())) in
+    let storage_state = dual irmin (Dual.Active (make_empty_nds ())) in
     let*! raised =
       Lwt.catch
         (fun () ->
@@ -1220,6 +1227,238 @@ struct
         ~__LOC__
         "Encoding_runner.encode accepted Durable_only + Active — deactivation \
          contract not enforced"
+
+  (* -------------------------------------------------------------------- *)
+  (* Mutable-state conversions: snapshot independence                      *)
+  (* -------------------------------------------------------------------- *)
+
+  let nds_handle_exn (s : Dual.state) =
+    match s with
+    | {nds = Dual.Active nds; _} -> nds
+    | {nds = Dual.Inactive; _} -> Test.fail ~__LOC__ "expected an Active state"
+
+  let resize_exn nds n =
+    match Octez_riscv_nds_common.Nds.resize nds n with
+    | Ok () -> ()
+    | Error _ -> Test.fail ~__LOC__ "failed to resize"
+
+  (** [to_imm] severs the NDS handle: mutating the live handle through
+      the mut_state after taking a snapshot must not change the
+      snapshot's registry hash.  This is the dissection-cache scenario —
+      an aliasing [to_imm] would let later evaluation corrupt cached
+      refutation-game states. *)
+  let test_to_imm_snapshot_independent () =
+    let open Lwt_result_syntax in
+    let irmin = Irmin.empty_state () in
+    let m = Dual.from_imm (dual irmin (Dual.Active (make_empty_nds ()))) in
+    let snapshot = Dual.to_imm m in
+    let h0 =
+      Octez_riscv_nds_common.Nds.registry_hash (nds_handle_exn snapshot)
+    in
+    (* Mutate the live handle through the mut_state, as kernel eval
+       does; [Dual.read] aliases, so this is the same handle [m]
+       carries. *)
+    let live = nds_handle_exn (Dual.read m) in
+    resize_exn live 1L ;
+    let h_live = Octez_riscv_nds_common.Nds.registry_hash live in
+    Check.(
+      (h_live <> h0)
+        bytes_typ
+        ~__LOC__
+        ~error_msg:"sanity: resize should have changed the live hash (= %L)") ;
+    let h_snapshot =
+      Octez_riscv_nds_common.Nds.registry_hash (nds_handle_exn snapshot)
+    in
+    Check.(
+      (h_snapshot = h0)
+        bytes_typ
+        ~__LOC__
+        ~error_msg:
+          "mutating the live handle changed the to_imm snapshot: %L, expected \
+           %R") ;
+    return_unit
+
+  (** [from_imm] severs symmetrically: evaluating through the returned
+      mut_state must leave the source state unchanged. *)
+  let test_from_imm_independent () =
+    let open Lwt_result_syntax in
+    let irmin = Irmin.empty_state () in
+    let source = dual irmin (Dual.Active (make_empty_nds ())) in
+    let h0 = Octez_riscv_nds_common.Nds.registry_hash (nds_handle_exn source) in
+    let m = Dual.from_imm source in
+    resize_exn (nds_handle_exn (Dual.read m)) 1L ;
+    let h_source =
+      Octez_riscv_nds_common.Nds.registry_hash (nds_handle_exn source)
+    in
+    Check.(
+      (h_source = h0)
+        bytes_typ
+        ~__LOC__
+        ~error_msg:
+          "mutating through from_imm's mut_state changed the source: %L, \
+           expected %R") ;
+    return_unit
+
+  (** The [Inactive -> Active] activation flip propagates through the
+      read / step / write cycle the PVM's mutable-state wrapper uses —
+      it cannot propagate through handle aliasing since [Inactive]
+      carries no handle. *)
+  let test_write_propagates_activation_flip () =
+    let open Lwt_result_syntax in
+    let*! irmin = make_seeded_inactive_state () in
+    let m = Dual.from_imm (dual irmin Dual.Inactive) in
+    let*! post, () = activation_step (Dual.read m) in
+    Dual.write m post ;
+    match Dual.read m with
+    | {nds = Dual.Active _; _} -> return_unit
+    | {nds = Dual.Inactive; _} ->
+        Test.fail
+          ~__LOC__
+          "activation flip written through Dual.write is not visible through \
+           Dual.read"
+
+  (** [read] aliases: a mutation through the handle [read] exposes is
+      the same mutation kernel evaluation performs — a later [to_imm]
+      must observe it (evaluation effects are never lost), and the
+      snapshot must equal the live hash at capture time. *)
+  let test_read_aliases_live_handle () =
+    let open Lwt_result_syntax in
+    let irmin = Irmin.empty_state () in
+    let m = Dual.from_imm (dual irmin (Dual.Active (make_empty_nds ()))) in
+    let h0 =
+      Octez_riscv_nds_common.Nds.registry_hash (nds_handle_exn (Dual.read m))
+    in
+    resize_exn (nds_handle_exn (Dual.read m)) 1L ;
+    let snapshot = Dual.to_imm m in
+    let h_snapshot =
+      Octez_riscv_nds_common.Nds.registry_hash (nds_handle_exn snapshot)
+    in
+    let h_live =
+      Octez_riscv_nds_common.Nds.registry_hash (nds_handle_exn (Dual.read m))
+    in
+    Check.(
+      (h_snapshot <> h0)
+        bytes_typ
+        ~__LOC__
+        ~error_msg:
+          "mutation through [read]'s handle was lost — to_imm still snapshots \
+           the pre-mutation content (%L)") ;
+    Check.(
+      (h_snapshot = h_live)
+        bytes_typ
+        ~__LOC__
+        ~error_msg:"to_imm snapshot (%L) should equal the live hash (%R)") ;
+    return_unit
+
+  (** [write] installs the state verbatim: [read] after [write] returns
+      the same Irmin tree and the {e same physical} NDS handle — write
+      is alias-preserving by design (the copy boundary is
+      [to_imm]/[from_imm], not [write]). *)
+  let test_write_installs_verbatim () =
+    let open Lwt_result_syntax in
+    let*! irmin' = make_seeded_inactive_state () in
+    let m = Dual.from_imm (dual (Irmin.empty_state ()) Dual.Inactive) in
+    let nds = make_empty_nds () in
+    let s = dual irmin' (Dual.Active nds) in
+    Dual.write m s ;
+    let r = Dual.read m in
+    (match r with
+    | {nds = Dual.Active h; _} ->
+        if not (h == nds) then
+          Test.fail
+            ~__LOC__
+            "write should install the NDS handle without copying (physical \
+             equality expected)"
+    | {nds = Dual.Inactive; _} ->
+        Test.fail ~__LOC__ "write dropped the Active tag") ;
+    let*! h_r = Irmin.state_hash (match r with {irmin; _} -> irmin) in
+    let*! h_s = Irmin.state_hash irmin' in
+    Check.(
+      (h_r = h_s)
+        state_hash_typ
+        ~__LOC__
+        ~error_msg:"write should install the Irmin tree verbatim (%L <> %R)") ;
+    return_unit
+
+  (** Pre-activation states pass through the conversions untouched:
+      [to_imm]/[from_imm] on [Inactive] never mint or copy a handle. *)
+  let test_inactive_passthrough () =
+    let open Lwt_result_syntax in
+    let s = dual (Irmin.empty_state ()) Dual.Inactive in
+    let m = Dual.from_imm s in
+    (match Dual.read m with
+    | {nds = Dual.Inactive; _} -> ()
+    | {nds = Dual.Active _; _} ->
+        Test.fail ~__LOC__ "from_imm minted a handle on an Inactive state") ;
+    (match Dual.to_imm m with
+    | {nds = Dual.Inactive; _} -> ()
+    | {nds = Dual.Active _; _} ->
+        Test.fail ~__LOC__ "to_imm minted a handle on an Inactive state") ;
+    return_unit
+
+  (** Conversions preserve marker coherence: on a state whose
+      [/pvm/nds_hash] marker matches its handle, [from_imm] then
+      [to_imm] still decode — the copy preserves the registry hash, so
+      {!Dual.Encoding_runner.decode_storage}'s cross-check passes. *)
+  let test_conversions_preserve_marker_coherence () =
+    let open Lwt_result_syntax in
+    let nds = make_empty_nds () in
+    let*! irmin = stamp_nds_marker (Irmin.empty_state ()) nds in
+    let m = Dual.from_imm (dual irmin (Dual.Active nds)) in
+    let snapshot = Dual.to_imm m in
+    let*! storage = Dual.Encoding_runner.decode_storage snapshot in
+    (match storage with
+    | Wasm_pvm_state.Internal_state.Dual _ -> ()
+    | Wasm_pvm_state.Internal_state.Durable_only _ ->
+        Test.fail ~__LOC__ "expected Dual storage after conversions") ;
+    return_unit
+
+  (** Regression for the aliasing bug this design fixes: snapshot a
+      mut_state ([to_imm], as the interpreter's dissection cache does),
+      keep evaluating through the live handle, then decode the
+      snapshot.  Under the old [to_imm = (!)] the snapshot shared the
+      live handle, whose registry hash no longer matched the
+      snapshot's [/pvm/nds_hash] marker —
+      [reconstruct_pvm_storage_of_marker] raised [Invalid_argument]
+      and the refutation game lost its cached state. *)
+  let test_snapshot_decodes_after_live_mutation () =
+    let open Lwt_result_syntax in
+    let nds = make_empty_nds () in
+    let*! irmin = stamp_nds_marker (Irmin.empty_state ()) nds in
+    let m = Dual.from_imm (dual irmin (Dual.Active nds)) in
+    let snapshot = Dual.to_imm m in
+    (* Kernel evaluation on the live state, after the snapshot. *)
+    resize_exn (nds_handle_exn (Dual.read m)) 1L ;
+    let*! storage =
+      Lwt.catch
+        (fun () ->
+          let*! s = Dual.Encoding_runner.decode_storage snapshot in
+          Lwt.return_some s)
+        (function Invalid_argument _ -> Lwt.return_none | e -> Lwt.reraise e)
+    in
+    match storage with
+    | Some (Wasm_pvm_state.Internal_state.Dual _) -> return_unit
+    | Some (Wasm_pvm_state.Internal_state.Durable_only _) ->
+        Test.fail ~__LOC__ "expected Dual storage from the snapshot"
+    | None ->
+        Test.fail
+          ~__LOC__
+          "decoding the snapshot raised Invalid_argument — the live handle's \
+           mutation reached the snapshot (the dissection-cache aliasing bug)"
+
+  (** {!NDS_BACKEND.copy} is [Normal]-mode only: a transient
+      [Prove]-mode session handle cannot be copied — a snapshot of a
+      recording session would be meaningless. *)
+  let test_copy_rejects_prove_handle () =
+    let open Lwt_result_syntax in
+    let _session, prove_nds = Backend.open_prove_session (make_empty_nds ()) in
+    match Backend.copy prove_nds with
+    | exception Invalid_argument _ -> return_unit
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "Backend.copy accepted a Prove-mode handle; it should raise \
+           Invalid_argument"
 
   (* -------------------------------------------------------------------- *)
   (* Suite                                                                *)
@@ -1344,6 +1583,44 @@ struct
         "plumbing: Dual proof with swapped NDS half rejected by verify_proof"
         `Quick
         test_dual_proof_with_swapped_nds_half_rejected;
+      (* Mutable-state conversions *)
+      tztest
+        "mut_state: to_imm snapshot unaffected by later live-handle mutation"
+        `Quick
+        test_to_imm_snapshot_independent;
+      tztest
+        "mut_state: from_imm evaluation leaves the source state unchanged"
+        `Quick
+        test_from_imm_independent;
+      tztest
+        "mut_state: activation flip propagates through read/write"
+        `Quick
+        test_write_propagates_activation_flip;
+      tztest
+        "mut_state: read aliases the live handle (eval effects reach to_imm)"
+        `Quick
+        test_read_aliases_live_handle;
+      tztest
+        "mut_state: write installs the state verbatim (no copy)"
+        `Quick
+        test_write_installs_verbatim;
+      tztest
+        "mut_state: Inactive passes through the conversions untouched"
+        `Quick
+        test_inactive_passthrough;
+      tztest
+        "mut_state: conversions preserve marker coherence (decode_storage)"
+        `Quick
+        test_conversions_preserve_marker_coherence;
+      tztest
+        "regression: snapshot still decodes after live-handle mutation \
+         (dissection-cache aliasing bug)"
+        `Quick
+        test_snapshot_decodes_after_live_mutation;
+      tztest
+        "backend: copy rejects a Prove-mode handle"
+        `Quick
+        test_copy_rejects_prove_handle;
     ]
 end
 

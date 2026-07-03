@@ -37,3 +37,16 @@ let open_verify_session nds_proof =
     Octez_riscv_nds_disk.Verify_tag
     (module Octez_riscv_nds_disk.Verify)
     verify_registry
+
+let copy nds =
+  match Octez_riscv_nds_disk.unwrap_normal nds with
+  | None ->
+      invalid_arg
+        "Tezos_smart_rollup_nds_on_disk.copy: NDS handle is not [Normal]-mode \
+         — [Prove]/[Verify] handles are transient in-step sessions and never \
+         live in a state at rest"
+  | Some normal_registry ->
+      Octez_riscv_nds_common.Nds.wrap
+        Octez_riscv_nds_disk.Normal_tag
+        (module Octez_riscv_nds_disk.Normal)
+        (Octez_riscv_nds_disk.Normal.Registry.duplicate normal_registry)

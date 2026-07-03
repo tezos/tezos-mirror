@@ -46,6 +46,17 @@ module type NDS_BACKEND = sig
       replaying the step against it checks each host-function call against
       [proof]. *)
   val open_verify_session : Proof.t -> Octez_riscv_nds_common.Nds.t
+
+  (** [copy nds] returns a handle independent of [nds]: mutations to
+      either handle are invisible to the other; both stay backed by the
+      same underlying store.  Copy-on-write — at most one lazy copy of
+      the registry state, deferred to the next mutation of either side.
+
+      Only [Normal]-mode handles can be copied — [Prove]/[Verify]
+      handles are transient in-step sessions and never live in a state
+      at rest.  Raises [Invalid_argument] otherwise (same precedent as
+      {!open_prove_session}). *)
+  val copy : Octez_riscv_nds_common.Nds.t -> Octez_riscv_nds_common.Nds.t
 end
 
 (** Content hash of an empty NDS registry — the expected
@@ -64,7 +75,7 @@ val empty_registry_hash : bytes
 
     {1 State}
 
-    [state] is a pair [(irmin, nds_state)].  The encoder keeps the halves
+    [state] is a record [{irmin; nds}].  The encoder keeps the halves
     consistent by writing the active registry's hash to the durable at
     [/pvm/nds_hash] on every [Dual] encode, so [state_hash] (the
     Irmin tree's hash) already commits to the NDS state — no external
@@ -88,6 +99,44 @@ module Make
     (** Activation tag carried alongside the Irmin tree: [Inactive] is
         pre-activation, [Active nds] carries the live NDS handle. *)
     type nds_state = Inactive | Active of Octez_riscv_nds_common.Nds.t
+
+    (** The dual state: the Irmin durable tree paired with the NDS
+        activation tag.
+
+        {b Beware}: an [Active] handle is intrinsically mutable, so a
+        [state] value is only as immutable as the discipline around it.
+        Values obtained from {!to_imm} are genuine snapshots (the handle
+        is severed); values built by hand share whatever handle was put
+        in them. *)
+    type state = {irmin : Irmin.state; nds : nds_state}
+
+    (** Mutable counterpart of [state], for in-place PVM evaluation:
+        [irmin] is replaced whole on every step (the tree is
+        persistent); [nds] is replaced on the activation flip and
+        mutated through the live handle during kernel execution. *)
+    type mut_state = {mutable irmin : Irmin.state; mutable nds : nds_state}
+
+    (** [to_imm m] snapshots [m]: the [Active] NDS handle is severed
+        with {!NDS_BACKEND.copy}, so later evaluation through [m] leaves
+        the snapshot unchanged.  Copy-on-write, at most one lazy copy. *)
+    val to_imm : mut_state -> state
+
+    (** [from_imm s] is a fresh mutable state seeded from [s]; the
+        [Active] NDS handle is severed with {!NDS_BACKEND.copy}, so
+        evaluation through the result leaves [s] unchanged. *)
+    val from_imm : state -> mut_state
+
+    (** [read m] is [m]'s current state {b without} severing the NDS
+        handle — the result aliases [m]'s live handle.  For the PVM's
+        mutable-state wrapper (read, evaluate, {!write} back); use
+        {!to_imm} for snapshots. *)
+    val read : mut_state -> state
+
+    (** [write m s] installs [s] into [m] (both fields, no copy) —
+        including the [Inactive -> Active] activation flip, which cannot
+        propagate through handle aliasing since [Inactive] carries no
+        handle. *)
+    val write : mut_state -> state -> unit
 
     (** Durable path of the NDS marker, relative to the PVM state root.
         Consumers reconstructing the NDS half from a persisted state
@@ -149,7 +198,7 @@ module Make
 
     include
       Tezos_scoru_wasm.Wasm_pvm_sig.STATE_PROOF
-        with type state = Irmin.state * nds_state
+        with type state := state
          and type context = Irmin.context
          and type proof := proof
 

@@ -45,6 +45,19 @@ module In_memory_backend :
       Octez_riscv_nds_memory.Verify_tag
       (module Octez_riscv_nds_memory.Verify)
       verify_registry
+
+  let copy nds =
+    match Octez_riscv_nds_memory.unwrap_normal nds with
+    | None ->
+        invalid_arg
+          "In_memory_backend.copy: NDS handle is not [Normal]-mode — \
+           [Prove]/[Verify] handles are transient in-step sessions and never \
+           live in a state at rest"
+    | Some normal_registry ->
+        Octez_riscv_nds_common.Nds.wrap
+          Octez_riscv_nds_memory.Normal_tag
+          (module Octez_riscv_nds_memory.Normal)
+          (Octez_riscv_nds_memory.Normal.Registry.duplicate normal_registry)
 end
 
 module Irmin = struct
