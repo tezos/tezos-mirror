@@ -241,6 +241,9 @@ etherlink.docker:arm64:
     CI_DOCKER_HUB: "true"
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
+  environment:
+    name: docker-publish
+    action: access
 
 etherlink.docker:amd64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -271,6 +274,9 @@ etherlink.docker:amd64:
     CI_DOCKER_HUB: "true"
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
+  environment:
+    name: docker-publish
+    action: access
 
 etherlink.docker:merge_manifests:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -298,4 +304,7 @@ etherlink.docker:merge_manifests:
   variables:
     DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+  environment:
+    name: docker-publish
+    action: access
   retry: 0

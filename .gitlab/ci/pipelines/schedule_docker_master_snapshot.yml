@@ -147,6 +147,9 @@ oc.docker:snapshot:arm64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+  environment:
+    name: docker-publish
+    action: access
   retry:
     max: 1
     when:
@@ -186,6 +189,9 @@ oc.docker:snapshot:amd64:
     DOCKER_BUILD_TARGET: with-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+  environment:
+    name: docker-publish
+    action: access
   retry:
     max: 1
     when:
@@ -219,6 +225,9 @@ docker:merge_manifests:snapshot:
   variables:
     DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+  environment:
+    name: docker-publish
+    action: access
   retry: 0
 
 docker:promote_weekly:
@@ -247,4 +256,7 @@ docker:promote_weekly:
   variables:
     DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+  environment:
+    name: docker-publish
+    action: access
   retry: 0
