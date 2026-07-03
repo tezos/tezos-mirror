@@ -76,7 +76,7 @@ let _release_page_base_lib =
   private_lib
     "base_lib"
     ~opam:""
-    ~path:"ci/bin_release_page/src"
+    ~path:"release_site/src"
     ~release_status:Unreleased
     ~modules:["base"]
     ~profile:"release-tools-deps"
@@ -86,7 +86,7 @@ let _release_page =
   private_exe
     "release_page"
     ~opam:""
-    ~path:"ci/bin_release_page/src"
+    ~path:"release_site/src"
     ~release_status:Unreleased
     ~modules:["release_page"]
     ~profile:"release-tools-deps"
@@ -96,7 +96,7 @@ let _version_manager =
   private_exe
     "version_manager"
     ~opam:""
-    ~path:"ci/bin_release_page/src"
+    ~path:"release_site/src"
     ~release_status:Unreleased
     ~modules:["version_manager"]
     ~profile:"release-tools-deps"
@@ -105,7 +105,7 @@ let _version_manager =
 let _release_page_tests =
   private_exe
     "main"
-    ~path:"ci/bin_release_page/tezt"
+    ~path:"release_site/tezt"
     ~opam:""
     ~synopsis:"Tests for the release page tools"
     ~release_status:Unreleased
@@ -118,7 +118,7 @@ let ci_release_page =
   private_lib
     "release_page_ci"
     ~opam:""
-    ~path:"ci/bin_release_page/ci"
+    ~path:"release_site/ci"
     ~bisect_ppx:No
     ~deps:
       [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]

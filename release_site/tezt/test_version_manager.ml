@@ -8,12 +8,12 @@
 (** Testing
     -------
     Component:    Release Page / version_manager
-    Invocation:   dune exec ci/bin_release_page/tezt/main.exe --file test_version_manager.exe
+    Invocation:   dune exec release_site/tezt/main.exe --file test_version_manager.exe
     Subject:      Tests for the version_manager tool
 *)
 
 let version_manager =
-  project_root // "_build/default/ci/bin_release_page/src/version_manager.exe"
+  project_root // "_build/default/release_site/src/version_manager.exe"
 
 (** [fresh_versions_file ()] creates a temporary file containing an empty
     JSON array, suitable for use as a [versions.json] input. *)
