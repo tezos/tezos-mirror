@@ -6,21 +6,30 @@ set -eu
 # (via docker_initialize.sh --image-names) in 'before_script'.
 . scripts/ci/docker.env
 
-# Note: 'ci_image_name' is set in the variables section
-# of the top-level .gitlab-ci.yml.
-ci_image_name=${ci_image_name:?"ci_image_name: is unset"}
-# Note: 'ci_image_tag' is dynamically set by an incoming
-# dotenv file from the job that produces the CI images
-# (currently: 'oc.docker:ci:*')
-ci_image_version=${ci_image_tag:?"ci_image_tag: is unset"}
-
+# Full image references (name:tag) for the runtime and build-dependencies images
+# the Octez distribution is built FROM. The distribution jobs pass them
+# explicitly (see the --runtime-image / --build-deps-image arguments below); they
+# default to the images matching the current checkout when a caller omits them
+# (e.g. a local invocation).
+runtime_image=""
+build_deps_image=""
 # The rust-toolchain image (L2 builder) used for with-EVM builds is passed
 # explicitly by the job via --rust-toolchain-image.
 rust_toolchain_image=""
-options=$(getopt -o '' -l rust-toolchain-image: -- "$@")
+
+options=$(getopt -o '' \
+  -l runtime-image:,build-deps-image:,rust-toolchain-image: -- "$@")
 eval set - "$options"
 while true; do
   case "$1" in
+  --runtime-image)
+    shift
+    runtime_image="$1"
+    ;;
+  --build-deps-image)
+    shift
+    build_deps_image="$1"
+    ;;
   --rust-toolchain-image)
     shift
     rust_toolchain_image="$1"
@@ -36,6 +45,17 @@ while true; do
   esac
   shift
 done
+
+# Fall back to the images matching the current checkout when the caller did not
+# pass an explicit reference. 'ci_image_name' is set in the variables section of
+# the top-level .gitlab-ci.yml; 'ci_image_tag' is set by an incoming dotenv file
+# from the job that produces those images (currently: 'oc.docker:ci:*').
+if [ -z "${runtime_image}" ] || [ -z "${build_deps_image}" ]; then
+  ci_image_name=${ci_image_name:?"ci_image_name: is unset"}
+  ci_image_version=${ci_image_tag:?"ci_image_tag: is unset"}
+  runtime_image="${runtime_image:-${ci_image_name}/runtime:${ci_image_version}}"
+  build_deps_image="${build_deps_image:-${ci_image_name}/build:${ci_image_version}}"
+fi
 
 cd "${CI_PROJECT_DIR}" || exit 1
 
@@ -54,8 +74,8 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 ./scripts/create_docker_image.sh \
   --image-name "${DOCKER_IMAGE_NAME}" \
   --image-version "${DOCKER_IMAGE_TAG}" \
-  --ci-image-name "${ci_image_name}" \
-  --ci-image-version "${ci_image_version}" \
+  --runtime-image "${runtime_image}" \
+  --build-deps-image "${build_deps_image}" \
   --executables "${OCTEZ_EXECUTABLES}" \
   --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
   --docker-target "${DOCKER_BUILD_TARGET}" \
