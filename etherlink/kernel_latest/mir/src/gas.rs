@@ -311,6 +311,17 @@ pub mod tc_cost {
         // corresponds to Cost_of.Typechecking.proof_argument in the protocol
         (Checked::from(size) * 50).as_gas_cost()
     }
+
+    pub fn check_printable(len: usize) -> Result<u32, CostOverflow> {
+        // corresponds to cost_CHECK_PRINTABLE in the protocol: 10 * len + 15
+        (Checked::from(len) * 10 + 15).as_gas_cost()
+    }
+
+    // Flat cost of resolving an entrypoint. L1 walks the parameter's Or-tree
+    // charging cost_FIND_ENTRYPOINT (= cost_N_ICompare 31 31 = 35) per node;
+    // MIR resolves against a flat entrypoint HashMap in O(1), so a single
+    // constant charge matches MIR's actual complexity.
+    pub const FIND_ENTRYPOINT: u32 = 35;
 }
 
 /// Get byte size of [BigInt] or [BigUint].
