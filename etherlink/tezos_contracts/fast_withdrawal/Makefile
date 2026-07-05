@@ -4,3 +4,4 @@ compile:
 	rm -r -f ./build
 	mkdir ./build
 	${LIGO_COMPILER} compile contract fast-withdrawal/fast-withdrawal.mligo -o build/fast-withdrawal.tz
+	${LIGO_COMPILER} compile contract service-provider/service-provider.mligo -o build/service-provider.tz

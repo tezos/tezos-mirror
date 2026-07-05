@@ -26,6 +26,11 @@ semantically equivalent.
 The audit report for the contract is available
 [here](https://github.com/etherlinkcom/audit/blob/main/Fast-Withdrawals/Inference%20-%20Etherlink%20-%20tez%20fast%20withdrawal%20bridge%20-%20v1.0.pdf).
 
+This service-provider folder contains a contract implementation
+[`service-provider.mligo`](service-provider/service-provider.mligo) that is only
+used for integration tests for fast withdrawals and not part of the original
+repo.
+
 ## Building
 
 ```bash
