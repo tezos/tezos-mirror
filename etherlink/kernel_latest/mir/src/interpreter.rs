@@ -2611,32 +2611,32 @@ fn interpret_one<'a>(
         }
         I::Gt => {
             ctx.gas().consume(interpret_cost::GT)?;
-            let i = pop!(V::Int);
+            pop_ref!(i, Int);
             stack.push(V::Bool(i.is_positive()));
         }
         I::Ge => {
             ctx.gas().consume(interpret_cost::GE)?;
-            let i = pop!(V::Int);
+            pop_ref!(i, Int);
             stack.push(V::Bool(!i.is_negative()));
         }
         I::Eq => {
             ctx.gas().consume(interpret_cost::EQ)?;
-            let i = pop!(V::Int);
+            pop_ref!(i, Int);
             stack.push(V::Bool(i.is_zero()));
         }
         I::Neq => {
             ctx.gas().consume(interpret_cost::NEQ)?;
-            let i = pop!(V::Int);
+            pop_ref!(i, Int);
             stack.push(V::Bool(!i.is_zero()));
         }
         I::Le => {
             ctx.gas().consume(interpret_cost::LE)?;
-            let i = pop!(V::Int);
+            pop_ref!(i, Int);
             stack.push(V::Bool(!i.is_positive()));
         }
         I::Lt => {
             ctx.gas().consume(interpret_cost::LT)?;
-            let i = pop!(V::Int);
+            pop_ref!(i, Int);
             stack.push(V::Bool(i.is_negative()));
         }
         I::Abs => {
