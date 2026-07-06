@@ -684,9 +684,9 @@ mod test_big_map_operations {
 }
 
 impl<'a> TypedValue<'a> {
-    /// Traverses a `TypedValue` and applies the `put_res` function on all big
-    /// maps inside it.
-    fn collect_big_maps<'b>(&'b mut self, put_res: &mut impl FnMut(&'b mut BigMap<'a>)) {
+    /// Traverses a `TypedValue` in AST pre-order and applies `f` to every big
+    /// map inside it.
+    fn for_each_big_map_mut(&mut self, f: &mut impl FnMut(&mut BigMap<'a>)) {
         use crate::ast::Or::*;
         use TypedValue::*;
         match self {
@@ -711,29 +711,30 @@ impl<'a> TypedValue<'a> {
             #[cfg(feature = "bls")]
             Bls12381G2(_) => {}
             Pair(l, r) => {
-                Rc::make_mut(l).collect_big_maps(put_res);
-                Rc::make_mut(r).collect_big_maps(put_res);
+                Rc::make_mut(l).for_each_big_map_mut(f);
+                Rc::make_mut(r).for_each_big_map_mut(f);
             }
             Or(p) => match p {
-                Left(l) => Rc::make_mut(l).collect_big_maps(put_res),
-                Right(r) => Rc::make_mut(r).collect_big_maps(put_res),
+                Left(l) => Rc::make_mut(l).for_each_big_map_mut(f),
+                Right(r) => Rc::make_mut(r).for_each_big_map_mut(f),
             },
             Option(p) => {
                 if let Some(x) = p.as_mut() {
-                    Rc::make_mut(x).collect_big_maps(put_res)
+                    Rc::make_mut(x).for_each_big_map_mut(f)
                 }
             }
             List(l) => l
                 .iter_mut()
-                .for_each(|v| Rc::make_mut(v).collect_big_maps(put_res)),
+                .for_each(|v| Rc::make_mut(v).for_each_big_map_mut(f)),
             Set(_) => {
                 // Elements are comparable and so have no big maps
             }
-            Map(m) => m.iter_mut().for_each(|(_k, v)| {
-                // Key is comparable as so has no big map, skipping it
-                Rc::make_mut(v).collect_big_maps(put_res)
-            }),
-            BigMap(m) => put_res(m),
+            Map(m) => {
+                // Keys are comparable (no big maps); visit each value.
+                m.values_mut()
+                    .for_each(|v| Rc::make_mut(v).for_each_big_map_mut(f))
+            }
+            BigMap(m) => f(m),
             Ticket(_) => {
                 // Value is comparable, has no big map
             }
@@ -742,29 +743,50 @@ impl<'a> TypedValue<'a> {
             }
             Operation(op) => match &mut op.as_mut().operation {
                 crate::ast::Operation::TransferTokens(t) => {
-                    t.param.collect_big_maps(put_res)
+                    t.param.for_each_big_map_mut(f)
                 }
                 crate::ast::Operation::SetDelegate(_) => {}
                 crate::ast::Operation::Emit(_) => {
                     // Can contain only pushable values, thus no big maps
                 }
                 crate::ast::Operation::CreateContract(cc) => {
-                    cc.storage.collect_big_maps(put_res)
+                    cc.storage.for_each_big_map_mut(f)
                 }
             },
         }
     }
 
-    /// Traverses a `TypedValue` and add a mutable reference to it to the output
-    /// vector.
-    pub fn view_big_maps_mut<'b>(&'b mut self, out: &mut Vec<&'b mut BigMap<'a>>) {
-        self.collect_big_maps(&mut |m| out.push(m));
+    /// Read-only counterpart of [TypedValue::for_each_big_map_mut]: applies
+    /// `f` to every big map inside self in AST order without mutating it.
+    fn for_each_big_map<'b>(&'b self, f: &mut impl FnMut(&'b BigMap<'a>)) {
+        use crate::ast::Or::*;
+        use TypedValue::*;
+        match self {
+            Pair(l, r) => {
+                l.for_each_big_map(f);
+                r.for_each_big_map(f);
+            }
+            Or(p) => match p {
+                Left(x) | Right(x) => x.for_each_big_map(f),
+            },
+            Option(Some(x)) => x.for_each_big_map(f),
+            List(l) => l.iter().for_each(|v| v.for_each_big_map(f)),
+            Map(m) => m.values().for_each(|v| v.for_each_big_map(f)),
+            BigMap(m) => f(m),
+            Operation(op) => match &op.operation {
+                crate::ast::Operation::TransferTokens(t) => t.param.for_each_big_map(f),
+                crate::ast::Operation::CreateContract(cc) => {
+                    cc.storage.for_each_big_map(f)
+                }
+                _ => {}
+            },
+            _ => {}
+        }
     }
 
-    /// Same as [TypedValue::view_big_maps_mut], but only collects `big_map`
-    /// identifiers.
-    pub fn view_big_map_ids(&mut self, out: &mut Vec<BigMapId>) {
-        self.collect_big_maps(&mut |m| {
+    /// Collects the big_map identifiers reachable from self.
+    pub fn view_big_map_ids(&self, out: &mut Vec<BigMapId>) {
+        self.for_each_big_map(&mut |m| {
             if let BigMapContent::FromId(content) = &m.content {
                 out.push(content.id.clone())
             }
@@ -782,15 +804,14 @@ impl<'a> TypedValue<'a> {
 pub fn dump_big_map_updates<'a>(
     storage: &mut (impl LazyStorage<'a> + ?Sized),
     started_with_map_ids: &[BigMapId],
-    finished_with_maps: &mut [&mut BigMap<'a>],
+    root: &mut TypedValue<'a>,
     temporary: bool,
 ) -> Result<(), LazyStorageError> {
     // Note: structurally similar to `extract_lazy_storage_diff` /
     // `extract_lazy_storage_updates` in the L1 protocol implementation
     // (`script_ir_translator.ml`). Like L1, we allocate fresh ids as we
-    // walk the storage in source order — `finished_with_maps` is
-    // already in AST order, courtesy of [TypedValue::view_big_maps_mut]
-    // — so the assigned ids respect that order.
+    // walk the storage in source order; [TypedValue::for_each_big_map_mut]
+    // visits big maps in AST order, so the assigned ids respect that order.
     //
     // After this call, the provided big maps satisfy:
     // * Every [BigMap]'s content is `FromId` with an empty overlay.
@@ -834,8 +855,7 @@ pub fn dump_big_map_updates<'a>(
     // never appears in `seen_source_ids` is dropped storage that we
     // must clean up.
     let mut seen_source_ids: BTreeSet<BigMapId> = BTreeSet::new();
-    let deferred =
-        dump_big_map_walk(storage, finished_with_maps, temporary, &mut seen_source_ids)?;
+    let deferred = dump_big_map_walk(storage, root, temporary, &mut seen_source_ids)?;
     remove_unreferenced_big_maps(storage, started_with_map_ids, &seen_source_ids)?;
     // Single walk: apply the deferral now (safe after the removal pass, which
     // only touches ids absent from `seen_source_ids`).
@@ -874,59 +894,81 @@ pub fn apply_deferred_big_map_updates<'a>(
 /// operation must survive the storage walk's removal pass.
 pub fn dump_big_map_walk<'a>(
     storage: &mut (impl LazyStorage<'a> + ?Sized),
-    finished_with_maps: &mut [&mut BigMap<'a>],
+    root: &mut TypedValue<'a>,
     temporary: bool,
     seen_source_ids: &mut BTreeSet<BigMapId>,
 ) -> Result<DeferredBigMapUpdates<'a>, LazyStorageError> {
     let mut deferred_in_place_updates: DeferredBigMapUpdates<'a> = Vec::new();
-    for map in finished_with_maps.iter_mut() {
-        // the "map" variable has type `&mut &mut BigMap<'_>`, the
-        // following assignment casts it to a single `&mut`.
-        let map: &mut BigMap<'_> = map;
-        match map.content {
-            BigMapContent::FromId(ref mut m) => {
-                let source_id = m.id.clone();
-                let already_seen = !seen_source_ids.insert(source_id);
-                let must_copy = temporary || m.id.is_temporary() || already_seen;
-                if must_copy {
-                    let new_id = storage.big_map_copy(&m.id, temporary)?;
-                    storage.big_map_bulk_update(&new_id, mem::take(&mut m.overlay))?;
-                    m.id = new_id;
-                } else {
-                    // First occurrence of a permanent id with a
-                    // permanent result: keep the id and defer the
-                    // overlay write until later occurrences (if any)
-                    // have completed their copies.
-                    deferred_in_place_updates
-                        .push((m.id.clone(), mem::take(&mut m.overlay)));
-                }
-                storage.record_diff_order(&m.id);
-            }
-            BigMapContent::InMemory(ref mut m) => {
-                // The entire big map is still in memory. Allocate a
-                // fresh id and write the data straight away — there is
-                // no source for any later occurrence to read from, so
-                // no need to defer.
-                let id =
-                    storage.big_map_new(&map.key_type, &map.value_type, temporary)?;
-                storage.record_diff_order(&id);
-                storage.big_map_bulk_update(
-                    &id,
-                    mem::take(m)
-                        .into_iter()
-                        .map(|(key, value)| (key, Some(value))),
-                )?;
-                map.content = BigMapContent::FromId(BigMapFromId {
-                    id,
-                    overlay: BTreeMap::new(),
-                });
-            }
+    // The per-big-map work is fallible, but for_each_big_map_mut takes an
+    // infallible closure, so the first error is captured here and later big
+    // maps are skipped (the tree walk still completes harmlessly).
+    let mut result: Result<(), LazyStorageError> = Ok(());
+    root.for_each_big_map_mut(&mut |map: &mut BigMap<'a>| {
+        if result.is_ok() {
+            result = dump_one_big_map(
+                map,
+                storage,
+                temporary,
+                seen_source_ids,
+                &mut deferred_in_place_updates,
+            );
         }
-    }
+    });
+    result?;
 
     // Return the deferred updates so a multi-walk caller applies them only
     // after every walk has copied from the pre-update source (L2-1761).
     Ok(deferred_in_place_updates)
+}
+
+/// Dump a single big map to the lazy storage, threading the dedup state across
+/// maps. Split from [dump_big_map_walk] so the fallible per-map work can use
+/// `?` inside the infallible [TypedValue::for_each_big_map_mut] closure.
+fn dump_one_big_map<'a>(
+    map: &mut BigMap<'a>,
+    storage: &mut (impl LazyStorage<'a> + ?Sized),
+    temporary: bool,
+    seen_source_ids: &mut BTreeSet<BigMapId>,
+    deferred_in_place_updates: &mut DeferredBigMapUpdates<'a>,
+) -> Result<(), LazyStorageError> {
+    match map.content {
+        BigMapContent::FromId(ref mut m) => {
+            let source_id = m.id.clone();
+            let already_seen = !seen_source_ids.insert(source_id);
+            let must_copy = temporary || m.id.is_temporary() || already_seen;
+            if must_copy {
+                let new_id = storage.big_map_copy(&m.id, temporary)?;
+                storage.big_map_bulk_update(&new_id, mem::take(&mut m.overlay))?;
+                m.id = new_id;
+            } else {
+                // First occurrence of a permanent id with a
+                // permanent result: keep the id and defer the
+                // overlay write until later occurrences (if any)
+                // have completed their copies.
+                deferred_in_place_updates.push((m.id.clone(), mem::take(&mut m.overlay)));
+            }
+            storage.record_diff_order(&m.id);
+        }
+        BigMapContent::InMemory(ref mut m) => {
+            // The entire big map is still in memory. Allocate a
+            // fresh id and write the data straight away — there is
+            // no source for any later occurrence to read from, so
+            // no need to defer.
+            let id = storage.big_map_new(&map.key_type, &map.value_type, temporary)?;
+            storage.record_diff_order(&id);
+            storage.big_map_bulk_update(
+                &id,
+                mem::take(m)
+                    .into_iter()
+                    .map(|(key, value)| (key, Some(value))),
+            )?;
+            map.content = BigMapContent::FromId(BigMapFromId {
+                id,
+                overlay: BTreeMap::new(),
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Remove every id in `started_with_map_ids` that is absent from
@@ -970,6 +1012,31 @@ mod test_big_map_to_storage_update {
         };
     }
 
+    /// Run [dump_big_map_updates] over a list of big maps by wrapping them in a
+    /// right-nested comb of pairs, visited in AST order by for_each_big_map_mut,
+    /// and taking the mutated maps back out in the same order.
+    fn dump_maps<'a>(
+        storage: &mut (impl LazyStorage<'a> + ?Sized),
+        started: &[BigMapId],
+        maps: Vec<BigMap<'a>>,
+        temporary: bool,
+    ) -> Vec<BigMap<'a>> {
+        let mut iter = maps.into_iter().rev();
+        let mut root = TypedValue::BigMap(iter.next().expect("at least one map"));
+        for m in iter {
+            root = TypedValue::new_pair(TypedValue::BigMap(m), root);
+        }
+        dump_big_map_updates(storage, started, &mut root, temporary).unwrap();
+        // A by-value `Pair(l, r)` destructure is rejected because `TypedValue`
+        // implements `Drop` (L2-1672), so visit through
+        // [TypedValue::for_each_big_map_mut] and swap a placeholder in instead.
+        let mut out = Vec::new();
+        root.for_each_big_map_mut(&mut |m| {
+            out.push(mem::replace(m, BigMap::empty(Type::Unit, Type::Unit)));
+        });
+        out
+    }
+
     #[test]
     fn test_map_from_memory() {
         let storage = &mut InMemoryLazyStorage::new();
@@ -977,12 +1044,12 @@ mod test_big_map_to_storage_update {
             (TypedValue::int(1), TypedValue::int(1)),
             (TypedValue::int(2), TypedValue::int(2)),
         ]));
-        let mut map = BigMap {
+        let map = BigMap {
             content,
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        dump_big_map_updates(storage, &[], &mut [&mut map], false).unwrap();
+        let map = dump_maps(storage, &[], vec![map], false).pop().unwrap();
 
         check_is_dumped_map(map, 0.into());
         assert_eq!(
@@ -1020,12 +1087,12 @@ mod test_big_map_to_storage_update {
                 (TypedValue::int(3), Some(TypedValue::int(3))),
             ]),
         });
-        let mut map = BigMap {
+        let map = BigMap {
             content,
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        dump_big_map_updates(storage, &[], &mut [&mut map], false).unwrap();
+        let map = dump_maps(storage, &[], vec![map], false).pop().unwrap();
 
         check_is_dumped_map(map, 0.into());
         assert_eq!(
@@ -1053,7 +1120,7 @@ mod test_big_map_to_storage_update {
             id: map_id1.clone(),
             overlay: BTreeMap::from([(TypedValue::int(11), Some(TypedValue::int(11)))]),
         });
-        let mut map1_1 = BigMap {
+        let map1_1 = BigMap {
             content,
             key_type: Type::Int,
             value_type: Type::Int,
@@ -1062,7 +1129,7 @@ mod test_big_map_to_storage_update {
             id: map_id1,
             overlay: BTreeMap::from([(TypedValue::int(12), Some(TypedValue::int(12)))]),
         });
-        let mut map1_2 = BigMap {
+        let map1_2 = BigMap {
             content,
             key_type: Type::Int,
             value_type: Type::Int,
@@ -1071,18 +1138,16 @@ mod test_big_map_to_storage_update {
             id: map_id2,
             overlay: BTreeMap::from([(TypedValue::int(2), Some(TypedValue::int(2)))]),
         });
-        let mut map2 = BigMap {
+        let map2 = BigMap {
             content,
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        dump_big_map_updates(
-            storage,
-            &[],
-            &mut [&mut map1_1, &mut map1_2, &mut map2],
-            false,
-        )
-        .unwrap();
+        let mut out =
+            dump_maps(storage, &[], vec![map1_1, map1_2, map2], false).into_iter();
+        let map1_1 = out.next().unwrap();
+        let map1_2 = out.next().unwrap();
+        let map2 = out.next().unwrap();
 
         check_is_dumped_map(map1_1, 0.into());
         check_is_dumped_map(map1_2, 2.into()); // newly created map
@@ -1134,13 +1199,12 @@ mod test_big_map_to_storage_update {
             id: map_id1.clone(),
             overlay: BTreeMap::from([(TypedValue::int(1), Some(TypedValue::int(1)))]),
         });
-        let mut map1 = BigMap {
+        let map1 = BigMap {
             content,
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        dump_big_map_updates(storage, &[map_id1, map_id2], &mut [&mut map1], false)
-            .unwrap();
+        dump_maps(storage, &[map_id1, map_id2], vec![map1], false);
 
         assert_eq!(
             storage.big_maps,
@@ -1189,21 +1253,21 @@ mod test_big_map_to_storage_update {
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        let mut map_ast_first = make_map(temp_ids[0].clone());
-        let mut map_ast_second = make_map(temp_ids[1].clone());
-        let mut map_ast_third = make_map(temp_ids[2].clone());
-        dump_big_map_updates(
+        let map_ast_first = make_map(temp_ids[0].clone());
+        let map_ast_second = make_map(temp_ids[1].clone());
+        let map_ast_third = make_map(temp_ids[2].clone());
+        let mut out = dump_maps(
             storage,
             &[],
-            &mut [&mut map_ast_first, &mut map_ast_second, &mut map_ast_third],
+            vec![map_ast_first, map_ast_second, map_ast_third],
             false,
         )
-        .unwrap();
+        .into_iter();
         // Fresh permanent ids start at 0 (no prior permanent
         // allocations on this storage). The leftmost AST occurrence
         // must get the lowest fresh id.
-        check_is_dumped_map(map_ast_first, 0.into());
-        check_is_dumped_map(map_ast_second, 1.into());
-        check_is_dumped_map(map_ast_third, 2.into());
+        check_is_dumped_map(out.next().unwrap(), 0.into());
+        check_is_dumped_map(out.next().unwrap(), 1.into());
+        check_is_dumped_map(out.next().unwrap(), 2.into());
     }
 }

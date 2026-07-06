@@ -1732,11 +1732,8 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1>(
 ) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
     let parser = Parser::new();
 
-    let mut big_maps = vec![];
-    storage.view_big_maps_mut(&mut big_maps);
-
     // Dump big_map allocation, starting with empty big_maps
-    mir::ast::big_map::dump_big_map_updates(ctx, &[], &mut big_maps, false)
+    mir::ast::big_map::dump_big_map_updates(ctx, &[], &mut storage, false)
         .map_err(|err| OriginationError::MirBigMapAllocation(err.to_string()))?;
     // Drain the diff before the fallible encode below: otherwise an
     // encode failure leaves `ctx.big_map_diff` half-populated and the
