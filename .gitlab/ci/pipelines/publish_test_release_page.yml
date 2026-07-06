@@ -131,7 +131,7 @@ grafazos.release_page:
     - index.html
   retry: 0
 
-teztale.release_page:
+teztale.release-page-publish:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
