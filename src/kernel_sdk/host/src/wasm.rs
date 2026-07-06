@@ -62,6 +62,9 @@ pub trait WasmHost {
     /// `/readonly/kernel/env/too_many_reboot` to indicate this happened.
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError>;
 
+    /// Remove a mark previously set to reboot the kernel, if any.
+    fn clear_reboot_mark(&mut self) -> Result<(), RuntimeError>;
+
     /// True if the last kernel run was aborted.
     fn last_run_aborted(&self) -> Result<bool, RuntimeError>;
 
@@ -131,6 +134,10 @@ impl<Host: SmartRollupCore> WasmHost for Host {
 
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
         self.store_write(&REBOOT_PATH, &[0_u8], 0)
+    }
+
+    fn clear_reboot_mark(&mut self) -> Result<(), RuntimeError> {
+        self.store_delete_value(&REBOOT_PATH)
     }
 
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {

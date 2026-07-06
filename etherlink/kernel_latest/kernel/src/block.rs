@@ -227,6 +227,7 @@ where
 
 enum BlueprintParsing<BIP> {
     Next(Box<BIP>),
+    Postponed,
     None,
 }
 
@@ -300,7 +301,7 @@ where
                     upgrade::upgrade(host, kernel_upgrade.preimage_hash)?;
                     // We abort the call, as there is no blueprint to execute,
                     // the kernel will reboot.
-                    return Ok(BlueprintParsing::None);
+                    return Ok(BlueprintParsing::Postponed);
                 }
             }
             let tezos_parent_hash =
@@ -547,6 +548,13 @@ where
                     BlueprintParsing::Next(bip) => {
                         log!(Debug, "Creating BIP from Blueprint: Success.");
                         bip
+                    }
+                    BlueprintParsing::Postponed => {
+                        log!(
+                            Debug,
+                            "Creating BIP from Blueprint: Postponed to apply an upgrade."
+                        );
+                        return Ok(ComputationResult::RebootNeeded);
                     }
                     BlueprintParsing::None => {
                         log!(Debug, "Creating BIP from Blueprint: Failure.");

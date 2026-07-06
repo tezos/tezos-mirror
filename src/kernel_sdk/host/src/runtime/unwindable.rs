@@ -215,6 +215,10 @@ impl<R: WasmHost> WasmHost for UnwindableRuntime<R> {
         self.runtime.write().unwrap().mark_for_reboot()
     }
 
+    fn clear_reboot_mark(&mut self) -> Result<(), RuntimeError> {
+        self.runtime.write().unwrap().clear_reboot_mark()
+    }
+
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
         self.runtime.read().unwrap().last_run_aborted()
     }

@@ -62,6 +62,7 @@
   a single chunk, saving one host call per read.
 - Add initial NDS support for the Wasm PVM - via `WasmNds` trait and `WasmNdsHandle`. Intended for use by kernels only via the
   `KeySpace` trait in future.
+- Add `clear_reboot_mark` to `WasmHost`, to cancel the effect of `mark_for_reboot`.
 
 ### Installer client/kernel
 

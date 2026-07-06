@@ -247,6 +247,11 @@ impl<R: WasmHost, Host: BorrowMut<R> + Borrow<R>> WasmHost for KernelHost<R, Hos
     }
 
     #[inline(always)]
+    fn clear_reboot_mark(&mut self) -> Result<(), RuntimeError> {
+        self.host.borrow_mut().clear_reboot_mark()
+    }
+
+    #[inline(always)]
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
         self.host.borrow().last_run_aborted()
     }
