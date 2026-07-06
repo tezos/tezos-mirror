@@ -118,8 +118,9 @@ let send_raw_tx_to_delayed_inbox ~sc_rollup_node ~client ~l1_contracts
 (* A panic() transaction reaching the block producer through the delayed inbox
    takes the sequencer down, exactly like one submitted directly. This
    exercises the operator's recovery path: manually flushing the delayed inbox
-   with [--force] publishes a blueprint the kernel drops on the trap, unblocking
-   the rollup node. *)
+   with [--force] publishes a blueprint the kernel drops on the trap,
+   unblocking the rollup node so the sequencer can be restarted and able to
+   produce blocks again.  *)
 let test_recover_crashing_delayed_transaction =
   Setup.register_test
     ~__FILE__
@@ -176,7 +177,24 @@ let test_recover_crashing_delayed_transaction =
       ()
   in
 
-  unit
+  (* Restart the sequencer to create a block *)
+  let* () = Evm_node.run sequencer in
+  (* Advance the layer 1 to make sure the sequencer fetches the dropped
+     transaction event. *)
+  let* l = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let wait_for =
+    Evm_node.wait_for_processed_l1_level ~level:(l + 2) sequencer
+  in
+  let* () =
+    repeat 4 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let* _ = wait_for in
+
+  let*@ _ = Rpc.produce_block sequencer in
+
+  bake_until_sync ~sc_rollup_node ~sequencer ~client ()
 
 let () =
   Self_tests.register () ;

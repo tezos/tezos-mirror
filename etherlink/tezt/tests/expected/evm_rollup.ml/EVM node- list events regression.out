@@ -788,7 +788,10 @@ evm_context_request_failed:
                                $unistring,
                                /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                            $timestamp.protocol,
-                           $positive_bignum ] } ... ] }
+                           $positive_bignum ] }
+                  || { /* dropped_delayed_transaction */
+                       "kind": $unistring,
+                       "event": $unistring } ... ] }
             || { /* Apply_blueprint */
                  "request": "apply_blueprint",
                  "events"?:
@@ -814,7 +817,10 @@ evm_context_request_failed:
                                   $unistring,
                                   /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                               $timestamp.protocol,
-                              $positive_bignum ] } ... ],
+                              $positive_bignum ] }
+                     || { /* dropped_delayed_transaction */
+                          "kind": $unistring,
+                          "event": $unistring } ... ],
                  "timestamp": $timestamp.protocol,
                  "chunks":
                    [ { "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
@@ -1123,7 +1129,10 @@ evm_events_new_event:
                      $unistring,
                      /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                  $timestamp.protocol,
-                 $positive_bignum ] } }
+                 $positive_bignum ] }
+        || { /* dropped_delayed_transaction */
+             "kind": $unistring,
+             "event": $unistring } }
     $Signature.Public_key:
       /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
@@ -2976,7 +2985,10 @@ evm_context_request_failed:
                                $unistring,
                                /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                            $timestamp.protocol,
-                           $positive_bignum ] } ... ] }
+                           $positive_bignum ] }
+                  || { /* dropped_delayed_transaction */
+                       "kind": $unistring,
+                       "event": $unistring } ... ] }
             || { /* Apply_blueprint */
                  "request": "apply_blueprint",
                  "events"?:
@@ -3002,7 +3014,10 @@ evm_context_request_failed:
                                   $unistring,
                                   /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                               $timestamp.protocol,
-                              $positive_bignum ] } ... ],
+                              $positive_bignum ] }
+                     || { /* dropped_delayed_transaction */
+                          "kind": $unistring,
+                          "event": $unistring } ... ],
                  "timestamp": $timestamp.protocol,
                  "chunks":
                    [ { "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,

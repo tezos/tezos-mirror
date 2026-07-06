@@ -594,6 +594,32 @@ module State = struct
         ~config
         `Skip_stage_one
 
+  let on_dropped_delayed_transaction ctxt txn_hash =
+    let open Lwt_result_syntax in
+    let*! data_dir, config = execution_config in
+    let native_execution =
+      ctxt.configuration.kernel_execution.native_execution_policy
+      = Configuration.Always
+    in
+    let* () =
+      modify_in_place
+        ctxt
+        ~key:
+          (Durable_storage_path.delayed_input
+             ~storage_version:ctxt.session.storage_version)
+        ~value:
+          (Bytes.to_string
+          @@ Rlp.encode
+               (Evm_events.Dropped_delayed_transaction.to_input txn_hash))
+    in
+    execute_in_place
+      ctxt
+      ~wasm_entrypoint:"drop_delayed_transaction"
+      ~native_execution
+      ~data_dir
+      ~config
+      `Skip_stage_one
+
   let background_preemptive_download config upgrade_event =
     let open Lwt_syntax in
     let open Evm_events.Upgrade in
@@ -2099,6 +2125,8 @@ module State = struct
             flushed_blueprint.level
         in
         flush_delayed_inbox ctxt conn flushed_blueprint
+    | Dropped_delayed_transaction txn_hash ->
+        on_dropped_delayed_transaction ctxt txn_hash
 
   and apply_evm_events ?finalized_level conn (ctxt : t) events =
     let open Lwt_result_syntax in
