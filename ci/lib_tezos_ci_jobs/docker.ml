@@ -12,6 +12,17 @@ module CI = Cacio.Shared
    During the migration to Cacio however, those other instances will continue to exist. *)
 let version = Tezos_ci.Images.Base_images.docker_version
 
+(* [docker_release.sh] invocation. For with-EVM builds the rust-toolchain image
+   (L2 builder) that the distribution is built FROM is stated explicitly; its
+   tag is resolved at runtime by the shell from the [Images.rust_toolchain]
+   dependency dotenv. Builds without EVM artifacts do not use that image. *)
+let docker_release_script contents =
+  match contents with
+  | `experimental_with_evm ->
+      "./scripts/ci/docker_release.sh --rust-toolchain-image \
+       ${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
+  | `released | `experimental -> "./scripts/ci/docker_release.sh"
+
 let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
   let arch_str = Tezos_ci.Runner.Arch.show_uniform arch in
   CI.job
@@ -84,7 +95,7 @@ let job_docker_snapshot =
         (* Override the image tag computed by [docker_initialize.sh --image-names]
            (which defaults to the branch name) with a dated master tag. *)
         "./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)";
-        "./scripts/ci/docker_release.sh";
+        docker_release_script contents;
       ]
     contents
     `real
@@ -103,7 +114,7 @@ let job_docker =
     ~scripts:
       [
         "./scripts/ci/docker_initialize.sh --image-names";
-        "./scripts/ci/docker_release.sh";
+        docker_release_script contents;
       ]
     contents
     mode

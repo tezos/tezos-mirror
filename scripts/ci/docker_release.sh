@@ -14,6 +14,33 @@ ci_image_name=${ci_image_name:?"ci_image_name: is unset"}
 # (currently: 'oc.docker:ci:*')
 ci_image_version=${ci_image_tag:?"ci_image_tag: is unset"}
 
+# The rust-toolchain image (L2 builder) may be passed explicitly by the job via
+# --rust-toolchain-image; otherwise fall back to the name/tag provided by the
+# [rust_toolchain] image dependency dotenv (present for with-EVM builds).
+rust_toolchain_image=""
+options=$(getopt -o '' -l rust-toolchain-image: -- "$@")
+eval set - "$options"
+while true; do
+  case "$1" in
+  --rust-toolchain-image)
+    shift
+    rust_toolchain_image="$1"
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    echo "Unknown option: $1" >&2
+    exit 1
+    ;;
+  esac
+  shift
+done
+if [ -z "${rust_toolchain_image}" ] && [ -n "${rust_toolchain_image_name:-}" ]; then
+  rust_toolchain_image="${rust_toolchain_image_name}:${rust_toolchain_image_tag:-master}"
+fi
+
 cd "${CI_PROJECT_DIR}" || exit 1
 
 EXECUTABLE_FILES=${EXECUTABLE_FILES:?"Error: environment variable EXECUTABLE_FILES is empty.
@@ -36,7 +63,7 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   --executables "${OCTEZ_EXECUTABLES}" \
   --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
   --docker-target "${DOCKER_BUILD_TARGET}" \
-  $(if [ -n "${rust_toolchain_image_name:-}" ]; then echo "--rust-toolchain-image ${rust_toolchain_image_name}:${rust_toolchain_image_tag:-master}"; fi) \
+  $(if [ -n "${rust_toolchain_image}" ]; then echo "--rust-toolchain-image ${rust_toolchain_image}"; fi) \
   $(
     # GCP_SCCACHE_BUCKET is defined in the GitLab CI/CD settings.
     if [ -n "${GCP_SCCACHE_BUCKET:-}" ]; then echo "--sccache-bucket ${GCP_SCCACHE_BUCKET}"; fi
