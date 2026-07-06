@@ -1876,19 +1876,6 @@ let id_tokens =
     );
   ]
 
-let job_datadog_pipeline_trace : tezos_job =
-  job
-    ~__POS__
-    ~allow_failure:Yes
-    ~name:"datadog_pipeline_trace"
-    ~image:Images.datadog_ci
-    ~stage:Stages.start
-    [
-      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
-       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
-    ]
-
 let enable_kernels =
   append_variables
     [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]

@@ -936,13 +936,36 @@ let job_trigger =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
+(* This job is defined directly with CIAO instead of Cacio mostly to avoid
+   having to add the [start] stage to the [stage] type.
+   Also we are automatically adding the job to all pipelines,
+   not registering it via the [register_*] functions. *)
+let job_datadog_pipeline_trace =
+  Tezos_ci.job
+    ~__POS__
+    ~allow_failure:Yes
+    ~name:"datadog_pipeline_trace"
+    ~image:Tezos_ci.Images.datadog_ci
+    ~stage:Tezos_ci.Stages.start
+    [
+      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
+    ]
+
 let get_jobs pipeline =
   let jobs = Hashtbl.find_all global_jobs pipeline |> List.rev in
+  [
+    (match pipeline with
+    | Before_merging ->
+        (* [job_trigger] includes what [job_datadog_pipeline_trace] does. *)
+        job_trigger
+    | _ -> job_datadog_pipeline_trace);
+  ]
+  @
   match pipeline with
   | Before_merging ->
-      (* Add [trigger] as a dependency of all [jobs]. *)
-      job_trigger
-      :: convert_jobs ~with_job_trigger:job_trigger ~with_condition:true jobs
+      convert_jobs ~with_job_trigger:job_trigger ~with_condition:true jobs
   | Merge_train -> convert_jobs ~with_condition:true jobs
   | Schedule_extended_test ->
       convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
@@ -1360,7 +1383,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let register_pipeline ~description ~jobs name rules =
     Tezos_ci.Pipeline.register
       ~description
-      ~jobs:(Tezos_ci.job_datadog_pipeline_trace :: jobs)
+      ~jobs:(job_datadog_pipeline_trace :: jobs)
       (make_name name)
       rules
 

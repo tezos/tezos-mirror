@@ -386,7 +386,7 @@ let () =
 (** Create an Octez release tag pipeline of type {!pipeline_type},
     which is expected to be a release pipeline type. *)
 let octez_jobs (pipeline_type : Cacio.global_pipeline) =
-  job_datadog_pipeline_trace :: Cacio.get_jobs pipeline_type
+  Cacio.get_jobs pipeline_type
 
 let job_docker_promote_to_version =
   Cacio.parameterize @@ fun mode ->
@@ -528,7 +528,5 @@ let octez_packaging_revision_jobs ?(test = false) () =
      The static jobs are independent so they are both manual,
      but [job_update_gitlab_release] depends on [job_create_gitlab_package]
      so it does not have to be manual, only [job_create_gitlab_package] does. *)
-  [(* Stage: start *) job_datadog_pipeline_trace]
-  @
   if test then Cacio.get_jobs Packaging_revision_test
   else Cacio.get_jobs Packaging_revision
