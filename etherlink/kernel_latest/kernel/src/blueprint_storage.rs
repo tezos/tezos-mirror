@@ -576,7 +576,7 @@ pub enum DelayedTransactionFetchingResult<Tx> {
 pub fn fetch_hashes_from_delayed_inbox<Host>(
     host: &mut Host,
     delayed_hashes: Vec<delayed_inbox::Hash>,
-    delayed_inbox: &mut DelayedInbox,
+    delayed_inbox: &DelayedInbox,
     current_blueprint_size: usize,
     block_number: U256,
 ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
@@ -645,7 +645,7 @@ fn transactions_from_bytes(
 pub fn fetch_delayed_txs<Host>(
     host: &mut Host,
     blueprint_with_hashes: BlueprintWithDelayedHashes,
-    delayed_inbox: &mut DelayedInbox,
+    delayed_inbox: &DelayedInbox,
     current_blueprint_size: usize,
     block_number: U256,
 ) -> anyhow::Result<(BlueprintValidity, usize)>
@@ -697,7 +697,7 @@ pub const DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: i64 = 300i64;
 fn parse_and_validate_blueprint<Host>(
     host: &mut Host,
     bytes: &[u8],
-    delayed_inbox: &mut DelayedInbox,
+    delayed_inbox: &DelayedInbox,
     current_blueprint_size: usize,
     evm_node_flag: bool,
     max_blueprint_lookahead_in_seconds: i64,
@@ -808,7 +808,7 @@ fn read_all_chunks_and_validate<Host>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
     nb_chunks: u16,
-    config: &mut Configuration,
+    config: &Configuration,
     previous_chain_header: &EVMBlockHeader,
     previous_timestamp: Timestamp,
     block_number: U256,
@@ -847,7 +847,7 @@ where
             StoreBlueprint::SequencerChunk(chunk) => chunks.push(chunk),
         }
     }
-    match &mut config.mode {
+    match &config.mode {
         ConfigurationMode::Proxy => Ok((None, size)),
         ConfigurationMode::Sequencer {
             delayed_inbox,
@@ -885,7 +885,7 @@ where
 
 pub fn read_blueprint<Host>(
     host: &mut Host,
-    config: &mut Configuration,
+    config: &Configuration,
     number: U256,
     previous_timestamp: Timestamp,
     previous_chain_header: &EVMBlockHeader,
@@ -1084,13 +1084,13 @@ mod tests {
 
         store_last_info_per_level_timestamp(&mut host, Timestamp::from(40)).unwrap();
 
-        let mut delayed_inbox =
+        let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
         let validity = parse_and_validate_blueprint(
             &mut host,
             blueprint_with_hashes_bytes.as_ref(),
-            &mut delayed_inbox,
+            &delayed_inbox,
             0,
             false,
             500,
@@ -1152,13 +1152,13 @@ mod tests {
             chain_id: None,
         };
 
-        let mut delayed_inbox =
+        let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
         let validity = parse_and_validate_blueprint(
             &mut host,
             blueprint_with_hashes_bytes.as_ref(),
-            &mut delayed_inbox,
+            &delayed_inbox,
             0,
             false,
             500,

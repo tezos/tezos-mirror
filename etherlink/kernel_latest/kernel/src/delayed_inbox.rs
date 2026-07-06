@@ -272,7 +272,7 @@ impl DelayedInbox {
     }
 
     pub fn find_transaction(
-        &mut self,
+        &self,
         host: &mut impl StorageV1,
         tx_hash: Hash,
     ) -> Result<Option<(Transaction, Timestamp)>> {
@@ -489,7 +489,7 @@ mod tests {
             .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
             .expect("Tx should be saved in the delayed inbox");
 
-        let mut delayed_inbox =
+        let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should exist");
 
         let read = delayed_inbox
@@ -517,7 +517,7 @@ mod tests {
             .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
             .expect("Tezos operation should be saved in the delayed inbox");
 
-        let mut delayed_inbox =
+        let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should exist");
 
         let read = delayed_inbox
