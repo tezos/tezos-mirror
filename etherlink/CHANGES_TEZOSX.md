@@ -4,6 +4,14 @@
 
 ### EVM Runtime
 
+- The `verify_tezos_signature` precompile (reached through an alias
+  forwarder's EIP-1271 `isValidSignature`) now rejects non-canonical
+  high-S P-256 (tz3) signatures. ECDSA is malleable: for any valid
+  `(r, s)` the twin `(r, n - s)` verifies too, so a contract that keys
+  anti-replay on the signature bytes could be defeated by presenting the
+  twin. The guard lives in the precompile only; the shared P-256 verifier
+  still accepts high-S so tz3 accounts keep signing ordinary,
+  counter-protected operations. (!22338)
 - A signed transaction's signature scalars `r`/`s` are now
   rejected unless canonically encoded. A list-shaped or leading-zero-padded
   scalar decodes to the same value but changes the raw bytes, so one signed

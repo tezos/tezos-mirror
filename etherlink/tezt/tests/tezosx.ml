@@ -5626,6 +5626,68 @@ let tz3_bootstrap : Account.key =
         "p2sk2rmHAdX9dDPrVSS4JJQK4i3cA3gRAERXEpWHZuSb7idjeMFD2U";
   }
 
+(** The P-256 (secp256r1) group order [n], big-endian, as a 64-char hex
+    string. The malleable twin of a signature [(r, s)] is [(r, n - s)]. *)
+let p256_group_order =
+  "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551"
+
+(** [be_sub a b] returns [a - b] for two equal-length big-endian byte strings,
+    assuming [a >= b]. *)
+let be_sub a b =
+  let len = String.length a in
+  let out = Bytes.create len in
+  let borrow = ref 0 in
+  for i = len - 1 downto 0 do
+    let d = Char.code a.[i] - Char.code b.[i] - !borrow in
+    if d < 0 then (
+      Bytes.set out i (Char.chr (d + 256)) ;
+      borrow := 1)
+    else (
+      Bytes.set out i (Char.chr d) ;
+      borrow := 0)
+  done ;
+  Bytes.to_string out
+
+(** [low_and_high_s sig_hex] takes a 64-byte P-256 signature [r ‖ s] (128 hex
+    chars, no [0x] prefix) and returns its two malleable forms
+    [(low_s_hex, high_s_hex)], both 128-char hex strings sharing the same [r].
+    Exactly one of [s] and [n - s] lies in [\[1, n/2\]] (the canonical "low-S"
+    form); the [verify_tezos_signature] precompile accepts only that one, while
+    a verifier missing the low-S guard accepts both. *)
+let low_and_high_s sig_hex =
+  let bytes_of_hex h = Hex.to_bytes (`Hex h) |> Bytes.to_string in
+  let raw = bytes_of_hex sig_hex in
+  Check.((String.length raw = 64) int)
+    ~error_msg:"expected a 64-byte P-256 signature, got %L bytes" ;
+  let r = String.sub raw 0 32 in
+  let s = String.sub raw 32 32 in
+  let n = bytes_of_hex p256_group_order in
+  let n_minus_s = be_sub n s in
+  (* Equal-length big-endian byte strings compare as their integer values. *)
+  let low, high =
+    if String.compare s n_minus_s <= 0 then (s, n_minus_s) else (n_minus_s, s)
+  in
+  let hex_of x =
+    let (`Hex h) = Hex.of_string x in
+    h
+  in
+  (hex_of (r ^ low), hex_of (r ^ high))
+
+(** [sign_bytes_low_s ~signer bytes] signs [bytes] with [signer] and returns the
+    signature hex (no [0x] prefix), normalized to canonical low-S for tz3
+    (P-256) signers. Octez does not normalize P-256 signatures, so a raw tz3
+    signature is often high-S; the [verify_tezos_signature] precompile rejects
+    the malleable high-S form, so callers exercising the accepted path must use
+    the low-S twin. Non-P256 signatures are returned unchanged. *)
+let sign_bytes_low_s ~(signer : Account.key) bytes =
+  let signature = Account.sign_bytes ~signer bytes in
+  let (`Hex sig_hex) = Tezos_crypto.Signature.to_hex signature in
+  if
+    String.length signer.public_key_hash >= 3
+    && String.sub signer.public_key_hash 0 3 = "tz3"
+  then fst (low_and_high_s sig_hex)
+  else sig_hex
+
 (** Test EIP-1271 isValidSignature for a single account: create alias,
     sign a hash, assert valid signature returns the magic value,
     and assert wrong hash returns failure. *)
@@ -5651,8 +5713,7 @@ let check_eip1271_for_account ~evm_node ~transfer (account : Account.key) =
     Hex.to_bytes
       (`Hex "64b58ce5683684531652feb45eb41f30ef7ebae57a440d942ca0579b7309ff83")
   in
-  let signature = Account.sign_bytes ~signer:account hash_bytes in
-  let (`Hex sig_hex) = Tezos_crypto.Signature.to_hex signature in
+  let sig_hex = sign_bytes_low_s ~signer:account hash_bytes in
   let sig_with_prefix = "0x" ^ sig_hex in
   let* calldata =
     Cast.calldata

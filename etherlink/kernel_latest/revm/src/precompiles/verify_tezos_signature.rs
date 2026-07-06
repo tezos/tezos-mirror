@@ -9,7 +9,8 @@ use revm::{
     primitives::Bytes,
 };
 use tezos_crypto_rs::{
-    public_key::PublicKey, signature::Signature, PublicKeySignatureVerifier,
+    hash::P256Signature, public_key::PublicKey, signature::Signature,
+    PublicKeySignatureVerifier,
 };
 use tezos_data_encoding::nom::NomReader;
 
@@ -58,7 +59,20 @@ pub(crate) fn verify_tezos_signature_precompile(
 
     let valid = public_key
         .verify_signature(&signature, call.hash.as_ref())
-        .unwrap_or(false);
+        .unwrap_or(false)
+        // ECDSA is malleable: for a P-256 (tz3) signer the high-S twin
+        // (r, n - s) verifies just as well as the canonical (r, s). A contract
+        // that keys anti-replay on the signature bytes (through this EIP-1271
+        // path) would be defeated by presenting that twin, so reject the
+        // non-canonical high-S form here. The shared P-256 verifier keeps
+        // accepting high-S so tz3 accounts can still sign ordinary,
+        // counter-protected operations.
+        && match &public_key {
+            PublicKey::P256(_) => P256Signature::try_from(call.signature.to_vec())
+                .map(|sig| sig.is_canonical_low_s())
+                .unwrap_or(false),
+            _ => true,
+        };
 
     let output = valid.abi_encode();
 
