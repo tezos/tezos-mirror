@@ -201,32 +201,67 @@ pub struct DepositInfo {
 }
 
 impl DepositInfo {
+    const RECEIVER_LENGTH: usize = std::mem::size_of::<Address>();
+
+    const RECEIVER_AND_CHAIN_ID_LENGTH: usize =
+        Self::RECEIVER_LENGTH + std::mem::size_of::<U256>();
+
+    /// Decodes the Michelson `bytes` receiver payload of an XTZ deposit into
+    /// its receiver and optional chain id.
+    ///
+    /// Byte-length is authoritative: the two legacy formats occupy exactly
+    /// [`Self::RECEIVER_LENGTH`] and [`Self::RECEIVER_AND_CHAIN_ID_LENGTH`]
+    /// bytes, and every other length is read as a versioned RLP payload.
+    /// Dispatching on length in a single function is what guarantees a
+    /// routing byte-string resolves to exactly one receiver: the versioned
+    /// scheme can never be read out of a legacy length, nor the reverse.
     fn decode(bytes: &[u8]) -> Result<Self, DecoderError> {
         if bytes.is_empty() {
             return Err(DecoderError::Custom("Unexpected empty deposit info"));
         }
 
-        let version = bytes[0];
-        let decoder = Rlp::new(&bytes[1..]);
-        if version == 1u8 {
-            if !decoder.is_list() {
-                return Err(DecoderError::RlpExpectedToBeList);
-            }
-            if decoder.item_count()? != 2 {
-                return Err(DecoderError::RlpIncorrectListLen);
-            }
-            let mut it: rlp::RlpIterator<'_, '_> = decoder.iter();
-            let receiver: DepositReceiver = decode_field(&next(&mut it)?, "receiver")?;
-            let chain_id: Option<U256> = decode_option_explicit(
-                &next(&mut it)?,
-                "chain_id",
-                decode_field_u256_le,
-            )?;
-            Ok(Self { receiver, chain_id })
+        let input_length = bytes.len();
+        if input_length == Self::RECEIVER_LENGTH {
+            // Legacy format: the input is exactly the receiver EVM address.
+            let receiver = H160::from_slice(bytes);
+            Ok(Self {
+                receiver: DepositReceiver::Ethereum(receiver),
+                chain_id: None,
+            })
+        } else if input_length == Self::RECEIVER_AND_CHAIN_ID_LENGTH {
+            // Legacy format: the receiver EVM address followed by the chain id.
+            let receiver = H160::from_slice(&bytes[..Self::RECEIVER_LENGTH]);
+            let chain_id = U256::from_little_endian(&bytes[Self::RECEIVER_LENGTH..]);
+            Ok(Self {
+                receiver: DepositReceiver::Ethereum(receiver),
+                chain_id: Some(chain_id),
+            })
         } else {
-            Err(DecoderError::Custom(
-                "Unexpected version for Deposit informations",
-            ))
+            // Every other length is a versioned RLP payload: a leading
+            // version byte followed by an RLP list.
+            let version = bytes[0];
+            let decoder = Rlp::new(&bytes[1..]);
+            if version == 1u8 {
+                if !decoder.is_list() {
+                    return Err(DecoderError::RlpExpectedToBeList);
+                }
+                if decoder.item_count()? != 2 {
+                    return Err(DecoderError::RlpIncorrectListLen);
+                }
+                let mut it: rlp::RlpIterator<'_, '_> = decoder.iter();
+                let receiver: DepositReceiver =
+                    decode_field(&next(&mut it)?, "receiver")?;
+                let chain_id: Option<U256> = decode_option_explicit(
+                    &next(&mut it)?,
+                    "chain_id",
+                    decode_field_u256_le,
+                )?;
+                Ok(Self { receiver, chain_id })
+            } else {
+                Err(DecoderError::Custom(
+                    "Unexpected version for Deposit informations",
+                ))
+            }
         }
     }
 }
@@ -244,36 +279,6 @@ pub struct Deposit {
 }
 
 impl Deposit {
-    const RECEIVER_LENGTH: usize = std::mem::size_of::<Address>();
-
-    const RECEIVER_AND_CHAIN_ID_LENGTH: usize =
-        Self::RECEIVER_LENGTH + std::mem::size_of::<U256>();
-
-    fn parse_deposit_info(input: MichelsonBytes) -> Result<DepositInfo, BridgeError> {
-        let input_bytes = input.0;
-        let input_length = input_bytes.len();
-        if input_length == Self::RECEIVER_LENGTH {
-            // Legacy format, input is exactly the receiver EVM address
-            let receiver = H160::from_slice(&input_bytes);
-            Ok(DepositInfo {
-                receiver: DepositReceiver::Ethereum(receiver),
-                chain_id: None,
-            })
-        } else if input_length == Self::RECEIVER_AND_CHAIN_ID_LENGTH {
-            // input is receiver followed by chain id
-            let receiver = H160::from_slice(&input_bytes[..Self::RECEIVER_LENGTH]);
-            let chain_id =
-                U256::from_little_endian(&input_bytes[Self::RECEIVER_LENGTH..]);
-            Ok(DepositInfo {
-                receiver: DepositReceiver::Ethereum(receiver),
-                chain_id: Some(chain_id),
-            })
-        } else {
-            // From now on, bytes are versionned rlp
-            DepositInfo::decode(&input_bytes).map_err(BridgeError::RlpError)
-        }
-    }
-
     /// Parses a deposit from a ticket transfer (internal inbox message).
     /// The "entrypoint" type is pair of ticket (FA2.1) and bytes (receiver address).
     #[cfg_attr(feature = "benchmark", inline(never))]
@@ -294,7 +299,7 @@ impl Deposit {
 
         // EVM address of the receiver and chain id both come from the
         // Michelson byte parameter.
-        let info = Self::parse_deposit_info(receiver)?;
+        let info = DepositInfo::decode(&receiver.0).map_err(BridgeError::RlpError)?;
 
         Ok((
             Self {
@@ -799,7 +804,7 @@ mod tests {
         // Receiver representation should be 20 bytes long
         let legacy_receiver = MichelsonBytes(receiver.as_bytes().to_vec());
 
-        assert_eq!(legacy_receiver.0.len(), Deposit::RECEIVER_LENGTH);
+        assert_eq!(legacy_receiver.0.len(), DepositInfo::RECEIVER_LENGTH);
 
         // Receiver and chain_id old representation should be 52 bytes long
         let mut legacy_receiver_and_chain_id = MichelsonBytes(vec![]);
@@ -812,7 +817,7 @@ mod tests {
 
         assert_eq!(
             legacy_receiver_and_chain_id.0.len(),
-            Deposit::RECEIVER_AND_CHAIN_ID_LENGTH
+            DepositInfo::RECEIVER_AND_CHAIN_ID_LENGTH
         );
 
         // DepositInfo with no chain_id representation should be 24 bytes long
@@ -878,6 +883,44 @@ mod tests {
             result_legacy_receiver_chain_id,
             result_deposit_info_chain_id,
         );
+    }
+
+    #[test]
+    fn deposit_info_decode_is_length_authoritative() {
+        // Build a byte-string that is *both* a structurally valid versioned
+        // encoding [version, [receiver_b, chain_id]] and exactly the legacy
+        // receiver-and-chain-id length. If the versioned scheme were tried
+        // first it would decode to receiver_b; length authority instead
+        // reads it as the legacy receiver+chain_id, so the payload maps to a
+        // single receiver.
+        let receiver_b = H160::from_slice(&[0xbbu8; 20]);
+        // The payload length is only chosen to land the whole encoding on
+        // the 52-byte legacy length; its contents are otherwise arbitrary.
+        let chain_id_payload = vec![0xccu8; 28];
+
+        let mut stream = RlpStream::new();
+        stream.append(&1u8);
+        stream.begin_list(2);
+        stream.append(&DepositReceiver::Ethereum(receiver_b));
+        stream.append(&chain_id_payload);
+        let bytes = stream.as_raw().to_vec();
+
+        assert_eq!(bytes.len(), DepositInfo::RECEIVER_AND_CHAIN_ID_LENGTH);
+
+        let info = DepositInfo::decode(&bytes).expect("decode");
+
+        // Read under the legacy scheme: first 20 bytes are the receiver, the
+        // trailing 32 bytes the little-endian chain id.
+        pretty_assertions::assert_eq!(
+            info,
+            DepositInfo {
+                receiver: DepositReceiver::Ethereum(H160::from_slice(&bytes[..20])),
+                chain_id: Some(U256::from_little_endian(&bytes[20..])),
+            }
+        );
+
+        // In particular it is not the receiver the versioned scheme carries.
+        assert_ne!(info.receiver, DepositReceiver::Ethereum(receiver_b));
     }
 
     #[test]
