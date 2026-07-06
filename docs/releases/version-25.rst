@@ -90,6 +90,9 @@ distribution version number instead of its codename:
 - ``ubuntu/noble`` becomes ``ubuntu/24.04``
 - ``ubuntu/26.04`` is newly supported
 
+For the complete list of supported distributions and the support calendar, see
+:doc:`../introduction/linux_support`.
+
 If you installed Octez v24 (or earlier) from the APT repository, the old
 codename-based path is no longer updated. Running ``apt-get update`` and
 ``apt-get upgrade`` will therefore not upgrade you to v25 until you repoint the
