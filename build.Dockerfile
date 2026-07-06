@@ -6,8 +6,9 @@
 # FROM or a real secret in ARG/ENV added later will therefore not be flagged.
 ARG BASE_IMAGE
 ARG BASE_IMAGE_VERSION
-ARG RUST_TOOLCHAIN_IMAGE_NAME
-ARG RUST_TOOLCHAIN_IMAGE_TAG
+# Full image reference (name:tag) for the rust-toolchain image (L2 builder),
+# passed by docker-bake.hcl.
+ARG RUST_TOOLCHAIN_IMAGE
 
 # hadolint ignore=DL3006
 FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} AS without-evm-artifacts
@@ -112,7 +113,7 @@ RUN while read -r protocol; do \
     cp tezos/src/proto_"$(echo "$protocol" | tr - _)"/parameters/*.json tezos/parameters/"$protocol"-parameters; \
     done < tezos/script-inputs/active_protocol_versions
 
-FROM ${RUST_TOOLCHAIN_IMAGE_NAME}:${RUST_TOOLCHAIN_IMAGE_TAG} AS layer2-builder
+FROM ${RUST_TOOLCHAIN_IMAGE} AS layer2-builder
 # Re-declare sccache ARGs for this stage (ARGs are stage-scoped after FROM).
 ARG SCCACHE_GCS_BUCKET=""
 ARG SCCACHE_GCS_RW_MODE="READ_WRITE"

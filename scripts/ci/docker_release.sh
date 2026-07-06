@@ -26,7 +26,7 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 # Build minimal, bare and debug images
 
 # Disable the quote-warning from shellcheck so that we can pass the
-# optional arguments rust_toolchain_image_{name,tag}
+# optional --rust-toolchain-image / --sccache-bucket arguments.
 # shellcheck disable=SC2046
 ./scripts/create_docker_image.sh \
   --image-name "${DOCKER_IMAGE_NAME}" \
@@ -36,8 +36,7 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   --executables "${OCTEZ_EXECUTABLES}" \
   --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
   --docker-target "${DOCKER_BUILD_TARGET}" \
-  $(if [ -n "${rust_toolchain_image_name:-}" ]; then echo "--rust-toolchain-image-name ${rust_toolchain_image_name}"; fi) \
-  $(if [ -n "${rust_toolchain_image_tag:-}" ]; then echo "--rust-toolchain-image-tag ${rust_toolchain_image_tag}"; fi) \
+  $(if [ -n "${rust_toolchain_image_name:-}" ]; then echo "--rust-toolchain-image ${rust_toolchain_image_name}:${rust_toolchain_image_tag:-master}"; fi) \
   $(
     # GCP_SCCACHE_BUCKET is defined in the GitLab CI/CD settings.
     if [ -n "${GCP_SCCACHE_BUCKET:-}" ]; then echo "--sccache-bucket ${GCP_SCCACHE_BUCKET}"; fi
