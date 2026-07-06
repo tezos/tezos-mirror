@@ -1354,3 +1354,102 @@ mod test_big_map_to_storage_update {
         check_is_dumped_map(out.next().unwrap(), 2.into());
     }
 }
+
+#[cfg(test)]
+mod review_verification {
+    //! Tests added while reviewing the persistent-collections change
+    //! (L2-1649): they pin the two properties the review leaned on — that
+    //! the `rpds` trees iterate in the same order as the `std` maps they
+    //! replaced, and that the read-only big-map walk reaches every position
+    //! the mutable walk does.
+    use super::*;
+    use crate::ast::{MichelsonList, Or, Type};
+    use rpds::RedBlackTreeSet;
+
+    /// Consensus-critical invariant behind the whole migration: `rpds`
+    /// `RedBlackTreeMap`/`RedBlackTreeSet` must iterate in ascending key
+    /// order, byte-for-byte matching the `BTreeMap`/`BTreeSet` they replaced.
+    /// PACK/serialization, `ITER`, `MAP` and the big-map durable layout all
+    /// depend on this; if a future `rpds` bump changed it, this fails loudly.
+    #[test]
+    fn rpds_collections_iterate_in_btreemap_order() {
+        // Deliberately unsorted, with negatives, a zero, and a duplicate.
+        let ks = [
+            TypedValue::int(5),
+            TypedValue::int(-3),
+            TypedValue::int(0),
+            TypedValue::int(100),
+            TypedValue::int(-1),
+            TypedValue::int(2),
+            TypedValue::int(-3),
+        ];
+        let mut rb = RedBlackTreeMap::new();
+        let mut bt = BTreeMap::new();
+        let mut rs = RedBlackTreeSet::new();
+        let mut bs = BTreeSet::new();
+        for (i, k) in ks.iter().enumerate() {
+            rb.insert_mut(k.clone(), i);
+            bt.insert(k.clone(), i);
+            rs.insert_mut(k.clone());
+            bs.insert(k.clone());
+        }
+        assert!(
+            rb.iter().map(|(k, _)| k).eq(bt.keys()),
+            "RedBlackTreeMap key order diverges from BTreeMap"
+        );
+        assert!(
+            rs.iter().eq(bs.iter()),
+            "RedBlackTreeSet order diverges from BTreeSet"
+        );
+        // Strictly ascending, independent of insertion order.
+        let mut sorted: Vec<TypedValue> = ks.to_vec();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(rb.keys().cloned().collect::<Vec<_>>(), sorted);
+    }
+
+    /// A persisted (`FromId`) big map placed in every value position the
+    /// mutable dump walk descends into must also be reached by the read-only
+    /// [TypedValue::view_big_map_ids] walk — otherwise `started_with_map_ids`
+    /// under-reports and [dump_big_map_updates]'s removal pass could leak a
+    /// dropped big map. Guards the two walks against drifting apart.
+    #[test]
+    fn view_big_map_ids_covers_all_container_positions() {
+        let bm = |id: i64| {
+            TypedValue::BigMap(BigMap {
+                content: BigMapContent::FromId(BigMapFromId {
+                    id: id.into(),
+                    overlay: RedBlackTreeMap::new(),
+                }),
+                key_type: Type::Int,
+                value_type: Type::Int,
+            })
+        };
+        // Nest a distinct FromId big map in: Pair (both sides), Or, Option,
+        // List element, and Map value.
+        let value = TypedValue::new_pair(
+            TypedValue::new_pair(bm(0), bm(1)),
+            TypedValue::new_pair(
+                TypedValue::Or(Or::Left(Rc::new(bm(2)))),
+                TypedValue::new_pair(
+                    TypedValue::Option(Some(Rc::new(bm(3)))),
+                    TypedValue::new_pair(
+                        TypedValue::List(MichelsonList::from(vec![Rc::new(bm(4))])),
+                        TypedValue::Map(RedBlackTreeMap::from_iter([(
+                            Rc::new(TypedValue::int(0)),
+                            Rc::new(bm(5)),
+                        )])),
+                    ),
+                ),
+            ),
+        );
+        let mut ids = vec![];
+        value.view_big_map_ids(&mut ids);
+        ids.sort();
+        assert_eq!(
+            ids,
+            (0..=5).map(BigMapId::from).collect::<Vec<_>>(),
+            "view_big_map_ids missed a big map in some container position"
+        );
+    }
+}
