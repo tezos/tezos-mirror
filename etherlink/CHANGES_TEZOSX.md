@@ -634,11 +634,13 @@
   batch could satisfy the raw-size budget yet serialize to more than the
   maximum number of chunks the kernel accepts, causing block production to
   fail. (!22092)
-- The sequencer block producer now clears the optimistically-popped pending
-  transactions when block production fails, so a rejected blueprint can no
-  longer permanently stall the sequencer. (!22092)
 - The `blueprint_application` event now accounts for Michelson runtime
   operations in its `txs_nb` count. (!22155)
+- Implements a recovery procedure to harden the kernel against software failure
+  (WASM traps). (!22296 !22387)
+- Treats 1-transaction blueprint as certificate that a given transaction
+  triggers a software failure, and drop such transactions from the delayed
+  inbox. (!22403)
 
 ## Version 0.6 (ae3d731879b9443f52dc14de64e3208ab256d7a0)
 

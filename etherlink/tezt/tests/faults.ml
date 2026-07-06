@@ -98,4 +98,86 @@ module Self_tests = struct
     test_panic_precompile_crashes_sequencer ()
 end
 
-let () = Self_tests.register ()
+(* Wrap [raw_tx] and post it to the L1 delayed transaction bridge, then bake an
+   L1 level so the rollup node -- and thus the sequencer's follower -- pick it
+   up. *)
+let send_raw_tx_to_delayed_inbox ~sc_rollup_node ~client ~l1_contracts
+    ~sc_rollup_address raw_tx =
+  let* () =
+    Client.transfer
+      ~arg:(sf "Pair %S 0x%s" sc_rollup_address raw_tx)
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap2.public_key_hash
+      ~receiver:l1_contracts.Setup.delayed_transaction_bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  unit
+
+(* A panic() transaction reaching the block producer through the delayed inbox
+   takes the sequencer down, exactly like one submitted directly. This
+   exercises the operator's recovery path: manually flushing the delayed inbox
+   with [--force] publishes a blueprint the kernel drops on the trap, unblocking
+   the rollup node. *)
+let test_recover_crashing_delayed_transaction =
+  Setup.register_test
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~kernel:Kernel.Latest
+    ~enable_dal:false
+    ~enable_debug_precompiles:true
+    ~da_fee:Wei.zero
+    ~tags:["evm"; "precompile"; "panic"; "fault"; "debug"; "delayed_inbox"]
+    ~title:"Recover from a delayed panic() transaction with a forced flush"
+  @@
+  fun {sequencer; sc_rollup_node; client; l1_contracts; sc_rollup_address; _}
+      _protocol
+    ->
+  (* Submit a panic() transaction through the delayed inbox. *)
+  let* raw_tx = craft_panic_tx ~sequencer ~nonce:0 in
+  let* () =
+    send_raw_tx_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      raw_tx
+  in
+  (* Advance the layer 1 to make sure the sequencer fetches the delayed item. *)
+  let* () =
+    repeat 3 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* This should fail *)
+  let*@? _ = Rpc.produce_block ~with_delayed_transactions:true sequencer in
+  (* While the sequencer is down, flush the delayed inbox with [--force]: the
+     blueprint is published even though applying it traps. *)
+  let* () = Evm_node.terminate sequencer in
+  let*! () =
+    Evm_node.flush_delayed_inbox
+      ~wallet_dir:(Client.base_dir client)
+      ~force:true
+      sequencer
+  in
+  (* Bake until the rollup node has processed the forced blueprint and its
+     delayed inbox is empty again. *)
+  let* () =
+    bake_until
+      ~timeout:120.
+      ~timeout_in_blocks:20
+      ~bake:(fun () ->
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+      ~result_f:(fun () ->
+        let* size = Delayed_inbox.size (Sc_rollup_node sc_rollup_node) in
+        if size = 0 then return (Some ()) else return None)
+      ()
+  in
+
+  unit
+
+let () =
+  Self_tests.register () ;
+  test_recover_crashing_delayed_transaction [Alpha]

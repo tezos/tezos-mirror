@@ -13,15 +13,18 @@ use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
     store_current_block_header, BlockHeader, ChainHeader, EVMBlockHeader,
 };
-use crate::chains::{EvmLimits, TezosXBlockConstants, TezosXChainConfig};
+use crate::chains::{
+    EvmLimits, TezosXBlockConstants, TezosXChainConfig, TezosXTransaction,
+};
 use crate::configuration::ConfigurationMode;
-use crate::delayed_inbox::DelayedInbox;
+use crate::delayed_inbox::{DelayedInbox, Hash};
 use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
 use crate::migration::allow_path_not_found;
-use crate::storage::read_block_in_progress;
 use crate::storage::{self, EVM_BLOCK_IN_PROGRESS};
+use crate::storage::{inside_stage_one, read_block_in_progress};
+use crate::transaction::TransactionContent;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
@@ -407,23 +410,69 @@ where
     Ok(())
 }
 
-pub fn health_check<Host>(host: &mut Host) -> Result<(), anyhow::Error>
+pub fn health_check<Host>(
+    host: &mut Host,
+    config: &mut Configuration,
+) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost,
+    Host: StorageV1 + WasmHost + IsEvmNode,
 {
     if host.last_run_aborted()? {
         log!(Error, "Something went wrong during previous kernel_run");
 
-        // Something went wrong during the last kernel run. We assume it was while executing the
-        // next blueprint, so we clean up the state to recover. This means getting rid of the
-        // (corrupted) safe storage, the potential blueprint in progress (it could be in the durable
-        // storage if said blueprint required more than one reboot to be executed), and the culprit
-        // blueprint itself. This is enough for the rollup to recover a runtime error.
-        allow_path_not_found(host.store_delete(&TMP_PATH))?;
-        allow_path_not_found(host.store_delete(&EVM_BLOCK_IN_PROGRESS))?;
+        if !inside_stage_one(host) {
+            // Something went wrong outside stage one, leading us to assume this is most certainly
+            // related to stage 2. We clean-up potential leftovers of the interrupted execution.
 
-        let (next_bip_number, _, _) = get_next_bip_info::<Host>(host);
-        drop_blueprint(host, next_bip_number)?;
+            allow_path_not_found(host.store_delete(&TMP_PATH))?;
+            allow_path_not_found(host.store_delete(&EVM_BLOCK_IN_PROGRESS))?;
+
+            let (number, previous_timestamp, ref previous_chain_header) =
+                get_next_bip_info::<Host>(host);
+
+            match read_blueprint(
+                host,
+                config,
+                number,
+                previous_timestamp,
+                previous_chain_header,
+            )? {
+                (Some(blueprint), _) if blueprint.transactions.len() == 1 => {
+                    // Blueprints with one transaction can be treated as certificates that given
+                    // transactions indeed trigger WASM traps. If said transaction is part of the
+                    // delayed inbox, it can never been included in a valid blueprint by
+                    // construction and should be dropped to protect the kernel.
+                    if let ConfigurationMode::Sequencer {
+                        ref mut delayed_inbox,
+                        ..
+                    } = config.mode
+                    {
+                        let potential_culprits: Vec<_> = blueprint
+                            .transactions
+                            .iter()
+                            .filter_map(|txn| match txn {
+                                TezosXTransaction::Ethereum(tx) => match tx.content {
+                                    TransactionContent::TezosDelayed(_)
+                                    | TransactionContent::EthereumDelayed(_) => {
+                                        Some(tx.tx_hash)
+                                    }
+                                    _ => None,
+                                },
+                                _ => None,
+                            })
+                            .collect();
+
+                        for hash in potential_culprits {
+                            delayed_inbox.delete(host, Hash(hash))?;
+                            Event::DroppedDelayedTransaction(hash).store(host)?;
+                        }
+                    }
+                }
+                _ => (),
+            }
+
+            drop_blueprint(host, number)?;
+        }
 
         return Ok(());
     }

@@ -12,6 +12,7 @@ use crate::{
 use primitive_types::{H256, U256};
 use rlp::{Encodable, RlpStream};
 use tezos_ethereum::rlp_helpers::{append_timestamp, append_u256_le};
+use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -21,6 +22,7 @@ pub const SEQUENCER_UPGRADE_TAG: u8 = 0x02;
 pub const BLUEPRINT_APPLIED_TAG: u8 = 0x03;
 pub const NEW_DELAYED_TRANSACTION_TAG: u8 = 0x04;
 pub const FLUSH_DELAYED_INBOX: u8 = 0x05;
+pub const DROPPED_DELAYED_TRANSACTION: u8 = 0x06;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Event<'a> {
@@ -36,6 +38,7 @@ pub enum Event<'a> {
         timestamp: Timestamp,
         level: U256,
     },
+    DroppedDelayedTransaction(TransactionHash),
 }
 
 impl Encodable for Event<'_> {
@@ -70,6 +73,11 @@ impl Encodable for Event<'_> {
                 stream.append_list(transactions);
                 append_timestamp(stream, *timestamp);
                 stream.append(level);
+            }
+            Event::DroppedDelayedTransaction(tx_hash) => {
+                stream.append(&DROPPED_DELAYED_TRANSACTION);
+                stream.begin_list(1);
+                stream.append_iter(*tx_hash);
             }
         }
     }
