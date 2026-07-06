@@ -19,11 +19,9 @@ pub mod overloads;
 
 pub use micheline::Micheline;
 use num_bigint::{BigInt, BigUint};
+use rpds::{RedBlackTreeMap, RedBlackTreeSet};
 use std::collections::HashMap;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    rc::Rc,
-};
+use std::rc::Rc;
 use tezos_crypto_rs::public_key::PublicKey;
 /// Reexported from [tezos_crypto_rs::hash]. Typechecked values of the Michelson
 /// type `chain_id`.
@@ -768,8 +766,8 @@ pub enum TypedValue<'a> {
     Pair(Rc<Self>, Rc<Self>),
     Option(Option<Rc<Self>>),
     List(MichelsonList<Rc<Self>>),
-    Set(BTreeSet<Rc<Self>>),
-    Map(BTreeMap<Rc<Self>, Rc<Self>>),
+    Set(RedBlackTreeSet<Rc<Self>>),
+    Map(RedBlackTreeMap<Rc<Self>, Rc<Self>>),
     BigMap(BigMap<'a>),
     Or(Or<Rc<Self>, Rc<Self>>),
     Address(Address),
@@ -815,7 +813,7 @@ impl Default for TypedValue<'_> {
 /// The output intentionally diverges from the derived `Debug`: the
 /// `PairBox` / `SingleBox` / `MichelsonList` indirection wrappers are
 /// elided (they are implementation detail), and `Map` prints `k -> v`
-/// rather than the `BTreeMap`-derived `k: v`. This Debug appears only in
+/// rather than the derived `k: v`. This Debug appears only in
 /// error messages; no consumer parses it.
 impl<'a> std::fmt::Debug for TypedValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -838,19 +836,16 @@ pub(crate) enum DebugFrame<'b, 'a: 'b> {
     VisitCl(&'b Closure<'a>),
     Str(&'static str),
     // Iterate over a Map's (key, value) pairs without recursing
-    // into the BTreeMap's auto Debug (which would walk values
+    // into the map's auto Debug (which would walk values
     // recursively).
     // The `bool` is `first`: whether the next entry is the first in
     // the container, so the ", " separator is emitted *before* every
     // non-first entry (no trailing comma).
     MapEntries(
-        std::collections::btree_map::Iter<'b, Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        std::vec::IntoIter<(&'b Rc<TypedValue<'a>>, &'b Rc<TypedValue<'a>>)>,
         bool,
     ),
-    SetEntries(
-        std::collections::btree_set::Iter<'b, Rc<TypedValue<'a>>>,
-        bool,
-    ),
+    SetEntries(std::vec::IntoIter<&'b Rc<TypedValue<'a>>>, bool),
     ListEntries(
         crate::ast::michelson_list::Iter<'b, Rc<TypedValue<'a>>>,
         bool,
@@ -1029,12 +1024,18 @@ pub(crate) fn debug_fmt_walk<'a, 'b>(
                 TV::Set(set) => {
                     f.write_str("Set({")?;
                     stack.push(DebugFrame::Str("})"));
-                    stack.push(DebugFrame::SetEntries(set.iter(), true));
+                    stack.push(DebugFrame::SetEntries(
+                        set.iter().collect::<Vec<_>>().into_iter(),
+                        true,
+                    ));
                 }
                 TV::Map(map) => {
                     f.write_str("Map({")?;
                     stack.push(DebugFrame::Str("})"));
-                    stack.push(DebugFrame::MapEntries(map.iter(), true));
+                    stack.push(DebugFrame::MapEntries(
+                        map.iter().collect::<Vec<_>>().into_iter(),
+                        true,
+                    ));
                 }
             },
         }
@@ -1294,10 +1295,11 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         }
                     }
                     TV::Set(s) => {
-                        let mut elems: Vec<TypedValue<'a>> = std::mem::take(s)
-                            .into_iter()
-                            .map(TypedValue::unwrap_rc)
-                            .collect();
+                        let mut elems: Vec<TypedValue<'a>> =
+                            rb_set_into_vec(std::mem::take(s))
+                                .into_iter()
+                                .map(TypedValue::unwrap_rc)
+                                .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
                             frames.push(TvImFrame::Visit(elem));
@@ -1305,7 +1307,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     }
                     TV::Map(m) => {
                         let mut entries: Vec<(Rc<Self>, Rc<Self>)> =
-                            std::mem::take(m).into_iter().collect();
+                            rb_map_into_vec(std::mem::take(m));
                         frames.push(TvImFrame::BuildSeqOf {
                             count: entries.len(),
                         });
@@ -1317,7 +1319,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     }
                     TV::BigMap(m) => match std::mem::take(&mut m.content) {
                         big_map::BigMapContent::InMemory(m) => {
-                            let mut entries: Vec<(Self, Self)> = m.into_iter().collect();
+                            let mut entries: Vec<(Self, Self)> = rb_map_into_vec(m);
                             frames.push(TvImFrame::BuildSeqOf {
                                 count: entries.len(),
                             });
@@ -1333,7 +1335,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                 results.push(id_part);
                             } else {
                                 let mut overlay: Vec<(Self, Option<Self>)> =
-                                    m.overlay.into_iter().collect();
+                                    rb_map_into_vec(m.overlay);
                                 frames.push(TvImFrame::BuildBigMapFromId {
                                     id_part,
                                     count: overlay.len(),
@@ -1529,19 +1531,11 @@ impl<'a> TypedValue<'a> {
         enum Frame<'v, 'a> {
             Visit(&'v TypedValue<'a>),
             ListNext(michelson_list::Iter<'v, Rc<TypedValue<'a>>>),
-            SetNext(std::collections::btree_set::Iter<'v, Rc<TypedValue<'a>>>),
-            MapNext(
-                std::collections::btree_map::Iter<
-                    'v,
-                    Rc<TypedValue<'a>>,
-                    Rc<TypedValue<'a>>,
-                >,
-            ),
+            SetNext(std::vec::IntoIter<&'v Rc<TypedValue<'a>>>),
+            MapNext(std::vec::IntoIter<(&'v Rc<TypedValue<'a>>, &'v Rc<TypedValue<'a>>)>),
             BuildPrim1(Prim),
             BuildPrim2(Prim),
-            BuildSeqOf {
-                count: usize,
-            },
+            BuildSeqOf { count: usize },
         }
 
         let mut frames = vec![Frame::Visit(self)];
@@ -1635,15 +1629,19 @@ impl<'a> TypedValue<'a> {
                     }
                     TV::Set(values) => {
                         frames.push(Frame::BuildSeqOf {
-                            count: values.len(),
+                            count: values.size(),
                         });
-                        frames.push(Frame::SetNext(values.iter()));
+                        frames.push(Frame::SetNext(
+                            values.iter().collect::<Vec<_>>().into_iter(),
+                        ));
                     }
                     TV::Map(values) => {
                         frames.push(Frame::BuildSeqOf {
-                            count: values.len(),
+                            count: values.size(),
                         });
-                        frames.push(Frame::MapNext(values.iter()));
+                        frames.push(Frame::MapNext(
+                            values.iter().collect::<Vec<_>>().into_iter(),
+                        ));
                     }
                     // The typechecker only emits `APPLY` for pushable capture
                     // types, which exclude these variants.
@@ -1683,6 +1681,20 @@ impl From<OutOfGas> for BorrowedUnparseError {
     fn from(_: OutOfGas) -> Self {
         Self::OutOfGas
     }
+}
+
+/// Drain a persistent [RedBlackTreeSet] into a `Vec`. rpds exposes no owning
+/// iterator, so we clone the element handles (cheap `Rc` bumps); when the set
+/// was unique a later [TypedValue::unwrap_rc] then moves rather than clones.
+pub(crate) fn rb_set_into_vec<T: Ord + Clone>(s: RedBlackTreeSet<T>) -> Vec<T> {
+    s.iter().cloned().collect()
+}
+
+/// Drain a persistent [RedBlackTreeMap] into a `Vec`. See [rb_set_into_vec].
+pub(crate) fn rb_map_into_vec<K: Ord + Clone, V: Clone>(
+    m: RedBlackTreeMap<K, V>,
+) -> Vec<(K, V)> {
+    m.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
 }
 
 pub(crate) fn unwrap_ticket(t: Ticket) -> TypedValue {
@@ -1933,8 +1945,8 @@ take_out_via_default_generic!(
     Rc<TypedValue<'a>>,
     Option<Rc<TypedValue<'a>>>,
     MichelsonList<Rc<TypedValue<'a>>>,
-    BTreeSet<Rc<TypedValue<'a>>>,
-    BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+    RedBlackTreeSet<Rc<TypedValue<'a>>>,
+    RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     Or<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     Closure<'a>,
     Box<Ticket<'a>>,
@@ -1974,12 +1986,12 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             }
         }
         TV::Set(s) => {
-            for rc in take(s) {
+            for rc in rb_set_into_vec(take(s)) {
                 push_rc(rc, stack);
             }
         }
         TV::Map(m) => {
-            for (k, v) in take(m) {
+            for (k, v) in rb_map_into_vec(take(m)) {
                 push_rc(k, stack);
                 push_rc(v, stack);
             }
@@ -2054,13 +2066,13 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             // owned `TypedValue`s that may be deep; drain them.
             match &mut m.content {
                 big_map::BigMapContent::InMemory(map) => {
-                    for (k, v) in take(map) {
+                    for (k, v) in rb_map_into_vec(take(map)) {
                         stack.push(DropNode::Value(k));
                         stack.push(DropNode::Value(v));
                     }
                 }
                 big_map::BigMapContent::FromId(from_id) => {
-                    for (k, v) in take(&mut from_id.overlay) {
+                    for (k, v) in rb_map_into_vec(take(&mut from_id.overlay)) {
                         stack.push(DropNode::Value(k));
                         if let Some(v) = v {
                             stack.push(DropNode::Value(v));
@@ -2497,7 +2509,8 @@ pub mod test_strategies {
                 ))
                     .prop_map(|(key_type, value_type, map)|
                               {
-                                  let content = big_map::BigMapContent::InMemory(map);
+                                  let content =
+                                      big_map::BigMapContent::InMemory(map.into_iter().collect());
                                   V::BigMap(BigMap {
                                       content,
                                       key_type,
@@ -3030,8 +3043,8 @@ mod drop_safety {
     fn drain_deep_bigmap_value() {
         // A big_map's in-memory values are owned `TypedValue`s that may be deep.
         on_kernel_stack(|| {
-            let mut map = std::collections::BTreeMap::new();
-            map.insert(TypedValue::Unit, deep_pair(DEPTH));
+            let mut map = RedBlackTreeMap::new();
+            map.insert_mut(TypedValue::Unit, deep_pair(DEPTH));
             let mut tv = TypedValue::BigMap(BigMap::new(Type::Unit, Type::Unit, map));
             drain_deep_typed_value(&mut tv);
         });

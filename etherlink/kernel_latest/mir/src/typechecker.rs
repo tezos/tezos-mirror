@@ -8,6 +8,7 @@
 use chrono::prelude::DateTime;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
+use rpds::{RedBlackTreeMap, RedBlackTreeSet};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
@@ -5275,7 +5276,11 @@ fn step_typecheck_value<'a, 'b>(
                             ));
                         }
                         MapFinalize::BigMapInMem { tk, tv } => {
-                            results.push(TV::BigMap(BigMap::new(tk, tv, acc)));
+                            results.push(TV::BigMap(BigMap::new(
+                                tk,
+                                tv,
+                                acc.into_iter().collect(),
+                            )));
                         }
                     }
                 }
@@ -5350,7 +5355,7 @@ fn step_typecheck_value<'a, 'b>(
                                 content: big_map::BigMapContent::FromId(
                                     big_map::BigMapFromId {
                                         id: big_map_id,
-                                        overlay: acc,
+                                        overlay: acc.into_iter().collect(),
                                     },
                                 ),
                                 key_type: tk_final,
@@ -5401,7 +5406,7 @@ fn step_typecheck_value<'a, 'b>(
                     results.push(TV::BigMap(BigMap {
                         content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                             id: big_map_id,
-                            overlay: acc,
+                            overlay: acc.into_iter().collect(),
                         }),
                         key_type: tk_final,
                         value_type: tv_final,
@@ -5632,7 +5637,7 @@ fn visit_value<'a, 'b>(
                     t: elem_t,
                 });
             } else {
-                results.push(TV::Set(BTreeSet::new()));
+                results.push(TV::Set(RedBlackTreeSet::new()));
             }
         }
         (T::Map(m), V::Seq(vs)) => {
@@ -5698,7 +5703,7 @@ fn visit_value<'a, 'b>(
                     results.push(TV::BigMap(BigMap {
                         content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                             id: big_map_id,
-                            overlay: BTreeMap::default(),
+                            overlay: RedBlackTreeMap::new(),
                         }),
                         key_type: tk_final,
                         value_type: tv_final,
@@ -5739,7 +5744,7 @@ fn visit_value<'a, 'b>(
                             content: big_map::BigMapContent::FromId(
                                 big_map::BigMapFromId {
                                     id: big_map_id,
-                                    overlay: BTreeMap::default(),
+                                    overlay: RedBlackTreeMap::new(),
                                 },
                             ),
                             key_type: tk_final,
@@ -6029,9 +6034,9 @@ fn visit_map_or_bigmap_inmem<'a, 'b>(
         });
     } else {
         match finalize {
-            MapFinalize::Map => results.push(TV::Map(BTreeMap::new())),
+            MapFinalize::Map => results.push(TV::Map(RedBlackTreeMap::new())),
             MapFinalize::BigMapInMem { tk, tv } => {
-                results.push(TV::BigMap(BigMap::new(tk, tv, BTreeMap::new())))
+                results.push(TV::BigMap(BigMap::new(tk, tv, RedBlackTreeMap::new())))
             }
         }
     }
@@ -10399,7 +10404,7 @@ mod typecheck_tests {
             Ok(TypedValue::BigMap(BigMap {
                 content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                     id: id0.clone(),
-                    overlay: BTreeMap::new()
+                    overlay: RedBlackTreeMap::new()
                 }),
                 key_type: Type::Int,
                 value_type: Type::Int
@@ -10450,10 +10455,9 @@ mod typecheck_tests {
                 crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Ok(TypedValue::BigMap(BigMap {
-                content: big_map::BigMapContent::InMemory(BTreeMap::from([(
-                    TypedValue::int(7),
-                    TypedValue::int(8)
-                )])),
+                content: big_map::BigMapContent::InMemory(RedBlackTreeMap::from_iter([
+                    (TypedValue::int(7), TypedValue::int(8))
+                ])),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))
@@ -10498,7 +10502,7 @@ mod typecheck_tests {
             Ok(TypedValue::BigMap(BigMap {
                 content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                     id: id0.clone(),
-                    overlay: BTreeMap::from([(
+                    overlay: RedBlackTreeMap::from_iter([(
                         TypedValue::int(7),
                         Some(TypedValue::int(8))
                     )])
@@ -10519,7 +10523,7 @@ mod typecheck_tests {
             Ok(TypedValue::BigMap(BigMap {
                 content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                     id: id0,
-                    overlay: BTreeMap::from([(TypedValue::int(7), None)])
+                    overlay: RedBlackTreeMap::from_iter([(TypedValue::int(7), None)])
                 }),
                 key_type: Type::Int,
                 value_type: Type::Int

@@ -10,8 +10,9 @@ use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
 use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{Signed, ToPrimitive, Zero};
+use rpds::{RedBlackTreeMap, RedBlackTreeSet};
 use std::cmp::min;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::ops::{Shl, Shr};
 use std::rc::Rc;
 use tezos_crypto_rs::hash::OperationHash;
@@ -541,12 +542,11 @@ enum InterpFrame<'a, 'b> {
     },
     IterSet {
         body: CodeRef<'a, 'b>,
-        remaining: std::collections::btree_set::IntoIter<Rc<TypedValue<'a>>>,
+        remaining: std::vec::IntoIter<Rc<TypedValue<'a>>>,
     },
     IterMap {
         body: CodeRef<'a, 'b>,
-        remaining:
-            std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        remaining: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
     },
     MapListAccum {
         body: CodeRef<'a, 'b>,
@@ -556,9 +556,8 @@ enum InterpFrame<'a, 'b> {
     MapOptionAfter,
     MapMapAccum {
         body: CodeRef<'a, 'b>,
-        remaining:
-            std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
-        acc: BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        remaining: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        acc: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         current_key: Option<Rc<TypedValue<'a>>>,
     },
     /// EXEC body just finished on the top sub stack; pop sub stack,
@@ -594,12 +593,11 @@ enum StepResult<'a, 'b> {
     },
     OpenIterSet {
         body: CodeRef<'a, 'b>,
-        iter: std::collections::btree_set::IntoIter<Rc<TypedValue<'a>>>,
+        iter: std::vec::IntoIter<Rc<TypedValue<'a>>>,
     },
     OpenIterMap {
         body: CodeRef<'a, 'b>,
-        iter:
-            std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        iter: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
     },
     OpenMapList {
         body: CodeRef<'a, 'b>,
@@ -608,8 +606,7 @@ enum StepResult<'a, 'b> {
     OpenMapOption(CodeRef<'a, 'b>),
     OpenMapMap {
         body: CodeRef<'a, 'b>,
-        iter:
-            std::collections::btree_map::IntoIter<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        iter: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
         first_key: Rc<TypedValue<'a>>,
     },
     /// EXEC: enter a lambda body on a fresh sub stack containing args.
@@ -841,7 +838,7 @@ fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
                     pending.push(k);
                     pending.push(v);
                 }
-                for (k, v) in acc {
+                for (k, v) in crate::ast::rb_map_into_vec(acc) {
                     pending.push(k);
                     pending.push(v);
                 }
@@ -1167,7 +1164,7 @@ fn run_interp_driver<'a, 'b>(
                 let prev_key = current_key.ok_or(InterpretError::InternalError(
                     InterpretInvariant::UnreachableState,
                 ))?;
-                acc.insert(prev_key, new_val);
+                acc.insert_mut(prev_key, new_val);
                 if let Some((k, v)) = remaining.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stk.push(TypedValue::Pair(k.clone(), v));
@@ -1335,7 +1332,7 @@ fn handle_step<'a, 'b>(
                 InterpFrame::MapMapAccum {
                     body: body.clone(),
                     remaining: iter,
-                    acc: BTreeMap::new(),
+                    acc: RedBlackTreeMap::new(),
                     current_key: Some(first_key),
                 },
             )?;
@@ -1556,14 +1553,14 @@ fn interpret_step<'a, 'b, 'c>(
                     let set = pop_v!(V::Set);
                     Ok(StepResult::OpenIterSet {
                         body: mk_body(body),
-                        iter: set.into_iter(),
+                        iter: crate::ast::rb_set_into_vec(set).into_iter(),
                     })
                 }
                 overloads::Iter::Map => {
                     let map = pop_v!(V::Map);
                     Ok(StepResult::OpenIterMap {
                         body: mk_body(body),
-                        iter: map.into_iter(),
+                        iter: crate::ast::rb_map_into_vec(map).into_iter(),
                     })
                 }
             }
@@ -1604,10 +1601,10 @@ fn interpret_step<'a, 'b, 'c>(
             overloads::Map::Map => {
                 ctx.gas().consume(interpret_cost::MAP_MAP)?;
                 let map = pop_v!(V::Map);
-                // Iterate the map's entries directly: unlike L1, which folds the
-                // map into a list first, MIR walks the `BTreeMap` in place, so
-                // there is no O(n) materialisation step to charge for.
-                let mut iter = map.into_iter();
+                // Iterate the map's entries by materialising them first: rpds
+                // exposes no owning iterator, so [crate::ast::rb_map_into_vec]
+                // collects the (cheap) entry handles up front.
+                let mut iter = crate::ast::rb_map_into_vec(map).into_iter();
                 if let Some((k, v)) = iter.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stack.push(TypedValue::Pair(k.clone(), v));
@@ -1617,7 +1614,7 @@ fn interpret_step<'a, 'b, 'c>(
                         first_key: k,
                     })
                 } else {
-                    stack.push(V::Map(BTreeMap::new()));
+                    stack.push(V::Map(RedBlackTreeMap::new()));
                     Ok(StepResult::Done)
                 }
             }
@@ -2904,14 +2901,12 @@ fn interpret_one<'a>(
             }
         },
         I::EmptySet => {
-            use std::collections::BTreeSet;
             ctx.gas().consume(interpret_cost::EMPTY_SET)?;
-            stack.push(V::Set(BTreeSet::new()))
+            stack.push(V::Set(RedBlackTreeSet::new()))
         }
         I::EmptyMap => {
-            use std::collections::BTreeMap;
             ctx.gas().consume(interpret_cost::EMPTY_MAP)?;
-            stack.push(V::Map(BTreeMap::new()))
+            stack.push(V::Map(RedBlackTreeMap::new()))
         }
         I::EmptyBigMap(kty, vty) => {
             ctx.gas().consume(interpret_cost::EMPTY_BIG_MAP)?;
@@ -2922,7 +2917,7 @@ fn interpret_one<'a>(
                 let key_rc = pop_rc!();
                 pop_ref!(set, Set);
                 ctx.gas()
-                    .consume(interpret_cost::set_mem(&key_rc, set.len())?)?;
+                    .consume(interpret_cost::set_mem(&key_rc, set.size())?)?;
                 let result = set.contains(&*key_rc);
                 stack.push(V::Bool(result));
             }
@@ -2930,7 +2925,7 @@ fn interpret_one<'a>(
                 let key_rc = pop_rc!();
                 pop_ref!(map, Map);
                 ctx.gas()
-                    .consume(interpret_cost::map_mem(&key_rc, map.len())?)?;
+                    .consume(interpret_cost::map_mem(&key_rc, map.size())?)?;
                 let result = map.contains_key(&*key_rc);
                 stack.push(V::Bool(result));
             }
@@ -2953,7 +2948,7 @@ fn interpret_one<'a>(
                 let key_rc = pop_rc!();
                 pop_ref!(map, Map);
                 ctx.gas()
-                    .consume(interpret_cost::map_get(&key_rc, map.len())?)?;
+                    .consume(interpret_cost::map_get(&key_rc, map.size())?)?;
                 let result = map.get(&*key_rc);
                 stack.push(V::new_option_rc(result.cloned()));
             }
@@ -2979,23 +2974,27 @@ fn interpret_one<'a>(
                 let new_present = pop!(V::Bool);
                 let set = top_mut!(V::Set);
                 ctx.gas()
-                    .consume(interpret_cost::set_update(&key_rc, set.len())?)?;
+                    .consume(interpret_cost::set_update(&key_rc, set.size())?)?;
                 if new_present {
-                    set.insert(key_rc)
+                    set.insert_mut(key_rc);
                 } else {
-                    set.remove(&*key_rc)
-                };
+                    set.remove_mut(&*key_rc);
+                }
             }
             overloads::Update::Map => {
                 let key_rc = pop_rc!();
                 let opt_new_val = pop!(V::Option);
                 let map = top_mut!(V::Map);
                 ctx.gas()
-                    .consume(interpret_cost::map_update(&key_rc, map.len())?)?;
+                    .consume(interpret_cost::map_update(&key_rc, map.size())?)?;
                 match opt_new_val {
-                    None => map.remove(&*key_rc),
-                    Some(val) => map.insert(key_rc, val),
-                };
+                    None => {
+                        map.remove_mut(&*key_rc);
+                    }
+                    Some(val) => {
+                        map.insert_mut(key_rc, val);
+                    }
+                }
             }
             overloads::Update::BigMap => {
                 let key = pop!();
@@ -3013,11 +3012,16 @@ fn interpret_one<'a>(
                 let opt_new_val = pop!(V::Option);
                 let map = top_mut!(V::Map);
                 ctx.gas()
-                    .consume(interpret_cost::map_get_and_update(&key_rc, map.len())?)?;
-                let opt_old_val = match opt_new_val {
-                    None => map.remove(&*key_rc),
-                    Some(val) => map.insert(key_rc, val),
-                };
+                    .consume(interpret_cost::map_get_and_update(&key_rc, map.size())?)?;
+                let opt_old_val = map.get(&*key_rc).cloned();
+                match opt_new_val {
+                    None => {
+                        map.remove_mut(&*key_rc);
+                    }
+                    Some(val) => {
+                        map.insert_mut(key_rc, val);
+                    }
+                }
                 stack.push(V::new_option_rc(opt_old_val));
             }
             overloads::GetAndUpdate::BigMap => {
@@ -3035,19 +3039,19 @@ fn interpret_one<'a>(
         },
         I::Size(overload) => {
             macro_rules! run_size {
-                ($ctor:tt, $gas:ident) => {{
+                ($ctor:tt, $gas:ident, $len:ident) => {{
                     pop_ref!(e, $ctor);
                     ctx.gas().consume(interpret_cost::$gas)?;
-                    let res = e.len();
+                    let res = e.$len();
                     stack.push(V::Nat(res.into()));
                 }};
             }
             match overload {
-                overloads::Size::String => run_size!(String, SIZE_STRING),
-                overloads::Size::Bytes => run_size!(Bytes, SIZE_BYTES),
-                overloads::Size::List => run_size!(List, SIZE_LIST),
-                overloads::Size::Set => run_size!(Set, SIZE_SET),
-                overloads::Size::Map => run_size!(Map, SIZE_MAP),
+                overloads::Size::String => run_size!(String, SIZE_STRING, len),
+                overloads::Size::Bytes => run_size!(Bytes, SIZE_BYTES, len),
+                overloads::Size::List => run_size!(List, SIZE_LIST, len),
+                overloads::Size::Set => run_size!(Set, SIZE_SET, size),
+                overloads::Size::Map => run_size!(Map, SIZE_MAP, size),
             }
         }
         I::UpdateN(n) => {
@@ -3636,7 +3640,7 @@ fn get_nth_field_rc<'b>(
 
 #[cfg(test)]
 mod interpreter_tests {
-    use std::collections::{BTreeMap, BTreeSet, HashMap};
+    use std::collections::HashMap;
     use std::rc::Rc;
 
     use super::*;
@@ -3680,14 +3684,14 @@ mod interpreter_tests {
         super::interpret_one(i, ctx, temp, stack)
     }
 
-    fn rc_set<'a, I>(values: I) -> BTreeSet<Rc<TypedValue<'a>>>
+    fn rc_set<'a, I>(values: I) -> RedBlackTreeSet<Rc<TypedValue<'a>>>
     where
         I: IntoIterator<Item = TypedValue<'a>>,
     {
         values.into_iter().map(Rc::new).collect()
     }
 
-    fn rc_map<'a, I>(values: I) -> BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>
+    fn rc_map<'a, I>(values: I) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>
     where
         I: IntoIterator<Item = (TypedValue<'a>, TypedValue<'a>)>,
     {
@@ -4067,12 +4071,11 @@ mod interpreter_tests {
                     },
                     InterpFrame::IterSet {
                         body: body(),
-                        remaining: BTreeSet::from([deep()]).into_iter(),
+                        remaining: vec![deep()].into_iter(),
                     },
                     InterpFrame::IterMap {
                         body: body(),
-                        remaining: BTreeMap::from([(Rc::new(V::int(0)), deep())])
-                            .into_iter(),
+                        remaining: vec![(Rc::new(V::int(0)), deep())].into_iter(),
                     },
                     InterpFrame::MapListAccum {
                         body: body(),
@@ -4081,9 +4084,8 @@ mod interpreter_tests {
                     },
                     InterpFrame::MapMapAccum {
                         body: body(),
-                        remaining: BTreeMap::from([(Rc::new(V::int(0)), deep())])
-                            .into_iter(),
-                        acc: BTreeMap::from([(Rc::new(V::int(0)), deep())]),
+                        remaining: vec![(Rc::new(V::int(0)), deep())].into_iter(),
+                        acc: [(Rc::new(V::int(0)), deep())].into_iter().collect(),
                         current_key: Some(deep()),
                     },
                 ];
@@ -5229,7 +5231,7 @@ mod interpreter_tests {
 
     #[test]
     fn test_iter_set_zero() {
-        let mut stack = stk![V::int(0), V::Set(BTreeSet::new())];
+        let mut stack = stk![V::int(0), V::Set(RedBlackTreeSet::new())];
         assert!(interpret(
             &[Iter(
                 overloads::Iter::Set,
@@ -5276,7 +5278,7 @@ mod interpreter_tests {
 
     #[test]
     fn test_iter_map_zero() {
-        let mut stack = stk![V::int(0), V::Map(BTreeMap::new())];
+        let mut stack = stk![V::int(0), V::Map(RedBlackTreeMap::new())];
         assert!(interpret(
             &[Iter(
                 overloads::Iter::Map,
@@ -5381,7 +5383,7 @@ mod interpreter_tests {
 
         test(overloads::Map::List, stk![V::List(MichelsonList::new())]);
         test(overloads::Map::Option, stk![V::new_option(None)]);
-        test(overloads::Map::Map, stk![V::Map(BTreeMap::new())]);
+        test(overloads::Map::Map, stk![V::Map(RedBlackTreeMap::new())]);
     }
 
     #[test]
@@ -6077,7 +6079,7 @@ mod interpreter_tests {
             .unwrap();
         let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
             id: big_map_id,
-            overlay: BTreeMap::from([(
+            overlay: RedBlackTreeMap::from_iter([(
                 TypedValue::int(2),
                 Some(TypedValue::String("bar".to_owned())),
             )]),
@@ -6271,7 +6273,7 @@ mod interpreter_tests {
             .unwrap();
         let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
             id: big_map_id,
-            overlay: BTreeMap::new(),
+            overlay: RedBlackTreeMap::new(),
         });
         let big_map = BigMap {
             content,
@@ -6341,7 +6343,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         let mut stack = Stack::new();
         assert_eq!(interpret(&[EmptySet], &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
+        assert_eq!(stack, stk![TypedValue::Set(RedBlackTreeSet::new())]);
         assert_eq!(
             ctx.gas().milligas().unwrap(),
             Gas::default().milligas().unwrap()
@@ -6355,7 +6357,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         let mut stack = Stack::new();
         assert_eq!(interpret(&[EmptyMap], &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![TypedValue::Map(BTreeMap::new())]);
+        assert_eq!(stack, stk![TypedValue::Map(RedBlackTreeMap::new())]);
         assert_eq!(
             ctx.gas().milligas().unwrap(),
             Gas::default().milligas().unwrap()
@@ -6385,7 +6387,7 @@ mod interpreter_tests {
     #[test]
     fn update_set_insert() {
         let mut ctx = Ctx::default();
-        let set = BTreeSet::new();
+        let set = RedBlackTreeSet::new();
         let mut stack = stk![
             TypedValue::Set(set),
             TypedValue::Bool(true),
@@ -6417,7 +6419,7 @@ mod interpreter_tests {
             interpret(&[Update(overloads::Update::Set)], &mut ctx, &mut stack),
             Ok(())
         );
-        assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
+        assert_eq!(stack, stk![TypedValue::Set(RedBlackTreeSet::new())]);
         assert_eq!(
             ctx.gas().milligas().unwrap(),
             Gas::default().milligas().unwrap()
@@ -6452,7 +6454,7 @@ mod interpreter_tests {
     fn update_set_remove_when_absent() {
         let mut ctx = Ctx::default();
         let mut stack = stk![
-            TypedValue::Set(BTreeSet::new()),
+            TypedValue::Set(RedBlackTreeSet::new()),
             TypedValue::Bool(false),
             TypedValue::int(1)
         ];
@@ -6460,7 +6462,7 @@ mod interpreter_tests {
             interpret(&[Update(overloads::Update::Set)], &mut ctx, &mut stack),
             Ok(())
         );
-        assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
+        assert_eq!(stack, stk![TypedValue::Set(RedBlackTreeSet::new())]);
         assert_eq!(
             ctx.gas().milligas().unwrap(),
             Gas::default().milligas().unwrap()
@@ -6472,7 +6474,7 @@ mod interpreter_tests {
     #[test]
     fn update_map_insert() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::new();
+        let map = RedBlackTreeMap::new();
         let mut stack = stk![
             V::Map(map),
             V::new_option(Some(V::String("foo".to_owned()))),
@@ -6528,7 +6530,7 @@ mod interpreter_tests {
             interpret(&[Update(overloads::Update::Map)], &mut ctx, &mut stack),
             Ok(())
         );
-        assert_eq!(stack, stk![V::Map(BTreeMap::new())]);
+        assert_eq!(stack, stk![V::Map(RedBlackTreeMap::new())]);
         assert_eq!(
             ctx.gas().milligas().unwrap(),
             Gas::default().milligas().unwrap()
@@ -6613,7 +6615,7 @@ mod interpreter_tests {
     #[test]
     fn get_and_update_map_insert() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::new();
+        let map = RedBlackTreeMap::new();
         let mut stack = stk![
             V::Map(map),
             V::new_option(Some(V::String("foo".to_owned()))),
@@ -6688,7 +6690,7 @@ mod interpreter_tests {
         assert_eq!(
             stack,
             stk![
-                V::Map(BTreeMap::new()),
+                V::Map(RedBlackTreeMap::new()),
                 V::new_option(Some(V::String("bar".into()))),
             ]
         );

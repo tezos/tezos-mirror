@@ -29,6 +29,9 @@ bitvec = "1.0"
 strum = "0.26.3"
 strum_macros = "0.26.4"
 smallvec = { version = "1.11", features = [ "const_new" ] }
+# Pinned: rpds >= 1.1.1 pulls archery >= 1.2.2 (edition 2024 / MSRV 1.85),
+# which the sdk-bindings workspace (Rust 1.83) cannot build.
+rpds = "=1.1.0"
 serde = { version = "1.0" }
 serde_json = "1.0"
 nom = { version = "7.1", default-features = false }
