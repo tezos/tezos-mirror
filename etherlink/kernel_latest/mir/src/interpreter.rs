@@ -3701,6 +3701,106 @@ mod interpreter_tests {
             .collect()
     }
 
+    // Global allocator, used in tests only, that counts bytes requested on the
+    // current thread, so a measurement is not polluted by other tests running in
+    // parallel. The counter is a const-initialised thread-local: the allocation
+    // hook then neither allocates nor registers a destructor, so it is safe to
+    // run from inside the allocator itself.
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::cell::Cell;
+
+    thread_local! {
+        static THREAD_ALLOCATED: Cell<u64> = const { Cell::new(0) };
+    }
+
+    struct CountingAllocator;
+
+    unsafe impl GlobalAlloc for CountingAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            THREAD_ALLOCATED.with(|b| b.set(b.get().wrapping_add(layout.size() as u64)));
+            System.alloc(layout)
+        }
+
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            System.dealloc(ptr, layout)
+        }
+
+        unsafe fn realloc(
+            &self,
+            ptr: *mut u8,
+            layout: Layout,
+            new_size: usize,
+        ) -> *mut u8 {
+            if new_size > layout.size() {
+                THREAD_ALLOCATED.with(|b| {
+                    b.set(b.get().wrapping_add((new_size - layout.size()) as u64))
+                });
+            }
+            System.realloc(ptr, layout, new_size)
+        }
+    }
+
+    #[global_allocator]
+    static GLOBAL_COUNTING_ALLOCATOR: CountingAllocator = CountingAllocator;
+
+    fn thread_allocated_bytes() -> u64 {
+        THREAD_ALLOCATED.with(|b| b.get())
+    }
+
+    // UPDATE charges gas logarithmic in the set size, so the memory it
+    // allocates must be logarithmic too. A DUP shares the operand, forcing
+    // UPDATE down the copy-on-write path: a persistent set copies one
+    // root-to-leaf path while a `BTreeSet` clones every node. The test fails
+    // on the cloning implementation, passes on the structurally shared one.
+    #[test]
+    fn dup_and_modify_allocates_in_line_with_charged_gas() {
+        // (bytes allocated, milligas charged) for DUP; PUSH true; PUSH 0;
+        // UPDATE run on a set of n ints built beforehand. The DUP leaves the
+        // set shared, so the UPDATE exercises the copy-on-write path.
+        fn measure(n: i64) -> (u64, u32) {
+            let set = V::Set(rc_set((0..n).map(V::int)));
+            let mut stack = stk![set];
+            let mut ctx = Ctx::default();
+            // Build the program and its pushed literals before measuring, so
+            // only the interpretation itself is counted.
+            let prog = [
+                Dup(None),
+                Push(Rc::new(V::Bool(true))),
+                Push(Rc::new(V::int(0))),
+                Update(overloads::Update::Set),
+            ];
+            let gas_before = ctx.gas().milligas().unwrap();
+            let bytes_before = thread_allocated_bytes();
+            interpret(&prog, &mut ctx, &mut stack).unwrap();
+            let bytes = thread_allocated_bytes() - bytes_before;
+            let gas = gas_before - ctx.gas().milligas().unwrap();
+            (bytes, gas)
+        }
+
+        const SMALL: i64 = 64;
+        const LARGE: i64 = 65536;
+
+        let (mem_small, gas_small) = measure(SMALL);
+        let (mem_large, gas_large) = measure(LARGE);
+
+        // The copy-on-write path allocates one node per tree level, and a
+        // red-black tree of n elements has height at most 2*log2(n+1). So the
+        // memory ratio is bounded by twice the depth ratio; the per-call
+        // overhead, common to every impl, only shrinks it and keeps the bound
+        // safe. A linear clone scales with n and exceeds this by far.
+        let depth_small = (SMALL as u64 + 1).ilog2() as u64;
+        let depth_large = (LARGE as u64 + 1).ilog2() as u64;
+        let max_mem_large = mem_small * 2 * depth_large / depth_small;
+        assert!(
+            mem_large <= max_mem_large,
+            "DUP+UPDATE on a shared set allocated {mem_large} bytes for {LARGE} elements \
+             (gas {gas_large} milligas), above the {max_mem_large} byte bound scaled from \
+             {mem_small} bytes for {SMALL} (gas {gas_small}) by twice the log2 depth ratio \
+             {depth_large}/{depth_small}: memory grows like n, not log n, so the shared \
+             operand is deep-cloned instead of structurally shared.",
+        );
+    }
+
     fn unparse_type_cost(ty: &Type) -> u32 {
         let arena = Arena::new();
         let mut gas = Gas::default();
