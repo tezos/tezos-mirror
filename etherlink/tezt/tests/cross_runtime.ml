@@ -7723,6 +7723,165 @@ let test_crac_applied_body_preserved_as_backtracked_on_evm_revert () =
   check_crac_brackets ~prefix internals ;
   unit
 
+(** OOG after the alias push in [resolve_aliases], before the CRAC
+    serves, must not leak the pushed alias origination into a later
+    sibling CRAC's receipt. child1 OOGs after materializing its alias
+    forwarder (never serves); child2 then serves and drains. A correct
+    kernel never surfaces alias(child1); run A (child2 only) is the
+    control. *)
+let test_crac_alias_origination_oog_in_window_leak () =
+  register_crac_runner_test
+    ~title:
+      "CRAC: OOG after alias push does not leak alias origination into a later \
+       sibling CRAC"
+    ~tags:["crac_receipt"; "regression"; "alias"; "leak"; "oog"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let child_addr_of_slot ~contract ~slot =
+    let*@ word = Rpc.get_storage_at ~address:contract ~pos:slot sequencer in
+    let hex = Test_helpers.remove_0x word in
+    return ("0x" ^ String.sub hex 24 40)
+  in
+  let deploy_instance ~dest1_kt1 ~dest2_kt1 =
+    let* addr =
+      EvmContract.deploy_solidity_contract
+        ~evm_version:(Kernel.select_evm_version Kernel.Latest)
+        ~sequencer
+        ~sender
+        ~nonce:(evm_nonce ())
+        ~contract:Solidity_contracts.crac_oog_then_drain
+        ()
+    in
+    let* _ =
+      EvmContract.craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce:(evm_nonce ())
+        ~value:Wei.zero
+        ~address:addr
+        ~abi_signature:"initialize(string,string)"
+        ~arguments:[dest1_kt1; dest2_kt1]
+        ()
+    in
+    let* child1 = child_addr_of_slot ~contract:addr ~slot:"0x00" in
+    let* child2 = child_addr_of_slot ~contract:addr ~slot:"0x01" in
+    return (addr, child1, child2)
+  in
+  let count_alias_originations internals alias_kt1 =
+    List.length
+      (List.filter
+         (fun iop ->
+           JSON.(iop |-> "kind" |> as_string) = "origination"
+           && JSON.(iop |-> "source" |> as_string) = handler_address
+           &&
+           let originated =
+             JSON.(iop |-> "result" |-> "originated_contracts" |> as_list)
+             |> List.map JSON.as_string
+           in
+           originated = [alias_kt1])
+         internals)
+  in
+  let run_and_fetch_internals ~instance ~signature ~arguments =
+    let* _ =
+      EvmContract.craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce:(evm_nonce ())
+        ~value:Wei.zero
+        ~address:instance
+        ~abi_signature:signature
+        ~arguments
+        ()
+    in
+    let* ops = fetch_recent_michelson_manager_ops sequencer in
+    let op_list = JSON.(ops |> as_list) in
+    Check.(
+      (List.length op_list = 1)
+        int
+        ~error_msg:"Expected 1 synthetic Michelson manager op, got %L") ;
+    let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+    return JSON.(top |-> "metadata" |-> "internal_operation_results" |> as_list)
+  in
+  let count_served_cracs internals =
+    List.length
+      (List.filter
+         (fun iop ->
+           JSON.(
+             iop |-> "tag" |> as_opt |> Option.fold ~none:"" ~some:as_string)
+           = "cross_runtime_call")
+         internals)
+  in
+  let* dest1 = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, dest1_kt1)) = dest1 in
+  let* dest2 = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, dest2_kt1)) = dest2 in
+  let g_locked = 150000 in
+  let* instB, child1B, child2B = deploy_instance ~dest1_kt1 ~dest2_kt1 in
+  let*@ child1B_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress child1B sequencer
+  in
+  let*@ child2B_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress child2B sequencer
+  in
+  let* internalsB =
+    run_and_fetch_internals
+      ~instance:instB
+      ~signature:"run(uint256)"
+      ~arguments:[string_of_int g_locked]
+  in
+  let b_served = count_served_cracs internalsB in
+  let b_child1_alias = count_alias_originations internalsB child1B_alias in
+  let b_child2_alias = count_alias_originations internalsB child2B_alias in
+  let* instA, child1A, child2A = deploy_instance ~dest1_kt1 ~dest2_kt1 in
+  let*@ child1A_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress child1A sequencer
+  in
+  let*@ child2A_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress child2A sequencer
+  in
+  let* internalsA =
+    run_and_fetch_internals
+      ~instance:instA
+      ~signature:"runControlOnly()"
+      ~arguments:[]
+  in
+  let a_served = count_served_cracs internalsA in
+  let a_child1_alias = count_alias_originations internalsA child1A_alias in
+  let a_child2_alias = count_alias_originations internalsA child2A_alias in
+  Check.(
+    (a_served = 1) int ~error_msg:"Control A: expected 1 served CRAC, got %L") ;
+  Check.(
+    (b_served = 1)
+      int
+      ~error_msg:
+        "Repro B: expected 1 served CRAC (child1 must OOG before serving), got \
+         %L") ;
+  Check.(
+    (a_child2_alias = 1)
+      int
+      ~error_msg:"Control A: expected alias(child2) originated once, got %L") ;
+  Check.(
+    (a_child1_alias = 0)
+      int
+      ~error_msg:"Control A: expected alias(child1) absent, got %L") ;
+  Check.(
+    (b_child2_alias = 1)
+      int
+      ~error_msg:"Repro B: expected alias(child2) originated once, got %L") ;
+  Check.(
+    (b_child1_alias = 0)
+      int
+      ~error_msg:
+        "Alias-origination leak: alias(child1) appeared %L time(s) though \
+         child1's CRAC OOG'd before serving") ;
+  Check.(
+    (b_child1_alias = a_child1_alias)
+      int
+      ~error_msg:
+        "Alias-origination leak (differential): B has alias(child1) %L vs \
+         control A's %R") ;
+  unit
+
 (* Two EVM→TEZ CRACs from the SAME EVM transaction (RFC Example 5).
  *
  *  The Michelson runtime block has ONE manager operation with TWO sibling
@@ -15415,6 +15574,7 @@ let () =
   test_crac_synthetic_event_survives_failed_inner_with_emit () ;
   test_crac_synthetic_event_present_when_applied_crac_reverted_out () ;
   test_crac_applied_body_preserved_as_backtracked_on_evm_revert () ;
+  test_crac_alias_origination_oog_in_window_leak () ;
   test_crac_receipt_two_independent () ;
   test_crac_receipt_separate_tx_two_cracs () ;
   test_crac_receipt_evm_tez_evm () ;

@@ -548,6 +548,12 @@ let crac_http_call_evm =
     ~label:"crac_http_call_evm"
     ~contract:"CracHttpCallEvm"
 
+let crac_oog_then_drain =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_oog_then_drain.sol")
+    ~label:"crac_oog_then_drain"
+    ~contract:"CracOogThenDrain"
+
 let crac_collect_result =
   compile_contract
     ~source:(solidity_contracts_path ^ "/crac_collect_result.sol")
