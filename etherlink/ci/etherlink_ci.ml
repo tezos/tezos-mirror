@@ -541,18 +541,22 @@ let register () =
     [(Auto, job_docker_merge `test); (Auto, job_gitlab_release `real)] ;
   (* Test release pipeline that does not require pushing a tag: it is triggered
      as a scheduled pipeline (see [ci/run_pipeline/schedule_test_release_evm_node.sh]).
-     It runs the release jobs in test mode (no image pushed to Docker Hub, GitLab
-     release created in --dry-run) so that changes to the release pipeline, e.g.
-     to the 'ci-release' image, can be tested without publishing anything. *)
+     Its purpose is to test changes to the release pipeline (e.g. the 'ci-release'
+     image) without publishing anything, and it must be safe even when run on
+     tezos/tezos (this pipeline is not restricted to forks). Therefore:
+     - it uses [job_docker_merge] rather than [job_docker_promote_to_latest], so
+       the 'octez-evm-node-latest' tag is never moved (the built images are only
+       pushed to the GCP registry under the branch name, in [`test] mode which
+       also disables any Docker Hub push);
+     - the GitLab release job runs in [`scheduled_test] mode, which fakes the
+       release tag and passes --dry-run, so no package is uploaded and no GitLab
+       release is created. *)
   CI.register_scheduled_pipeline
     "scheduled_test_release"
     ~description:
       "Test release pipeline for the EVM node, triggered as a scheduled \
-       pipeline instead of by pushing a tag."
-    [
-      (Auto, job_docker_promote_to_latest `test);
-      (Auto, job_gitlab_release `scheduled_test);
-    ] ;
+       pipeline instead of by pushing a tag. Does not publish anything."
+    [(Auto, job_docker_merge `test); (Auto, job_gitlab_release `scheduled_test)] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Etherlink."
