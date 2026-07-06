@@ -32,6 +32,12 @@ hex.workspace = true
 
 bytes.workspace = true
 
+# Security floor for `ruint`, pulled transitively via `alloy-primitives` and
+# flagged by `cargo audit` (RUSTSEC-2025-0137). `default-features = false`
+# leaves feature unification unchanged. Capped below 1.18 because 1.18+
+# requires Rust 1.90 while this kernel is pinned to 1.88.
+ruint = { version = "~1.17.1", default-features = false } # RUSTSEC-2025-0137
+
 sha3.workspace = true
 tezos_crypto_rs.workspace = true
 
