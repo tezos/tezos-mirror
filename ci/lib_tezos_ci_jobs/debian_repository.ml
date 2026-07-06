@@ -20,6 +20,57 @@ module CI = Cacio.Shared
    - Full: we run the complete test matrix *)
 type repository_pipeline = Full | Partial | Release
 
+(* "Distribution" would be a more proper name but the "Distro" slang
+   makes it more clear that we are talking about a Linux distribution
+   and not about the distribution of something else. (Also it's shorter.)
+
+   Feel free to move this into e.g. Tezos_ci.Images.Base_images instead.
+   For now it's only used in debian_repository.ml so we can define it here,
+   closer to where it is actually used. *)
+module Distro = struct
+  type name = Debian | Ubuntu
+
+  type t = {name : name; release : string}
+
+  let debian release = {name = Debian; release}
+
+  let ubuntu year month = {name = Ubuntu; release = sf "%02d.%02d" year month}
+
+  let name_for_humans = function Debian -> "Debian" | Ubuntu -> "Ubuntu"
+
+  let name_for_scripts distro = String.lowercase_ascii (name_for_humans distro)
+
+  let full_name_for_humans distro =
+    name_for_humans distro.name ^ " " ^ distro.release
+
+  let full_name_with_underscores distro =
+    name_for_scripts distro.name
+    ^ "_"
+    ^ String.map (function '.' -> '_' | c -> c) distro.release
+
+  let image distro =
+    let open Tezos_ci.Images.Base_images in
+    match distro with
+    | {name = Debian; release = "bookworm"} -> debian_bookworm
+    | {name = Debian; release = "trixie"} -> debian_trixie
+    | {name = Ubuntu; release = "22.04"} -> ubuntu_22_04
+    | {name = Ubuntu; release = "24.04"} -> ubuntu_24_04
+    | {name = Ubuntu; release = "26.04"} -> ubuntu_26_04
+    | _ -> failwith ("no base image for " ^ full_name_for_humans distro)
+
+  (* Image for jobs that just need one version that works, such as [apt_repo_*]. *)
+  let main_image = function
+    | Debian -> image (debian "trixie")
+    | Ubuntu -> image (ubuntu 24 04)
+
+  let supported_releases name pipeline_type =
+    match (name, pipeline_type) with
+    | Debian, Partial -> ["trixie"]
+    | Debian, (Full | Release) -> ["bookworm"; "trixie"]
+    | Ubuntu, Partial -> ["22.04"]
+    | Ubuntu, (Full | Release) -> ["22.04"; "24.04"; "26.04"]
+end
+
 (** Return a tuple (ARCHITECTURES, <archs>) based on the type
     of repository pipeline. *)
 let archs_variables pipeline =
@@ -36,39 +87,6 @@ let tag_amd64 ~ramfs =
   else Runner.Tag.show Gcp_very_high_cpu
 
 let tag_arm64 = Runner.Tag.show Gcp_arm64
-
-(** Debian releases tested per pipeline type.
-
-    Partial pipelines (merge requests) only test the current Debian
-    stable; Full and Release pipelines test both supported releases. *)
-let debian_releases : repository_pipeline -> string list = function
-  | Partial -> ["trixie"]
-  | Full | Release -> ["bookworm"; "trixie"]
-
-(* Job names use [_] instead of [.] in releases (e.g. [22_04] for
-   Ubuntu [22.04]). Debian codenames have no dots so this is a no-op
-   for them. *)
-let release_token release = String.map (function '.' -> '_' | c -> c) release
-
-(** These are the set of Debian release-architecture combinations for
-    which we build deb packages in the job [oc.build-debian].
-    A dependency image will be built once for each combination of [RELEASE] and [TAGS].
-
-    If [release_pipeline] is false, we only tests a subset of the matrix,
-    one release, and one architecture.
-
-    Specify [ramfs] to select the specific runner for amd64.
-
-    Set [arm64] to false to exclude from the matrix arm64 architecture.
-    *)
-let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) pipeline_type
-    =
-  let tags =
-    match pipeline_type with
-    | Partial -> [tag_amd64 ~ramfs]
-    | Full | Release -> tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else [])
-  in
-  [[("RELEASE", debian_releases pipeline_type); ("TAGS", tags)]]
 
 (* Points to [(debian|ubuntu)-build] static images. *)
 let build_dependency_image =
@@ -87,28 +105,6 @@ let make_debian_variables distribution image_kind release version =
       release
       version )
   :: [("PREFIX", ""); ("DISTRIBUTION", distribution); ("RELEASE", release)]
-
-(** These are the set of Ubuntu release-architecture combinations for
-    which we build deb packages in the job
-    [job_build_ubuntu_package]. See {!debian_package_release_matrix}
-    for more information.
-
-    If [release_pipeline] is false, we only tests a subset of the matrix,
-    one release, and one architecture.
-
-    Specify [ramfs] to select the specific runner for amd64.
-
-    Set [arm64] to false to exclude from the matrix arm64 architecture.
-    *)
-let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
-  | Partial -> [[("RELEASE", ["22.04"]); ("TAGS", [tag_amd64 ~ramfs])]]
-  | Full | Release ->
-      [
-        [
-          ("RELEASE", ["22.04"; "24.04"; "26.04"]);
-          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
-        ];
-      ]
 
 (* This is a hack to enable Cargo networking for jobs in child pipelines.
 
@@ -162,41 +158,56 @@ let job_build_keyring_package =
 
 (* These jobs build the packages in a matrix using the
    build dependencies images *)
-let job_build_debian =
+let job_build =
+  Cacio.parameterize @@ fun distro ->
   Cacio.parameterize @@ fun pipeline_type ->
+  let matrix =
+    (* Set of distro/release/architecture combinations for which we build deb packages.
+       A dependency image will be built once for each combination of [RELEASE] and [TAGS]. *)
+    [
+      [
+        ("RELEASE", Distro.supported_releases distro pipeline_type);
+        ( "TAGS",
+          match pipeline_type with
+          | Partial -> [tag_amd64 ~ramfs:true]
+          | Full | Release -> [tag_amd64 ~ramfs:true; tag_arm64] );
+      ];
+    ]
+  in
   make_package_build_job
-    "oc.build-debian"
+    ("oc.build-" ^ Distro.name_for_scripts distro)
     ~__POS__
-    ~description:"Build the Debian packages for Debian."
-    ~variables:[("DISTRIBUTION", "debian"); ("DUNE_BUILD_JOBS", "-j 12")]
-    ~parallel:(Matrix (debian_package_release_matrix ~ramfs:true pipeline_type))
+    ~description:
+      (sf "Build the Debian packages for %s." (Distro.name_for_humans distro))
+    ~variables:
+      [
+        ("DISTRIBUTION", Distro.name_for_scripts distro);
+        ("DUNE_BUILD_JOBS", "-j 12");
+      ]
+    ~parallel:(Matrix matrix)
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
 
-let job_build_ubuntu =
+let job_apt_repo =
+  Cacio.parameterize @@ fun (distro : Distro.name) ->
   Cacio.parameterize @@ fun pipeline_type ->
-  make_package_build_job
-    "oc.build-ubuntu"
-    ~__POS__
-    ~description:"Build the Debian packages for Ubuntu."
-    ~variables:[("DISTRIBUTION", "ubuntu"); ("DUNE_BUILD_JOBS", "-j 12")]
-    ~parallel:(Matrix (ubuntu_package_release_matrix ~ramfs:true pipeline_type))
-    ~sccache:(Cacio.sccache ())
-    ~target:"binaries"
-
-let make_apt_repo_job ~pipeline_type ~build_job ~distribution ~releases =
   CI.job
+    ("apt_repo_" ^ Distro.name_for_scripts distro)
+    ~__POS__
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~description:
-      (sf "Create the apt repository for %s packages and sign it." distribution)
+      (sf
+         "Create the apt repository for %s packages and sign it."
+         (Distro.name_for_humans distro))
     ~stage:Publish
     ~needs:
       [
         (Artifacts, job_build_data_packages);
         (Artifacts, job_build_keyring_package);
-        (Artifacts, build_job pipeline_type);
+        (Artifacts, job_build distro pipeline_type);
       ]
+    ~image:(Distro.main_image distro)
     ~variables:
       (archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
@@ -206,67 +217,38 @@ let make_apt_repo_job ~pipeline_type ~build_job ~distribution ~releases =
       [
         ". ./scripts/version.sh";
         "apt-get install -y --update apt-utils debsigs";
-        "./scripts/ci/create_debian_repo.sh "
-        ^ String.concat " " (distribution :: releases);
+        String.concat
+          " "
+          ("./scripts/ci/create_debian_repo.sh"
+          :: Distro.name_for_scripts distro
+          :: Distro.supported_releases distro pipeline_type);
       ]
 
-let job_apt_repo_debian =
+let job_lintian =
+  Cacio.parameterize @@ fun distro ->
   Cacio.parameterize @@ fun pipeline_type ->
-  make_apt_repo_job
-    "apt_repo_debian"
-    ~__POS__
-    ~pipeline_type
-    ~build_job:job_build_debian
-    ~image:Images.Base_images.debian_trixie
-    ~distribution:"debian"
-    ~releases:(debian_releases pipeline_type)
-
-let job_apt_repo_ubuntu =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_apt_repo_job
-    "apt_repo_ubuntu"
-    ~__POS__
-    ~pipeline_type
-    ~build_job:job_build_ubuntu
-    ~image:Images.Base_images.ubuntu_24_04
-    ~distribution:"ubuntu"
-    ~releases:["22.04"; "24.04"; "26.04"]
-
-let make_lintian_job ~distribution ~releases =
   CI.job
+    ("oc.lintian_" ^ Distro.name_for_scripts distro)
+    ~__POS__
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~stage:Test_publication
-    ~description:(sf "Run lintian on %s packages." distribution)
+    ~description:
+      (sf "Run lintian on %s packages." (Distro.name_for_humans distro))
+    ~needs:[(Artifacts, job_build distro pipeline_type)]
+    ~image:(Distro.main_image distro)
     ~script:
       [
         ". ./scripts/version.sh";
         "export DEBIAN_FRONTEND=noninteractive";
         "apt-get update";
         "apt-get install lintian parallel -y";
-        "./scripts/ci/lintian_debian_packages.sh "
-        ^ String.concat " " (distribution :: releases);
+        String.concat
+          " "
+          ("./scripts/ci/lintian_debian_packages.sh"
+          :: Distro.name_for_scripts distro
+          :: Distro.supported_releases distro pipeline_type);
       ]
-
-let job_lintian_ubuntu =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_lintian_job
-    "oc.lintian_ubuntu"
-    ~__POS__
-    ~needs:[(Artifacts, job_build_ubuntu pipeline_type)]
-    ~image:Images.Base_images.ubuntu_24_04
-    ~distribution:"ubuntu"
-    ~releases:["22.04"; "24.04"; "26.04"]
-
-let job_lintian_debian =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_lintian_job
-    "oc.lintian_debian"
-    ~__POS__
-    ~needs:[(Artifacts, job_build_debian pipeline_type)]
-    ~image:Images.Base_images.debian_trixie
-    ~distribution:"debian"
-    ~releases:(debian_releases pipeline_type)
 
 (* Rebuild the Debian binary, data and keyring packages for trixie/amd64 and
    check, with diffoscope, that they are byte-for-byte identical to the packages
@@ -293,7 +275,7 @@ let job_reproducibility_debian =
     ~tag:Dynamic
     ~needs:
       [
-        (Artifacts, job_build_debian pipeline_type);
+        (Artifacts, job_build Debian pipeline_type);
         (Artifacts, job_build_data_packages);
         (Artifacts, job_build_keyring_package);
       ]
@@ -314,74 +296,43 @@ let job_reproducibility_debian =
     ~sccache:(Cacio.sccache ())
     ~script:[cargo_network_hack; "./scripts/ci/test-debian-reproducibility.sh"]
 
-let make_install_bin_job ~distribution ~release =
+let job_install_bin =
+  Cacio.parameterize @@ fun (distro : Distro.t) ->
+  Cacio.parameterize @@ fun pipeline_type ->
   CI.job
+    (sf "oc.install_bin_%s" (Distro.full_name_with_underscores distro))
+    ~__POS__
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~stage:Test_publication
-    ~description:(sf "Check that %s packages can be installed." distribution)
+    ~description:
+      (sf
+         "Check that %s packages can be installed."
+         (Distro.name_for_humans distro.name))
+    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
+    ~image:(Distro.image distro)
     ~variables:[("PREFIX", "")]
     ~script:
-      ["./docs/introduction/install-bin-deb.sh " ^ distribution ^ " " ^ release]
+      [
+        "./docs/introduction/install-bin-deb.sh "
+        ^ Distro.name_for_scripts distro.name
+        ^ " " ^ distro.release;
+      ]
 
-let job_install_bin ~distribution ~release ~image ~apt_repo =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_install_bin_job
-    (sf "oc.install_bin_%s_%s" distribution (release_token release))
-    ~__POS__
-    ~needs:[(Job, apt_repo pipeline_type)]
-    ~image
-    ~distribution
-    ~release
-
-let job_install_bin_ubuntu_22_04 =
-  job_install_bin
-    ~distribution:"ubuntu"
-    ~release:"22.04"
-    ~image:Images.Base_images.ubuntu_22_04
-    ~apt_repo:job_apt_repo_ubuntu
-
-let job_install_bin_ubuntu_24_04 =
-  job_install_bin
-    ~distribution:"ubuntu"
-    ~release:"24.04"
-    ~image:Images.Base_images.ubuntu_24_04
-    ~apt_repo:job_apt_repo_ubuntu
-
-let job_install_bin_ubuntu_26_04 =
-  job_install_bin
-    ~distribution:"ubuntu"
-    ~release:"26.04"
-    ~image:Images.Base_images.ubuntu_26_04
-    ~apt_repo:job_apt_repo_ubuntu
-
-let job_install_bin_debian_bookworm =
-  job_install_bin
-    ~distribution:"debian"
-    ~release:"bookworm"
-    ~image:Images.Base_images.debian_bookworm
-    ~apt_repo:job_apt_repo_debian
-
-let job_install_bin_debian_trixie =
-  job_install_bin
-    ~distribution:"debian"
-    ~release:"trixie"
-    ~image:Images.Base_images.debian_trixie
-    ~apt_repo:job_apt_repo_debian
-
-let make_systemd_test_job ~script ~distribution ~release =
+let make_systemd_test_job ~script ~(distro : Distro.t) ~pipeline_type =
   CI.job
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Changesets.changeset_debian_packages)
     ~stage:Test_publication
+    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
     ~image:Images.Base_images.alpine_docker_ci
     ~services:[{name = Images.Base_images.dind_service}]
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
       @ make_debian_variables
-          distribution
+          (Distro.name_for_scripts distro.name)
           "systemd"
-          release
+          distro.release
           Tezos_ci.Images.Base_images.debian_version)
     ~script:
       [
@@ -390,197 +341,87 @@ let make_systemd_test_job ~script ~distribution ~release =
         ^ " images/packages/debian-systemd-tests.Dockerfile";
       ]
 
-let make_systemd_install_job =
+let job_install_bin_systemd =
+  Cacio.parameterize @@ fun (distro : Distro.t) ->
+  Cacio.parameterize @@ fun pipeline_type ->
   make_systemd_test_job
+    (sf "oc.install_bin_%s_systemd" (Distro.full_name_with_underscores distro))
+    ~__POS__
     ~description:"Check that packages that use systemd can be installed."
+    ~distro
+    ~pipeline_type
     ~script:"scripts/packaging/tests/deb/install-bin-deb.sh"
-
-let make_systemd_upgrade_job =
-  make_systemd_test_job
-    ~description:"Check the upgrade process in a systemd enabled Docker image."
-    ~script:"scripts/packaging/tests/deb/upgrade-systemd-test.sh"
-
-let make_systemd_keyring_test_job =
-  make_systemd_test_job
-    ~description:"Check that the keyring package works for APT authentication."
-    ~script:"scripts/packaging/tests/deb/test-keyring.sh"
-
-let job_install_bin_ubuntu_24_04_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_install_job
-    "oc.install_bin_ubuntu_24_04_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"24.04"
-
-let job_install_bin_ubuntu_26_04_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_install_job
-    "oc.install_bin_ubuntu_26_04_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"26.04"
-
-let job_upgrade_bin_ubuntu_22_04_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_upgrade_job
-    "oc.upgrade_bin_ubuntu_22_04_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"22.04"
-
-let job_upgrade_bin_ubuntu_24_04_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_upgrade_job
-    "oc.upgrade_bin_ubuntu_24_04_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"24.04"
-
-let job_upgrade_bin_ubuntu_26_04_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_upgrade_job
-    "oc.upgrade_bin_ubuntu_26_04_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"26.04"
-
-let job_install_bin_debian_bookworm_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_install_job
-    "oc.install_bin_debian_bookworm_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~distribution:"debian"
-    ~release:"bookworm"
-
-let job_install_bin_debian_trixie_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_install_job
-    "oc.install_bin_debian_trixie_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~distribution:"debian"
-    ~release:"trixie"
 
 (* Note: this job is in the publish stage because it depends on a job
    that is in the publish stage, but it is a test.
    Ideally we would build the images in the build stage, test them in the test stage,
    and only then publish them in the publish stage. *)
-let job_upgrade_bin_debian_bookworm_systemd =
+let job_upgrade_bin_systemd =
+  Cacio.parameterize @@ fun (distro : Distro.t) ->
   Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_upgrade_job
-    "oc.upgrade_bin_debian_bookworm-systemd"
+  make_systemd_test_job
+    (sf "oc.upgrade_bin_%s_systemd" (Distro.full_name_with_underscores distro))
     ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~distribution:"debian"
-    ~release:"bookworm"
+    ~description:"Check the upgrade process in a systemd enabled Docker image."
+    ~distro
+    ~pipeline_type
+    ~script:"scripts/packaging/tests/deb/upgrade-systemd-test.sh"
 
-let job_test_keyring_debian_bookworm =
+let job_test_keyring =
+  Cacio.parameterize @@ fun (distro : Distro.t) ->
   Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_keyring_test_job
-    "oc.test_keyring_debian_bookworm"
+  make_systemd_test_job
+    ("oc.test_keyring_" ^ Distro.full_name_with_underscores distro)
     ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~distribution:"debian"
-    ~release:"bookworm"
+    ~description:"Check that the keyring package works for APT authentication."
+    ~distro
+    ~pipeline_type
+    ~script:"scripts/packaging/tests/deb/test-keyring.sh"
 
-let job_test_keyring_debian_trixie =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_keyring_test_job
-    "oc.test_keyring_debian_trixie"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~distribution:"debian"
-    ~release:"trixie"
+let jobs_for (distro : Distro.t) pipeline_type =
+  [
+    (Cacio.Auto, job_apt_repo distro.name pipeline_type);
+    (Cacio.Auto, job_lintian distro.name pipeline_type);
+    (Cacio.Auto, job_install_bin distro pipeline_type);
+  ]
+  @ (match distro with
+    | {name = Ubuntu; release = "22.04"} ->
+        (* Not sure why this exception? *)
+        []
+    | _ -> [(Cacio.Auto, job_install_bin_systemd distro pipeline_type)])
+  @ [
+      (Cacio.Auto, job_upgrade_bin_systemd distro pipeline_type);
+      (Cacio.Auto, job_test_keyring distro pipeline_type);
+    ]
 
-let job_upgrade_bin_debian_trixie_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_upgrade_job
-    "oc.upgrade_bin_debian_trixie_systemd"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~distribution:"debian"
-    ~release:"trixie"
-
-let job_test_keyring_ubuntu_22_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_keyring_test_job
-    "oc.test_keyring_ubuntu_22_04"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"22.04"
-
-let job_test_keyring_ubuntu_24_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_keyring_test_job
-    "oc.test_keyring_ubuntu_24_04"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"24.04"
-
-let job_test_keyring_ubuntu_26_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
-  make_systemd_keyring_test_job
-    "oc.test_keyring_ubuntu_26_04"
-    ~__POS__
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~distribution:"ubuntu"
-    ~release:"26.04"
+let jobs pipeline_type =
+  match pipeline_type with
+  | Partial -> jobs_for (Distro.debian "trixie") Partial
+  | Full | Release ->
+      let concat_map l f = List.concat_map f l in
+      concat_map [Distro.Debian; Ubuntu] @@ fun distro ->
+      concat_map (Distro.supported_releases distro pipeline_type)
+      @@ fun release -> jobs_for {name = distro; release} pipeline_type
 
 let () =
   (* Register the Debian partial jobs directly into before_merging and
      merge_train pipelines with only_if_changed so they run automatically
      only when relevant files change. *)
-  Cacio.register_merge_request_jobs
-    [
-      (Auto, job_apt_repo_debian Partial);
-      (Auto, job_lintian_debian Partial);
-      (* These test jobs consume the apt repository published by
-         [job_apt_repo_debian Partial], which only contains the releases
-         returned by [debian_releases Partial]. They must therefore target the
-         same release, otherwise the install/upgrade/keyring tests request a
-         distribution whose Release file was never published (404). *)
-      (Auto, job_install_bin_debian_trixie Partial);
-      (Auto, job_install_bin_debian_trixie_systemd Partial);
-      (Auto, job_upgrade_bin_debian_trixie_systemd Partial);
-      (Auto, job_test_keyring_debian_trixie Partial);
-    ] ;
+  Cacio.register_merge_request_jobs (jobs Partial) ;
   (* In merge pipelines we tests only Debian.
      Ubuntu packages are built and tested in the scheduled pipelines. *)
-  Cacio.register_jobs
-    Debian_daily
-    [
-      (Auto, job_apt_repo_debian Full);
-      (Auto, job_apt_repo_ubuntu Full);
-      (Auto, job_reproducibility_debian Full);
-      (Auto, job_lintian_ubuntu Full);
-      (Auto, job_lintian_debian Full);
-      (Auto, job_install_bin_ubuntu_22_04 Full);
-      (Auto, job_install_bin_ubuntu_24_04 Full);
-      (Auto, job_install_bin_ubuntu_26_04 Full);
-      (Auto, job_install_bin_ubuntu_24_04_systemd Full);
-      (Auto, job_install_bin_ubuntu_26_04_systemd Full);
-      (Auto, job_upgrade_bin_ubuntu_22_04_systemd Full);
-      (Auto, job_upgrade_bin_ubuntu_24_04_systemd Full);
-      (Auto, job_upgrade_bin_ubuntu_26_04_systemd Full);
-      (Auto, job_install_bin_debian_bookworm Full);
-      (Auto, job_install_bin_debian_trixie Full);
-      (Auto, job_install_bin_debian_bookworm_systemd Full);
-      (Auto, job_install_bin_debian_trixie_systemd Full);
-      (Auto, job_upgrade_bin_debian_bookworm_systemd Full);
-      (Auto, job_upgrade_bin_debian_trixie_systemd Full);
-      (Auto, job_test_keyring_debian_bookworm Full);
-      (Auto, job_test_keyring_debian_trixie Full);
-      (Auto, job_test_keyring_ubuntu_22_04 Full);
-      (Auto, job_test_keyring_ubuntu_24_04 Full);
-      (Auto, job_test_keyring_ubuntu_26_04 Full);
-    ] ;
+  Cacio.register_jobs Debian_daily (jobs Full) ;
+  Cacio.register_jobs Debian_daily [(Auto, job_reproducibility_debian Full)] ;
   ()
+
+(* Jobs exported outside this module.
+   For now we do not need the Distro module outside of this module,
+   so we export instances instead of the functions themselves. *)
+
+let job_build_debian = job_build Debian
+
+let job_build_ubuntu = job_build Ubuntu
+
+let job_apt_repo_debian = job_apt_repo Debian
+
+let job_apt_repo_ubuntu = job_apt_repo Ubuntu
