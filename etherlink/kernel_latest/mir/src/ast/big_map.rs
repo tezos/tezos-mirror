@@ -758,10 +758,38 @@ impl<'a> TypedValue<'a> {
 
     /// Read-only counterpart of [TypedValue::for_each_big_map_mut]: applies
     /// `f` to every big map inside self in AST order without mutating it.
+    ///
+    /// Kept exhaustive (no catch-all) and in lock-step with
+    /// [TypedValue::for_each_big_map_mut] on purpose: this read-only walk feeds
+    /// `started_with_map_ids` while the mutable walk feeds `seen_source_ids`,
+    /// and [dump_big_map_updates] removes ids present in the former but not the
+    /// latter. A new big-map-carrying variant must be added to both walks or a
+    /// dropped big map could leak; a wildcard here would silently skip it while
+    /// the mutable walk still compile-errored, so the two would diverge.
     fn for_each_big_map<'b>(&'b self, f: &mut impl FnMut(&'b BigMap<'a>)) {
         use crate::ast::Or::*;
         use TypedValue::*;
         match self {
+            Int(_) => {}
+            Nat(_) => {}
+            Mutez(_) => {}
+            Bool(_) => {}
+            Unit => {}
+            String(_) => {}
+            Bytes(_) => {}
+            Address(_) => {}
+            KeyHash(_) => {}
+            Key(_) => {}
+            Signature(_) => {}
+            ChainId(_) => {}
+            Contract(_) => {}
+            Timestamp(_) => {}
+            #[cfg(feature = "bls")]
+            Bls12381Fr(_) => {}
+            #[cfg(feature = "bls")]
+            Bls12381G1(_) => {}
+            #[cfg(feature = "bls")]
+            Bls12381G2(_) => {}
             Pair(l, r) => {
                 l.for_each_big_map(f);
                 r.for_each_big_map(f);
@@ -769,18 +797,31 @@ impl<'a> TypedValue<'a> {
             Or(p) => match p {
                 Left(x) | Right(x) => x.for_each_big_map(f),
             },
-            Option(Some(x)) => x.for_each_big_map(f),
+            Option(p) => {
+                if let Some(x) = p {
+                    x.for_each_big_map(f)
+                }
+            }
             List(l) => l.iter().for_each(|v| v.for_each_big_map(f)),
+            Set(_) => {
+                // Elements are comparable and so have no big maps
+            }
             Map(m) => m.values().for_each(|v| v.for_each_big_map(f)),
             BigMap(m) => f(m),
+            Ticket(_) => {
+                // Value is comparable, has no big map
+            }
+            Lambda(_) => {
+                // Can contain only pushable values, thus no big maps
+            }
             Operation(op) => match &op.operation {
                 crate::ast::Operation::TransferTokens(t) => t.param.for_each_big_map(f),
+                crate::ast::Operation::SetDelegate(_) => {}
+                crate::ast::Operation::Emit(_) => {}
                 crate::ast::Operation::CreateContract(cc) => {
                     cc.storage.for_each_big_map(f)
                 }
-                _ => {}
             },
-            _ => {}
         }
     }
 
