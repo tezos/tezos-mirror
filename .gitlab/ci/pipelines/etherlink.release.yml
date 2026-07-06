@@ -239,6 +239,9 @@ etherlink.docker:arm64:
     CI_DOCKER_HUB: "true"
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
+  environment:
+    name: docker-publish
+    action: access
 
 etherlink.docker:amd64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -269,6 +272,9 @@ etherlink.docker:amd64:
     CI_DOCKER_HUB: "true"
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
+  environment:
+    name: docker-publish
+    action: access
 
 etherlink.docker:merge_manifests:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -296,6 +302,9 @@ etherlink.docker:merge_manifests:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
+  environment:
+    name: docker-publish
+    action: access
   retry: 0
 
 etherlink.docker:promote_to_latest:
@@ -323,4 +332,7 @@ etherlink.docker:promote_to_latest:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
+  environment:
+    name: docker-publish
+    action: access
   retry: 0

@@ -56,6 +56,14 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
                script-inputs/experimental-executables"
           | `released -> "script-inputs/released-executables" );
       ]
+      (* Docker Hub credentials (CI_DOCKER_AUTH) are scoped to the
+       [docker-publish] environment; only [`real] jobs (CI_DOCKER_HUB=true)
+       authenticate and thus need access. *)
+    ?environment:
+      (match mode with
+      | `real ->
+          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
+      | `test -> None)
     ~script:scripts
 
 let job_docker_snapshot =
@@ -111,6 +119,11 @@ let make_job_docker_merge_manifests ~__POS__ ~name ~description ~needs ~scripts
         ("DOCKER_VERSION", version);
         ("CI_DOCKER_HUB", match mode with `real -> "true" | `test -> "false");
       ]
+    ?environment:
+      (match mode with
+      | `real ->
+          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
+      | `test -> None)
     ~script:scripts
 
 let job_docker_merge_manifests_snapshot =
