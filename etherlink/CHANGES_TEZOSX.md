@@ -107,6 +107,13 @@
 
 ### Michelson Runtime
 
+- **Bug fix:** A cross-runtime call that runs out of gas after
+  materialising its sender's alias forwarder but before serving no longer
+  leaks that forwarder's origination into a later sibling cross-runtime
+  call's receipt. The pending alias-origination list is now rolled back
+  on EVM frame revert, so the orphaned origination is dropped with the
+  reverted state instead of being re-attributed to the next call that
+  drains it. (!22393)
 - **Bug fix:** Michelson contracts executed via the delayed inbox now observe
   the configured Michelson runtime chain id from `CHAIN_ID`, matching the
   sequenced and gateway ingress lanes. Previously the delayed path derived

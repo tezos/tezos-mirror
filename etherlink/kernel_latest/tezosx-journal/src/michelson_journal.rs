@@ -59,6 +59,10 @@ struct ExternalCheckpoint {
     /// is dropped (the counter already reflects the post-frame state).
     /// See the field of the same name on [`MichelsonJournal`] (L2-1676).
     internal_operation_counter: u128,
+    /// Length of `pending_alias_origination_internals` at the time the
+    /// checkpoint was created. On revert the list is truncated back to
+    /// this count; on commit the saved value is dropped.
+    alias_internals_count: usize,
 }
 
 /// Error returned by [`MichelsonJournal::set_dispatch_result`].
@@ -348,6 +352,7 @@ impl MichelsonJournal {
             receipt_count: self.pending_crac_receipts.len(),
             origination_index: self.origination_index,
             internal_operation_counter: self.internal_operation_counter,
+            alias_internals_count: self.pending_alias_origination_internals.len(),
         });
     }
 
@@ -413,6 +418,7 @@ impl MichelsonJournal {
                 receipt_count: 0,
                 origination_index: 0,
                 internal_operation_counter: 0,
+                alias_internals_count: 0,
             });
         // The saved origination index is dropped on commit: any
         // increments performed during this frame are kept, so a later
@@ -424,6 +430,7 @@ impl MichelsonJournal {
         // a later reentrant frame keeps a monotonic, collision-free
         // replay identity (L2-1676).
         let _ = checkpoint.internal_operation_counter;
+        let _ = checkpoint.alias_internals_count;
         let drain_from = if self.external_checkpoints.is_empty() {
             checkpoint.snapshot_watermark
         } else {
@@ -460,6 +467,7 @@ impl MichelsonJournal {
                 receipt_count: 0,
                 origination_index: 0,
                 internal_operation_counter: 0,
+                alias_internals_count: 0,
             });
         // Roll the origination-nonce index back to its value at
         // checkpoint entry: any `CREATE_CONTRACT` performed inside the
@@ -477,6 +485,8 @@ impl MichelsonJournal {
         // next reentrant frame resumes from the pre-frame counter
         // (L2-1676).
         self.internal_operation_counter = checkpoint.internal_operation_counter;
+        self.pending_alias_origination_internals
+            .truncate(checkpoint.alias_internals_count);
         // Drain (not truncate) the CRAC receipts pushed during this
         // frame, transform their statuses to `BackTracked`, and
         // migrate them to the backtracked list.  Like
@@ -1668,5 +1678,65 @@ mod tests {
         // Outer commits: counter stays at 2.
         journal.commit_frame(&mut host).unwrap();
         assert_eq!(journal.internal_operation_counter(), 2);
+    }
+
+    fn dummy_alias_internal() -> InternalOperationSum {
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+        use tezos_data_encoding::types::Narith;
+        use tezos_protocol::contract::Contract;
+        use tezos_tezlink::operation::{Parameters, TransferContent};
+        use tezos_tezlink::operation_result::{
+            ContentResult, InternalContentWithMetadata,
+        };
+        let kt1 = Contract::Originated(
+            ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .unwrap(),
+        );
+        InternalOperationSum::Transfer(InternalContentWithMetadata {
+            sender: kt1.clone(),
+            nonce: 0,
+            content: TransferContent {
+                amount: Narith(0u64.into()),
+                destination: kt1,
+                parameters: Parameters::default(),
+            },
+            result: ContentResult::Skipped,
+        })
+    }
+
+    #[test]
+    fn test_pending_alias_originations_roll_back_on_revert_frame() {
+        let mut host = MockHost::default();
+        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
+        journal.push_external_checkpoint();
+        journal.push_pending_alias_origination_internal(dummy_alias_internal());
+        journal.revert_frame(&mut host).unwrap();
+        assert!(journal
+            .take_pending_alias_origination_internals()
+            .is_empty());
+    }
+
+    #[test]
+    fn test_pending_alias_originations_persist_on_commit_frame() {
+        let mut host = MockHost::default();
+        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
+        journal.push_external_checkpoint();
+        journal.push_pending_alias_origination_internal(dummy_alias_internal());
+        journal.commit_frame(&mut host).unwrap();
+        assert_eq!(journal.take_pending_alias_origination_internals().len(), 1);
+    }
+
+    #[test]
+    fn test_pending_alias_originations_nested_revert_only_inner() {
+        let mut host = MockHost::default();
+        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
+        journal.push_external_checkpoint();
+        journal.push_pending_alias_origination_internal(dummy_alias_internal());
+        journal.push_external_checkpoint();
+        journal.push_pending_alias_origination_internal(dummy_alias_internal());
+        journal.push_pending_alias_origination_internal(dummy_alias_internal());
+        journal.revert_frame(&mut host).unwrap();
+        journal.commit_frame(&mut host).unwrap();
+        assert_eq!(journal.take_pending_alias_origination_internals().len(), 1);
     }
 }
