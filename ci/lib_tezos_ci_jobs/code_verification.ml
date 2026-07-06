@@ -40,30 +40,10 @@ type code_verification_pipeline =
   | Schedule_extended_test
   | Merge_train
 
-(* Define the [start] job.
-
-   The purpose of this job is to implement a manual trigger
-   for [Before_merging] pipelines, instead of running it on
-   each update to the merge request. *)
-let job_start =
-  Tezos_ci.job
-    ~__POS__
-    ~image:Tezos_ci.Images.datadog_ci
-    ~stage:Tezos_ci.Stages.start
-    ~rules:[Gitlab_ci.Util.job_rule ~allow_failure:No ~when_:Manual ()]
-    ~timeout:(Minutes 10)
-    ~name:"trigger"
-    [
-      "echo 'Trigger pipeline!'";
-      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
-       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
-    ]
-
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
   match pipeline_type with
   | Schedule_extended_test | Merge_train ->
       [Tezos_ci.job_datadog_pipeline_trace]
-  | Before_merging -> [job_start]
+  | Before_merging -> []
