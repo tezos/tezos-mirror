@@ -22,6 +22,11 @@ include
     with type state = Irmin_context.tree
      and type context = Irmin_context.rw_index
 
+(** The compact encoding underlying [proof_encoding], for composite
+    proof formats that join its tag space (see
+    {!Tezos_smart_rollup_wasm_dual_state.Make}). *)
+val proof_compact_encoding : proof Data_encoding.Compact.t
+
 module Wrapped_tree :
   Tezos_tree_encoding.TREE with type tree = Irmin_context.tree
 

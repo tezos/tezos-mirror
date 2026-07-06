@@ -69,6 +69,12 @@ module Make
     (Irmin : sig
       include Tezos_scoru_wasm.Wasm_pvm_sig.STATE_PROOF
 
+      (** The compact encoding underlying [proof_encoding] (which must
+          be its [Compact.make ~tag_size:`Uint8]).  The dual machine
+          joins its tag space in a [Compact.union] so [Irmin_only]
+          proofs stay byte-identical to bare Irmin proofs. *)
+      val proof_compact_encoding : proof Data_encoding.Compact.t
+
       val find_value : state -> string list -> bytes option Lwt.t
 
       val set_value : state -> string list -> bytes -> state Lwt.t
@@ -120,11 +126,15 @@ module Make
 
         {b Wire format}
 
-        [proof_encoding] is untagged: [Irmin_only] serialises
-        byte-identically to [Irmin.proof_encoding], [Dual] to the composite
-        [(irmin, nds)] pair.  Decoding tries [Dual] then falls back to
-        [Irmin_only]; the shapes are disjoint, so the fallback is
-        deterministic. *)
+        [proof_encoding] is a [Compact.union] joining the tag space of
+        the bare Irmin proof compact: an [Irmin_only] proof is
+        byte-identical to a bare [Irmin.proof_encoding] — pre-activation,
+        single-state and dual-state nodes exchange proofs freely — while
+        a [Dual] proof claims a tag-byte value no bare proof uses, so a
+        legacy decoder rejects it outright.  Like the bare encoding it
+        extends, the union is [`Dynamic]-classified and composes inside
+        consumers' [obj]s (e.g. the protocol machine's output-proof
+        encoding). *)
     type proof = private Irmin_only of Irmin.proof | Dual of dual_proof
 
     include

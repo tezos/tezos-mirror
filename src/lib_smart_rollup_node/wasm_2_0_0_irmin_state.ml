@@ -23,6 +23,10 @@ include
 
 type context = Irmin_context.rw_index
 
+let proof_compact_encoding =
+  Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
+  .tree_proof_compact
+
 let proof_start_state = proof_before
 
 let proof_stop_state = proof_after

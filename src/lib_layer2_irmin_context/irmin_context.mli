@@ -183,8 +183,13 @@ end) : sig
 
   type tree = Tree.tree
 
-  (** See {!Sc_rollup_PVM_sem.proof} *)
-  type proof
+  (** See {!Sc_rollup_PVM_sem.proof}.  The equation with the context
+      tree-proof type is exposed so consumers can supply proof encodings
+      of their own (e.g. the compact tag-space join of
+      {!Tezos_smart_rollup_wasm_dual_state.Make}). *)
+  type proof =
+    Tezos_context_sigs.Context.Proof_types.tree
+    Tezos_context_sigs.Context.Proof_types.t
 
   val hash_tree : tree -> Hash.t
 

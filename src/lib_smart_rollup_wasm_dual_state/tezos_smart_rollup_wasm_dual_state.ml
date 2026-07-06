@@ -26,6 +26,8 @@ module Make
     (Irmin : sig
       include Tezos_scoru_wasm.Wasm_pvm_sig.STATE_PROOF
 
+      val proof_compact_encoding : proof Data_encoding.Compact.t
+
       val find_value : state -> string list -> bytes option Lwt.t
 
       val set_value : state -> string list -> bytes -> state Lwt.t
@@ -71,30 +73,35 @@ struct
 
     let proof_encoding =
       let open Data_encoding in
-      (* Untagged: [Irmin_only] serialises byte-identically to
-         [Irmin.proof_encoding], [Dual] to the length-framed [(irmin, nds)]
-         pair, with no discriminant byte. This keeps pre-activation proofs
-         identical to a legacy node's, so the two don't diverge in a
-         refutation game; [Dual] is additive, emitted only after NDS
-         activation. Hence [Variable.bytes] over per-variant [to_bytes],
-         not a tagged [union]. Decoding tries [Dual] then falls back to
-         [Irmin_only]; the shapes are disjoint — a bare Irmin proof's
-         leading bytes don't form a valid [dynamic_size] frame for the
-         composite, so the [Dual] parse fails and decoding falls back. *)
-      conv_with_guard
-        (function
-          | Irmin_only p -> Binary.to_bytes_exn Irmin.proof_encoding p
-          | Dual d -> Binary.to_bytes_exn dual_proof_encoding d)
-        (fun blob ->
-          match Binary.of_bytes_opt dual_proof_encoding blob with
-          | Some d -> Ok (Dual d)
-          | None -> (
-              match Binary.of_bytes_opt Irmin.proof_encoding blob with
-              | Some p -> Ok (Irmin_only p)
-              | None ->
-                  Error
-                    "Dual_state: proof decodes as neither Dual nor Irmin-only"))
-        Variable.bytes
+      (* A [Compact.union] joining the tag space of the bare Irmin proof
+         compact.  A compact union writes [case_index << inner_tag_bits
+         lor inner_tag] as its tag byte, so [Irmin_only] (case 0) keeps
+         the bare proof's tag values — and hence its bytes — verbatim,
+         and [Dual] claims a tag byte no bare proof uses.  Byte-identity
+         keeps pre-activation proofs interchangeable with a legacy
+         node's (refutations, output proofs); the disjoint tag makes a
+         legacy decoder reject [Dual] proofs outright.  Unlike a
+         [Variable]-classified scheme, the union is [`Dynamic] like the
+         bare encoding, so it survives embedding in [obj]s with
+         following fields (the protocol's [output_proof_encoding] in
+         [Sc_rollup_wasm.Make_pvm]). *)
+      Compact.(
+        make ~tag_size:`Uint8
+        @@ union
+             ~union_tag_bits:1
+             ~cases_tag_bits:2
+             [
+               case
+                 ~title:"Irmin_only"
+                 Irmin.proof_compact_encoding
+                 (function Irmin_only p -> Some p | Dual _ -> None)
+                 (fun p -> Irmin_only p);
+               case
+                 ~title:"Dual"
+                 (payload dual_proof_encoding)
+                 (function Dual d -> Some d | Irmin_only _ -> None)
+                 (fun d -> Dual d);
+             ])
 
     let nds_hash_path = ["pvm"; "nds_hash"]
 

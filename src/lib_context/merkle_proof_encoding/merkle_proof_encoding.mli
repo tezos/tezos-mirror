@@ -38,9 +38,21 @@ end
 (** V2 : using Compact_encoding.  Smaller than V1 but more complex parser
     is required. *)
 module V2 : sig
+  (** [PROOF_ENCODING] extended with the compact underlying
+      [tree_proof_encoding] ([Compact.make ~tag_size:`Uint8] of it), so
+      composite proof formats can join its tag space in a
+      {!Data_encoding.Compact.union} while keeping the tree-proof case
+      byte-identical. *)
+  module type PROOF_ENCODING_COMPACT = sig
+    include PROOF_ENCODING
+
+    val tree_proof_compact :
+      Proof_types.tree Proof_types.t Data_encoding.Compact.t
+  end
+
   (** Encoding for 32-tree proofs *)
-  module Tree32 : PROOF_ENCODING
+  module Tree32 : PROOF_ENCODING_COMPACT
 
   (** Encoding for binary tree proofs *)
-  module Tree2 : PROOF_ENCODING
+  module Tree2 : PROOF_ENCODING_COMPACT
 end

@@ -19,13 +19,20 @@
     Uses {!Tezos_context_memory.Context_binary} as the underlying tree
     backend, providing proof production and verification over binary
     Merkle trees. *)
-module State_in_memory :
-  Tezos_scoru_wasm.Wasm_pvm_sig.STATE_PROOF
-    with type context = Tezos_context_memory.Context_binary.t
-     and type state = Tezos_context_memory.Context_binary.tree
-     and type proof =
-      Tezos_context_memory.Context_binary.Proof.tree
-      Tezos_context_memory.Context_binary.Proof.t
+module State_in_memory : sig
+  include
+    Tezos_scoru_wasm.Wasm_pvm_sig.STATE_PROOF
+      with type context = Tezos_context_memory.Context_binary.t
+       and type state = Tezos_context_memory.Context_binary.tree
+       and type proof =
+        Tezos_context_memory.Context_binary.Proof.tree
+        Tezos_context_memory.Context_binary.Proof.t
+
+  (** The compact encoding underlying [proof_encoding], for composite
+      proof formats that join its tag space (see
+      {!Tezos_smart_rollup_wasm_dual_state.Make}). *)
+  val proof_compact_encoding : proof Data_encoding.Compact.t
+end
 
 (** [wasm_pvm_machine ~config] returns a WASM PVM machine over
     {!State_in_memory}, closing over the supplied [config]. The env
