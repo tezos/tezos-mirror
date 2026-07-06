@@ -54,7 +54,11 @@ target "build" {
     GIT_SHORTREF              = GIT_SHORTREF
     GIT_DATETIME              = GIT_DATETIME
     GIT_VERSION               = GIT_VERSION
-    RUST_TOOLCHAIN_IMAGE      = RUST_TOOLCHAIN_IMAGE
+    # Only the [with-evm-artifacts] target uses the [layer2-builder] stage, but
+    # BuildKit parses every [FROM] regardless of the selected target and rejects
+    # a blank base name. For without-EVM builds RUST_TOOLCHAIN_IMAGE is empty, so
+    # fall back to [scratch]: the stage is unreachable and pruned, never pulled.
+    RUST_TOOLCHAIN_IMAGE      = RUST_TOOLCHAIN_IMAGE != "" ? RUST_TOOLCHAIN_IMAGE : "scratch"
     SCCACHE_GCS_BUCKET        = SCCACHE_GCS_BUCKET
   }
   # build.Dockerfile has `RUN --network=host` (cargo CI mirror / sccache).

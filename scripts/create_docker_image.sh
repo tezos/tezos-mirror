@@ -21,9 +21,10 @@ executables=$(cat script-inputs/released-executables)
 commit_short_sha=$(git rev-parse --short HEAD)
 variants="debug bare minimal"
 docker_target="without-evm-artifacts"
-# Full image reference (name:tag) for the rust-toolchain image (L2 builder),
-# used to build the EVM artifacts. Overridable via --rust-toolchain-image.
-rust_toolchain_image="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain:master"
+# Full image reference (name:tag) for the rust-toolchain image (L2 builder).
+# Required only for --docker-target with-evm-artifacts (the CI distribution
+# jobs pass it via --rust-toolchain-image); unused for other targets.
+rust_toolchain_image=""
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
 sccache_bucket=""
@@ -68,11 +69,9 @@ DESCRIPTION
 
     If TARGET is 'with-evm-artifacts' then EVM artifacts are
     included. The rust-toolchain image is used to build these
-    artifacts, and is pulled from RUST_TOOLCHAIN_IMAGE. By default,
-    RUST_TOOLCHAIN_IMAGE points to a rust-toolchain image built from
-    the latest commit on master. To rebuild the rust-toolchain image
-    locally, see ./images/README.md and
-    ./images/create_rust_toolchain_image.sh.
+    artifacts, and is pulled from RUST_TOOLCHAIN_IMAGE, which must then
+    be provided via --rust-toolchain-image. See ./images/README.md for
+    how the base images are built.
 
     The built distribution includes the set of executables defined by
     EXECUTABLES: for a set of valid values, see
@@ -99,7 +98,8 @@ OPTIONS
 
         --rust-toolchain-image RUST_TOOLCHAIN_IMAGE
             Full reference (name:tag) of the rust-toolchain image (L2
-            builder), used to build the EVM artifacts.
+            builder), used to build the EVM artifacts. Required for
+            --docker-target with-evm-artifacts.
 
     Image contents
         --executables EXECUTABLES
@@ -243,6 +243,18 @@ echo "Executables to include in Docker images:"
 for executable in $executables; do
   echo "- $executable"
 done
+
+# The rust-toolchain image is only consumed by the with-evm-artifacts build
+# stage, so require it explicitly for that target (the CI distribution jobs
+# pass --rust-toolchain-image). Other targets never reference it.
+case "$docker_target" in
+"with-evm-artifacts")
+  if [ -z "$rust_toolchain_image" ]; then
+    echo "Error: --rust-toolchain-image is required for --docker-target ${docker_target}." >&2
+    exit 1
+  fi
+  ;;
+esac
 
 image_test="${ci_image_name}/build:${ci_image_version}"
 if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
