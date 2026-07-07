@@ -91,6 +91,10 @@ let sc_rollup_challenge_window node_ctxt =
   (Reference.get node_ctxt.Node_context.current_protocol).constants.sc_rollup
     .challenge_window_in_blocks
 
+let sc_rollup_max_lookahead node_ctxt =
+  (Reference.get node_ctxt.Node_context.current_protocol).constants.sc_rollup
+    .max_lookahead_in_blocks
+
 let next_commitment_level node_ctxt last_commitment_level =
   add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
 
@@ -267,6 +271,7 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
   let sc_rollup_challenge_window_int32 =
     sc_rollup_challenge_window node_ctxt |> Int32.of_int
   in
+  let max_lookahead = sc_rollup_max_lookahead node_ctxt in
   let rec gather acc (commitment_hash : Commitment.Hash.t) =
     let* commitment = Node_context.find_commitment node_ctxt commitment_hash in
     let lcc = Reference.get node_ctxt.lcc in
@@ -292,20 +297,44 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
               > sc_rollup_challenge_window_int32
         in
         let is_finalized = commitment.inbox_level <= finalized_level in
-        (* Only publish commitments whose inbox level is finalized on L1 and
-           that are not past the curfew.
+        (* The protocol rejects the publication of commitments whose inbox
+           level is more than [max_lookahead] blocks after the LCC (with
+           [Sc_rollup_too_far_ahead], see
+           [Sc_rollup_stake_storage.assert_commitment_not_too_far_ahead]). *)
+        let within_lookahead =
+          commitment.inbox_level <= Int32.add lcc.level max_lookahead
+        in
+        (* Only publish commitments whose inbox level is finalized on L1,
+           that are not past the curfew and that are within the maximum
+           lookahead window. Commitments beyond the lookahead window are not
+           enqueued: they can only be published once cementation advances the
+           LCC, and enqueueing them would only fill the injector queue with
+           operations that fail with [Sc_rollup_too_far_ahead].
 
            The finality gate is load-bearing for refutation-time cache safety
            (see [Interpreter.global_tick_state_cache]): by never publishing a
            commitment for a non-final inbox level, an honest node guarantees
            it can never become a party to a refutation game over a tick range
            that an L1 reorg could invalidate. *)
-        let acc =
+        let*! acc =
+          let open Lwt_syntax in
           if is_finalized && not past_curfew then
-            (commitment_hash, commitment) :: acc
-          else acc
+            if within_lookahead then
+              return ((commitment_hash, commitment) :: acc)
+            else
+              (* The commitment is withheld solely because of the lookahead
+                 window. *)
+              let* () =
+                Commitment_event.publish_commitment_delayed
+                  commitment_hash
+                  commitment.inbox_level
+              in
+              return acc
+          else return acc
         in
-        (* We keep the commitment and go back to the previous one. *)
+        (* We keep walking to the previous commitment even when this one is
+           not gathered: older commitments, closer to the LCC, may still be
+           publishable. *)
         gather acc commitment.predecessor
   in
   let* finalized_block = Node_context.get_finalized_head_opt node_ctxt in
