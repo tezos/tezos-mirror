@@ -114,6 +114,11 @@
   on EVM frame revert, so the orphaned origination is dropped with the
   reverted state instead of being re-attributed to the next call that
   drains it. (!22393)
+- The typechecker now charges the gas for entrypoint resolution (a flat cost
+  for `SELF`, the `CONTRACT` instruction, and contract-value parsing) and the
+  `CHECK_PRINTABLE` cost (10·len+15) of string literals and view names, which
+  were previously not metered. Bounded impact (view name ≤ 31 chars) and no
+  funds at risk. (!22394)
 - **Bug fix:** Michelson contracts executed via the delayed inbox now observe
   the configured Michelson runtime chain id from `CHAIN_ID`, matching the
   sequenced and gateway ingress lanes. Previously the delayed path derived

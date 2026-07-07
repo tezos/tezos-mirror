@@ -546,6 +546,7 @@ fn parse_script_prefix<'x, 'a>(
     let mut views = HashMap::new();
     let mut views_to_validate = Vec::new();
     for (name, mich_view) in mich_views {
+        gas.consume(gas::tc_cost::check_printable(name.len())?)?;
         let input_type = mich_view.input_type.parse_ty(gas)?;
         let output_type = mich_view.output_type.parse_ty(gas)?;
         if typecheck_views.enabled() {
@@ -3398,6 +3399,10 @@ fn typecheck_instruction_step<'a, 'b>(
                 [] => Option::None,
                 _ => unexpected_micheline!(),
             };
+            // Unlike L1's `proof_argument n` (a decreasing loop allocating at
+            // each step), MIR resolves `DUP n` with an O(1) `stack_get` index,
+            // so no per-n typecheck charge applies. The type-dependent
+            // `Duplicable` check below is charged separately.
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             ensure_stack_len(Prim::DUP, stack, dup_height)?;
             let ty = stack_get(stack, dup_height - 1)?;
@@ -4165,6 +4170,10 @@ fn typecheck_instruction_step<'a, 'b>(
         (App(CHAIN_ID, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(SELF, [], anns), ..) => {
+            // Flat entrypoint-resolution charge: MIR looks the entrypoint up in
+            // a flat HashMap in O(1) (see `FIND_ENTRYPOINT`), so a single
+            // constant applies regardless of the parameter's Or-tree shape.
+            gas.consume(gas::tc_cost::FIND_ENTRYPOINT)?;
             let entrypoint = anns
                 .get_single_field_ann()?
                 .map(Entrypoint::try_from)
@@ -4680,6 +4689,7 @@ fn typecheck_instruction_step<'a, 'b>(
         (App(VIEW, [name, return_ty], _), [.., T::Address, _arg_type]) => {
             let name = match name {
                 Micheline::String(s) => {
+                    gas.consume(gas::tc_cost::check_printable(s.len())?)?;
                     check_view_name(s)?;
                     s.clone()
                 }
@@ -4763,6 +4773,12 @@ pub(crate) fn typecheck_contract_address<'a>(
             let contract_entrypoints = _ctx
                 .lookup_entrypoints(&address.hash)
                 .ok_or(TcError::NoSuchContract)?;
+
+            // Flat entrypoint-resolution charge, as for `SELF` (see
+            // `FIND_ENTRYPOINT`). L1 reaches `find_entrypoint_for_type` only
+            // for originated contracts (the implicit branch above does not),
+            // matching this `Kt1`/`Sr1`-only placement.
+            _ctx.gas().consume(gas::tc_cost::FIND_ENTRYPOINT)?;
 
             // Do we have the entrypoint for the call in the entrypoints parsed
             // from the destination contract parameter?
@@ -5522,7 +5538,10 @@ fn visit_value<'a, 'b>(
         (T::Mutez, V::Int(n)) if !n.is_negative() => {
             results.push(TV::Mutez(i64::try_from(n)?))
         }
-        (T::String, V::String(s)) => results.push(TV::String(s.clone())),
+        (T::String, V::String(s)) => {
+            ctx.gas().consume(gas::tc_cost::check_printable(s.len())?)?;
+            results.push(TV::String(s.clone()))
+        }
         (T::Unit, V::App(Prim::Unit, [], _)) => results.push(TV::Unit),
         (
             T::Pair(pt),
@@ -6463,6 +6482,133 @@ mod typecheck_tests {
         );
         assert_eq!(stack, expected_stack);
         assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
+    }
+
+    /// L2-1770 (!22394): MIR was omitting typecheck-time gas charges that L1
+    /// applies for `SELF` and the `CHECK_PRINTABLE` cost of string literals and
+    /// view names. Each test fails if the corresponding `gas.consume` is
+    /// reverted. `DUP n` is deliberately *not* charged per `n`: MIR resolves it
+    /// with an O(1) `stack_get`, so its cost does not depend on `n`.
+    mod l2_1770_gas {
+        use super::*;
+
+        /// `DUP n` does not charge per `n`: MIR resolves the element with an
+        /// O(1) `stack_get`, so `DUP 1`, `DUP 2`, `DUP 3` over the same
+        /// duplicated type (`Int`) all consume the same gas as plain `DUP`.
+        #[test]
+        fn dup_n_not_charged_per_n() {
+            let run = |src: &str, stack: &mut FailingTypeStack| {
+                let mut gas = Gas::default();
+                typecheck_instruction(&parse(src).unwrap(), &mut gas, stack).unwrap();
+                Gas::default().milligas().unwrap() - gas.milligas().unwrap()
+            };
+            let plain = run("DUP", &mut tc_stk![Type::Int]);
+            let dup1 = run("DUP 1", &mut tc_stk![Type::Int]);
+            let dup2 = run("DUP 2", &mut tc_stk![Type::Int, Type::Int]);
+            let dup3 = run("DUP 3", &mut tc_stk![Type::Int, Type::Int, Type::Int]);
+            assert_eq!(plain, dup1);
+            assert_eq!(dup1, dup2);
+            assert_eq!(dup2, dup3);
+        }
+
+        /// `SELF` charges one flat entrypoint-resolution cost (`FIND_ENTRYPOINT`)
+        /// on top of `INSTR_STEP`.
+        #[test]
+        fn self_charged() {
+            let mut eps: Entrypoints = HashMap::new();
+            eps.insert(Entrypoint::default(), Type::Unit);
+            let mut stack = tc_stk![];
+            let mut gas = Gas::default();
+            crate::typechecker::typecheck_instruction(
+                &parse("SELF").unwrap(),
+                &mut gas,
+                Some(&eps),
+                &mut stack,
+                false,
+            )
+            .unwrap();
+            assert_eq!(
+                Gas::default().milligas().unwrap() - gas.milligas().unwrap(),
+                tc_cost::INSTR_STEP + tc_cost::FIND_ENTRYPOINT
+            );
+        }
+
+        /// Resolving an originated contract's entrypoint (the `CONTRACT`
+        /// instruction and contract-value parsing, both via
+        /// `typecheck_contract_address`) charges the flat `FIND_ENTRYPOINT`
+        /// cost, on top of the `ensure_ty_eq` check.
+        #[test]
+        fn contract_address_find_entrypoint_charged() {
+            let hash =
+                addr::AddressHash::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye")
+                    .unwrap();
+            let mut eps: Entrypoints = HashMap::new();
+            eps.insert(Entrypoint::default(), Type::Unit);
+            let mut ctx = Ctx::default();
+            ctx.set_known_contracts(HashMap::from([(hash.clone(), eps)]));
+            let address = addr::Address {
+                hash,
+                entrypoint: Entrypoint::default(),
+            };
+            let start = ctx.gas.milligas().unwrap();
+            typecheck_contract_address(
+                &mut ctx,
+                address,
+                Entrypoint::default(),
+                &Type::Unit,
+            )
+            .unwrap();
+            assert_eq!(
+                start - ctx.gas.milligas().unwrap(),
+                tc_cost::FIND_ENTRYPOINT
+                    + tc_cost::ty_eq(
+                        Type::Unit.size_for_gas(),
+                        Type::Unit.size_for_gas()
+                    )
+                    .unwrap()
+            );
+        }
+
+        /// A string literal charges `cost_CHECK_PRINTABLE(len)`. Measured
+        /// differentially over two lengths so the constant base cost cancels.
+        #[test]
+        fn string_literal_charged() {
+            let run = |s: &str| {
+                let mut ctx = Ctx::default();
+                let start = ctx.gas.milligas().unwrap();
+                typecheck_value(
+                    &Micheline::String(s.to_string()),
+                    &mut ctx,
+                    &Type::String,
+                    AllowForgedLazyStorageId::No,
+                )
+                .unwrap();
+                start - ctx.gas.milligas().unwrap()
+            };
+            assert_eq!(
+                run("ab") - run("a"),
+                tc_cost::check_printable(2).unwrap()
+                    - tc_cost::check_printable(1).unwrap()
+            );
+        }
+
+        /// The `VIEW` instruction charges `cost_CHECK_PRINTABLE(name_len)` for
+        /// its view-name argument. Measured differentially over two name lengths.
+        #[test]
+        fn view_name_charged() {
+            let run = |src: &str| {
+                let mut stack = tc_stk![Type::Address, Type::Nat];
+                let mut gas = Gas::default();
+                typecheck_instruction(&parse(src).unwrap(), &mut gas, &mut stack)
+                    .unwrap();
+                Gas::default().milligas().unwrap() - gas.milligas().unwrap()
+            };
+            assert_eq!(
+                run("VIEW \"ab\" nat") - run("VIEW \"a\" nat"),
+                tc_cost::check_printable(2).unwrap()
+                    - tc_cost::check_printable(1).unwrap()
+            );
+        }
     }
 
     #[test]

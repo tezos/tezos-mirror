@@ -4184,7 +4184,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 1153093_u64.into(),
+                        consumed_milligas: 1153428_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -4381,7 +4381,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 1153093_u64.into(),
+                        consumed_milligas: 1153428_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -5419,7 +5419,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_kt1.clone(),
                     }],
-                    consumed_milligas: 2_352_383_u64.into(),
+                    consumed_milligas: 2_352_448_u64.into(),
                     storage_size: 38u64.into(),
                     paid_storage_size_diff: 38u64.into(),
                     lazy_storage_diff: None,
@@ -6417,7 +6417,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1.clone(),
                         }],
-                        consumed_milligas: 2_352_383_u64.into(),
+                        consumed_milligas: 2_352_448_u64.into(),
                         storage_size: 38_u64.into(),
                         paid_storage_size_diff: 38_u64.into(),
                         lazy_storage_diff: None,
@@ -10192,12 +10192,18 @@ mod tests {
         // applies to the rendered length delta.
         let metering_delta =
             PERSISTED_ERROR_PER_BYTE_MILLIGAS * (long_rendered - short_rendered);
+        // CHECK_PRINTABLE gas on the pushed FAILWITH string literal, charged at
+        // typecheck as 10*len+15; the +15 base cancels in the delta.
+        let check_printable_delta = mir::gas::tc_cost::check_printable(N_LONG).unwrap()
+            as u64
+            - mir::gas::tc_cost::check_printable(N_SHORT).unwrap() as u64;
 
         assert_eq!(
             gas_long - gas_short,
-            storage_read_delta + decode_delta + metering_delta,
+            storage_read_delta + decode_delta + metering_delta + check_printable_delta,
             "exact per-byte delta: storage_read({storage_read_delta}) \
-             + decode({decode_delta}) + metering({metering_delta})"
+             + decode({decode_delta}) + metering({metering_delta}) \
+             + check_printable({check_printable_delta})"
         );
     }
 

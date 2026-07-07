@@ -8265,6 +8265,7 @@ mod interpreter_tests {
             Some(
                 tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas())
                     .unwrap()
+                    + tc_cost::FIND_ENTRYPOINT
                     + interpret_cost::CONTRACT
                     + interpret_cost::INTERPRET_RET,
             ),
@@ -8281,6 +8282,7 @@ mod interpreter_tests {
             Some(
                 tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas())
                     .unwrap()
+                    + tc_cost::FIND_ENTRYPOINT
                     + interpret_cost::CONTRACT
                     + interpret_cost::INTERPRET_RET,
             ),
@@ -8298,6 +8300,7 @@ mod interpreter_tests {
             Some(
                 tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas())
                     .unwrap()
+                    + tc_cost::FIND_ENTRYPOINT
                     + interpret_cost::CONTRACT
                     + interpret_cost::INTERPRET_RET,
             ),
@@ -8319,6 +8322,7 @@ mod interpreter_tests {
             Some(
                 tc_cost::ty_eq(Type::Int.size_for_gas(), Type::Int.size_for_gas())
                     .unwrap()
+                    + tc_cost::FIND_ENTRYPOINT
                     + interpret_cost::CONTRACT
                     + interpret_cost::INTERPRET_RET,
             ),
