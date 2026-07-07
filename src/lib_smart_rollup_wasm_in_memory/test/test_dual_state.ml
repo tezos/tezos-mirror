@@ -363,6 +363,119 @@ struct
         | None ->
             Test.fail ~__LOC__ "Irmin_only proof bytes failed to decode back")
 
+  (** Produce a real [Irmin_only] proof (no-op step on a seeded
+      pre-activation state) with its underlying Irmin proof. *)
+  let make_irmin_only_proof () =
+    let open Lwt_syntax in
+    let context = make_empty_context () in
+    let* irmin = make_seeded_inactive_state () in
+    let no_op_step state = Lwt.return (state, ()) in
+    let* proof_opt =
+      Dual.produce_proof context (irmin, Dual.Inactive) no_op_step
+    in
+    match proof_opt with
+    | Some ((Dual.Irmin_only irmin_proof as proof), ()) ->
+        return (proof, irmin_proof)
+    | Some (Dual.Dual _, ()) ->
+        Test.fail ~__LOC__ "expected an Irmin_only proof from Inactive"
+    | None -> Test.fail ~__LOC__ "produce_proof returned None"
+
+  (** Build a real [Dual] proof from a no-op Irmin proof and an NDS
+      proof minted from an empty prove session. *)
+  let make_dual_proof_for_encoding () =
+    let open Lwt_syntax in
+    let+ _proof, irmin_proof = make_irmin_only_proof () in
+    let session, _prove_nds = Backend.open_prove_session (make_empty_nds ()) in
+    let nds_proof = Backend.produce_proof session in
+    Dual.Internal_for_tests.make_dual_proof ~irmin_proof ~nds_proof
+
+  (** [proof_encoding] must classify [`Dynamic]: the frozen protocol's
+      [output_proof_encoding] places the proof as a {e non-final} [obj2]
+      field, and data-encoding raises at encoding construction — i.e. at
+      module initialisation of any binary linking a protocol machine over
+      the dual state — if the field is [`Variable]. *)
+  let test_proof_encoding_classifies_dynamic () =
+    let open Lwt_result_syntax in
+    (match Data_encoding.classify Dual.proof_encoding with
+    | `Dynamic -> ()
+    | `Fixed _ ->
+        Test.fail ~__LOC__ "proof_encoding classifies `Fixed; expected `Dynamic"
+    | `Variable ->
+        Test.fail
+          ~__LOC__
+          "proof_encoding classifies `Variable — composing it in the \
+           protocol's output_proof_encoding would raise at module \
+           initialisation") ;
+    return_unit
+
+  (** Simulate the frozen protocol's [output_proof_encoding] composition
+      ([obj2] with the proof {e first}): construction must not raise, and
+      a composed value must roundtrip — the proof field has to
+      self-delimit mid-object. *)
+  let test_proof_encoding_composes_in_obj2 () =
+    let open Lwt_result_syntax in
+    let composed =
+      let open Data_encoding in
+      obj2
+        (req "output_proof" Dual.proof_encoding)
+        (req "output_proof_output" (dynamic_size Variable.bytes))
+    in
+    let*! proof, _irmin_proof = make_irmin_only_proof () in
+    let output = Bytes.of_string "output-payload" in
+    let bytes = Data_encoding.Binary.to_bytes_exn composed (proof, output) in
+    let proof', output' = Data_encoding.Binary.of_bytes_exn composed bytes in
+    Check.(
+      (output' = output)
+        bytes_typ
+        ~__LOC__
+        ~error_msg:
+          "second obj2 field corrupted by the proof field: %L, expected %R — \
+           the proof encoding does not self-delimit mid-object") ;
+    Check.(
+      (Data_encoding.Binary.to_bytes_exn Dual.proof_encoding proof'
+      = Data_encoding.Binary.to_bytes_exn Dual.proof_encoding proof)
+        bytes_typ
+        ~__LOC__
+        ~error_msg:"proof field corrupted by obj2 composition: %L <> %R") ;
+    return_unit
+
+  (** [Dual] proofs occupy the compact tag byte 4 — outside the legacy
+      tag space [{0..3}].  Pins the union case layout: if the compact
+      union ever reallocates its tag bits, this catches the wire-format
+      move that a "legacy rejects Dual" check alone would miss. *)
+  let test_dual_proof_tag_byte () =
+    let open Lwt_result_syntax in
+    let*! dual_proof = make_dual_proof_for_encoding () in
+    let bytes =
+      Data_encoding.Binary.to_bytes_exn Dual.proof_encoding dual_proof
+    in
+    Check.(
+      (Bytes.get bytes 0 = '\x04')
+        char
+        ~__LOC__
+        ~error_msg:
+          "Dual proof tag byte is %L, expected %R — the compact union case \
+           layout moved; legacy/dual wire disjointness relies on it") ;
+    return_unit
+
+  (** [Irmin_only] JSON is unchanged: the compact union's JSON side is
+      wrapper-less with the legacy case first, so schema-sensitive tooling
+      keeps seeing the flat legacy proof object. *)
+  let test_irmin_only_json_unchanged () =
+    let open Lwt_result_syntax in
+    let*! proof, irmin_proof = make_irmin_only_proof () in
+    let dual_json = Data_encoding.Json.construct Dual.proof_encoding proof in
+    let legacy_json =
+      Data_encoding.Json.construct Irmin.proof_encoding irmin_proof
+    in
+    if not (dual_json = legacy_json) then
+      Test.fail
+        ~__LOC__
+        "Irmin_only JSON differs from the legacy proof JSON:\n%s\nvs\n%s"
+        (Data_encoding.Json.to_string dual_json)
+        (Data_encoding.Json.to_string legacy_json) ;
+    return_unit
+
   (** Active no-op: a canonical [Active nds] state and a real
       decode/encode round-trip — the Irmin half attests the
       [/pvm/nds_hash] write, the NDS half an empty transition.
@@ -1143,6 +1256,22 @@ struct
          Irmin proof"
         `Quick
         test_proof_encoding_irmin_only_untagged;
+      tztest
+        "proof: proof_encoding classifies `Dynamic (composes in obj2)"
+        `Quick
+        test_proof_encoding_classifies_dynamic;
+      tztest
+        "proof: proof_encoding composes as a non-final obj2 field"
+        `Quick
+        test_proof_encoding_composes_in_obj2;
+      tztest
+        "proof: Dual proof occupies compact tag byte 4"
+        `Quick
+        test_dual_proof_tag_byte;
+      tztest
+        "proof: Irmin_only JSON matches the bare Irmin proof JSON"
+        `Quick
+        test_irmin_only_json_unchanged;
       tztest
         "proof: Dual no-op produce + verify roundtrip"
         `Quick
