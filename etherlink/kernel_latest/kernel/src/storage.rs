@@ -174,6 +174,11 @@ const MICHELSON_RUNTIME_SUNRISE_LEVEL: RefPath =
 pub const ENABLE_MICHELSON_GAS_REFUND: RefPath =
     RefPath::assert_from(b"/base/feature_flags/enable_michelson_gas_refund");
 
+// Debug Features
+pub const ENABLE_DEBUG_PRECOMPILES: RefPath =
+    RefPath::assert_from(b"/base/debug_features_flags/enable_debug_precompiles");
+// EOF Debug Features
+
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
 const EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER: RefPath =
@@ -967,6 +972,10 @@ pub fn store_michelson_runtime_sunrise_level(
 
 pub fn read_michelson_runtime_sunrise_level(host: &impl StorageV1) -> Option<U256> {
     read_u256_le(host, &MICHELSON_RUNTIME_SUNRISE_LEVEL).ok()
+}
+
+pub fn enable_debug_precompiles(host: &impl StorageV1) -> bool {
+    Ok(Some(ValueType::Value)) == host.store_has(&ENABLE_DEBUG_PRECOMPILES)
 }
 
 pub fn enable_michelson_gas_refund(host: &impl StorageV1) -> bool {

@@ -143,6 +143,12 @@ pub(crate) const VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS: Address =
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a,
     ]));
 
+// Debug precompile
+pub(crate) const PANIC_PRECOMPILE_ADDRESS: Address = Address(FixedBytes::new([
+    0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+]));
+
 /// Dedicated caller address for TezosX internal transactions.
 ///
 /// This address is used when the actual caller doesn't have an Ethereum-format
@@ -178,6 +184,8 @@ pub(crate) const CUSTOMS: [Address; 10] = [
     FA12_WRAPPER_SOL_ADDR,
     VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS,
 ];
+
+pub(crate) const DEBUGS: [Address; 1] = [PANIC_PRECOMPILE_ADDRESS];
 
 // Rationale regarding the cost:
 // Worst-case across Ed25519, secp256k1, and P-256. Dominated by the

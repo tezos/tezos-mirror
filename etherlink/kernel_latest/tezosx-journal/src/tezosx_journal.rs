@@ -243,6 +243,10 @@ impl TezosXJournal {
         }
     }
 
+    pub fn enable_debug_precompiles(&mut self) {
+        self.evm.enable_debug_precompiles()
+    }
+
     /// Build a journal entered from `runtime` with placeholder seeds: a zero
     /// operation hash (so origination addresses are non-deterministic — see
     /// [`Self::new`]) and [`BlockConstants::dummy`]. This reproduces what the

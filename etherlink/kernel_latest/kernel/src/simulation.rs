@@ -10,7 +10,7 @@
 
 use crate::apply::revm_run_transaction;
 use crate::block_storage;
-use crate::chains::ExperimentalFeatures;
+use crate::chains::{DebugFeatures, ExperimentalFeatures};
 use crate::configuration::fetch_evm_chain_id;
 use crate::fees::simulation_add_gas_for_fees;
 use crate::storage::{
@@ -399,6 +399,7 @@ impl Evaluation {
         let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
         let experimental_features = ExperimentalFeatures::read_from_storage(host);
+        let debug_features = DebugFeatures::read_from_storage(host);
 
         let constants = match block_storage::read_current_etherlink_block(host) {
             Ok(block) => {
@@ -522,6 +523,9 @@ impl Evaluation {
         // `eth_estimateGas` — which share this path and are called a lot —
         // leave the flag unset and pay no trace clone.
         journal.set_http_trace_enabled(crate::storage::is_http_trace_enabled(host));
+        if debug_features.enable_debug_precompiles {
+            journal.enable_debug_precompiles();
+        }
         let sim_result = match revm_run_transaction(
             host,
             registry,

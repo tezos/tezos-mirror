@@ -43,6 +43,7 @@ pub struct CracTransactionInfo {
 pub struct EvmJournal {
     pub layered_state: LayeredState,
     pub inner: JournalInner<JournalEntry>,
+    enable_debug_precompiles: bool,
     access_list: Option<AccessList>,
     /// Aggregate identity of the incoming CRACs serviced so far.
     crac_tx_info: Option<CracTransactionInfo>,
@@ -84,6 +85,7 @@ impl EvmJournal {
         Self {
             layered_state: LayeredState::new(),
             inner: JournalInner::new(),
+            enable_debug_precompiles: false,
             access_list: None,
             crac_tx_info: None,
             crac_chain_depth: 0,
@@ -112,6 +114,14 @@ impl EvmJournal {
         // backtracked Michelson operation to drop accumulated EVM state,
         // but a later CRAC in the same operation must still observe the
         // same block — wiping it here would re-zero those observables.
+    }
+
+    pub fn enable_debug_precompiles(&mut self) {
+        self.enable_debug_precompiles = true;
+    }
+
+    pub fn debug_precompiles_are_enabled(&self) -> bool {
+        self.enable_debug_precompiles
     }
 
     /// Stage the alias whose delegation the next run_transaction installs.

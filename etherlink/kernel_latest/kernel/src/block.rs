@@ -665,8 +665,8 @@ mod tests {
     use crate::blueprint_storage::{
         store_current_tez_block_header, store_inbox_blueprint, TezBlockHeader,
     };
-    use crate::chains::TezlinkContent;
     use crate::chains::TezlinkOperation;
+    use crate::chains::{DebugFeatures, TezlinkContent};
     use crate::chains::{
         ExperimentalFeatures, TezlinkBlockConstants, TezosXBlockConstants,
         TezosXChainConfig, TezosXTransaction, EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
@@ -909,6 +909,7 @@ mod tests {
             EvmLimits::default(),
             spec_id,
             ExperimentalFeatures::default(),
+            DebugFeatures::default(),
             ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
     }
@@ -1168,11 +1169,13 @@ mod tests {
             .expect("Should have written feature flag");
         init_safe_storage_roots(host);
         let experimental_features = ExperimentalFeatures::read_from_storage(host);
+        let debug_features = DebugFeatures::read_from_storage(host);
         TezosXChainConfig::create_config(
             DUMMY_CHAIN_ID,
             EvmLimits::default(),
             SpecId::default(),
             experimental_features,
+            debug_features,
             ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
     }

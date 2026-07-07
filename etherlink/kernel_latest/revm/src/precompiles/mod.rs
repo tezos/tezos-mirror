@@ -11,5 +11,6 @@ pub mod send_outbox_message;
 
 mod global_counter;
 mod guard;
+mod panic;
 mod table;
 mod verify_tezos_signature;
