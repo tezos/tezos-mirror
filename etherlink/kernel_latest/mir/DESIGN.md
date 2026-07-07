@@ -146,9 +146,44 @@ CREATE_CONTRACT scripts.
 
 ### Known differences between MIR and L1 (OCaml implementation)
 
-#### `CHECK_SIGNATURE`
+#### Gas consumption
+
+The gas consumed for each operation and instruction in MIR is generally different from that of L1. This is because the two implementations are different (Rust and OCaml, so different performances for the generated code) and gas values have been benchmarked for MIR on a machine with Tezos X sequencer-like characteristics, which is also different from a L1 baker reference machine.
+
+#### Divergences
+
+##### `CHECK_SIGNATURE`
 
 The L1 version is more permissive than MIR for the Ed25519 scheme: the former accepts some small order / mixed order points (RFC-8032), while the latter rejects them (_dalek_). Here is an example where the two implementations differ:
 * `0x00ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f` for the key;
 * `0x776f726c64` for the data;
 * `0xecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000` for the signature.
+
+##### Errors
+
+The errors returned by MIR or the L1 interpreter are not always the same. This comes from the different capabilities of the source languages (Rust and OCaml), their implementation specificities and their handling of errors.
+
+This can be observed for instance on the TZT files `drop_deep_apply_00.tzt`, `drop_deep_comb_00.tzt` and `swap_drop_deep_apply_00.tzt` in `tzt_reference_test_suite`. These files return a static error when run with a L1 client, against a gas exhaustion in MIR.
+
+##### TZT
+
+It happens that MIR and L1 don't provide the same results on TZT files. There can be two reasons why:
+* their error handling, as explained above;
+* the missing support for some TZT format directives. For instance, MIR supports setting the level in the context of the TZT file execution, while the L1 client doesn't.
+
+### Unsupported features in MIR
+
+#### Deferred features
+
+* BLS addresses
+* Ticket manipulations
+* Sapling
+* Timelocks
+* Global constants
+* Address indexing
+
+#### Not applicable to an L2
+
+* Delegation
+* Smart rollups
+* Deprecated instructions like `SUB` on the `mutez` type or the `CREATE_ACCOUNT` and `STEPS_TO_QUOTA` instructions.
