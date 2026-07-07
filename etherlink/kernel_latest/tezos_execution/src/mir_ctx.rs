@@ -1577,6 +1577,30 @@ pub mod tests {
         };
     }
 
+    /// Take a big map back out of a dump root without moving out of the
+    /// `Drop`-implementing [TypedValue] (which the compiler forbids): swap an
+    /// empty placeholder in via `&mut`.
+    fn take_big_map<'a>(root: &mut TypedValue<'a>) -> BigMap<'a> {
+        match root {
+            TypedValue::BigMap(m) => {
+                std::mem::replace(m, BigMap::empty(Type::Unit, Type::Unit))
+            }
+            other => panic!("expected BigMap, got {other:?}"),
+        }
+    }
+
+    /// Dump a single standalone big map through [dump_big_map_updates] by
+    /// wrapping it in a value, then unwrap the mutated map back out.
+    fn dump_one<'a, Host: StorageV1>(
+        ctx: &mut TcCtx<'a, Host>,
+        started: &[BigMapId],
+        map: BigMap<'a>,
+    ) -> BigMap<'a> {
+        let mut root = TypedValue::BigMap(map);
+        dump_big_map_updates(ctx, started, &mut root, false).unwrap();
+        take_big_map(&mut root)
+    }
+
     #[track_caller]
     fn check_is_dumped_map(map: BigMap, id: BigMapId) {
         match map.content {
@@ -1658,12 +1682,12 @@ pub mod tests {
             (TypedValue::int(2), TypedValue::String("two".into())),
         ]);
 
-        let mut map = BigMap {
+        let map = BigMap {
             content: BigMapContent::InMemory(content.clone()),
             key_type: Type::Int,
             value_type: Type::String,
         };
-        dump_big_map_updates(&mut storage, &[], &mut [&mut map], false).unwrap();
+        let map = dump_one(&mut storage, &[], map);
 
         check_is_dumped_map(map, 0.into());
 
@@ -1763,12 +1787,12 @@ pub mod tests {
             (TypedValue::int(2), TypedValue::String("two".into())),
         ]);
 
-        let mut map = BigMap {
+        let map = BigMap {
             content: BigMapContent::InMemory(content.clone()),
             key_type: Type::Int,
             value_type: Type::String,
         };
-        dump_big_map_updates(&mut storage, &[], &mut [&mut map], false).unwrap();
+        let map = dump_one(&mut storage, &[], map);
 
         check_is_dumped_map(map, 0.into());
 
@@ -1905,19 +1929,13 @@ pub mod tests {
             id: map_id1.clone(),
             overlay: BTreeMap::from([(TypedValue::int(1), Some(TypedValue::int(1)))]),
         });
-        let mut map1 = BigMap {
+        let map1 = BigMap {
             content: content_diff,
             key_type: Type::Int,
             value_type: Type::Int,
         };
 
-        dump_big_map_updates(
-            &mut storage,
-            &[map_id1.clone(), map_id2.clone()],
-            &mut [&mut map1],
-            false,
-        )
-        .unwrap();
+        dump_one(&mut storage, &[map_id1.clone(), map_id2.clone()], map1);
 
         let expected_content = BTreeMap::from([
             (TypedValue::int(0), TypedValue::int(0)),
@@ -1967,15 +1985,16 @@ pub mod tests {
 
         // Returned-storage walk: the parent returns a fresh empty big map
         // (EMPTY_BIG_MAP) that does not reference S.
-        let mut returned_storage = BigMap {
+        let returned_storage = BigMap {
             content: BigMapContent::InMemory(BTreeMap::new()),
             key_type: Type::Int,
             value_type: Type::String,
         };
+        let mut returned_root = TypedValue::BigMap(returned_storage);
         let mut seen_in_storage = BTreeSet::new();
         dump_big_map_walk(
             &mut storage,
-            &mut [&mut returned_storage],
+            &mut returned_root,
             false,
             &mut seen_in_storage,
         )
@@ -1985,7 +2004,7 @@ pub mod tests {
 
         // Operation-list walk: the outgoing operation carries S, moved out
         // of the parent storage. This must succeed: S is still present.
-        let mut operation_map = BigMap {
+        let operation_map = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: s.clone(),
                 overlay: BTreeMap::new(),
@@ -1993,14 +2012,16 @@ pub mod tests {
             key_type: Type::Int,
             value_type: Type::String,
         };
+        let mut operation_root = TypedValue::BigMap(operation_map);
         let mut seen_in_operations = BTreeSet::new();
         dump_big_map_walk(
             &mut storage,
-            &mut [&mut operation_map],
+            &mut operation_root,
             true,
             &mut seen_in_operations,
         )
         .expect("operation walk must copy S before it is removed");
+        let operation_map = take_big_map(&mut operation_root);
 
         // The operation now references a temporary copy, not S itself, and
         // that copy carries S's content.
@@ -2050,7 +2071,7 @@ pub mod tests {
             )
             .unwrap();
 
-        let mut returned_storage = BigMap {
+        let returned_storage = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: p.clone(),
                 overlay: BTreeMap::from([(
@@ -2061,10 +2082,11 @@ pub mod tests {
             key_type: Type::Int,
             value_type: Type::String,
         };
+        let mut returned_root = TypedValue::BigMap(returned_storage);
         let mut seen_in_storage = BTreeSet::new();
         let deferred_storage = dump_big_map_walk(
             &mut storage,
-            &mut [&mut returned_storage],
+            &mut returned_root,
             false,
             &mut seen_in_storage,
         )
@@ -2078,7 +2100,7 @@ pub mod tests {
             "the storage walk must NOT flush P's overlay yet",
         );
 
-        let mut operation_map = BigMap {
+        let operation_map = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: p.clone(),
                 overlay: BTreeMap::new(),
@@ -2086,14 +2108,16 @@ pub mod tests {
             key_type: Type::Int,
             value_type: Type::String,
         };
+        let mut operation_root = TypedValue::BigMap(operation_map);
         let mut seen_in_operations = BTreeSet::new();
         let deferred_operations = dump_big_map_walk(
             &mut storage,
-            &mut [&mut operation_map],
+            &mut operation_root,
             true,
             &mut seen_in_operations,
         )
         .unwrap();
+        let operation_map = take_big_map(&mut operation_root);
         let operation_id = match &operation_map.content {
             BigMapContent::FromId(m) => m.id.clone(),
             BigMapContent::InMemory(_) => panic!("operation big map was not dumped"),
@@ -2168,11 +2192,18 @@ pub mod tests {
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        let mut op1 = mk();
-        let mut op2 = mk();
+        let mut root =
+            TypedValue::new_pair(TypedValue::BigMap(mk()), TypedValue::BigMap(mk()));
         let mut seen = BTreeSet::new();
-        dump_big_map_walk(&mut storage, &mut [&mut op1, &mut op2], true, &mut seen)
-            .unwrap();
+        dump_big_map_walk(&mut storage, &mut root, true, &mut seen).unwrap();
+        // Extract the two operation big maps back out in AST order (left, right).
+        let (op1, op2) = match &mut root {
+            TypedValue::Pair(l, r) => (
+                take_big_map(std::rc::Rc::make_mut(l)),
+                take_big_map(std::rc::Rc::make_mut(r)),
+            ),
+            other => panic!("expected Pair, got {other:?}"),
+        };
 
         let id_of = |m: &BigMap| match &m.content {
             BigMapContent::FromId(c) => c.id.clone(),
@@ -2218,7 +2249,7 @@ pub mod tests {
         // Buggy ordering: the source is removed before the operation copy.
         storage.big_map_remove(&s).unwrap();
 
-        let mut operation_map = BigMap {
+        let operation_map = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: s.clone(),
                 overlay: BTreeMap::new(),
@@ -2226,9 +2257,10 @@ pub mod tests {
             key_type: Type::Int,
             value_type: Type::String,
         };
+        let mut operation_root = TypedValue::BigMap(operation_map);
         let mut seen = BTreeSet::new();
         let result =
-            dump_big_map_walk(&mut storage, &mut [&mut operation_map], true, &mut seen);
+            dump_big_map_walk(&mut storage, &mut operation_root, true, &mut seen);
         assert!(
             result.is_err(),
             "copying from a removed source must fail; deferring removal avoids this"

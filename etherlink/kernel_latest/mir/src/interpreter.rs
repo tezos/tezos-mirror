@@ -289,7 +289,7 @@ impl<'a> ContractScript<'a> {
             parameter_allow_forged_lazy_storage_id,
         )?;
         // The contract's own committed storage may reference big_maps it owns.
-        let mut storage =
+        let storage =
             self.typecheck_storage(ctx, storage_in, AllowForgedLazyStorageId::Yes)?;
         let mut started_with_map_ids = vec![];
         storage.view_big_map_ids(&mut started_with_map_ids);
@@ -335,22 +335,14 @@ impl<'a> ContractScript<'a> {
         // storage.
         let mut seen_in_storage = BTreeSet::new();
         // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
-        let mut storage_big_maps = vec![];
-        storage.view_big_maps_mut(&mut storage_big_maps);
-        let deferred_storage = dump_big_map_walk(
-            lazy_storage,
-            &mut storage_big_maps,
-            false,
-            &mut seen_in_storage,
-        )?;
+        let deferred_storage =
+            dump_big_map_walk(lazy_storage, &mut storage, false, &mut seen_in_storage)?;
         // Handle big_maps that appears in the operation list, those big_maps are temporary and it depends to
         // the internal operation to determine what to do with it
         let mut seen_in_operations = BTreeSet::new();
-        let mut operations_big_maps = vec![];
-        operation_list.view_big_maps_mut(&mut operations_big_maps);
         let deferred_operations = dump_big_map_walk(
             lazy_storage,
-            &mut operations_big_maps,
+            &mut operation_list,
             true,
             &mut seen_in_operations,
         )?;
