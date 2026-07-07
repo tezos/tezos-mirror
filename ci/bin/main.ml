@@ -119,6 +119,8 @@ let () = Tezos_ci_jobs.Docker.register ()
 
 let () = Tezos_ci_jobs.Security_scans.register ()
 
+let () = Release_tag.register ()
+
 (** {3 General pipelines} *)
 
 let () =
@@ -127,7 +129,7 @@ let () =
   register
     "before_merging"
     If.(merge_request && not merge_train)
-    ~jobs:(Code_verification.jobs Before_merging @ Cacio.get_jobs Before_merging)
+    ~jobs:(Cacio.get_jobs Before_merging)
     ~description:
       "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
        This pipeline is created on each push to a branch with an associated \
@@ -138,7 +140,7 @@ let () =
     "merge_train"
     ~auto_cancel:{on_job_failure = true; on_new_commit = false}
     If.(on_tezos_namespace && merge_request && merge_train)
-    ~jobs:(Code_verification.jobs Merge_train @ Cacio.get_jobs Merge_train)
+    ~jobs:(Cacio.get_jobs Merge_train)
     ~description:
       "A merge-train-specific version of 'before_merging'.\n\n\
        This pipeline contains the same set of jobs as 'before_merging' but \
@@ -234,7 +236,7 @@ let () =
   register
     "octez_major_release_tag"
     If.(on_tezos_namespace && push && has_tag_match octez_major_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs Major_release_tag)
+    ~jobs:(Cacio.get_jobs Major_release_tag)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       ("Release tag pipelines for major Octez release.\n\n\
@@ -245,7 +247,7 @@ let () =
   register
     "octez_minor_release_tag"
     If.(on_tezos_namespace && push && has_tag_match octez_minor_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs Minor_release_tag)
+    ~jobs:(Cacio.get_jobs Minor_release_tag)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       ("Release tag pipelines for minor Octez release.\n\n\
@@ -255,7 +257,7 @@ let () =
   register
     "octez_beta_release_tag"
     If.(on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs Beta_release_tag)
+    ~jobs:(Cacio.get_jobs Beta_release_tag)
     ~description:
       ("Beta release tag pipelines for Octez.\n\n\
         This pipeline is created when the release manager pushes a tag in the \
@@ -265,7 +267,7 @@ let () =
     "octez_major_release_tag_test"
     If.(
       not_on_tezos_namespace && push && has_tag_match octez_major_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs Major_release_tag_test)
+    ~jobs:(Cacio.get_jobs Major_release_tag_test)
     ~description:
       "Dry-run pipeline for 'octez_major_release_tag'.\n\n\
        This pipeline checks that 'octez_major_release_tag' pipelines work as \
@@ -276,7 +278,7 @@ let () =
     "octez_minor_release_tag_test"
     If.(
       not_on_tezos_namespace && push && has_tag_match octez_minor_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs Minor_release_tag_test)
+    ~jobs:(Cacio.get_jobs Minor_release_tag_test)
     ~description:
       "Dry-run pipeline for 'octez_minor_release_tag'.\n\n\
        This pipeline checks that 'octez_minor_release_tag' pipelines work as \
@@ -287,7 +289,7 @@ let () =
     "octez_beta_release_tag_test"
     If.(
       not_on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs Beta_release_tag_test)
+    ~jobs:(Cacio.get_jobs Beta_release_tag_test)
     ~description:
       "Dry run pipeline for 'octez_beta_release_tag'.\n\n\
        This pipeline checks that 'octez_beta_release_tag' pipelines work as \
@@ -300,7 +302,7 @@ let () =
       on_tezos_namespace && push
       && Rules.has_tag_match octez_packaging_revision_tag_re)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
-    ~jobs:(Release_tag.octez_packaging_revision_jobs ~test:false ())
+    ~jobs:(Cacio.get_jobs Packaging_revision)
     ~description:
       "Packaging revision pipeline for Octez.\n\n\
        This pipeline is created when a packaging revision tag in the format \
@@ -311,7 +313,7 @@ let () =
       not_on_tezos_namespace && push
       && Rules.has_tag_match octez_packaging_revision_tag_re)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
-    ~jobs:(Release_tag.octez_packaging_revision_jobs ~test:true ())
+    ~jobs:(Cacio.get_jobs Packaging_revision_test)
     ~description:
       "Dry run pipeline for 'octez_packaging_revision_tag'.\n\n\
        This pipeline checks that 'octez_packaging_revision_tag' pipelines work \
@@ -321,7 +323,7 @@ let () =
   register
     "non_release_tag"
     If.(on_tezos_namespace && push && has_non_release_tag)
-    ~jobs:(Release_tag.octez_jobs Non_release_tag)
+    ~jobs:(Cacio.get_jobs Non_release_tag)
     ~description:
       ("Tag pipeline for non-release tags.\n\n\
         Created on each push of a tag that does not match e.g. \
@@ -331,7 +333,7 @@ let () =
   register
     "non_release_tag_test"
     If.(not_on_tezos_namespace && push && has_non_release_tag)
-    ~jobs:(Release_tag.octez_jobs Non_release_tag_test)
+    ~jobs:(Cacio.get_jobs Non_release_tag_test)
     ~description:
       "Dry-run pipeline for 'non_release_tag'.\n\n\
        This pipeline checks that 'non_release_tag' pipelines work as intended, \
@@ -352,8 +354,7 @@ let () =
     "schedule_extended_test"
     schedule_extended_tests
     ~jobs:
-      (Code_verification.jobs Schedule_extended_test
-       @ Cacio.get_jobs Schedule_extended_test
+      (Cacio.get_jobs Schedule_extended_test
       |> List.map (with_interruptible false))
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
@@ -430,7 +431,7 @@ let () =
   register
     "schedule_test_release"
     schedule_test_release
-    ~jobs:(Release_tag.octez_jobs Scheduled_test_release)
+    ~jobs:(Cacio.get_jobs Scheduled_test_release)
     ~description:
       "Scheduled pipeline that runs a test release pipeline. The jobs are the \
        same as a release pipeline but run in dry-mode." ;

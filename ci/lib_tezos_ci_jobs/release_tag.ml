@@ -383,11 +383,6 @@ let () =
     [(Auto, job_docker_promote_to_latest `test)] ;
   ()
 
-(** Create an Octez release tag pipeline of type {!pipeline_type},
-    which is expected to be a release pipeline type. *)
-let octez_jobs (pipeline_type : Cacio.global_pipeline) =
-  Cacio.get_jobs pipeline_type
-
 let job_docker_promote_to_version =
   Cacio.parameterize @@ fun mode ->
   CI.job
@@ -487,7 +482,7 @@ let job_release_page_packaging_revision =
         "./scripts/releases/publish-release-page-packaging-revision.sh";
       ]
 
-let () =
+let register () =
   Cacio.register_jobs
     Packaging_revision
     [
@@ -521,12 +516,3 @@ let () =
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   ()
-
-let octez_packaging_revision_jobs ?(test = false) () =
-  (* We want to be able to trigger each "batch" of jobs manually.
-     There are two batches: one with the static jobs, and one that publishes.
-     The static jobs are independent so they are both manual,
-     but [job_update_gitlab_release] depends on [job_create_gitlab_package]
-     so it does not have to be manual, only [job_create_gitlab_package] does. *)
-  if test then Cacio.get_jobs Packaging_revision_test
-  else Cacio.get_jobs Packaging_revision
