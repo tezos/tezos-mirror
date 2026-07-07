@@ -30,6 +30,7 @@ use std::convert::Infallible;
 
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
+use octez_riscv_api_common::move_semantics::ImmutableState;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_data::hash::Hash;
@@ -61,6 +62,16 @@ impl GcNames for InMemoryGcNames {
 /// In-memory durable storage registry, exposed as an OCaml custom block.
 #[ocaml::sig]
 pub type Registry = MutableState<RegistryState<InMemoryKeyValueStore, InMemoryGcNames>>;
+
+/// Immutable snapshot of an in-memory durable storage registry.
+///
+/// Obtained from [`octez_riscv_durable_in_memory_registry_to_imm`]; mutations
+/// on the source registry after the conversion are not observable through the
+/// snapshot, and vice versa for registries recovered with
+/// [`octez_riscv_durable_in_memory_registry_from_imm`] (copy-on-write via
+/// [`ImmutableState`] / [`MutableState`]).
+#[ocaml::sig]
+pub type ImmRegistry = ImmutableState<RegistryState<InMemoryKeyValueStore, InMemoryGcNames>>;
 
 /// OCaml GC names for the in-memory registry state (prove).
 pub struct InMemoryProveGcNames;
@@ -197,6 +208,22 @@ pub fn octez_riscv_durable_in_memory_registry_new() -> OcamlFallible<SafePointer
     let registry = RegistryState::new(InMemoryRepo::default())?;
 
     Ok(SafePointer::from(MutableState::owned(registry)))
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry -> imm_registry")]
+pub fn octez_riscv_durable_in_memory_registry_to_imm(
+    state: SafePointer<Registry>,
+) -> OcamlFallible<SafePointer<ImmRegistry>> {
+    Ok(SafePointer::from(state.to_imm_state()?))
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> registry")]
+pub fn octez_riscv_durable_in_memory_registry_from_imm(
+    state: SafePointer<ImmRegistry>,
+) -> SafePointer<Registry> {
+    SafePointer::from(state.to_mut_state())
 }
 
 #[ocaml::func]

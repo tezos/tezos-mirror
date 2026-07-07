@@ -31,6 +31,7 @@ use std::path::Path;
 
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
+use octez_riscv_api_common::move_semantics::ImmutableState;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_data::hash::Hash;
@@ -63,6 +64,17 @@ impl GcNames for OnDiskGcNames {
 /// On-disk durable storage registry, exposed as an OCaml custom block.
 #[ocaml::sig]
 pub type Registry = MutableState<RegistryState<PersistenceLayer, OnDiskGcNames>>;
+
+/// Immutable snapshot of an on-disk durable storage registry.
+///
+/// Obtained from [`octez_riscv_durable_on_disk_registry_to_imm`]; mutations
+/// on the source registry after the conversion are not observable through the
+/// snapshot, and vice versa for registries recovered with
+/// [`octez_riscv_durable_on_disk_registry_from_imm`] (copy-on-write via
+/// [`ImmutableState`] / [`MutableState`]).  Both handles keep sharing the
+/// same underlying repository.
+#[ocaml::sig]
+pub type ImmRegistry = ImmutableState<RegistryState<PersistenceLayer, OnDiskGcNames>>;
 
 /// On-disk repository, wrapping a DirectoryManager.
 #[derive(derive_more::Deref)]
@@ -209,6 +221,22 @@ pub fn octez_riscv_durable_on_disk_registry_new(
     let dir = repo.0.clone();
     let registry = RegistryState::new(dir)?;
     Ok(SafePointer::from(MutableState::owned(registry)))
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry -> imm_registry")]
+pub fn octez_riscv_durable_on_disk_registry_to_imm(
+    state: SafePointer<Registry>,
+) -> OcamlFallible<SafePointer<ImmRegistry>> {
+    Ok(SafePointer::from(state.to_imm_state()?))
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> registry")]
+pub fn octez_riscv_durable_on_disk_registry_from_imm(
+    state: SafePointer<ImmRegistry>,
+) -> SafePointer<Registry> {
+    SafePointer::from(state.to_mut_state())
 }
 
 #[ocaml::func]
