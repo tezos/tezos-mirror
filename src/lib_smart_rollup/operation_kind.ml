@@ -80,14 +80,22 @@ let map_encoding value_encoding =
        ~key_of_string:of_string_exn
        ~value_encoding)
 
+(* Cementation has a strictly higher priority than publication:
+   cementing raises the last cemented commitment (LCC), which is what
+   allows commitments blocked behind the protocol's
+   [smart_rollup_max_lookahead_in_blocks] window (failing with
+   [Sc_rollup_too_far_ahead]) to be published. Keeping [Cement] ahead
+   of [Publish] ensures a backlog of publish operations cannot starve
+   cementation when both kinds share the same injector queue
+   (https://linear.app/tezos/issue/L2-1792). *)
 let priority_order = function
   | Timeout -> 0
   | Refute -> 1
-  | Publish -> 2
-  | Publish_dal_commitment -> 2
   | Cement -> 2
-  | Recover -> 3
-  | Add_messages -> 4
-  | Execute_outbox_message -> 5
+  | Publish -> 3
+  | Publish_dal_commitment -> 3
+  | Recover -> 4
+  | Add_messages -> 5
+  | Execute_outbox_message -> 6
 
 let compare_priority k1 k2 = compare (priority_order k1) (priority_order k2)
