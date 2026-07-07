@@ -43,7 +43,8 @@
   dev_commands
   cross_runtime
   compact_receipt_encoding
-  tezosx_address_translation))
+  tezosx_address_translation
+  faults))
 
 (executable
  (name main)

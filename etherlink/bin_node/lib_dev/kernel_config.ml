@@ -347,9 +347,10 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     ?enable_revm ?enable_dal ?dal_slots ?dal_publishers_whitelist
     ?disable_legacy_dal_signals ?enable_fast_withdrawal
     ?enable_fast_fa_withdrawal ?enable_multichain ?enable_michelson_gas_refund
-    ?set_account_code ?max_delayed_inbox_blueprint_length ?evm_version
-    ?(with_runtimes = []) ?tez_bootstrap_accounts ~tez_bootstrap_balance
-    ?tez_bootstrap_contracts ~output () =
+    ?enable_debug_precompiles ?set_account_code
+    ?max_delayed_inbox_blueprint_length ?evm_version ?(with_runtimes = [])
+    ?tez_bootstrap_accounts ~tez_bootstrap_balance ?tez_bootstrap_contracts
+    ~output () =
   let eth_bootstrap_path address =
     if Constants.(kernel_is_newer ~than:Previewnet05 kernel_compat) then
       ["evm"; "eth_accounts"; address]
@@ -619,6 +620,9 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     @ make_governance_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))
         max_delayed_inbox_blueprint_length
+    @ make_instr
+        ~path_prefix:["base"; "debug_features_flags"]
+        enable_debug_precompiles
     @ chain_ids_instr @ with_runtimes
   in
   Installer_config.to_file instrs ~output

@@ -594,14 +594,14 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
     ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ?history_mode
     ?patch_config ?websockets ?(kernel = Kernel.Latest) ?evm_version
-    ?sequencer_pool_address ?chain_id
+    ?sequencer_pool_address ?chain_id ?time_between_blocks
     ?(eth_bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
         (Array.to_list Eth_account.bootstrap_accounts))
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?(sequencer_keys = []) ?with_runtimes ?enable_michelson_gas_refund
-    ?michelson_hard_gas_limit_per_block () =
+    ?michelson_hard_gas_limit_per_block ?enable_debug_precompiles () =
   let patch_config =
     Option.map
       (fun input_patch json ->
@@ -632,6 +632,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ?with_runtimes
       ?chain_id
       ?enable_michelson_gas_refund
+      ?enable_debug_precompiles
       ?kernel_compat:(Kernel.name_of kernel)
       ?sequencer_pool_address
       ?sequencer:
@@ -652,7 +653,11 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
   let () = Account.write Constant.all_secret_keys ~base_dir:wallet_dir in
   let sequencer_config : Evm_node.sequencer_config =
     {
-      time_between_blocks = Some Nothing;
+      time_between_blocks =
+        Some
+          (match time_between_blocks with
+          | Some f -> Time_between_blocks f
+          | None -> Nothing);
       genesis_timestamp;
       max_number_of_chunks = None;
       wallet_dir = Some wallet_dir;
@@ -781,7 +786,8 @@ let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
     ?tx_queue_tx_per_addr_limit ~title ?tez_bootstrap_accounts ?set_account_code
     ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
     ?sequencer_keys ?(regression = false) ?with_runtimes ?chain_id
-    ?enable_michelson_gas_refund body =
+    ?enable_michelson_gas_refund ?enable_debug_precompiles ?time_between_blocks
+    body =
   let register =
     if regression then Regression.register ?file:None
     else Test.register ?seed:None
@@ -819,6 +825,8 @@ let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
       ?with_runtimes
       ?chain_id
       ?enable_michelson_gas_refund
+      ?enable_debug_precompiles
+      ?time_between_blocks
       ()
   in
   body sequencer

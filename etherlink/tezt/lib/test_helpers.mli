@@ -315,12 +315,14 @@ val init_sequencer_sandbox :
   ?evm_version:Evm_version.t ->
   ?sequencer_pool_address:string ->
   ?chain_id:int ->
+  ?time_between_blocks:float ->
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer_keys:Account.key list ->
   ?with_runtimes:Tezosx_runtime.t list ->
   ?enable_michelson_gas_refund:bool ->
   ?michelson_hard_gas_limit_per_block:int ->
+  ?enable_debug_precompiles:bool ->
   unit ->
   Evm_node.t Lwt.t
 
@@ -396,6 +398,8 @@ val register_sandbox :
   ?with_runtimes:Tezosx_runtime.t list ->
   ?chain_id:int ->
   ?enable_michelson_gas_refund:bool ->
+  ?enable_debug_precompiles:bool ->
+  ?time_between_blocks:float ->
   (Evm_node.t -> unit Lwt.t) ->
   unit
 

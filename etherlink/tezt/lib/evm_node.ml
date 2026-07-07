@@ -162,6 +162,7 @@ type kernel_setup = {
   enable_fast_withdrawal : bool option;
   enable_fast_fa_withdrawal : bool option;
   enable_michelson_gas_refund : bool option;
+  enable_debug_precompiles : bool option;
   evm_version : Evm_version.t option;
   with_runtimes : Tezosx_runtime.t list option;
   tezosx_target_sunrise_levels : (Tezosx_runtime.t * int) list option;
@@ -181,8 +182,9 @@ let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
     ?set_account_code ?enable_fa_bridge ?enable_revm ?enable_dal ?dal_slots
     ?dal_publishers_whitelist ?disable_legacy_dal_signals
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
-    ?enable_michelson_gas_refund ?evm_version ?with_runtimes
-    ?tezosx_target_sunrise_levels ?michelson_runtime_chain_id () =
+    ?enable_michelson_gas_refund ?enable_debug_precompiles ?evm_version
+    ?with_runtimes ?tezosx_target_sunrise_levels ?michelson_runtime_chain_id ()
+    =
   let tez_bootstrap_accounts =
     match tez_bootstrap_accounts with
     | Some _ -> tez_bootstrap_accounts
@@ -230,6 +232,7 @@ let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
     enable_fast_withdrawal;
     enable_fast_fa_withdrawal;
     enable_michelson_gas_refund;
+    enable_debug_precompiles;
     evm_version;
     with_runtimes;
     tezosx_target_sunrise_levels;
@@ -1926,6 +1929,9 @@ let make_kernel_installer_config (kernel_setup : kernel_setup) ~output () =
         "michelson-runtime-chain-id"
         Fun.id
         kernel_setup.michelson_runtime_chain_id
+    @ Cli_arg.optional_switch
+        "enable-debug-precompiles"
+        (Option.value ~default:false kernel_setup.enable_debug_precompiles)
     @ with_runtimes
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
