@@ -1538,6 +1538,22 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   in
   let* _ = Sc_rollup_node.wait_sync ~timeout:60. rollup_node_2
   and* _ = Sc_rollup_node.wait_sync ~timeout:60. rollup_node_3 in
+  Log.info "Check LCC is known to the rollup node bootstrapped from snapshot." ;
+  (* The LCC hash and level are always known, but the commitment content may
+     be absent from the storage depending on GC timing, so we don't check its
+     presence. *)
+  let* (lcc : Sc_rollup_rpc.lcc_with_commitment) =
+    Sc_rollup_node.RPC.call rollup_node_3
+    @@ Sc_rollup_rpc.get_global_last_cemented_commitment ()
+  in
+  Check.(lcc.hash <> "")
+    Check.string
+    ~error_msg:"LCC hash of rollup node bootstrapped from snapshot is empty" ;
+  Check.(lcc.level > 0)
+    Check.int
+    ~error_msg:
+      "LCC level of rollup node bootstrapped from snapshot is %L but should be \
+       positive" ;
   Log.info "Try importing outdated snapshot." ;
   let* () = Sc_rollup_node.terminate rollup_node_2 in
   let*? outdated =
@@ -2755,6 +2771,26 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup node
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+  (* The rollup node always knows the LCC hash and level from L1, even when
+     the commitment content may not be available in its storage (at genesis,
+     the LCC is the genesis commitment). *)
+  let* l1_lcc_hash, l1_lcc_level =
+    Sc_rollup_helpers.last_cemented_commitment_hash_with_level ~sc_rollup client
+  in
+  let* (rollup_node_lcc : Sc_rollup_rpc.lcc_with_commitment) =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_last_cemented_commitment ()
+  in
+  Check.(rollup_node_lcc.hash = l1_lcc_hash)
+    Check.string
+    ~error_msg:
+      "LCC hash of rollup node (%L) is not the same as the genesis LCC hash on \
+       L1 (%R)" ;
+  Check.(rollup_node_lcc.level = l1_lcc_level)
+    Check.int
+    ~error_msg:
+      "LCC level of rollup node (%L) is not the same as the genesis LCC level \
+       on L1 (%R)" ;
   let* () = bake_levels commitment_period client in
   let* commitment_inbox_level =
     Sc_rollup_node.wait_for_level
@@ -2814,6 +2850,32 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup node
     let* current_level = Node.get_level node in
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node current_level
   in
+
+  (* After cementation, the rollup node reports the new LCC, with its content
+     as it is available in the node's storage. *)
+  let* (rollup_node_lcc : Sc_rollup_rpc.lcc_with_commitment) =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_last_cemented_commitment ()
+  in
+  Check.(rollup_node_lcc.hash = cemented_commitment_hash)
+    Check.string
+    ~error_msg:
+      "LCC hash of rollup node (%L) is not the cemented commitment hash (%R)" ;
+  Check.(rollup_node_lcc.level = commitment_inbox_level)
+    Check.int
+    ~error_msg:
+      "LCC level of rollup node (%L) is not the cemented commitment inbox \
+       level (%R)" ;
+  (match rollup_node_lcc.commitment with
+  | None ->
+      Test.fail
+        "LCC commitment content is not available in the rollup node storage"
+  | Some commitment ->
+      Check.(commitment.inbox_level = commitment_inbox_level)
+        Check.int
+        ~error_msg:
+          "LCC commitment content inbox level (%L) is not the cemented \
+           commitment inbox level (%R)") ;
 
   (* Withdraw stake after cementing should succeed *)
   let* () =
