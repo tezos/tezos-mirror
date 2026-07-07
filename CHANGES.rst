@@ -95,6 +95,13 @@ Smart Rollup node
   injection round. This fixes a permanent stall with large backlogs of
   same-tag operations (e.g. cementation). (MR :gl:`!22417`)
 
+- The injector now gives cementation operations strictly higher priority than
+  commitment publication, and the rollup node no longer enqueues commitments
+  that are beyond the protocol's ``smart_rollup_max_lookahead_in_blocks``
+  window. This prevents a backlog of failing publish operations from starving
+  cementation when the ``operating`` and ``cementing`` purposes share the same
+  key. (MR :gl:`!22414`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

@@ -297,6 +297,16 @@ batching:${OPERATOR_ADDR2}``.  Where the rollup node will use
 ``${OPERATOR_ADDR2}`` for the batching purpose and
 ``${OPERATOR_ADDR1}`` for everything else.
 
+.. note::
+
+   It is recommended to use a dedicated key for the ``cementing``
+   purpose. When the ``cementing`` purpose shares its key with the
+   ``operating`` purpose, cement operations share an injector queue
+   (and the one-manager-operation-per-block slot of that key) with
+   publish operations. With a separate key, cementation gets its own
+   injector worker and can proceed independently of commitment
+   publication.
+
 The L1 chain has a limitation of one manager operation per key per
 block (see :ref:`one_manager_op_per_manager_per_block`). In the case of a high
 throughput rollup, this limitation could slow down the rollup by
