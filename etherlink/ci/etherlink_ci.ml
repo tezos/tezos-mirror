@@ -404,6 +404,7 @@ let job_tezt_flaky =
     ~retry_tests:3
 
 let job_gitlab_release =
+  Cacio.parameterize @@ fun mode ->
   CI.job
     ~__POS__
     "gitlab:octez-evm-node-release"
@@ -414,8 +415,22 @@ let job_gitlab_release =
         (Artifacts, job_build_evm_node_static Amd64 Release);
         (Artifacts, job_build_evm_node_static Arm64 Release);
       ]
+    ?variables:
+      (match mode with
+      (* Scheduled test release pipelines are not triggered by a tag, so there
+         is no [CI_COMMIT_TAG]. Fake one so that the release scripts can compute
+         a version, just like the Octez scheduled test release does. *)
+      | `scheduled_test -> Some [("CI_COMMIT_TAG", "octez-evm-node-v0.0")]
+      | `real -> None)
     ~description:"Create a GitLab release for Etherlink."
-    ~script:["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
+    ~script:
+      ((match mode with
+       | `scheduled_test -> ["git tag octez-evm-node-v0.0"]
+       | `real -> [])
+      @ [
+          ("./scripts/ci/create_gitlab_octez_evm_node_release.sh"
+          ^ match mode with `scheduled_test -> " --dry-run" | `real -> "");
+        ])
 
 let job_docker_merge =
   Cacio.parameterize @@ fun test ->
@@ -508,16 +523,40 @@ let register () =
   in
   CI.register_dedicated_release_pipeline
     ~tag_rex:octez_evm_node_release_tag_re
-    [(Auto, job_docker_promote_to_latest `real); (Auto, job_gitlab_release)] ;
+    [
+      (Auto, job_docker_promote_to_latest `real);
+      (Auto, job_gitlab_release `real);
+    ] ;
   CI.register_dedicated_test_release_pipeline
     ~tag_rex:octez_evm_node_release_tag_re
-    [(Auto, job_docker_promote_to_latest `test); (Auto, job_gitlab_release)] ;
+    [
+      (Auto, job_docker_promote_to_latest `test);
+      (Auto, job_gitlab_release `real);
+    ] ;
   CI.register_dedicated_prerelease_pipeline
     ~tag_rex:octez_evm_node_prerelease_tag_re
-    [(Auto, job_docker_merge `real); (Auto, job_gitlab_release)] ;
+    [(Auto, job_docker_merge `real); (Auto, job_gitlab_release `real)] ;
   CI.register_dedicated_test_prerelease_pipeline
     ~tag_rex:octez_evm_node_prerelease_tag_re
-    [(Auto, job_docker_merge `test); (Auto, job_gitlab_release)] ;
+    [(Auto, job_docker_merge `test); (Auto, job_gitlab_release `real)] ;
+  (* Test release pipeline that does not require pushing a tag: it is triggered
+     as a scheduled pipeline (see [ci/run_pipeline/schedule_test_release_evm_node.sh]).
+     Its purpose is to test changes to the release pipeline (e.g. the 'ci-release'
+     image) without publishing anything, and it must be safe even when run on
+     tezos/tezos (this pipeline is not restricted to forks). Therefore:
+     - it uses [job_docker_merge] rather than [job_docker_promote_to_latest], so
+       the 'octez-evm-node-latest' tag is never moved (the built images are only
+       pushed to the GCP registry under the branch name, in [`test] mode which
+       also disables any Docker Hub push);
+     - the GitLab release job runs in [`scheduled_test] mode, which fakes the
+       release tag and passes --dry-run, so no package is uploaded and no GitLab
+       release is created. *)
+  CI.register_scheduled_pipeline
+    "scheduled_test_release"
+    ~description:
+      "Test release pipeline for the EVM node, triggered as a scheduled \
+       pipeline instead of by pushing a tag. Does not publish anything."
+    [(Auto, job_docker_merge `test); (Auto, job_gitlab_release `scheduled_test)] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Etherlink."

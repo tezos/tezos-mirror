@@ -6,6 +6,18 @@ set -eu
 # In case of failures with this pipeline, contact the maintainer.
 # Maintainer: Thomas Letan <lthms@nomadic-labs.com>
 
+# Checks if running in dry-run mode. In dry-run mode nothing is uploaded and no
+# release is created; it is used by the scheduled test release pipeline, which
+# has no release tag.
+for arg in "$@"; do
+  case $arg in
+  "--dry-run")
+    dry_run="--dry-run"
+    echo "Running in dry-run mode. Nothing will be uploaded."
+    ;;
+  esac
+done
+
 # shellcheck source=./scripts/ci/octez-evm-node-release.sh
 . ./scripts/ci/octez-evm-node-release.sh
 gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_binaries_package_name}/${gitlab_package_version}"
@@ -35,6 +47,13 @@ gitlab_upload() {
   local_path="${1}"
   remote_file="${2}"
   url="${3-${gitlab_octez_package_url}}"
+
+  # Upload only if not running in dry-run mode.
+  if [ -n "${dry_run:-}" ]; then
+    echo "The following file would be uploaded if not running in dry-run mode: ${url}/${remote_file}"
+    return
+  fi
+
   echo "Upload to ${url}/${remote_file}"
 
   i=0
@@ -103,6 +122,14 @@ for architecture in ${architectures}; do
     "octez-binaries/${architecture}/octez-evm-node.sha512" \
     "$os-${architecture}-octez-evm-node.sha512"
 done
+
+# In dry-run mode nothing was uploaded, so there is no package to query and no
+# release to create.
+if [ -n "${dry_run:-}" ]; then
+  echo "Dry-run mode: skipping package URL query and GitLab release creation."
+  echo "A release named '${gitlab_release_name}' would be created for tag '${CI_COMMIT_TAG}'."
+  exit 0
+fi
 
 echo "Query GitLab to get generic package URL"
 
