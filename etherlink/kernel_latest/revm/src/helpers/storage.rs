@@ -82,6 +82,15 @@ pub fn read_b256_be_default(
     }
 }
 
+/// Turn a `PathNotFound` error into success: deleting a node that does
+/// not exist is a no-op.
+pub fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeError> {
+    match res {
+        Ok(()) | Err(RuntimeError::PathNotFound) => Ok(()),
+        Err(err) => Err(err),
+    }
+}
+
 pub fn write_u64_le(
     host: &mut impl StorageV1,
     path: &impl Path,

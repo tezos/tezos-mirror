@@ -12,6 +12,11 @@
   twin. The guard lives in the precompile only; the shared P-256 verifier
   still accepts high-S so tz3 accounts keep signing ordinary,
   counter-protected operations. (!22338)
+- A fully-reverted (or fully-drained) FA-bridge `claim` no longer leaves an
+  orphan durable ticket-table node holding zero. The end-of-transaction commit
+  now deletes a ticket-balance node when the balance is zero (read-equivalent to
+  an absent node) instead of writing zero, so a reverted frame leaves no durable
+  trace. (!22416)
 - A signed transaction's signature scalars `r`/`s` are now
   rejected unless canonically encoded. A list-shaped or leading-zero-padded
   scalar decodes to the same value but changes the raw bytes, so one signed
