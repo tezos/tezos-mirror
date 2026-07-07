@@ -25,7 +25,7 @@ kernel.workspace = true
 hex = { version = "0.4.3", features = ["serde"] }
 hex-literal.workspace = true
 
-bytes = "1.5"
+bytes = "1.12"
 walkdir = "2.4"
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde_yaml = "0.9.25"

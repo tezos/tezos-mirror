@@ -22,7 +22,9 @@ nom = { version = "7.1", default-features = false }
 
 num-bigint = { version = "0.4", optional = true, default-features = false }
 num-traits = { version = "0.2.8", optional = true }
-time = { version = "0.3", features = [
+# Floored to the patched version flagged by `cargo audit` (RUSTSEC-2026-0009:
+# DoS via stack exhaustion).
+time = { version = "0.3.53", features = [
   "formatting",
   "parsing",
 ], optional = true }
