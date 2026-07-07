@@ -2234,6 +2234,165 @@ let test_attestations_encode_decode_multiple_lags ~__FILE__ =
   Log.info "Multi-lag encode/decode succeeded" ;
   unit
 
+(* Regression test for a DAL-node crash that was present when this test was
+   written. The durable part of this test is the *scenario* below; the exact
+   mechanism of the original bug is only sketched here.
+
+   Bug, as understood at the time of writing: after a producer DAL node was
+   restarted from a persisted store, a slot that had been attested at a shorter
+   lag than the maximum could be left stuck in status [Waiting_attestation].
+   When the node later processed the finalized block at [pub + max_lag], this
+   stale status was treated as a fatal [Unexpected_slot_status] and tore down
+   the daemon (gossipsub + p2p + RPC) while leaving the process alive via the
+   metrics server -- so the node was silently bricked.
+
+   The scenario requires dynamic/multi-lag attestations
+   ([attestation_lags = [short_lag; max_lag]]): the slot is attested at the
+   short lag, so its only skip-list cell is recorded at [pub + short_lag] and
+   none at [pub + max_lag]. A single fixed lag cannot reproduce this.
+
+   Scenario:
+   - start a producer DAL node early (small [first_seen_level], so a restart
+     does not hide the slot behind the [published_level >= first_seen_level]
+     guard);
+   - publish a slot at [pub];
+   - attest it at [short_lag] only, so its only skip-list cell is at
+     [pub + short_lag];
+   - advance the chain to head = [pub + max_lag] and restart the producer from
+     its persisted store;
+   - bake until the crawler processes the finalized block at [pub + max_lag].
+
+   The test asserts the node does *not* emit a fatal daemon error and keeps
+   processing blocks past [pub + max_lag]. It fails while the bug is present. *)
+let test_backfill_waiting_attestation_crash (protocol : Protocol.t)
+    (dal_parameters : Dal_common.Parameters.t) (_cryptobox : Cryptobox.t)
+    (node : Node.t) (client : Client.t) (_bootstrap_key : string) : unit Lwt.t =
+  let {log_step} = init_logger () in
+  let short_lag, max_lag =
+    match dal_parameters.attestation_lags with
+    | [a; b] -> (a, b)
+    | _ ->
+        Test.fail
+          "This test requires attestation_lags = [short; max], got [%s]"
+          (dal_parameters.attestation_lags |> List.map string_of_int
+         |> String.concat "; ")
+  in
+  Check.((dal_parameters.attestation_lag = max_lag) int)
+    ~error_msg:"Expected attestation_lag (%L) = max lag (%R)" ;
+  (* We need the gap between the two lags to be large enough that the short-lag
+     cell ends up strictly below the crawler's restart point (head - 3), so it
+     is never re-processed after restart. *)
+  Check.((max_lag - short_lag >= 3) int)
+    ~error_msg:"Expected max_lag - short_lag (%L) >= %R" ;
+  let slot_size = dal_parameters.cryptobox.slot_size in
+  let index = 0 in
+
+  log_step "Bake one block, then start the producer DAL node early" ;
+  (* Starting the producer now keeps its [first_seen_level] small, so that after
+     the restart the [published_level >= first_seen_level] guard in
+     [remove_unattested_slots_and_shards] does not hide the bug. *)
+  let* () = bake_for client in
+  let producer = Dal_node.create ~name:"producer" ~node () in
+  let* () = Dal_node.init_config ~operator_profiles:[index] producer in
+  let* () = Dal_node.run ~wait_ready:true producer in
+
+  (* On U (025), [Apply.record_dal_content] discards the DAL content of any
+     attestation for a level within [attestation_lag] of protocol activation
+     (issue 8065, "reverted in protocol V"). In a fresh sandbox that window
+     covers the lowest levels, so publish only after baking past it, otherwise
+     the short-lag attestation below is silently dropped and the slot never
+     leaves [Waiting_attestation]. The producer is already running, so its
+     [first_seen_level] stays small. *)
+  let* () = bake_for ~count:max_lag client in
+
+  log_step "Publish a slot" ;
+  let* () = bake_for ~count:2 client in
+  let message = Helpers.make_slot ~slot_size "backfill-waiting-attestation" in
+  let* _ =
+    Helpers.publish_and_store_slot
+      client
+      producer
+      Constant.bootstrap1
+      ~index
+      message
+  in
+  let* lvl_publish = Client.level client in
+  (* The publication is included in the first block baked after injection. *)
+  let published_level = lvl_publish + 1 in
+  Log.info
+    "Publishing at level %d (commitment lands at level %d); lags = [%d; %d]"
+    lvl_publish
+    published_level
+    short_lag
+    max_lag ;
+
+  log_step "Attest the slot at the SHORT lag only" ;
+  (* Bake [short_lag] blocks, then inject a DAL attestation for lag index 0
+     (the short lag). Injected at level [lvl_publish + short_lag], it attests the
+     slot published at [published_level] and is included at [published_level +
+     short_lag]. The slot's skip-list cell is therefore recorded at
+     [published_level + short_lag] and *not* at [published_level + max_lag]. *)
+  let* () = bake_for ~count:short_lag client in
+  let* () =
+    inject_dal_attestations_and_bake
+      ~protocol
+      ~lag_index:0
+      node
+      client
+      (Slots [index])
+      dal_parameters
+  in
+  (* Let the producer process the finalized block containing the attestation so
+     that it records the slot as attested at [short_lag]. *)
+  let* () =
+    bake_until_processed ~level:(published_level + short_lag) client [producer]
+  in
+  let* () =
+    check_slot_status
+      ~__LOC__
+      producer
+      ~expected_status:(Dal_RPC.Attested short_lag)
+      ~check_attested_lag:`At_most
+      ~slot_level:published_level
+      ~slot_index:index
+  in
+
+  log_step "Advance the chain so that head = published_level + max_lag" ;
+  let head_restart = published_level + max_lag in
+  let* current_level = Client.level client in
+  assert (current_level <= head_restart) ;
+  let* () = bake_for ~count:(head_restart - current_level) client in
+  let* current_level = Client.level client in
+  Check.((current_level = head_restart) int)
+    ~error_msg:"Expected head %R before restart, got %L" ;
+
+  log_step "Restart the producer DAL node (reusing its persisted store)" ;
+  let* () = Dal_node.terminate producer in
+  let* () = Dal_node.run ~wait_ready:true producer in
+
+  log_step
+    "Bake until the crawler processes the finalized block at published_level + \
+     max_lag" ;
+  (* If the bug is present, [remove_unattested_slots_and_shards] hits the stuck
+     [Waiting_attestation] status for [{published_level; index}] and the daemon
+     crashes with [Unexpected_slot_status]. Detect the crash via the daemon
+     error event; assert liveness via processing of the target finalized block. *)
+  let crash_promise =
+    let* error = Dal_node.wait_for producer "dal_daemon_error.v0" Option.some in
+    Test.fail
+      "The DAL node's daemon crashed after restart (regression of the \
+       backfill/Waiting_attestation bug): %s"
+      (JSON.encode error)
+  in
+  let processed_promise =
+    wait_for_layer1_final_block producer (published_level + max_lag)
+  in
+  (* head is at [published_level + max_lag]; finalized is [head - 2]. Baking two
+     more blocks makes the crawler process the finalized block at
+     [published_level + max_lag]. *)
+  let* () = bake_for ~count:2 client in
+  Lwt.pick [crash_promise; processed_promise]
+
 let register ~__FILE__ ~protocols =
   scenario_with_layer1_node
     ~__FILE__
@@ -2313,4 +2472,25 @@ let register ~__FILE__ ~protocols =
     use_mockup_node_for_getting_attestable_slots
     protocols ;
   test_attestations_encode_decode_single_lag ~__FILE__ protocols ;
-  test_attestations_encode_decode_multiple_lags ~__FILE__ protocols
+  test_attestations_encode_decode_multiple_lags ~__FILE__ protocols ;
+  test
+    ~__FILE__
+    ~uses:(fun _protocol -> [Constant.octez_dal_node])
+      (* Needs dynamic/multi-lag attestations, available from U (025). *)
+    ~supports:(Protocol.From_protocol 025)
+    ~tags:["attestation"; "backfill"; "restart"; "crash"]
+    "DAL node: backfill Waiting_attestation crash after restart"
+    (fun protocol ->
+      with_layer1
+        ~attestation_threshold:1
+        ~prover:true
+        ~l1_history_mode:Default_with_refutation
+        ~parameters:
+          [
+            (["dal_parametric"; "attestation_lag"], `Float 6.);
+            (["dal_parametric"; "attestation_lags"], `A [`Float 2.; `Float 6.]);
+          ]
+        ~protocol
+        ~dal_enable:true
+        (test_backfill_waiting_attestation_crash protocol))
+    protocols
