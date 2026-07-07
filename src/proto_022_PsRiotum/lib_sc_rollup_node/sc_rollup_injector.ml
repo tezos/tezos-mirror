@@ -357,10 +357,8 @@ module Proto_client = struct
         annot_op
     in
     match simulation_result with
-    | Error trace ->
-        fail
-          (if trace_exceeds_quota trace then `Exceeds_quotas trace
-           else `TzError trace)
+    | Error trace when trace_exceeds_quota trace -> fail (`Exceeds_quotas trace)
+    | Error trace -> fail (`TzError trace)
     | Ok (_oph, packed_op, _contents, results) -> (
         let nb_ops = List.length operations in
         let results = Apply_results.to_list (Contents_result_list results) in
