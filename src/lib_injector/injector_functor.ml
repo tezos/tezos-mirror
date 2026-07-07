@@ -590,11 +590,13 @@ module Make (Parameters : PARAMETERS) = struct
             state
             (Op_heap.length state.heap)
         in
-        (* We perform a dichotomy by injecting the first half of the
-           operations (we are not looking to maximize the number of operations
-           injected because of the cost of simulation). Only the operations
-           which are actually injected will be removed from the heap so the
-           other half will be reconsidered later. *)
+        (* We perform a dichotomy by simulating (and ultimately injecting)
+           only the first half of the operations (we are not looking to
+           maximize the number of operations injected because of the cost of
+           simulation). The operations have already been removed from the heap
+           by [get_n_ops_batch_from_queue], so the dropped second half is
+           re-queued here to be reconsidered in a subsequent injection round
+           instead of being lost. *)
         match keep_half operations with
         | None ->
             fail
@@ -602,11 +604,20 @@ module Make (Parameters : PARAMETERS) = struct
                  (Exn (Failure "Quotas exceeded when simulating one operation"))
                  trace
         | Some new_operations ->
+            let dropped_operations =
+              let kept = List.length new_operations in
+              List.filteri (fun i _ -> i >= kept) operations
+            in
             let*! () =
               Event.(emit2 batch_too_large_splitting)
                 state
                 (List.length operations)
                 (List.length new_operations)
+            in
+            let* () =
+              List.iter_es
+                (fun op -> add_pending_operation ~retry:true state op)
+                dropped_operations
             in
             simulate_operations state signer new_operations)
     | Ok {operations_statuses; unsigned_operation} ->
