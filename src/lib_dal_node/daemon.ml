@@ -437,10 +437,13 @@ let update_and_register_profiles ctxt =
 
 (* Re-populates the DAL node's in-memory slot state for the window of levels
    [from_level] down to [from_level - attestation_lag + 1], skipping levels
-   below the L1 savepoint. *)
-let backfill_slot_headers_and_statuses cctxt store
-    (module Plugin : Dal_plugin.T) proto_parameters ~from_level =
+   below the L1 savepoint. It reconciles the seeded statuses against the
+   skip-list store via [Slot_manager.get_slot_status_from_skip_list], promoting
+   any slot already attested at a shorter lag to its terminal status. *)
+let backfill_slot_headers_and_statuses cctxt ctxt (module Plugin : Dal_plugin.T)
+    proto_parameters ~from_level =
   let open Lwt_result_syntax in
+  let store = Node_context.get_store ctxt in
   let number_of_slots = proto_parameters.Types.number_of_slots in
   let* _block_hash, l1_savepoint_level =
     Chain_services.Levels.savepoint cctxt ()
@@ -460,7 +463,25 @@ let backfill_slot_headers_and_statuses cctxt store
             slot_headers
             store
         in
-        return_unit
+        List.iter_es
+          (fun Dal_plugin.{slot_index; published_level; _} ->
+            let slot_id =
+              Types.Slot_id.{slot_level = published_level; slot_index}
+            in
+            let* skip_list_status =
+              Slot_manager.get_slot_status_from_skip_list ~slot_id ctxt
+            in
+            match skip_list_status with
+            | Some ((`Attested _ | `Unattested) as status) ->
+                let*? () =
+                  Slot_manager.update_slot_header_status store slot_id status
+                in
+                return_unit
+            | Some (`Unpublished | `Waiting_attestation) | None ->
+                (* No terminal status recorded yet: the slot is genuinely still
+                   waiting, leave it as seeded by [store_slot_headers]. *)
+                return_unit)
+          slot_headers
       else return_unit)
     (Stdlib.List.init proto_parameters.attestation_lag Fun.id)
 
@@ -868,7 +889,7 @@ let run ?(disable_shard_validation = false) ?(ignore_l1_history_check = false)
        it. *)
     (backfill_slot_headers_and_statuses
        cctxt
-       store
+       ctxt
        (module Plugin)
        proto_parameters
        ~from_level

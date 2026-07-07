@@ -985,6 +985,9 @@ let update_slot_header_status node_store slot_id status =
 
 let get_slot_status ~slot_id ctxt = Statuses.find_status ctxt slot_id
 
+let get_slot_status_from_skip_list ~slot_id ctxt =
+  Statuses.get_status_from_skip_list ctxt slot_id
+
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   Store.Shards.read (Store.shards store) slot_id shard_index
 
