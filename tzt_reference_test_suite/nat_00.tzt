@@ -1,0 +1,3 @@
+code { NAT } ;
+input { Stack_elt bytes 0x1538f1dbfd6880afe6bc } ;
+output { Stack_elt nat 100220141610198602081980 }

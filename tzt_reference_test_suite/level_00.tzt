@@ -1,0 +1,4 @@
+code { LEVEL } ;
+input { } ;
+output { Stack_elt nat 42 } ;
+level 42
