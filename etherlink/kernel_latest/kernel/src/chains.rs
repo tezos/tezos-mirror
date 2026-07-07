@@ -529,7 +529,7 @@ impl TezosXChainConfig {
     pub fn fetch_hashes_from_delayed_inbox<Host>(
         host: &mut Host,
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
-        delayed_inbox: &mut DelayedInbox,
+        delayed_inbox: &DelayedInbox,
         current_blueprint_size: usize,
         block_number: U256,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>

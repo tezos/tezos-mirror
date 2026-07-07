@@ -539,7 +539,7 @@ mod tests {
         // The dummy chunk in the inbox is registered at block 10
         if read_blueprint(
             &mut host,
-            &mut conf,
+            &conf,
             U256::from(10),
             Timestamp::from(0),
             &EVMBlockHeader::genesis_header(),
