@@ -248,11 +248,99 @@ let test_injector_batch_split_on_gas_exhaustion : Protocol.t list -> unit =
      so the event has necessarily been seen at this point. *)
   if not (is_resolved wait_split) then
     Test.fail "The batch was never split by the injector" ;
-  (* No operation should have been discarded by the injector. *)
+  (* No operation should have been discarded by the injector. The injector
+     handles only the operations queued by this test, so any discard would
+     necessarily be one of them. *)
   if is_resolved discarded then
     Test.fail "An operation was discarded by the injector" ;
   unit
 
+(* Number of loop iterations for a call to [gas_burner_script] to exceed the
+   per-operation gas limit (1_040_000): such a call can never be injected on
+   its own. *)
+let over_operation_quota_iterations = 7_000_000
+
+(* Test that when an operation which individually exceeds the per-operation
+   gas limit is batched with injectable operations, the injector still makes
+   progress: the batch is split down to the failing operation (which can never
+   be injected), and the injectable operations set aside by the split are
+   re-queued and eventually injected instead of being lost. *)
+let test_injector_split_isolates_failing_operation : Protocol.t list -> unit =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Injector batch split isolates a failing operation"
+    ~tags:["injector"; "batch"; "split"; "gas"; "fail"]
+    ~uses:(fun _ -> [Constant.octez_injector_server])
+  @@ fun protocol ->
+  let nodes_args = Node.[Synchronisation_threshold 0; Private_mode] in
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol ~nodes_args ()
+  in
+  let injector = Injector.create node client in
+  let* _config_file =
+    Injector.init_config injector Account.Bootstrap.keys.(0)
+  in
+  let* () = Injector.run injector in
+  let* () = Client.bake_for client in
+  let* contract =
+    Client.originate_contract
+      ~alias:"gas_burner"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap2.alias
+      ~prg:gas_burner_script
+      ~init:"Unit"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for client in
+  (* Queue first an operation that individually exceeds the per-operation gas
+     limit (it can never be injected), then two cheap injectable ones. They
+     are all considered in a single batch. *)
+  let* failing_op_id =
+    Injector.RPC.(
+      call injector
+      @@ add_pending_transaction
+           ~parameters:
+             (String.empty, string_of_int over_operation_quota_iterations)
+           0L
+           contract)
+  in
+  Log.info "Added over-quota operation: id = %s" failing_op_id ;
+  let* wait_included =
+    Lwt_list.map_s
+      (fun i ->
+        let* op_id =
+          Injector.RPC.(
+            call injector
+            @@ add_pending_transaction
+                 ~parameters:(String.empty, string_of_int (10 + i))
+                 0L
+                 contract)
+        in
+        Log.info "Added cheap operation: id = %s" op_id ;
+        return (wait_for_inclusion ~timeout:120. injector op_id))
+      (Base.range 1 2)
+  in
+  let is_resolved p = match Lwt.state p with Lwt.Sleep -> false | _ -> true in
+  let rec bake_until_included attempts =
+    if List.for_all is_resolved wait_included then unit
+    else if attempts <= 0 then
+      Test.fail
+        "The injectable operations set aside by the split were not included"
+    else
+      let* () = Injector.RPC.(call injector @@ inject ()) in
+      let* () = Lwt_unix.sleep 0.5 in
+      let* () = Client.bake_for client in
+      let* () = Lwt_unix.sleep 0.5 in
+      bake_until_included (attempts - 1)
+  in
+  let* () = bake_until_included 30 in
+  let* () = Lwt.join wait_included in
+  Log.info
+    "The injectable operations were included despite the failing operation." ;
+  unit
+
 let register ~protocols =
   test_injector protocols ;
-  test_injector_batch_split_on_gas_exhaustion protocols
+  test_injector_batch_split_on_gas_exhaustion protocols ;
+  test_injector_split_isolates_failing_operation protocols
