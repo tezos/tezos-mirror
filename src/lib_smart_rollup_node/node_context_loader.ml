@@ -494,6 +494,7 @@ module Internal_for_tests = struct
                       };
                   max_number_of_stored_cemented_commitments = 0;
                   max_active_outbox_levels = 0;
+                  max_lookahead_in_blocks = 0l;
                 };
               dal =
                 {

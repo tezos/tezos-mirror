@@ -137,6 +137,7 @@ let constants_of_parametric
             reveal_activation_level;
             max_number_of_stored_cemented_commitments;
             max_active_outbox_levels;
+            max_lookahead_in_blocks;
             _;
           };
         dal =
@@ -164,6 +165,7 @@ let constants_of_parametric
                  reveal_activation_level);
           max_number_of_stored_cemented_commitments;
           max_active_outbox_levels = Int32.to_int max_active_outbox_levels;
+          max_lookahead_in_blocks;
         };
       dal =
         {
