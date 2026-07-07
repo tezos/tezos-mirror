@@ -287,6 +287,18 @@ module Proto_client = struct
     @@ Tezos_crypto.Signature.Secret_key.of_b58check_exn
          "edsk3UqeiQWXX7NFEY1wUs6J1t2ez5aQ3hEWdqX5Jr5edZiGLW8nZr"
 
+  (** [trace_exceeds_quota trace] returns [true] if [trace] contains a gas
+      exhaustion error, for either the operation or the block quota. *)
+  let trace_exceeds_quota trace =
+    TzTrace.fold
+      (fun exceeds -> function
+        | Environment.Ecoproto_error
+            (Gas.Block_quota_exceeded | Gas.Operation_quota_exceeded) ->
+            true
+        | _ -> exceeds)
+      false
+      trace
+
   let simulate_operations cctxt ~force ~source ~src_pk ~successor_level
       ~fee_parameter ?safety_guard operations =
     let open Lwt_result_syntax in
@@ -344,18 +356,10 @@ module Proto_client = struct
     in
     match simulation_result with
     | Error trace ->
-        let exceeds_quota =
-          TzTrace.fold
-            (fun exceeds -> function
-              | Environment.Ecoproto_error
-                  (Gas.Block_quota_exceeded | Gas.Operation_quota_exceeded) ->
-                  true
-              | _ -> exceeds)
-            false
-            trace
-        in
-        fail (if exceeds_quota then `Exceeds_quotas trace else `TzError trace)
-    | Ok (_oph, packed_op, _contents, results) ->
+        fail
+          (if trace_exceeds_quota trace then `Exceeds_quotas trace
+           else `TzError trace)
+    | Ok (_oph, packed_op, _contents, results) -> (
         let nb_ops = List.length operations in
         let results = Apply_results.to_list (Contents_result_list results) in
         (* packed_op can have reveal operations added automatically. *)
@@ -371,14 +375,37 @@ module Proto_client = struct
             results
           |> List.rev
         in
-        let unsigned_operation =
-          let {shell; protocol_data = Operation_data {contents; signature = _}}
-              =
-            packed_op
-          in
-          (shell, Contents_list contents)
+        let several_operations =
+          match operations with _ :: _ :: _ -> true | _ -> false
         in
-        return {operations_statuses; unsigned_operation}
+        let gas_exhausted_trace =
+          (* In force mode with several operations, a simulation that succeeds
+             globally can still contain operations which individually failed
+             with gas exhaustion. Report the batch as exceeding quotas so that
+             the caller splits it instead of discarding these operations. *)
+          if force && several_operations then
+            List.find_map
+              (fun {status; _} ->
+                match status with
+                | Unsuccessful (Failed trace) when trace_exceeds_quota trace ->
+                    Some trace
+                | _ -> None)
+              operations_statuses
+          else None
+        in
+        match gas_exhausted_trace with
+        | Some trace -> fail (`Exceeds_quotas trace)
+        | None ->
+            let unsigned_operation =
+              let {
+                shell;
+                protocol_data = Operation_data {contents; signature = _};
+              } =
+                packed_op
+              in
+              (shell, Contents_list contents)
+            in
+            return {operations_statuses; unsigned_operation})
 
   let sign_operation cctxt src_sk
       ((shell, Contents_list contents) as unsigned_op) =
