@@ -64,6 +64,18 @@ module Normal = struct
       |> wrap_error
 
     let create () = Api.octez_riscv_durable_in_memory_registry_new ()
+
+    type imm = Api.imm_registry
+
+    let to_imm registry =
+      Api.octez_riscv_durable_in_memory_registry_to_imm registry
+
+    let from_imm imm = Api.octez_riscv_durable_in_memory_registry_from_imm imm
+
+    (* [to_imm] then [from_imm] copies unshared state up to twice (once
+       now, once on the duplicate's first mutation); fine off the hot
+       path. *)
+    let duplicate registry = from_imm (to_imm registry)
   end
 
   module Database = struct

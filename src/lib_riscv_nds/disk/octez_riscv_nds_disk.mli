@@ -44,6 +44,34 @@ module Normal : sig
     (** [checkout repo commit_id] restores the registry to the state
         recorded at [commit_id]. *)
     val checkout : Repo.t -> bytes -> t
+
+    (** Immutable snapshot of a registry.  Only obtainable through
+        {!to_imm}; carries no operations of its own. *)
+    type imm
+
+    (** [to_imm registry] captures the current contents of [registry] —
+        including operations not yet {!commit}ted — as an immutable
+        snapshot.  Mutations to [registry] after the call are not
+        observable through the snapshot.  Copy-on-write of the in-memory
+        state: eager (one copy now) if [registry] holds unshared state,
+        free if it is already shared with another handle, after which the
+        next mutation on either side pays the copy.  Nothing is written
+        to the repository. *)
+    val to_imm : t -> imm
+
+    (** [from_imm imm] recovers a live registry from a snapshot, backed
+        by the same repository.  The returned registry is independent of
+        every other registry recovered from the same snapshot
+        (copy-on-write, as {!to_imm}). *)
+    val from_imm : imm -> t
+
+    (** [duplicate registry] is [from_imm (to_imm registry)]: an
+        independent registry holding the same contents, backed by the
+        same repository.  Mutations to either handle are invisible to
+        the other.  Copies the in-memory state up to twice for unshared
+        state (once in {!to_imm}, once on the duplicate's first
+        mutation); acceptable here as this is not a hot path. *)
+    val duplicate : t -> t
   end
 
   include NORMAL with module Registry := Registry

@@ -74,6 +74,18 @@ module Normal = struct
 
     let checkout repo commit_id =
       Api.octez_riscv_durable_on_disk_registry_checkout repo commit_id
+
+    type imm = Api.imm_registry
+
+    let to_imm registry =
+      Api.octez_riscv_durable_on_disk_registry_to_imm registry
+
+    let from_imm imm = Api.octez_riscv_durable_on_disk_registry_from_imm imm
+
+    (* [to_imm] then [from_imm] copies unshared state up to twice (once
+       now, once on the duplicate's first mutation); fine off the hot
+       path. *)
+    let duplicate registry = from_imm (to_imm registry)
   end
 
   module Database = struct
