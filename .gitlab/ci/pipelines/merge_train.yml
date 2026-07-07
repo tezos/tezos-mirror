@@ -5997,6 +5997,7 @@ oc.docker:arm64:
     - Dockerfile
     - build.Dockerfile
     - docker-bake.hcl
+    - scripts/ci/docker_release.sh
     - scripts/create_docker_image.sh
     when: on_success
   needs:
@@ -6040,6 +6041,7 @@ oc.docker:amd64:
     - Dockerfile
     - build.Dockerfile
     - docker-bake.hcl
+    - scripts/ci/docker_release.sh
     - scripts/create_docker_image.sh
     when: on_success
   needs:

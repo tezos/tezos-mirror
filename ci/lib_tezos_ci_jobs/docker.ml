@@ -35,6 +35,8 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
         "build.Dockerfile";
         "Dockerfile";
         "docker-bake.hcl";
+        (* The job runs this script, which in turn calls create_docker_image.sh. *)
+        "scripts/ci/docker_release.sh";
         "scripts/create_docker_image.sh";
       ]
     ~allow_failure:No
