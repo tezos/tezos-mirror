@@ -6,8 +6,8 @@
 (*****************************************************************************)
 
 (* Create a promise that resolves when the given operation ID is included *)
-let wait_for_inclusion injector operation_id =
-  Injector.wait_for ~timeout:10. injector "included.v0" (fun event ->
+let wait_for_inclusion ?(timeout = 10.) injector operation_id =
+  Injector.wait_for ~timeout injector "included.v0" (fun event ->
       let open JSON in
       let operations = event |-> "operations" |> as_list in
       let operation_ids = List.map as_string operations in
@@ -143,4 +143,116 @@ let test_injector : Protocol.t list -> unit =
   Log.info "All operations successfully included!" ;
   unit
 
-let register ~protocols = test_injector protocols
+(* Michelson contract burning an amount of gas proportional to its nat
+   parameter (number of loop iterations). *)
+let gas_burner_script =
+  {|parameter nat ;
+storage unit ;
+code { CAR ;
+       PUSH nat 0 ;
+       DUP 2 ; DUP 2 ; COMPARE ; LT ;
+       LOOP { PUSH nat 1 ; ADD ;
+              DUP 2 ; DUP 2 ; COMPARE ; LT } ;
+       DROP 2 ;
+       UNIT ; NIL operation ; PAIR }|}
+
+(* Number of loop iterations for a call to [gas_burner_script] to consume
+   about 60% of the sandbox block gas limit (1_040_000 gas, which is also the
+   per-operation gas limit): a single call fits within the per-operation gas
+   limit but any two calls exceed the block gas quota. *)
+let gas_burner_iterations = 3_870_000
+
+(* Test that a batch whose operations individually fail simulation with gas
+   exhaustion is split by the injector (instead of the operations being
+   repeatedly dropped) and that all operations are eventually included. *)
+let test_injector_batch_split_on_gas_exhaustion : Protocol.t list -> unit =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Injector batch splitting on gas exhaustion"
+    ~tags:["injector"; "batch"; "split"; "gas"]
+    ~uses:(fun _ -> [Constant.octez_injector_server])
+  @@ fun protocol ->
+  let nodes_args = Node.[Synchronisation_threshold 0; Private_mode] in
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol ~nodes_args ()
+  in
+  let injector = Injector.create node client in
+  let* _config_file =
+    Injector.init_config injector Account.Bootstrap.keys.(0)
+  in
+  let* () = Injector.run injector in
+  let* () = Client.bake_for client in
+  (* Originate a contract which burns gas proportionally to its parameter *)
+  let* contract =
+    Client.originate_contract
+      ~alias:"gas_burner"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap2.alias
+      ~prg:gas_burner_script
+      ~init:"Unit"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for client in
+  (* The event promises must be registered before the operations are
+     queued. *)
+  let wait_split =
+    Injector.wait_for injector "batch_too_large_splitting.v0" (fun _ -> Some ())
+  in
+  let discarded =
+    Injector.wait_for injector "discard_error_operation.v0" (fun _ -> Some ())
+  in
+  let nb_ops = 4 in
+  (* Queue [nb_ops] gas-heavy contract calls without baking in between, so
+     that they are all considered in a single batch. The loop counts differ so
+     that the operations have different hashes. *)
+  let* wait_included =
+    Lwt_list.map_s
+      (fun i ->
+        let* op_id =
+          Injector.RPC.(
+            call injector
+            @@ add_pending_transaction
+                 ~parameters:
+                   (String.empty, string_of_int (gas_burner_iterations + i))
+                 0L
+                 contract)
+        in
+        Log.info "Added pending gas-heavy contract call: id = %s" op_id ;
+        return (wait_for_inclusion ~timeout:120. injector op_id))
+      (Base.range 1 nb_ops)
+  in
+  (* Bake blocks until all the operations have been included. Because of the
+     block gas quota, the injector can only get (roughly) one operation
+     included per block. On each iteration we trigger an injection (the
+     standalone injector server injects on demand, unlike the rollup node
+     which injects on every new L1 head) so that the operations re-queued
+     after a batch split are reconsidered. *)
+  let is_resolved p = match Lwt.state p with Lwt.Sleep -> false | _ -> true in
+  let rec bake_until_included attempts =
+    if List.for_all is_resolved wait_included then unit
+    else if attempts <= 0 then
+      Test.fail "Operations were not included after baking many blocks"
+    else
+      let* () = Injector.RPC.(call injector @@ inject ()) in
+      let* () = Lwt_unix.sleep 0.5 in
+      let* () = Client.bake_for client in
+      let* () = Lwt_unix.sleep 0.5 in
+      bake_until_included (attempts - 1)
+  in
+  let* () = bake_until_included (6 * nb_ops) in
+  let* () = Lwt.join wait_included in
+  Log.info "All operations were included." ;
+  (* The batch could not fit in a single block, so it must have been split at
+     least once. Splitting happens before injection, hence before inclusion,
+     so the event has necessarily been seen at this point. *)
+  if not (is_resolved wait_split) then
+    Test.fail "The batch was never split by the injector" ;
+  (* No operation should have been discarded by the injector. *)
+  if is_resolved discarded then
+    Test.fail "An operation was discarded by the injector" ;
+  unit
+
+let register ~protocols =
+  test_injector protocols ;
+  test_injector_batch_split_on_gas_exhaustion protocols
