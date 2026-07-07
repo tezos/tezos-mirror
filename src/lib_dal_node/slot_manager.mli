@@ -222,6 +222,17 @@ val get_slot_status :
   Node_context.t ->
   (Types.header_status, [Errors.other | Errors.not_found]) result Lwt.t
 
+(** [get_slot_status_from_skip_list ~slot_id ctxt] returns the status of
+    [slot_id] as recorded in the skip-list store, or [None] if the skip-list
+    has no cell for that slot yet (i.e. its attestation has not been observed).
+    Unlike {!get_slot_status}, it does not consult the in-memory status cache,
+    so it reflects the authoritative on-chain status even when the cache holds
+    a stale value. *)
+val get_slot_status_from_skip_list :
+  slot_id:Types.slot_id ->
+  Node_context.t ->
+  Types.header_status option tzresult Lwt.t
+
 (** [get_slot_shard store slot_id shard_index] returns the shard at
     index [shard_index] of the slot given by [slot_id].
 *)
