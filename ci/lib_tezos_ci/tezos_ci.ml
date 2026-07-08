@@ -1347,15 +1347,6 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
         (error_not_generated |> String_set.elements |> String.concat " ")) ;
   if !Cli.has_error then exit 1
 
-let append_script script tezos_job =
-  map_non_trigger_job
-    ~error_on_trigger:
-      (sf
-         "[append_script] attempting to append script to trigger job '%s'"
-         (name_of_tezos_job tezos_job))
-    tezos_job
-  @@ fun job -> {job with script = job.script @ script}
-
 let append_cache cache tezos_job =
   map_non_trigger_job
     ~error_on_trigger:

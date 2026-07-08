@@ -481,11 +481,6 @@ val add_artifacts :
 val append_variables :
   ?allow_overwrite:bool -> Gitlab_ci.Types.variables -> tezos_job -> tezos_job
 
-(** Append to the [script:] section of a job.
-
-    Throws error when applied to {!trigger_job}s. *)
-val append_script : string list -> tezos_job -> tezos_job
-
 (** Append to the [cache:] section of a job.
 
     Throws error when applied to {!trigger_job}s. *)
