@@ -137,8 +137,7 @@ sdk_bindings.build_python_windows:
   - choco install make
   - make -C $Env:CI_PROJECT_DIR/contrib/sdk-bindings/rust -f python.mk build
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  after_script: []
   variables:
     SHELL: powershell
     TAGS: saas-windows-medium-amd64
