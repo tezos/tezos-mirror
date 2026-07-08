@@ -425,7 +425,12 @@
       "max_transaction_batch_length"?: integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
       "max_lifespan"?: integer ∈ [-2^30, 2^30],
       "tx_per_addr_limit"?: $int64 },
-  "performance_profile"?: "performance" | "default" }
+  "performance_profile"?: "performance" | "default",
+  "gc_time_of_day"?:
+    $unistring
+    /* Time of day (HH:MM, or HH:MM:SS, in UTC) at which the daily history garbage collection
+       is performed. Only relevant for full/rolling/seed history modes. When unset, the GC
+       drifts relative to the previous garbage collection. */ }
 $bignum:
   /* Big number
      Decimal representation of a big number */
