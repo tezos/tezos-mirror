@@ -1,0 +1,241 @@
+{ parameter
+    (or (pair %default
+           (nat %withdrawal_id)
+           (ticket %ticket (pair nat (option bytes)))
+           (timestamp %timestamp)
+           (address %base_withdrawer)
+           (bytes %payload)
+           (bytes %l2_caller))
+        (pair %payout_withdrawal
+           (pair %withdrawal
+              (nat %withdrawal_id)
+              (nat %full_amount)
+              (address %ticketer)
+              (pair %content nat (option bytes))
+              (timestamp %timestamp)
+              (address %base_withdrawer)
+              (bytes %payload)
+              (bytes %l2_caller))
+           (address %service_provider))) ;
+  storage
+    (pair (big_map %withdrawals
+             (pair (nat %withdrawal_id)
+                   (nat %full_amount)
+                   (address %ticketer)
+                   (pair %content nat (option bytes))
+                   (timestamp %timestamp)
+                   (address %base_withdrawer)
+                   (bytes %payload)
+                   (bytes %l2_caller))
+             (or (address %paid_out) (unit %cemented)))
+          (pair %config
+             (address %xtz_ticketer)
+             (address %smart_rollup)
+             (int %expiration_seconds))
+          (big_map %metadata string bytes)) ;
+  code { UNPAIR ;
+         IF_LEFT
+           { UNPAIR 6 ;
+             SWAP ;
+             READ_TICKET ;
+             UNPAIR ;
+             SWAP ;
+             UNPAIR ;
+             DIG 8 ;
+             DIG 8 ;
+             DIG 8 ;
+             DIG 8 ;
+             DIG 4 ;
+             DIG 6 ;
+             DIG 6 ;
+             DIG 8 ;
+             PAIR 8 ;
+             SWAP ;
+             PUSH mutez 0 ;
+             AMOUNT ;
+             COMPARE ;
+             GT ;
+             IF { PUSH string "XTZ_DEPOSIT_DISALLOWED" ; FAILWITH } {} ;
+             DUP 3 ;
+             GET 3 ;
+             GET 3 ;
+             SENDER ;
+             COMPARE ;
+             NEQ ;
+             IF { PUSH string "SENDER_NOT_ALLOWED" ; FAILWITH } {} ;
+             DUP 3 ;
+             CAR ;
+             DUP 3 ;
+             GET ;
+             IF_NONE
+               { NONE address }
+               { IF_LEFT
+                   {}
+                   { DROP ; PUSH string "UNEXPECTED_CEMENTED_WITHDRAWAL" ; FAILWITH } ;
+                 SOME } ;
+             DUP ;
+             IF_NONE { DUP 3 ; GET 11 } {} ;
+             DUP 5 ;
+             GET 3 ;
+             CAR ;
+             DUP 5 ;
+             GET 5 ;
+             COMPARE ;
+             EQ ;
+             IF { DUP 4 ;
+                  GET 5 ;
+                  CONTRACT %burn (pair address (ticket (pair nat (option bytes)))) ;
+                  IF_NONE { PUSH string "INVALID_XTZ_TKTR" ; FAILWITH } {} ;
+                  PUSH mutez 0 ;
+                  DIG 4 ;
+                  DUP 4 ;
+                  PAIR ;
+                  TRANSFER_TOKENS }
+                { DUP 4 ;
+                  GET 11 ;
+                  CONTRACT (ticket (pair nat (option bytes))) ;
+                  IF_NONE { PUSH string "FAILED_TO_GET_TKT_ENTRYPOINT" ; FAILWITH } {} ;
+                  PUSH mutez 0 ;
+                  DIG 4 ;
+                  TRANSFER_TOKENS } ;
+             SWAP ;
+             DUP 4 ;
+             PAIR ;
+             EMIT %settle_withdrawal
+               (pair (pair %withdrawal
+                        (nat %withdrawal_id)
+                        (nat %full_amount)
+                        (address %ticketer)
+                        (pair %content nat (option bytes))
+                        (timestamp %timestamp)
+                        (address %base_withdrawer)
+                        (bytes %payload)
+                        (bytes %l2_caller))
+                     (address %receiver)) ;
+             DIG 2 ;
+             IF_NONE
+               { DIG 2 ; DROP ; DUP 3 ; CAR }
+               { DROP ; DUP 4 ; CAR ; UNIT ; RIGHT address ; SOME ; DIG 4 ; UPDATE } ;
+             DIG 3 ;
+             SWAP ;
+             UPDATE 1 }
+           { UNPAIR ;
+             DUP 3 ;
+             CAR ;
+             DUP 2 ;
+             GET ;
+             IF_NONE { PUSH bool False } { DROP ; PUSH bool True } ;
+             IF { PUSH string "DUPLICATE_WITHDRAWAL_PAYOUT" ; FAILWITH } {} ;
+             DUP ;
+             GET 9 ;
+             NOW ;
+             COMPARE ;
+             LT ;
+             IF { PUSH string "TIMESTAMP_IN_FUTURE" ; FAILWITH } {} ;
+             PUSH nat 20 ;
+             DUP 2 ;
+             GET 14 ;
+             SIZE ;
+             COMPARE ;
+             NEQ ;
+             IF { PUSH string "WRONG_L2_CALLER_LENGTH" ; FAILWITH } {} ;
+             DUP 3 ;
+             GET 3 ;
+             GET 4 ;
+             DUP 2 ;
+             GET 9 ;
+             ADD ;
+             NOW ;
+             COMPARE ;
+             GT ;
+             IF { DUP ; GET 3 }
+                { DUP ;
+                  GET 13 ;
+                  UNPACK nat ;
+                  IF_NONE { PUSH string "PAYLOAD_UNPACK_FAILED" ; FAILWITH } {} } ;
+             DUP 2 ;
+             GET 3 ;
+             DUP 2 ;
+             COMPARE ;
+             GT ;
+             IF { PUSH string "PAYOUT_EXCEEDS_FULL_AMOUNT" ; FAILWITH } {} ;
+             DUP 4 ;
+             GET 3 ;
+             CAR ;
+             DUP 3 ;
+             GET 5 ;
+             COMPARE ;
+             EQ ;
+             IF { NONE bytes ;
+                  PUSH nat 0 ;
+                  PAIR ;
+                  DUP 3 ;
+                  GET 7 ;
+                  COMPARE ;
+                  NEQ ;
+                  IF { PUSH string "WRONG_XTZ_CONTENT" ; FAILWITH } {} ;
+                  PUSH mutez 1 ;
+                  DUP 2 ;
+                  MUL ;
+                  AMOUNT ;
+                  COMPARE ;
+                  NEQ ;
+                  IF { PUSH string "INVALID_XTZ_AMOUNT" ; FAILWITH } {} ;
+                  DUP 2 ;
+                  GET 11 ;
+                  CONTRACT unit ;
+                  IF_NONE { PUSH string "bad address for get_contract" ; FAILWITH } {} ;
+                  PUSH mutez 1 ;
+                  DUP 3 ;
+                  MUL ;
+                  UNIT ;
+                  TRANSFER_TOKENS }
+                { PUSH string "ONLY_XTZ_WITHDRAWALS_ARE_SUPPORTED" ; FAILWITH } ;
+             DUP 4 ;
+             LEFT unit ;
+             DIG 2 ;
+             DIG 4 ;
+             DUP 5 ;
+             PAIR 3 ;
+             EMIT %payout_withdrawal
+               (pair (pair %withdrawal
+                        (nat %withdrawal_id)
+                        (nat %full_amount)
+                        (address %ticketer)
+                        (pair %content nat (option bytes))
+                        (timestamp %timestamp)
+                        (address %base_withdrawer)
+                        (bytes %payload)
+                        (bytes %l2_caller))
+                     (address %service_provider)
+                     (nat %payout_amount)) ;
+             DUP 5 ;
+             DIG 5 ;
+             CAR ;
+             DIG 3 ;
+             SOME ;
+             DIG 5 ;
+             UPDATE ;
+             UPDATE 1 } ;
+         NIL operation ;
+         DIG 2 ;
+         CONS ;
+         DIG 2 ;
+         CONS ;
+         PAIR } ;
+  view "get_status"
+       (pair (nat %withdrawal_id)
+             (nat %full_amount)
+             (address %ticketer)
+             (pair %content nat (option bytes))
+             (timestamp %timestamp)
+             (address %base_withdrawer)
+             (bytes %payload)
+             (bytes %l2_caller))
+       (option (or (address %paid_out) (unit %cemented)))
+       { UNPAIR ; SWAP ; CAR ; SWAP ; GET } ;
+  view "get_config"
+       unit
+       (pair (address %xtz_ticketer) (address %smart_rollup) (int %expiration_seconds))
+       { CDR ; GET 3 } }
+

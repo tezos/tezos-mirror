@@ -1,14 +1,18 @@
 (* SPDX-CopyrightText 2025 Functori <contact@functori.com> *)
 (* SPDX-CopyrightText 2025 Nomadic Labs <contact@nomadic-labs.com> *)
+(* SPDX-CopyrightText 2026 Trilitech <contact@trili.tech> *)
 
-#include "./ticket_type.mligo"
+#import "../common/types/fast-withdrawal.mligo" "FastWithdrawal"
 
-(* 
+type tez_ticket = (nat * (bytes option)) ticket
+
+(*
  * Fast Withdrawal Proxy Contract
  *
- * This contract acts as an intermediary for processing fast withdrawals,
- * supporting both tez and FA token payouts. It handles ticket creation
- * and routing to the appropriate fast withdrawal contract.
+ * This contract is used for testing purposes only and acts as an intermediary
+ * for processing fast withdrawals. For tez withdrawals, it forwards the call
+ * directly to the fast-withdrawal contract with the attached tez. For FA withdrawals,
+ * it still handles the ticket creation/routing through the exchanger.
  *)
 
 (* Type Definitions *)
@@ -23,19 +27,10 @@ type storage = {
   service_provider: address;          (* Service provider address *)
   payload: bytes;                     (* Additional payload data *)
   l2_caller: bytes;                   (* L2 caller address (20 bytes) *)
+  payout_amount: tez;                 (* Amount to forward to payout_withdrawal *)
 }
 
-(* Payout entry type used for the payout entrypoint *)
-type payout_entry = {
-  fast_withdrawal_contract: address;
-  withdrawal_id: nat;
-  ticket: tez_ticket;
-  target: address;
-  timestamp: timestamp;
-  service_provider: address;
-  payload: bytes;
-  l2_caller: bytes;
-}
+type payout_withdrawal_params = FastWithdrawal.t * address
 
 (* tez payout proxy parameters *)
 type payout_entry_proxy = {
@@ -104,45 +99,43 @@ let get_mint_entrypoint (exchanger: address) =
   | None -> failwith "Invalid exchanger contract: missing %mint entrypoint"
   | Some contract -> contract
 
+let get_payout_withdrawal_entrypoint (fast_withdrawal_contract: address) =
+  match Tezos.get_entrypoint_opt "%payout_withdrawal" fast_withdrawal_contract with
+  | None ->
+      failwith
+        "Invalid fast withdrawal contract: missing %payout_withdrawal entrypoint"
+  | Some contract -> contract
+
+
 (* Entrypoints *)
 
 (*
  * Proxy entrypoint for tez payouts
  *
- * Creates a tez ticket via the exchanger and processes it through
- * the payout entrypoint.
+ * Forwards the payout directly to the fast-withdrawal contract with the
+ * attached tez.
  *)
 [@entry]
-let payout_proxy_tez (params: payout_entry_proxy) (_storage: storage) : return =
-  (* Validate L2 caller address *)
+let payout_proxy_tez (params: payout_entry_proxy) (storage: storage) : return =
   let () = validate_l2_caller params.l2_caller in
-
-  (* Get the amount of tez sent to this contract *)
   let amount = Tezos.get_amount () in
-
-  (* Get our own payout entrypoint address *)
-  let payout_address = Tezos.address (Tezos.self("%payout"): tez_ticket contract) in
-
-  (* Get the mint entrypoint *)
-  let mint_contract = get_mint_entrypoint params.exchanger in
-
-  (* Create mint operation to generate the ticket *)
-  let mint_operation = Tezos.Next.Operation.transaction payout_address amount mint_contract in
-
-  (* Update the storage with input parameters *)
-  let updated_storage = {
-    fast_withdrawal_contract = params.fast_withdrawal_contract;
-    exchanger = params.exchanger;
+  let full_amount : nat = amount / 1mutez in
+  let withdrawal : FastWithdrawal.t = {
     withdrawal_id = params.withdrawal_id;
-    target = params.target;
+    full_amount;
+    ticketer = params.exchanger;
+    content = (0n, (None : bytes option));
     timestamp = params.timestamp;
-    service_provider = params.service_provider;
+    base_withdrawer = params.target;
     payload = params.payload;
     l2_caller = params.l2_caller;
   } in
-
-  (* Return the mint operation and updated storage *)
-  [mint_operation], updated_storage
+  let full_payload = (withdrawal, params.service_provider) in
+  let contract = get_payout_withdrawal_entrypoint params.fast_withdrawal_contract in
+  let withdrawal_operation =
+    Tezos.Next.Operation.transaction full_payload amount contract
+  in
+  [withdrawal_operation], storage
 
 (*
  * Proxy entrypoint for FA token payouts
@@ -198,6 +191,7 @@ let payout_proxy_fa (params: fa_payout_entry_proxy) (_storage: storage) : return
         service_provider = params.service_provider;
         payload = params.payload;
         l2_caller = params.l2_caller;
+        payout_amount = 0mutez;
       } in
 
       (* Return both operations and updated storage *)
@@ -211,26 +205,22 @@ let payout_proxy_fa (params: fa_payout_entry_proxy) (_storage: storage) : return
  *)
 [@entry]
 let payout (ticket: tez_ticket) (storage: storage) : return =
-  (* Get the payout_withdrawal entrypoint on the fast withdrawal contract *)
-  match Tezos.get_entrypoint_opt "%payout_withdrawal" storage.fast_withdrawal_contract with
-  | None -> failwith "Invalid fast withdrawal contract: missing %payout_withdrawal entrypoint"
-  | Some contract ->
-      (* Build the payload according to the expected format *)
-      let full_payload = (
-        storage.withdrawal_id,
-        (ticket,
-          (storage.timestamp,
-            (storage.target,
-              (storage.service_provider,
-                (storage.payload, storage.l2_caller)
-              )
-            )
-          )
-        )
-      ) in
+  let contract = get_payout_withdrawal_entrypoint storage.fast_withdrawal_contract in
+  let (ticketer, (content, full_amount)), _ticket = Tezos.Next.Ticket.read ticket in
+  let withdrawal : FastWithdrawal.t = {
+    withdrawal_id = storage.withdrawal_id;
+    full_amount;
+    ticketer;
+    content;
+    timestamp = storage.timestamp;
+    base_withdrawer = storage.target;
+    payload = storage.payload;
+    l2_caller = storage.l2_caller;
+  } in
+  let full_payload = (withdrawal, storage.service_provider) in
 
-      (* Create transaction to the fast withdrawal contract *)
-      let withdrawal_operation = Tezos.Next.Operation.transaction full_payload 0mutez contract in
+  let withdrawal_operation =
+    Tezos.Next.Operation.transaction full_payload storage.payout_amount contract
+  in
 
-      (* Return the operation with unchanged storage *)
-      [withdrawal_operation], storage
+  [withdrawal_operation], storage

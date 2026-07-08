@@ -27,7 +27,8 @@
           (timestamp %timestamp)
           (address %service_provider)
           (bytes %payload)
-          (bytes %l2_caller)) ;
+          (bytes %l2_caller)
+          (mutez %payout_amount)) ;
   code { LAMBDA
            bytes
            unit
@@ -47,42 +48,57 @@
              DUP 2 ;
              CAR ;
              CONTRACT %payout_withdrawal
-               (pair nat (ticket (pair nat (option bytes))) timestamp address address bytes bytes) ;
+               (pair (pair (nat %withdrawal_id)
+                           (nat %full_amount)
+                           (address %ticketer)
+                           (pair %content nat (option bytes))
+                           (timestamp %timestamp)
+                           (address %base_withdrawer)
+                           (bytes %payload)
+                           (bytes %l2_caller))
+                     address) ;
              IF_NONE
-               { DROP 2 ;
-                 PUSH string
+               { PUSH string
                       "Invalid fast withdrawal contract: missing %payout_withdrawal entrypoint" ;
                  FAILWITH }
-               { PUSH mutez 0 ;
-                 DUP 4 ;
-                 GET 14 ;
-                 DUP 5 ;
-                 GET 13 ;
-                 PAIR ;
-                 DUP 5 ;
-                 GET 11 ;
-                 PAIR ;
-                 DUP 5 ;
-                 GET 7 ;
-                 PAIR ;
-                 DUP 5 ;
-                 GET 9 ;
-                 PAIR ;
-                 DIG 3 ;
-                 PAIR ;
-                 DUP 4 ;
-                 GET 5 ;
-                 PAIR ;
-                 TRANSFER_TOKENS ;
-                 SWAP ;
-                 NIL operation ;
-                 DIG 2 ;
-                 CONS ;
-                 PAIR } }
-           { SWAP ;
+               {} ;
+             SWAP ;
+             READ_TICKET ;
+             SWAP ;
              DROP ;
-             IF_LEFT
-               { DUP ;
+             UNPAIR ;
+             SWAP ;
+             UNPAIR ;
+             DIG 3 ;
+             DUP 5 ;
+             GET 16 ;
+             DUP 6 ;
+             GET 11 ;
+             DUP 7 ;
+             GET 15 ;
+             DUP 8 ;
+             GET 13 ;
+             DUP 9 ;
+             GET 7 ;
+             DUP 10 ;
+             GET 9 ;
+             DIG 7 ;
+             DIG 9 ;
+             DIG 9 ;
+             DUP 11 ;
+             GET 5 ;
+             PAIR 8 ;
+             PAIR ;
+             TRANSFER_TOKENS ;
+             SWAP ;
+             NIL operation ;
+             DIG 2 ;
+             CONS ;
+             PAIR }
+           { IF_LEFT
+               { SWAP ;
+                 DROP ;
+                 DUP ;
                  GET 16 ;
                  DIG 2 ;
                  SWAP ;
@@ -125,23 +141,24 @@
                          PAIR ;
                          PAIR ;
                          TRANSFER_TOKENS ;
-                         DUP 3 ;
-                         GET 16 ;
+                         PUSH mutez 0 ;
                          DUP 4 ;
-                         GET 15 ;
+                         GET 16 ;
                          DUP 5 ;
-                         GET 13 ;
+                         GET 15 ;
                          DUP 6 ;
-                         GET 11 ;
+                         GET 13 ;
                          DUP 7 ;
-                         GET 9 ;
+                         GET 11 ;
                          DUP 8 ;
-                         GET 7 ;
+                         GET 9 ;
                          DUP 9 ;
+                         GET 7 ;
+                         DUP 10 ;
                          GET 3 ;
-                         DIG 9 ;
+                         DIG 10 ;
                          CAR ;
-                         PAIR 8 ;
+                         PAIR 9 ;
                          NIL operation ;
                          DIG 2 ;
                          CONS ;
@@ -150,21 +167,54 @@
                          PAIR } } }
                { DUP ;
                  GET 14 ;
-                 DIG 2 ;
+                 DIG 3 ;
                  SWAP ;
                  EXEC ;
                  DROP ;
                  AMOUNT ;
-                 SELF %payout ;
-                 ADDRESS ;
+                 PUSH mutez 1 ;
+                 DUP 2 ;
+                 EDIV ;
+                 IF_NONE { PUSH string "DIV by 0" ; FAILWITH } {} ;
+                 CAR ;
                  DUP 3 ;
-                 GET 3 ;
-                 CONTRACT %mint address ;
+                 CAR ;
+                 CONTRACT %payout_withdrawal
+                   (pair (pair (nat %withdrawal_id)
+                               (nat %full_amount)
+                               (address %ticketer)
+                               (pair %content nat (option bytes))
+                               (timestamp %timestamp)
+                               (address %base_withdrawer)
+                               (bytes %payload)
+                               (bytes %l2_caller))
+                         address) ;
                  IF_NONE
-                   { PUSH string "Invalid exchanger contract: missing %mint entrypoint" ;
+                   { PUSH string
+                          "Invalid fast withdrawal contract: missing %payout_withdrawal entrypoint" ;
                      FAILWITH }
                    {} ;
-                 DUG 2 ;
+                 DIG 2 ;
+                 DUP 4 ;
+                 GET 11 ;
+                 DUP 5 ;
+                 GET 14 ;
+                 DUP 6 ;
+                 GET 13 ;
+                 DUP 7 ;
+                 GET 7 ;
+                 DUP 8 ;
+                 GET 9 ;
+                 NONE bytes ;
+                 PUSH nat 0 ;
+                 PAIR ;
+                 DUP 10 ;
+                 GET 3 ;
+                 DIG 9 ;
+                 DIG 10 ;
+                 GET 5 ;
+                 PAIR 8 ;
+                 PAIR ;
                  TRANSFER_TOKENS ;
                  SWAP ;
                  NIL operation ;

@@ -15,10 +15,14 @@ let bridge_path () =
 let admin_path () = Base.(project_root // "etherlink/tezos_contracts/admin.tz")
 
 let fast_withdrawal_path () =
-  Base.(project_root // "etherlink/tezos_contracts/fast_withdrawal_mockup.tz")
+  Base.(
+    project_root
+    // "etherlink/tezos_contracts/fast_withdrawal/build/fast-withdrawal.tz")
 
 let service_provider_path () =
-  Base.(project_root // "etherlink/tezos_contracts/service_provider.tz")
+  Base.(
+    project_root
+    // "etherlink/tezos_contracts/fast_withdrawal/build/service-provider.tz")
 
 let predep_xtz_bridge_abi_path () =
   Base.(
