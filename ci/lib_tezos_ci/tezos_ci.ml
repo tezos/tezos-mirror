@@ -168,6 +168,27 @@ let stabilize_order_in_job (job : Gitlab_ci.Types.generic_job) :
         }
   | Trigger_job _ -> job
 
+(* Reorder config elements so that the result is more stable.
+   Similar to [stabilize_order_in_job], but for a whole YAML file. *)
+let stabilize_toplevel_order config =
+  let compare_elements (a : Gitlab_ci.Types.config_element)
+      (b : Gitlab_ci.Types.config_element) =
+    match (a, b) with
+    | Generic_job (Job a), Generic_job (Job b) ->
+        (* Sort jobs by name. *)
+        String.compare a.name b.name
+    | _, Generic_job _ ->
+        (* Put jobs last. *)
+        -1
+    | Generic_job _, _ ->
+        (* Put jobs last. *)
+        1
+    | _ ->
+        (* For everything else, keep the order as it was. *)
+        0
+  in
+  List.sort compare_elements config
+
 let tezos_job_to_config_elements (j : tezos_job) =
   let source_comment =
     if Cli.config.inline_source_info then
@@ -537,6 +558,7 @@ module Pipeline = struct
     in
     let config =
       prepend_config @ List.concat_map tezos_job_to_config_elements jobs
+      |> stabilize_toplevel_order
     in
     to_file ~filename config
 

@@ -7,6 +7,27 @@ stages:
 - build
 - publish
 
+datadog_pipeline_trace:
+  image: datadog/ci:v5.18.0@sha256:07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2
+  stage: start
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
 oc.docker:ci:amd64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: images
@@ -66,27 +87,6 @@ oc.docker:ci:arm64:
     max: 1
     when:
     - runner_system_failure
-
-datadog_pipeline_trace:
-  image: datadog/ci:v5.18.0@sha256:07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2
-  stage: start
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  allow_failure: true
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
-  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
-    --tags mr_number:$CI_MERGE_REQUEST_IID
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 octez-smart-rollup-node.build:static-arm64-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -182,6 +182,94 @@ octez-smart-rollup-node.build:static-x86_64-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
+octez-smart-rollup-node.docker:amd64:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh --image-names
+  - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    CI_DOCKER_HUB: "false"
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    DOCKER_VERSION: 28.5.1
+    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
+    IMAGE_ARCH_PREFIX: amd64_
+
+octez-smart-rollup-node.docker:arm64:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: build
+  tags:
+  - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh --image-names
+  - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    CI_DOCKER_HUB: "false"
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    DOCKER_VERSION: 28.5.1
+    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
+    IMAGE_ARCH_PREFIX: arm64_
+
+octez-smart-rollup-node.docker:merge_manifests:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - octez-smart-rollup-node.docker:amd64
+  - octez-smart-rollup-node.docker:arm64
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh --image-names
+  - ./scripts/ci/docker_merge_manifests.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
+  retry: 0
+
 octez-smart-rollup-node.gitlab:octez-smart-rollup-node-release:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-0d951d27
   stage: publish
@@ -235,8 +323,8 @@ octez-smart-rollup-node.release-page-deploy-assets:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    S3_BUCKET: release-page-test.nomadic-labs.com
     DISTRIBUTION_ID: E19JF46UG3Z747
+    S3_BUCKET: release-page-test.nomadic-labs.com
   environment:
     name: release-page
     action: access
@@ -275,92 +363,4 @@ octez-smart-rollup-node.release-page-publish:
     paths:
     - index.md
     - index.html
-  retry: 0
-
-octez-smart-rollup-node.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: build
-  tags:
-  - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    CI_DOCKER_HUB: "false"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
-    DOCKER_VERSION: 28.5.1
-    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
-    IMAGE_ARCH_PREFIX: arm64_
-
-octez-smart-rollup-node.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: build
-  tags:
-  - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    CI_DOCKER_HUB: "false"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
-    DOCKER_VERSION: 28.5.1
-    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
-    IMAGE_ARCH_PREFIX: amd64_
-
-octez-smart-rollup-node.docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  needs:
-  - octez-smart-rollup-node.docker:amd64
-  - octez-smart-rollup-node.docker:arm64
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_merge_manifests.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    CI_DOCKER_HUB: "false"
-    DOCKER_VERSION: 28.5.1
   retry: 0

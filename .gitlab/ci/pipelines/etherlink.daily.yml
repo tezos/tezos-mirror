@@ -7,66 +7,6 @@ stages:
 - build
 - test
 
-oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    ARCH: amd64
-    CI_DOCKER_HUB: "false"
-    DOCKER_VERSION: 28.5.1
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-
-oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: images
-  tags:
-  - gcp_arm64
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    ARCH: arm64
-    CI_DOCKER_HUB: "false"
-    DOCKER_VERSION: 28.5.1
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-  retry:
-    max: 1
-    when:
-    - runner_system_failure
-
 datadog_pipeline_trace:
   image: datadog/ci:v5.18.0@sha256:07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2
   stage: start
@@ -87,6 +27,745 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+etherlink.build_evm_node_static_arm64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: arm64
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-evm-node
+  artifacts:
+    name: octez-binaries
+    paths:
+    - octez-binaries/$ARCH/*
+    when: on_success
+
+etherlink.build_evm_node_static_x86_64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_very_high_cpu
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: x86_64
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-evm-node
+  artifacts:
+    name: octez-binaries
+    paths:
+    - octez-binaries/$ARCH/*
+    when: on_success
+
+etherlink.build_tezt:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  - key: dune_cache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - scripts/ci/dune.sh build etherlink/tezt/tests/main.exe
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
+  variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_CACHE: enabled
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+  artifacts:
+    name: etherlink_tezt_exe
+    expire_in: 1 day
+    paths:
+    - _build/default/etherlink/tezt/tests/main.exe
+    when: on_success
+
+etherlink.lint_solidity_artifacts:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - make -C etherlink/kernel_latest/revm/contracts/predeployed bytecode
+  - forge --version
+  - git status
+  - git diff-index --quiet HEAD --
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+etherlink.lint_wasm_runtime:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - etherlink/lib_wasm_runtime/lint.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+
+etherlink.mir_no_tickets:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - cargo clippy --manifest-path etherlink/kernel_latest/mir/Cargo.toml --no-default-features
+    --features bls,allow_lazy_storage_transfer --all-targets -- --deny warnings
+  - RUST_MIN_STACK=104857600 RUST_TEST_THREADS=1 cargo test --manifest-path etherlink/kernel_latest/mir/Cargo.toml
+    --no-default-features --features bls,allow_lazy_storage_transfer
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+
+etherlink.mir_tzt:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - cargo run --manifest-path etherlink/kernel_latest/mir/Cargo.toml --bin tzt_runner
+    tzt_reference_test_suite/*.tzt
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    CARGO_NET_OFFLINE: "false"
+
+etherlink.test_evm_compatibility:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.build_kernels
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
+  - git clone --depth 1 --branch v14.1@etherlink https://github.com/functori/tests
+    ethereum_tests
+  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_latest/evm_evaluation/resources/
+    -c
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+
+etherlink.test_kernel:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.build_kernels
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk check
+  - make -f etherlink.mk test
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+
+etherlink.test_revm_compatibility:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.build_kernels
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs revm-evaluation-assessor
+  - git clone --depth 1 https://github.com/functori/evm-fixtures evm_fixtures
+  - ./revm-evaluation-assessor --test-cases ./evm_fixtures/
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+
+etherlink.tezt:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  needs:
+  - oc.docker:ci:amd64
+  - etherlink.build_tezt
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
+  dependencies:
+  - oc.docker:ci:amd64
+  - etherlink.build_tezt
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
+  timeout: 40 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --without-select-tezts
+    -- "${TESTS}" --from-record tezt/records/etherlink --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
+    ${JUNIT} --datadog-service etherlink --tezt-exe 'etherlink/tezt/tests/main.exe'
+    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
+    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/etherlink
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
+    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    JUNIT: tezt-junit.xml
+    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && /flaky
+    TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "3"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: ""
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 36
+
+etherlink.tezt-extra:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  needs:
+  - oc.docker:ci:amd64
+  - etherlink.build_tezt
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
+  dependencies:
+  - oc.docker:ci:amd64
+  - etherlink.build_tezt
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
+  timeout: 40 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --without-select-tezts
+    -- "${TESTS}" --from-record tezt/records/etherlink/extra --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
+    ${JUNIT} --datadog-service etherlink --tezt-exe 'etherlink/tezt/tests/main.exe'
+    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
+    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/etherlink/extra
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
+    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    JUNIT: tezt-junit.xml
+    TESTS: extra && /ci_disabled && /time_sensitive && /slow && /cloud && /flaky
+    TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "6"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: -extra
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 12
+
+etherlink.tezt-flaky:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  needs:
+  - oc.docker:ci:amd64
+  - etherlink.build_tezt
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
+  dependencies:
+  - oc.docker:ci:amd64
+  - etherlink.build_tezt
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
+  allow_failure: true
+  timeout: 40 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --without-select-tezts
+    -- "${TESTS}" --from-record tezt/records/etherlink/flaky --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
+    ${JUNIT} --datadog-service etherlink --tezt-exe 'etherlink/tezt/tests/main.exe'
+    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
+    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/etherlink/flaky
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
+    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    JUNIT: tezt-junit.xml
+    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && flaky
+    TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "1"
+    TEZT_RETRY: "3"
+    TEZT_VARIANT: -flaky
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 2
+
+etherlink.tezt-slow:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  needs:
+  - oc.docker:ci:amd64
+  - etherlink.build_tezt
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
+  dependencies:
+  - oc.docker:ci:amd64
+  - etherlink.build_tezt
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
+  timeout: 40 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --without-select-tezts
+    -- "${TESTS}" --from-record tezt/records/etherlink/slow --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
+    ${JUNIT} --datadog-service etherlink --tezt-exe 'etherlink/tezt/tests/main.exe'
+    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT}
+    --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/etherlink/slow
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
+    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    JUNIT: tezt-junit.xml
+    TESTS: slow && /ci_disabled && /time_sensitive && /extra && /cloud
+    TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "3"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: -slow
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 3
+
+etherlink.unit_tests:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  - key: dune_cache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - make test-etherlink-unit
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
+  variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_ARGS: -j 12
+    DUNE_CACHE: enabled
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+  artifacts:
+    name: $CI_JOB_NAME-$CI_COMMIT_SHA-x86_64
+    expire_in: 1 day
+    paths:
+    - test_results
+    reports:
+      junit: test_results/*.xml
+    when: always
+  retry: 2
 
 oc.build_kernels:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
@@ -267,741 +946,62 @@ oc.build_x86_64-released:
     - src/proto_*/parameters/*.json
     when: on_success
 
-etherlink.lint_wasm_runtime:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
+oc.docker:ci:amd64:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: images
   tags:
   - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
+  dependencies: []
+  timeout: 90 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
   script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - etherlink/lib_wasm_runtime/lint.sh
+  - ./images/ci_create_ci_images.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    CARGO_INCREMENTAL: "0"
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-
-etherlink.lint_solidity_artifacts:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - make -C etherlink/kernel_latest/revm/contracts/predeployed bytecode
-  - forge --version
-  - git status
-  - git diff-index --quiet HEAD --
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-etherlink.unit_tests:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  - key: dune_cache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_dune_cache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - make test-etherlink-unit
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  - eval $(opam env)
-  - dune cache trim --size=5GB
-  variables:
-    CARGO_INCREMENTAL: "0"
-    CARGO_NET_OFFLINE: "false"
-    DUNE_ARGS: -j 12
-    DUNE_CACHE: enabled
-    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
-    DUNE_CACHE_STORAGE_MODE: hardlink
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
+    GCLOUD_VERSION: 543.0.0
   artifacts:
-    name: $CI_JOB_NAME-$CI_COMMIT_SHA-x86_64
-    expire_in: 1 day
-    paths:
-    - test_results
     reports:
-      junit: test_results/*.xml
-    when: always
-  retry: 2
+      dotenv: ci_image_tag.env
 
-etherlink.test_kernel:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.build_kernels
-  dependencies: []
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -f etherlink.mk check
-  - make -f etherlink.mk test
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_INCREMENTAL: "0"
-    CARGO_NET_OFFLINE: "false"
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-
-etherlink.test_evm_compatibility:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.build_kernels
-  dependencies: []
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
-  - git clone --depth 1 --branch v14.1@etherlink https://github.com/functori/tests
-    ethereum_tests
-  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_latest/evm_evaluation/resources/
-    -c
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_INCREMENTAL: "0"
-    CARGO_NET_OFFLINE: "false"
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-
-etherlink.test_revm_compatibility:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.build_kernels
-  dependencies: []
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs revm-evaluation-assessor
-  - git clone --depth 1 https://github.com/functori/evm-fixtures evm_fixtures
-  - ./revm-evaluation-assessor --test-cases ./evm_fixtures/
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_INCREMENTAL: "0"
-    CARGO_NET_OFFLINE: "false"
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-
-etherlink.mir_tzt:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - cargo run --manifest-path etherlink/kernel_latest/mir/Cargo.toml --bin tzt_runner
-    tzt_reference_test_suite/*.tzt
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    CARGO_NET_OFFLINE: "false"
-
-etherlink.mir_no_tickets:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
-  stage: test
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - cargo clippy --manifest-path etherlink/kernel_latest/mir/Cargo.toml --no-default-features
-    --features bls,allow_lazy_storage_transfer --all-targets -- --deny warnings
-  - RUST_MIN_STACK=104857600 RUST_TEST_THREADS=1 cargo test --manifest-path etherlink/kernel_latest/mir/Cargo.toml
-    --no-default-features --features bls,allow_lazy_storage_transfer
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_INCREMENTAL: "0"
-    CARGO_NET_OFFLINE: "false"
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-
-etherlink.build_tezt:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  - key: dune_cache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_dune_cache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - scripts/ci/dune.sh build etherlink/tezt/tests/main.exe
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  - eval $(opam env)
-  - dune cache trim --size=5GB
-  variables:
-    CARGO_INCREMENTAL: "0"
-    CARGO_NET_OFFLINE: "false"
-    DUNE_CACHE: enabled
-    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
-    DUNE_CACHE_STORAGE_MODE: hardlink
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-  artifacts:
-    name: etherlink_tezt_exe
-    expire_in: 1 day
-    paths:
-    - _build/default/etherlink/tezt/tests/main.exe
-    when: on_success
-
-etherlink.build_evm_node_static_arm64:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
+oc.docker:ci:arm64:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: images
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
+  dependencies: []
+  timeout: 90 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
   script:
-  - ./scripts/ci/take_ownership.sh
-  - eval $(opam env)
-  - ./scripts/ci/build_static_binaries.sh
+  - ./images/ci_create_ci_images.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     ARCH: arm64
-    CARGO_INCREMENTAL: "0"
-    CARGO_NET_OFFLINE: "false"
-    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    VERSION_EXECUTABLE: octez-evm-node
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
+    GCLOUD_VERSION: 543.0.0
   artifacts:
-    name: octez-binaries
-    paths:
-    - octez-binaries/$ARCH/*
-    when: on_success
-
-etherlink.build_evm_node_static_x86_64:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/take_ownership.sh
-  - eval $(opam env)
-  - ./scripts/ci/build_static_binaries.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    ARCH: x86_64
-    CARGO_INCREMENTAL: "0"
-    CARGO_NET_OFFLINE: "false"
-    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    VERSION_EXECUTABLE: octez-evm-node
-  artifacts:
-    name: octez-binaries
-    paths:
-    - octez-binaries/$ARCH/*
-    when: on_success
-
-etherlink.tezt-flaky:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_tezt
-  needs:
-  - oc.docker:ci:amd64
-  - etherlink.build_tezt
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp
-  dependencies:
-  - oc.docker:ci:amd64
-  - etherlink.build_tezt
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp
-  allow_failure: true
-  timeout: 40 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . ./scripts/version.sh
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --without-select-tezts
-    -- "${TESTS}" --from-record tezt/records/etherlink/flaky --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    ${JUNIT} --datadog-service etherlink --tezt-exe 'etherlink/tezt/tests/main.exe'
-    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
-    tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
-    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/etherlink/flaky
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
-    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
-    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
-    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
-    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
-    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
-    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    JUNIT: tezt-junit.xml
-    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && flaky
-    TEZT_NO_NPX: "true"
-    TEZT_PARALLEL: "1"
-    TEZT_RETRY: "3"
-    TEZT_VARIANT: -flaky
-  artifacts:
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results.json
-    - $JUNIT
     reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
-  parallel: 2
-
-etherlink.tezt-extra:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_tezt
-  needs:
-  - oc.docker:ci:amd64
-  - etherlink.build_tezt
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp
-  dependencies:
-  - oc.docker:ci:amd64
-  - etherlink.build_tezt
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp
-  timeout: 40 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . ./scripts/version.sh
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --without-select-tezts
-    -- "${TESTS}" --from-record tezt/records/etherlink/extra --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    ${JUNIT} --datadog-service etherlink --tezt-exe 'etherlink/tezt/tests/main.exe'
-    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
-    tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
-    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/etherlink/extra
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
-    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
-    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
-    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
-    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
-    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
-    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    JUNIT: tezt-junit.xml
-    TESTS: extra && /ci_disabled && /time_sensitive && /slow && /cloud && /flaky
-    TEZT_NO_NPX: "true"
-    TEZT_PARALLEL: "6"
-    TEZT_RETRY: "1"
-    TEZT_VARIANT: -extra
-  artifacts:
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results.json
-    - $JUNIT
-    reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
-  parallel: 12
-
-etherlink.tezt-slow:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_tezt
-  needs:
-  - oc.docker:ci:amd64
-  - etherlink.build_tezt
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp
-  dependencies:
-  - oc.docker:ci:amd64
-  - etherlink.build_tezt
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp
-  timeout: 40 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . ./scripts/version.sh
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --without-select-tezts
-    -- "${TESTS}" --from-record tezt/records/etherlink/slow --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    ${JUNIT} --datadog-service etherlink --tezt-exe 'etherlink/tezt/tests/main.exe'
-    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
-    tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT}
-    --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/etherlink/slow
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
-    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
-    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
-    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
-    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
-    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
-    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    JUNIT: tezt-junit.xml
-    TESTS: slow && /ci_disabled && /time_sensitive && /extra && /cloud
-    TEZT_NO_NPX: "true"
-    TEZT_PARALLEL: "3"
-    TEZT_RETRY: "1"
-    TEZT_VARIANT: -slow
-  artifacts:
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results.json
-    - $JUNIT
-    reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
-  parallel: 3
-
-etherlink.tezt:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_tezt
-  needs:
-  - oc.docker:ci:amd64
-  - etherlink.build_tezt
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp
-  dependencies:
-  - oc.docker:ci:amd64
-  - etherlink.build_tezt
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp
-  timeout: 40 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . ./scripts/version.sh
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --without-select-tezts
-    -- "${TESTS}" --from-record tezt/records/etherlink --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    ${JUNIT} --datadog-service etherlink --tezt-exe 'etherlink/tezt/tests/main.exe'
-    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
-    tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
-    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/etherlink
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
-    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
-    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
-    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
-    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
-    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
-    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    JUNIT: tezt-junit.xml
-    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && /flaky
-    TEZT_NO_NPX: "true"
-    TEZT_PARALLEL: "3"
-    TEZT_RETRY: "1"
-    TEZT_VARIANT: ""
-  artifacts:
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results.json
-    - $JUNIT
-    reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
-  parallel: 36
+      dotenv: ci_image_tag.env
+  retry:
+    max: 1
+    when:
+    - runner_system_failure

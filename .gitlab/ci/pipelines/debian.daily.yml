@@ -7,6 +7,76 @@ stages:
 - publish
 - publishing_tests
 
+apt_repo_debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - oc.build-data_packages
+  - oc.build-keyring_package
+  - oc.build-debian
+  dependencies:
+  - oc.build-data_packages
+  - oc.build-keyring_package
+  - oc.build-debian
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - apt-get install -y --update apt-utils debsigs
+  - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    ARCHITECTURES: amd64 arm64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: ""
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
+  retry: 0
+
+apt_repo_ubuntu:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - oc.build-data_packages
+  - oc.build-keyring_package
+  - oc.build-ubuntu
+  dependencies:
+  - oc.build-data_packages
+  - oc.build-keyring_package
+  - oc.build-ubuntu
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - apt-get install -y --update apt-utils debsigs
+  - ./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04 26.04
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    ARCHITECTURES: amd64 arm64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: ""
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
+  retry: 0
+
 datadog_pipeline_trace:
   image: datadog/ci:v5.18.0@sha256:07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2
   stage: start
@@ -55,36 +125,6 @@ oc.build-data_packages:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
 
-oc.build-keyring_package:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
-  stage: build
-  tags:
-  - $TAGS
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages.sh keyring
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    DISTRIBUTION: debian
-    RELEASE: trixie
-    TAGS: gcp
-  artifacts:
-    paths:
-    - packages/$DISTRIBUTION/$RELEASE
-  id_tokens:
-    GCP_ID_TOKEN:
-      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
-
 oc.build-debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
   stage: build
@@ -127,289 +167,35 @@ oc.build-debian:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
-apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
-  stage: publish
+oc.build-keyring_package:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  stage: build
   tags:
-  - gcp_not_interruptible
-  needs:
-  - oc.build-data_packages
-  - oc.build-keyring_package
-  - oc.build-debian
-  dependencies:
-  - oc.build-data_packages
-  - oc.build-keyring_package
-  - oc.build-debian
+  - $TAGS
+  needs: []
+  dependencies: []
   timeout: 60 minutes
-  interruptible: false
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - . ./scripts/version.sh
-  - apt-get install -y --update apt-utils debsigs
-  - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh keyring
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    ARCHITECTURES: amd64 arm64
-    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: ""
+    DISTRIBUTION: debian
+    RELEASE: trixie
+    TAGS: gcp
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
-  retry: 0
-
-oc.test_keyring_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
-    DISTRIBUTION: debian
-    DOCKER_VERSION: 28.5.1
-    PREFIX: ""
-    RELEASE: bookworm
-
-oc.upgrade_bin_debian_bookworm_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
-    DISTRIBUTION: debian
-    DOCKER_VERSION: 28.5.1
-    PREFIX: ""
-    RELEASE: bookworm
-
-oc.install_bin_debian_bookworm_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
-    DISTRIBUTION: debian
-    DOCKER_VERSION: 28.5.1
-    PREFIX: ""
-    RELEASE: bookworm
-
-oc.install_bin_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-100afa6d
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/introduction/install-bin-deb.sh debian bookworm
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    PREFIX: ""
-
-oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - oc.build-debian
-  dependencies:
-  - oc.build-debian
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . ./scripts/version.sh
-  - export DEBIAN_FRONTEND=noninteractive
-  - apt-get update
-  - apt-get install lintian parallel -y
-  - ./scripts/ci/lintian_debian_packages.sh debian bookworm trixie
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-oc.test_keyring_debian_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
-    DISTRIBUTION: debian
-    DOCKER_VERSION: 28.5.1
-    PREFIX: ""
-    RELEASE: trixie
-
-oc.upgrade_bin_debian_trixie_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
-    DISTRIBUTION: debian
-    DOCKER_VERSION: 28.5.1
-    PREFIX: ""
-    RELEASE: trixie
-
-oc.install_bin_debian_trixie_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
-    DISTRIBUTION: debian
-    DOCKER_VERSION: 28.5.1
-    PREFIX: ""
-    RELEASE: trixie
-
-oc.install_bin_debian_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/introduction/install-bin-deb.sh debian trixie
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    PREFIX: ""
 
 oc.build-ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
@@ -454,19 +240,14 @@ oc.build-ubuntu:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
-apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
-  stage: publish
+oc.install_bin_debian_bookworm:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-100afa6d
+  stage: publishing_tests
   tags:
-  - gcp_not_interruptible
+  - gcp
   needs:
-  - oc.build-data_packages
-  - oc.build-keyring_package
-  - oc.build-ubuntu
-  dependencies:
-  - oc.build-data_packages
-  - oc.build-keyring_package
-  - oc.build-ubuntu
+  - apt_repo_debian
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -474,28 +255,20 @@ apt_repo_ubuntu:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - . ./scripts/version.sh
-  - apt-get install -y --update apt-utils debsigs
-  - ./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04 26.04
+  - ./docs/introduction/install-bin-deb.sh debian bookworm
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    ARCHITECTURES: amd64 arm64
-    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
     PREFIX: ""
-  id_tokens:
-    GCP_ID_TOKEN:
-      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
-  retry: 0
 
-oc.test_keyring_ubuntu_22_04:
+oc.install_bin_debian_bookworm_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - apt_repo_ubuntu
+  - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -505,7 +278,7 @@ oc.test_keyring_ubuntu_22_04:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
     images/packages/debian-systemd-tests.Dockerfile
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -513,19 +286,41 @@ oc.test_keyring_ubuntu_22_04:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-100afa6d
-    DISTRIBUTION: ubuntu
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
-    RELEASE: "22.04"
+    RELEASE: bookworm
 
-oc.upgrade_bin_ubuntu_22_04_systemd:
+oc.install_bin_debian_trixie:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./docs/introduction/install-bin-deb.sh debian trixie
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    PREFIX: ""
+
+oc.install_bin_debian_trixie_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - apt_repo_ubuntu
+  - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -535,7 +330,7 @@ oc.upgrade_bin_ubuntu_22_04_systemd:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
     images/packages/debian-systemd-tests.Dockerfile
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -543,11 +338,11 @@ oc.upgrade_bin_ubuntu_22_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-100afa6d
-    DISTRIBUTION: ubuntu
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
-    RELEASE: "22.04"
+    RELEASE: trixie
 
 oc.install_bin_ubuntu_22_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-100afa6d
@@ -571,37 +366,12 @@ oc.install_bin_ubuntu_22_04:
   variables:
     PREFIX: ""
 
-oc.lintian_ubuntu:
+oc.install_bin_ubuntu_24_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.build-ubuntu
-  dependencies:
-  - oc.build-ubuntu
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . ./scripts/version.sh
-  - export DEBIAN_FRONTEND=noninteractive
-  - apt-get update
-  - apt-get install lintian parallel -y
-  - ./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04 26.04
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-oc.test_keyring_ubuntu_24_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
   - apt_repo_ubuntu
   dependencies: []
   timeout: 60 minutes
@@ -611,50 +381,12 @@ oc.test_keyring_ubuntu_24_04:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
-    images/packages/debian-systemd-tests.Dockerfile
+  - ./docs/introduction/install-bin-deb.sh ubuntu 24.04
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-100afa6d
-    DISTRIBUTION: ubuntu
-    DOCKER_VERSION: 28.5.1
     PREFIX: ""
-    RELEASE: "24.04"
-
-oc.upgrade_bin_ubuntu_24_04_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_ubuntu
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-100afa6d
-    DISTRIBUTION: ubuntu
-    DOCKER_VERSION: 28.5.1
-    PREFIX: ""
-    RELEASE: "24.04"
 
 oc.install_bin_ubuntu_24_04_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -686,8 +418,8 @@ oc.install_bin_ubuntu_24_04_systemd:
     PREFIX: ""
     RELEASE: "24.04"
 
-oc.install_bin_ubuntu_24_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
+oc.install_bin_ubuntu_26_04:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:26.04-master-100afa6d
   stage: publishing_tests
   tags:
   - gcp
@@ -701,72 +433,12 @@ oc.install_bin_ubuntu_24_04:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./docs/introduction/install-bin-deb.sh ubuntu 24.04
+  - ./docs/introduction/install-bin-deb.sh ubuntu 26.04
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     PREFIX: ""
-
-oc.test_keyring_ubuntu_26_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_ubuntu
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-100afa6d
-    DISTRIBUTION: ubuntu
-    DOCKER_VERSION: 28.5.1
-    PREFIX: ""
-    RELEASE: "26.04"
-
-oc.upgrade_bin_ubuntu_26_04_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_ubuntu
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-100afa6d
-    DISTRIBUTION: ubuntu
-    DOCKER_VERSION: 28.5.1
-    PREFIX: ""
-    RELEASE: "26.04"
 
 oc.install_bin_ubuntu_26_04_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -798,14 +470,15 @@ oc.install_bin_ubuntu_26_04_systemd:
     PREFIX: ""
     RELEASE: "26.04"
 
-oc.install_bin_ubuntu_26_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:26.04-master-100afa6d
+oc.lintian_debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - apt_repo_ubuntu
-  dependencies: []
+  - oc.build-debian
+  dependencies:
+  - oc.build-debian
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -813,12 +486,39 @@ oc.install_bin_ubuntu_26_04:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./docs/introduction/install-bin-deb.sh ubuntu 26.04
+  - . ./scripts/version.sh
+  - export DEBIAN_FRONTEND=noninteractive
+  - apt-get update
+  - apt-get install lintian parallel -y
+  - ./scripts/ci/lintian_debian_packages.sh debian bookworm trixie
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    PREFIX: ""
+
+oc.lintian_ubuntu:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.build-ubuntu
+  dependencies:
+  - oc.build-ubuntu
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - export DEBIAN_FRONTEND=noninteractive
+  - apt-get update
+  - apt-get install lintian parallel -y
+  - ./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04 26.04
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.reproducibility_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
@@ -861,3 +561,303 @@ oc.reproducibility_debian:
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
+
+oc.test_keyring_debian_bookworm:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
+    RELEASE: bookworm
+
+oc.test_keyring_debian_trixie:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
+    RELEASE: trixie
+
+oc.test_keyring_ubuntu_22_04:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-100afa6d
+    DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
+    RELEASE: "22.04"
+
+oc.test_keyring_ubuntu_24_04:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-100afa6d
+    DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
+    RELEASE: "24.04"
+
+oc.test_keyring_ubuntu_26_04:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/test-keyring.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-100afa6d
+    DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
+    RELEASE: "26.04"
+
+oc.upgrade_bin_debian_bookworm_systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
+    RELEASE: bookworm
+
+oc.upgrade_bin_debian_trixie_systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
+    RELEASE: trixie
+
+oc.upgrade_bin_ubuntu_22_04_systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-100afa6d
+    DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
+    RELEASE: "22.04"
+
+oc.upgrade_bin_ubuntu_24_04_systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-100afa6d
+    DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
+    RELEASE: "24.04"
+
+oc.upgrade_bin_ubuntu_26_04_systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-100afa6d
+    DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
+    RELEASE: "26.04"
