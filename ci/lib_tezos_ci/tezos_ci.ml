@@ -1606,9 +1606,6 @@ module Images = struct
   module Base_images = struct
     let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
 
-    let make_img distro version =
-      Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
-
     (* DEB packaging *)
 
     (* All base images below are built together by the [base_images.daily]
@@ -1616,32 +1613,35 @@ module Images = struct
      https://gitlab.com/tezos/tezos/-/pipelines/2660556657 (commit 25648bf0). *)
     let base_images_tag = "master-25648bf0"
 
-    let debian_bookworm = make_img "debian:bookworm" base_images_tag
+    let make_img distro =
+      Image.mk_external
+        ~image_path:(sf "%s/%s-%s" path_prefix distro base_images_tag)
 
-    let debian_trixie = make_img "debian:trixie" base_images_tag
+    let debian_bookworm = make_img "debian:bookworm"
 
-    let ubuntu_22_04 = make_img "ubuntu:22.04" base_images_tag
+    let debian_trixie = make_img "debian:trixie"
 
-    let ubuntu_24_04 = make_img "ubuntu:24.04" base_images_tag
+    let ubuntu_22_04 = make_img "ubuntu:22.04"
 
-    let ubuntu_26_04 = make_img "ubuntu:26.04" base_images_tag
+    let ubuntu_24_04 = make_img "ubuntu:24.04"
+
+    let ubuntu_26_04 = make_img "ubuntu:26.04"
 
     (* RPM packaging *)
 
-    let rockylinux_9 = make_img "rockylinux:9" base_images_tag
+    let rockylinux_9 = make_img "rockylinux:9"
 
-    let rockylinux_10 = make_img "rockylinux:10" base_images_tag
+    let rockylinux_10 = make_img "rockylinux:10"
 
-    let fedora_39 = make_img "fedora:39" base_images_tag
+    let fedora_39 = make_img "fedora:39"
 
-    let fedora_42 = make_img "fedora:42" base_images_tag
+    let fedora_42 = make_img "fedora:42"
 
-    let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie" base_images_tag
+    let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie"
 
-    let debian_homebrew_trixie =
-      make_img "debian-homebrew:trixie" base_images_tag
+    let debian_homebrew_trixie = make_img "debian-homebrew:trixie"
 
-    let debian_rust_trixie = make_img "debian-rust:trixie" base_images_tag
+    let debian_rust_trixie = make_img "debian-rust:trixie"
 
     let ci_release =
       Image.mk_external
