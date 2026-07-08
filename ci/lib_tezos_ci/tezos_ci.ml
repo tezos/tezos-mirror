@@ -152,6 +152,19 @@ let stabilize_order_in_job (job : Gitlab_ci.Types.generic_job) :
             Option.map
               (List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2))
               job.variables;
+          cache =
+            (* The order shouldn't matter for caches.
+               GitLab stores all of them in a single .zip file.
+               Each cache key just choose parts of it to restore.
+               Even if there is some overlap in paths,
+               there is only one version of each file to restore,
+               to the order of restoration does not matter.
+               Sort caches by key. *)
+            Option.map
+              (List.sort
+                 (fun (a : Gitlab_ci.Types.cache) (b : Gitlab_ci.Types.cache) ->
+                   String.compare a.key b.key))
+              job.cache;
         }
   | Trigger_job _ -> job
 
