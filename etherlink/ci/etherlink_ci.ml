@@ -500,10 +500,7 @@ let register () =
   let open Runner.Arch in
   Cacio.register_merge_request_jobs
     [
-      (* In theory there should be no manual jobs in merge trains.
-         But we're not sure if the build jobs are still used. *)
-      (Manual, job_build_evm_node_static Amd64 Test);
-      (Manual, job_build_evm_node_static Arm64 Test);
+      (* No manual jobs in merge trains. *)
       (Auto, job_lint_wasm_runtime);
       (Auto, job_lint_solidity_artifacts);
       (Auto, job_unit_tests);
@@ -519,6 +516,8 @@ let register () =
   Cacio.register_jobs
     Before_merging
     [
+      (Manual, job_build_evm_node_static Amd64 Test);
+      (Manual, job_build_evm_node_static Arm64 Test);
       (Manual, job_tezt_slow `merge_request);
       (Manual, job_tezt_extra `merge_request);
       (Manual, job_tezt_flaky `merge_request);
