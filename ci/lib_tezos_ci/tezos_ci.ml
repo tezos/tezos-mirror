@@ -1875,7 +1875,3 @@ let id_tokens =
         "https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}"
     );
   ]
-
-let enable_kernels =
-  append_variables
-    [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
