@@ -192,7 +192,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
     make_job_docker_systemd_tests
       ~base_image:
         Images.Base_images.(
-          sf "%s/${DISTRIBUTION}:${RELEASE}-%s" path_prefix rpm_version)
+          sf "%s/${DISTRIBUTION}:${RELEASE}-%s" path_prefix debian_version)
       ~script:
         [
           "./scripts/ci/build-packages-dependencies.sh \
@@ -218,7 +218,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
     make_docker_build_dependencies
       ~base_image:
         Images.Base_images.(
-          sf "%s/${DISTRIBUTION}:${RELEASE}-%s" path_prefix rpm_version)
+          sf "%s/${DISTRIBUTION}:${RELEASE}-%s" path_prefix debian_version)
       ~script:
         [
           "./scripts/ci/build-packages-dependencies.sh \

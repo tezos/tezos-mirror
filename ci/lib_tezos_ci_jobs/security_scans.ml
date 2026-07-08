@@ -60,11 +60,12 @@ let jobs : tezos_job list =
             Container_scanning.name =
               "${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora";
             tag =
-              Images.Base_images.(Format.asprintf "%s-%s" release rpm_version);
+              Images.Base_images.(
+                Format.asprintf "%s-%s" release debian_version);
             dockerfile = "images/base-images/Dockerfile.rpm";
             job_name =
               Images.Base_images.(
-                Format.asprintf "tezos-fedora-%s-%s" release rpm_version);
+                Format.asprintf "tezos-fedora-%s-%s" release debian_version);
           })
         (Base_images.Distribution.releases Fedora)
       @ List.map
@@ -73,11 +74,15 @@ let jobs : tezos_job list =
               Container_scanning.name =
                 "${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux";
               tag =
-                Images.Base_images.(Format.asprintf "%s-%s" release rpm_version);
+                Images.Base_images.(
+                  Format.asprintf "%s-%s" release debian_version);
               dockerfile = "images/base-images/Dockerfile.rpm";
               job_name =
                 Images.Base_images.(
-                  Format.asprintf "tezos-rockylinux-%s-%s" release rpm_version);
+                  Format.asprintf
+                    "tezos-rockylinux-%s-%s"
+                    release
+                    debian_version);
             })
           (Base_images.Distribution.releases Rockylinux)
     else []

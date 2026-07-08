@@ -609,8 +609,6 @@ module Images : sig
 
     val debian_version : string
 
-    val rpm_version : string
-
     val debian_bookworm : Image.t
 
     val debian_trixie : Image.t
