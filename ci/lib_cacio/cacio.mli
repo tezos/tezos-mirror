@@ -486,7 +486,9 @@ val register_jobs : global_pipeline -> (trigger * job) list -> unit
 (** Register jobs to be included in [before_merging] and [merge_train] pipelines.
 
     This is equivalent to registering the job with both
-    [register_jobs Before_merging] and [register_jobs Merge_train]. *)
+    [register_jobs Before_merging] and [register_jobs Merge_train].
+
+    If a job is [Manual], this function only registers it into [Before_merging]. *)
 val register_merge_request_jobs : (trigger * job) list -> unit
 
 (** Register jobs to be included in release pipelines.

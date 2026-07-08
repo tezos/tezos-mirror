@@ -914,7 +914,8 @@ let register_jobs pipeline jobs =
 
 let register_merge_request_jobs jobs =
   register_jobs Before_merging jobs ;
-  register_jobs Merge_train jobs
+  let non_manual_jobs = List.filter (fun x -> not (is_manual x)) jobs in
+  register_jobs Merge_train non_manual_jobs
 
 let register_release_jobs jobs =
   register_jobs Major_release_tag jobs ;
