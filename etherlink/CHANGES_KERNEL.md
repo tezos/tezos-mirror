@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Michelson runtime: support the `INDEX_ADDRESS` and `GET_ADDRESS_INDEX`
+  instructions. `INDEX_ADDRESS` registers an address in the global address
+  registry and returns its unique index (idempotently); `GET_ADDRESS_INDEX`
+  is the read-only lookup, returning `None` for unregistered addresses.
+  `INDEX_ADDRESS` writes to storage and is therefore rejected at typechecking
+  in views, following the `TRANSFER_TOKENS` / `SET_DELEGATE` pattern. New
+  registrations are reported in the operation receipt's `address_registry_diff` 
+  field.
+  (!22424 !22425)
 - The account info record (`/info`) may now carry a fourth RLP field,
   the origin classification (alias payload included). Legacy 3-field
   records remain valid and are migrated lazily as accounts are touched;
