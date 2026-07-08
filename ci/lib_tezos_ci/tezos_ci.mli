@@ -491,11 +491,6 @@ val append_script : string list -> tezos_job -> tezos_job
     Throws error when applied to {!trigger_job}s. *)
 val append_cache : Gitlab_ci.Types.cache -> tezos_job -> tezos_job
 
-(** Append to the [before_script:] section of a job.
-
-    Throws error when applied to {!trigger_job}s. *)
-val append_before_script : string list -> tezos_job -> tezos_job
-
 (** Override the [interruptible:] flag of a job.
 
     Has no effect on {!trigger_job}s. *)
