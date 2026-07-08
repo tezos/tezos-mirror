@@ -4023,6 +4023,66 @@ let test_michelson_gas_exhaustion =
       ~error_msg:"Expected %R mutez consumed (fee only), got %L") ;
   unit
 
+(* Builds a large Michelson [bytes] with CONCAT and checks the operation runs
+   out of gas instead of crashing the kernel with an out-of-memory trap. *)
+let test_michelson_oom_concat =
+  register_tezosx_test
+    ~title:"Michelson CONCAT output gas floor prevents an OOM"
+    ~tags:["gas"; "exhaustion"; "oom"; "concat"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  (* The script builds a 1 GiB seed (32 zero bytes CONCAT-doubled 25 times),
+     Rc-shares it into [n] list copies, then CONCATs them into an [n] GiB
+     output. Without the allocation floor the seed and the CONCAT are gas-legal,
+     yet materialising the multi-GiB output buffer exceeds the WASM heap and
+     crashes the kernel. With the floor, [max(time, alloc)] makes the aggregate
+     cost exceed the per-op gas cap, so the operation runs out of gas before it
+     allocates. *)
+  let n = 3 in
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let doublings = String.concat " " (List.init 25 (fun _ -> "DUP; CONCAT;")) in
+  let script =
+    Format.sprintf
+      "parameter nat; storage unit; code { CAR; PUSH bytes 0x%s; %s NIL bytes; \
+       DIG 2; DUP; INT; GT; LOOP { PUSH nat 1; SWAP; SUB; ISNAT; ASSERT_SOME; \
+       DUP 3; DIP { SWAP }; CONS; SWAP; DUP; INT; GT }; DROP; CONCAT; DROP; \
+       DROP; UNIT; NIL operation; PAIR }"
+      (String.make 64 '0')
+      doublings
+  in
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"concat_oom"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"Unit"
+      ~prg:script
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  (* The operation runs out of gas during simulation, so the client rejects it
+     rather than the kernel crashing: assert a gas-exhaustion error. *)
+  let process =
+    Client.spawn_transfer
+      ~endpoint
+      ~force:true
+      ~amount:Tez.zero
+      ~fee:(Tez.of_mutez_int 100_000)
+      ~gas_limit:3_000_000
+      ~storage_limit:0
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:contract
+      ~arg:(string_of_int n)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  Check.(err =~ rex "Gas limit exceeded")
+    ~error_msg:"Expected a gas-exhaustion failure, got %L" ;
+  unit
+
 (* Tests that the [/mempool/filter] RPC returns the expected
     [minimal_nanotez_per_gas_unit] and [minimal_nanotez_per_byte] computed
     from the kernel's [base_fee_per_gas] and [michelson_to_evm_gas_multiplier]
@@ -6230,6 +6290,7 @@ let () =
   test_michelson_gas_backlog_on_failed_op [Alpha] ;
   test_michelson_execution_gas_fee [Alpha] ;
   test_michelson_gas_exhaustion [Alpha] ;
+  test_michelson_oom_concat [Alpha] ;
   test_mempool_filter_fields [Alpha] ;
   test_gas_refund_on_transfer ~enable_refund:true [Alpha] ;
   test_gas_refund_on_transfer ~enable_refund:false [Alpha] ;
