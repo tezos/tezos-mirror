@@ -13,7 +13,6 @@
 open Gitlab_ci
 open Gitlab_ci.Types
 open Tezos_ci
-open Tezos_ci.Cache
 
 let () = Tezos_ci.Cli.init ()
 
@@ -52,7 +51,7 @@ let variables : variables =
        set to true in the opam jobs where we want to run the tests
        --with-test. *)
     ("RUNTEZTALIAS", "false");
-    ("CARGO_HOME", cargo_home);
+    ("CARGO_HOME", Cargo.home);
     (* To avoid Cargo accessing the network in jobs without caching (see
        {!Common.enable_cargo_cache}), we turn off net access by default. *)
     ("CARGO_NET_OFFLINE", "true");

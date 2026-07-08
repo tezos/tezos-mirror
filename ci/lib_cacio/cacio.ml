@@ -1112,26 +1112,23 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     (* ~cargo_cache *)
     let cache =
       if cargo_cache then
-        (let cargo_home =
-           Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
-         in
-         Gitlab_ci.Util.cache
-           ~policy:Gitlab_ci.Types.Pull_push
-           ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-           [
-             (* The cache folder contains the .crate (tar.gz) files. *)
-             cargo_home // "registry/cache";
-             (* The index folder contains the database of all
+        Gitlab_ci.Util.cache
+          ~policy:Gitlab_ci.Types.Pull_push
+          ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+          [
+            (* The cache folder contains the .crate (tar.gz) files. *)
+            Tezos_ci.Cargo.home // "registry/cache";
+            (* The index folder contains the database of all
                  available crates on crates.io. *)
-             cargo_home // "registry/index";
-             (* The src folder contains the unzipped source code
+            Tezos_ci.Cargo.home // "registry/index";
+            (* The src folder contains the unzipped source code
                  ready for compilation. *)
-             cargo_home // "registry/src";
-             (* cargo_home // "git/db";
+            Tezos_ci.Cargo.home // "registry/src";
+            (* cargo_home // "git/db";
                  These are "bare" git repositories. They contain all
                  the compressed git history and objects. We might
                  agree to add them later *)
-           ])
+          ]
         :: cache
       else cache
     in

@@ -161,9 +161,9 @@ module Pipeline : sig
   val describe_pipeline : string -> unit
 end
 
-module Cache : sig
+module Cargo : sig
   (** Value of [CARGO_HOME] *)
-  val cargo_home : string
+  val home : string
 end
 
 (** A facility for registering images for [image:] keywords.

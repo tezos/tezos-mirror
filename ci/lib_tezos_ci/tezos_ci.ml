@@ -1513,9 +1513,8 @@ let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
     ~name
     script
 
-(** {2 Caches} *)
-module Cache = struct
-  let cargo_home =
+module Cargo = struct
+  let home =
     (* Note:
        - We want [CARGO_HOME] to be in a sub-folder of
          {!ci_project_dir} to enable GitLab CI caching.
