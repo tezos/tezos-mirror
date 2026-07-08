@@ -5,7 +5,7 @@
 
 use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
-    chains::{EvmLimits, ExperimentalFeatures, TezosXChainConfig},
+    chains::{DebugFeatures, EvmLimits, ExperimentalFeatures, TezosXChainConfig},
     delayed_inbox::DelayedInbox,
     retrieve_minimum_base_fee_per_gas,
     storage::{
@@ -264,12 +264,14 @@ where
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
+    let debug_features = DebugFeatures::read_from_storage(host);
     let michelson_chain_id = fetch_michelson_runtime_chain_id(host, evm_chain_id);
     TezosXChainConfig::create_config(
         evm_chain_id,
         limits,
         spec_id,
         experimental_features,
+        debug_features,
         michelson_chain_id,
     )
 }

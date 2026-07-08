@@ -104,6 +104,8 @@
   (excluding the call's own `gasUsed`), so block-gas cross-checks and
   consecutive-receipt differencing reported wrong per-transaction gas
   for every cross-runtime-originated receipt. (!22049)
+- Add a precompile contract leading the kernel to panic—requires a feature flag
+  to be available, as to avoid leaving an DoS path. (!22412)
 
 ### Michelson Runtime
 

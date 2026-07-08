@@ -202,6 +202,7 @@ type kernel_setup = {
   enable_fast_withdrawal : bool option;
   enable_fast_fa_withdrawal : bool option;
   enable_michelson_gas_refund : bool option;
+  enable_debug_precompiles : bool option;
   evm_version : Evm_version.t option;
   with_runtimes : Tezosx_runtime.t list option;
   tezosx_target_sunrise_levels : (Tezosx_runtime.t * int) list option;
@@ -253,6 +254,7 @@ val make_kernel_setup :
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?enable_michelson_gas_refund:bool ->
+  ?enable_debug_precompiles:bool ->
   ?evm_version:Evm_version.t ->
   ?with_runtimes:Tezosx_runtime.t list ->
   ?tezosx_target_sunrise_levels:(Tezosx_runtime.t * int) list ->

@@ -470,6 +470,7 @@ let _etherlink_tezts =
       "cross_runtime";
       "compact_receipt_encoding";
       "tezosx_address_translation";
+      "faults";
     ]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"

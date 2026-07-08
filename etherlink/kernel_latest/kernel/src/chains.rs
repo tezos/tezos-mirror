@@ -117,6 +117,24 @@ fn operation_safe_roots(
 }
 
 #[derive(Debug, Default)]
+pub struct DebugFeatures {
+    pub enable_debug_precompiles: bool,
+}
+
+impl DebugFeatures {
+    pub fn read_from_storage<Host>(host: &mut Host) -> Self
+    where
+        Host: StorageV1,
+    {
+        let enable_debug_precompiles = crate::storage::enable_debug_precompiles(host);
+
+        DebugFeatures {
+            enable_debug_precompiles,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct ExperimentalFeatures {
     enable_michelson_gas_refund: bool,
     /// If `Some(level)`, the Michelson runtime is enabled and activates at the
@@ -168,6 +186,7 @@ pub struct TezosXChainConfig {
     pub limits: EvmLimits,
     pub spec_id: SpecId,
     pub experimental_features: ExperimentalFeatures,
+    pub debug_features: DebugFeatures,
     michelson_chain_id: ChainId,
 }
 
@@ -640,6 +659,7 @@ impl TezosXChainConfig {
                     &self.limits,
                     http_trace_enabled,
                     internal_operations_base,
+                    &self.debug_features,
                 )
             }
             TezosXTransaction::Tezos(operation) => self.apply_tezos_operation(
@@ -796,6 +816,7 @@ impl TezosXChainConfig {
         limits: EvmLimits,
         spec_id: SpecId,
         experimental_features: ExperimentalFeatures,
+        debug_features: DebugFeatures,
         michelson_chain_id: ChainId,
     ) -> Self {
         Self {
@@ -803,6 +824,7 @@ impl TezosXChainConfig {
             limits,
             spec_id,
             experimental_features,
+            debug_features,
             michelson_chain_id,
         }
     }
@@ -1228,6 +1250,7 @@ impl Default for TezosXChainConfig {
             EvmLimits::default(),
             SpecId::default(),
             ExperimentalFeatures::default(),
+            DebugFeatures::default(),
             ChainId::from(EVM_CHAIN_ID.to_le_bytes()),
         )
     }
@@ -1240,6 +1263,7 @@ pub fn test_tezosx_chain_config() -> TezosXChainConfig {
         EvmLimits::default(),
         SpecId::default(),
         ExperimentalFeatures::default(),
+        DebugFeatures::default(),
         ChainId::from(EVM_CHAIN_ID.to_le_bytes()),
     )
 }

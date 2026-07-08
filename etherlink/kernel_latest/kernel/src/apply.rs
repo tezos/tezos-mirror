@@ -48,7 +48,7 @@ use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::{CracId, TezosXJournal};
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
-use crate::chains::EvmLimits;
+use crate::chains::{DebugFeatures, EvmLimits};
 use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
 use crate::transaction::{Transaction, TransactionContent};
@@ -679,6 +679,7 @@ fn apply_ethereum_transaction_common<Host>(
     // Block's prior internal-op count; seeded into the journal so EVM-origin
     // CRAC sub-operations enforce L1's per-block cap cumulatively.
     internal_operations_base: u128,
+    debug_features: &DebugFeatures,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, anyhow::Error>
 where
     Host: StorageV1,
@@ -744,6 +745,7 @@ where
         block_constants.chain_id.low_u64(),
         block_constants.number.low_u64(),
     );
+
     let mut journal =
         TezosXJournal::new(crac_id, operation_hash, block_constants.clone());
     // Fold the block's prior internal ops into this op's cap (anti-DoS).
@@ -751,6 +753,10 @@ where
         .michelson
         .set_internal_operation_counter(internal_operations_base);
     journal.set_http_trace_enabled(http_trace_enabled);
+    if debug_features.enable_debug_precompiles {
+        journal.enable_debug_precompiles();
+    }
+
     let run_result = revm_run_transaction(
         host,
         registry,
@@ -1265,6 +1271,7 @@ pub fn apply_transaction<Host>(
     // Block's prior internal-op count, threaded so the EVM-origin delayed and
     // CRAC paths enforce the per-block cap cumulatively (like the native path).
     internal_operations_base: u128,
+    debug_features: &DebugFeatures,
 ) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1,
@@ -1287,6 +1294,7 @@ where
             crac_id,
             http_trace_enabled,
             internal_operations_base,
+            debug_features,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
@@ -1301,6 +1309,7 @@ where
             crac_id,
             http_trace_enabled,
             internal_operations_base,
+            debug_features,
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(Benchmarking, "Transaction type: DEPOSIT");

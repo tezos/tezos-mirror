@@ -21,11 +21,12 @@ use crate::{
         change_sequencer_key::change_sequencer_key_precompile,
         constants::{
             CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, CUSTOMS,
-            GLOBAL_COUNTER_PRECOMPILE_ADDRESS, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
-            VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS,
+            GLOBAL_COUNTER_PRECOMPILE_ADDRESS, PANIC_PRECOMPILE_ADDRESS,
+            RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
+            TABLE_PRECOMPILE_ADDRESS, VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS,
         },
         global_counter::global_counter_precompile,
+        panic::panic_precompile,
         runtime_gateway::runtime_gateway_precompile,
         send_outbox_message::send_outbox_message_precompile,
         table::table_precompile,
@@ -34,30 +35,49 @@ use crate::{
     storage::version::EVMVersion,
 };
 
+use super::constants::DEBUGS;
+
 #[derive(Debug, Clone)]
 pub struct EtherlinkPrecompiles {
     pub builtins: EthPrecompiles,
+    enable_debug_precompiles: bool,
 }
 
 impl Default for EtherlinkPrecompiles {
     fn default() -> Self {
-        Self::new()
+        Self::new(
+            false, // no debug precompiles by default
+        )
     }
 }
 
 impl EtherlinkPrecompiles {
-    pub fn new() -> Self {
+    pub fn new(enable_debug_precompiles: bool) -> Self {
         Self {
             builtins: EthPrecompiles::new(EVMVersion::default().into()),
+            enable_debug_precompiles,
         }
     }
 
     fn warm_addresses(&self) -> Box<impl Iterator<Item = Address>> {
-        Box::new(self.builtins.warm_addresses().chain(CUSTOMS))
+        let debugs: &'static [Address] = if self.enable_debug_precompiles {
+            &DEBUGS
+        } else {
+            &[]
+        };
+
+        Box::new(
+            self.builtins
+                .warm_addresses()
+                .chain(CUSTOMS)
+                .chain(debugs.iter().copied()),
+        )
     }
 
     fn contains(&self, address: &Address) -> bool {
-        CUSTOMS.contains(address) || self.builtins.contains(address)
+        CUSTOMS.contains(address)
+            || self.builtins.contains(address)
+            || (self.enable_debug_precompiles && DEBUGS.contains(address))
     }
 
     fn run_custom_precompile<'j, CTX, Host, R>(
@@ -101,6 +121,9 @@ impl EtherlinkPrecompiles {
             }
             VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS => {
                 verify_tezos_signature_precompile(&calldata, inputs)
+            }
+            PANIC_PRECOMPILE_ADDRESS if self.enable_debug_precompiles => {
+                panic_precompile(&calldata, inputs)
             }
             _ => return Ok(None),
         };
