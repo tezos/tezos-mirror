@@ -1614,34 +1614,34 @@ module Images = struct
     (* All base images below are built together by the [base_images.daily]
      pipeline and share a single version tag. Current version created by
      https://gitlab.com/tezos/tezos/-/pipelines/2660556657 (commit 25648bf0). *)
-    let debian_version = "master-25648bf0"
+    let base_images_tag = "master-25648bf0"
 
-    let debian_bookworm = make_img "debian:bookworm" debian_version
+    let debian_bookworm = make_img "debian:bookworm" base_images_tag
 
-    let debian_trixie = make_img "debian:trixie" debian_version
+    let debian_trixie = make_img "debian:trixie" base_images_tag
 
-    let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
+    let ubuntu_22_04 = make_img "ubuntu:22.04" base_images_tag
 
-    let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
+    let ubuntu_24_04 = make_img "ubuntu:24.04" base_images_tag
 
-    let ubuntu_26_04 = make_img "ubuntu:26.04" debian_version
+    let ubuntu_26_04 = make_img "ubuntu:26.04" base_images_tag
 
     (* RPM packaging *)
 
-    let rockylinux_9 = make_img "rockylinux:9" debian_version
+    let rockylinux_9 = make_img "rockylinux:9" base_images_tag
 
-    let rockylinux_10 = make_img "rockylinux:10" debian_version
+    let rockylinux_10 = make_img "rockylinux:10" base_images_tag
 
-    let fedora_39 = make_img "fedora:39" debian_version
+    let fedora_39 = make_img "fedora:39" base_images_tag
 
-    let fedora_42 = make_img "fedora:42" debian_version
+    let fedora_42 = make_img "fedora:42" base_images_tag
 
-    let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie" debian_version
+    let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie" base_images_tag
 
     let debian_homebrew_trixie =
-      make_img "debian-homebrew:trixie" debian_version
+      make_img "debian-homebrew:trixie" base_images_tag
 
-    let debian_rust_trixie = make_img "debian-rust:trixie" debian_version
+    let debian_rust_trixie = make_img "debian-rust:trixie" base_images_tag
 
     let ci_release =
       Image.mk_external
