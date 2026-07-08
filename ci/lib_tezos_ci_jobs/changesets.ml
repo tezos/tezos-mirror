@@ -29,15 +29,6 @@ let changeset_base =
       ".gitlab-ci.yml";
     ]
 
-let changeset_images_rust_toolchain =
-  Changeset.make
-    [
-      "images/rust-toolchain/**/*";
-      "images/create_image.sh";
-      "images/scripts/install_datadog_static.sh";
-      "scripts/version.sh";
-    ]
-
 (** Only if octez source code has changed *)
 let changeset_octez =
   let octez_source_content =

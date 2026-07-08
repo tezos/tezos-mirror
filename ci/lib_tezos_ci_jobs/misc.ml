@@ -415,8 +415,10 @@ let job_test_sdk_rust =
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~stage:Test
     ~only_if_changed:
-      (Tezos_ci.Changeset.encode Changesets.changeset_images_rust_toolchain
-      @ ["sdk/rust/**/*"])
+      (* Rerun when [sdk/rust/] changes, or when the [debian-rust] base image
+         this job runs in is rebuilt.
+         NB: [debian-rust] is on top of base [debian] thus rebuilt when base [debian] image is. *)
+      (Base_images.Files.(debian_rust_build @ debian_base) @ ["sdk/rust/**/*"])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
     ~script:["make -C sdk/rust check"; "make -C sdk/rust test"]
