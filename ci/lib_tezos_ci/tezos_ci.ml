@@ -1312,30 +1312,6 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
         (error_not_generated |> String_set.elements |> String.concat " ")) ;
   if !Cli.has_error then exit 1
 
-let append_before_script script tezos_job =
-  map_non_trigger_job
-    ~error_on_trigger:
-      (sf
-         "[append_before_script] attempting to append before_script to trigger \
-          job '%s'"
-         (name_of_tezos_job tezos_job))
-    tezos_job
-  @@ fun job ->
-  let before_script = Option.value ~default:[] job.before_script in
-  {job with before_script = Some (before_script @ script)}
-
-let append_after_script script tezos_job =
-  map_non_trigger_job
-    ~error_on_trigger:
-      (sf
-         "[append_after_script] attempting to append after_script to trigger \
-          job '%s'"
-         (name_of_tezos_job tezos_job))
-    tezos_job
-  @@ fun job ->
-  let after_script = Option.value ~default:[] job.after_script in
-  {job with after_script = Some (after_script @ script)}
-
 (* The reason we don't use [error_on_trigger] here is that this is intended to be
    used with [List.map] on a whole pipeline, and it's just more convenient to
    not have to filter out the trigger job to then put it back. *)
@@ -1573,32 +1549,6 @@ let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
 
 (** {2 Caches} *)
 module Cache = struct
-  let enable_sccache ?error_log ?log ?(policy = Gitlab_ci.Types.Pull) job =
-    let rw_mode =
-      match policy with Pull -> "READ_ONLY" | Pull_push | Push -> "READ_WRITE"
-    in
-    job
-    |> append_variables
-         ([
-            (* force incremental build in cargo
-
-              see https://github.com/mozilla/sccache?tab=readme-ov-file#known-caveats *)
-            ("CARGO_INCREMENTAL", "0");
-            (* we use GCP backend in r/w mode *)
-            ("SCCACHE_GCS_BUCKET", "$GCP_SCCACHE_BUCKET");
-            ("SCCACHE_GCS_RW_MODE", rw_mode);
-            ("SCCACHE_GCS_KEY_PREFIX", "sccache");
-            (* if network error, fail over local rust compiler instead of stopping *)
-            ("SCCACHE_IGNORE_SERVER_IO_ERROR", "1");
-            (* daemon does not stop if no client request *)
-            ("SCCACHE_IDLE_TIMEOUT", "0");
-          ]
-         @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
-         @ opt_var "SCCACHE_LOG" Fun.id log)
-    (* Starts sccache and sets [RUSTC_WRAPPER] *)
-    |> append_before_script [". ./scripts/ci/sccache-start.sh"]
-    |> append_after_script ["./scripts/ci/sccache-stop.sh"]
-
   let cargo_home =
     (* Note:
        - We want [CARGO_HOME] to be in a sub-folder of

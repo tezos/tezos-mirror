@@ -162,21 +162,6 @@ module Pipeline : sig
 end
 
 module Cache : sig
-  (** Add variable enabling sccache.
-
-    This function should be applied to jobs that build rust files and
-    which has a configured sccache Gitlab CI cache.
-
-    - [error_log] and [log] sets the environment
-    variables [SCCACHE_ERROR_LOG] and [SCCACHE_LOG] respectively.
-    See the sccache documentation for more information on these variables. *)
-  val enable_sccache :
-    ?error_log:string ->
-    ?log:string ->
-    ?policy:Gitlab_ci.Types.cache_policy ->
-    tezos_job ->
-    tezos_job
-
   (** Value of [CARGO_HOME] *)
   val cargo_home : string
 

@@ -57,7 +57,10 @@ type sccache_config
 
 (** Make an sccache configuration.
 
-    See {!Tezos_ci.Cache.enable_sccache}. *)
+    [error_log]: value of the [SCCACHE_ERROR_LOG] environment variable.
+    [log]: value of the [SCCACHE_LOG] environment variable.
+    [policy]: influences the value of the [SCCACHE_GCS_RW_MODE] environment variable
+    ([READ_WRITE] for push and pull-push policies, [READ_ONLY] otherwise). *)
 val sccache :
   ?error_log:string ->
   ?log:string ->
@@ -183,8 +186,9 @@ module type COMPONENT_API = sig
       of [.cargo] using GitLab's cache. It also allows cargo to access the network.
       Default is [false].
 
-      If [sccache] is specified, the resulting job is modified with
-      {!Tezos_ci.Cache.enable_sccache}.
+      If [sccache] is specified, the resulting job use sccache.
+      This does not use GitLab's cache.
+      Using sccache also forces incremental build in cargo.
 
       If [dune_cache] is [true], the resulting job uses dune's cache,
       stored in GitLab's cache. The cache is per job name. Default is [false].
