@@ -160,6 +160,7 @@ You may also access this whole documentation as a single `text file <https://oct
 
    introduction/tezos
    introduction/howtoget
+   introduction/linux_support
    introduction/howtouse
    introduction/howtorun
    introduction/services
