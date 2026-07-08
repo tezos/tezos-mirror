@@ -473,29 +473,6 @@ val add_artifacts :
     Has no effect on {!trigger_job}s. *)
 val with_interruptible : bool -> tezos_job -> tezos_job
 
-val job_docker_authenticated :
-  ?ci_docker_hub:bool ->
-  ?artifacts:Gitlab_ci.Types.artifacts ->
-  ?variables:(string * string) list ->
-  ?rules:Gitlab_ci.Types.job_rule list ->
-  ?dependencies:dependencies ->
-  ?image_dependencies:Image.t list ->
-  ?arch:Runner.Arch.t ->
-  ?storage:Runner.Storage.t ->
-  ?tag:Runner.Tag.t ->
-  ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
-  ?parallel:Gitlab_ci.Types.parallel ->
-  ?environment:Gitlab_ci.Types.environment ->
-  ?timeout:Gitlab_ci.Types.time_interval ->
-  ?retry:Gitlab_ci.Types.retry ->
-  ?description:string ->
-  ?dev_infra:bool ->
-  __POS__:string * int * int * int ->
-  stage:Stage.t ->
-  name:string ->
-  string list ->
-  tezos_job
-
 module Stages : sig
   val start : Stage.t
 
