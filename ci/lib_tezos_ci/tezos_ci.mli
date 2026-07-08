@@ -25,9 +25,6 @@ val name_of_tezos_job : tezos_job -> string
     Warns not to modify the generated files, and refers to the generator. *)
 val header : string
 
-(** Write a CI configuration to a file *)
-val to_file : filename:string -> Gitlab_ci.Types.config -> unit
-
 (** Checks that should be performed after {!Pipeline.write}.
 
     Checks that the file [.gitlab-ci.yml] and all the [.yml] files in [.gitlab]
