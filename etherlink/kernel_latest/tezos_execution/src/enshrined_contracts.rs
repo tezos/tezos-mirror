@@ -305,6 +305,34 @@ where
                 ctx.operation_gas()
                     .cast_and_consume_milligas(collect_result_size_cost(payload.len()))
                     .map_err(TransferError::OutOfGas)?;
+                // Only the dispatch slot's owner — the contract whose
+                // code this `serve` invocation is running — may write
+                // the slot. A native callee reached from the owner's
+                // own execution presents a different `SENDER` here, and
+                // its `%collect_result` is rejected, reverting the whole
+                // operation. Silently continuing would let the operation
+                // apply an effect it was never meant to have — a callee's
+                // bytes surfaced as the caller's result, or a griefed
+                // deposit; reverting on anything suspicious is clearer
+                // and safer than papering over it.
+                //
+                // A missing slot altogether (called outside `serve`)
+                // is a distinct, unreachable-in-production kernel
+                // invariant violation and is left to surface through
+                // `set_dispatch_result`'s `NoSlot` error below, same
+                // as before this check existed.
+                let sender = ctx.sender();
+                let mut sender_bytes = Vec::new();
+                sender.to_bytes(&mut sender_bytes);
+                if ctx.journal().michelson.has_dispatch_slot()
+                    && ctx.journal().michelson.dispatch_slot_owner()
+                        != Some(sender_bytes.as_slice())
+                {
+                    return Err(TransferError::GatewayError(
+                        "collect_result: sender is not the dispatch slot owner".into(),
+                    )
+                    .into());
+                }
                 ctx.journal()
                     .michelson
                     .set_dispatch_result(payload)
@@ -2275,6 +2303,17 @@ pub(crate) mod tests {
 
     use tezosx_journal::CracId;
 
+    /// The journal stores the dispatch-slot owner as opaque bytes (the
+    /// canonical `AddressHash::to_bytes` encoding) rather than a typed
+    /// `AddressHash`, so it doesn't need to depend on the Michelson
+    /// interpreter crate. Test helper mirroring the encoding done at
+    /// the owner-set call site.
+    fn address_hash_bytes(address: &AddressHash) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        address.to_bytes(&mut bytes);
+        bytes
+    }
+
     /// Build a CRAC event internal operation (test helper).
     fn make_crac_event(
         gateway_kt1: &ContractKt1Hash,
@@ -4081,9 +4120,14 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        // %collect_result writes to the dispatch slot opened by `serve`.
-        // Simulate that here.
+        // %collect_result writes to the dispatch slot opened by `serve`,
+        // owned by the target `serve` is dispatching to. Simulate both
+        // here, with the owner matching the caller's own sender so the
+        // deposit is authorized.
         journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&source));
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![0xCA, 0xFE]);
         let result = execute_enshrined_contract(
@@ -4118,9 +4162,14 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        // %collect_result writes to the dispatch slot opened by `serve`.
-        // Simulate that here.
+        // %collect_result writes to the dispatch slot opened by `serve`,
+        // owned by the target `serve` is dispatching to. Simulate both
+        // here, with the owner matching the caller's own sender so the
+        // deposit is authorized.
         journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&source));
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![]);
         let result = execute_enshrined_contract(
@@ -4185,9 +4234,14 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        // %collect_result writes to the dispatch slot opened by `serve`.
-        // Simulate that here.
+        // %collect_result writes to the dispatch slot opened by `serve`,
+        // owned by the target `serve` is dispatching to. Simulate both
+        // here, with the owner matching the caller's own sender so the
+        // deposit is authorized.
         journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&source));
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         // First dispatch deposits the payload.
         let first = execute_enshrined_contract(
@@ -4283,6 +4337,9 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&source));
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
@@ -4309,6 +4366,9 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&source));
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
             TYPECHECK_VALUE_STEP_MILLIGAS + COLLECT_RESULT_SIZE_BASE_MILLIGAS,
@@ -4423,6 +4483,9 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&source));
         let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
@@ -4451,6 +4514,271 @@ pub(crate) mod tests {
             after_first + 944
         );
         // Original payload is preserved.
+        assert_eq!(
+            journal.michelson.take_dispatch_result(),
+            Ok(Some(vec![0xCA, 0xFE]))
+        );
+    }
+
+    // --- %collect_result slot-owner sender check ---
+
+    // A collect from a sender that doesn't match the dispatch slot's
+    // owner is rejected with an `Err` (which reverts the whole
+    // operation): reverting on a suspicious write is clearer and safer
+    // than silently applying an effect the operation was never meant
+    // to have. The slot is never written.
+    #[test]
+    fn test_collect_result_mismatched_sender_reverts() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+
+        let owner = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
+        let mismatched_sender = AddressHash::Kt1(ContractKt1Hash::from([0xBB; 20]));
+
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&owner));
+        let mut ctx =
+            MockCtx::new(&mut host, &mut journal, &registry, mismatched_sender, 0);
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0xDE, 0xAD]),
+            &mut ctx,
+        );
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("sender is not the dispatch slot owner"),
+            "error should mention the owner mismatch: {err}"
+        );
+        // No serve calls are made: %collect_result only deposits bytes.
+        assert!(registry.serve_calls.borrow().is_empty());
+        // Rejected: the slot stays empty, not the mismatched sender's bytes.
+        assert_eq!(journal.michelson.take_dispatch_result(), Ok(None));
+    }
+
+    // An owner-mismatched collect still charges the same size-dependent
+    // gas as an accepted one: the sender check must not turn into a
+    // free probe.
+    #[test]
+    fn test_collect_result_mismatched_sender_still_charges_gas() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+
+        let owner = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
+        let mismatched_sender = AddressHash::Kt1(ContractKt1Hash::from([0xBB; 20]));
+
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&owner));
+        let mut ctx =
+            MockCtx::new(&mut host, &mut journal, &registry, mismatched_sender, 0);
+        ctx.operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0u8; 256]),
+            &mut ctx,
+        );
+        assert!(result.is_err());
+        // Gas is charged before the sender check, so a rejected collect
+        // still pays the full accepted-path charge — not a free probe:
+        // typecheck (100) + size base (460) + 1.5 * 256 (384) = 944.
+        assert_eq!(ctx.operation_gas().total_milligas_consumed() as u64, 944);
+    }
+
+    // No owner assigned at all (e.g. a defensively-simulated slot that
+    // never went through `set_current_dispatch_owner`) is treated the
+    // same as a mismatch: rejected with an `Err`, slot not written.
+    #[test]
+    fn test_collect_result_unassigned_owner_reverts() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let sender = AddressHash::Kt1(ContractKt1Hash::from([0xCC; 20]));
+
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        // Slot is open, but no owner was ever assigned.
+        journal.michelson.push_dispatch_slot();
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, sender, 0);
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0xDE, 0xAD]),
+            &mut ctx,
+        );
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("sender is not the dispatch slot owner"),
+            "error should mention the owner mismatch: {err}"
+        );
+        assert_eq!(journal.michelson.take_dispatch_result(), Ok(None));
+    }
+
+    // Owner double-collect (the legitimate owner calling twice) is
+    // unaffected by the sender check: it still trips the pre-existing
+    // `AlreadySet` fail-closed error — a distinct error from an
+    // unauthorized caller's owner-mismatch rejection.
+    #[test]
+    fn test_collect_result_owner_double_collect_still_errors() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let owner = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
+
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&owner));
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, owner, 0);
+        let first = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0xCA, 0xFE]),
+            &mut ctx,
+        );
+        assert!(first.is_ok());
+        let second = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0xBE, 0xEF]),
+            &mut ctx,
+        );
+        assert!(second.is_err());
+        let err = second.unwrap_err();
+        assert!(
+            err.to_string().contains("dispatch result already set"),
+            "error should mention already-set slot: {err}"
+        );
+        assert_eq!(
+            journal.michelson.take_dispatch_result(),
+            Ok(Some(vec![0xCA, 0xFE]))
+        );
+    }
+
+    // Griefing: after the owner's collect already deposited, a
+    // mismatched-sender collect is rejected with an `Err` (reverting
+    // the operation) rather than clobbering the owner's deposit — the
+    // owner's bytes stay untouched by the rejected write.
+    #[test]
+    fn test_collect_result_mismatched_sender_after_owner_collect_reverts() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let owner = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
+        let mismatched_sender = AddressHash::Kt1(ContractKt1Hash::from([0xBB; 20]));
+
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&owner));
+
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, owner, 0);
+        let owner_collect = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0xCA, 0xFE]),
+            &mut ctx,
+        );
+        assert!(owner_collect.is_ok());
+
+        // Same synthetic operation, now presenting the griefing
+        // callee's SENDER on the same slot.
+        ctx.sender = mismatched_sender;
+        let grief_collect = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0xBE, 0xEF]),
+            &mut ctx,
+        );
+        assert!(grief_collect.is_err());
+        let err = grief_collect.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("sender is not the dispatch slot owner"),
+            "error should mention the owner mismatch: {err}"
+        );
+        // The owner's payload is untouched by the rejected griefing attempt.
+        assert_eq!(
+            journal.michelson.take_dispatch_result(),
+            Ok(Some(vec![0xCA, 0xFE]))
+        );
+    }
+
+    // Griefing, reversed order: a mismatched-sender collect arriving
+    // BEFORE the owner's is rejected with an `Err` and does not consume
+    // the slot, so the owner's own collect right after still lands.
+    #[test]
+    fn test_collect_result_owner_collect_after_mismatched_sender_lands() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let owner = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
+        let mismatched_sender = AddressHash::Kt1(ContractKt1Hash::from([0xBB; 20]));
+
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        journal.michelson.push_dispatch_slot();
+        journal
+            .michelson
+            .set_current_dispatch_owner(address_hash_bytes(&owner));
+
+        let mut ctx =
+            MockCtx::new(&mut host, &mut journal, &registry, mismatched_sender, 0);
+        let grief_collect = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0xBE, 0xEF]),
+            &mut ctx,
+        );
+        assert!(grief_collect.is_err());
+        let err = grief_collect.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("sender is not the dispatch slot owner"),
+            "error should mention the owner mismatch: {err}"
+        );
+
+        ctx.sender = owner;
+        let owner_collect = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0xCA, 0xFE]),
+            &mut ctx,
+        );
+        assert!(owner_collect.is_ok());
+        // The owner's payload landed; the earlier grief attempt left
+        // no trace to collide with the once-per-dispatch invariant.
         assert_eq!(
             journal.michelson.take_dispatch_result(),
             Ok(Some(vec![0xCA, 0xFE]))

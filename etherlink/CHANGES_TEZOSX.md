@@ -121,6 +121,15 @@
   `CHECK_PRINTABLE` cost (10·len+15) of string literals and view names, which
   were previously not metered. Bounded impact (view name ≤ 31 chars) and no
   funds at risk. (!22394)
+- **Security fix:** the `%collect_result` gateway entrypoint now only
+  accepts a deposit from the contract that is actually being dispatched
+  (the enshrined dispatch slot now records that contract's address as
+  its owner). Previously any contract reachable during the dispatch —
+  including one called internally by the intended target — could write
+  the slot, letting a callee inject its own bytes as the caller's
+  result, or grief the legitimate deposit into an `AlreadySet` failure.
+  A `%collect_result` from any other sender is now rejected, reverting
+  the whole operation.
 - **Bug fix:** Michelson contracts executed via the delayed inbox now observe
   the configured Michelson runtime chain id from `CHAIN_ID`, matching the
   sequenced and gateway ingress lanes. Previously the delayed path derived

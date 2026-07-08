@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use http::StatusCode;
-use mir::ast::{big_map::BigMapId, AddressHash};
+use mir::ast::{big_map::BigMapId, AddressHash, ByteReprTrait};
 use mir::gas::{Gas, OutOfGas};
 use primitive_types::U256;
 use std::collections::BTreeMap;
@@ -688,6 +688,21 @@ where
         journal.michelson.take_pending_alias_origination_internals();
     let parsed = url::parse_tezos_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
+
+    // Assign the dispatch slot's owner to the serve target BEFORE its
+    // code runs. Only this address's own `%collect_result` may write
+    // the slot (enforced by the entrypoint handler); a native callee
+    // reached from the target's own execution presents a different
+    // `SENDER` and is rejected. Must match the `AddressHash` the
+    // target's own `%collect_result` will observe as `ctx.sender()`
+    // (`ExecCtx::create`'s `self_address`, derived the same way).
+    let dispatch_owner = match &parsed.destination {
+        Contract::Implicit(pkh) => AddressHash::Implicit(pkh.clone()),
+        Contract::Originated(kt1) => AddressHash::Kt1(kt1.clone()),
+    };
+    let mut owner_bytes = Vec::new();
+    dispatch_owner.to_bytes(&mut owner_bytes);
+    journal.michelson.set_current_dispatch_owner(owner_bytes);
 
     // Start the op-gas counter early so the Unit fallback below can be
     // metered against the user's actual budget.
