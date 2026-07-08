@@ -6432,6 +6432,114 @@ let test_native_branch_foreign_rejected_delayed =
        changed from %R to %L" ;
   unit
 
+let test_michelson_address_registry () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"Michelson INDEX_ADDRESS and GET_ADDRESS_INDEX on Tezos X"
+    ~tags:["michelson"; "address_registry"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sandbox in
+  let originate ~script_name =
+    sandbox_originate_michelson_contract
+      ~source
+      ~script_name
+      ~init_storage_data:"None"
+      sandbox
+  in
+  let call ~dest pkh =
+    sandbox_call_michelson_contract
+      ~source
+      ~dest
+      ~arg_data:(sf {|"%s"|} pkh)
+      sandbox
+  in
+  let check_storage ~__LOC__ kt1 expected =
+    let* storage = Client.contract_storage kt1 tez_client in
+    Check.(
+      (remove_whitespace storage = remove_whitespace expected)
+        string
+        ~__LOC__
+        ~error_msg:"Expected contract storage %R but got %L") ;
+    unit
+  in
+  (* Fetch the head block's first manager operation and check its
+     operation_result's address_registry_diff as [(address, index)] pairs.
+     The field is a dft in the protocol encoding, so it may be absent when
+     empty. *)
+  let check_head_registry_diff ~__LOC__ expected =
+    let tezlink_endpoint =
+      Endpoint.{(Evm_node.rpc_endpoint_record sandbox) with path = "/tezlink"}
+    in
+    let* operation =
+      RPC_core.call tezlink_endpoint
+      @@ RPC.get_chain_block_operations_validation_pass
+           ~validation_pass:3
+           ~operation_offset:0
+           ()
+    in
+    let open JSON in
+    let op_result =
+      operation |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+    in
+    Check.(
+      (op_result |-> "status" |> as_string = "applied")
+        string
+        ~__LOC__
+        ~error_msg:"Expected operation status %R but got %L") ;
+    let diff =
+      op_result |-> "address_registry_diff" |> as_list_opt
+      |> Option.value ~default:[]
+      |> List.map (fun entry ->
+             (entry |-> "address" |> as_string, entry |-> "index" |> as_string))
+    in
+    Check.(
+      (diff = expected)
+        (list (tuple2 string string))
+        ~__LOC__
+        ~error_msg:"Expected address_registry_diff %R but got %L") ;
+    unit
+  in
+  (* Originate a contract that stores the result of INDEX_ADDRESS on its
+     parameter. *)
+  let* idx_kt1 = originate ~script_name:["opcodes"; "index_address"] in
+  Log.info "Originated index_address contract: %s" idx_kt1 ;
+  (* Index 0 is reserved for the pre-registered null address (as on L1), so the
+     first user-registered address gets index 1. *)
+  let bootstrap1_pkh = Constant.bootstrap1.public_key_hash in
+  let* () = call ~dest:idx_kt1 bootstrap1_pkh in
+  let* () = check_storage ~__LOC__ idx_kt1 "Some 1" in
+  (* The fresh registration is reported on the operation receipt. *)
+  let* () = check_head_registry_diff ~__LOC__ [(bootstrap1_pkh, "1")] in
+  (* Registering the same address again is idempotent. *)
+  let* () = call ~dest:idx_kt1 bootstrap1_pkh in
+  let* () = check_storage ~__LOC__ idx_kt1 "Some 1" in
+  (* ... and an idempotent re-registration emits no receipt diff. *)
+  let* () = check_head_registry_diff ~__LOC__ [] in
+  (* A distinct address gets the next index. *)
+  let* () = call ~dest:idx_kt1 Constant.bootstrap2.public_key_hash in
+  let* () = check_storage ~__LOC__ idx_kt1 "Some 2" in
+  let* () =
+    check_head_registry_diff
+      ~__LOC__
+      [(Constant.bootstrap2.public_key_hash, "2")]
+  in
+  (* Originate a contract that stores the result of GET_ADDRESS_INDEX on its
+     parameter. *)
+  let* get_kt1 = originate ~script_name:["opcodes"; "get_address_index"] in
+  Log.info "Originated get_address_index contract: %s" get_kt1 ;
+  (* The registry is shared: an address registered through the index_address
+     contract is visible from the get_address_index contract. *)
+  let* () = call ~dest:get_kt1 bootstrap1_pkh in
+  let* () = check_storage ~__LOC__ get_kt1 "Some 1" in
+  (* GET_ADDRESS_INDEX is read-only: no receipt diff. *)
+  let* () = check_head_registry_diff ~__LOC__ [] in
+  (* An address that was never registered yields None. *)
+  let* () = call ~dest:get_kt1 Constant.bootstrap3.public_key_hash in
+  let* () = check_storage ~__LOC__ get_kt1 "None" in
+  unit
+
 let () =
   test_native_branch_valid_applied () ;
   test_native_branch_valid_delayed_applied [Alpha] ;
@@ -6518,4 +6626,5 @@ let () =
   test_eip1271_wrong_signature_rejected () ;
   test_p256_malleable_signature_drains_vault () ;
   test_meta_block_rpcs ~runtime:Tezos () ;
-  test_meta_block_rpcs_without_michelson_runtime ()
+  test_meta_block_rpcs_without_michelson_runtime () ;
+  test_michelson_address_registry ()
