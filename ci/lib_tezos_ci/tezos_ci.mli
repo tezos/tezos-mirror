@@ -365,24 +365,6 @@ val retry_twice : Gitlab_ci.Types.retry
     so that GCP runner preemptions are recovered. *)
 val dind_retry : Gitlab_ci.Types.retry
 
-(** Define a trigger job for a child pipeline.
-
-    The trigger job will be named [trigger:CHILD_PIPELINE_NAME].
-
-    We may provide the [parent_pipeline_name] to include it in the
-    PIPELINE_TYPE variable. This helps observability of pipelines
-    containing child pipelines. *)
-val trigger_job :
-  ?dependencies:dependencies ->
-  ?rules:Gitlab_ci.Types.job_rule list ->
-  ?description:string ->
-  ?variables:(string * string) list ->
-  __POS__:string * int * int * int ->
-  stage:Stage.t ->
-  ?parent_pipeline_name:string ->
-  Pipeline.child_pipeline ->
-  tezos_job
-
 module Stages : sig
   val start : Stage.t
 

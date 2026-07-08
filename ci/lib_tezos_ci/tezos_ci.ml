@@ -1166,64 +1166,6 @@ let retry_twice = Gitlab_ci.Types.{max = 2; when_ = []}
 let dind_retry =
   Gitlab_ci.Types.{max = 2; when_ = [Script_failure; Runner_system_failure]}
 
-(* helper function to merge two list of variables, giving the precedence
-   to the values in [variables] over the [default_variables] *)
-let merge_variables ~default_variables variables =
-  let module StringMap = Map.Make (String) in
-  let m1 = List.to_seq default_variables |> StringMap.of_seq in
-  let m2 = List.to_seq variables |> StringMap.of_seq in
-  StringMap.union (fun _ _ v2 -> Some v2) m1 m2
-  |> StringMap.to_seq |> List.of_seq |> List.rev
-
-let trigger_job ?(dependencies = Staged []) ?rules ?description
-    ?(variables = []) ~__POS__ ~stage ?parent_pipeline_name
-    Pipeline.
-      {
-        name = child_pipeline_name;
-        inherit_;
-        jobs = _;
-        auto_cancel = _;
-        description = _;
-        default = _;
-      } : tezos_job =
-  let job_name = "trigger:" ^ child_pipeline_name in
-  let needs, dependencies = resolve_dependencies job_name dependencies in
-  if dependencies != [] then
-    failwith
-      "[trigger_job] trigger job '%s' has artifact-dependencies, which is not \
-       allowed by GitLab CI."
-      job_name ;
-  let pipeline_type =
-    match parent_pipeline_name with
-    | None -> child_pipeline_name
-    | Some parent_name -> parent_name ^ "-" ^ child_pipeline_name
-  in
-  let trigger_job =
-    Gitlab_ci.Util.trigger_job
-      ?needs
-      ?inherit_
-      ?rules
-      ~stage:(Stage.name stage)
-      ~variables:
-        (merge_variables
-           ~default_variables:
-             [
-               ("PIPELINE_TYPE", pipeline_type);
-               ("DOCKER_FORCE_BUILD", "$DOCKER_FORCE_BUILD");
-             ]
-           variables)
-      ~name:job_name
-      (Pipeline.path ~name:child_pipeline_name)
-  in
-  {
-    job = Trigger_job trigger_job;
-    description;
-    source_position = __POS__;
-    stage;
-    image_builders = [];
-    template = None;
-  }
-
 let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
   let all_files =
     let root = "." in
