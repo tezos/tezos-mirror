@@ -1488,41 +1488,40 @@ end
 module Base_images = struct
   let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
 
-  let make_img distro version =
-    Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
-
-  (* DEB packaging *)
-
-  (* All base images below are built together by the [base_images.daily]
-     pipeline and share a single version tag. Current version created by
+  (* Version tag shared by all base images below (built together by the
+     [base_images.daily] pipeline). Current version created by
      https://gitlab.com/tezos/tezos/-/pipelines/2660556657 (commit 25648bf0). *)
   let base_images_tag = "master-25648bf0"
 
-  let debian_bookworm = make_img "debian:bookworm" base_images_tag
+  let make_img distro =
+    Image.mk_external
+      ~image_path:(sf "%s/%s-%s" path_prefix distro base_images_tag)
 
-  let debian_trixie = make_img "debian:trixie" base_images_tag
+  (* DEB packaging *)
+  let debian_bookworm = make_img "debian:bookworm"
 
-  let debian_build_trixie = make_img "debian-build:trixie" base_images_tag
+  let debian_trixie = make_img "debian:trixie"
 
-  let ubuntu_22_04 = make_img "ubuntu:22.04" base_images_tag
+  let debian_build_trixie = make_img "debian-build:trixie"
 
-  let ubuntu_24_04 = make_img "ubuntu:24.04" base_images_tag
+  let ubuntu_22_04 = make_img "ubuntu:22.04"
 
-  let ubuntu_build_24_04 = make_img "ubuntu-build:24.04" base_images_tag
+  let ubuntu_24_04 = make_img "ubuntu:24.04"
 
-  let ubuntu_26_04 = make_img "ubuntu:26.04" base_images_tag
+  let ubuntu_build_24_04 = make_img "ubuntu-build:24.04"
 
-  let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie" base_images_tag
+  let ubuntu_26_04 = make_img "ubuntu:26.04"
 
-  let debian_homebrew_trixie = make_img "debian-homebrew:trixie" base_images_tag
+  let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie"
+
+  let debian_homebrew_trixie = make_img "debian-homebrew:trixie"
 
   (* [debian-rust-trixie] contains libclang for building rocksdb in CI. *)
-  let debian_rust_trixie = make_img "debian-rust:trixie" base_images_tag
+  let debian_rust_trixie = make_img "debian-rust:trixie"
 
   (* [debian-rust-sdk-bindings-trixie]: all dependencies required to build the
      Rust SDK bindings. Built by [images.debian-rust-sdk-bindings]. *)
-  let debian_rust_sdk_bindings =
-    make_img "debian-rust-sdk-bindings:trixie" base_images_tag
+  let debian_rust_sdk_bindings = make_img "debian-rust-sdk-bindings:trixie"
 
   let docker_version = docker_version
 
@@ -1530,12 +1529,11 @@ module Base_images = struct
 
   let dind_service = sf "docker:%s-dind@%s" docker_version docker_digest
 
-  let alpine_docker_ci =
-    make_img (sf "alpine-docker-ci:%s" docker_version) base_images_tag
+  let alpine_docker_ci = make_img (sf "alpine-docker-ci:%s" docker_version)
 
   (* [ci-release] is built on top of the internal [debian] base image (so it
      inherits jq, gcloud, datadog, ...). Since !22370. *)
-  let ci_release = make_img "ci-release:trixie" base_images_tag
+  let ci_release = make_img "ci-release:trixie"
 
   let pp = Image.pp
 end
