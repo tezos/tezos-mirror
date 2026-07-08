@@ -30,9 +30,9 @@ oc.docker:ci:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -58,8 +58,8 @@ oc.docker:rust-toolchain:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
   artifacts:
     reports:
@@ -85,9 +85,9 @@ oc.docker:ci:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: arm64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -212,13 +212,13 @@ sdk_bindings.test:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -289,14 +289,14 @@ build-layer1-profiling:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    PROFILE: static
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    PROFILE: static
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     expire_in: 1 day
     paths:
@@ -346,16 +346,16 @@ check_riscv_kernels:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    EVM_KERNEL_SKIP_BYTECODE: "yes"
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    CC: clang
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
+    NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 audit_riscv_deps:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
@@ -397,16 +397,16 @@ audit_riscv_deps:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    EVM_KERNEL_SKIP_BYTECODE: "yes"
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    CC: clang
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
+    NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 test_kernels:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
@@ -445,16 +445,16 @@ test_kernels:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    EVM_KERNEL_SKIP_BYTECODE: "yes"
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    CC: clang
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
+    NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.build_kernels:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
@@ -514,16 +514,16 @@ oc.build_kernels:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    EVM_KERNEL_SKIP_BYTECODE: "yes"
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    CC: clang
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
+    NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -604,17 +604,17 @@ oc.build_x86_64-exp:
   - eval $(opam env)
   - dune cache trim --size=5GB
   variables:
-    EXECUTABLE_FILES: script-inputs/experimental-executables
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    EXECUTABLE_FILES: script-inputs/experimental-executables
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -704,19 +704,19 @@ oc.build_x86_64-extra-dev:
   - eval $(opam env)
   - dune cache trim --size=5GB
   variables:
-    EXECUTABLE_FILES: script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    EXECUTABLE_FILES: script-inputs/dev-executables
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -797,14 +797,14 @@ oc.build_x86_64-released:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    EXECUTABLE_FILES: script-inputs/released-executables
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -878,8 +878,8 @@ images.debian:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: debian:$RELEASE
     PLATFORM: linux/amd64,linux/arm64
   parallel:
@@ -936,8 +936,8 @@ images.ubuntu:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ubuntu:$RELEASE
     PLATFORM: linux/amd64,linux/arm64
   parallel:
@@ -980,8 +980,8 @@ images.ci-release:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: ci-release
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
   parallel:
@@ -1021,16 +1021,16 @@ images.alpine-docker-ci:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    RELEASE: 28.5.1
+    CI_DOCKER_HUB: "false"
     DISTRIBUTION: alpine-docker-ci
-    IMAGE_PATH: ""
+    DOCKER_DIGEST: sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
     HADOLINT_VERSION: 2.10.0
-    DOCKER_VERSION: 28.5.1
-    DOCKER_DIGEST: sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-    REGCTL_VERSION: v0.4.3
+    IMAGE_PATH: ""
     PLATFORM: linux/amd64,linux/arm64
-    CI_DOCKER_HUB: "false"
+    REGCTL_VERSION: v0.4.3
+    RELEASE: 28.5.1
 
 images.debian-rust:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -1066,8 +1066,8 @@ images.debian-rust:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-rust
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
   parallel:
@@ -1113,8 +1113,8 @@ images.debian-rust.merge:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     DOCKER_VERSION: 28.5.1
-    RELEASE: trixie
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
+    RELEASE: trixie
 
 images.debian-homebrew:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -1149,8 +1149,8 @@ images.debian-homebrew:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-homebrew
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
   parallel:
@@ -1201,8 +1201,8 @@ images.debian-build:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-build
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
   parallel:
@@ -1308,8 +1308,8 @@ images.ubuntu-build:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: ubuntu-build
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
   parallel:
@@ -1411,8 +1411,8 @@ images.debian-systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-systemd
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
   parallel:
@@ -1458,8 +1458,8 @@ images.ubuntu-systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: ubuntu-systemd
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
   parallel:
@@ -1501,8 +1501,8 @@ images.debian-jsonnet:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-jsonnet
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
   parallel:
@@ -1543,8 +1543,8 @@ images.debian-rust-sdk-bindings:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DISTRIBUTION: debian-rust-sdk-bindings
+    DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
   parallel:
@@ -1793,8 +1793,8 @@ oc.ocaml_fmt:
   - dune cache trim --size=5GB
   variables:
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
 
 oc.semgrep:
   image: returntocorp/semgrep-agent:sha-c6cd7cf@sha256:431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24
@@ -2037,14 +2037,14 @@ oc.build-debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
     DISTRIBUTION: debian
     DUNE_BUILD_JOBS: -j 12
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -2146,10 +2146,10 @@ oc.test_keyring_debian_trixie:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: trixie
 
 oc.upgrade_bin_debian_trixie_systemd:
@@ -2192,10 +2192,10 @@ oc.upgrade_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: trixie
 
 oc.install_bin_debian_trixie_systemd:
@@ -2238,10 +2238,10 @@ oc.install_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: trixie
 
 oc.install_bin_debian_trixie:
@@ -2388,10 +2388,10 @@ oc.build-homebrew-formula:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
+    CARGO_NET_OFFLINE: "false"
     DUNE_BUILD_JOBS: -j 12
     HOMEBREW_KISSCACHE: http://kisscache.kisscache.svc.cluster.local
     HOMEBREW_OPAMFETCH: scripts/kiss-fetch.sh
-    CARGO_NET_OFFLINE: "false"
 
 oc.build-homebrew-formula-macosx:
   image: $MACOS_IMAGE
@@ -2473,13 +2473,13 @@ oc.check_lift_limits_patch:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.python_check:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2570,13 +2570,13 @@ oc.integration:compiler-rejections:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.script:test-gen-genesis:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2676,14 +2676,14 @@ oc.script:snapshot_alpha_and_link:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.script:b58_prefix:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2865,13 +2865,13 @@ oc.unit:protocol_compiles:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.unit:webassembly-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2999,17 +2999,17 @@ oc.unit:non-proto-x86_64:
   - eval $(opam env)
   - dune cache trim --size=5GB
   variables:
-    DUNE_ARGS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_ARGS: -j 12
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-x86_64
     expire_in: 1 day
@@ -3081,15 +3081,15 @@ oc.unit:non-proto-arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     DISTRIBUTE_TESTS_TO_PARALLELS: "true"
     DUNE_ARGS: -j 12
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-arm64
     expire_in: 1 day
@@ -3166,17 +3166,17 @@ oc.unit:proto-x86_64:
   - eval $(opam env)
   - dune cache trim --size=5GB
   variables:
-    DUNE_ARGS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_ARGS: -j 12
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-x86_64
     expire_in: 1 day
@@ -3252,17 +3252,17 @@ oc.unit:other-x86_64:
   - eval $(opam env)
   - dune cache trim --size=5GB
   variables:
-    DUNE_ARGS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_ARGS: -j 12
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-x86_64
     expire_in: 1 day
@@ -3314,8 +3314,8 @@ ocaml-check:
   variables:
     CARGO_NET_OFFLINE: "false"
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
 
 test_sdk_rust:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
@@ -3354,13 +3354,13 @@ test_sdk_rust:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.compile_sources_doc:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-100afa6d
@@ -3388,14 +3388,14 @@ oc.compile_sources_doc:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 release_page.build:
   image: ${ci_image_name}/release-page:${ci_image_tag}
@@ -3460,10 +3460,10 @@ release_page.build_tezt:
   variables:
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: release_page_tezt_exe
     expire_in: 1 day
@@ -3518,11 +3518,11 @@ release_page.tezt:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
-    TEZT_VARIANT: ""
     TESTS: "true"
-    TEZT_RETRY: "0"
-    TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "1"
+    TEZT_RETRY: "0"
+    TEZT_VARIANT: ""
   artifacts:
     expire_in: 7 days
     paths:
@@ -3572,13 +3572,13 @@ etherlink.lint_wasm_runtime:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.lint_solidity_artifacts:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -3655,17 +3655,17 @@ etherlink.unit_tests:
   - eval $(opam env)
   - dune cache trim --size=5GB
   variables:
-    DUNE_ARGS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_ARGS: -j 12
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-x86_64
     expire_in: 1 day
@@ -3717,15 +3717,15 @@ etherlink.test_kernel:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.test_evm_compatibility:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
@@ -3766,15 +3766,15 @@ etherlink.test_evm_compatibility:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.test_revm_compatibility:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
@@ -3813,15 +3813,15 @@ etherlink.test_revm_compatibility:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.mir_tzt:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3900,15 +3900,15 @@ etherlink.mir_no_tickets:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.build_tezt:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -3976,16 +3976,16 @@ etherlink.build_tezt:
   - eval $(opam env)
   - dune cache trim --size=5GB
   variables:
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: etherlink_tezt_exe
     expire_in: 1 day
@@ -4122,13 +4122,13 @@ documentation.docgen:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     expire_in: 1 week
     paths:
@@ -4208,14 +4208,14 @@ teztale.build-arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    PROFILE: static
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    PROFILE: static
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: teztale-binaries
     expire_in: 1 day
@@ -4262,14 +4262,14 @@ teztale.build-x86_64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    PROFILE: static
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    PROFILE: static
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: teztale-binaries
     expire_in: 1 day
@@ -4328,13 +4328,13 @@ documentation.odoc:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     expire_in: 4 hours
     paths:
@@ -4501,11 +4501,11 @@ etherlink.tezt:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
-    TEZT_VARIANT: ""
     TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && /flaky
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "3"
     TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "3"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: ""
   artifacts:
     expire_in: 7 days
     paths:
@@ -4560,15 +4560,15 @@ etherlink.build_evm_node_static_arm64:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    VERSION_EXECUTABLE: octez-evm-node
-    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-evm-node
   artifacts:
     name: octez-binaries
     paths:
@@ -4615,15 +4615,15 @@ etherlink.build_evm_node_static_x86_64:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    VERSION_EXECUTABLE: octez-evm-node
-    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-evm-node
   artifacts:
     name: octez-binaries
     paths:
@@ -4800,16 +4800,16 @@ oc.build:static-x86_64-linux-experimental-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/octez-experimental-executables
-    VERSION_EXECUTABLE: octez-baker-alpha
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
+    EXECUTABLE_FILES: script-inputs/octez-experimental-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-baker-alpha
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -4874,15 +4874,15 @@ oc.build:static-x86_64-linux-released-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/octez-released-executables
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
+    EXECUTABLE_FILES: script-inputs/octez-released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -5066,12 +5066,12 @@ tezt-static-binaries:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -static-binaries
     TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && cli &&
       /flaky
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "3"
     TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "3"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: -static-binaries
   artifacts:
     expire_in: 7 days
     paths:
@@ -5158,11 +5158,11 @@ tezt-time-sensitive:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -time-sensitive
     TESTS: time_sensitive && /ci_disabled && /slow && /extra && /cloud
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "1"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: -time-sensitive
   artifacts:
     expire_in: 7 days
     paths:
@@ -5251,11 +5251,11 @@ tezt:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
-    TEZT_VARIANT: ""
     TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && /flaky
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "6"
     TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "6"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: ""
   artifacts:
     expire_in: 7 days
     paths:
@@ -5303,11 +5303,11 @@ oc.docker:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: arm64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    IMAGE_ARCH_PREFIX: arm64_
   retry:
     max: 1
     when:
@@ -5349,11 +5349,11 @@ oc.docker:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: with-evm-artifacts
-    IMAGE_ARCH_PREFIX: amd64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    IMAGE_ARCH_PREFIX: amd64_
   retry:
     max: 1
     when:

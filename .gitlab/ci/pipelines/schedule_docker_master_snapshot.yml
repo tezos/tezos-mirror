@@ -27,9 +27,9 @@ oc.docker:ci:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -55,8 +55,8 @@ oc.docker:rust-toolchain:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
   artifacts:
     reports:
@@ -82,9 +82,9 @@ oc.docker:ci:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: arm64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -142,11 +142,11 @@ oc.docker:snapshot:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: arm64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    IMAGE_ARCH_PREFIX: arm64_
   environment:
     name: docker-publish
     action: access
@@ -184,11 +184,11 @@ oc.docker:snapshot:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: with-evm-artifacts
-    IMAGE_ARCH_PREFIX: amd64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    IMAGE_ARCH_PREFIX: amd64_
   environment:
     name: docker-publish
     action: access
@@ -223,8 +223,8 @@ docker:merge_manifests:snapshot:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+    DOCKER_VERSION: 28.5.1
   environment:
     name: docker-publish
     action: access
@@ -254,8 +254,8 @@ docker:promote_weekly:
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+    DOCKER_VERSION: 28.5.1
   environment:
     name: docker-publish
     action: access

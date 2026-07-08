@@ -27,9 +27,9 @@ oc.docker:ci:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -55,8 +55,8 @@ oc.docker:rust-toolchain:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
   artifacts:
     reports:
@@ -82,9 +82,9 @@ oc.docker:ci:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: arm64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -148,16 +148,16 @@ oc.build:static-arm64-linux-experimental-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/octez-experimental-executables
-    VERSION_EXECUTABLE: octez-baker-alpha
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
+    EXECUTABLE_FILES: script-inputs/octez-experimental-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-baker-alpha
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -195,15 +195,15 @@ oc.build:static-arm64-linux-released-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/octez-released-executables
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
+    EXECUTABLE_FILES: script-inputs/octez-released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -244,14 +244,14 @@ oc.build_arm64-exp:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    EXECUTABLE_FILES: script-inputs/experimental-executables
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/experimental-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-arm64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -305,16 +305,16 @@ oc.build_arm64-extra-dev:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    EXECUTABLE_FILES: script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/dev-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-arm64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -364,14 +364,14 @@ oc.build_arm64-released:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    EXECUTABLE_FILES: script-inputs/released-executables
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-arm64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -423,16 +423,16 @@ oc.build:static-x86_64-linux-experimental-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/octez-experimental-executables
-    VERSION_EXECUTABLE: octez-baker-alpha
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
+    EXECUTABLE_FILES: script-inputs/octez-experimental-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-baker-alpha
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -470,15 +470,15 @@ oc.build:static-x86_64-linux-released-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/octez-released-executables
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
+    EXECUTABLE_FILES: script-inputs/octez-released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -508,11 +508,11 @@ oc.docker:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: arm64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    IMAGE_ARCH_PREFIX: arm64_
   environment:
     name: docker-publish
     action: access
@@ -549,11 +549,11 @@ oc.docker:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: with-evm-artifacts
-    IMAGE_ARCH_PREFIX: amd64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    IMAGE_ARCH_PREFIX: amd64_
   environment:
     name: docker-publish
     action: access
@@ -587,8 +587,8 @@ docker:merge_manifests:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+    DOCKER_VERSION: 28.5.1
   environment:
     name: docker-publish
     action: access

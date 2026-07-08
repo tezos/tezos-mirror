@@ -27,9 +27,9 @@ oc.docker:ci:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -55,9 +55,9 @@ oc.docker:ci:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: arm64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -202,15 +202,15 @@ oc.build:static-arm64-linux-released-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/octez-released-executables
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
+    EXECUTABLE_FILES: script-inputs/octez-released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     expire_in: 90 days
     paths:
@@ -250,15 +250,15 @@ oc.build:static-x86_64-linux-released-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/octez-released-executables
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
+    EXECUTABLE_FILES: script-inputs/octez-released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     expire_in: 90 days
     paths:
@@ -286,14 +286,14 @@ oc.build-ubuntu:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
     DISTRIBUTION: ubuntu
     DUNE_BUILD_JOBS: -j 12
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -364,14 +364,14 @@ oc.build-debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
     DISTRIBUTION: debian
     DUNE_BUILD_JOBS: -j 12
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -444,11 +444,11 @@ oc.docker:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: arm64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables
+    IMAGE_ARCH_PREFIX: arm64_
   retry:
     max: 1
     when:
@@ -480,11 +480,11 @@ oc.docker:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: amd64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables
+    IMAGE_ARCH_PREFIX: amd64_
   retry:
     max: 1
     when:
@@ -515,8 +515,8 @@ docker:merge_manifests:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
   retry: 0
 
 docker:container_scanning:
@@ -641,14 +641,14 @@ teztale.build-arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    PROFILE: static
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    PROFILE: static
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: teztale-binaries
     expire_in: never
@@ -691,14 +691,14 @@ teztale.build-x86_64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    PROFILE: static
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    PROFILE: static
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: teztale-binaries
     expire_in: never
@@ -739,15 +739,15 @@ octez-smart-rollup-node.build:static-arm64-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
-    VERSION_EXECUTABLE: octez-smart-rollup-node
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-smart-rollup-node
   artifacts:
     expire_in: 90 days
     paths:
@@ -786,15 +786,15 @@ octez-smart-rollup-node.build:static-x86_64-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
-    VERSION_EXECUTABLE: octez-smart-rollup-node
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-smart-rollup-node
   artifacts:
     expire_in: 90 days
     paths:
@@ -824,11 +824,11 @@ octez-smart-rollup-node.docker:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: arm64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
+    IMAGE_ARCH_PREFIX: arm64_
 
 octez-smart-rollup-node.docker:amd64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -854,11 +854,11 @@ octez-smart-rollup-node.docker:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: amd64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
+    IMAGE_ARCH_PREFIX: amd64_
 
 octez-smart-rollup-node.docker:merge_manifests:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -884,6 +884,6 @@ octez-smart-rollup-node.docker:merge_manifests:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
   retry: 0

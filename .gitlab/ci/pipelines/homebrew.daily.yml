@@ -73,10 +73,10 @@ oc.build-homebrew-formula:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
+    CARGO_NET_OFFLINE: "false"
     DUNE_BUILD_JOBS: -j 12
     HOMEBREW_KISSCACHE: http://kisscache.kisscache.svc.cluster.local
     HOMEBREW_OPAMFETCH: scripts/kiss-fetch.sh
-    CARGO_NET_OFFLINE: "false"
 
 oc.build-homebrew-formula-macosx:
   image: $MACOS_IMAGE

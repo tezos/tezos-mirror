@@ -26,9 +26,9 @@ oc.docker:ci:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:

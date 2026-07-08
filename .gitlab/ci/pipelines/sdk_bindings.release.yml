@@ -80,13 +80,13 @@ sdk_bindings.build_python_linux:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - contrib/sdk-bindings/rust/target/wheels/*
@@ -127,14 +127,14 @@ sdk_bindings.build_python_macos:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    TAGS: saas-macos-medium-m1
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    TAGS: saas-macos-medium-m1
   artifacts:
     paths:
     - contrib/sdk-bindings/rust/target/wheels/*
@@ -162,8 +162,8 @@ sdk_bindings.build_python_windows:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    TAGS: saas-windows-medium-amd64
     SHELL: powershell
+    TAGS: saas-windows-medium-amd64
   artifacts:
     paths:
     - contrib/sdk-bindings/rust/target/wheels/*
@@ -195,6 +195,6 @@ sdk_bindings.publish:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    MATURIN_REPOSITORY: testpypi
     MATURIN_PYPI_TOKEN: $CI_TESTPYPI_TOKEN
+    MATURIN_REPOSITORY: testpypi
   retry: 0

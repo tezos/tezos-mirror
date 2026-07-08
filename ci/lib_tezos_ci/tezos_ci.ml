@@ -135,6 +135,26 @@ let name_of_generic_job (generic_job : Gitlab_ci.Types.generic_job) =
 
 let name_of_tezos_job tezos_job = name_of_generic_job tezos_job.job
 
+(* Reorder some entries in a job's definition so that the result is more stable.
+   We only reorder entries that are order-insensitive.
+   The goal is to increase the chance of "git diff" being empty (or simpler)
+   after a refactoring, and also to reduce conflicts. *)
+let stabilize_order_in_job (job : Gitlab_ci.Types.generic_job) :
+    Gitlab_ci.Types.generic_job =
+  match job with
+  | Job job ->
+      Job
+        {
+          job with
+          variables =
+            (* Order of variables does not matter if we assume they are all different.
+               Sort them by name. *)
+            Option.map
+              (List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2))
+              job.variables;
+        }
+  | Trigger_job _ -> job
+
 let tezos_job_to_config_elements (j : tezos_job) =
   let source_comment =
     if Cli.config.inline_source_info then
@@ -143,7 +163,7 @@ let tezos_job_to_config_elements (j : tezos_job) =
       [Gitlab_ci.Types.Comment source_info]
     else []
   in
-  source_comment @ [Gitlab_ci.Types.Generic_job j.job]
+  source_comment @ [Gitlab_ci.Types.Generic_job (stabilize_order_in_job j.job)]
 
 let header =
   {|# This file was automatically generated, do not edit.

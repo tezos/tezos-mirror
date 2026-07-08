@@ -107,14 +107,14 @@ oc.build-debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
     DISTRIBUTION: debian
     DUNE_BUILD_JOBS: -j 12
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -186,10 +186,10 @@ oc.test_keyring_debian_bookworm:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: bookworm
 
 oc.upgrade_bin_debian_bookworm_systemd:
@@ -216,10 +216,10 @@ oc.upgrade_bin_debian_bookworm_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: bookworm
 
 oc.install_bin_debian_bookworm_systemd:
@@ -246,10 +246,10 @@ oc.install_bin_debian_bookworm_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: bookworm
 
 oc.install_bin_debian_bookworm:
@@ -323,10 +323,10 @@ oc.test_keyring_debian_trixie:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: trixie
 
 oc.upgrade_bin_debian_trixie_systemd:
@@ -353,10 +353,10 @@ oc.upgrade_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: trixie
 
 oc.install_bin_debian_trixie_systemd:
@@ -383,10 +383,10 @@ oc.install_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: trixie
 
 oc.install_bin_debian_trixie:
@@ -433,14 +433,14 @@ oc.build-ubuntu:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
     DISTRIBUTION: ubuntu
     DUNE_BUILD_JOBS: -j 12
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -513,10 +513,10 @@ oc.test_keyring_ubuntu_22_04:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: "22.04"
 
 oc.upgrade_bin_ubuntu_22_04_systemd:
@@ -543,10 +543,10 @@ oc.upgrade_bin_ubuntu_22_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: "22.04"
 
 oc.install_bin_ubuntu_22_04:
@@ -620,10 +620,10 @@ oc.test_keyring_ubuntu_24_04:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: "24.04"
 
 oc.upgrade_bin_ubuntu_24_04_systemd:
@@ -650,10 +650,10 @@ oc.upgrade_bin_ubuntu_24_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: "24.04"
 
 oc.install_bin_ubuntu_24_04_systemd:
@@ -680,10 +680,10 @@ oc.install_bin_ubuntu_24_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: "24.04"
 
 oc.install_bin_ubuntu_24_04:
@@ -732,10 +732,10 @@ oc.test_keyring_ubuntu_26_04:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: "26.04"
 
 oc.upgrade_bin_ubuntu_26_04_systemd:
@@ -762,10 +762,10 @@ oc.upgrade_bin_ubuntu_26_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: "26.04"
 
 oc.install_bin_ubuntu_26_04_systemd:
@@ -792,10 +792,10 @@ oc.install_bin_ubuntu_26_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-100afa6d
-    PREFIX: ""
     DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    PREFIX: ""
     RELEASE: "26.04"
 
 oc.install_bin_ubuntu_26_04:
@@ -848,16 +848,16 @@ oc.reproducibility_debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    DISTRIBUTION: debian
-    RELEASE: trixie
-    TAGS: gcp_very_high_cpu_ramfs
-    DUNE_BUILD_JOBS: -j 12
     CARGO_INCREMENTAL: "0"
+    DISTRIBUTION: debian
+    DUNE_BUILD_JOBS: -j 12
+    RELEASE: trixie
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    TAGS: gcp_very_high_cpu_ramfs
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}

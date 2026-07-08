@@ -26,9 +26,9 @@ oc.docker:ci:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -84,16 +84,16 @@ oc.build_kernels:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    EVM_KERNEL_SKIP_BYTECODE: "yes"
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    CC: clang
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
+    NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -141,14 +141,14 @@ tezos_x.build_released:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    EXECUTABLE_FILES: script-inputs/tezos-x-executables
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/tezos-x-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day

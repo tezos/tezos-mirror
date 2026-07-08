@@ -27,9 +27,9 @@ oc.docker:ci:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -55,9 +55,9 @@ oc.docker:ci:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: arm64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -121,15 +121,15 @@ octez-smart-rollup-node.build:static-arm64-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
-    VERSION_EXECUTABLE: octez-smart-rollup-node
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-smart-rollup-node
   artifacts:
     expire_in: 90 days
     paths:
@@ -168,15 +168,15 @@ octez-smart-rollup-node.build:static-x86_64-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
-    VERSION_EXECUTABLE: octez-smart-rollup-node
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-smart-rollup-node
   artifacts:
     expire_in: 90 days
     paths:
@@ -265,8 +265,8 @@ octez-smart-rollup-node.release-page-publish:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    S3_BUCKET: release-page-test.nomadic-labs.com
     DISTRIBUTION_ID: E19JF46UG3Z747
+    S3_BUCKET: release-page-test.nomadic-labs.com
   environment:
     name: release-page
     action: access
@@ -301,11 +301,11 @@ octez-smart-rollup-node.docker:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: arm64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
+    IMAGE_ARCH_PREFIX: arm64_
 
 octez-smart-rollup-node.docker:amd64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -331,11 +331,11 @@ octez-smart-rollup-node.docker:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: amd64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
+    IMAGE_ARCH_PREFIX: amd64_
 
 octez-smart-rollup-node.docker:merge_manifests:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -361,6 +361,6 @@ octez-smart-rollup-node.docker:merge_manifests:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
   retry: 0

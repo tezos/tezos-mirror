@@ -27,9 +27,9 @@ oc.docker:ci:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -55,9 +55,9 @@ oc.docker:ci:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: arm64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -185,15 +185,15 @@ oc.build:static-arm64-linux-released-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/octez-released-executables
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
+    EXECUTABLE_FILES: script-inputs/octez-released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     expire_in: 90 days
     paths:
@@ -236,15 +236,15 @@ oc.build:static-x86_64-linux-released-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/octez-released-executables
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_BUILD_JOBS: -j 12
+    EXECUTABLE_FILES: script-inputs/octez-released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     expire_in: 90 days
     paths:
@@ -278,11 +278,11 @@ oc.docker:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: arm64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables
+    IMAGE_ARCH_PREFIX: arm64_
   environment:
     name: docker-publish
     action: access
@@ -320,11 +320,11 @@ oc.docker:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: amd64_
+    DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables
+    IMAGE_ARCH_PREFIX: amd64_
   environment:
     name: docker-publish
     action: access
@@ -358,8 +358,8 @@ docker:merge_manifests:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+    DOCKER_VERSION: 28.5.1
   environment:
     name: docker-publish
     action: access
@@ -390,14 +390,14 @@ oc.build-ubuntu:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
     DISTRIBUTION: ubuntu
     DUNE_BUILD_JOBS: -j 12
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -471,14 +471,14 @@ oc.build-debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    CARGO_INCREMENTAL: "0"
     DISTRIBUTION: debian
     DUNE_BUILD_JOBS: -j 12
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -610,10 +610,10 @@ publish:release-page-packaging-revision:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    S3_BUCKET: site-prod.octez.tezos.com
     BUCKET_PATH: /releases
-    URL: octez.tezos.com
     DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+    S3_BUCKET: site-prod.octez.tezos.com
+    URL: octez.tezos.com
   artifacts:
     expire_in: 1 day
     paths:
@@ -650,8 +650,8 @@ oc.docker:promote_revision_to_version:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+    DOCKER_VERSION: 28.5.1
   environment:
     name: docker-publish
     action: access

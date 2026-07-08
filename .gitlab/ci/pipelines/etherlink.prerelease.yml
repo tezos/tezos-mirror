@@ -27,9 +27,9 @@ oc.docker:ci:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -55,9 +55,9 @@ oc.docker:ci:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: arm64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -121,16 +121,16 @@ etherlink.build_evm_node_static_arm64:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    VERSION_EXECUTABLE: octez-evm-node
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     DUNE_BUILD_JOBS: -j 12
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-evm-node
   artifacts:
     name: octez-binaries
     expire_in: 90 days
@@ -171,16 +171,16 @@ etherlink.build_evm_node_static_x86_64:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    VERSION_EXECUTABLE: octez-evm-node
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     DUNE_BUILD_JOBS: -j 12
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-evm-node
   artifacts:
     name: octez-binaries
     expire_in: 90 days
@@ -236,11 +236,11 @@ etherlink.docker:arm64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
+    CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "true"
-    IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
+    IMAGE_ARCH_PREFIX: arm64_
   environment:
     name: docker-publish
     action: access
@@ -269,11 +269,11 @@ etherlink.docker:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
+    CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "true"
-    IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
+    IMAGE_ARCH_PREFIX: amd64_
   environment:
     name: docker-publish
     action: access
@@ -302,8 +302,8 @@ etherlink.docker:merge_manifests:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+    DOCKER_VERSION: 28.5.1
   environment:
     name: docker-publish
     action: access

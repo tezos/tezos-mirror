@@ -26,9 +26,9 @@ oc.docker:ci:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
     ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
     GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
@@ -80,10 +80,10 @@ release_page.publish:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    S3_BUCKET: site-prod.octez.tezos.com
     BUCKET_PATH: /releases
-    URL: octez.tezos.com
     DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+    S3_BUCKET: site-prod.octez.tezos.com
+    URL: octez.tezos.com
   environment:
     name: release-page
     action: access
@@ -121,10 +121,10 @@ grafazos.release-page-publish:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    S3_BUCKET: site-prod.octez.tezos.com
-    URL: octez.tezos.com
     BUCKET_PATH: /releases
     DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+    S3_BUCKET: site-prod.octez.tezos.com
+    URL: octez.tezos.com
   environment:
     name: release-page
     action: access
@@ -160,10 +160,10 @@ teztale.release-page-publish:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    S3_BUCKET: site-prod.octez.tezos.com
-    URL: octez.tezos.com
     BUCKET_PATH: /releases
     DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+    S3_BUCKET: site-prod.octez.tezos.com
+    URL: octez.tezos.com
   environment:
     name: release-page
     action: access
@@ -199,10 +199,10 @@ octez-smart-rollup-node.release-page-publish:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    S3_BUCKET: site-prod.octez.tezos.com
-    URL: octez.tezos.com
     BUCKET_PATH: /releases
     DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+    S3_BUCKET: site-prod.octez.tezos.com
+    URL: octez.tezos.com
   environment:
     name: release-page
     action: access
