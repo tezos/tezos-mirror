@@ -255,8 +255,8 @@ oc.build-debian:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
@@ -327,8 +327,8 @@ oc.build-ubuntu:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
@@ -380,8 +380,8 @@ oc.build:static-arm64-linux-released-binaries:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -428,8 +428,8 @@ oc.build:static-x86_64-linux-released-binaries:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -630,8 +630,8 @@ teztale.build-arm64:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -680,8 +680,8 @@ teztale.build-x86_64:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh

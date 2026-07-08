@@ -31,8 +31,8 @@ audit_riscv_deps:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make -C src/riscv audit
   - make -C src/lib_riscv/kernels audit
@@ -73,8 +73,8 @@ build-layer1-profiling:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -135,8 +135,8 @@ build_octez_source:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -226,8 +226,8 @@ check_riscv_kernels:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features --features ci'
     check
@@ -425,8 +425,8 @@ oc.build:static-arm64-linux-experimental-binaries:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -472,8 +472,8 @@ oc.build:static-arm64-linux-released-binaries:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -518,8 +518,8 @@ oc.build:static-x86_64-linux-experimental-binaries:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -565,8 +565,8 @@ oc.build:static-x86_64-linux-released-binaries:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -611,8 +611,8 @@ oc.build_arm64-exp:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -669,8 +669,8 @@ oc.build_arm64-extra-dev:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -725,8 +725,8 @@ oc.build_arm64-released:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -782,8 +782,8 @@ oc.build_kernels:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
@@ -841,8 +841,8 @@ oc.build_x86_64-exp:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -908,8 +908,8 @@ oc.build_x86_64-extra-dev:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -970,8 +970,8 @@ oc.build_x86_64-released:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1029,8 +1029,8 @@ oc.check_lift_limits_patch:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1063,8 +1063,8 @@ oc.compile_sources_doc_debian:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
@@ -1135,8 +1135,8 @@ oc.compile_sources_doc_ubuntu:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
@@ -1234,8 +1234,8 @@ oc.integration:compiler-rejections:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1384,8 +1384,8 @@ oc.script:snapshot_alpha_and_link:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1533,8 +1533,8 @@ oc.unit:non-proto-arm64:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1591,8 +1591,8 @@ oc.unit:non-proto-x86_64:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1650,8 +1650,8 @@ oc.unit:other-x86_64:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1709,8 +1709,8 @@ oc.unit:proto-x86_64:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1764,8 +1764,8 @@ oc.unit:protocol_compiles:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1915,8 +1915,8 @@ release_page.build_tezt:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
   - dune build ci/bin_release_page/tezt/
@@ -2083,8 +2083,8 @@ sdk_bindings.test:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . $HOME/.venv/bin/activate
   - make -C contrib/sdk-bindings check
@@ -2121,8 +2121,8 @@ test_kernels:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make -f kernels.mk check
   - make -f kernels.mk test
@@ -2161,8 +2161,8 @@ test_sdk_rust:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make -C sdk/rust check
   - make -C sdk/rust test

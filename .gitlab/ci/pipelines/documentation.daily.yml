@@ -84,8 +84,8 @@ documentation.docgen:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
   - make -C docs -j docexes-gen
@@ -254,8 +254,8 @@ documentation.odoc:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
   - make -C docs odoc-lite
@@ -323,8 +323,8 @@ oc.build_x86_64-extra-dev:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -385,8 +385,8 @@ oc.build_x86_64-released:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
