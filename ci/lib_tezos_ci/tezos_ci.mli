@@ -75,11 +75,6 @@ end
 module Stage : sig
   (* Represents a pipeline stage *)
   type t
-
-  (** Register a stage.
-
-      Fails if a stage of the same name has already been registered. *)
-  val register : string -> t
 end
 
 (** A facility for registering pipelines. *)
