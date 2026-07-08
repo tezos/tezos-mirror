@@ -20,11 +20,6 @@ module Runner = Runner
     [~name] and the stem is equivalent. *)
 val name_of_tezos_job : tezos_job -> string
 
-(** A string that should be prepended to all generated files.
-
-    Warns not to modify the generated files, and refers to the generator. *)
-val header : string
-
 (** Checks that should be performed after {!Pipeline.write}.
 
     Checks that the file [.gitlab-ci.yml] and all the [.yml] files in [.gitlab]
