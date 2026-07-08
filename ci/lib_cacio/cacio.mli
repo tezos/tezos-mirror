@@ -185,8 +185,8 @@ module type COMPONENT_API = sig
       If [sccache] is specified, the resulting job is modified with
       {!Tezos_ci.Cache.enable_sccache}.
 
-      If [dune_cache] is [true], the resulting job is modified with
-      {!Tezos_ci.Cache.enable_dune_cache}. Default is [false].
+      If [dune_cache] is [true], the resulting job uses dune's cache,
+      stored in GitLab's cache. The cache is per job name. Default is [false].
 
       [?image_dependencies] is temporary,
       it will be removed once the image feature is implemented in Cacio.

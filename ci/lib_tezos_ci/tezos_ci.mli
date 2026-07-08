@@ -162,18 +162,6 @@ module Pipeline : sig
 end
 
 module Cache : sig
-  (** Adds a GitLab CI cache for the DUNE_CACHE_ROOT folder.
-
-    This function can be applied to jobs that run dune.
-
-    It adds variables enabling dune cache. It also adds a [cache] where
-    the {!cache_key} is the job name and with a [pull-push] cache policy: i.e. the
-    cache is pulled when the job starts, and is pushed when the job
-    finishes.
-
-   *)
-  val enable_dune_cache : tezos_job -> tezos_job
-
   (** Add variable enabling sccache.
 
     This function should be applied to jobs that build rust files and
