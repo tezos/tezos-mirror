@@ -188,12 +188,6 @@ module Cache : sig
     Exceptions can be made for jobs that must have CARGO_HOME set to
     something different than {!cargo_home}. *)
   val enable_networked_cargo : tezos_job -> tezos_job
-
-  (** Adds a GitLab CI cache for the CARGO_HOME folder.
-
-    More precisely, we only cache the non-SCM dependencies in the
-    sub-directory [registry/cache]. *)
-  val enable_cargo_cache : tezos_job -> tezos_job
 end
 
 (** A facility for registering images for [image:] keywords.

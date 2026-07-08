@@ -211,7 +211,6 @@ type job = {
   after_script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
   cache : Gitlab_ci.Types.cache list;
-  cargo_cache : bool;
   sccache : sccache_config option;
   disable_datadog : bool;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
@@ -579,7 +578,6 @@ let convert_graph ?(interruptible_pipeline = true)
                     after_script;
                     artifacts;
                     cache;
-                    cargo_cache;
                     sccache;
                     disable_datadog;
                     allow_failure;
@@ -669,10 +667,6 @@ let convert_graph ?(interruptible_pipeline = true)
                 | None | Some GCP | Some AWS -> false
                 | Some GCP_dev -> true
               in
-              let maybe_enable_cargo_cache job =
-                if cargo_cache then Tezos_ci.Cache.enable_cargo_cache job
-                else job
-              in
               let maybe_enable_sccache job =
                 match sccache with
                 | None -> job
@@ -710,7 +704,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ~before_script
                 script
                 ~after_script
-              |> maybe_enable_cargo_cache |> maybe_enable_sccache
+              |> maybe_enable_sccache
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -1124,6 +1118,36 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         ["eval $(opam env)"; "dune cache trim --size=5GB"] @ after_script
       else after_script
     in
+    (* ~cargo_cache *)
+    let cache =
+      if cargo_cache then
+        (let cargo_home =
+           Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
+         in
+         Gitlab_ci.Util.cache
+           ~policy:Gitlab_ci.Types.Pull_push
+           ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+           [
+             (* The cache folder contains the .crate (tar.gz) files. *)
+             cargo_home // "registry/cache";
+             (* The index folder contains the database of all
+                 available crates on crates.io. *)
+             cargo_home // "registry/index";
+             (* The src folder contains the unzipped source code
+                 ready for compilation. *)
+             cargo_home // "registry/src";
+             (* cargo_home // "git/db";
+                 These are "bare" git repositories. They contain all
+                 the compressed git history and objects. We might
+                 agree to add them later *)
+           ])
+        :: cache
+      else cache
+    in
+    let variables =
+      if cargo_cache then [("CARGO_NET_OFFLINE", "false")] @ variables
+      else variables
+    in
     {
       uid = fresh_uid ();
       source_location;
@@ -1154,7 +1178,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       after_script;
       artifacts;
       cache;
-      cargo_cache;
       sccache;
       disable_datadog;
       allow_failure;

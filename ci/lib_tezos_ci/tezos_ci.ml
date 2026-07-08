@@ -1312,17 +1312,6 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
         (error_not_generated |> String_set.elements |> String.concat " ")) ;
   if !Cli.has_error then exit 1
 
-let append_cache cache tezos_job =
-  map_non_trigger_job
-    ~error_on_trigger:
-      (sf
-         "[append_cache] attempting to append a cache to trigger job '%s'"
-         (name_of_tezos_job tezos_job))
-    tezos_job
-  @@ fun job ->
-  let caches = Option.value ~default:[] job.cache in
-  {job with cache = Some (caches @ [cache])}
-
 let append_before_script script tezos_job =
   map_non_trigger_job
     ~error_on_trigger:
@@ -1619,28 +1608,6 @@ module Cache = struct
     Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
 
   let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
-
-  let enable_cargo_cache job =
-    job
-    |> append_cache
-         (cache
-            ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-            [
-              (* The cache folder contains the .crate (tar.gz) files. *)
-              cargo_home // "registry/cache";
-              (* The index folder contains the database of all
-                 available crates on crates.io. *)
-              cargo_home // "registry/index";
-              (* The src folder contains the unzipped source code
-                 ready for compilation. *)
-              cargo_home // "registry/src";
-              (* cargo_home // "git/db";
-                 These are "bare" git repositories. They contain all
-                 the compressed git history and objects. We might
-                 agree to add them later *)
-            ])
-    (* Allow Cargo to access the network *)
-    |> enable_networked_cargo
 end
 
 (** A set of internally and externally built images.

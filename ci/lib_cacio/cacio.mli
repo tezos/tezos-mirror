@@ -179,8 +179,9 @@ module type COMPONENT_API = sig
       but [needs_legacy] jobs are not automatically added to pipelines,
       contrary to [needs] jobs.
 
-      If [cargo_cache] is [true], the resulting job is modified with
-      {!Tezos_ci.Cache.enable_cargo_cache}. Default is [false].
+      If [cargo_cache] is [true], the resulting job caches some subdirectories
+      of [.cargo] using GitLab's cache. It also allows cargo to access the network.
+      Default is [false].
 
       If [sccache] is specified, the resulting job is modified with
       {!Tezos_ci.Cache.enable_sccache}.
