@@ -27,6 +27,8 @@ type head = {
   tezosx_runtimes : Tezosx.runtime list;
 }
 
+val blueprint_version : head -> Sequencer_blueprint.blueprint_version
+
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
 (** [start] creates a new worker to manage a local EVM context where it
