@@ -325,12 +325,6 @@ type git_strategy =
 
           Renamed to avoid clashes with {!Option.None}. *)
 
-(** GitLab CI/CD YAML representation of [git_strategy].
-
-    Translates {!git_strategy} to values of accepted by the GitLab
-    CI/CD YAML variable [GIT_STRATEGY]. *)
-val enc_git_strategy : git_strategy -> string
-
 (** Define a job.
 
     This is a smart constructor for {!Gitlab_ci.Types.job}.
