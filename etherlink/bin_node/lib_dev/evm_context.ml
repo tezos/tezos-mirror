@@ -499,17 +499,27 @@ module State = struct
         let split =
           match ctxt.session.last_split_block with
           | None -> true
-          | Some (_level, last_split_timestamp) ->
-              let timestamp = Time.Protocol.to_seconds timestamp in
-              let last_split_timestamp =
-                Time.Protocol.to_seconds last_split_timestamp
-              in
-              Compare.Int64.(
-                timestamp
-                >= Int64.(
-                     add
-                       last_split_timestamp
-                       (of_int gc_param.split_frequency_in_seconds)))
+          | Some (_level, last_split_timestamp) -> (
+              let ts = Time.Protocol.to_seconds timestamp in
+              let last_ts = Time.Protocol.to_seconds last_split_timestamp in
+              let period = Int64.of_int gc_param.split_frequency_in_seconds in
+              match ctxt.configuration.gc_time_of_day with
+              | None ->
+                  (* Default behaviour: the GC drifts relative to the previous
+                     split. *)
+                  Compare.Int64.(ts >= Int64.add last_ts period)
+              | Some time_of_day ->
+                  (* Anchor the GC to a fixed UTC time of day: split as soon as
+                     the block timestamp crosses a new [time_of_day]-aligned
+                     daily boundary. This assumes [period = 86400] (one day),
+                     which holds today because [split_frequency_in_seconds] is
+                     pinned to 86400 (see [gc_param_from_retention_period] and
+                     the legacy-config migration). [Int64.div] truncates towards
+                     zero, which equals floor here since [ts - offset] is
+                     positive for real Unix timestamps ([offset < 86400]). *)
+                  let offset = Int64.of_int time_of_day in
+                  let boundary t = Int64.div (Int64.sub t offset) period in
+                  Compare.Int64.(boundary ts > boundary last_ts))
         in
         if split then (
           Pvm.Context.split ctxt.index ;
@@ -2692,6 +2702,15 @@ module State = struct
       match history_mode with
       | Rolling _ | Full _ | Seed _ -> Evm_store.Irmin_chunks.latest conn
       | Archive -> return_none
+    in
+
+    let*! () =
+      match (history_mode, configuration.gc_time_of_day) with
+      | (Rolling _ | Full _ | Seed _), Some time_of_day ->
+          Evm_context_events.gc_scheduled
+            ~time_of_day:(Configuration.string_of_gc_time_of_day time_of_day)
+      | Archive, Some _ -> Evm_context_events.gc_time_ignored_in_archive ()
+      | (Rolling _ | Full _ | Seed _), None | Archive, None -> Lwt.return_unit
     in
 
     let future_block_info =

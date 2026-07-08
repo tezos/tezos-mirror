@@ -253,6 +253,10 @@ type t = {
   fee_history : fee_history;
   finalized_view : bool;
   history_mode : history_mode option;
+  gc_time_of_day : int option;
+      (** Time of day, in seconds since UTC midnight (0..86399), at which
+          the daily history garbage collection is performed. When [None],
+          the GC drifts relative to the previous garbage collection. *)
   db : db;
   opentelemetry : telemetry_config;
   tx_queue : tx_queue;
@@ -324,6 +328,19 @@ val string_of_history_mode_info : history_mode -> string
 
 val history_mode_of_string_opt : string -> history_mode option
 
+(** [gc_time_of_day_of_string s] parses a time of day ["HH:MM"] (or
+    ["HH:MM:SS"]), interpreted in UTC, into the number of seconds since
+    midnight. Returns [None] if [s] is malformed or out of range. *)
+val gc_time_of_day_of_string : string -> int option
+
+(** [string_of_gc_time_of_day seconds] renders [seconds] since UTC midnight
+    as ["HH:MM"] (or ["HH:MM:SS"] when there is a non-zero seconds part). *)
+val string_of_gc_time_of_day : int -> string
+
+(** Encoding for a GC time of day, serialized as a ["HH:MM"] (or ["HH:MM:SS"])
+    string. *)
+val gc_time_of_day_encoding : int Data_encoding.t
+
 (** [retention ~days] returns the GC parameters to retain [days] of history
     when provided or the default otherwise. *)
 val gc_param_from_retention_period : days:int -> garbage_collector_parameters
@@ -376,6 +393,7 @@ module Cli : sig
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
+    ?gc_time_of_day:int ->
     ?sunset_sec:int64 ->
     ?rpc_timeout:float ->
     ?fail_on_divergence:bool ->
@@ -416,6 +434,7 @@ module Cli : sig
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
     ?history_mode:history_mode ->
+    ?gc_time_of_day:int ->
     ?dal_slots:int list ->
     ?sunset_sec:int64 ->
     ?rpc_timeout:float ->
@@ -459,6 +478,7 @@ module Cli : sig
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
+    ?gc_time_of_day:int ->
     ?sunset_sec:int64 ->
     ?rpc_timeout:float ->
     ?fail_on_divergence:bool ->

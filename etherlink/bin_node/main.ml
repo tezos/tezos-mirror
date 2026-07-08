@@ -409,6 +409,17 @@ module Params = struct
           "Invalid history mode. Must be archive, full:N, rolling:N or seed:N \
            where N is the retention period in days."
 
+  let gc_time_param =
+    Tezos_clic.parameter @@ fun () s ->
+    let open Lwt_result_syntax in
+    match Configuration.gc_time_of_day_of_string s with
+    | Some seconds -> return seconds
+    | None ->
+        failwith
+          "Invalid GC time %S. Must be a time of day HH:MM (or HH:MM:SS) in \
+           UTC."
+          s
+
   let history next =
     Tezos_clic.param
       ~name:"history"
@@ -1150,6 +1161,17 @@ let history_arg =
     ~placeholder:"archive|full:N|rolling:N|seed:N"
     Params.history_param
 
+let gc_time_arg =
+  Tezos_clic.arg
+    ~long:"gc-time"
+    ~doc:
+      "Time of day, in UTC, at which the EVM node performs its daily history \
+       garbage collection, e.g. `03:00`. Only relevant for `full`, `rolling` \
+       and `seed` history modes. When unset, the garbage collection drifts \
+       relative to the previous one."
+    ~placeholder:"HH:MM"
+    Params.gc_time_param
+
 let profiling_arg =
   Tezos_clic.arg_or_switch
     ~long:"profiling"
@@ -1466,7 +1488,7 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_keys ?rpc_addr ?rpc_port
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
     ?genesis_timestamp ?restricted_rpcs ?kernel ?dal_slots ?sandbox_config
-    ~finalized_view ?sunset_sec config_file =
+    ~finalized_view ?sunset_sec ?gc_time_of_day config_file =
   let open Lwt_result_syntax in
   let* configuration =
     Cli.create_or_read_config
@@ -1503,6 +1525,7 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_keys ?rpc_addr ?rpc_port
       ?dal_slots
       ~finalized_view
       ?sunset_sec
+      ?gc_time_of_day
       config_file
   in
   let*! () = init_logs ~daily_logs:true configuration in
@@ -1675,8 +1698,8 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
     ?evm_node_endpoint ?tx_queue_max_lifespan ?tx_queue_max_size
     ?tx_queue_tx_per_addr_limit ?log_filter_chunk_size ?log_filter_max_nb_logs
     ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel ~no_sync
-    ~init_from_snapshot ?history_mode ~finalized_view ?network ~sandbox
-    config_file =
+    ~init_from_snapshot ?history_mode ?gc_time_of_day ~finalized_view ?network
+    ~sandbox config_file =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1708,6 +1731,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
       ?restricted_rpcs
       ?dal_slots:None
       ?history_mode
+      ?gc_time_of_day
       ~finalized_view
       ?network
       config_file
@@ -2560,7 +2584,7 @@ let init_config_command =
        configuration for the observer mode."
     (merge_options
        common_config_args
-       (args20
+       (args21
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -2575,6 +2599,7 @@ let init_config_command =
           catchup_cooldown_arg
           evm_node_endpoint_arg
           history_arg
+          gc_time_arg
           fail_on_divergence_arg
           (* other options *)
           dont_track_rollup_node_arg
@@ -2629,6 +2654,7 @@ let init_config_command =
              catchup_cooldown,
              evm_node_endpoint,
              history_mode,
+             gc_time_of_day,
              fail_on_divergence,
              dont_track_rollup_node,
              wallet_dir,
@@ -2692,6 +2718,7 @@ let init_config_command =
           ~finalized_view
           ?network
           ?history_mode
+          ?gc_time_of_day
           ?sunset_sec:sequencer_sunset_sec
           ~fail_on_divergence
           config_file
@@ -3092,7 +3119,7 @@ let make_kernel_config_command =
         ())
 
 let sequencer_config_args =
-  Tezos_clic.args16
+  Tezos_clic.args17
     preimages_arg
     preimages_endpoint_arg
     time_between_blocks_arg
@@ -3109,6 +3136,7 @@ let sequencer_config_args =
     (Client_config.password_filename_arg ())
     dal_slots_arg
     sunset_sec_arg
+    gc_time_arg
 
 let fund_arg =
   let long = "fund" in
@@ -3205,7 +3233,8 @@ let sequencer_command =
              wallet_dir,
              password_filename,
              dal_slots,
-             sunset_sec ) )
+             sunset_sec,
+             gc_time_of_day ) )
          ()
        ->
       let open Lwt_result_syntax in
@@ -3258,6 +3287,7 @@ let sequencer_command =
         ?dal_slots
         ~finalized_view
         ?sunset_sec
+        ?gc_time_of_day
         config_file)
 
 let sandbox_command =
@@ -3396,7 +3426,7 @@ let sandbox_command =
         config_file)
 
 let observer_run_args =
-  Tezos_clic.args12
+  Tezos_clic.args13
     private_rpc_port_arg
     evm_node_endpoint_arg
     preimages_arg
@@ -3407,6 +3437,7 @@ let observer_run_args =
     no_sync_arg
     init_from_snapshot_arg
     history_arg
+    gc_time_arg
     (supported_network_arg
        ~why:
          "If set, additional sanity checks are performed on the node’s startup."
@@ -3454,6 +3485,7 @@ let observer_command =
              no_sync,
              init_from_snapshot,
              history_mode,
+             gc_time_of_day,
              network,
              sandbox ) )
          ()
@@ -3496,6 +3528,7 @@ let observer_command =
         ~no_sync
         ~init_from_snapshot
         ?history_mode
+        ?gc_time_of_day
         ~finalized_view
         ?network
         ~sandbox

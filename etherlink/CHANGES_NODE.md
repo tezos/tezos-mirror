@@ -6,9 +6,18 @@
 
 ### Configuration changes
 
+- Add a `gc_time_of_day` configuration field to schedule the daily history
+  garbage collection at a fixed time of day (`HH:MM`, in UTC). When unset,
+  the garbage collection keeps drifting relative to the previous one. (!22437)
+
 ### RPCs changes
 
 ### Monitoring changes
+
+- Emit a `gc_scheduled` event at startup reporting the configured daily
+  history garbage collection time when `gc_time_of_day` / `--gc-time` is set.
+  In `archive` history mode, emit a warning instead, since no garbage
+  collection is performed and the configured GC time is discarded. (!22437)
 
 ### Command-line interface changes
 
@@ -16,6 +25,10 @@
   the delayed transactions known to the sequencer and not included in a
   blueprint yet and forward it to a rollup node for injection in the L1.
   (!22418)
+
+- Add a `--gc-time HH:MM` option (UTC) to the `init config`, `run sequencer`
+  and `run observer` commands to pin the daily history garbage collection to a
+  fixed time of day. (!22437)
 
 ### Execution changes
 
