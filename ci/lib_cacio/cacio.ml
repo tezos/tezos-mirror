@@ -207,6 +207,7 @@ type job = {
   only_if : Condition.t;
   variables : Gitlab_ci.Types.variables;
   script : string list;
+  after_script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
   cache : Gitlab_ci.Types.cache list;
   cargo_cache : bool;
@@ -574,6 +575,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     only_if = _;
                     variables;
                     script;
+                    after_script;
                     artifacts;
                     cache;
                     cargo_cache;
@@ -709,6 +711,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?allow_failure
                 ?cache:(match cache with [] -> None | _ :: _ -> Some cache)
                 script
+                ~after_script
               |> maybe_enable_cargo_cache |> maybe_enable_sccache
               |> maybe_enable_dune_cache
         in
@@ -1069,6 +1072,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?(image_dependencies = []) ?services ?id_tokens ?(script = []) name =
     let name = make_name name in
     declared_jobs := String_map.add name source_location !declared_jobs ;
+    let after_script = [] in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
       if compare_stages dep.stage stage > 0 then
@@ -1106,6 +1110,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
              (Condition.label force_if_label));
       variables;
       script;
+      after_script;
       artifacts;
       cache;
       cargo_cache;
