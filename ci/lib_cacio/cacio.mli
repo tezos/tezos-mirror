@@ -527,12 +527,6 @@ val output_tezt_job_list : string -> unit
 
 (** {2 Future work} *)
 
-(** One idea would be to have Cacio provide a dedicated function to create Tezt jobs.
-    This would automatically cause the relevant pipelines with those jobs
-    to have a [select_tezts] job.
-    It could assume that the [main.ml] is located in [component/tezt]
-    (although this requires to change [COMPONENT] to be able to identify the main path). *)
-
 (** Ideally, all components would only have a single path (their toplevel directory).
     For now, we choose to allow multiple paths, so that:
     - one can migrate old components more easily;
