@@ -206,6 +206,7 @@ type job = {
   parallel : Gitlab_ci.Types.parallel option;
   only_if : Condition.t;
   variables : Gitlab_ci.Types.variables;
+  before_script : string list;
   script : string list;
   after_script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
@@ -574,6 +575,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     parallel;
                     only_if = _;
                     variables;
+                    before_script;
                     script;
                     after_script;
                     artifacts;
@@ -710,6 +712,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ~datadog:(not disable_datadog)
                 ?allow_failure
                 ?cache:(match cache with [] -> None | _ :: _ -> Some cache)
+                ~before_script
                 script
                 ~after_script
               |> maybe_enable_cargo_cache |> maybe_enable_sccache
@@ -1072,6 +1075,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?(image_dependencies = []) ?services ?id_tokens ?(script = []) name =
     let name = make_name name in
     declared_jobs := String_map.add name source_location !declared_jobs ;
+    let before_script = [] in
     let after_script = [] in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -1109,6 +1113,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
                 | Some list -> Tezos_ci.Changeset.make list))
              (Condition.label force_if_label));
       variables;
+      before_script;
       script;
       after_script;
       artifacts;
