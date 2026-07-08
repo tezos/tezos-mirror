@@ -72,9 +72,9 @@ let ci_lib_tezos_ci_jobs =
       ]
     ~release_status:Unreleased
 
-let ci_release_page =
+let ci_release_site =
   private_lib
-    "release_page_ci"
+    "release_site_ci"
     ~opam:""
     ~path:"release_site/ci"
     ~bisect_ppx:No
@@ -157,7 +157,7 @@ let _ci_bin_main =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_lib_tezos_ci_jobs |> open_;
-        ci_release_page;
+        ci_release_site;
         ci_grafazos;
         ci_teztale;
         ci_rollup_node;

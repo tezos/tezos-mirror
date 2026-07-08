@@ -7,7 +7,7 @@
   gitlab_ci
   tezos_ci
   tezos_ci_jobs
-  release_page_ci
+  release_site_ci
   grafazos_ci
   teztale_ci
   rollup_node_ci

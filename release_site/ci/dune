@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name release_page_ci)
+ (name release_site_ci)
  (libraries
   gitlab_ci
   tezos_ci
