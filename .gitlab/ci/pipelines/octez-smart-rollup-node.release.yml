@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: images
   tags:
   - gcp
@@ -57,7 +57,7 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: images
   tags:
   - gcp_arm64
@@ -183,7 +183,7 @@ octez-smart-rollup-node.build:static-x86_64-binaries:
     - octez-binaries/$ARCH/*
 
 octez-smart-rollup-node.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: build
   tags:
   - gcp
@@ -216,7 +216,7 @@ octez-smart-rollup-node.docker:amd64:
     action: access
 
 octez-smart-rollup-node.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: build
   tags:
   - gcp_arm64
@@ -249,7 +249,7 @@ octez-smart-rollup-node.docker:arm64:
     action: access
 
 octez-smart-rollup-node.docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -280,7 +280,7 @@ octez-smart-rollup-node.docker:merge_manifests:
   retry: 0
 
 octez-smart-rollup-node.gitlab:octez-smart-rollup-node-release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-0d951d27
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-25648bf0
   stage: publish
   tags:
   - gcp_not_interruptible

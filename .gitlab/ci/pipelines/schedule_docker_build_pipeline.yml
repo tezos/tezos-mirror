@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -60,7 +60,7 @@ docker:merge_manifests:
   retry: 0
 
 oc.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: build
   tags:
   - gcp
@@ -101,7 +101,7 @@ oc.docker:amd64:
     - runner_system_failure
 
 oc.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: build
   tags:
   - gcp_arm64
@@ -140,7 +140,7 @@ oc.docker:arm64:
     - runner_system_failure
 
 oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: images
   tags:
   - gcp
@@ -168,7 +168,7 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: images
   tags:
   - gcp_arm64
@@ -200,7 +200,7 @@ oc.docker:ci:arm64:
     - runner_system_failure
 
 oc.docker:rust-toolchain:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: images
   tags:
   - gcp
@@ -221,7 +221,7 @@ oc.docker:rust-toolchain:amd64:
   variables:
     CI_DOCKER_HUB: "false"
     DOCKER_VERSION: 28.5.1
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
   artifacts:
     reports:
       dotenv: rust_toolchain_image_tag.env
