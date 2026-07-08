@@ -927,6 +927,23 @@ Debug commands:
       If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
     -f --force: Force suppression of data to reset state of sequencer to a specified L2 level.
   
+  flush delayed inbox [--data-dir <data-dir>] [--config-file <path>] [-d --wallet-dir <path>]
+      [--sequencer-key <edsk...>] [-x --exclude <TXN_HASH>] [-f --force]
+    Create and publish a blueprint containing the current items from the delayed inbox
+    --data-dir <data-dir>: The path to the EVM node data directory. Default is
+      $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
+    --config-file <path>: Path to a configuration file. Defaults to `config.json` inside the
+      data directory of the node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
+    -d --wallet-dir <path>: The directory where the Tezos client stores all its wallet
+      data.
+      Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR` if it exists, or
+      `$HOME/.tezos-client` otherwise.
+    --sequencer-key <edsk...>: Key to sign the blueprints.
+    -x --exclude <TXN_HASH>: Transactions to exclude from the blueprint crafted by the command
+    -f --force: Send the resulting blueprint even if the application fails
+  
   replay blueprints from <level> to <level> [--data-dir <data-dir>] [--config-file <path>]
       [--preimages-dir <_evm_installer_preimages>] [--preimages-endpoint <url>]
       [-n --native-execution-policy <policy>] [--kernel <evm_kernel.wasm>]

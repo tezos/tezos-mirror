@@ -247,17 +247,6 @@ module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-(* The kernel deserializes V1 blueprints (a per-transaction runtime tag plus a
-   version marker) once the storage version is recent enough and at least one
-   Tezos X runtime is enabled; otherwise it uses the Legacy format. *)
-let blueprint_version (head_info : Evm_context.head) :
-    Sequencer_blueprint.blueprint_version =
-  if
-    head_info.storage_version >= 48
-    && not (List.is_empty head_info.tezosx_runtimes)
-  then V1
-  else Legacy
-
 let take_delayed_transactions evm_state maximum_number_of_chunks =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
@@ -284,7 +273,7 @@ let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
     (Blueprint_events.blueprint_production
        head_info.Evm_context.next_blueprint_number)
   @@ fun () ->
-  let version = blueprint_version head_info in
+  let version = Evm_context.blueprint_version head_info in
   let chunks =
     Sequencer_blueprint.make_blueprint_chunks
       ~number:head_info.next_blueprint_number
@@ -449,7 +438,7 @@ let pop_valid_tx ?michelson_hard_gas_limit_per_block
     let* initial_validation_state =
       init_validation_state ?michelson_hard_gas_limit_per_block head_info
     in
-    let version = blueprint_version head_info in
+    let version = Evm_context.blueprint_version head_info in
     let* l =
       Tx_queue.pop_transactions
         ~maximum_cumulative_size
@@ -882,7 +871,7 @@ let preconfirm_transactions ?michelson_hard_gas_limit_per_block
       maximum_number_of_chunks
   in
   let*! head_info = Evm_context.head_info () in
-  let version = blueprint_version head_info in
+  let version = Evm_context.blueprint_version head_info in
   Octez_telemetry.Trace.add_attrs (fun () ->
       [Telemetry.Attributes.Block.number head_info.next_blueprint_number]) ;
   let* validation_state, preconfirmation_state =

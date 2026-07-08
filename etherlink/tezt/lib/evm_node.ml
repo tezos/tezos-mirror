@@ -2064,6 +2064,20 @@ let trace_block evm_node block_number =
   in
   Runnable.{value = process; run = parse}
 
+let flush_delayed_inbox ?config_file ?wallet_dir ?sequencer_key ?(exclude = [])
+    ?(force = false) evm_node =
+  let process =
+    spawn_command
+      evm_node
+      (["flush"; "delayed"; "inbox"; "--data-dir"; data_dir evm_node]
+      @ Cli_arg.optional_arg "config-file" Fun.id config_file
+      @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+      @ Cli_arg.optional_arg "sequencer-key" Fun.id sequencer_key
+      @ List.concat_map (fun hash -> ["--exclude"; hash]) exclude
+      @ Cli_arg.optional_switch "force" force)
+  in
+  Runnable.{value = process; run = Process.check}
+
 let trace_transaction ?tracer evm_node tx_hash =
   let tracer_args =
     match tracer with Some t -> ["--tracer"; t] | None -> []

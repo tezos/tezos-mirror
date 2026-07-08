@@ -12,6 +12,11 @@
 
 ### Command-line interface changes
 
+- Add a new command `flush delayed inbox` which crafts a blueprint containing
+  the delayed transactions known to the sequencer and not included in a
+  blueprint yet and forward it to a rollup node for injection in the L1.
+  (!22418)
+
 ### Execution changes
 
 ### Storage changes

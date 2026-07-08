@@ -1259,6 +1259,14 @@ flush_delayed_inbox:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+forced_flush_delayed_inbox_blueprint:
+  description: forcing publication of the blueprint even though it could not be applied
+  level: warning
+  section: evm_node
+  json format:
+    { /* forced_flush_delayed_inbox_blueprint version 0 */
+      "forced_flush_delayed_inbox_blueprint.v0": any }
+  
 gcp_kms_is_ready:
   description: GCP KMS handler for {public_key} is ready
   level: notice
@@ -1811,6 +1819,18 @@ private_server_is_ready:
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+published_flushed_delayed_inbox_blueprint:
+  description: publishing blueprint {number} to flush the delayed inbox
+  level: notice
+  section: evm_node
+  json format:
+    { /* published_flushed_delayed_inbox_blueprint version 0 */
+      "published_flushed_delayed_inbox_blueprint.v0": $bignum }
+    $bignum:
+      /* Big number
+         Decimal representation of a big number */
+      string
   
 received_upgrade:
   description: received an upgrade payload: {payload}

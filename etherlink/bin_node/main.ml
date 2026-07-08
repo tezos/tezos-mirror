@@ -78,6 +78,24 @@ module Event = struct
       ~msg:"running with {profile} profile"
       ~level:Notice
       ("profile", Configuration.performance_profile_encoding)
+
+  let forced_flush =
+    declare_0
+      ~section
+      ~name:"forced_flush_delayed_inbox_blueprint"
+      ~msg:
+        "forcing publication of the blueprint even though it could not be \
+         applied"
+      ~level:Warning
+      ()
+
+  let published_flushed_delayed_inbox =
+    declare_1
+      ~section
+      ~name:"published_flushed_delayed_inbox_blueprint"
+      ~msg:"publishing blueprint {number} to flush the delayed inbox"
+      ~level:Notice
+      ("number", Data_encoding.z)
 end
 
 module Params = struct
@@ -231,6 +249,12 @@ module Params = struct
     Tezos_clic.parameter (fun _ s ->
         let list = String.split ',' s in
         Lwt.return_ok list)
+
+  let transaction_hash =
+    let open Tezos_clic in
+    parameter (fun _ str ->
+        Lwt_result.return
+        @@ Evm_node_lib_dev_encoding.Ethereum_types.hash_of_string str)
 
   let profile =
     let open Lwt_result_syntax in
@@ -2065,6 +2089,140 @@ let dump_to_rlp_command =
       in
 
       write_bytes_to_file dump_rlp bytes ;
+
+      return_unit)
+
+let flush_delayed_inbox_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:
+      "Create and publish a blueprint containing the current items from the \
+       delayed inbox"
+    (args6
+       data_dir_arg
+       config_path_arg
+       wallet_dir_arg
+       sequencer_key_arg
+       (multiple_arg
+          ~long:"exclude"
+          ~short:'x'
+          ~placeholder:"TXN_HASH"
+          ~doc:
+            "Transactions to exclude from the blueprint crafted by the command"
+          Params.transaction_hash)
+       (force_arg
+          ~doc:"Send the resulting blueprint even if the application fails"))
+    (prefixes ["flush"; "delayed"; "inbox"] @@ stop)
+    (fun ( data_dir,
+           config_file,
+           wallet_dir,
+           sequencer_key_str,
+           excluded_txns,
+           force )
+         ()
+       ->
+      let open Evm_node_lib_dev in
+      let open Lwt_result_syntax in
+      let config_file =
+        Configuration.config_filename ~data_dir ?config_file ()
+      in
+      let wallet_ctxt = register_wallet ~wallet_dir () in
+
+      let* sequencer_key =
+        Option.map_es
+          (Evm_node_lib_dev.Signer.sequencer_key_of_string wallet_ctxt)
+          sequencer_key_str
+      in
+
+      let* configuration =
+        Cli.create_or_read_config
+          ~data_dir
+          ?sequencer_keys:(Option.map (fun x -> [x]) sequencer_key)
+          config_file
+      in
+
+      let* _, smart_rollup_address =
+        Evm_context.start ~configuration ~store_perm:Read_write ()
+      in
+      let*! head_info = Evm_context.head_info () in
+
+      let* delayed_transactions =
+        Evm_state.delayed_inbox_hashes head_info.evm_state
+      in
+
+      let timestamp = Misc.now () in
+      let delayed_hashes =
+        List.filter
+          (fun hash ->
+            List.for_all (( <> ) hash) (Option.value ~default:[] excluded_txns))
+          delayed_transactions
+      in
+      let chunks =
+        Sequencer_blueprint.make_blueprint_chunks
+          ~number:head_info.next_blueprint_number
+          {
+            version = Evm_context.blueprint_version head_info;
+            parent_hash = head_info.current_block_hash;
+            delayed_transactions = delayed_hashes;
+            transactions = [];
+            timestamp;
+          }
+      in
+
+      let* signers =
+        match sequencer_key with
+        | Some key -> Signer.of_sequencer_keys configuration wallet_ctxt [key]
+        | None ->
+            Signer.of_sequencer_keys
+              configuration
+              wallet_ctxt
+              configuration.sequencer.sequencer
+      in
+
+      let* pkh = Durable_storage.read Sequencer_key head_info.evm_state in
+      let*? signer = Signer.get_signer signers pkh in
+
+      let* signed_chunks = Sequencer_blueprint.sign ~signer ~chunks in
+
+      let payload =
+        Sequencer_blueprint.create_inbox_payload
+          ~smart_rollup_address:
+            (Tezos_crypto.Hashed.Smart_rollup_address.to_string
+               smart_rollup_address)
+          ~chunks:signed_chunks
+      in
+
+      let* delayed_transactions_items =
+        List.map_es
+          (Evm_state.get_delayed_inbox_item head_info.evm_state)
+          delayed_hashes
+      in
+      let*! apply_result =
+        Evm_context.apply_blueprint timestamp payload delayed_transactions_items
+      in
+
+      let* () =
+        match apply_result with
+        | Ok _ -> return_unit
+        | Error _err when force ->
+            let*! () = Internal_event.Simple.emit Event.forced_flush () in
+            return_unit
+        | Error err -> Lwt.return (Error err)
+      in
+
+      let (Qty number) = head_info.next_blueprint_number in
+      let*! () =
+        Internal_event.Simple.emit Event.published_flushed_delayed_inbox number
+      in
+      let* () =
+        Rollup_services.publish
+          ~order:number
+          ~keep_alive:configuration.keep_alive
+          ~rollup_node_endpoint:configuration.rollup_node_endpoint
+          ~timeout:configuration.rpc_timeout
+          payload
+      in
 
       return_unit)
 
@@ -4005,6 +4163,7 @@ let commands =
     make_sequencer_upgrade_command;
     init_from_rollup_node_command;
     reset_command;
+    flush_delayed_inbox_command;
     replay_command;
     replay_many_command;
     trace_block_command;

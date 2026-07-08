@@ -115,6 +115,17 @@ let pvm_config ctxt =
     ~trace_host_funs:ctxt.configuration.opentelemetry.trace_host_functions
     ()
 
+(* The kernel deserializes V1 blueprints (a per-transaction runtime tag plus a
+   version marker) once the storage version is recent enough and at least one
+   Tezos X runtime is enabled; otherwise it uses the Legacy format. *)
+let blueprint_version (head_info : head) : Sequencer_blueprint.blueprint_version
+    =
+  if
+    head_info.storage_version >= 48
+    && not (List.is_empty head_info.tezosx_runtimes)
+  then V1
+  else Legacy
+
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
 type error +=

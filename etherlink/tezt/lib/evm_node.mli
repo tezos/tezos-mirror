@@ -863,6 +863,19 @@ val switch_history_mode : t -> history_mode -> (Process.t, unit) runnable
     the given [block_number] using the CLI and returns the parsed JSON list. *)
 val trace_block : t -> int -> (Process.t, JSON.t list) runnable
 
+(** [flush_delayed_inbox ?config_file ?wallet_dir ?sequencer_key ?exclude ?force
+    evm_node] crafts and publishes a blueprint containing the current delayed
+    inbox items, excluding the transaction hashes listed in [exclude]. With
+    [force], the blueprint is published even if its application fails. *)
+val flush_delayed_inbox :
+  ?config_file:string ->
+  ?wallet_dir:string ->
+  ?sequencer_key:string ->
+  ?exclude:string list ->
+  ?force:bool ->
+  t ->
+  (Process.t, unit) runnable
+
 (** [trace_transaction ?tracer evm_node tx_hash] traces a single transaction
     identified by [tx_hash] using the CLI. [tracer] selects the tracer
     (defaults to [callTracer]). *)
