@@ -310,10 +310,6 @@ type dependency =
     imposed limit of 50 [needs:] per job. *)
 type dependencies = Staged of tezos_job list | Dependent of dependency list
 
-(** Add the artifacts of [tezos_job] to a [dependencies] set. *)
-val dependencies_add_artifact_dependency :
-  dependencies -> tezos_job -> dependencies
-
 (** Values for the [GIT_STRATEGY] variable.
 
     This can be used to specify whether a job should [Fetch] or [Clone]
