@@ -1493,9 +1493,9 @@ module Base_images = struct
 
   (* DEB packaging *)
 
-  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2660556657
-     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-     https://gitlab.com/tezos/tezos/-/commit/25648bf0/pipelines *)
+  (* All base images below are built together by the [base_images.daily]
+     pipeline and share a single version tag. Current version created by
+     https://gitlab.com/tezos/tezos/-/pipelines/2660556657 (commit 25648bf0). *)
   let debian_version = "master-25648bf0"
 
   let debian_bookworm = make_img "debian:bookworm" debian_version
@@ -1512,34 +1512,17 @@ module Base_images = struct
 
   let ubuntu_26_04 = make_img "ubuntu:26.04" debian_version
 
-  (* [debian-jsonnet-trixie] *)
-  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
-     after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
-  let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie" "master-d70f7d37"
+  let debian_jsonnet_trixie = make_img "debian-jsonnet:trixie" debian_version
 
-  (* [debian-homebrew-trixie] *)
-  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2566178052
-     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-     https://gitlab.com/tezos/tezos/-/commit/100afa6d/pipelines *)
-  let debian_homebrew_trixie =
-    make_img "debian-homebrew:trixie" "master-100afa6d"
+  let debian_homebrew_trixie = make_img "debian-homebrew:trixie" debian_version
 
-  (* [debian-rust-trixie] *)
-  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2555089489
-     Contains libclang for building rocksdb in CI.
-     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-     https://gitlab.com/tezos/tezos/-/commit/23205065/pipelines *)
-  let debian_rust_trixie = make_img "debian-rust:trixie" "master-23205065"
+  (* [debian-rust-trixie] contains libclang for building rocksdb in CI. *)
+  let debian_rust_trixie = make_img "debian-rust:trixie" debian_version
 
-  (* [debian-rust-sdk-bindings-trixie] *)
-  (* Image containing all dependencies required to build the Rust SDK
-     bindings. Built by [images.debian-rust-sdk-bindings] in the
-     [base_images.daily] pipeline.
-     Version created by https://gitlab.com/tezos/tezos/-/pipelines/2593078862
-     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-     https://gitlab.com/tezos/tezos/-/commit/a8af426e/pipelines *)
+  (* [debian-rust-sdk-bindings-trixie]: all dependencies required to build the
+     Rust SDK bindings. Built by [images.debian-rust-sdk-bindings]. *)
   let debian_rust_sdk_bindings =
-    make_img "debian-rust-sdk-bindings:trixie" "master-a8af426e"
+    make_img "debian-rust-sdk-bindings:trixie" debian_version
 
   let docker_version = docker_version
 
@@ -1548,18 +1531,11 @@ module Base_images = struct
   let dind_service = sf "docker:%s-dind@%s" docker_version docker_digest
 
   let alpine_docker_ci =
-    make_img (sf "alpine-docker-ci:%s" docker_version) "master-be43e621"
+    make_img (sf "alpine-docker-ci:%s" docker_version) debian_version
 
-  (* [ci-release] *)
-  (* Built daily by [images.ci-release] in the [base_images.daily] pipeline.
-     Since !22370 this image is built on top of the internal [debian] base
-     image (so it inherits jq, gcloud, datadog, ...).
-     Version created by https://gitlab.com/tezos/tezos/-/pipelines/2646982156
-     May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-     https://gitlab.com/tezos/tezos/-/commit/0d951d27/pipelines *)
-  let ci_release_version = "master-0d951d27"
-
-  let ci_release = make_img "ci-release:trixie" ci_release_version
+  (* [ci-release] is built on top of the internal [debian] base image (so it
+     inherits jq, gcloud, datadog, ...). Since !22370. *)
+  let ci_release = make_img "ci-release:trixie" debian_version
 
   let pp = Image.pp
 end
