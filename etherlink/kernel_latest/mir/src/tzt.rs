@@ -438,7 +438,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                         Micheline::Seq(elts) => elts,
                         _ => return Err("Big map elements must be a sequence".into()),
                     };
-                    let descr: BTreeMap<TypedValue<'a>, TypedValue<'a>> = elts
+                    let descr: rpds::RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>> = elts
                         .iter()
                         .map(
                             |elt| -> Result<(TypedValue<'a>, TypedValue<'a>), Box<dyn Error>> {
@@ -458,7 +458,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                             }
                             },
                         )
-                        .collect::<Result<BTreeMap<_, _>, Box<dyn Error>>>()?;
+                        .collect::<Result<rpds::RedBlackTreeMap<_, _>, Box<dyn Error>>>()?;
 
                     a.insert(idx, MapInfo::new(descr, key_ty, val_ty));
                 }

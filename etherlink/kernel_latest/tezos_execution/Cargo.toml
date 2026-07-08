@@ -44,3 +44,6 @@ tezosx-journal.workspace = true
 pretty_assertions = "1.4.0"
 http.workspace = true
 tezosx-interfaces = { workspace = true, features = ["testing"] }
+# Pinned: rpds >= 1.1.1 pulls archery >= 1.2.2 (edition 2024 / MSRV 1.85),
+# which the sdk-bindings workspace (Rust 1.83) cannot build.
+rpds = "=1.1.0"

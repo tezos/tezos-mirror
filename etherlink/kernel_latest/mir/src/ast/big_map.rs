@@ -6,6 +6,7 @@
 
 use num_bigint::{BigInt, Sign};
 use num_traits::{One, Zero};
+use rpds::RedBlackTreeMap;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
@@ -117,7 +118,7 @@ pub struct BigMapFromId<'a> {
     /// certain key points like the end of the contract execution this diff is
     /// dumped into the storage. Change in storage can be applied in-place or,
     /// if necessary, with copy of the stored map.
-    pub overlay: BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
+    pub overlay: RedBlackTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
 }
 
 /// The content of a big map, either backed by a map in the lazy
@@ -126,7 +127,7 @@ pub struct BigMapFromId<'a> {
 pub enum BigMapContent<'a> {
     /// Big map can be backed by no map in the lazy storage and yet
     /// stay fully in memory.
-    InMemory(BTreeMap<TypedValue<'a>, TypedValue<'a>>),
+    InMemory(RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>),
     /// Otherwise they come from the lazy storage and have both an
     /// identifier and an overlay
     FromId(BigMapFromId<'a>),
@@ -136,7 +137,7 @@ pub enum BigMapContent<'a> {
 /// content out of a `&mut BigMap` without cloning.
 impl Default for BigMapContent<'_> {
     fn default() -> Self {
-        BigMapContent::InMemory(BTreeMap::new())
+        BigMapContent::InMemory(RedBlackTreeMap::new())
     }
 }
 
@@ -154,11 +155,11 @@ pub struct BigMap<'a> {
 }
 
 impl<'a> BigMap<'a> {
-    /// Create an in-memory big map from a BTreeMap
+    /// Create an in-memory big map from the given entries.
     pub fn new(
         key_type: Type,
         value_type: Type,
-        map: BTreeMap<TypedValue<'a>, TypedValue<'a>>,
+        map: RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>,
     ) -> Self {
         Self {
             content: BigMapContent::InMemory(map),
@@ -169,7 +170,7 @@ impl<'a> BigMap<'a> {
 
     /// Michelson's `EMPTY_BIG_MAP`
     pub fn empty(key_type: Type, value_type: Type) -> Self {
-        Self::new(key_type, value_type, BTreeMap::new())
+        Self::new(key_type, value_type, RedBlackTreeMap::new())
     }
 
     /// Michelson's `GET`.
@@ -218,14 +219,14 @@ impl<'a> BigMap<'a> {
         match &mut self.content {
             BigMapContent::InMemory(m) => match value {
                 Some(value) => {
-                    m.insert(key, value);
+                    m.insert_mut(key, value);
                 }
                 None => {
-                    m.remove(&key);
+                    m.remove_mut(&key);
                 }
             },
             BigMapContent::FromId(BigMapFromId { id: _, overlay }) => {
-                overlay.insert(key, value);
+                overlay.insert_mut(key, value);
             }
         }
     }
@@ -233,8 +234,8 @@ impl<'a> BigMap<'a> {
     /// Length of the in-memory part of the big map
     pub fn len_for_gas(&self) -> usize {
         match &self.content {
-            BigMapContent::InMemory(m) => m.len(),
-            BigMapContent::FromId(BigMapFromId { id: _, overlay }) => overlay.len(),
+            BigMapContent::InMemory(m) => m.size(),
+            BigMapContent::FromId(BigMapFromId { id: _, overlay }) => overlay.size(),
         }
     }
 }
@@ -388,7 +389,7 @@ impl<'a, T: LazyStorage<'a> + ?Sized> LazyStorageBulkUpdate<'a> for T {}
 /// A `big_map` representation with metadata, used in [InMemoryLazyStorage].
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct MapInfo<'a> {
-    map: BTreeMap<TypedValue<'a>, TypedValue<'a>>,
+    map: RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>,
     key_type: Type,
     value_type: Type,
 }
@@ -396,7 +397,7 @@ pub(crate) struct MapInfo<'a> {
 impl<'a> MapInfo<'a> {
     /// Construct a new, empty, in-memory storage.
     pub fn new(
-        map: BTreeMap<TypedValue<'a>, TypedValue<'a>>,
+        map: RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>,
         key_type: Type,
         value_type: Type,
     ) -> Self {
@@ -516,10 +517,10 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         let info = self.access_big_map_mut(id)?;
         match value {
             None => {
-                info.map.remove(&key);
+                info.map.remove_mut(&key);
             }
             Some(value) => {
-                info.map.insert(key, value);
+                info.map.insert_mut(key, value);
             }
         }
         Ok(())
@@ -539,7 +540,7 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         self.big_maps.insert(
             id.clone(),
             MapInfo {
-                map: BTreeMap::new(),
+                map: RedBlackTreeMap::new(),
                 key_type: key_type.clone(),
                 value_type: value_type.clone(),
             },
@@ -610,7 +611,7 @@ mod test_big_map_operations {
     fn test_get_mem_in_memory() {
         let arena = &Arena::new();
         let storage = &mut InMemoryLazyStorage::new();
-        let content = BigMapContent::InMemory(BTreeMap::from([(
+        let content = BigMapContent::InMemory(RedBlackTreeMap::from_iter([(
             TypedValue::int(1),
             TypedValue::int(1),
         )]));
@@ -646,7 +647,7 @@ mod test_big_map_operations {
             .unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id,
-            overlay: BTreeMap::from([
+            overlay: RedBlackTreeMap::from_iter([
                 (TypedValue::int(1), Some(TypedValue::int(-1))),
                 (TypedValue::int(2), None),
                 (TypedValue::int(3), Some(TypedValue::int(3))),
@@ -685,7 +686,9 @@ mod test_big_map_operations {
 
 impl<'a> TypedValue<'a> {
     /// Traverses a `TypedValue` in AST pre-order and applies `f` to every big
-    /// map inside it.
+    /// map inside it. Big maps nested in a map value are reached via
+    /// [RedBlackTreeMap::get_mut], which path-copies the node so `f`'s writes
+    /// stick.
     fn for_each_big_map_mut(&mut self, f: &mut impl FnMut(&mut BigMap<'a>)) {
         use crate::ast::Or::*;
         use TypedValue::*;
@@ -730,9 +733,15 @@ impl<'a> TypedValue<'a> {
                 // Elements are comparable and so have no big maps
             }
             Map(m) => {
-                // Keys are comparable (no big maps); visit each value.
-                m.values_mut()
-                    .for_each(|v| Rc::make_mut(v).for_each_big_map_mut(f))
+                // Keys are comparable (no big maps); visit each value via
+                // get_mut. Collect the keys first so we can call get_mut,
+                // which borrows the map mutably, one at a time.
+                let keys: Vec<Rc<TypedValue<'a>>> = m.keys().cloned().collect();
+                for k in keys {
+                    if let Some(v) = m.get_mut(&k) {
+                        Rc::make_mut(v).for_each_big_map_mut(f)
+                    }
+                }
             }
             BigMap(m) => f(m),
             Ticket(_) => {
@@ -757,7 +766,8 @@ impl<'a> TypedValue<'a> {
     }
 
     /// Read-only counterpart of [TypedValue::for_each_big_map_mut]: applies
-    /// `f` to every big map inside self in AST order without mutating it.
+    /// `f` to every big map inside self in AST order without mutating it. Map
+    /// values are walked via [RedBlackTreeMap::values].
     ///
     /// Kept exhaustive (no catch-all) and in lock-step with
     /// [TypedValue::for_each_big_map_mut] on purpose: this read-only walk feeds
@@ -906,8 +916,10 @@ pub fn dump_big_map_updates<'a>(
 
 /// Deferred first-occurrence in-place overlays from [dump_big_map_walk],
 /// applied once every walk sharing the lazy storage has run.
-pub type DeferredBigMapUpdates<'a> =
-    Vec<(BigMapId, BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>)>;
+pub type DeferredBigMapUpdates<'a> = Vec<(
+    BigMapId,
+    RedBlackTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
+)>;
 
 /// Apply the deferred in-place overlays returned by [dump_big_map_walk].
 pub fn apply_deferred_big_map_updates<'a>(
@@ -915,7 +927,10 @@ pub fn apply_deferred_big_map_updates<'a>(
     deferred: DeferredBigMapUpdates<'a>,
 ) -> Result<(), LazyStorageError> {
     for (id, overlay) in deferred {
-        storage.big_map_bulk_update(&id, overlay)?;
+        storage.big_map_bulk_update(
+            &id,
+            overlay.iter().map(|(k, v)| (k.clone(), v.clone())),
+        )?;
     }
     Ok(())
 }
@@ -979,7 +994,11 @@ fn dump_one_big_map<'a>(
             let must_copy = temporary || m.id.is_temporary() || already_seen;
             if must_copy {
                 let new_id = storage.big_map_copy(&m.id, temporary)?;
-                storage.big_map_bulk_update(&new_id, mem::take(&mut m.overlay))?;
+                let overlay = mem::take(&mut m.overlay);
+                storage.big_map_bulk_update(
+                    &new_id,
+                    overlay.iter().map(|(k, v)| (k.clone(), v.clone())),
+                )?;
                 m.id = new_id;
             } else {
                 // First occurrence of a permanent id with a
@@ -997,15 +1016,16 @@ fn dump_one_big_map<'a>(
             // no need to defer.
             let id = storage.big_map_new(&map.key_type, &map.value_type, temporary)?;
             storage.record_diff_order(&id);
+            let in_memory = mem::take(m);
             storage.big_map_bulk_update(
                 &id,
-                mem::take(m)
-                    .into_iter()
-                    .map(|(key, value)| (key, Some(value))),
+                in_memory
+                    .iter()
+                    .map(|(key, value)| (key.clone(), Some(value.clone()))),
             )?;
             map.content = BigMapContent::FromId(BigMapFromId {
                 id,
-                overlay: BTreeMap::new(),
+                overlay: RedBlackTreeMap::new(),
             });
         }
     }
@@ -1048,14 +1068,14 @@ mod test_big_map_to_storage_update {
         match map.content {
             BigMapContent::InMemory(_) => panic!("Big map has not been dumped"),
             BigMapContent::FromId(map) => {
-                assert_eq!((map.id, map.overlay), (id, BTreeMap::new()))
+                assert_eq!((map.id, map.overlay), (id, RedBlackTreeMap::new()))
             }
         };
     }
 
     /// Run [dump_big_map_updates] over a list of big maps by wrapping them in a
     /// right-nested comb of pairs, visited in AST order by for_each_big_map_mut,
-    /// and taking the mutated maps back out in the same order.
+    /// and unwinding the mutated maps back out in the same order.
     fn dump_maps<'a>(
         storage: &mut (impl LazyStorage<'a> + ?Sized),
         started: &[BigMapId],
@@ -1068,8 +1088,9 @@ mod test_big_map_to_storage_update {
             root = TypedValue::new_pair(TypedValue::BigMap(m), root);
         }
         dump_big_map_updates(storage, started, &mut root, temporary).unwrap();
-        // A by-value `Pair(l, r)` destructure is rejected because `TypedValue`
-        // implements `Drop` (L2-1672), so visit through
+        // Walk the comb in the same AST order it was built and take each mutated
+        // big map back out. A by-value `Pair(l, r)` destructure is rejected
+        // because `TypedValue` implements `Drop` (L2-1672), so we visit through
         // [TypedValue::for_each_big_map_mut] and swap a placeholder in instead.
         let mut out = Vec::new();
         root.for_each_big_map_mut(&mut |m| {
@@ -1081,7 +1102,7 @@ mod test_big_map_to_storage_update {
     #[test]
     fn test_map_from_memory() {
         let storage = &mut InMemoryLazyStorage::new();
-        let content = BigMapContent::InMemory(BTreeMap::from([
+        let content = BigMapContent::InMemory(RedBlackTreeMap::from_iter([
             (TypedValue::int(1), TypedValue::int(1)),
             (TypedValue::int(2), TypedValue::int(2)),
         ]));
@@ -1098,7 +1119,7 @@ mod test_big_map_to_storage_update {
             BTreeMap::from([(
                 0.into(),
                 MapInfo {
-                    map: BTreeMap::from([
+                    map: RedBlackTreeMap::from_iter([
                         (TypedValue::int(1), TypedValue::int(1)),
                         (TypedValue::int(2), TypedValue::int(2))
                     ]),
@@ -1121,7 +1142,7 @@ mod test_big_map_to_storage_update {
             .unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id,
-            overlay: BTreeMap::from([
+            overlay: RedBlackTreeMap::from_iter([
                 (TypedValue::int(0), None),
                 (TypedValue::int(1), Some(TypedValue::int(5))),
                 (TypedValue::int(2), None),
@@ -1141,7 +1162,7 @@ mod test_big_map_to_storage_update {
             BTreeMap::from([(
                 0.into(),
                 MapInfo {
-                    map: BTreeMap::from([
+                    map: RedBlackTreeMap::from_iter([
                         (TypedValue::int(1), TypedValue::int(5)),
                         (TypedValue::int(3), TypedValue::int(3))
                     ]),
@@ -1159,7 +1180,10 @@ mod test_big_map_to_storage_update {
         let map_id2 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
-            overlay: BTreeMap::from([(TypedValue::int(11), Some(TypedValue::int(11)))]),
+            overlay: RedBlackTreeMap::from_iter([(
+                TypedValue::int(11),
+                Some(TypedValue::int(11)),
+            )]),
         });
         let map1_1 = BigMap {
             content,
@@ -1168,7 +1192,10 @@ mod test_big_map_to_storage_update {
         };
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id1,
-            overlay: BTreeMap::from([(TypedValue::int(12), Some(TypedValue::int(12)))]),
+            overlay: RedBlackTreeMap::from_iter([(
+                TypedValue::int(12),
+                Some(TypedValue::int(12)),
+            )]),
         });
         let map1_2 = BigMap {
             content,
@@ -1177,7 +1204,10 @@ mod test_big_map_to_storage_update {
         };
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id2,
-            overlay: BTreeMap::from([(TypedValue::int(2), Some(TypedValue::int(2)))]),
+            overlay: RedBlackTreeMap::from_iter([(
+                TypedValue::int(2),
+                Some(TypedValue::int(2)),
+            )]),
         });
         let map2 = BigMap {
             content,
@@ -1200,7 +1230,10 @@ mod test_big_map_to_storage_update {
                 (
                     0.into(),
                     MapInfo {
-                        map: BTreeMap::from([(TypedValue::int(11), TypedValue::int(11))]),
+                        map: RedBlackTreeMap::from_iter([(
+                            TypedValue::int(11),
+                            TypedValue::int(11)
+                        )]),
                         key_type: Type::Int,
                         value_type: Type::Int
                     }
@@ -1208,7 +1241,10 @@ mod test_big_map_to_storage_update {
                 (
                     1.into(),
                     MapInfo {
-                        map: BTreeMap::from([(TypedValue::int(2), TypedValue::int(2))]),
+                        map: RedBlackTreeMap::from_iter([(
+                            TypedValue::int(2),
+                            TypedValue::int(2)
+                        )]),
                         key_type: Type::Int,
                         value_type: Type::Int
                     }
@@ -1216,7 +1252,10 @@ mod test_big_map_to_storage_update {
                 (
                     2.into(),
                     MapInfo {
-                        map: BTreeMap::from([(TypedValue::int(12), TypedValue::int(12))]),
+                        map: RedBlackTreeMap::from_iter([(
+                            TypedValue::int(12),
+                            TypedValue::int(12)
+                        )]),
                         key_type: Type::Int,
                         value_type: Type::Int
                     }
@@ -1238,7 +1277,10 @@ mod test_big_map_to_storage_update {
             .unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
-            overlay: BTreeMap::from([(TypedValue::int(1), Some(TypedValue::int(1)))]),
+            overlay: RedBlackTreeMap::from_iter([(
+                TypedValue::int(1),
+                Some(TypedValue::int(1)),
+            )]),
         });
         let map1 = BigMap {
             content,
@@ -1252,7 +1294,7 @@ mod test_big_map_to_storage_update {
             BTreeMap::from([(
                 0.into(),
                 MapInfo {
-                    map: BTreeMap::from([
+                    map: RedBlackTreeMap::from_iter([
                         (TypedValue::int(0), TypedValue::int(0)),
                         (TypedValue::int(1), TypedValue::int(1))
                     ]),
@@ -1289,7 +1331,7 @@ mod test_big_map_to_storage_update {
         let make_map = |id: BigMapId| BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id,
-                overlay: BTreeMap::new(),
+                overlay: RedBlackTreeMap::new(),
             }),
             key_type: Type::Int,
             value_type: Type::Int,
@@ -1310,5 +1352,104 @@ mod test_big_map_to_storage_update {
         check_is_dumped_map(out.next().unwrap(), 0.into());
         check_is_dumped_map(out.next().unwrap(), 1.into());
         check_is_dumped_map(out.next().unwrap(), 2.into());
+    }
+}
+
+#[cfg(test)]
+mod review_verification {
+    //! Tests added while reviewing the persistent-collections change
+    //! (L2-1649): they pin the two properties the review leaned on — that
+    //! the `rpds` trees iterate in the same order as the `std` maps they
+    //! replaced, and that the read-only big-map walk reaches every position
+    //! the mutable walk does.
+    use super::*;
+    use crate::ast::{MichelsonList, Or, Type};
+    use rpds::RedBlackTreeSet;
+
+    /// Consensus-critical invariant behind the whole migration: `rpds`
+    /// `RedBlackTreeMap`/`RedBlackTreeSet` must iterate in ascending key
+    /// order, byte-for-byte matching the `BTreeMap`/`BTreeSet` they replaced.
+    /// PACK/serialization, `ITER`, `MAP` and the big-map durable layout all
+    /// depend on this; if a future `rpds` bump changed it, this fails loudly.
+    #[test]
+    fn rpds_collections_iterate_in_btreemap_order() {
+        // Deliberately unsorted, with negatives, a zero, and a duplicate.
+        let ks = [
+            TypedValue::int(5),
+            TypedValue::int(-3),
+            TypedValue::int(0),
+            TypedValue::int(100),
+            TypedValue::int(-1),
+            TypedValue::int(2),
+            TypedValue::int(-3),
+        ];
+        let mut rb = RedBlackTreeMap::new();
+        let mut bt = BTreeMap::new();
+        let mut rs = RedBlackTreeSet::new();
+        let mut bs = BTreeSet::new();
+        for (i, k) in ks.iter().enumerate() {
+            rb.insert_mut(k.clone(), i);
+            bt.insert(k.clone(), i);
+            rs.insert_mut(k.clone());
+            bs.insert(k.clone());
+        }
+        assert!(
+            rb.iter().map(|(k, _)| k).eq(bt.keys()),
+            "RedBlackTreeMap key order diverges from BTreeMap"
+        );
+        assert!(
+            rs.iter().eq(bs.iter()),
+            "RedBlackTreeSet order diverges from BTreeSet"
+        );
+        // Strictly ascending, independent of insertion order.
+        let mut sorted: Vec<TypedValue> = ks.to_vec();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(rb.keys().cloned().collect::<Vec<_>>(), sorted);
+    }
+
+    /// A persisted (`FromId`) big map placed in every value position the
+    /// mutable dump walk descends into must also be reached by the read-only
+    /// [TypedValue::view_big_map_ids] walk — otherwise `started_with_map_ids`
+    /// under-reports and [dump_big_map_updates]'s removal pass could leak a
+    /// dropped big map. Guards the two walks against drifting apart.
+    #[test]
+    fn view_big_map_ids_covers_all_container_positions() {
+        let bm = |id: i64| {
+            TypedValue::BigMap(BigMap {
+                content: BigMapContent::FromId(BigMapFromId {
+                    id: id.into(),
+                    overlay: RedBlackTreeMap::new(),
+                }),
+                key_type: Type::Int,
+                value_type: Type::Int,
+            })
+        };
+        // Nest a distinct FromId big map in: Pair (both sides), Or, Option,
+        // List element, and Map value.
+        let value = TypedValue::new_pair(
+            TypedValue::new_pair(bm(0), bm(1)),
+            TypedValue::new_pair(
+                TypedValue::Or(Or::Left(Rc::new(bm(2)))),
+                TypedValue::new_pair(
+                    TypedValue::Option(Some(Rc::new(bm(3)))),
+                    TypedValue::new_pair(
+                        TypedValue::List(MichelsonList::from(vec![Rc::new(bm(4))])),
+                        TypedValue::Map(RedBlackTreeMap::from_iter([(
+                            Rc::new(TypedValue::int(0)),
+                            Rc::new(bm(5)),
+                        )])),
+                    ),
+                ),
+            ),
+        );
+        let mut ids = vec![];
+        value.view_big_map_ids(&mut ids);
+        ids.sort();
+        assert_eq!(
+            ids,
+            (0..=5).map(BigMapId::from).collect::<Vec<_>>(),
+            "view_big_map_ids missed a big map in some container position"
+        );
     }
 }

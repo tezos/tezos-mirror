@@ -1560,22 +1560,10 @@ pub mod tests {
         apply_deferred_big_map_updates, dump_big_map_updates, dump_big_map_walk,
         remove_unreferenced_big_maps, BigMap, BigMapContent, BigMapFromId, BigMapId,
     };
+    use mir::ast::Type;
+    use rpds::RedBlackTreeMap;
     use std::collections::{BTreeMap, BTreeSet};
     use tezos_evm_runtime::runtime::MockKernelHost;
-
-    #[macro_export]
-    macro_rules! make_default_ctx {
-        ($ctx:ident, $host: expr) => {
-            let mut operation_gas = TezlinkOperationGas::default();
-            let mut $ctx = TcCtx {
-                host: $host,
-                operation_gas: &mut operation_gas,
-                big_map_diff: BTreeMap::new(),
-                interpret_context: $crate::mir_ctx::InterpretContext::new(),
-                next_temporary_id: &mut BigMapId { value: (-1).into() },
-            };
-        };
-    }
 
     /// Take a big map back out of a dump root without moving out of the
     /// `Drop`-implementing [TypedValue] (which the compiler forbids): swap an
@@ -1601,12 +1589,26 @@ pub mod tests {
         take_big_map(&mut root)
     }
 
+    #[macro_export]
+    macro_rules! make_default_ctx {
+        ($ctx:ident, $host: expr) => {
+            let mut operation_gas = TezlinkOperationGas::default();
+            let mut $ctx = TcCtx {
+                host: $host,
+                operation_gas: &mut operation_gas,
+                big_map_diff: BTreeMap::new(),
+                interpret_context: $crate::mir_ctx::InterpretContext::new(),
+                next_temporary_id: &mut BigMapId { value: (-1).into() },
+            };
+        };
+    }
+
     #[track_caller]
     fn check_is_dumped_map(map: BigMap, id: BigMapId) {
         match map.content {
             BigMapContent::InMemory(_) => panic!("Big map has not been dumped"),
             BigMapContent::FromId(map) => {
-                assert_eq!((map.id, map.overlay), (id, BTreeMap::new()))
+                assert_eq!((map.id, map.overlay), (id, RedBlackTreeMap::new()))
             }
         };
     }
@@ -1683,7 +1685,7 @@ pub mod tests {
         ]);
 
         let map = BigMap {
-            content: BigMapContent::InMemory(content.clone()),
+            content: BigMapContent::InMemory(RedBlackTreeMap::from_iter(content.clone())),
             key_type: Type::Int,
             value_type: Type::String,
         };
@@ -1788,7 +1790,7 @@ pub mod tests {
         ]);
 
         let map = BigMap {
-            content: BigMapContent::InMemory(content.clone()),
+            content: BigMapContent::InMemory(RedBlackTreeMap::from_iter(content.clone())),
             key_type: Type::Int,
             value_type: Type::String,
         };
@@ -1927,7 +1929,10 @@ pub mod tests {
             .unwrap();
         let content_diff = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
-            overlay: BTreeMap::from([(TypedValue::int(1), Some(TypedValue::int(1)))]),
+            overlay: RedBlackTreeMap::from_iter([(
+                TypedValue::int(1),
+                Some(TypedValue::int(1)),
+            )]),
         });
         let map1 = BigMap {
             content: content_diff,
@@ -1986,7 +1991,7 @@ pub mod tests {
         // Returned-storage walk: the parent returns a fresh empty big map
         // (EMPTY_BIG_MAP) that does not reference S.
         let returned_storage = BigMap {
-            content: BigMapContent::InMemory(BTreeMap::new()),
+            content: BigMapContent::InMemory(RedBlackTreeMap::new()),
             key_type: Type::Int,
             value_type: Type::String,
         };
@@ -2007,7 +2012,7 @@ pub mod tests {
         let operation_map = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: s.clone(),
-                overlay: BTreeMap::new(),
+                overlay: RedBlackTreeMap::new(),
             }),
             key_type: Type::Int,
             value_type: Type::String,
@@ -2074,7 +2079,7 @@ pub mod tests {
         let returned_storage = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: p.clone(),
-                overlay: BTreeMap::from([(
+                overlay: RedBlackTreeMap::from_iter([(
                     TypedValue::int(1),
                     Some(TypedValue::String("new".into())),
                 )]),
@@ -2103,7 +2108,7 @@ pub mod tests {
         let operation_map = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: p.clone(),
-                overlay: BTreeMap::new(),
+                overlay: RedBlackTreeMap::new(),
             }),
             key_type: Type::Int,
             value_type: Type::String,
@@ -2149,7 +2154,7 @@ pub mod tests {
         let original = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: BigMapId::from(7),
-                overlay: BTreeMap::from([(
+                overlay: RedBlackTreeMap::from_iter([(
                     TypedValue::int(1),
                     Some(TypedValue::String("v".into())),
                 )]),
@@ -2187,7 +2192,7 @@ pub mod tests {
         let mk = || BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: p.clone(),
-                overlay: BTreeMap::new(),
+                overlay: RedBlackTreeMap::new(),
             }),
             key_type: Type::Int,
             value_type: Type::Int,
@@ -2252,7 +2257,7 @@ pub mod tests {
         let operation_map = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: s.clone(),
-                overlay: BTreeMap::new(),
+                overlay: RedBlackTreeMap::new(),
             }),
             key_type: Type::Int,
             value_type: Type::String,
