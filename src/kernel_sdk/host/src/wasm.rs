@@ -5,7 +5,7 @@
 //! The WASM pvm provides certain capabilities specific to its runtime.
 //! See [WasmHost] for more details.
 //!
-//! # RISC-V compatability
+//! # RISC-V compatibility
 //!
 //! While it is currently possible to target RISC-V using the WasmHost,
 //! most of the functionalities exposed here will panic if an attempt is made to use them on
@@ -29,6 +29,9 @@ use crate::{path::RefPath, runtime::RuntimeError, Error};
 
 const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
 
+/// The size of chunks in the wasm PVM durable storage
+pub const WASM_CHUNK_SIZE: usize = 512;
+
 /// Certain capabilities of the WASM pvm runtime are specific to this platform, or
 /// have certain characteristics that may differ to RISC-V.
 pub trait WasmHost {
@@ -40,7 +43,7 @@ pub trait WasmHost {
     /// Returns `None` if no message was available. This happens when the kernel has
     /// finished reading the inbox at the current level.
     ///
-    /// The kernel will need to yield to the next level to recieve more input.
+    /// The kernel will need to yield to the next level to receive more input.
     #[cfg(feature = "alloc")]
     fn read_input(&mut self) -> Result<Option<Message>, RuntimeError>;
 

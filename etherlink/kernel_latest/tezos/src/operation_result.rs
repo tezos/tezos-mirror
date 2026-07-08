@@ -189,6 +189,10 @@ pub enum TransferError {
     /// already classifies the same brokenness on the entrypoint path.
     #[error("Enshrined view dispatch reported peer-runtime failure: {0}")]
     EnshrinedViewDispatchAbort(String),
+    /// Kernel-internal storage failure from the address registry; routes to
+    /// `CracError::BlockAbort` like the `FailedTo*` variants.
+    #[error("Address registry reported a storage I/O failure: {0}")]
+    AddressRegistryAbort(String),
 }
 
 #[derive(Error, Clone, Debug, PartialEq, Eq, NomReader)]
@@ -245,6 +249,12 @@ impl From<mir::interpreter::ContractInterpretError<'_>> for TransferError {
             if !matches!(inner, EnshrinedViewDispatchError::InvalidDestination { .. }) {
                 return Self::EnshrinedViewDispatchAbort(inner.to_string());
             }
+        }
+        if let ContractInterpretError::InterpretError(
+            InterpretError::AddressRegistryError(ref inner),
+        ) = err
+        {
+            return Self::AddressRegistryAbort(inner.to_string());
         }
         Self::MichelsonContractInterpretError(mir::bounded_fmt::display_bounded(
             &err,

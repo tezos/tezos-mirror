@@ -68,6 +68,21 @@ impl From<tezos_data_encoding::enc::BinError> for LookupViewError {
     }
 }
 
+/// Errors from address registry I/O. The in-memory [Ctx] never produces them.
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+pub enum AddressRegistryError {
+    /// Non-recoverable host storage failure, stringified (MIR is
+    /// host-agnostic). Aborts execution.
+    #[error("address registry error: {0}")]
+    HostError(String),
+    /// Gas exhausted charging a registry access; routed to `OutOfGas`.
+    #[error(transparent)]
+    OutOfGas(#[from] crate::gas::OutOfGas),
+    /// The registry was already seeded with a nonzero counter.
+    #[error("address registry already seeded with counter {0}")]
+    AlreadySeeded(BigUint),
+}
+
 #[allow(missing_docs)]
 pub trait TypecheckingCtx<'a> {
     fn gas(&mut self) -> &mut Gas;
@@ -212,6 +227,20 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
     {
         None
     }
+
+    /// Register an address and return its unique index, or return the existing
+    /// index if already registered.
+    fn index_address(
+        &mut self,
+        address: &AddressHash,
+    ) -> Result<BigUint, AddressRegistryError>;
+
+    /// Look up the index of a registered address. `&mut self` lets host
+    /// implementations charge gas for the storage read.
+    fn get_address_index(
+        &mut self,
+        address: &AddressHash,
+    ) -> Result<Option<BigUint>, AddressRegistryError>;
 }
 
 /// Standalone implementation of the MIR execution context, used for tests,
@@ -290,6 +319,9 @@ pub struct Ctx<'a> {
     /// Used by [`lookup_view_storage_balance`](CtxTrait::lookup_view_storage_balance) to
     /// return the target contract's balance during view execution. Defaults to empty.
     pub balances: HashMap<ContractKt1Hash, i64>,
+    /// Maps each `AddressHash` to its unique index. The null address is
+    /// pre-registered at index 0, as on L1.
+    address_registry: HashMap<AddressHash, BigUint>,
 }
 
 impl<'a> Ctx<'a> {
@@ -367,6 +399,10 @@ impl Default for Ctx<'_> {
             .unwrap(),
             origination_counter: 0,
             balances: HashMap::new(),
+            address_registry: HashMap::from([(
+                AddressHash::default(),
+                BigUint::from(0u32),
+            )]),
         }
     }
 }
@@ -507,5 +543,25 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         self.sender = sender;
         self.amount = amount;
         self.balance = balance;
+    }
+
+    fn index_address(
+        &mut self,
+        address: &AddressHash,
+    ) -> Result<BigUint, AddressRegistryError> {
+        if let Some(index) = self.address_registry.get(address) {
+            return Ok(index.clone());
+        }
+        // Indices are contiguous from 0, so the next free index is the map length.
+        let index = BigUint::from(self.address_registry.len());
+        self.address_registry.insert(address.clone(), index.clone());
+        Ok(index)
+    }
+
+    fn get_address_index(
+        &mut self,
+        address: &AddressHash,
+    ) -> Result<Option<BigUint>, AddressRegistryError> {
+        Ok(self.address_registry.get(address).cloned())
     }
 }

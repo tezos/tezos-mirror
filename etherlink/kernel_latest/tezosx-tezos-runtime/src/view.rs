@@ -104,11 +104,12 @@ fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
 /// **except** kernel-side failures surfaced via
 /// [`InterpretError::EnshrinedViewDispatch`] (alias resolution,
 /// gas-conversion overflow, request-build, unclassifiable peer
-/// response), which route to [`TezosXRuntimeError::Custom`] (→ 500).
-/// The `InvalidDestination` arm of that enum is caller-controllable
-/// (Michelson `string` allows characters that `http::Uri` rejects),
-/// so it routes to `BadRequest` instead. `OutOfGas` (including the
-/// variant nested under `TcError`) routes to
+/// response) and [`InterpretError::AddressRegistryError`] (durable
+/// storage I/O), which route to [`TezosXRuntimeError::Custom`] (→ 500).
+/// The `InvalidDestination` arm of `EnshrinedViewDispatch` is
+/// caller-controllable (Michelson `string` allows characters that
+/// `http::Uri` rejects), so it routes to `BadRequest` instead.
+/// `OutOfGas` (including the variant nested under `TcError`) routes to
 /// [`TezosXRuntimeError::OutOfGas`]; everything else defaults to
 /// [`TezosXRuntimeError::BadRequest`].
 fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
@@ -140,6 +141,11 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
             err @ EnshrinedViewDispatchError::InvalidDestination { .. },
         ) => TezosXRuntimeError::BadRequest(err.to_string()),
         InterpretError::EnshrinedViewDispatch(err) => {
+            TezosXRuntimeError::Custom(err.to_string())
+        }
+        // Kernel-internal storage failure: must not be catchable as a 4XX.
+        // Registry out-of-gas arrives as `InterpretError::OutOfGas`, above.
+        InterpretError::AddressRegistryError(err) => {
             TezosXRuntimeError::Custom(err.to_string())
         }
         other => TezosXRuntimeError::BadRequest(mir::bounded_fmt::debug_bounded(
@@ -631,5 +637,19 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Registry storage I/O failures are kernel-internal → `Custom` (5xx).
+    #[test]
+    fn classify_interpret_error_address_registry_is_custom() {
+        use mir::context::AddressRegistryError;
+        assert!(matches!(
+            classify_interpret_error(InterpretError::AddressRegistryError(
+                AddressRegistryError::HostError(
+                    "host I/O on /address_registry".to_owned()
+                )
+            )),
+            TezosXRuntimeError::Custom(_)
+        ));
     }
 }

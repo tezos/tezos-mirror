@@ -110,6 +110,9 @@ impl From<TransferError> for CracError {
             TransferError::EnshrinedViewDispatchAbort(_) => {
                 CracError::BlockAbort(format!("enshrined view dispatch: {e}"))
             }
+            TransferError::AddressRegistryAbort(_) => {
+                CracError::BlockAbort(format!("address registry: {e}"))
+            }
             _ => CracError::Operation(e),
         }
     }

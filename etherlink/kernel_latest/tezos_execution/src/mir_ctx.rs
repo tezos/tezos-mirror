@@ -8,9 +8,11 @@ use crate::account_storage::{
     Code, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
 use crate::address::OriginationNonce;
-use crate::context::big_maps::*;
+use crate::context::{address_registry, big_maps::*};
 use crate::get_contract_entrypoint;
-use crate::{consume_storage_read_milligas, consume_storage_write_milligas};
+use crate::{
+    consume_storage_read_milligas, consume_storage_write_milligas, COUNTER_SIZE,
+};
 use mir::parser::Parser;
 use mir::typechecker::{
     typecheck_value, AllowForgedLazyStorageId, MichelineContractScript, MichelineView,
@@ -20,7 +22,7 @@ use mir::{
         big_map::{BigMapId, LazyStorage, LazyStorageError},
         AddressHash, IntoMicheline, Micheline, PublicKeyHash, Type, TypedValue,
     },
-    context::{CtxTrait, TypecheckingCtx},
+    context::{AddressRegistryError, CtxTrait, TypecheckingCtx},
     gas::{interpret_cost, Gas, OutOfGas},
 };
 use num_bigint::{BigInt, BigUint};
@@ -33,6 +35,7 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WASM_CHUNK_SIZE;
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
@@ -288,6 +291,43 @@ impl<'a, Host: StorageV1, R: tezosx_interfaces::Registry> TypecheckingCtx<'a>
     }
 }
 
+/// Collapse path and storage errors into the non-recoverable
+/// [`AddressRegistryError::HostError`].
+fn registry_error(e: impl std::fmt::Display) -> AddressRegistryError {
+    AddressRegistryError::HostError(e.to_string())
+}
+
+/// Seed the address registry: the null address takes index 0 and the counter
+/// (next free index) starts at 1, as on L1. Seeds exactly once — the counter's
+/// presence marks the registry as seeded, so a second call errors with
+/// [`AddressRegistryError::AlreadySeeded`] rather than overwriting it. Fresh
+/// networks seed at runtime activation; that is the only seeding point.
+pub fn init_address_registry<Host: StorageV1>(
+    host: &mut Host,
+) -> Result<(), AddressRegistryError> {
+    let counter_path = address_registry::counter_path().map_err(registry_error)?;
+    if let Some(counter) =
+        read_optional_nom_value::<Narith>(host, &counter_path).map_err(registry_error)?
+    {
+        return Err(AddressRegistryError::AlreadySeeded(counter.0));
+    }
+    let zero_entry =
+        address_registry::entry_path(&AddressHash::default()).map_err(registry_error)?;
+    store_bin(&Narith(BigUint::from(0u32)), host, &zero_entry).map_err(registry_error)?;
+    store_bin(&Narith(BigUint::from(1u32)), host, &counter_path)
+        .map_err(registry_error)?;
+    Ok(())
+}
+
+pub fn read_address_counter<Host: StorageV1>(
+    host: &mut Host,
+) -> Result<BigUint, AddressRegistryError> {
+    let counter_path = address_registry::counter_path().map_err(registry_error)?;
+    Ok(read_nom_value::<Narith>(host, &counter_path)
+        .map_err(registry_error)?
+        .0)
+}
+
 impl<'a, Host: StorageV1, R: tezosx_interfaces::Registry> CtxTrait<'a>
     for Ctx<'_, 'a, Host, R>
 {
@@ -515,6 +555,46 @@ impl<'a, Host: StorageV1, R: tezosx_interfaces::Registry> CtxTrait<'a>
                  try_dispatch_enshrined_view"
             ),
         }
+    }
+
+    /// Register an address or return its existing index. The entry and
+    /// counter writes are not individually atomic, but `SafeStorage` reverts
+    /// the whole batch on error, so partial writes cannot persist.
+    fn index_address(
+        &mut self,
+        address: &AddressHash,
+    ) -> Result<BigUint, AddressRegistryError> {
+        if let Some(index) = self.get_address_index(address)? {
+            return Ok(index);
+        }
+
+        // Charge for the whole chunk allocation, not only the counter
+        consume_storage_write_milligas(
+            self.tc_ctx.operation_gas,
+            1,
+            WASM_CHUNK_SIZE as u64,
+        )?;
+
+        let entry = address_registry::entry_path(address).map_err(registry_error)?;
+        let counter = read_address_counter(self.tc_ctx.host)?;
+        let current = Narith(counter);
+        store_bin(&current, self.tc_ctx.host, &entry).map_err(registry_error)?;
+
+        let counter_path = address_registry::counter_path().map_err(registry_error)?;
+        store_bin(&Narith(&current.0 + 1u32), self.tc_ctx.host, &counter_path)
+            .map_err(registry_error)?;
+        Ok(current.0)
+    }
+
+    fn get_address_index(
+        &mut self,
+        address: &AddressHash,
+    ) -> Result<Option<BigUint>, AddressRegistryError> {
+        let entry = address_registry::entry_path(address).map_err(registry_error)?;
+        consume_storage_read_milligas(self.tc_ctx.operation_gas, 1, COUNTER_SIZE)?;
+        Ok(read_optional_nom_value::<Narith>(self.tc_ctx.host, &entry)
+            .map_err(registry_error)?
+            .map(|n| n.0))
     }
 }
 
@@ -822,7 +902,7 @@ pub trait HasRegistry {
 /// `registry.ensure_alias(host, journal, ...)` calls where the three
 /// fields must be live simultaneously — sequential `host()`,
 /// `journal()`, `registry()` trait method calls would each hold
-/// `&mut self` exclusively and conflict. Implementors construct the
+/// `&mut self` exclusively and conflict. Implementers construct the
 /// tuple via direct field access so the borrow checker accepts the
 /// distinct-field split.
 pub trait HasCrossRuntime<Host: StorageV1>: HasJournal + HasRegistry {
@@ -3343,6 +3423,67 @@ pub mod tests {
         let second = ctx.interpret_context.take_lazy_storage_size_diff();
         assert_eq!(second, Zarith(BigInt::from(0)));
     }
+
+    #[test]
+    fn address_registry_seeding() {
+        use tezos_smart_rollup_host::path::RefPath;
+
+        // Pinned layout: seeded networks hold exactly these bytes, so the
+        // helpers must keep resolving to them.
+        const NULL_ENTRY_PATH: RefPath = RefPath::assert_from(
+            b"/tez/tez_accounts/address_registry/00000000000000000000000000000000000000000000",
+        );
+        const COUNTER_PATH: RefPath =
+            RefPath::assert_from(b"/tez/tez_accounts/address_registry/counter");
+
+        let mut host = MockKernelHost::default();
+        // An unseeded registry has no counter: the read errors rather than
+        // seeding on demand.
+        assert!(super::read_address_counter(&mut host).is_err());
+
+        // Seeding installs null@0 and the next-free counter at 1.
+        super::init_address_registry(&mut host).unwrap();
+        assert_eq!(host.store_read_all(&NULL_ENTRY_PATH).unwrap(), [0x00]);
+        assert_eq!(host.store_read_all(&COUNTER_PATH).unwrap(), [0x01]);
+        assert_eq!(
+            super::read_address_counter(&mut host).unwrap(),
+            BigUint::from(1u32)
+        );
+
+        // Seeding is one-shot: a second call errors instead of overwriting.
+        assert_eq!(
+            super::init_address_registry(&mut host),
+            Err(AddressRegistryError::AlreadySeeded(BigUint::from(1u32)))
+        );
+        assert_eq!(host.store_read_all(&COUNTER_PATH).unwrap(), [0x01]);
+    }
+
+    #[test]
+    fn mock_ctx_address_registry() {
+        // In-memory registry mirroring the standalone Ctx: null at 0, first
+        // user address at 1, idempotent indexing, read-only get.
+        use super::mock::MockCtx;
+        use crate::test_utils::MockRegistry;
+        use tezosx_journal::{CracId, TezosXJournal};
+        let mut host = MockKernelHost::default();
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let sender: AddressHash =
+            "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".try_into().unwrap();
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, sender, 0);
+        let null = AddressHash::default();
+        let addr: AddressHash =
+            "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".try_into().unwrap();
+        assert_eq!(ctx.get_address_index(&null), Ok(Some(BigUint::from(0u32))));
+        assert_eq!(ctx.get_address_index(&addr), Ok(None));
+        assert_eq!(ctx.index_address(&addr), Ok(BigUint::from(1u32)));
+        assert_eq!(ctx.index_address(&addr), Ok(BigUint::from(1u32)));
+        assert_eq!(ctx.get_address_index(&addr), Ok(Some(BigUint::from(1u32))));
+    }
 }
 
 #[cfg(test)]
@@ -3376,6 +3517,8 @@ pub(crate) mod mock {
         pub crac_chain_depth: u32,
         pub crac_origin: Option<Contract>,
         pub delegated_storage_cost: u64,
+        /// In-memory registry mirroring the standalone [`super::Ctx`].
+        pub address_registry: HashMap<AddressHash, BigUint>,
     }
 
     impl<'h, 'j, 'r, Host: StorageV1, R: tezosx_interfaces::Registry>
@@ -3406,6 +3549,11 @@ pub(crate) mod mock {
                 crac_chain_depth: 0,
                 crac_origin: None,
                 delegated_storage_cost: 0,
+                // Null address pre-registered at index 0, as in `Ctx`.
+                address_registry: HashMap::from([(
+                    AddressHash::default(),
+                    BigUint::from(0u32),
+                )]),
             }
         }
     }
@@ -3617,6 +3765,25 @@ pub(crate) mod mock {
             _balance: i64,
         ) {
             // MockCtx does not support views
+        }
+
+        fn index_address(
+            &mut self,
+            address: &AddressHash,
+        ) -> Result<BigUint, mir::context::AddressRegistryError> {
+            if let Some(index) = self.address_registry.get(address) {
+                return Ok(index.clone());
+            }
+            let index = BigUint::from(self.address_registry.len());
+            self.address_registry.insert(address.clone(), index.clone());
+            Ok(index)
+        }
+
+        fn get_address_index(
+            &mut self,
+            address: &AddressHash,
+        ) -> Result<Option<BigUint>, mir::context::AddressRegistryError> {
+            Ok(self.address_registry.get(address).cloned())
         }
     }
 }
