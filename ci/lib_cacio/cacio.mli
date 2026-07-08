@@ -437,7 +437,13 @@ module Shared : COMPONENT_API
 
 (** Global pipelines.
 
-    Global pipelines are shared between components. *)
+    Global pipelines are shared between components.
+
+    Note that [Manual] jobs are not allowed in [Merge_train] pipelines,
+    because this pipeline must finish ASAP so as to not block other MRs
+    so it doesn't make sense to have to wait on a manual action.
+    Manual, allowed to fail jobs would not block the pipeline,
+    but they are better reserved for other pipelines. *)
 type global_pipeline =
   | Before_merging
   | Merge_train

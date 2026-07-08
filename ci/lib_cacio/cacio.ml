@@ -895,7 +895,21 @@ type global_pipeline =
 let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
   Hashtbl.create 128
 
+let is_manual =
+ fun (mode, _) -> match mode with Manual -> true | Auto | Immediate -> false
+
 let register_jobs pipeline jobs =
+  (if pipeline = Merge_train then
+     match List.filter is_manual jobs with
+     | [] -> ()
+     | _ :: _ as manual_jobs ->
+         failwith
+           ("the following jobs are manual in the merge_train pipeline, which \
+             is not allowed (see the documentation of type global_pipeline in \
+             cacio.mli): "
+           ^ String.concat
+               ", "
+               (List.map (fun (_, job) -> job.name) manual_jobs))) ;
   List.iter (Hashtbl.add global_jobs pipeline) jobs
 
 let register_merge_request_jobs jobs =
