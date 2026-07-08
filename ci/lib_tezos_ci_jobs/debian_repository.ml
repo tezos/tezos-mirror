@@ -94,7 +94,7 @@ let build_dependency_image =
     ~image_path:
       (sf
          "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-%s"
-         Tezos_ci.Images.Base_images.debian_version)
+         Tezos_ci.Images.Base_images.base_images_tag)
 
 let make_debian_variables distribution image_kind release version =
   ( "DEP_IMAGE",
@@ -333,7 +333,7 @@ let make_systemd_test_job ~script ~(distro : Distro.t) ~pipeline_type =
           (Distro.name_for_scripts distro.name)
           "systemd"
           distro.release
-          Tezos_ci.Images.Base_images.debian_version)
+          Tezos_ci.Images.Base_images.base_images_tag)
     ~script:
       [
         "./scripts/ci/docker_initialize.sh";

@@ -40,11 +40,11 @@ let base_images : docker_image list =
       {
         name = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian";
         tag =
-          Images.Base_images.(Format.asprintf "%s-%s" release debian_version);
+          Images.Base_images.(Format.asprintf "%s-%s" release base_images_tag);
         dockerfile = "images/base-images/Dockerfile.debian";
         job_name =
           Images.Base_images.(
-            Format.asprintf "tezos-debian-%s-%s" release debian_version);
+            Format.asprintf "tezos-debian-%s-%s" release base_images_tag);
       })
     (Base_images.Distribution.releases Debian)
   @ List.map
@@ -52,11 +52,11 @@ let base_images : docker_image list =
         {
           name = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu";
           tag =
-            Images.Base_images.(Format.asprintf "%s-%s" release debian_version);
+            Images.Base_images.(Format.asprintf "%s-%s" release base_images_tag);
           dockerfile = "images/base-images/Dockerfile.debian";
           job_name =
             Images.Base_images.(
-              Format.asprintf "tezos-ubuntu-%s-%s" release debian_version);
+              Format.asprintf "tezos-ubuntu-%s-%s" release base_images_tag);
         })
       (Base_images.Distribution.releases Ubuntu)
 
