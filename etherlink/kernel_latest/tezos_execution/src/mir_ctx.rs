@@ -11,7 +11,8 @@ use crate::address::OriginationNonce;
 use crate::context::{address_registry, big_maps::*};
 use crate::get_contract_entrypoint;
 use crate::{
-    consume_storage_read_milligas, consume_storage_write_milligas, COUNTER_SIZE,
+    consume_storage_read_milligas, consume_storage_write_milligas, contract_from_address,
+    COUNTER_SIZE,
 };
 use mir::parser::Parser;
 use mir::typechecker::{
@@ -41,7 +42,7 @@ use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
 };
-use tezos_tezlink::operation_result::TransferError;
+use tezos_tezlink::operation_result::{AddressRegistry, TransferError};
 use typed_arena::Arena;
 
 pub struct InterpretContext {
@@ -158,6 +159,11 @@ pub struct Ctx<'a, 'operation, Host: StorageV1, R: tezosx_interfaces::Registry> 
     pub operation_ctx: &'a mut OperationCtx<'operation>,
     pub journal: &'a mut tezosx_journal::TezosXJournal,
     pub registry: &'a R,
+    /// (address, index) pairs registered by INDEX_ADDRESS during this frame,
+    /// in registration order, emitted on the frame's receipt. Frame-scoped: a
+    /// fresh `Ctx` per internal operation keeps each frame's registrations
+    /// separate, and a reverted frame drops them with its `Ctx`.
+    pub address_registry_diff: Vec<AddressRegistry>,
 }
 
 pub struct BlockCtx<'block> {
@@ -583,6 +589,20 @@ impl<'a, Host: StorageV1, R: tezosx_interfaces::Registry> CtxTrait<'a>
         let counter_path = address_registry::counter_path().map_err(registry_error)?;
         store_bin(&Narith(&current.0 + 1u32), self.tc_ctx.host, &counter_path)
             .map_err(registry_error)?;
+        // Emit the (address, index) pair on the frame's receipt, like L1's
+        // address_registry_diff.
+        // Sr1 addresses consume an index but are skipped here: the receipt's
+        // `AddressRegistry.address` is a `Contract` (no smart-rollup case),
+        // whereas L1 types the diff with `Destination_repr.t`. Smart rollups
+        // cannot be originated from Michelson, but an sr1 address can still
+        // reach INDEX_ADDRESS as an `address` value.
+        // TODO: https://linear.app/tezos/issue/L2-1813
+        if let Ok(address) = contract_from_address(address.clone()) {
+            self.address_registry_diff.push(AddressRegistry {
+                address,
+                index: Zarith(current.0.clone().into()),
+            });
+        }
         Ok(current.0)
     }
 
@@ -2589,6 +2609,7 @@ pub mod tests {
             operation_ctx: &mut operation_ctx,
             journal: &mut journal,
             registry: &registry,
+            address_registry_diff: Vec::new(),
         };
 
         // A KT1 that the fresh `MockKernelHost` has never seen.
@@ -3177,6 +3198,7 @@ pub mod tests {
             operation_ctx: &mut operation_ctx,
             journal: &mut journal,
             registry: &registry,
+            address_registry_diff: Vec::new(),
         };
 
         // Recover each enshrined contract's KT1 from its 22-byte
