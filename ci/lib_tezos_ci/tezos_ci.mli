@@ -164,15 +164,6 @@ end
 module Cache : sig
   (** Value of [CARGO_HOME] *)
   val cargo_home : string
-
-  (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
-
-    This function should only be applied to jobs that have a GitLab CI
-    cache for [CARGO_HOME], as enabled through [enable_cache_cargo] (that
-    function calls this function, so there is no need to apply both).
-    Exceptions can be made for jobs that must have CARGO_HOME set to
-    something different than {!cargo_home}. *)
-  val enable_networked_cargo : tezos_job -> tezos_job
 end
 
 (** A facility for registering images for [image:] keywords.

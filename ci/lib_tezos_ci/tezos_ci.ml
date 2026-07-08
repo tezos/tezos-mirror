@@ -1222,40 +1222,6 @@ let map_non_trigger_job ?error_on_trigger (tezos_job : tezos_job)
       | None -> tezos_job
       | Some error_on_trigger -> failwith "%s" error_on_trigger)
 
-let append_variables ?(allow_overwrite = false) new_variables
-    (tezos_job : tezos_job) : tezos_job =
-  map_non_trigger_job
-    ~error_on_trigger:
-      (sf
-         "[append_variables] attempting to append variables to trigger job '%s'"
-         (name_of_tezos_job tezos_job))
-    tezos_job
-  @@ fun job ->
-  let variables =
-    let old_variables, new_variables =
-      List.fold_left
-        (fun (old_variables, new_variables) (name, value) ->
-          let old_variables =
-            match List.assoc_opt name old_variables with
-            | Some old_value ->
-                if not allow_overwrite then
-                  failwith
-                    "[Tezos_ci.append_variables] attempted to overwrite the \
-                     variable '%s' (old value: '%s', new value: '%s')"
-                    name
-                    old_value
-                    value ;
-                List.remove_assoc name old_variables
-            | None -> old_variables
-          in
-          (old_variables, (name, value) :: new_variables))
-        (Option.value ~default:[] job.variables, [])
-        new_variables
-    in
-    old_variables @ List.rev new_variables
-  in
-  {job with variables = Some variables}
-
 let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
   let all_files =
     let root = "." in
@@ -1556,8 +1522,6 @@ module Cache = struct
        - We want [CARGO_HOME] to be hidden from dune
          (thus the dot-prefix). *)
     Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
-
-  let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
 end
 
 (** A set of internally and externally built images.
