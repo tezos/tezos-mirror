@@ -26,6 +26,15 @@ Smart Rollups
 Data Availability Layer
 -----------------------
 
+Enshrined Liquid Staking
+------------------------
+
+- Updated allocation agorithm of sTEZ rights at cycle end. The algorithm
+  greedily allocates to bakers in increasing fee order. In case of a tie, the
+  rights are distributed proportionally to their available space for the bakers
+  with equal fees. (MR :gl:`!21994`)
+
+
 Adaptive Issuance
 -----------------
 

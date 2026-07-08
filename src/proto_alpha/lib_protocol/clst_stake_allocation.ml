@@ -11,7 +11,7 @@
 
    1. Clear all previous allocations (read stez_frozen from staking balances).
    2. Compute each registered delegate's target allocation via [compute_cap].
-   3. Greedily allocate from the deposits in public-key-hash order.
+   3. Greedily allocate from the deposits in increasing fee order.
 
    Allocations are pure accounting: no tez is physically moved from
    [CLST_deposits]. The per-delegate [stez_frozen] field in the staking balance
@@ -41,10 +41,7 @@ let allocated_rights_of_delegate ctxt delegate =
 
    Direct staking takes priority: if a delegate is already overstaked
    (allowed_staked_frozen >= global_limit * own_frozen), the global-limit bound is
-   zero and no CLST is allocated regardless of the ratio.
-
-   NOTE: this is behind a feature flag and not production-ready.  The greedy
-   allocation order (pkh) is intentionally simple and may change later. *)
+   zero and no CLST is allocated regardless of the ratio. *)
 let compute_cap ~own_frozen ~allowed_staked_frozen
     ~global_limit_of_staking_over_baking
     ~ratio_of_clst_staking_over_direct_staking_billionth =
@@ -112,8 +109,8 @@ let compute_target ctxt delegate params =
    staking balance records how much of the deposits is attributed to each
    delegate for baking rights, but no tez is transferred.
 
-   NOTE: the allocation algorithm (greedy in pkh order) is not definitive and
-   may be replaced by a fairer or more balanced strategy in the future. *)
+   The allocation algorithm distributes rights greedily to bakers in increasing order of their
+   registered fees. In case of a tie, the rights are distributed proportionally. *)
 let rebalance_at_cycle_end ctxt ~new_cycle:_ =
   let open Lwt_result_syntax in
   (* Step 1: deallocate everything *)
@@ -128,27 +125,76 @@ let rebalance_at_cycle_end ctxt ~new_cycle:_ =
         if Tez_repr.(old_amount = zero) then return ctxt
         else Stake_storage.clear_stez_frozen_stake ctxt delegate)
   in
-  (* Step 2: compute targets and greedily allocate from deposits (pkh order) *)
-  let* available = Clst_storage.get_deposits_balance ctxt in
-  let* ctxt, _remaining =
+  (* Step 2: sort bakers by their fees *)
+  let module FeeMap = Map.Make (Int32) in
+  let* ctxt, map_fee_bakers =
     Storage.Clst.Registered_delegates.fold
       ctxt
-      ~order:`Sorted
-      ~init:(Ok (ctxt, available))
+      ~order:`Undefined
+      ~init:(Ok (ctxt, FeeMap.empty))
       ~f:(fun contract params acc ->
-        let*? ctxt, remaining = acc in
+        let*? ctxt, fee_map = acc in
         match contract with
         | Contract_repr.Implicit delegate ->
-            let* target = compute_target ctxt delegate params in
-            let allocation = Tez_repr.min target remaining in
-            if Tez_repr.(allocation = zero) then return (ctxt, remaining)
+            let fee_map =
+              FeeMap.update
+                params
+                  .Clst_delegates_parameters_repr
+                   .edge_of_clst_staking_over_baking_millionth
+                (function
+                  | None -> Some [(delegate, params)]
+                  | Some l -> Some ((delegate, params) :: l))
+                fee_map
+            in
+            return (ctxt, fee_map)
+        | Contract_repr.Originated _ -> return (ctxt, fee_map))
+  in
+  (* Step 3: allocate available rights *)
+  let* available = Clst_storage.get_deposits_balance ctxt in
+  let* ctxt, _remaining =
+    (* The fold is done in increasing order of the fees *)
+    FeeMap.fold_es
+      (fun _fee delegates (ctxt, remaining) ->
+        let* targets =
+          List.map_es
+            (fun (delegate, params) ->
+              let* target = compute_target ctxt delegate params in
+              return (delegate, target))
+            delegates
+        in
+        let*? total_target =
+          List.fold_left_e Tez_repr.( +? ) Tez_repr.zero (List.map snd targets)
+        in
+        let allocation = Tez_repr.min total_target remaining in
+        if Tez_repr.(allocation = zero) then return (ctxt, remaining)
+        else
+          (* Distribute fairly amongst all delegates *)
+          let* ctxt =
+            if Tez_repr.(allocation = total_target) then
+              (* All bakers can reach their target *)
+              List.fold_left_es
+                (fun ctxt (delegate, target) ->
+                  Stake_storage.set_stez_frozen_stake ctxt delegate target)
+                ctxt
+                targets
             else
-              let* ctxt =
-                Stake_storage.set_stez_frozen_stake ctxt delegate allocation
-              in
-              let*? remaining = Tez_repr.(remaining -? allocation) in
-              return (ctxt, remaining)
-        | Contract_repr.Originated _ -> return (ctxt, remaining))
+              (* Otherwise, we divide proportionally *)
+              (* 0 < allocation < total_target *)
+              let num = Tez_repr.to_mutez allocation in
+              let den = Tez_repr.to_mutez total_target in
+              List.fold_left_es
+                (fun ctxt (delegate, target) ->
+                  let*? new_target =
+                    Tez_repr.mul_ratio ~rounding:`Down target ~num ~den
+                  in
+                  Stake_storage.set_stez_frozen_stake ctxt delegate new_target)
+                ctxt
+                targets
+          in
+          let*? remaining = Tez_repr.(remaining -? allocation) in
+          return (ctxt, remaining))
+      map_fee_bakers
+      (ctxt, available)
   in
   return ctxt
 

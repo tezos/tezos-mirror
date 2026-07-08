@@ -39,8 +39,7 @@ How It Works
 This section describes the core mechanisms behind sTEZ: the
 :ref:`internal ledgers <stez_staking_ledger_alpha>` that track funds,
 the :ref:`exchange rate <exchange_rate_alpha>` that determines token
-value, the :ref:`fee auction <stez_global_fee_alpha>` that determines
-delegate fees, the :ref:`allocation algorithm
+value, the :ref:`allocation algorithm
 <stez_staking_power_alpha>` that distributes staking power, and the
 :ref:`rules and constants <stez_safeguards_alpha>` that govern the
 system.
@@ -120,33 +119,6 @@ tez. The user can either redeem their sTEZ to receive ~105 tez, or
 sell the sTEZ tokens directly on an exchange.
 
 
-.. _stez_global_fee_alpha:
-
-Global Fee Mechanism
-^^^^^^^^^^^^^^^^^^^^
-
-sTEZ uses a **uniform price auction**: delegates declare a fee as a
-competitive bid, the protocol selects the lowest-fee delegates
-(respecting capacity limits), and all of them receive the **same** fee
-rate -- the **global fee**, defined as the highest declared fee among
-all selected delegates in a given cycle. The remainder of sTEZ staking
-rewards (after the global fee) goes to the :ref:`sTEZ staking ledger
-<stez_staking_ledger_alpha>`,
-increasing the :ref:`exchange rate <exchange_rate_alpha>` for all sTEZ
-holders.
-
-This auction design creates a self-correcting dynamic: delegates are
-incentivized to set lower fees to increase their chances of being
-selected, but the effective fee is always determined by the
-least competitive selected delegate. If the global fee rises too high,
-sTEZ holders receive a smaller share of staking rewards, reducing the
-attractiveness of the token and creating redemption pressure, which in
-turn pressures delegates to lower their fees.
-
-For details on how :ref:`participation rewards
-<adaptive_rewards_alpha>` are computed and distributed, see
-:doc:`adaptive_issuance`.
-
 .. _stez_staking_power_alpha:
 
 Staking Power Distribution Across Delegates
@@ -223,6 +195,11 @@ tez). If the delegate raised their capacity to the global maximum
 (``20%``), up to ``1800`` tez of sTEZ could have their rights
 allocated to them.
 
+If there is not enough sTEZ power to allocate to all the participating bakers,
+the rights are allocated in priority to the bakers with the lowest fees. In
+case of a tie, the fees are distributed proportionally to the available capacity
+of the bakers with the same fee.
+
 .. _stez_safeguards_alpha:
 
 Protocol Rules and Constants
@@ -238,12 +215,10 @@ They can be adjusted through on-chain governance as conditions change:
   lower capacity but cannot exceed this global maximum.
 - **Delegate fee maximum** (``GLOBAL_STEZ_BAKER_EDGE``): the maximum
   fee bid a delegate can declare, expressed in millionths (a ratio
-  between 0 and 1). The effective fee determines the fraction of sTEZ
+  between 0 and 1). The declared fee determines the fraction of sTEZ
   staking rewards that accrues to the delegate's frozen deposit; the
   remainder goes to the :ref:`sTEZ staking ledger
-  <stez_staking_ledger_alpha>`. See :ref:`Global Fee
-  <stez_global_fee_alpha>` for how bids determine delegate selection
-  and the effective fee.
+  <stez_staking_ledger_alpha>`.
 - **Eligibility**: delegates must maintain a clean slashing history to
   receive sTEZ staking power allocations. Deactivated delegates are
   automatically excluded and may re-register once they are active
@@ -425,11 +400,8 @@ The ``register_delegate`` entrypoint opts a delegate into sTEZ. The
 registration takes effect after ``CONSENSUS_RIGHTS_DELAY`` (currently
 2) cycles. The delegate specifies two parameters:
 
-- **Fee**: the delegate's fee bid, expressed in millionths (range
-  ``0`` -- ``GLOBAL_STEZ_BAKER_EDGE``). This is a competitive bid, not
-  the actual fee charged. See :ref:`Global Fee
-  <stez_global_fee_alpha>` for how bids determine delegate selection
-  and the effective fee.
+- **Fee**: the delegate's fee, expressed in millionths (range
+  ``0`` -- ``GLOBAL_STEZ_BAKER_EDGE``).
 
 - **Capacity**: the maximum proportion of the delegate's maximum
   allowed external stake that can be filled by sTEZ, expressed in
@@ -577,10 +549,6 @@ Base path: ``/chains/<chain>/blocks/<block>/context/stez``
    * - ``../stez_staking_power?cycle=n``
      - List of delegates with their staking power from sTEZ for the
        given cycle ``n``; defaults to the current cycle
-   * - ``../global_fee?cycle=n``
-     - Maximum fee among the selected (lowest-fee first) eligible
-       delegates for the given cycle ``n``; defaults to the current
-       cycle
 
 User Info
 """""""""

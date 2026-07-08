@@ -2926,8 +2926,8 @@ let () =
       global_limit_of_staking_over_baking = 2;
     }
   in
-  let* b, (d1, d2, d3) =
-    Context.init3
+  let* b, delegates =
+    Context.init_n
       ~consensus_threshold_size:0
       ~cost_per_byte:Tez.zero
       ~issuance_weights:
@@ -2936,9 +2936,10 @@ let () =
           base_total_issued_per_minute = Tez.zero;
         }
       ~adaptive_issuance
+      6
       ()
   in
-  let delegates = [d1; d2; d3] in
+  let d1 = Stdlib.List.hd delegates in
   (* Set staking parameters for all delegates *)
   let* b =
     List.fold_left_es
@@ -2964,37 +2965,32 @@ let () =
       b
   in
   (* Register all delegates with CLST (ratio = 20%) *)
+  let fees = [10_000l; 20_000l; 20_000l; 30_000l; 30_000l; 40_000l] in
   let clst_ratio = 200_000_000l in
-  let clst_fee = 50_000l in
+  let delegate_fees = Stdlib.List.combine delegates fees in
   let* b, clst_params =
-    register_delegate_and_bake
-      ~edge_of_clst_staking_over_baking_millionth:clst_fee
-      ~ratio_of_clst_staking_over_direct_staking_billionth:clst_ratio
-      b
-      d1
-  in
-  let* b =
     List.fold_left_es
-      (fun b d ->
-        let* b, _params =
+      (fun (b, p) (d, fees) ->
+        let* b, params =
           register_delegate_and_bake
-            ~edge_of_clst_staking_over_baking_millionth:clst_fee
+            ~edge_of_clst_staking_over_baking_millionth:fees
             ~ratio_of_clst_staking_over_direct_staking_billionth:clst_ratio
             b
             d
         in
-        return b)
-      b
-      [d2; d3]
+        return (b, Option.fold ~none:(Some params) ~some:(fun _ -> p) p))
+      (b, None)
+      delegate_fees
   in
-  (* Deposit an amount that exceeds 2 caps but not 3.
+  let clst_params = Stdlib.Option.get clst_params in
+  (* Deposit an amount that exceeds 3 caps but not 4.
      With the global-limit formula: cap = min(own_frozen * ratio, own_frozen *
      global_limit - staked_frozen).  Each delegate has ~200k tez own_frozen.
      ratio = 20%, global_limit = 2.  The ratio bound dominates:
      cap ~ 200k * 2 * 0.2 = 80k tez per delegate.
-     Deposit 250k tez: enough for 2.5 caps — first two get full cap (80k),
-     last one gets the remainder (40k). *)
-  let deposit_mutez = 200_000_000_000L in
+     Deposit 300k tez: enough for 3.3 caps — first three get full cap (80k),
+     next two gets the remainder (30k each), last one gets nothing*)
+  let deposit_mutez = 300_000_000_000L in
   let* sender, b =
     create_funded_account ~funder:d1 ~amount_mutez:deposit_mutez b
   in
@@ -3007,7 +3003,6 @@ let () =
   in
   let* b = Block.bake ~operation:deposit_tx b in
   let* total_before = total_amount_of_tez (B b) in
-  let pkhs = List.map pkh_of_contract delegates in
   (* Bake until CLST params activate *)
   let first_pkh = pkh_of_contract d1 in
   let* activation_cycle =
@@ -3025,45 +3020,57 @@ let () =
   (* Check: total_amount_of_tez is preserved *)
   let* total_after = total_amount_of_tez (B b) in
   let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
-  (* Collect allocations sorted by pkh order (same as greedy order) *)
-  let pkhs_sorted = List.sort Implicit_account_repr.compare pkhs in
+  (* Collect allocations sorted by fee order (we made sure the fees were defined increasingly) *)
+  let pkhs_sorted = List.map pkh_of_contract delegates in
   let* allocs =
     List.map_es
       (fun pkh -> Delegate_services.stez_staking_power Block.rpc_ctxt b pkh)
       pkhs_sorted
   in
-  let* () =
-    List.iter_es
-      (fun alloc -> Assert.is_true ~loc:__LOC__ Tez.(alloc > zero))
-      allocs
-  in
   (* All delegates have the same cap (same ratio, similar own_frozen, no
-     direct stakers).  The first two should get equal amounts (full cap),
-     and the last gets the remainder from the pool.  Verify exact sum. *)
-  let first_alloc, second_alloc, last_alloc =
+     direct stakers).  The first three should get equal amounts (full cap),
+     the next two get the remainder from the pool, and the last one gets
+     nothing (doesn't appear in the list).  Verify exact sum. *)
+  let ( first_alloc,
+        second_alloc,
+        third_alloc,
+        fourth_alloc,
+        fifth_alloc,
+        sixth_alloc ) =
     match allocs with
-    | [first; second; last] -> (first, second, last)
-    | _ -> Test.fail ~loc:__LOC__ "Expected exactly 3 allocations"
+    | [first; second; third; fourth; fifth; sixth] ->
+        (first, second, third, fourth, fifth, sixth)
+    | _ -> Test.fail ~loc:__LOC__ "Expected exactly 6 allocations"
   in
-  (* First two delegates get equal amounts (full cap) *)
+  (* First three delegates get equal amounts (full cap) *)
   let* () = Assert.equal_tez ~loc:__LOC__ first_alloc second_alloc in
+  let* () = Assert.equal_tez ~loc:__LOC__ second_alloc third_alloc in
   (* Sum of all allocations equals the deposit *)
   let total_alloc_mutez =
-    Int64.add
-      (Int64.add (Tez.to_mutez first_alloc) (Tez.to_mutez second_alloc))
-      (Tez.to_mutez last_alloc)
+    Tez_helpers.(
+      first_alloc +! second_alloc +! third_alloc +! fourth_alloc +! fifth_alloc
+      |> to_mutez)
   in
   let* () = Assert.equal_int64 ~loc:__LOC__ deposit_mutez total_alloc_mutez in
-  (* The last delegate received strictly less (pool exhausted before cap) *)
-  let* () = Assert.is_true ~loc:__LOC__ Tez.(last_alloc < first_alloc) in
-  (* Exact difference: last_alloc = deposit - 2 * first_alloc *)
+  (* The 4th and 5th delegates received strictly less (pool exhausted before cap) *)
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(fourth_alloc < first_alloc) in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(fifth_alloc < first_alloc) in
+  (* The 4th and 5th delegates received the same amount *)
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(fourth_alloc = fifth_alloc) in
+  (* Exact difference: last_alloc = (deposit - 3 * first_alloc) / 2 *)
   let expected_last_mutez =
-    Int64.sub deposit_mutez (Int64.mul 2L (Tez.to_mutez first_alloc))
+    Int64.div
+      (Int64.sub deposit_mutez (Int64.mul 3L (Tez.to_mutez first_alloc)))
+      2L
   in
-  Assert.equal_tez
-    ~loc:__LOC__
-    (Tez.of_mutez_exn expected_last_mutez)
-    last_alloc
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      (Tez.of_mutez_exn expected_last_mutez)
+      fourth_alloc
+  in
+  (* Last delegate gets nothing *)
+  Assert.equal_tez ~loc:__LOC__ Tez.zero sixth_alloc
 
 let () =
   register_test ~title:"Test no allocation when delegate is overstaked"
