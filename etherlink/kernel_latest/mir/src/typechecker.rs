@@ -4545,6 +4545,22 @@ fn typecheck_instruction_step<'a, 'b>(
         (App(IS_IMPLICIT_ACCOUNT, [], _), []) => no_overload!(IS_IMPLICIT_ACCOUNT, len 1),
         (App(IS_IMPLICIT_ACCOUNT, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(INDEX_ADDRESS, [], _), [.., T::Address]) => {
+            *stack_top_mut(stack)? = T::Nat;
+            I::IndexAddress
+        }
+        (App(INDEX_ADDRESS, [], _), [.., _]) => no_overload!(INDEX_ADDRESS),
+        (App(INDEX_ADDRESS, [], _), []) => no_overload!(INDEX_ADDRESS, len 1),
+        (App(INDEX_ADDRESS, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(GET_ADDRESS_INDEX, [], _), [.., T::Address]) => {
+            *stack_top_mut(stack)? = T::new_option(T::Nat);
+            I::GetAddressIndex
+        }
+        (App(GET_ADDRESS_INDEX, [], _), [.., _]) => no_overload!(GET_ADDRESS_INDEX),
+        (App(GET_ADDRESS_INDEX, [], _), []) => no_overload!(GET_ADDRESS_INDEX, len 1),
+        (App(GET_ADDRESS_INDEX, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(TOTAL_VOTING_POWER, [], _), ..) => {
             stack.push(T::Nat);
             I::TotalVotingPower
