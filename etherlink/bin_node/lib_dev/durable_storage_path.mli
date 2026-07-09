@@ -103,6 +103,10 @@ val michelson_alias_implementation : path
     ([/tez/world_state/tez_blocks]). *)
 val tezosx_tezos_blocks_root : path
 
+(** Presence marker for a recent Michelson block hash (the kernel's
+    [live_blocks] set); the argument is the lowercase hex of the 32-byte hash. *)
+val tezosx_tez_live_block : string -> path
+
 val block_root_of_chain_family : _ L2_types.chain_family -> path
 
 val reboot_counter : string

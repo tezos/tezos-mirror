@@ -568,8 +568,14 @@ impl BlockInProgress {
                 next_protocol: tez_block.next_protocol,
             };
             let tez_block = L2Block::Tezlink(tez_block);
-            block_storage::store_current(host, &TEZ_BLOCKS_PATH, &tez_block)
-                .context("Failed to store the Tezos block")?;
+            // Maintain the live_blocks set for the Michelson runtime (branch validation).
+            block_storage::store_current(
+                host,
+                &TEZ_BLOCKS_PATH,
+                &tez_block,
+                true, // maintain_live_blocks
+            )
+            .context("Failed to store the Tezos block")?;
             store_current_tez_block_header(host, &new_header)
                 .context("Failed to store the current TezBlockHeader")?;
         }
@@ -588,8 +594,13 @@ impl BlockInProgress {
             base_fee_per_gas,
         );
         let new_block = L2Block::Etherlink(Box::new(new_block));
-        block_storage::store_current(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH, &new_block)
-            .context("Failed to store the current block")?;
+        block_storage::store_current(
+            host,
+            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            &new_block,
+            false, // maintain_live_blocks
+        )
+        .context("Failed to store the current block")?;
 
         Ok(new_block)
     }

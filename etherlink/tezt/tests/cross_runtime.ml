@@ -117,6 +117,11 @@ module EvmContract = struct
     | None -> Test.fail "No receipt for EVM transaction to %s" address
 end
 
+(* Fetches the current Michelson-runtime head hash to use as a native
+   operation branch, matching how octez-client sources it from the chain. *)
+let tez_branch client_tezlink =
+  Client.RPC.call_via_endpoint client_tezlink @@ RPC.get_chain_block_hash ()
+
 module TezContract = struct
   (** Durable storage path where Michelson originated contracts are indexed in
    *  Tezos X. Each subkey is the hex-encoded [Contract_repr.t] of the
@@ -170,9 +175,11 @@ module TezContract = struct
     let* init_storage =
       Client.convert_data_to_json ~data:init_storage_data client
     in
+    let* branch = tez_branch client_tezlink in
     let* origination_op =
       Operation.Manager.(
         operation
+          ~branch
           [
             make
               ~fee:10_000
@@ -216,9 +223,11 @@ module TezContract = struct
     let* init_storage =
       Client.convert_data_to_json ~data:init_storage_data client
     in
+    let* branch = tez_branch client_tezlink in
     let* origination_op =
       Operation.Manager.(
         operation
+          ~branch
           [
             make
               ~fee:1000
@@ -256,9 +265,11 @@ module TezContract = struct
       ~counter ~dest ~arg_data ?(entrypoint = "default") ?(amount = 0)
       ?(gas_limit = 100_000) ?(fee = 100_000) ?(storage_limit = 5_000) () =
     let* arg = Client.convert_data_to_json ~data:arg_data client in
+    let* branch = tez_branch client_tezlink in
     let* call_op =
       Operation.Manager.(
         operation
+          ~branch
           [
             make
               ~fee
@@ -2910,9 +2921,11 @@ module CracRunnerWrapper = struct
 
       let inject_crac_no_block (`Tez_runner (_, dest)) =
         let* arg = Client.convert_data_to_json ~data:"Unit" client in
+        let* branch = tez_branch client_tezlink in
         let* crac_op =
           Operation.Manager.(
             operation
+              ~branch
               [
                 make
                   ~fee:100_000
@@ -9764,9 +9777,11 @@ let test_crac_receipt_tez_not_first_tx () =
   (* Inject a dummy Michelson transfer into the mempool (no block produced).
      Per the RFC, CRAC-ID tx_index is per-runtime, so this dummy
      Michelson tx occupies tx_index 0 in the Michelson block. *)
+  let* branch = tez_branch client_tezlink in
   let* dummy_op =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee:100_000
@@ -9785,6 +9800,7 @@ let test_crac_receipt_tez_not_first_tx () =
   let* crac_op =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee:100_000
@@ -9855,9 +9871,11 @@ let test_crac_receipt_evm_then_tez_same_block () =
   let* client_tezlink = Client.init ~endpoint:tezlink_endpoint () in
   let (`Tez_runner (_, tez_runner_dest)) = tez_runner in
   let* arg = Client.convert_data_to_json ~data:"Unit" client in
+  let* branch = tez_branch client_tezlink in
   let* crac_op =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee:100_000

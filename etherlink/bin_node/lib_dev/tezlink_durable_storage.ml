@@ -27,6 +27,36 @@ let manager state pkh =
 let counter state pkh =
   Durable_storage.read_or_default ~default:None (Tezlink_counter pkh) state
 
+(* Mirrors the kernel's genesis block hash ([TezBlock::genesis_block_hash]). *)
+let genesis_block_hash =
+  Block_hash.of_b58check_exn
+    "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9"
+
+(* Number of recent blocks kept in the kernel's live_blocks window
+   ([BLOCKS_STORED] in revm-etherlink). *)
+let live_blocks_window = Z.of_int 256
+
+(* Whether [branch] is a valid branch for a native operation, mirroring the
+   kernel's [is_valid_tez_branch] so the prevalidator rejects exactly what the
+   kernel would drop at inclusion: it must be one of the recent blocks in the
+   [live_blocks] set, or the genesis hash while the chain is still within its
+   first [live_blocks_window] blocks (genesis is not stored in live_blocks). *)
+let is_valid_branch state branch =
+  let open Lwt_result_syntax in
+  let* live = Durable_storage.read_opt (Tezos_live_block branch) state in
+  if Option.is_some live then return true
+  else if Block_hash.equal branch genesis_block_hash then
+    let* block = Durable_storage.read_opt Tezosx_tezos_current_block state in
+    let current =
+      match block with
+      | Some b ->
+          let (Ethereum_types.Qty n) = L2_types.block_number b in
+          n
+      | None -> Z.zero
+    in
+    return Z.(lt current live_blocks_window)
+  else return false
+
 let da_fee_per_byte_mutez state =
   let open Lwt_result_syntax in
   let* (Ethereum_types.Qty da_fee_per_byte_wei) =

@@ -188,6 +188,10 @@ type ('a, 'cap) path =
       Tezos_types.Contract.implicit
       -> (Tezos_types.Manager.t option, ro) path
   | Tezlink_counter : Tezos_types.Contract.implicit -> (Z.t option, ro) path
+  | Tezos_live_block : Block_hash.t -> (unit, ro) path
+      (** Presence in the kernel's recent-block ([live_blocks]) set: [Some ()]
+          when the hash is a recent Michelson block of this instance, [None]
+          otherwise. *)
   | Blueprint_current_generation : (Ethereum_types.quantity, ro) path
   | Kernel_boot_wasm : (bytes, rw) path
   | Kernel_verbosity : (string, rw) path

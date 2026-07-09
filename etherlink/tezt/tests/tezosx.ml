@@ -152,6 +152,16 @@ let tezos_client node =
   in
   Client.init ~endpoint ()
 
+(* A recent Tezos X block hash to use as [branch]; sync the rollup first so it is committed to the kernel's live_blocks. *)
+let tezlink_branch ~sc_rollup_node ~client ~sequencer =
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let tezlink_endpoint =
+    Endpoint.{(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+  in
+  RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_hash ()
+
 (** [sandbox_test_script_path names] resolves a Michelson test script,
     identified by its [michelson_test_scripts] path components, to its on-disk
     path for the [Alpha] protocol. Shared by the sandbox-based Michelson
@@ -282,9 +292,11 @@ let call_michelson_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node
     ~client ~l1_contracts ~sequencer ~source ~counter ~dest ~arg_data
     ?(entrypoint = "default") ?(amount = 0) ?(gas_limit = 100_000) () =
   let* arg = Client.convert_data_to_json ~data:arg_data client in
+  let* branch = tezlink_branch ~sc_rollup_node ~client ~sequencer in
   let* call_op =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee:1000000
@@ -645,9 +657,11 @@ let test_low_fee_op_refused_by_sequencer_accepted_via_delayed_inbox =
   let* receiver_balance_before =
     Client.get_balance_for ~account:receiver.public_key_hash tez_client
   in
+  let* branch = tezlink_branch ~sc_rollup_node ~client ~sequencer in
   let* transfer_op =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee:(Tez.to_mutez fee)
@@ -1706,9 +1720,11 @@ let michelson_to_evm_transfer ~source ~evm_destination ~transfer_amount
         in
         Lwt.return ("call_evm", arg)
   in
+  let* branch = tezlink_branch ~sc_rollup_node ~client ~sequencer in
   let* call_op =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee
@@ -6202,7 +6218,225 @@ let test_meta_block_rpcs_without_michelson_runtime () =
        runtime is not activated" ;
   unit
 
+(* Branch validation (L2-1748): valid/foreign branch across the tx-pool and delayed-inbox paths. *)
+
+(* A well-formed block hash that is not a block of this instance. *)
+let foreign_branch = "BL5HqLzfzPd4b72LwoGtwgXYth26dvit8S8RW4tMkQgbzTWfzww"
+
+let branch_transfer_amount = 1_000_000
+
+let branch_transfer_fee = 1_000_000
+
+let branch_transfer_gas_limit = 10_000
+
+(* Test 1: tx-pool transfer with a recent branch is applied. *)
+let test_native_branch_valid_applied () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"Native transfer with a recent branch is applied (tx pool)"
+    ~tags:["branch"; "liveness"; "replay"; "transfer"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sandbox ->
+  let source = Constant.bootstrap1 in
+  let dest = Constant.bootstrap2 in
+  let* tez_client = tezos_client sandbox in
+  let* balance_before =
+    Client.get_balance_for ~account:dest.public_key_hash tez_client
+  in
+  let* branch = Client.RPC.call tez_client @@ RPC.get_chain_block_hash () in
+  let* counter =
+    Client.RPC.call tez_client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:source.public_key_hash
+         ()
+  in
+  let counter = JSON.as_int counter + 1 in
+  let* op =
+    Operation.Manager.mk_single_transfer
+      ~source
+      ~fee:branch_transfer_fee
+      ~gas_limit:branch_transfer_gas_limit
+      ~amount:branch_transfer_amount
+      ~counter
+      ~branch
+      ~dest
+      tez_client
+  in
+  let* (`OpHash _) = Operation.inject ~dont_wait:true op tez_client in
+  let*@ _ = Rpc.produce_block sandbox in
+  let* balance_after =
+    Client.get_balance_for ~account:dest.public_key_hash tez_client
+  in
+  Check.(
+    (Tez.to_mutez balance_after
+    = Tez.to_mutez balance_before + branch_transfer_amount)
+      int)
+    ~error_msg:"Recipient balance: expected %R, got %L" ;
+  unit
+
+(* Test 2: delayed-inbox transfer with a recent branch is applied. *)
+let test_native_branch_valid_delayed_applied =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed native transfer with a recent branch is applied"
+    ~tags:["branch"; "liveness"; "replay"; "delayed_inbox"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let source = Constant.bootstrap1 in
+  let dest = Constant.bootstrap2 in
+  let* tez_client = tezos_client sequencer in
+  let* balance_before =
+    Client.get_balance_for ~account:dest.public_key_hash tez_client
+  in
+  let* branch = tezlink_branch ~sc_rollup_node ~client ~sequencer in
+  let* counter =
+    Client.RPC.call tez_client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:source.public_key_hash
+         ()
+  in
+  let counter = JSON.as_int counter + 1 in
+  let* op =
+    Operation.Manager.mk_single_transfer
+      ~source
+      ~fee:branch_transfer_fee
+      ~gas_limit:branch_transfer_gas_limit
+      ~amount:branch_transfer_amount
+      ~counter
+      ~branch
+      ~dest
+      client
+  in
+  let* () =
+    send_tezos_op_to_delayed_inbox_and_wait
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      op
+  in
+  let* balance_after =
+    Client.get_balance_for ~account:dest.public_key_hash tez_client
+  in
+  Check.(
+    (Tez.to_mutez balance_after
+    = Tez.to_mutez balance_before + branch_transfer_amount)
+      int)
+    ~error_msg:"Recipient balance: expected %R, got %L" ;
+  unit
+
+(* Test 3: a transfer with a foreign branch is rejected by the prevalidator at
+   injection (so it never gets included and pays no inclusion fees). *)
+let test_native_branch_foreign_rejected () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"Native transfer with a foreign branch is rejected (tx pool)"
+    ~tags:["branch"; "liveness"; "replay"; "transfer"; "security"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sandbox ->
+  let source = Constant.bootstrap1 in
+  let dest = Constant.bootstrap2 in
+  let* tez_client = tezos_client sandbox in
+  let* counter =
+    Client.RPC.call tez_client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:source.public_key_hash
+         ()
+  in
+  let counter = JSON.as_int counter + 1 in
+  let* op =
+    Operation.Manager.mk_single_transfer
+      ~source
+      ~fee:branch_transfer_fee
+      ~gas_limit:branch_transfer_gas_limit
+      ~amount:branch_transfer_amount
+      ~counter
+      ~branch:foreign_branch
+      ~dest
+      tez_client
+  in
+  let* _ =
+    Operation.inject
+      ~error:(rex "evm_node.dev.tezlink.outdated_operation")
+      ~dont_wait:true
+      op
+      tez_client
+  in
+  unit
+
+(* Test 4: a foreign-branch transfer routed through the delayed inbox is dropped
+   at entry; it never enters the inbox and no funds move. *)
+let test_native_branch_foreign_rejected_delayed =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed native transfer with a foreign branch is dropped"
+    ~tags:["branch"; "liveness"; "replay"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let source = Constant.bootstrap1 in
+  let dest = Constant.bootstrap2 in
+  let* tez_client = tezos_client sequencer in
+  let* balance_before =
+    Client.get_balance_for ~account:dest.public_key_hash tez_client
+  in
+  let* counter =
+    Client.RPC.call tez_client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:source.public_key_hash
+         ()
+  in
+  let counter = JSON.as_int counter + 1 in
+  let* op =
+    Operation.Manager.mk_single_transfer
+      ~source
+      ~fee:branch_transfer_fee
+      ~gas_limit:branch_transfer_gas_limit
+      ~amount:branch_transfer_amount
+      ~counter
+      ~branch:foreign_branch
+      ~dest
+      client
+  in
+  (* Send to the delayed bridge without waiting for inbox insertion: the op is
+     dropped at entry (foreign branch), so it never enters the delayed inbox. *)
+  let* _hash =
+    Delayed_inbox.send_tezos_operation_to_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~tezosx_format:true
+      op
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let* balance_after =
+    Client.get_balance_for ~account:dest.public_key_hash tez_client
+  in
+  Check.((Tez.to_mutez balance_after = Tez.to_mutez balance_before) int)
+    ~error_msg:
+      "Foreign-branch delayed transfer must be dropped: recipient balance \
+       changed from %R to %L" ;
+  unit
+
 let () =
+  test_native_branch_valid_applied () ;
+  test_native_branch_valid_delayed_applied [Alpha] ;
+  test_native_branch_foreign_rejected_delayed [Alpha] ;
+  test_native_branch_foreign_rejected () ;
   test_bootstrap_kernel_config () ;
   test_low_fee_op_refused_by_sequencer_accepted_via_delayed_inbox [Alpha] ;
   test_deposit [Alpha] ;

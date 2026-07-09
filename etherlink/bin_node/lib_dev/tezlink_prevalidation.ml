@@ -30,8 +30,26 @@ type error +=
   | Oversized_operation of clue * int * int
   | Bls_is_not_allowed of clue * Signature.V2.public_key_hash
   | Insufficient_fees of string * string
+  | Outdated_operation of clue
 
 let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.outdated_operation"
+    ~title:"Failed to validate an operation: branch is not a recent block"
+    ~description:
+      "Validation failed because the operation branch is not a recent block of \
+       this instance (cross-instance replay protection and TTL freshness)."
+    ~pp:(fun ppf clue ->
+      Format.fprintf
+        ppf
+        "Failed to validate operation %a: branch is not a recent block of this \
+         instance"
+        pp_clue
+        clue)
+    Data_encoding.(obj1 (req "operation" clue_encoding))
+    (function Outdated_operation clue -> Some clue | _ -> None)
+    (fun clue -> Outdated_operation clue) ;
   register_error_kind
     `Permanent
     ~id:"evm_node.dev.tezlink.bls_is_not_allowed"
@@ -551,10 +569,21 @@ let parse_and_validate_for_queue ?michelson_hard_gas_limit_per_block
   (* During operation simulation, fees are not yet estimated and the
      operation is not properly signed yet. For this reason, the
      simulator bypasses the corresponding checks during validation. *)
-  let check_signature, check_minimal_fees =
+  let check_signature, check_minimal_fees, check_branch =
     match simulator_mode with
-    | Tezlink_backend_sig.Simulation -> (false, false)
-    | Preapplication -> (true, true)
+    | Tezlink_backend_sig.Simulation -> (false, false, false)
+    | Preapplication -> (true, true, true)
+  in
+  (* Reject operations whose branch is not a recent block of this instance, so
+     spam with a foreign/stale branch is dropped at the mempool rather than
+     included in a block and only rejected by the kernel at apply (which would
+     let an attacker fill blocks without paying inclusion fees). Simulation is
+     lenient, like the signature and fee checks. *)
+  let* () =
+    if check_branch then
+      let* valid = Tezlink_durable_storage.is_valid_branch state shell.branch in
+      if valid then return () else tzfail @@ Outdated_operation error_clue
+    else return ()
   in
   let** () = signature_exists ~check_signature signature in
   let** pk, source, first_counter =

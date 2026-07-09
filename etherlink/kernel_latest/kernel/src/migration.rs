@@ -670,6 +670,7 @@ where
                     host,
                     &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                     &block_from_bytes,
+                    false, // maintain_live_blocks
                 )?;
             } else {
                 allow_path_not_found(host.store_delete(&concat(

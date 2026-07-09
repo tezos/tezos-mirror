@@ -149,6 +149,11 @@ let tezlink_client_from_evm_node evm_node =
   let endpoint = tezlink_endpoint_from_evm_node evm_node in
   Client.init ~endpoint
 
+(* Fetches the current Michelson-runtime head hash to use as a native
+   operation branch, matching how octez-client sources it from the chain. *)
+let tez_branch client_tezlink =
+  Client.RPC.call_via_endpoint client_tezlink @@ RPC.get_chain_block_hash ()
+
 (** Helper to parse RPC response. Returns [Some json] if 200, [None] if 404,
     fails otherwise. *)
 let parse_rpc_response ~origin response =
@@ -2764,12 +2769,15 @@ let test_prevalidation =
   in
 
   let*@ _ = produce_block sequencer in
+  (* All native ops below branch on a recent Michelson-runtime block, as
+     octez-client would; otherwise the prevalidator rejects them as outdated. *)
+  let* branch = tez_branch client_tezlink in
 
   (* - Tests - *)
   (* case unknown source*)
   let* op_unknown_source =
     Operation.Manager.(
-      operation [make ~fee:1000 ~source:unknown (transfer ())] client)
+      operation ~branch [make ~fee:1000 ~source:unknown (transfer ())] client)
   in
   (* Unknown contracts are treated as unrevealed *)
   let unknown_rex =
@@ -2785,7 +2793,7 @@ let test_prevalidation =
   (* case unrevealed source*)
   let* op_unrevealed =
     Operation.Manager.(
-      operation [make ~fee:1000 ~source:unrevealed (transfer ())] client)
+      operation ~branch [make ~fee:1000 ~source:unrevealed (transfer ())] client)
   in
   let unrevealed_rex =
     rex
@@ -2805,6 +2813,7 @@ let test_prevalidation =
   let* op_not_manager =
     Operation.Consensus.(
       operation
+        ~branch
         ~signer:Constant.bootstrap1
         (consensus
            ~kind:(Attestation {with_dal = false; companion_key = None})
@@ -2838,6 +2847,7 @@ let test_prevalidation =
   let* op_inconsistent =
     Operation.Manager.(
       operation
+        ~branch
         [make ~fee:1000 ~source:unrevealed (reveal Constant.bootstrap2 ())]
         client)
   in
@@ -2859,6 +2869,7 @@ let test_prevalidation =
   let* op_previously_revealed =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee:1000
@@ -2879,6 +2890,7 @@ let test_prevalidation =
   let* op_not_supported =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee:1000
@@ -2903,6 +2915,7 @@ let test_prevalidation =
   let* op_two_sources =
     Operation.Manager.(
       operation
+        ~branch
         [
           make ~fee:1000 ~counter ~source:Constant.bootstrap1 (transfer ());
           make
@@ -2938,6 +2951,7 @@ let test_prevalidation =
   let* op_balance_too_low =
     Operation.Manager.(
       operation
+        ~branch
         [
           make ~fee ~counter ~source:Constant.bootstrap1 (transfer ~amount:1 ());
           make
@@ -2964,6 +2978,7 @@ let test_prevalidation =
   let* op_wrong_counter =
     Operation.Manager.(
       operation
+        ~branch
         [make ~fee:1000 ~counter:0 ~source:Constant.bootstrap1 (transfer ())]
         client)
   in
@@ -2987,6 +3002,7 @@ let test_prevalidation =
   let* op_non_consecutive_counter =
     Operation.Manager.(
       operation
+        ~branch
         [
           make ~fee:1000 ~counter ~source:Constant.bootstrap1 (transfer ());
           make
@@ -3017,6 +3033,7 @@ let test_prevalidation =
   let* op_wrong_signer =
     Operation.Manager.(
       operation
+        ~branch
         ~signer:Constant.bootstrap2
         [make ~fee:1000 ~counter:2 ~source:Constant.bootstrap1 (transfer ())]
         client)
@@ -3050,6 +3067,7 @@ let test_prevalidation =
   let* op_wrong_gas_limit =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee:1000
@@ -3072,6 +3090,7 @@ let test_prevalidation =
   let* batch_wrong_gas_limit =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee:1000
@@ -3101,6 +3120,7 @@ let test_prevalidation =
   let* op_not_supported =
     Operation.Manager.(
       operation
+        ~branch
         [make ~fee:1000 ~source:Constant.bootstrap1 (transfer ~dest:tz4 ())]
         client)
   in
@@ -3118,6 +3138,7 @@ let test_prevalidation =
   let* op_wrong_gas_limit2 =
     Operation.Manager.(
       operation
+        ~branch
         [
           make
             ~fee:1000
@@ -3162,7 +3183,8 @@ let test_prevalidation_gas_limit_lower_bound =
 
   let* client_tezlink = tezlink_client_from_evm_node sequencer () in
   let build_and_inject ?error operations =
-    let* op = Operation.Manager.operation operations client in
+    let* branch = tez_branch client_tezlink in
+    let* op = Operation.Manager.operation ~branch operations client in
     Operation.inject ~dont_wait:true ?error op client_tezlink
   in
 
