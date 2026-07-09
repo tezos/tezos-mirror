@@ -359,6 +359,7 @@ type ('a, 'cap) path =
       Tezos_types.Contract.implicit
       -> (Tezos_types.Manager.t option, ro) path
   | Tezlink_counter : Tezos_types.Contract.implicit -> (Z.t option, ro) path
+  | Tezos_live_block : Block_hash.t -> (unit, ro) path
   | Blueprint_current_generation : (Ethereum_types.quantity, ro) path
   | Kernel_boot_wasm : (bytes, rw) path
   | Kernel_verbosity : (string, rw) path
@@ -921,6 +922,11 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
             Tezosx.Tezos_runtime.extract_field (fun info ->
                 Some (Z.of_int64 info.nonce));
         }
+  | Tezos_live_block branch ->
+      let (`Hex hash_hex) = Hex.of_bytes (Block_hash.to_bytes branch) in
+      static_ro
+        (unit_flag_ro_codec
+           ~path:(Durable_storage_path.tezosx_tez_live_block hash_hex))
   | Blueprint_current_generation ->
       versioned_ro (fun ~storage_version ->
           {

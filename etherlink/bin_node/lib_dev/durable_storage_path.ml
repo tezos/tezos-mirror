@@ -172,6 +172,11 @@ let michelson_alias_implementation =
 (** TezosX: Tezos blocks live in the Michelson world-state keyspace. *)
 let tezosx_tezos_blocks_root = TEZ.World_state.make "/tez_blocks"
 
+(* Presence marker for a recent Michelson block hash (the kernel's [live_blocks]
+   set, keyed by the lowercase hex of the 32-byte block hash). *)
+let tezosx_tez_live_block hash_hex =
+  tezosx_tezos_blocks_root ^ "/live_blocks/" ^ hash_hex
+
 let block_root_of_chain_family (type f) (chain_family : f L2_types.chain_family)
     =
   match chain_family with
