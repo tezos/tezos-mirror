@@ -1577,6 +1577,101 @@ mod tests {
         );
     }
 
+    /// Regression (L2-1748): delayed native operations are branch-checked only
+    /// at delayed-inbox entry, not at inclusion. A transfer whose branch is a
+    /// foreign hash (not a recent block of this instance) that reaches inclusion
+    /// via the delayed inbox is still applied, so a branch aging out of the
+    /// window cannot drop a force-included operation. The entry check itself is
+    /// covered by `delayed_inbox::tests::test_delayed_inbox_tezos_dropped_on_stale_branch`.
+    #[test]
+    fn test_tezosx_delayed_op_foreign_branch_applied_at_inclusion() {
+        use tezos_execution::account_storage::{
+            get_tezos_account_info, set_tezos_account_info, TezosAccountInfo,
+        };
+
+        let mut host = MockKernelHost::default();
+        storage::store_da_fee(&mut host, U256::zero()).unwrap();
+
+        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host);
+        let mut config = dummy_configuration();
+
+        let bootstrap1 = bootstrap1();
+        let src_pkh = bootstrap1.pkh.clone();
+        let bootstrap2 = bootstrap2();
+        let dst_pkh = bootstrap2.pkh.clone();
+
+        context::implicit_from_public_key_hash(&dst_pkh)
+            .expect("Account interface should be correct")
+            .allocate(&mut host)
+            .expect("Contract initialization should have succeeded");
+
+        let initial_balance = 10000_u64;
+        set_tezos_account_info(
+            &mut host,
+            &src_pkh,
+            TezosAccountInfo {
+                balance: U256::from(initial_balance),
+                nonce: 0,
+                pub_key: None,
+            },
+        )
+        .expect("Should have set bootstrap1 account info");
+        set_tezos_account_info(
+            &mut host,
+            &dst_pkh,
+            TezosAccountInfo {
+                balance: U256::zero(),
+                nonce: 0,
+                pub_key: None,
+            },
+        )
+        .expect("Should have set bootstrap2 account info");
+
+        let transfer_amount = 35_u64;
+        let reveal = make_reveal_operation(1000, 1, 500, 0, bootstrap1.clone());
+        let mut transfer = make_transaction_operation(
+            1000,
+            2,
+            3000,
+            0,
+            bootstrap1.clone(),
+            transfer_amount.into(),
+            Contract::Implicit(dst_pkh.clone()),
+            Parameters::default(),
+        );
+        // Re-branch the transfer on a foreign hash (not genesis, not a block of
+        // this instance) and re-sign, so only its branch is stale.
+        let foreign_branch = tezos_crypto_rs::hash::BlockHash::from([0x11u8; 32]);
+        transfer.signature =
+            sign_operation(&bootstrap1.sk, &foreign_branch, &transfer.content).unwrap();
+        transfer.branch = foreign_branch;
+
+        store_blueprints(
+            &mut host,
+            vec![tezos_blueprint(
+                vec![reveal, transfer],
+                Timestamp::from(0i64),
+            )],
+        );
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        // The foreign-branch transfer was force-included and applied.
+        let dst_info = get_tezos_account_info(&host, &dst_pkh)
+            .expect("account info read should succeed")
+            .expect("bootstrap2 should be allocated");
+        assert_eq!(
+            dst_info.balance,
+            U256::from(transfer_amount),
+            "delayed foreign-branch transfer must be applied at inclusion"
+        );
+    }
+
     /// Ports the standalone `test_tezlink_level_now_chain_id_instructions` to
     /// the TezosX path: originate a Michelson contract whose code records the
     /// chain id, level and timestamp at the time of a call, then call it and

@@ -138,6 +138,18 @@
   result, or grief the legitimate deposit into an `AlreadySet` failure.
   A `%collect_result` from any other sender is now rejected, reverting
   the whole operation.
+- **Security fix:** a native manager operation's `branch` is now validated
+  against the last 256 blocks of this instance — at delayed-inbox entry for
+  delayed operations, and at inclusion for sequencer-injected ones. The `branch`
+  was signed but never checked and the manager-operation signature watermark
+  carries no chain id, so identical signed bytes could be replayed on another
+  instance for the same address (cross-instance replay). A `branch` that is not
+  a recent block of this instance is now rejected, which also restores
+  transaction-TTL freshness. The sequencer's prevalidator also rejects such
+  operations at injection, so a stale/foreign branch cannot fill blocks without
+  paying inclusion fees. As a consequence, native operations — in particular
+  those routed through the delayed inbox — must branch on a recent Tezos X block
+  rather than on L1. (!22402)
 - **Bug fix:** Michelson contracts executed via the delayed inbox now observe
   the configured Michelson runtime chain id from `CHAIN_ID`, matching the
   sequenced and gateway ingress lanes. Previously the delayed path derived

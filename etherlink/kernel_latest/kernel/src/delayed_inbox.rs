@@ -10,6 +10,7 @@ use crate::{
     transaction::{Transaction, TransactionContent},
 };
 use anyhow::Result;
+use primitive_types::H256;
 use revm_etherlink::helpers::legacy::FaDeposit;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::{
@@ -218,6 +219,18 @@ impl DelayedInbox {
         match tx {
             TezosXTransaction::Ethereum(tx) => {
                 let Transaction { tx_hash, content } = *tx.clone();
+                // Validate the branch at delayed-inbox entry; drop foreign/stale branches (cross-instance replay).
+                if let TransactionContent::TezosDelayed(op) = &content {
+                    if !crate::chains::is_valid_tez_branch(host, &H256(*op.branch))? {
+                        log!(
+                            Error,
+                            "Dropping delayed Tezos operation {}: branch {} is not a recent block of this instance",
+                            hex::encode(tx_hash),
+                            hex::encode(*op.branch)
+                        );
+                        return Ok(());
+                    }
+                }
                 let transaction = match content {
             TransactionContent::Ethereum(_) => anyhow::bail!("Non-delayed evm transaction should not be saved to the delayed inbox. {:?}", tx.tx_hash),
             TransactionContent::EthereumDelayed(tx) => DelayedTransaction::Ethereum(tx),
@@ -417,10 +430,11 @@ mod tests {
     use super::DelayedInbox;
     use super::DelayedTransaction;
     use super::Hash;
-    use crate::chains::make_test_operation;
+    use crate::block_storage;
+    use crate::chains::{make_test_operation, TEZ_BLOCKS_PATH};
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
-    use primitive_types::{H160, U256};
+    use primitive_types::{H160, H256, U256};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
@@ -506,6 +520,13 @@ mod tests {
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
 
         let op = make_test_operation();
+        // Register the branch as live so the entry check accepts the operation.
+        block_storage::internal_for_tests::register_live_block(
+            &mut host,
+            &TEZ_BLOCKS_PATH,
+            &H256(*op.branch),
+        )
+        .expect("register live block");
         let tx = Transaction {
             tx_hash: [5; TRANSACTION_HASH_SIZE],
             content: TezosDelayed(op),
@@ -525,6 +546,39 @@ mod tests {
             .expect("Reading from the delayed inbox should work")
             .expect("Transaction should be in the delayed inbox");
         assert_eq!((tx, timestamp), read)
+    }
+
+    /// A delayed operation with a stale/foreign branch is dropped at entry, not saved.
+    #[test]
+    fn test_delayed_inbox_tezos_dropped_on_stale_branch() {
+        let mut host = MockKernelHost::default();
+        let mut delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+
+        // A branch neither in live_blocks nor covered by the genesis fallback: must be rejected.
+        let mut op = make_test_operation();
+        op.branch = tezos_crypto_rs::hash::BlockHash::from([0x11u8; 32]);
+        let tx = Transaction {
+            tx_hash: [7; TRANSACTION_HASH_SIZE],
+            content: TezosDelayed(op),
+        };
+
+        let timestamp =
+            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
+        // Dropping is not an error: the call succeeds but nothing is stored.
+        delayed_inbox
+            .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
+            .expect("save_transaction should drop, not fail");
+
+        let delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should exist");
+        let read = delayed_inbox
+            .find_transaction(&mut host, Hash(tx.tx_hash))
+            .expect("Reading from the delayed inbox should work");
+        assert!(
+            read.is_none(),
+            "operation with a stale branch must not be saved"
+        );
     }
 
     #[test]

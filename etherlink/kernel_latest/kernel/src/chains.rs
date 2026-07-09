@@ -27,7 +27,7 @@ use revm::primitives::hardfork::SpecId;
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     inspectors::TracerInput,
-    storage::world_state_handler::StorageAccount,
+    storage::{block::BLOCKS_STORED, world_state_handler::StorageAccount},
 };
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
@@ -51,7 +51,7 @@ use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_tezlink::{
-    block::AppliedOperation,
+    block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
     operation::{ManagerOperation, ManagerOperationContent, Operation},
     operation_result::{
@@ -73,6 +73,22 @@ pub const TEZ_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tez/worl
 /// included in SafeStorage transactions and snapshotted as part of the
 /// Michelson world state.
 pub const TEZ_BLOCKS_PATH: RefPath = RefPath::assert_from(b"/tez/world_state/tez_blocks");
+
+/// True if `branch` is a recent block of this instance; genesis is accepted only while the chain is under [`BLOCKS_STORED`] blocks.
+pub(crate) fn is_valid_tez_branch<Host: StorageV1>(
+    host: &Host,
+    branch: &H256,
+) -> Result<bool, crate::Error> {
+    if crate::block_storage::is_recent_block_hash(host, &TEZ_BLOCKS_PATH, branch)? {
+        return Ok(true);
+    }
+    if *branch == H256(*TezBlock::genesis_block_hash()) {
+        let current = crate::block_storage::read_current_number(host, &TEZ_BLOCKS_PATH)
+            .unwrap_or_else(|_| U256::zero());
+        return Ok(current < U256::from(BLOCKS_STORED));
+    }
+    Ok(false)
+}
 
 /// Unified SafeStorage root for all Tezos account state. Holds Michelson
 /// contract / big_map state directly (ex `/tezlink/context/`) and TezosX
@@ -636,6 +652,7 @@ impl TezosXChainConfig {
                             false, // da fees are disabled for delayed operations
                             skip_signature_check,
                             skip_fees_check,
+                            true, // branch already checked at delayed-inbox entry
                             http_trace_enabled,
                         );
                     } // Tezos
@@ -674,6 +691,7 @@ impl TezosXChainConfig {
                 true, // da fees are enabled when the sequencer injects a transaction
                 skip_signature_check,
                 skip_fees_check,
+                false, // branch validated at inclusion for sequencer-injected ops
                 http_trace_enabled,
             ),
         }
@@ -740,6 +758,7 @@ impl TezosXChainConfig {
         da_fees_enabled: bool,
         skip_signature_check: bool,
         skip_fees_check: bool,
+        skip_branch_check: bool,
         http_trace_enabled: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
@@ -779,6 +798,7 @@ impl TezosXChainConfig {
             sequencer_pool_address,
             skip_signature_check,
             skip_fees_check,
+            skip_branch_check,
             Some(outbox_queue),
             Some(&block_constants.evm_runtime_block_constants),
             &mut journal,
@@ -1044,6 +1064,9 @@ pub fn apply_tezos_operation<Host>(
     sequencer_pool_address: Option<H160>,
     skip_signature_check: bool,
     skip_fees_check: bool,
+    // Delayed-origin ops are branch-checked once at delayed-inbox entry; skip the
+    // check here so a branch aging out before forced inclusion cannot drop them.
+    skip_branch_check: bool,
     outbox_queue: Option<&OutboxQueue<'_, impl Path>>,
     evm_block_constants: Option<&tezos_ethereum::block::BlockConstants>,
     external_journal: &mut TezosXJournal,
@@ -1101,6 +1124,17 @@ where
 
             let branch = operation.branch.clone();
             let signature = operation.signature.clone();
+
+            // The branch must be a recent block of this instance (see is_valid_tez_branch); reject otherwise.
+            if !skip_branch_check && !is_valid_tez_branch(host, &H256(*branch))? {
+                log!(
+                    Error,
+                    "Dropping Tezos operation {}: branch {} is not a recent block of this instance",
+                    hex::encode(*hash),
+                    hex::encode(*branch)
+                );
+                return Ok(crate::apply::ExecutionResult::Invalid);
+            }
 
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not

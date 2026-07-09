@@ -334,6 +334,9 @@ where
                 None,
                 skip_signature_check,
                 skip_fees_check,
+                // Simulation / pre-application: do not enforce branch liveness
+                // (lenient, like skip_signature_check; matches L1 run_operation).
+                true,
                 Some(&outbox_queue),
                 Some(&block_constants.evm_runtime_block_constants),
                 &mut trace_journal,
