@@ -299,7 +299,13 @@ let rec skip n state k =
   Atom.fixed_length_string n resume state @@ fun ((_, state) : string * _) ->
   k state
 
-(** Main recursive reading function, in continuation passing style. *)
+(** Main recursive reading function, in continuation passing style.
+
+    Unlike the one-shot reader ({!Binary_reader}), this reader needs no
+    recursion-depth bound: every recursive call is tail-recursive (checked by
+    the [@ocaml.tailcall] annotations below), so deeply-nested input consumes
+    heap in the continuation rather than the native stack and cannot overflow.
+    The only non-tail call is [resume], used once per await, not per level. *)
 let rec read_rec : type next ret.
     bool ->
     next Encoding.t ->
@@ -309,7 +315,10 @@ let rec read_rec : type next ret.
  fun whole e state k ->
   let resume buffer =
     let stream = Binary_stream.push buffer state.stream in
-    try read_rec whole e {state with stream} k
+    try
+      (* This recursive call is not tail-recursive but this resume
+         function is only used in atomic cases. *)
+      read_rec whole e {state with stream} k
     with Local_read_error err -> Error err
   in
   let open Encoding in
@@ -343,8 +352,8 @@ let rec read_rec : type next ret.
       let size = remaining_bytes_for_variable_encoding state in
       Atom.fixed_length_bigstring size resume state k
   | Padded (e, n) ->
-      read_rec false e state @@ fun (v, state) ->
-      skip n state @@ fun state -> k (v, state)
+      (read_rec [@ocaml.tailcall]) false e state (fun (v, state) ->
+          skip n state @@ fun state -> k (v, state))
   | RangedInt {minimum; endianness; maximum} ->
       Atom.ranged_int ~minimum ~endianness ~maximum resume state k
   | RangedFloat {minimum; maximum} ->
@@ -353,27 +362,40 @@ let rec read_rec : type next ret.
   | Array {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
       | No_limit ->
-          read_variable_list Array_too_long max_int e state
-          @@ fun (l, size, state) ->
-          let arr = Arrconv.array_of_list_size l size in
-          k (arr, state)
+          (read_variable_list [@ocaml.tailcall])
+            Array_too_long
+            max_int
+            e
+            state
+            (fun (l, size, state) ->
+              let arr = Arrconv.array_of_list_size l size in
+              k (arr, state))
       | At_most max_length ->
-          read_variable_list Array_too_long max_length e state
-          @@ fun (l, size, state) ->
-          let arr = Arrconv.array_of_list_size l size in
-          k (arr, state)
-      | Exactly exact_length -> read_fixed_array exact_length e state k)
+          (read_variable_list [@ocaml.tailcall])
+            Array_too_long
+            max_length
+            e
+            state
+            (fun (l, size, state) ->
+              let arr = Arrconv.array_of_list_size l size in
+              k (arr, state))
+      | Exactly exact_length ->
+          (read_fixed_array [@ocaml.tailcall]) exact_length e state k)
   | Array
       {
         length_limit = At_most max_length;
         length_encoding = Some length_encoding;
         elts = e;
       } ->
-      read_rec whole length_encoding state @@ fun (len, state) ->
-      if len < 0 then
-        raise_read_error (Invalid_int {min = 0; v = len; max = max_length}) ;
-      if len > max_length then raise (Read_error Array_too_long) ;
-      read_fixed_array len e state k
+      (read_rec [@ocaml.tailcall])
+        whole
+        length_encoding
+        state
+        (fun (len, state) ->
+          if len < 0 then
+            raise_read_error (Invalid_int {min = 0; v = len; max = max_length}) ;
+          if len > max_length then raise (Read_error Array_too_long) ;
+          (read_fixed_array [@ocaml.tailcall]) len e state k)
   | Array
       {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
     ->
@@ -381,64 +403,82 @@ let rec read_rec : type next ret.
   | List {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
       | No_limit ->
-          read_variable_list List_too_long max_int e state
-          @@ fun (l, _, state) -> k (l, state)
+          (read_variable_list [@ocaml.tailcall])
+            List_too_long
+            max_int
+            e
+            state
+            (fun (l, _, state) -> k (l, state))
       | At_most max_length ->
-          read_variable_list List_too_long max_length e state
-          @@ fun (l, _, state) -> k (l, state)
-      | Exactly exact_length -> read_fixed_list exact_length e state k)
+          (read_variable_list [@ocaml.tailcall])
+            List_too_long
+            max_length
+            e
+            state
+            (fun (l, _, state) -> k (l, state))
+      | Exactly exact_length ->
+          (read_fixed_list [@ocaml.tailcall]) exact_length e state k)
   | List
       {
         length_limit = At_most max_length;
         length_encoding = Some length_encoding;
         elts = e;
       } ->
-      read_rec whole length_encoding state @@ fun (len, state) ->
-      if len < 0 then
-        raise_read_error (Invalid_int {min = 0; v = len; max = max_length}) ;
-      if len > max_length then raise (Read_error List_too_long) ;
-      read_fixed_list len e state k
+      (read_rec [@ocaml.tailcall])
+        whole
+        length_encoding
+        state
+        (fun (len, state) ->
+          if len < 0 then
+            raise_read_error (Invalid_int {min = 0; v = len; max = max_length}) ;
+          if len > max_length then raise (Read_error List_too_long) ;
+          (read_fixed_list [@ocaml.tailcall]) len e state k)
   | List
       {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
     ->
       assert false
-  | Obj (Req {encoding = e; _}) -> read_rec whole e state k
-  | Obj (Dft {encoding = e; _}) -> read_rec whole e state k
+  | Obj (Req {encoding = e; _}) -> (read_rec [@ocaml.tailcall]) whole e state k
+  | Obj (Dft {encoding = e; _}) -> (read_rec [@ocaml.tailcall]) whole e state k
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) ->
       Atom.bool resume state @@ fun (present, state) ->
       if not present then k (None, state)
-      else read_rec whole e state @@ fun (v, state) -> k (Some v, state)
+      else
+        (read_rec [@ocaml.tailcall]) whole e state (fun (v, state) ->
+            k (Some v, state))
   | Obj (Opt {kind = `Variable; encoding = e; _}) ->
       let size = remaining_bytes_for_variable_encoding state in
       if size = 0 then k (None, state)
-      else read_rec whole e state @@ fun (v, state) -> k (Some v, state)
+      else
+        (read_rec [@ocaml.tailcall]) whole e state (fun (v, state) ->
+            k (Some v, state))
   | Objs {kind = `Fixed sz; left; right} ->
       ignore (check_remaining_bytes state sz : int option) ;
       ignore (check_allowed_bytes state sz : int option) ;
-      read_rec false left state @@ fun (left, state) ->
-      read_rec whole right state @@ fun (right, state) ->
-      k ((left, right), state)
+      (read_rec [@ocaml.tailcall]) false left state (fun (left, state) ->
+          (read_rec [@ocaml.tailcall]) whole right state (fun (right, state) ->
+              k ((left, right), state)))
   | Objs {kind = `Dynamic; left; right} ->
-      read_rec false left state @@ fun (left, state) ->
-      read_rec whole right state @@ fun (right, state) ->
-      k ((left, right), state)
+      (read_rec [@ocaml.tailcall]) false left state (fun (left, state) ->
+          (read_rec [@ocaml.tailcall]) whole right state (fun (right, state) ->
+              k ((left, right), state)))
   | Objs {kind = `Variable; left; right} ->
-      read_variable_pair left right state k
-  | Tup e -> read_rec whole e state k
+      (read_variable_pair [@ocaml.tailcall]) left right state k
+  | Tup e -> (read_rec [@ocaml.tailcall]) whole e state k
   | Tups {kind = `Fixed sz; left; right} ->
       ignore (check_remaining_bytes state sz : int option) ;
       ignore (check_allowed_bytes state sz : int option) ;
-      read_rec false left state @@ fun (left, state) ->
-      read_rec whole right state @@ fun (right, state) ->
-      k ((left, right), state)
+      (read_rec [@ocaml.tailcall]) false left state (fun (left, state) ->
+          (read_rec [@ocaml.tailcall]) whole right state (fun (right, state) ->
+              k ((left, right), state)))
   | Tups {kind = `Dynamic; left; right} ->
-      read_rec false left state @@ fun (left, state) ->
-      read_rec whole right state @@ fun (right, state) ->
-      k ((left, right), state)
+      (read_rec [@ocaml.tailcall]) false left state (fun (left, state) ->
+          (read_rec [@ocaml.tailcall]) whole right state (fun (right, state) ->
+              k ((left, right), state)))
   | Tups {kind = `Variable; left; right} ->
-      read_variable_pair left right state k
+      (read_variable_pair [@ocaml.tailcall]) left right state k
   | Conv {inj; encoding; _} ->
-      read_rec whole encoding state @@ fun (v, state) -> k (inj v, state)
+      (read_rec [@ocaml.tailcall]) whole encoding state (fun (v, state) ->
+          k (inj v, state))
   | Union {tag_size; cases; _} -> (
       Atom.tag tag_size resume state @@ fun (ctag, state) ->
       match
@@ -449,7 +489,8 @@ let rec read_rec : type next ret.
       with
       | None -> Error (Unexpected_tag ctag)
       | Some (Case {encoding; inj; _}) ->
-          read_rec whole encoding state @@ fun (v, state) -> k (inj v, state))
+          (read_rec [@ocaml.tailcall]) whole encoding state (fun (v, state) ->
+              k (inj v, state)))
   | Dynamic_size {kind; encoding = e} ->
       (match kind with
       | `N -> Atom.uint30_like_n resume state
@@ -459,24 +500,24 @@ let rec read_rec : type next ret.
       let remaining = check_remaining_bytes state sz in
       let state = {state with remaining_bytes = Some sz} in
       ignore (check_allowed_bytes state sz : int option) ;
-      read_rec true e state @@ fun (v, state) ->
-      if state.remaining_bytes <> Some 0 then Error Extra_bytes
-      else k (v, {state with remaining_bytes = remaining})
+      (read_rec [@ocaml.tailcall]) true e state (fun (v, state) ->
+          if state.remaining_bytes <> Some 0 then Error Extra_bytes
+          else k (v, {state with remaining_bytes = remaining}))
   | Check_size {limit; encoding = e} ->
       Atom.with_limit
         ~limit
         whole
-        (fun state k -> read_rec whole e state k)
+        (fun state k -> (read_rec [@ocaml.tailcall]) whole e state k)
         state
         k
-  | Describe {encoding = e; _} -> read_rec whole e state k
-  | Splitted {encoding = e; _} -> read_rec whole e state k
+  | Describe {encoding = e; _} -> (read_rec [@ocaml.tailcall]) whole e state k
+  | Splitted {encoding = e; _} -> (read_rec [@ocaml.tailcall]) whole e state k
   | Mu {fix; _} ->
       let e = fix e in
-      read_rec whole e state k
+      (read_rec [@ocaml.tailcall]) whole e state k
   | Delayed f ->
       let e = f () in
-      read_rec whole e state k
+      (read_rec [@ocaml.tailcall]) whole e state k
 
 and remaining_bytes_for_variable_encoding {remaining_bytes; _} =
   match remaining_bytes with
@@ -496,18 +537,19 @@ and read_variable_pair : type left right ret.
   let size = remaining_bytes_for_variable_encoding state in
   match (Encoding.classify e1, Encoding.classify e2) with
   | (`Dynamic | `Fixed _), `Variable ->
-      read_rec false e1 state @@ fun (left, state) ->
-      read_rec true e2 state @@ fun (right, state) -> k ((left, right), state)
+      (read_rec [@ocaml.tailcall]) false e1 state (fun (left, state) ->
+          (read_rec [@ocaml.tailcall]) true e2 state (fun (right, state) ->
+              k ((left, right), state)))
   | `Variable, `Fixed n ->
       if n > size then Error Not_enough_data
       else
         let state = {state with remaining_bytes = Some (size - n)} in
-        read_rec true e1 state @@ fun (left, state) ->
-        assert (state.remaining_bytes = Some 0) ;
-        let state = {state with remaining_bytes = Some n} in
-        read_rec true e2 state @@ fun (right, state) ->
-        assert (state.remaining_bytes = Some 0) ;
-        k ((left, right), state)
+        (read_rec [@ocaml.tailcall]) true e1 state (fun (left, state) ->
+            assert (state.remaining_bytes = Some 0) ;
+            let state = {state with remaining_bytes = Some n} in
+            (read_rec [@ocaml.tailcall]) true e2 state (fun (right, state) ->
+                assert (state.remaining_bytes = Some 0) ;
+                k ((left, right), state)))
   | `Dynamic, (`Fixed _ | `Dynamic)
   | `Fixed _, (`Fixed _ | `Dynamic)
   | `Variable, (`Variable | `Dynamic) ->
@@ -527,8 +569,8 @@ and read_variable_list : type a ret.
     if size = 0 then k (List.rev acc, accsize, state)
     else if max_length = 0 then raise_read_error error
     else
-      read_rec false e state @@ fun (v, state) ->
-      loop state (v :: acc) (accsize + 1) (max_length - 1)
+      (read_rec [@ocaml.tailcall]) false e state (fun (v, state) ->
+          loop state (v :: acc) (accsize + 1) (max_length - 1))
   in
   loop state [] 0 max_length
 
@@ -544,8 +586,8 @@ and read_fixed_list : type a ret.
         | Some size -> if size = 0 then raise_read_error Not_enough_data
         | None -> ()
       in
-      read_rec false e state @@ fun (v, state) ->
-      loop state (v :: acc) (exact_length - 1)
+      (read_rec [@ocaml.tailcall]) false e state (fun (v, state) ->
+          loop state (v :: acc) (exact_length - 1))
   in
   loop state [] exact_length
 
@@ -563,21 +605,21 @@ and read_fixed_array : type a ret.
       | Some size -> if size = 0 then raise_read_error Not_enough_data
       | None -> ()
     in
-    read_rec false e state @@ fun (v, state) ->
-    let arr = Array.make exact_length v in
-    let rec loop state index =
-      if index = exact_length then k (arr, state)
-      else
-        let () =
-          match state.remaining_bytes with
-          | Some size -> if size = 0 then raise_read_error Not_enough_data
-          | None -> ()
+    (read_rec [@ocaml.tailcall]) false e state (fun (v, state) ->
+        let arr = Array.make exact_length v in
+        let rec loop state index =
+          if index = exact_length then k (arr, state)
+          else
+            let () =
+              match state.remaining_bytes with
+              | Some size -> if size = 0 then raise_read_error Not_enough_data
+              | None -> ()
+            in
+            (read_rec [@ocaml.tailcall]) false e state (fun (v, state) ->
+                Array.unsafe_set arr index v ;
+                loop state (index + 1))
         in
-        read_rec false e state @@ fun (v, state) ->
-        Array.unsafe_set arr index v ;
-        loop state (index + 1)
-    in
-    loop state 1
+        loop state 1)
 
 let read_rec e state k =
   try read_rec false e state k with
