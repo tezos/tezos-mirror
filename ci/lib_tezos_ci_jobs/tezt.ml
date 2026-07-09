@@ -171,13 +171,18 @@ let job_tezt_static_binaries =
 let register () =
   Cacio.register_merge_request_jobs
     [
+      (* No manual jobs in merge trains. *)
       (Auto, job_tezt `merge_request);
       (Auto, job_tezt_time_sensitive `merge_request);
+      (Auto, job_tezt_static_binaries `merge_request);
+    ] ;
+  Cacio.register_jobs
+    Before_merging
+    [
       (Manual, job_tezt_riscv_slow `merge_request);
       (Manual, job_tezt_slow `merge_request);
       (Manual, job_tezt_extra `merge_request);
       (Manual, job_tezt_flaky `merge_request);
-      (Auto, job_tezt_static_binaries `merge_request);
     ] ;
   Cacio.register_jobs
     Schedule_extended_test

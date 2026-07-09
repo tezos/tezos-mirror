@@ -259,11 +259,12 @@ let job_publish =
 let register () =
   Cacio.register_merge_request_jobs
     [
+      (* No manual jobs in merge trains. *)
       (Immediate, job_rst_check);
       (Auto, job_install_python `debian_trixie `current_branch);
       (Auto, job_build_all `lite);
-      (Manual, job_linkcheck `lite);
     ] ;
+  Cacio.register_jobs Before_merging [(Manual, job_linkcheck `lite)] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for the documentation."
