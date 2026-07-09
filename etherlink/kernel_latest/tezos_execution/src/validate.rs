@@ -4,7 +4,7 @@
 
 use num_bigint::{BigInt, Sign, TryFromBigIntError};
 use num_traits::ops::checked::CheckedSub;
-use tezos_crypto_rs::PublicKeySignatureVerifier;
+use tezos_crypto_rs::{PublicKeySignatureVerifier, PublicKeyWithHash};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
@@ -104,7 +104,19 @@ fn get_revealed_key<Host: StorageV1>(
     first_content: &ManagerOperationContent,
 ) -> Result<PublicKey, ValidityError> {
     match first_content {
-        ManagerOperationContent::Reveal(content) => Ok(content.operation.pk.clone()),
+        ManagerOperationContent::Reveal(content) => {
+            let pk = content.operation.pk.clone();
+            // The revealed key must belong to the source. Otherwise an attacker
+            // could authenticate a batch with their own key while charging the
+            // victim's fee/counter: application would later reject the reveal
+            // with InconsistentPublicKey, but the fee/counter debit is already
+            // promoted. Reject here, before any state change (mirrors the
+            // application-phase check in `reveal`).
+            if pk.pk_hash() != *account.pkh() {
+                return Err(ValidityError::InconsistentPublicKey(account.pkh().clone()));
+            }
+            Ok(pk)
+        }
         _ => {
             let manager = account
                 .manager(host)
