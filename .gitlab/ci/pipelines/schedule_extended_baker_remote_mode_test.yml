@@ -7,34 +7,6 @@ stages:
 - build
 - test
 
-oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
-    ARCH: amd64
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-
 datadog_pipeline_trace:
   image: datadog/ci:v5.18.0@sha256:07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2
   stage: start
@@ -86,16 +58,16 @@ oc.build_kernels:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    EVM_KERNEL_SKIP_BYTECODE: "yes"
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    CC: clang
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
+    NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -149,17 +121,17 @@ oc.build_x86_64-exp:
   - eval $(opam env)
   - dune cache trim --size=5GB
   variables:
-    EXECUTABLE_FILES: script-inputs/experimental-executables
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    EXECUTABLE_FILES: script-inputs/experimental-executables
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -216,19 +188,19 @@ oc.build_x86_64-extra-dev:
   - eval $(opam env)
   - dune cache trim --size=5GB
   variables:
-    EXECUTABLE_FILES: script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
     DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    EXECUTABLE_FILES: script-inputs/dev-executables
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -276,14 +248,14 @@ oc.build_x86_64-released:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    EXECUTABLE_FILES: script-inputs/released-executables
-    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    EXECUTABLE_FILES: script-inputs/released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -301,6 +273,161 @@ oc.build_x86_64-released:
     - octez-baker-PtTALLiN
     - src/proto_*/parameters/*.json
     when: on_success
+
+oc.docker:ci:amd64:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
+    GCLOUD_VERSION: 543.0.0
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
+
+tezt:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
+  timeout: 40 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh --without-select-tezts -- "${TESTS}" --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
+    ${JUNIT} --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
+    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
+    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    JUNIT: tezt-junit.xml
+    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && /flaky
+    TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "6"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: ""
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 34
+
+tezt-extra:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
+  timeout: 40 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh --without-select-tezts -- "${TESTS}" --from-record tezt/records/extra
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
+    ${JUNIT} --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
+    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/extra
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
+    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    JUNIT: tezt-junit.xml
+    TESTS: extra && /ci_disabled && /time_sensitive && /slow && /cloud && /flaky
+    TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "6"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: -extra
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
 
 tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -348,11 +475,11 @@ tezt-flaky:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -flaky
     TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && flaky
-    TEZT_RETRY: "3"
-    TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "1"
+    TEZT_RETRY: "3"
+    TEZT_VARIANT: -flaky
   artifacts:
     expire_in: 7 days
     paths:
@@ -366,69 +493,6 @@ tezt-flaky:
     when: always
   retry: 2
   parallel: 2
-
-tezt-extra:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_tezt
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-extra-dev
-  - oc.build_x86_64-exp
-  dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-extra-dev
-  - oc.build_x86_64-exp
-  timeout: 40 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . ./scripts/version.sh
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh --without-select-tezts -- "${TESTS}" --from-record tezt/records/extra
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    ${JUNIT} --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
-    tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
-    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/extra
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
-    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
-    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
-    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
-    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
-    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
-    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -extra
-    TESTS: extra && /ci_disabled && /time_sensitive && /slow && /cloud && /flaky
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "6"
-    TEZT_NO_NPX: "true"
-  artifacts:
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results.json
-    - $JUNIT
-    reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
 
 tezt-slow:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -475,11 +539,11 @@ tezt-slow:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -slow
     TESTS: slow && /ci_disabled && /time_sensitive && /extra && /cloud
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "3"
     TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "3"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: -slow
   artifacts:
     expire_in: 7 days
     paths:
@@ -539,11 +603,11 @@ tezt-time-sensitive:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -time-sensitive
     TESTS: time_sensitive && /ci_disabled && /slow && /extra && /cloud
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
+    TEZT_PARALLEL: "1"
+    TEZT_RETRY: "1"
+    TEZT_VARIANT: -time-sensitive
   artifacts:
     expire_in: 7 days
     paths:
@@ -557,67 +621,3 @@ tezt-time-sensitive:
     when: always
   retry: 2
   parallel: 2
-
-tezt:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_tezt
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-extra-dev
-  - oc.build_x86_64-exp
-  dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_kernels
-  - oc.build_x86_64-released
-  - oc.build_x86_64-extra-dev
-  - oc.build_x86_64-exp
-  timeout: 40 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . ./scripts/version.sh
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh --without-select-tezts -- "${TESTS}" --from-record tezt/records
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    ${JUNIT} --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
-    tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
-    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
-    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
-    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
-    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
-    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
-    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
-    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    JUNIT: tezt-junit.xml
-    TEZT_VARIANT: ""
-    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && /flaky
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "6"
-    TEZT_NO_NPX: "true"
-  artifacts:
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results.json
-    - $JUNIT
-    reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
-  parallel: 34

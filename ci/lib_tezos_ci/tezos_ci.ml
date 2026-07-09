@@ -135,6 +135,60 @@ let name_of_generic_job (generic_job : Gitlab_ci.Types.generic_job) =
 
 let name_of_tezos_job tezos_job = name_of_generic_job tezos_job.job
 
+(* Reorder some entries in a job's definition so that the result is more stable.
+   We only reorder entries that are order-insensitive.
+   The goal is to increase the chance of "git diff" being empty (or simpler)
+   after a refactoring, and also to reduce conflicts. *)
+let stabilize_order_in_job (job : Gitlab_ci.Types.generic_job) :
+    Gitlab_ci.Types.generic_job =
+  match job with
+  | Job job ->
+      Job
+        {
+          job with
+          variables =
+            (* Order of variables does not matter if we assume they are all different.
+               Sort them by name. *)
+            Option.map
+              (List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2))
+              job.variables;
+          cache =
+            (* The order shouldn't matter for caches.
+               GitLab stores all of them in a single .zip file.
+               Each cache key just choose parts of it to restore.
+               Even if there is some overlap in paths,
+               there is only one version of each file to restore,
+               to the order of restoration does not matter.
+               Sort caches by key. *)
+            Option.map
+              (List.sort
+                 (fun (a : Gitlab_ci.Types.cache) (b : Gitlab_ci.Types.cache) ->
+                   String.compare a.key b.key))
+              job.cache;
+        }
+  | Trigger_job _ -> job
+
+(* Reorder config elements so that the result is more stable.
+   Similar to [stabilize_order_in_job], but for a whole YAML file. *)
+let stabilize_toplevel_order config =
+  let compare_elements (a : Gitlab_ci.Types.config_element)
+      (b : Gitlab_ci.Types.config_element) =
+    match (a, b) with
+    | Generic_job (Job a), Generic_job (Job b) ->
+        (* Sort jobs by name. *)
+        String.compare a.name b.name
+    | _, Generic_job _ ->
+        (* Put jobs last. *)
+        -1
+    | Generic_job _, _ ->
+        (* Put jobs last. *)
+        1
+    | _ ->
+        (* For everything else, keep the order as it was. *)
+        0
+  in
+  List.sort compare_elements config
+
 let tezos_job_to_config_elements (j : tezos_job) =
   let source_comment =
     if Cli.config.inline_source_info then
@@ -143,7 +197,7 @@ let tezos_job_to_config_elements (j : tezos_job) =
       [Gitlab_ci.Types.Comment source_info]
     else []
   in
-  source_comment @ [Gitlab_ci.Types.Generic_job j.job]
+  source_comment @ [Gitlab_ci.Types.Generic_job (stabilize_order_in_job j.job)]
 
 let header =
   {|# This file was automatically generated, do not edit.
@@ -504,6 +558,7 @@ module Pipeline = struct
     in
     let config =
       prepend_config @ List.concat_map tezos_job_to_config_elements jobs
+      |> stabilize_toplevel_order
     in
     to_file ~filename config
 

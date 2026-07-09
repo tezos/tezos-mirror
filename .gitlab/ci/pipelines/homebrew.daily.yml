@@ -28,29 +28,6 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
-  stage: build
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/packaging/homebrew_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    expire_in: 1 day
-    paths:
-    - public/homebrew/*
-
 oc.build-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
   stage: test
@@ -73,10 +50,10 @@ oc.build-homebrew-formula:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
+    CARGO_NET_OFFLINE: "false"
     DUNE_BUILD_JOBS: -j 12
     HOMEBREW_KISSCACHE: http://kisscache.kisscache.svc.cluster.local
     HOMEBREW_OPAMFETCH: scripts/kiss-fetch.sh
-    CARGO_NET_OFFLINE: "false"
 
 oc.build-homebrew-formula-macosx:
   image: $MACOS_IMAGE
@@ -107,3 +84,26 @@ oc.build-homebrew-formula-macosx:
     - MACOS_IMAGE:
       - macos-15-xcode-16
       - macos-26-xcode-26
+
+oc.create-homebrew-formula:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-100afa6d
+  stage: build
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/packaging/homebrew_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - public/homebrew/*

@@ -7,66 +7,6 @@ stages:
 - build
 - publish
 
-oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
-    ARCH: amd64
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-
-oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: images
-  tags:
-  - gcp_arm64
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "false"
-    ARCH: arm64
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-  retry:
-    max: 1
-    when:
-    - runner_system_failure
-
 datadog_pipeline_trace:
   image: datadog/ci:v5.18.0@sha256:07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2
   stage: start
@@ -121,16 +61,16 @@ etherlink.build_evm_node_static_arm64:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    VERSION_EXECUTABLE: octez-evm-node
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     DUNE_BUILD_JOBS: -j 12
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-evm-node
   artifacts:
     name: octez-binaries
     expire_in: 90 days
@@ -171,79 +111,22 @@ etherlink.build_evm_node_static_x86_64:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    VERSION_EXECUTABLE: octez-evm-node
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
     DUNE_BUILD_JOBS: -j 12
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    VERSION_EXECUTABLE: octez-evm-node
   artifacts:
     name: octez-binaries
     expire_in: 90 days
     paths:
     - octez-binaries/$ARCH/*
     when: on_success
-
-etherlink.gitlab:octez-evm-node-release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-0d951d27
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  needs:
-  - etherlink.build_evm_node_static_x86_64
-  - etherlink.build_evm_node_static_arm64
-  dependencies:
-  - etherlink.build_evm_node_static_x86_64
-  - etherlink.build_evm_node_static_arm64
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/create_gitlab_octez_evm_node_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  retry: 0
-
-etherlink.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
-  stage: build
-  tags:
-  - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    DOCKER_BUILD_TARGET: without-evm-artifacts
-    DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "true"
-    IMAGE_ARCH_PREFIX: arm64_
-    EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
-  environment:
-    name: docker-publish
-    action: access
 
 etherlink.docker:amd64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
@@ -269,11 +152,44 @@ etherlink.docker:amd64:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
+    CI_DOCKER_HUB: "true"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     DOCKER_VERSION: 28.5.1
-    CI_DOCKER_HUB: "true"
-    IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
+    IMAGE_ARCH_PREFIX: amd64_
+  environment:
+    name: docker-publish
+    action: access
+
+etherlink.docker:arm64:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: build
+  tags:
+  - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh --image-names
+  - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    CI_DOCKER_HUB: "true"
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    DOCKER_VERSION: 28.5.1
+    EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
+    IMAGE_ARCH_PREFIX: arm64_
   environment:
     name: docker-publish
     action: access
@@ -302,8 +218,8 @@ etherlink.docker:merge_manifests:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+    DOCKER_VERSION: 28.5.1
   environment:
     name: docker-publish
     action: access
@@ -332,9 +248,93 @@ etherlink.docker:promote_to_latest:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
+    DOCKER_VERSION: 28.5.1
   environment:
     name: docker-publish
     action: access
   retry: 0
+
+etherlink.gitlab:octez-evm-node-release:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-0d951d27
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - etherlink.build_evm_node_static_x86_64
+  - etherlink.build_evm_node_static_arm64
+  dependencies:
+  - etherlink.build_evm_node_static_x86_64
+  - etherlink.build_evm_node_static_arm64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/create_gitlab_octez_evm_node_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  retry: 0
+
+oc.docker:ci:amd64:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    ARCH: amd64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
+    GCLOUD_VERSION: 543.0.0
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
+
+oc.docker:ci:arm64:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: images
+  tags:
+  - gcp_arm64
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    ARCH: arm64
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
+    GCLOUD_VERSION: 543.0.0
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
+  retry:
+    max: 1
+    when:
+    - runner_system_failure
