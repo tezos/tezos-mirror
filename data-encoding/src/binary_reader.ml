@@ -225,9 +225,21 @@ module Atom = struct
     | `Uint16 -> uint16 TzEndian.default_endianness
 end
 
-(** Main recursive reading function, in continuation passing style. *)
-let rec read_rec : type ret. ret Encoding.t -> state -> ret =
- fun e state ->
+(* Maximum number of nested non-tail recursive calls the decoder makes before
+   rejecting the input with [Too_many_recursive_calls]. Set to twice the
+   Michelson [max_micheline_node_count] (50_000): decoding a Micheline node
+   costs two non-tail calls, so this rejects no expression a protocol would
+   accept. *)
+let max_recursion_depth = 100_000
+
+let non_terminal ~stack_depth f =
+  if stack_depth >= max_recursion_depth then
+    raise_read_error Too_many_recursive_calls
+  else f ~stack_depth:(stack_depth + 1)
+
+(** Main recursive reading function. *)
+let rec read_rec : type ret. stack_depth:int -> ret Encoding.t -> state -> ret =
+ fun ~stack_depth e state ->
   let open Encoding in
   match e.encoding with
   | Null -> ()
@@ -254,7 +266,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Bigstring (`Variable, _) ->
       Atom.fixed_length_bigstring state.remaining_bytes state
   | Padded (e, n) ->
-      let v = read_rec e state in
+      let v = non_terminal ~stack_depth @@ read_rec e state in
       ignore (Atom.fixed_length_string n state : string) ;
       v
   | RangedInt {minimum; endianness; maximum} ->
@@ -264,12 +276,20 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Array {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
       | No_limit ->
-          let l, size = read_variable_list Array_too_long max_int e state in
+          let l, size =
+            non_terminal ~stack_depth
+            @@ read_variable_list Array_too_long max_int e state
+          in
           Arrconv.array_of_list_size l size
       | At_most max_length ->
-          let l, size = read_variable_list Array_too_long max_length e state in
+          let l, size =
+            non_terminal ~stack_depth
+            @@ read_variable_list Array_too_long max_length e state
+          in
           Arrconv.array_of_list_size l size
-      | Exactly exact_length -> read_fixed_array exact_length e state)
+      | Exactly exact_length ->
+          (read_fixed_array [@ocaml.tailcall]) ~stack_depth exact_length e state
+      )
   | Array
       {
         length_limit = At_most max_length;
@@ -277,7 +297,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
         elts = e;
       } ->
       let len =
-        try read_rec length_encoding state
+        try non_terminal ~stack_depth @@ read_rec length_encoding state
         with
         (* translating uint_like_n overflow *)
         | Binary_error_types.Read_error (Invalid_int _) ->
@@ -286,17 +306,23 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       if len < 0 then
         raise_read_error (Invalid_int {min = 0; v = len; max = max_length}) ;
       if len > max_length then raise_read_error Array_too_long ;
-      read_fixed_array len e state
+      (read_fixed_array [@ocaml.tailcall]) ~stack_depth len e state
   | Array
       {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
     ->
       assert false
   | List {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
-      | No_limit -> fst (read_variable_list List_too_long max_int e state)
+      | No_limit ->
+          fst
+            (non_terminal ~stack_depth
+            @@ read_variable_list List_too_long max_int e state)
       | At_most max_length ->
-          fst (read_variable_list List_too_long max_length e state)
-      | Exactly exact_length -> read_fixed_list exact_length e state)
+          fst
+            (non_terminal ~stack_depth
+            @@ read_variable_list List_too_long max_length e state)
+      | Exactly exact_length ->
+          (read_fixed_list [@ocaml.tailcall]) ~stack_depth exact_length e state)
   | List
       {
         length_limit = At_most max_length;
@@ -304,7 +330,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
         elts = e;
       } ->
       let len =
-        try read_rec length_encoding state
+        try non_terminal ~stack_depth @@ read_rec length_encoding state
         with
         (* translating uint_like_n overflow *)
         | Binary_error_types.Read_error (Invalid_int _) ->
@@ -313,43 +339,49 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       if len < 0 then
         raise_read_error (Invalid_int {min = 0; v = len; max = max_length}) ;
       if len > max_length then raise_read_error List_too_long ;
-      read_fixed_list len e state
+      (read_fixed_list [@ocaml.tailcall]) ~stack_depth len e state
   | List
       {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
     ->
       assert false
-  | Obj (Req {encoding = e; _}) -> read_rec e state
-  | Obj (Dft {encoding = e; _}) -> read_rec e state
+  | Obj (Req {encoding = e; _}) ->
+      (read_rec [@ocaml.tailcall]) ~stack_depth e state
+  | Obj (Dft {encoding = e; _}) ->
+      (read_rec [@ocaml.tailcall]) ~stack_depth e state
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) ->
       let present = Atom.bool state in
-      if not present then None else Some (read_rec e state)
+      if not present then None
+      else Some (non_terminal ~stack_depth @@ read_rec e state)
   | Obj (Opt {kind = `Variable; encoding = e; _}) ->
-      if state.remaining_bytes = 0 then None else Some (read_rec e state)
+      if state.remaining_bytes = 0 then None
+      else Some (non_terminal ~stack_depth @@ read_rec e state)
   | Objs {kind = `Fixed sz; left; right} ->
       ignore (check_remaining_bytes state sz : int) ;
       ignore (check_allowed_bytes state sz : int option) ;
-      let left = read_rec left state in
-      let right = read_rec right state in
+      let left = non_terminal ~stack_depth @@ read_rec left state in
+      let right = non_terminal ~stack_depth @@ read_rec right state in
       (left, right)
   | Objs {kind = `Dynamic; left; right} ->
-      let left = read_rec left state in
-      let right = read_rec right state in
+      let left = non_terminal ~stack_depth @@ read_rec left state in
+      let right = non_terminal ~stack_depth @@ read_rec right state in
       (left, right)
-  | Objs {kind = `Variable; left; right} -> read_variable_pair left right state
-  | Tup e -> read_rec e state
+  | Objs {kind = `Variable; left; right} ->
+      (read_variable_pair [@ocaml.tailcall]) ~stack_depth left right state
+  | Tup e -> (read_rec [@ocaml.tailcall]) ~stack_depth e state
   | Tups {kind = `Fixed sz; left; right} ->
       ignore (check_remaining_bytes state sz : int) ;
       ignore (check_allowed_bytes state sz : int option) ;
-      let left = read_rec left state in
-      let right = read_rec right state in
+      let left = non_terminal ~stack_depth @@ read_rec left state in
+      let right = non_terminal ~stack_depth @@ read_rec right state in
       (left, right)
   | Tups {kind = `Dynamic; left; right} ->
-      let left = read_rec left state in
-      let right = read_rec right state in
+      let left = non_terminal ~stack_depth @@ read_rec left state in
+      let right = non_terminal ~stack_depth @@ read_rec right state in
       (left, right)
-  | Tups {kind = `Variable; left; right} -> read_variable_pair left right state
+  | Tups {kind = `Variable; left; right} ->
+      (read_variable_pair [@ocaml.tailcall]) ~stack_depth left right state
   | Conv {inj; encoding; _} ->
-      let v = read_rec encoding state in
+      let v = non_terminal ~stack_depth @@ read_rec encoding state in
       inj v
   | Union {tag_size; tagged_cases; _} ->
       let ctag = Atom.tag tag_size state in
@@ -358,7 +390,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let (Case {inj; encoding; _} as case) = tagged_cases.(ctag) in
       if is_undefined_case case then raise_read_error (Unexpected_tag ctag)
       else
-        let e = read_rec encoding state in
+        let e = non_terminal ~stack_depth @@ read_rec encoding state in
         inj e
   | Dynamic_size {kind; encoding = e} ->
       let sz =
@@ -370,36 +402,42 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let remaining = check_remaining_bytes state sz in
       state.remaining_bytes <- sz ;
       ignore (check_allowed_bytes state sz : int option) ;
-      let v = read_rec e state in
+      let v = non_terminal ~stack_depth @@ read_rec e state in
       if state.remaining_bytes <> 0 then raise_read_error Extra_bytes ;
       state.remaining_bytes <- remaining ;
       v
   | Check_size {limit; encoding = e} ->
-      Atom.with_limit ~limit (read_rec e) state
-  | Describe {encoding = e; _} -> read_rec e state
-  | Splitted {encoding = e; _} -> read_rec e state
+      Atom.with_limit ~limit (non_terminal ~stack_depth @@ read_rec e) state
+  | Describe {encoding = e; _} ->
+      (read_rec [@ocaml.tailcall]) ~stack_depth e state
+  | Splitted {encoding = e; _} ->
+      (read_rec [@ocaml.tailcall]) ~stack_depth e state
   | Mu {fix; _} ->
       let e = fix e in
-      read_rec e state
+      (read_rec [@ocaml.tailcall]) ~stack_depth e state
   | Delayed f ->
       let e = f () in
-      read_rec e state
+      (read_rec [@ocaml.tailcall]) ~stack_depth e state
 
 and read_variable_pair : type left right.
-    left Encoding.t -> right Encoding.t -> state -> left * right =
- fun e1 e2 state ->
+    stack_depth:int ->
+    left Encoding.t ->
+    right Encoding.t ->
+    state ->
+    left * right =
+ fun ~stack_depth e1 e2 state ->
   match (Encoding.classify e1, Encoding.classify e2) with
   | (`Dynamic | `Fixed _), `Variable ->
-      let left = read_rec e1 state in
-      let right = read_rec e2 state in
+      let left = non_terminal ~stack_depth @@ read_rec e1 state in
+      let right = non_terminal ~stack_depth @@ read_rec e2 state in
       (left, right)
   | `Variable, `Fixed n ->
       if n > state.remaining_bytes then raise_read_error Not_enough_data ;
       state.remaining_bytes <- state.remaining_bytes - n ;
-      let left = read_rec e1 state in
+      let left = non_terminal ~stack_depth @@ read_rec e1 state in
       assert (state.remaining_bytes = 0) ;
       state.remaining_bytes <- n ;
-      let right = read_rec e2 state in
+      let right = non_terminal ~stack_depth @@ read_rec e2 state in
       assert (state.remaining_bytes = 0) ;
       (left, right)
   | `Dynamic, (`Fixed _ | `Dynamic) -> assert false
@@ -408,41 +446,50 @@ and read_variable_pair : type left right.
 (* Should be rejected by [Encoding.Kind.combine] *)
 
 and read_variable_list : type a.
-    read_error -> int -> a Encoding.t -> state -> a list * int =
- fun error max_length e state ->
+    stack_depth:int ->
+    read_error ->
+    int ->
+    a Encoding.t ->
+    state ->
+    a list * int =
+ fun ~stack_depth error max_length e state ->
   let rec loop max_length acc size =
     if state.remaining_bytes = 0 then (List.rev acc, size)
     else if max_length = 0 then raise_read_error error
     else
-      let v = read_rec e state in
+      let v = non_terminal ~stack_depth @@ read_rec e state in
       loop (max_length - 1) (v :: acc) (size + 1)
   in
   loop max_length [] 0
 
-and read_fixed_list : type a. int -> a Encoding.t -> state -> a list =
- fun exact_length e state ->
+and read_fixed_list : type a.
+    stack_depth:int -> int -> a Encoding.t -> state -> a list =
+ fun ~stack_depth exact_length e state ->
   let rec loop exact_length acc =
     if exact_length = 0 then List.rev acc
     else if state.remaining_bytes = 0 then raise_read_error Not_enough_data
     else
-      let v = read_rec e state in
+      let v = non_terminal ~stack_depth @@ read_rec e state in
       loop (exact_length - 1) (v :: acc)
   in
   loop exact_length []
 
-and read_fixed_array : type a. int -> a Encoding.t -> state -> a array =
- fun exact_length e state ->
+and read_fixed_array : type a.
+    stack_depth:int -> int -> a Encoding.t -> state -> a array =
+ fun ~stack_depth exact_length e state ->
   if exact_length = 0 then [||]
   else if state.remaining_bytes = 0 then raise_read_error Not_enough_data
   else
-    let v = read_rec e state in
+    let v = non_terminal ~stack_depth @@ read_rec e state in
     let arr = Array.make exact_length v in
     for i = 1 to exact_length - 1 do
       if state.remaining_bytes = 0 then raise_read_error Not_enough_data ;
-      let v = read_rec e state in
+      let v = non_terminal ~stack_depth @@ read_rec e state in
       Array.unsafe_set arr i v
     done ;
     arr
+
+let read_rec e state = read_rec ~stack_depth:0 e state
 
 (** ******************** *)
 

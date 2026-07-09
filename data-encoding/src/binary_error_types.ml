@@ -38,6 +38,7 @@ type read_error =
   | Array_too_long
   | Exception_raised_in_user_function of string
   | User_invariant_guard of string
+  | Too_many_recursive_calls
 
 exception Read_error of read_error
 
