@@ -57,6 +57,42 @@ let job_test =
     ~select_tezts:false
     ~tezt_exe:"release_site/tezt/main.exe"
 
+let release_site_variables = function
+  | `test ->
+      (* The S3_BUCKET and DISTRIBUTION_ID depend on the release type (tests
+         or not). *)
+      [
+        ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+        ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+      ]
+  | `real ->
+      [
+        ("S3_BUCKET", "site-prod.octez.tezos.com");
+        ("URL", "octez.tezos.com");
+        ("BUCKET_PATH", "/releases");
+        ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+      ]
+
+let job_render =
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "render"
+    ~__POS__
+    ~image:Images.CI.release_page
+    ~stage:Publish
+    ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
+    ~description:
+      "Render the whole release site: regenerate every component's page from \
+       its published versions.json and upload the site. Reflects what has been \
+       deployed by the per-component [deploy-assets] jobs, so it neither \
+       deploys assets nor depends on any build job."
+    ~variables:(release_site_variables pipeline_type)
+    ~script:
+      ["eval $(opam env)"; "./release_site/scripts/render_release_site.sh"]
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+
 let register () =
   Cacio.register_merge_request_jobs [(Auto, job_test)] ;
-  Cacio.register_jobs Schedule_extended_test [(Auto, job_test)]
+  Cacio.register_jobs Schedule_extended_test [(Auto, job_test)] ;
+  Cacio.register_jobs Publish_release_page [(Manual, job_render `real)] ;
+  Cacio.register_jobs Test_publish_release_page [(Manual, job_render `test)]
