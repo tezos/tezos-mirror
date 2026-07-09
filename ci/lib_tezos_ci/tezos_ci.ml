@@ -767,11 +767,6 @@ type dependency =
 
 type dependencies = Staged of tezos_job list | Dependent of dependency list
 
-let dependencies_add_artifact_dependency dependencies tezos_job =
-  match dependencies with
-  | Staged jobs -> Staged (tezos_job :: jobs)
-  | Dependent dependencies -> Dependent (Artifacts tezos_job :: dependencies)
-
 (* Resolve {!dependencies} into a pair of [needs:] and [dependencies:] *)
 let resolve_dependencies job_name dependencies =
   let needs, dependencies =
@@ -1347,15 +1342,6 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
         (error_not_generated |> String_set.elements |> String.concat " ")) ;
   if !Cli.has_error then exit 1
 
-let append_script script tezos_job =
-  map_non_trigger_job
-    ~error_on_trigger:
-      (sf
-         "[append_script] attempting to append script to trigger job '%s'"
-         (name_of_tezos_job tezos_job))
-    tezos_job
-  @@ fun job -> {job with script = job.script @ script}
-
 let append_cache cache tezos_job =
   map_non_trigger_job
     ~error_on_trigger:
@@ -1875,7 +1861,3 @@ let id_tokens =
         "https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}"
     );
   ]
-
-let enable_kernels =
-  append_variables
-    [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
