@@ -5626,6 +5626,68 @@ let tz3_bootstrap : Account.key =
         "p2sk2rmHAdX9dDPrVSS4JJQK4i3cA3gRAERXEpWHZuSb7idjeMFD2U";
   }
 
+(** The P-256 (secp256r1) group order [n], big-endian, as a 64-char hex
+    string. The malleable twin of a signature [(r, s)] is [(r, n - s)]. *)
+let p256_group_order =
+  "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551"
+
+(** [be_sub a b] returns [a - b] for two equal-length big-endian byte strings,
+    assuming [a >= b]. *)
+let be_sub a b =
+  let len = String.length a in
+  let out = Bytes.create len in
+  let borrow = ref 0 in
+  for i = len - 1 downto 0 do
+    let d = Char.code a.[i] - Char.code b.[i] - !borrow in
+    if d < 0 then (
+      Bytes.set out i (Char.chr (d + 256)) ;
+      borrow := 1)
+    else (
+      Bytes.set out i (Char.chr d) ;
+      borrow := 0)
+  done ;
+  Bytes.to_string out
+
+(** [low_and_high_s sig_hex] takes a 64-byte P-256 signature [r ‖ s] (128 hex
+    chars, no [0x] prefix) and returns its two malleable forms
+    [(low_s_hex, high_s_hex)], both 128-char hex strings sharing the same [r].
+    Exactly one of [s] and [n - s] lies in [\[1, n/2\]] (the canonical "low-S"
+    form); the [verify_tezos_signature] precompile accepts only that one, while
+    a verifier missing the low-S guard accepts both. *)
+let low_and_high_s sig_hex =
+  let bytes_of_hex h = Hex.to_bytes (`Hex h) |> Bytes.to_string in
+  let raw = bytes_of_hex sig_hex in
+  Check.((String.length raw = 64) int)
+    ~error_msg:"expected a 64-byte P-256 signature, got %L bytes" ;
+  let r = String.sub raw 0 32 in
+  let s = String.sub raw 32 32 in
+  let n = bytes_of_hex p256_group_order in
+  let n_minus_s = be_sub n s in
+  (* Equal-length big-endian byte strings compare as their integer values. *)
+  let low, high =
+    if String.compare s n_minus_s <= 0 then (s, n_minus_s) else (n_minus_s, s)
+  in
+  let hex_of x =
+    let (`Hex h) = Hex.of_string x in
+    h
+  in
+  (hex_of (r ^ low), hex_of (r ^ high))
+
+(** [sign_bytes_low_s ~signer bytes] signs [bytes] with [signer] and returns the
+    signature hex (no [0x] prefix), normalized to canonical low-S for tz3
+    (P-256) signers. Octez does not normalize P-256 signatures, so a raw tz3
+    signature is often high-S; the [verify_tezos_signature] precompile rejects
+    the malleable high-S form, so callers exercising the accepted path must use
+    the low-S twin. Non-P256 signatures are returned unchanged. *)
+let sign_bytes_low_s ~(signer : Account.key) bytes =
+  let signature = Account.sign_bytes ~signer bytes in
+  let (`Hex sig_hex) = Tezos_crypto.Signature.to_hex signature in
+  if
+    String.length signer.public_key_hash >= 3
+    && String.sub signer.public_key_hash 0 3 = "tz3"
+  then fst (low_and_high_s sig_hex)
+  else sig_hex
+
 (** Test EIP-1271 isValidSignature for a single account: create alias,
     sign a hash, assert valid signature returns the magic value,
     and assert wrong hash returns failure. *)
@@ -5651,8 +5713,7 @@ let check_eip1271_for_account ~evm_node ~transfer (account : Account.key) =
     Hex.to_bytes
       (`Hex "64b58ce5683684531652feb45eb41f30ef7ebae57a440d942ca0579b7309ff83")
   in
-  let signature = Account.sign_bytes ~signer:account hash_bytes in
-  let (`Hex sig_hex) = Tezos_crypto.Signature.to_hex signature in
+  let sig_hex = sign_bytes_low_s ~signer:account hash_bytes in
   let sig_with_prefix = "0x" ^ sig_hex in
   let* calldata =
     Cast.calldata
@@ -5680,6 +5741,180 @@ let check_eip1271_for_account ~evm_node ~transfer (account : Account.key) =
       string
       ~error_msg:(sf "[%s] wrong hash: expected %%R but got %%L" label)) ;
   Log.info "[%s] wrong hash → failure" label ;
+  unit
+
+(** Worst-consequence showcase of tz3 (P-256) ECDSA signature malleability.
+
+    A [MalleableReplayVault] EVM contract pays a fixed reward to whoever
+    presents a signature — by an authorized tz3 account, validated through the
+    alias forwarder's EIP-1271 [isValidSignature] (which reaches the
+    [verify_tezos_signature] precompile) — over a fixed voucher hash. The vault
+    enforces "one payout per signature" by remembering [keccak256(signature)].
+
+    The attacker holds ONE legitimate voucher signature. They:
+      1. redeem with the canonical (low-S) signature → paid once;
+      2. rebuild the malleable twin [(r, n - s)] and redeem AGAIN.
+
+    The twin has a different [keccak256], so the vault's anti-replay does not
+    fire. Without the precompile's low-S guard the twin's [isValidSignature]
+    returns the magic value, the second [redeem] succeeds, and the vault is
+    drained twice (worst consequence: theft of the full balance). With the
+    guard the twin is rejected, the second [redeem] reverts, and the vault
+    keeps the remaining funds.
+
+    The test asserts the guarded behaviour, so it fails (the twin redeem would
+    succeed and drain the vault) if the precompile's low-S guard is reverted. *)
+let test_p256_malleable_signature_drains_vault () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"tz3 P-256 signature malleability drains a replay-guarded vault"
+    ~tags:["eip1271"; "signature"; "p256"; "malleability"; "replay"; "vault"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sandbox ->
+  let sequencer = sandbox in
+  let one_ether = Wei.of_string "1000000000000000000" in
+  let two_ether = Wei.of_string "2000000000000000000" in
+  (* Fund and reveal the tz3 voucher signer (the config tool only seeds
+     Ed25519 bootstrap accounts): import its key, fund it from bootstrap5, and
+     reveal its manager key. *)
+  let* tez_client = tezos_client sandbox in
+  let* () =
+    Client.import_secret_key
+      ~force:true
+      tez_client
+      tz3_bootstrap.secret_key
+      ~alias:tz3_bootstrap.alias
+  in
+  let* () =
+    Client.transfer
+      ~giver:Constant.bootstrap5.alias
+      ~receiver:tz3_bootstrap.public_key_hash
+      ~amount:(Tez.of_int 100)
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  let* () = Client.reveal ~src:tz3_bootstrap.alias tez_client |> Runnable.run in
+  let*@ _ = Rpc.produce_block sandbox in
+  (* Materialize the tz3 alias (an EIP-1271 signer) via a cross-runtime
+     transfer, then resolve its EVM address. *)
+  let* () =
+    sandbox_michelson_to_evm_transfer
+      ~source:tz3_bootstrap
+      ~evm_destination:"0x1111111111111111111111111111111111111111"
+      ~transfer_amount:(Tez.of_int 1)
+      ~tez_client
+      sandbox
+  in
+  let*@ alias_address =
+    Rpc.Tezosx.tez_getTezosEthereumAddress
+      tz3_bootstrap.public_key_hash
+      sequencer
+  in
+  Log.info "tz3 alias (EIP-1271 signer) EVM address: %s" alias_address ;
+  (* The attacker is a pre-funded EVM bootstrap account. *)
+  let attacker = Eth_account.bootstrap_accounts.(0) in
+  (* Deploy the vault, funding it with 2 ether (= 2 × PAYOUT) so that a
+     successful double-spend is actually payable. *)
+  let* vault_contract =
+    Solidity_contracts.malleable_replay_vault Evm_version.Shanghai
+  in
+  let init_code =
+    "0x" ^ Tezt.Base.read_file vault_contract.Solidity_contracts.bin
+  in
+  let* deploy_tx =
+    Cast.craft_deploy_tx
+      ~source_private_key:attacker.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~value:two_ether
+      ~gas:2_000_000
+      ~gas_price:1_000_000_000
+      ~data:init_code
+      ()
+  in
+  let*@ deploy_hash = Rpc.send_raw_transaction ~raw_tx:deploy_tx sequencer in
+  let*@ _ = Rpc.produce_block sequencer in
+  let* deploy_receipt =
+    Test_helpers.wait_for_transaction_receipt
+      ~evm_node:sequencer
+      ~transaction_hash:deploy_hash
+      ()
+  in
+  Check.((deploy_receipt.status = true) bool)
+    ~error_msg:"vault deployment transaction failed" ;
+  let vault =
+    match deploy_receipt.contractAddress with
+    | Some addr -> addr
+    | None -> Test.fail "vault deployment produced no contract address"
+  in
+  let*@ vault_balance0 =
+    Rpc.get_balance ~address:vault ~block:Latest sequencer
+  in
+  Check.((vault_balance0 = two_ether) Wei.typ)
+    ~error_msg:"vault should hold 2 ether after funding, got %L" ;
+  (* The attacker holds ONE valid voucher signature. Sign the voucher hash with
+     the tz3 key, then derive its canonical (low-S) form and its malleable twin
+     (high-S). [Account.sign_bytes] blake2b-prehashes exactly like the kernel
+     verifier, matching the EIP-1271 path used elsewhere in this file. *)
+  let voucher_hash_raw =
+    "abababababababababababababababababababababababababababababababab"
+  in
+  let voucher_hash_hex = "0x" ^ voucher_hash_raw in
+  let voucher_hash_bytes = Hex.to_bytes (`Hex voucher_hash_raw) in
+  let signature = Account.sign_bytes ~signer:tz3_bootstrap voucher_hash_bytes in
+  let (`Hex sig_hex) = Tezos_crypto.Signature.to_hex signature in
+  let low_s_sig, high_s_sig = low_and_high_s sig_hex in
+  (* Helper: call [redeem(address,bytes32,bytes)] and check the receipt status. *)
+  let redeem ~nonce ~sig_hex ~expected_status =
+    let* raw_tx =
+      Cast.craft_tx
+        ~source_private_key:attacker.private_key
+        ~chain_id:1337
+        ~nonce
+        ~value:Wei.zero
+        ~gas:2_000_000
+        ~gas_price:1_000_000_000
+        ~address:vault
+        ~signature:"redeem(address,bytes32,bytes)"
+        ~arguments:[alias_address; voucher_hash_hex; "0x" ^ sig_hex]
+        ()
+    in
+    let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+    let*@ _ = Rpc.produce_block sequencer in
+    let* receipt =
+      Test_helpers.wait_for_transaction_receipt
+        ~evm_node:sequencer
+        ~transaction_hash:tx_hash
+        ()
+    in
+    Check.((receipt.status = expected_status) bool)
+      ~error_msg:
+        (sf "redeem: expected receipt status %%R but got %%L (nonce %d)" nonce) ;
+    unit
+  in
+  (* First redeem with the canonical (low-S) signature: accepted, paid once. *)
+  let* () = redeem ~nonce:1 ~sig_hex:low_s_sig ~expected_status:true in
+  let*@ vault_balance1 =
+    Rpc.get_balance ~address:vault ~block:Latest sequencer
+  in
+  Check.((vault_balance1 = one_ether) Wei.typ)
+    ~error_msg:"vault should hold 1 ether after the first redeem, got %L" ;
+  Log.info "First redeem (low-S) paid out; vault holds 1 ether" ;
+  (* Second redeem with the malleable twin (high-S). On the FIXED kernel the
+     twin is rejected by the P-256 verifier, so [isValidSignature] fails, the
+     [redeem] reverts (status 0), and the vault keeps its remaining ether.
+     On a vulnerable kernel this redeem SUCCEEDS and drains the vault to 0. *)
+  let* () = redeem ~nonce:2 ~sig_hex:high_s_sig ~expected_status:false in
+  let*@ vault_balance2 =
+    Rpc.get_balance ~address:vault ~block:Latest sequencer
+  in
+  Check.((vault_balance2 = one_ether) Wei.typ)
+    ~error_msg:
+      "REPLAY: the malleable twin drained the vault — expected 1 ether to \
+       remain but vault holds %L (0 ether means the high-S guard is missing)" ;
+  Log.info "Malleable twin (high-S) rejected; vault not drained" ;
   unit
 
 (** Boots on Kernel.Previewnet with the Tezos runtime enabled at genesis,
@@ -6047,5 +6282,6 @@ let () =
   test_delayed_michelson_chain_id [Alpha] ;
   test_eip1271_signature_verification () ;
   test_eip1271_wrong_signature_rejected () ;
+  test_p256_malleable_signature_drains_vault () ;
   test_meta_block_rpcs ~runtime:Tezos () ;
   test_meta_block_rpcs_without_michelson_runtime ()

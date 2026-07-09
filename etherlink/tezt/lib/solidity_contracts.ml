@@ -118,6 +118,14 @@ let simple_storage =
     ~label:"simpleStorage"
     ~contract:"SimpleStorage"
 
+(** The info for the "malleable_replay_vault.sol" contract: a voucher vault
+    whose naive per-signature anti-replay is defeated by ECDSA malleability. *)
+let malleable_replay_vault =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/malleable_replay_vault.sol")
+    ~label:"malleableReplayVault"
+    ~contract:"MalleableReplayVault"
+
 (* The info for the "even_block_gas_consumer.sol" contract. *)
 let even_block_gas_consumer =
   compile_contract

@@ -737,6 +737,38 @@ impl PublicKeySignatureVerifier for PublicKeySecp256k1 {
     }
 }
 
+impl P256Signature {
+    /// Returns `true` when the signature's `s` scalar is in the canonical low
+    /// half of the field (`s <= n/2`, with `n` the P-256 group order).
+    ///
+    /// ECDSA is malleable: for any valid `(r, s)` the twin `(r, n - s)` is an
+    /// equally-valid signature, and exactly one of the two is low-S. This
+    /// predicate lets callers that use the signature bytes as an identity (for
+    /// example an EVM anti-replay key) reject the malleable high-S form. It is
+    /// intentionally *not* enforced inside [`PublicKeyP256::verify_signature`],
+    /// which must keep accepting the high-S signatures produced by Octez for
+    /// tz3 accounts on the ordinary (counter-protected) operation path.
+    ///
+    /// Malformed signatures (unparsable, or `s = 0`) are reported as non-low-S.
+    pub fn is_canonical_low_s(&self) -> bool {
+        let bytes = self.as_ref();
+        let (Ok(r), Ok(s)) = (
+            <[u8; 32]>::try_from(&bytes[..32]),
+            <[u8; 32]>::try_from(&bytes[32..]),
+        ) else {
+            return false;
+        };
+        match p256::ecdsa::Signature::from_scalars(r, s) {
+            Ok(sig) => {
+                let s = *sig.s();
+                // Low-S iff `n - s` is not strictly smaller than `s`.
+                !((-s).to_bytes() < s.to_bytes())
+            }
+            Err(_) => false,
+        }
+    }
+}
+
 impl PublicKeySignatureVerifier for PublicKeyP256 {
     type Signature = P256Signature;
     type Error = CryptoError;
@@ -1226,6 +1258,26 @@ mod tests {
         let msg = b"hello, message";
         let result = tz3.verify_signature(&sig, msg).unwrap();
         assert!(result);
+    }
+
+    #[test]
+    fn test_p256_is_canonical_low_s() {
+        // A valid signature produced by Octez (high-S, as Octez does not
+        // normalize P-256 signatures) and its canonical low-S twin.
+        let low = P256Signature::from_base58_check(
+            "p2sigU4yPcGNuYzkTVGy7VTyFSbGBAnVWBQrnkfrUEgTSuuM68bzHKxvCsdprERe3Gf8oCvXXdoq9v6qM8rixfP23cyUCSjmTa",
+        )
+        .unwrap();
+        assert!(low.is_canonical_low_s());
+
+        // Build the high-S twin (r, n - s) and check it is rejected.
+        let bytes = low.as_ref();
+        let r: [u8; 32] = bytes[..32].try_into().unwrap();
+        let s: [u8; 32] = bytes[32..].try_into().unwrap();
+        let parsed = p256::ecdsa::Signature::from_scalars(r, s).unwrap();
+        let high = p256::ecdsa::Signature::from_scalars(r, (-*parsed.s()).to_bytes()).unwrap();
+        let twin = P256Signature::try_from(high.as_ref().to_vec()).unwrap();
+        assert!(!twin.is_canonical_low_s());
     }
 
     mod hash_as_json_is_base58check {
