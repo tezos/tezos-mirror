@@ -50,7 +50,8 @@ let read_error_encoding : read_error Encoding.t =
       | List_too_long -> Matched (9, empty, ())
       | Array_too_long -> Matched (10, empty, ())
       | Exception_raised_in_user_function msg -> Matched (11, string, msg)
-      | User_invariant_guard msg -> Matched (12, string, msg))
+      | User_invariant_guard msg -> Matched (12, string, msg)
+      | Too_many_recursive_calls -> Matched (13, empty, ()))
     [
       case
         (Tag 0)
@@ -130,6 +131,13 @@ let read_error_encoding : read_error Encoding.t =
         string
         (function User_invariant_guard s -> Some s | _ -> None)
         (fun s -> User_invariant_guard s);
+      case
+        (Tag 13)
+        ~title:"Too many recursive calls"
+        empty
+        (function
+          | (Too_many_recursive_calls : read_error) -> Some () | _ -> None)
+        (fun () -> Too_many_recursive_calls);
     ]
 
 let pp_read_error ppf = function
@@ -152,6 +160,7 @@ let pp_read_error ppf = function
         ppf
         "User-specified invariant not respected in encoded data: %s"
         s
+  | Too_many_recursive_calls -> Format.fprintf ppf "Too many recursive calls"
 
 let write_error_encoding =
   let open Encoding in
