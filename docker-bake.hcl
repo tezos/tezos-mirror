@@ -31,8 +31,7 @@ variable "GIT_SHORTREF" { default = "" }
 variable "GIT_DATETIME" { default = "" }
 variable "GIT_VERSION" { default = "" }
 variable "COMMIT_SHORT_SHA" { default = "" }
-variable "RUST_TOOLCHAIN_IMAGE_NAME" { default = "" }
-variable "RUST_TOOLCHAIN_IMAGE_TAG" { default = "master" }
+variable "RUST_TOOLCHAIN_IMAGE" { default = "" } # L2 builder (name:tag)
 variable "SCCACHE_GCS_BUCKET" { default = "" }
 
 # CI provenance labels (empty in local dev; auto-populated in GitLab CI).
@@ -55,8 +54,7 @@ target "build" {
     GIT_SHORTREF              = GIT_SHORTREF
     GIT_DATETIME              = GIT_DATETIME
     GIT_VERSION               = GIT_VERSION
-    RUST_TOOLCHAIN_IMAGE_NAME = RUST_TOOLCHAIN_IMAGE_NAME
-    RUST_TOOLCHAIN_IMAGE_TAG  = RUST_TOOLCHAIN_IMAGE_TAG
+    RUST_TOOLCHAIN_IMAGE      = RUST_TOOLCHAIN_IMAGE
     SCCACHE_GCS_BUCKET        = SCCACHE_GCS_BUCKET
   }
   # build.Dockerfile has `RUN --network=host` (cargo CI mirror / sccache).

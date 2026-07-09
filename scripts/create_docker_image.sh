@@ -21,8 +21,9 @@ executables=$(cat script-inputs/released-executables)
 commit_short_sha=$(git rev-parse --short HEAD)
 variants="debug bare minimal"
 docker_target="without-evm-artifacts"
-rust_toolchain_image_name="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain"
-rust_toolchain_image_tag="master"
+# Full image reference (name:tag) for the rust-toolchain image (L2 builder),
+# used to build the EVM artifacts. Overridable via --rust-toolchain-image.
+rust_toolchain_image="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain:master"
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
 sccache_bucket=""
@@ -37,8 +38,7 @@ Usage:  $(basename "$0") [-h|--help]
   [--ci-image-version <IMAGE_TAG> ]
   [--variants VARIANTS]
   [--docker-target <TARGET> ]
-  [--rust-toolchain-image-name <IMAGE_NAME> ]
-  [--rust-toolchain-image-tag <IMAGE_TAG> ]
+  [--rust-toolchain-image <IMAGE> ]
   [--executables <EXECUTABLES> ]
   [--commit-short-sha <COMMIT_SHA> ]
   [--commit-datetime <DATETIME> ]
@@ -67,13 +67,12 @@ DESCRIPTION
     is used.
 
     If TARGET is 'with-evm-artifacts' then EVM artifacts are
-    included. The image rust-toolchain is used to build these
-    artifacts, and is pulled from
-    RUST_TOOLCHAIN_IMAGE_NAME:RUST_TOOLCHAIN_IMAGE_TAG. By default,
-    RUST_TOOLCHAIN_IMAGE_NAME:RUST_TOOLCHAIN_IMAGE_TAG points to a
-    rust-toolchain image built from the latest commit on master. To
-    rebuild the rust-toolchain image locally, see ./images/README.md
-    and ./images/create_rust_toolchain_image.sh.
+    included. The rust-toolchain image is used to build these
+    artifacts, and is pulled from RUST_TOOLCHAIN_IMAGE. By default,
+    RUST_TOOLCHAIN_IMAGE points to a rust-toolchain image built from
+    the latest commit on master. To rebuild the rust-toolchain image
+    locally, see ./images/README.md and
+    ./images/create_rust_toolchain_image.sh.
 
     The built distribution includes the set of executables defined by
     EXECUTABLES: for a set of valid values, see
@@ -98,11 +97,9 @@ OPTIONS
         --ci-image-version CI_IMAGE_VERSION
             Version of the CI image.
 
-        --rust-toolchain-image-name RUST_TOOLCHAIN_IMAGE_NAME
-            Name of the rust-toolchain image.
-
-        --rust-toolchain-image-tag RUST_TOOLCHAIN_IMAGE_TAG
-            Tag of the rust-toolchain image.
+        --rust-toolchain-image RUST_TOOLCHAIN_IMAGE
+            Full reference (name:tag) of the rust-toolchain image (L2
+            builder), used to build the EVM artifacts.
 
     Image contents
         --executables EXECUTABLES
@@ -143,8 +140,7 @@ CURRENT VALUES
     CI_IMAGE_VERSION: $ci_image_version
     VARIANTS: $variants
     DOCKER_TARGET: $docker_target
-    RUST_TOOLCHAIN_IMAGE_NAME: $rust_toolchain_image_name
-    RUST_TOOLCHAIN_IMAGE_TAG: $rust_toolchain_image_tag
+    RUST_TOOLCHAIN_IMAGE: $rust_toolchain_image
     EXECUTABLES: $(echo "$executables" | tr "\n" " ")
     COMMIT_SHORT_SHA: $commit_short_sha
     COMMIT_DATETIME: $commit_datetime
@@ -158,7 +154,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,ci-image-name:,ci-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image-name:,rust-toolchain-image-tag:,commit-datetime:,commit-tag:,sccache-bucket: -- "$@")
+  -l help,image-name:,image-version:,ci-image-name:,ci-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image:,commit-datetime:,commit-tag:,sccache-bucket: -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -205,13 +201,9 @@ while true; do
     shift
     docker_target="$1"
     ;;
-  --rust-toolchain-image-name)
+  --rust-toolchain-image)
     shift
-    rust_toolchain_image_name="$1"
-    ;;
-  --rust-toolchain-image-tag)
-    shift
-    rust_toolchain_image_tag="$1"
+    rust_toolchain_image="$1"
     ;;
   --commit-datetime)
     shift
@@ -276,8 +268,7 @@ fi
 # Notes:
 # - $GIT_SHORTREF / $GIT_DATETIME / $GIT_VERSION are used by libversion to
 #   assign the correct version to the octez binaries at compile time.
-# - ${RUST_TOOLCHAIN_IMAGE_NAME}:${RUST_TOOLCHAIN_IMAGE_TAG} is the master image
-#   used to build L2 binaries.
+# - ${RUST_TOOLCHAIN_IMAGE} is the image used to build L2 binaries.
 # - [--allow network.host] is needed because build.Dockerfile has
 #   [RUN --network=host] (for sccache). Cf. the matching comment in
 #   build.Dockerfile.
@@ -307,8 +298,7 @@ IMAGE_NAME="$image_name" \
   GIT_DATETIME="$commit_datetime" \
   GIT_VERSION="$commit_tag" \
   COMMIT_SHORT_SHA="$commit_short_sha" \
-  RUST_TOOLCHAIN_IMAGE_NAME="$rust_toolchain_image_name" \
-  RUST_TOOLCHAIN_IMAGE_TAG="$rust_toolchain_image_tag" \
+  RUST_TOOLCHAIN_IMAGE="$rust_toolchain_image" \
   SCCACHE_GCS_BUCKET="$sccache_bucket" \
   docker buildx bake \
   --allow network.host \

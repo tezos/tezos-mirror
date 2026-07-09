@@ -118,10 +118,8 @@ building the EVM artifacts requires the rust-toolchain image as
 input. By default, the script will attempt to re-use the latest
 version of this image built on the `master` branch of the tezos/tezos
 CI. If you need to use a different image for the rust-toolchain image,
-follow the instructions in `./images/README.MD` and
-`./images/create_rust_toolchain_image.sh` to create one. Then specify
-the `--rust-toolchain-image-name` and `--rust-toolchain-image-tag`
-parameters to `./scripts/create_docker_image.sh` accordingly.
+specify the `--rust-toolchain-image` parameter to
+`./scripts/create_docker_image.sh` accordingly.
 
 For more info on how to configure:
  - naming of the built images in the Octez Docker distribution,
