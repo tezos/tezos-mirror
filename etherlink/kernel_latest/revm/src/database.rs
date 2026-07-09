@@ -376,12 +376,25 @@ where
             );
         }
         for ((owner, ticket_hash), amount) in etherlink_data.ticket_balances {
-            abort_on_error!(
-                self,
-                self.system
-                    .write_ticket_balance(self.host, &ticket_hash, &owner, amount),
-                "DatabaseCommitPrecompileStateChanges `write_ticket_balance`"
-            );
+            if amount.is_zero() {
+                abort_on_error!(
+                    self,
+                    self.system
+                        .delete_ticket_balance(self.host, &ticket_hash, &owner),
+                    "DatabaseCommitPrecompileStateChanges `delete_ticket_balance`"
+                );
+            } else {
+                abort_on_error!(
+                    self,
+                    self.system.write_ticket_balance(
+                        self.host,
+                        &ticket_hash,
+                        &owner,
+                        amount
+                    ),
+                    "DatabaseCommitPrecompileStateChanges `write_ticket_balance`"
+                );
+            }
         }
         for (deposit_id, deposit) in etherlink_data.deposits.iter() {
             abort_on_error!(

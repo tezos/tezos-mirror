@@ -22,8 +22,8 @@ use evm_types::{FaDepositWithProxy, PrecompileStateError};
 use crate::{
     error::EvmDbError,
     helpers::storage::{
-        read_b256_be_default, read_u256_be_default, read_u256_le_default,
-        read_u64_le_default, write_u256_le,
+        allow_path_not_found, read_b256_be_default, read_u256_be_default,
+        read_u256_le_default, read_u64_le_default, write_u256_le,
     },
     storage::code::CodeStorage,
 };
@@ -606,6 +606,40 @@ impl StorageAccount {
         Ok(())
     }
 
+    /// Delete the durable ticket-balance node for `(ticket_hash, owner)`.
+    ///
+    /// A zero balance is read-equivalent to an absent node (see
+    /// [`Self::read_ticket_balance`], which defaults a missing path to
+    /// [`U256::ZERO`]), so a balance that reaches zero must leave no durable
+    /// trace. Deleting an already-absent node is a no-op.
+    pub(crate) fn delete_ticket_balance(
+        &mut self,
+        host: &mut impl StorageV1,
+        ticket_hash: &U256,
+        owner: &Address,
+    ) -> Result<(), EvmDbError> {
+        let path = self.ticket_path(ticket_hash, owner)?;
+        allow_path_not_found(host.store_delete(&path))?;
+        Ok(())
+    }
+
+    /// Whether a durable ticket-balance node exists for `(ticket_hash, owner)`.
+    ///
+    /// Test-only: unlike [`Self::read_ticket_balance`] (which defaults a
+    /// missing node to zero and so cannot tell an absent node from one holding
+    /// zero), this distinguishes the two, which is exactly what the orphan-node
+    /// regression tests assert.
+    #[cfg(test)]
+    pub(crate) fn ticket_balance_node_exists(
+        &self,
+        host: &impl StorageV1,
+        ticket_hash: &U256,
+        owner: &Address,
+    ) -> Result<bool, EvmDbError> {
+        let path = self.ticket_path(ticket_hash, owner)?;
+        Ok(host.store_has(&path)?.is_some())
+    }
+
     fn deposit_path(&self, withdrawal_id: &U256) -> Result<OwnedPath, PathError> {
         concat(
             &concat(&self.path, &DEPOSIT_QUEUE_TABLE)?,
@@ -931,5 +965,60 @@ mod test {
             let read_back = account.info(&mut host).unwrap().origin;
             assert_eq!(read_back, origin);
         }
+    }
+
+    // A ticket balance that reaches zero must leave no durable node: a zero
+    // node is read-equivalent to an absent one, so persisting it would leave an
+    // orphan behind a fully-reverted (or fully-drained) balance change.
+    #[test]
+    fn delete_ticket_balance_removes_orphan_node() {
+        use crate::storage::world_state_handler::StorageAccount;
+        use revm::primitives::{Address, U256};
+
+        let mut host = MockKernelHost::default();
+        let mut system = StorageAccount::from_address(&Address::ZERO).unwrap();
+        let ticket_hash = U256::from(1);
+        let owner = Address::from_slice(&[0x11; 20]);
+
+        // A fresh key has no durable node...
+        assert!(!system
+            .ticket_balance_node_exists(&host, &ticket_hash, &owner)
+            .unwrap());
+        // ...and deleting an absent balance is a tolerated no-op.
+        system
+            .delete_ticket_balance(&mut host, &ticket_hash, &owner)
+            .unwrap();
+        assert!(!system
+            .ticket_balance_node_exists(&host, &ticket_hash, &owner)
+            .unwrap());
+
+        // A non-zero balance creates the node.
+        system
+            .write_ticket_balance(&mut host, &ticket_hash, &owner, U256::from(7))
+            .unwrap();
+        assert!(system
+            .ticket_balance_node_exists(&host, &ticket_hash, &owner)
+            .unwrap());
+        assert_eq!(
+            system
+                .read_ticket_balance(&host, &ticket_hash, &owner)
+                .unwrap(),
+            U256::from(7)
+        );
+
+        // Draining to zero deletes the node instead of persisting a zero.
+        system
+            .delete_ticket_balance(&mut host, &ticket_hash, &owner)
+            .unwrap();
+        assert!(!system
+            .ticket_balance_node_exists(&host, &ticket_hash, &owner)
+            .unwrap());
+        // The read is still zero, identical to an absent node.
+        assert_eq!(
+            system
+                .read_ticket_balance(&host, &ticket_hash, &owner)
+                .unwrap(),
+            U256::ZERO
+        );
     }
 }

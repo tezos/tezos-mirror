@@ -2038,12 +2038,18 @@ mod test {
         };
     }
 
+    /// Init code for the `CallAndRevert` test contract: it forwards `callArgs`
+    /// to `target`, then unconditionally reverts with "Reverting", so any state
+    /// the sub-call committed must be rolled back.
+    const CALL_AND_REVERT_INIT_CODE: &str = "0x6080604052348015600e575f5ffd5b506103ba8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c8063b1755bc81461002d575b5f5ffd5b610047600480360381019061004291906101f3565b610049565b005b5f5f8473ffffffffffffffffffffffffffffffffffffffff16848460405161007292919061028c565b5f604051808303815f865af19150503d805f81146100ab576040519150601f19603f3d011682016040523d82523d5f602084013e6100b0565b606091505b5091509150816100f5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100ec906102fe565b60405180910390fd5b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161012790610366565b60405180910390fd5b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61016182610138565b9050919050565b61017181610157565b811461017b575f5ffd5b50565b5f8135905061018c81610168565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f8401126101b3576101b2610192565b5b8235905067ffffffffffffffff8111156101d0576101cf610196565b5b6020830191508360018202830111156101ec576101eb61019a565b5b9250929050565b5f5f5f6040848603121561020a57610209610130565b5b5f6102178682870161017e565b935050602084013567ffffffffffffffff81111561023857610237610134565b5b6102448682870161019e565b92509250509250925092565b5f81905092915050565b828183375f83830152505050565b5f6102738385610250565b935061028083858461025a565b82840190509392505050565b5f610298828486610268565b91508190509392505050565b5f82825260208201905092915050565b7f43616c6c206661696c65640000000000000000000000000000000000000000005f82015250565b5f6102e8600b836102a4565b91506102f3826102b4565b602082019050919050565b5f6020820190508181035f830152610315816102dc565b9050919050565b7f526576657274696e6700000000000000000000000000000000000000000000005f82015250565b5f6103506009836102a4565b915061035b8261031c565b602082019050919050565b5f6020820190508181035f83015261037d81610344565b905091905056fea264697066735822122054a37109eed5c973161a962f99e7485f344af2bc66af38eed5ef05d1c30561ea64736f6c634300081e0033";
+
     /// Test the revert behavior of the precompile state changes.
     #[test]
     fn test_revert_precompile_state_changes() {
         let mut host = MockKernelHost::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
-        let deploy_call_and_revert_bytecode = Bytes::from_hex("0x6080604052348015600e575f5ffd5b506103ba8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c8063b1755bc81461002d575b5f5ffd5b610047600480360381019061004291906101f3565b610049565b005b5f5f8473ffffffffffffffffffffffffffffffffffffffff16848460405161007292919061028c565b5f604051808303815f865af19150503d805f81146100ab576040519150601f19603f3d011682016040523d82523d5f602084013e6100b0565b606091505b5091509150816100f5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100ec906102fe565b60405180910390fd5b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161012790610366565b60405180910390fd5b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61016182610138565b9050919050565b61017181610157565b811461017b575f5ffd5b50565b5f8135905061018c81610168565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f8401126101b3576101b2610192565b5b8235905067ffffffffffffffff8111156101d0576101cf610196565b5b6020830191508360018202830111156101ec576101eb61019a565b5b9250929050565b5f5f5f6040848603121561020a57610209610130565b5b5f6102178682870161017e565b935050602084013567ffffffffffffffff81111561023857610237610134565b5b6102448682870161019e565b92509250509250925092565b5f81905092915050565b828183375f83830152505050565b5f6102738385610250565b935061028083858461025a565b82840190509392505050565b5f610298828486610268565b91508190509392505050565b5f82825260208201905092915050565b7f43616c6c206661696c65640000000000000000000000000000000000000000005f82015250565b5f6102e8600b836102a4565b91506102f3826102b4565b602082019050919050565b5f6020820190508181035f830152610315816102dc565b9050919050565b7f526576657274696e6700000000000000000000000000000000000000000000005f82015250565b5f6103506009836102a4565b915061035b8261031c565b602082019050919050565b5f6020820190508181035f83015261037d81610344565b905091905056fea264697066735822122054a37109eed5c973161a962f99e7485f344af2bc66af38eed5ef05d1c30561ea64736f6c634300081e0033").unwrap();
+        let deploy_call_and_revert_bytecode =
+            Bytes::from_hex(CALL_AND_REVERT_INIT_CODE).unwrap();
         init_precompile_bytecodes(&mut host, true).unwrap();
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -2502,6 +2508,168 @@ mod test {
         assert!(owner_ == proxy);
         assert!(receiver_ == receiver);
         assert!(outcome.result.is_success());
+    }
+
+    // Regression for L2-1756: a fully-reverted FA-bridge `claim` on a
+    // fresh-EOA proxy must not leave an orphan durable ticket-table node.
+    // The `claim` credits `ticket_balance_add(hash, proxy, amount)` on the
+    // fresh key (a codeless EOA proxy call succeeds, so `ticketOwner = proxy`);
+    // wrapping it in `CallAndRevert` rolls the whole frame back, and the
+    // reverted zero balance must delete the node rather than persist a zero.
+    #[test]
+    fn test_reverted_fresh_ticket_balance_add_leaves_no_orphan_node() {
+        let mut host = MockKernelHost::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let caller = Address::from(&[2u8; 20]);
+        let receiver = Address::from(&[3u8; 20]);
+        // A fresh EOA proxy: never deployed (codeless) and with no
+        // pre-existing ticket-table node.
+        let proxy = Address::from(&[7u8; 20]);
+        let ticket_hash = U256::from(0x1234);
+        let deposit_id = U256::ZERO;
+
+        // Deploy the `CallAndRevert` contract.
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let deploy_bytecode = Bytes::from_hex(CALL_AND_REVERT_INIT_CODE).unwrap();
+        let result_create = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            caller,
+            None,
+            deploy_bytecode,
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        );
+        let revert_contract_address = match result_create {
+            Ok(ExecutionOutcome {
+                result:
+                    ExecutionResult::Success {
+                        output: Output::Create(_, Some(address)),
+                        ..
+                    },
+                ..
+            }) => address,
+            other => panic!("ERROR: ended up in {other:?}"),
+        };
+
+        // Queue a real FA deposit routed to the fresh proxy.
+        let deposit = ITable::FaDepositWithProxy {
+            amount: U256::from(1000),
+            receiver,
+            proxy,
+            inboxLevel: U256::ZERO,
+            inboxMsgId: U256::ZERO,
+            ticketHash: ticket_hash,
+        };
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let outcome = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            FEED_DEPOSIT_ADDR,
+            Some(FA_BRIDGE_SOL_ADDR),
+            FABridge::queueCall { deposit }.abi_encode().into(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .unwrap();
+        assert!(outcome.result.is_success());
+
+        // Precondition: the ticket node for (hash, proxy) does not exist.
+        let system = StorageAccount::from_address(&Address::ZERO).unwrap();
+        assert!(!system
+            .ticket_balance_node_exists(&host, &ticket_hash, &proxy)
+            .unwrap());
+
+        // Fund the caller so the wrapping call executes.
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
+        caller_account
+            .set_info_without_code(
+                &mut host,
+                AccountInfo {
+                    balance: U256::MAX,
+                    nonce: 0,
+                    code_hash: Default::default(),
+                    origin: AccountOrigin::Unclassified,
+                    code: None,
+                },
+            )
+            .unwrap();
+
+        // Call the reverting wrapper around `claim(depositId)`.
+        let calldata = FABridge::FABridgeCalls::claim(FABridge::claimCall {
+            depositId: deposit_id,
+        })
+        .abi_encode();
+        let call_and_revert_call =
+            CallAndRevert::CallAndRevertCalls::callAndRevert(callAndRevertCall {
+                callArgs: Bytes::from(calldata),
+                target: FA_BRIDGE_SOL_ADDR,
+            });
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let ExecutionOutcome { result, .. } = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            caller,
+            Some(revert_contract_address),
+            Bytes::from(call_and_revert_call.abi_encode()),
+            GasData::new(10_000_000, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .unwrap();
+
+        // The frame is fully reverted.
+        match result {
+            ExecutionResult::Revert { output, .. } => {
+                assert_eq!(
+                    RevertReason::decode(&output).unwrap(),
+                    RevertReason::ContractError(ContractError::Revert(Revert {
+                        reason: "Reverting".into()
+                    }))
+                );
+            }
+            other => panic!("ERROR: ended up in {other:?}"),
+        }
+
+        // Postcondition: no orphan node was left behind. Asserts node
+        // existence, not value, since the read is zero either way. Fails on
+        // the pre-fix kernel (the node is present holding zero).
+        let system = StorageAccount::from_address(&Address::ZERO).unwrap();
+        assert!(!system
+            .ticket_balance_node_exists(&host, &ticket_hash, &proxy)
+            .unwrap());
     }
 
     mod fa_bridge {
