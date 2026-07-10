@@ -4161,6 +4161,56 @@ mod interpreter_tests {
             .expect("worker thread completes");
     }
 
+    /// Nested control flow inside an `EXEC`'d lambda executes correctly
+    /// with the body borrowed from the keep-alive arena (L2-1790).
+    #[test]
+    fn exec_lambda_with_nested_control_flow() {
+        use crate::parser::test_helpers::parse;
+
+        let prog = parse(
+            "{ LAMBDA int int { PUSH bool True ; IF { PUSH int 1 ; ADD } {} } ; \
+               PUSH int 5 ; EXEC }",
+        )
+        .unwrap()
+        .typecheck_instruction(&mut Gas::default(), None, &[])
+        .unwrap();
+        let arena = Arena::new();
+        let mut stack: IStack = Stack::new();
+        prog.interpret(&mut Ctx::default(), &arena, &mut stack)
+            .unwrap();
+        assert_eq!(stack, stk![TypedValue::int(6)]);
+    }
+
+    /// Regression (L2-1790): `EXEC` of a lambda whose body is a deeply
+    /// nested singleton sequence `{ { … {} … } }` used to overflow the
+    /// stack by deep-cloning each opened sub-block. Runs on a 1 MiB worker
+    /// stack (the kernel's size) so a reintroduced recursion traps here.
+    #[test]
+    fn exec_deeply_nested_lambda_does_not_overflow() {
+        // Far beyond the ~2240 depth that trapped the kernel.
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                // DEPTH nested singleton `Seq`s, built bottom-up so
+                // construction itself never recurses.
+                let mut body: Vec<Instruction> = vec![];
+                for _ in 0..DEPTH {
+                    body = vec![Seq(body)];
+                }
+                let lambda = TypedValue::Lambda(Closure::Lambda(Lambda::Lambda {
+                    micheline_code: Micheline::Seq(&[]), // ignored by the interpreter
+                    code: body.into(),
+                }));
+                let mut stack = stk![lambda, TypedValue::Unit];
+                assert_eq!(interpret(&[Exec], &mut Ctx::default(), &mut stack), Ok(()));
+                assert_eq!(stack, stk![TypedValue::Unit]);
+            })
+            .unwrap()
+            .join()
+            .expect("EXEC of a deeply nested lambda must not overflow the stack");
+    }
+
     mod sub {
         use super::*;
 
