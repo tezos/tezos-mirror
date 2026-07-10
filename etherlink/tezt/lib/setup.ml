@@ -585,7 +585,10 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
   (* Launching the sequencer made it produced the first blueprint, we
      need to bake a block to include it in the inbox, which will
      trigger the installation of the kernel in the rollup. *)
-  let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* l1_level = Client.bake_for_and_wait_level ~keys:[] client in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:300. sc_rollup_node l1_level
+  in
   let evm_version = Kernel.select_evm_version kernel ?evm_version in
   return
     {
