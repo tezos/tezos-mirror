@@ -129,6 +129,11 @@
   source's fee and bumped its counter even though the reveal was later
   rejected as inconsistent, letting an attacker grief any solvent
   account. (!22446)
+- **Security fix:** `ISNAT` and `INT` on a `nat` are now charged gas
+  proportional to the operand's width. Both deep-clone a `DUP`-shared operand's
+  magnitude but were charged a flat cost, so a `DUP ; ISNAT ; DROP` loop could
+  do work proportional to the operand's size for constant gas. The per-op charge
+  now scales with the clone, bounding per-gas work. (!22449)
 - **Bug fix:** A cross-runtime call that runs out of gas after
   materialising its sender's alias forwarder but before serving no longer
   leaks that forwarder's origination into a later sibling cross-runtime
