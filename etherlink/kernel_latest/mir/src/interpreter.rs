@@ -114,6 +114,25 @@ pub enum InterpretError<'a> {
     /// `InterpretError` without detouring through `TcError`.
     #[error("internal interpreter error: {0}")]
     InternalError(InterpretInvariant),
+    /// Non-recoverable kernel storage failure from the address registry;
+    /// aborts contract execution. Carries the abort-worthy variants
+    /// (`HostError`, `AlreadySeeded`) — the `From` impl below routes
+    /// `OutOfGas` to [`InterpretError::OutOfGas`].
+    #[error("address registry error: {0}")]
+    AddressRegistryError(crate::context::AddressRegistryError),
+}
+
+impl<'a> From<crate::context::AddressRegistryError> for InterpretError<'a> {
+    fn from(e: crate::context::AddressRegistryError) -> Self {
+        use crate::context::AddressRegistryError;
+        match e {
+            AddressRegistryError::OutOfGas(_) => InterpretError::OutOfGas,
+            e @ (AddressRegistryError::HostError(_)
+            | AddressRegistryError::AlreadySeeded(_)) => {
+                InterpretError::AddressRegistryError(e)
+            }
+        }
+    }
 }
 
 /// `FAILWITH` embeds its popped argument directly in

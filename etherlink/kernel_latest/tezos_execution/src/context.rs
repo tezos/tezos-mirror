@@ -196,6 +196,29 @@ pub mod big_maps {
     }
 }
 
+pub mod address_registry {
+    use mir::ast::{AddressHash, ByteReprTrait};
+
+    use super::*;
+
+    const ROOT: RefPath = RefPath::assert_from(b"/address_registry");
+
+    const COUNTER: RefPath = RefPath::assert_from(b"/counter");
+
+    fn root() -> Result<OwnedPath, PathError> {
+        concat(&TEZOS_ACCOUNTS_ROOT, &ROOT)
+    }
+
+    pub fn entry_path(address: &AddressHash) -> Result<OwnedPath, PathError> {
+        let addr_hex = hex::encode(address.to_bytes_vec());
+        concat(&root()?, &OwnedPath::try_from(format!("/{addr_hex}"))?)
+    }
+
+    pub fn counter_path() -> Result<OwnedPath, PathError> {
+        concat(&root()?, &COUNTER)
+    }
+}
+
 pub mod code {
     use super::*;
 

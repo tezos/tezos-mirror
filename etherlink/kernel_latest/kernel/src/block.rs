@@ -671,6 +671,12 @@ where
                 .map_err(|e| {
                     anyhow::anyhow!("seeding alias implementation failed: {e}")
                 })?;
+                // Seed the address registry (null address at index 0) when
+                // the runtime activates on a fresh network. Activation is the
+                // only seeding point.
+                tezos_execution::mir_ctx::init_address_registry(safe_host.host).map_err(
+                    |e| anyhow::anyhow!("seeding address registry failed: {e}"),
+                )?;
             }
             upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
 
