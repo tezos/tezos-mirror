@@ -1322,6 +1322,33 @@ pub mod interpret_cost {
         (50 + (size >> 4) + (size >> 6) + (size >> 8) + (size >> 9)).as_gas_cost()
     }
 
+    // `ISNAT` deep-clones a DUP-shared operand's magnitude in `pop!` -- the same
+    // O(width) copy `abs` performs -- so its cost is the flat coercion base
+    // (`ISNAT`) plus `abs`'s size term. The size term bounds per-gas work:
+    // without it a `DUP; ISNAT` loop would do O(k*width) work for O(k) gas
+    // (L2-1794). Diverges from L1's flat cost, as MIR's `MUL` pricing does.
+    pub fn isnat(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
+        let size = Checked::from(int.byte_size());
+        (Checked::from(u64::from(ISNAT))
+            + (size >> 4)
+            + (size >> 6)
+            + (size >> 8)
+            + (size >> 9))
+            .as_gas_cost()
+    }
+
+    // `INT(nat)` clones a DUP-shared magnitude in `pop!` like `ISNAT`, so its
+    // cost is the flat coercion base (`INT_NAT`) plus `abs`'s size term.
+    pub fn int_nat(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
+        let size = Checked::from(int.byte_size());
+        (Checked::from(u64::from(INT_NAT))
+            + (size >> 4)
+            + (size >> 6)
+            + (size >> 8)
+            + (size >> 9))
+            .as_gas_cost()
+    }
+
     // corresponds to cost_N_IInt_bytes in the Tezos protocol
     pub fn int_bytes(size: usize) -> Result<u32, CostOverflow> {
         let size = Checked::from(size);
