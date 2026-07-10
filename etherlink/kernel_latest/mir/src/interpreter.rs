@@ -2654,13 +2654,13 @@ fn interpret_one<'a>(
         }
         I::IsNat => {
             let i = pop!(V::Int);
-            ctx.gas().consume(interpret_cost::ISNAT)?;
+            ctx.gas().consume(interpret_cost::isnat(&i)?)?;
             stack.push(V::new_option(i.try_into().ok().map(V::Nat)));
         }
         I::Int(overload) => match overload {
             overloads::Int::Nat => {
                 let i = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::INT_NAT)?;
+                ctx.gas().consume(interpret_cost::int_nat(&i)?)?;
                 stack.push(V::Int(i.into()));
             }
             #[cfg(feature = "bls")]
@@ -5069,6 +5069,73 @@ mod interpreter_tests {
         test(0, Some(0u32));
         test(10, Some(10u32));
         test(-10, None::<u32>);
+    }
+
+    // L2-1794 is an amplification: `ISNAT`/`INT(nat)` clone a DUP-shared
+    // operand's magnitude (O(width)), so the *bytes cloned per milligas charged*
+    // grows with the operand width -- unbounded work per gas. The per-byte gas
+    // coefficient is 43/512 mgas/byte, so charging for the clone bounds that
+    // ratio by its reciprocal, ~12 bytes/milligas, for any operand size. This
+    // measures the ratio for `DUP; op; DROP` at two large operands and asserts it
+    // stays under that bound. On the pre-fix flat cost the ratio is unbounded
+    // (~25 bytes/milligas at 64 KiB, ~99 at 256 KiB), so this test fails there.
+    #[test]
+    fn dup_scalar_conversion_amplification_is_bounded() {
+        // Above the ~12 bytes/milligas asymptote (with headroom for the fixed
+        // per-op allocation), well under the pre-fix >= 25 bytes/milligas.
+        const MAX_BYTES_PER_MILLIGAS: f64 = 16.0;
+
+        // Bytes allocated per milligas charged for one `DUP; op; DROP`. The DUP
+        // shares the operand, so `op` takes the clone path; DROP discards its
+        // result. Operand built before measuring so only interpretation counts.
+        fn amplification(prog: &[Instruction], operand: TypedValue<'static>) -> f64 {
+            let mut stack = stk![operand];
+            let mut ctx = Ctx::default();
+            let gas_before = ctx.gas().milligas().unwrap();
+            let bytes_before = thread_allocated_bytes();
+            interpret(prog, &mut ctx, &mut stack).unwrap();
+            let bytes = thread_allocated_bytes() - bytes_before;
+            let gas = gas_before - ctx.gas().milligas().unwrap();
+            bytes as f64 / gas as f64
+        }
+
+        // Large negative two's-complement int -> ISNAT = None; its magnitude is
+        // `nbytes` wide, so the shared-operand clone copies `nbytes`.
+        fn int_operand(nbytes: usize) -> TypedValue<'static> {
+            let mut be = vec![0xFFu8; nbytes];
+            be[0] = 0x80;
+            V::Int(BigInt::from_signed_bytes_be(&be))
+        }
+        fn nat_operand(nbytes: usize) -> TypedValue<'static> {
+            V::Nat(BigUint::from_bytes_be(&vec![0xFFu8; nbytes]))
+        }
+
+        // Two large operands (past the flat base), 4x apart: the ratio must stay
+        // bounded at both, rather than scaling ~4x with the width as it would on
+        // the flat cost.
+        for (name, prog, wide_a, wide_b) in [
+            (
+                "ISNAT",
+                [Dup(None), IsNat, Drop(None)],
+                int_operand(65536),
+                int_operand(262144),
+            ),
+            (
+                "INT(nat)",
+                [Dup(None), Int(overloads::Int::Nat), Drop(None)],
+                nat_operand(65536),
+                nat_operand(262144),
+            ),
+        ] {
+            let amp_a = amplification(&prog, wide_a);
+            let amp_b = amplification(&prog, wide_b);
+            assert!(
+                amp_a < MAX_BYTES_PER_MILLIGAS && amp_b < MAX_BYTES_PER_MILLIGAS,
+                "{name}: amplification {amp_a:.1} (64 KiB) / {amp_b:.1} (256 KiB) \
+                 bytes-per-milligas exceeds the {MAX_BYTES_PER_MILLIGAS} bound; per-gas \
+                 clone work is unbounded (L2-1794)",
+            );
+        }
     }
 
     #[test]
