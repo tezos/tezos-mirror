@@ -24,9 +24,10 @@ use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
 use revm_etherlink::precompiles::initializer::init_precompile_bytecodes;
 use storage::{
-    read_da_fee, read_kernel_version, read_minimum_base_fee_per_gas, read_tracer_input,
-    store_da_fee, store_kernel_version, store_minimum_base_fee_per_gas,
-    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+    enter_stage_one, leave_stage_one, read_da_fee, read_kernel_version,
+    read_minimum_base_fee_per_gas, read_tracer_input, store_da_fee, store_kernel_version,
+    store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
+    STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -132,7 +133,10 @@ where
     log!(Debug, "Chain Configuration: {chain_config:?}");
     log!(Debug, "Configuration: {}", configuration);
 
-    fetch_blueprints(host, smart_rollup_address, chain_config, configuration)
+    enter_stage_one(host)?;
+    let res = fetch_blueprints(host, smart_rollup_address, chain_config, configuration);
+    leave_stage_one(host)?;
+    res
 }
 
 fn set_kernel_version(host: &mut impl StorageV1) -> Result<(), Error> {
@@ -313,7 +317,7 @@ where
     // Performing health check to recover from a potentially corrupted durable storage. We do it
     // before the stage one because stage one reboots and would clear the flag.
     if !host.is_evm_node() {
-        health_check::<Host>(host)?;
+        health_check::<Host>(host, &mut configuration)?;
     }
 
     // Initialize custom precompile

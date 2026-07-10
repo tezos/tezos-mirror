@@ -132,6 +132,9 @@ pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/base/delayed_bridge"
 pub const MAXIMUM_ALLOWED_TICKS: RefPath =
     RefPath::assert_from(b"/base/maximum_allowed_ticks");
 
+pub const STAGE_ONE_WITNESS_PATH: RefPath =
+    RefPath::assert_from(b"/base/stage_one_witness");
+
 pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
     RefPath::assert_from(b"/evm/world_state/maximum_gas_per_transaction");
 
@@ -797,6 +800,29 @@ pub fn read_kernel_security_governance(
 
 pub fn read_maximum_allowed_ticks(host: &mut impl StorageV1) -> Option<u64> {
     read_u64_le(host, &MAXIMUM_ALLOWED_TICKS).ok()
+}
+
+pub fn enter_stage_one<Host>(host: &mut Host) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
+    Ok(host.store_write(&STAGE_ONE_WITNESS_PATH, b"", 0)?)
+}
+
+pub fn leave_stage_one<Host>(host: &mut Host) -> Result<(), Error>
+where
+    Host: StorageV1,
+{
+    Ok(host.store_delete_value(&STAGE_ONE_WITNESS_PATH)?)
+}
+
+pub fn inside_stage_one<Host>(host: &Host) -> bool
+where
+    Host: StorageV1,
+{
+    host.store_has(&STAGE_ONE_WITNESS_PATH)
+        .unwrap_or(None)
+        .is_some()
 }
 
 /// Reads the maximum gas per transaction. If the value cannot found in the storage,

@@ -258,7 +258,8 @@ let setup_kernel ~l1_contracts ?max_delayed_inbox_blueprint_length
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
     ?dal_publishers_whitelist ?evm_version ?with_runtimes
-    ?enable_michelson_gas_refund ~sequencer ~preimages_dir ~kernel protocol () =
+    ?enable_michelson_gas_refund ?enable_debug_precompiles ~sequencer
+    ~preimages_dir ~kernel protocol () =
   let output_config = Temp.file "config.yaml" in
   let tez_bootstrap_accounts =
     (* Tezos bootstrap accounts are only relevant if the runtime is activated *)
@@ -341,6 +342,7 @@ let setup_kernel ~l1_contracts ?max_delayed_inbox_blueprint_length
       ?enable_fa_bridge
       ?with_runtimes
       ?enable_michelson_gas_refund
+      ?enable_debug_precompiles
       ()
   in
   let*! () =
@@ -370,7 +372,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ~(l2_chain : Evm_node.l2_setup) ?rpc_server ?websockets ?history_mode
     ?spawn_rpc ?periodic_snapshot_path ?(signatory = false) ?tx_queue
     ?(sequencer_sunset_sec = 0) ?with_runtimes ?enable_michelson_gas_refund
-    ?instant_confirmations protocol =
+    ?enable_debug_precompiles ?instant_confirmations protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -480,6 +482,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?evm_version
       ?with_runtimes
       ?enable_michelson_gas_refund
+      ?enable_debug_precompiles
       ~preimages_dir
       ~kernel
       protocol
@@ -695,7 +698,8 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?dal_publishers_whitelist ?rpc_server ?websockets ?history_mode ?tx_queue
     ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setup
     ?sequencer_sunset_sec ?with_runtimes ?enable_michelson_gas_refund
-    ?instant_confirmations body ~title ~tags protocols =
+    ?enable_debug_precompiles ?instant_confirmations body ~title ~tags protocols
+    =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -767,6 +771,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?sequencer_sunset_sec
         ?with_runtimes
         ?enable_michelson_gas_refund
+        ?enable_debug_precompiles
         ?instant_confirmations
         protocol
     in

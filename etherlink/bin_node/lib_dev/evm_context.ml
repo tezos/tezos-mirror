@@ -1576,7 +1576,6 @@ module State = struct
                   ~pool:ctxt.execution_pool
                   ~native_execution_policy:
                     ctxt.configuration.kernel_execution.native_execution_policy
-                  ~wasm_pvm_fallback:(not @@ List.is_empty delayed_transactions)
                   ~data_dir
                   ~chain_family
                   ~config
