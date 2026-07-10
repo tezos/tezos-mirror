@@ -310,6 +310,87 @@ let generate_html ~template ~title ~path md_path =
       html_path
   | n -> failwith ("Failed to generate release page: Error " ^ Int.to_string n)
 
+(* [make_component ~name ~bucket ~path ~url] builds the [component] record
+   describing where [name]'s versions.json and assets live in [bucket]/[path].
+
+   The "octez" component is special: its assets are stored at the root of
+   [bucket]/[path] rather than under a [name]/ subdirectory. *)
+let make_component ~name ~bucket ~path ~url =
+  {
+    name;
+    path =
+      (* For octez, the path is the root of the bucket. *)
+      (if name = "octez" then sf "%s%s" bucket path
+       else sf "%s%s/%s" bucket path name);
+    asset_path =
+      (fun version asset_type ->
+        let variant_suffix =
+          match version.prerelease with
+          | Some (RC n) -> sf "-rc%d" n
+          | Some (Beta n) -> sf "-beta%d" n
+          | None -> ""
+        in
+        if name = "octez" then
+          sf
+            "%s%s/%s-v%i.%i%s/%s"
+            bucket
+            path
+            name
+            version.major
+            version.minor
+            variant_suffix
+            (string_of_asset_type asset_type |> String.lowercase_ascii)
+        else
+          sf
+            "%s%s/%s/%s-v%i.%i%s/%s"
+            bucket
+            path
+            name
+            name
+            version.major
+            version.minor
+            variant_suffix
+            (string_of_asset_type asset_type |> String.lowercase_ascii));
+    url;
+  }
+
+(* [render_page ~component ~asset_types ~filter_active ~title ~path ~file ~output]
+   renders a single release page for [component]: it writes the markdown to
+   [output] and the HTML alongside it (with a [.html] extension). Versions are
+   read from S3 unless [file] provides a local versions.json. *)
+let render_page ~component ~asset_types ~filter_active ~title ~path ~file
+    ~output =
+  let all_versions = get_versions ~component ~file in
+  let versions =
+    match filter_active with
+    | Some Active -> List.filter (fun v -> v.active) all_versions
+    | Some Inactive -> List.filter (fun v -> not v.active) all_versions
+    | Some All -> all_versions
+    | None ->
+        Format.printf
+          "Warning: no [--filter-active] argument. No filter will be applied." ;
+        all_versions
+  in
+  let md_path = generate_md ~component ~versions ~asset_types ~filter_active in
+  let html_path =
+    generate_html
+      ~template:"./docs/release_page/template.html"
+      ~title
+      ~path
+      md_path
+  in
+  let move src dst =
+    try Sys.rename src dst
+    with Sys_error _ ->
+      (* Fallback for cross-device moves (e.g. /tmp to working directory) *)
+      let content = In_channel.(with_open_bin src input_all) in
+      Out_channel.(with_open_bin dst (fun oc -> output_string oc content)) ;
+      Sys.remove src
+  in
+  let dst_html = Filename.remove_extension output ^ ".html" in
+  move md_path output ;
+  move html_path dst_html
+
 (* This script takes a [component] name, page [title], a [bucket] name,
    a [path] and a list of [asset_type] as arguments.
 
@@ -441,72 +522,5 @@ let () =
       "./index.md"
   in
   Clap.close () ;
-  let component =
-    {
-      name = component;
-      path =
-        (* For octez, the path is root of the bucket. *)
-        (if component = "octez" then sf "%s%s" bucket path
-         else sf "%s%s/%s" bucket path component);
-      asset_path =
-        (fun version asset_type ->
-          let variant_suffix =
-            match version.prerelease with
-            | Some (RC n) -> sf "-rc%d" n
-            | Some (Beta n) -> sf "-beta%d" n
-            | None -> ""
-          in
-          if component = "octez" then
-            sf
-              "%s%s/%s-v%i.%i%s/%s"
-              bucket
-              path
-              component
-              version.major
-              version.minor
-              variant_suffix
-              (string_of_asset_type asset_type |> String.lowercase_ascii)
-          else
-            sf
-              "%s%s/%s/%s-v%i.%i%s/%s"
-              bucket
-              path
-              component
-              component
-              version.major
-              version.minor
-              variant_suffix
-              (string_of_asset_type asset_type |> String.lowercase_ascii));
-      url;
-    }
-  in
-  let all_versions = get_versions ~component ~file in
-  let versions =
-    match filter_active with
-    | Some Active -> List.filter (fun v -> v.active) all_versions
-    | Some Inactive -> List.filter (fun v -> not v.active) all_versions
-    | Some All -> all_versions
-    | None ->
-        Format.printf
-          "Warning: no [--filter-active] argument. No filter will be applied." ;
-        all_versions
-  in
-  let md_path = generate_md ~component ~versions ~asset_types ~filter_active in
-  let html_path =
-    generate_html
-      ~template:"./docs/release_page/template.html"
-      ~title
-      ~path
-      md_path
-  in
-  let move src dst =
-    try Sys.rename src dst
-    with Sys_error _ ->
-      (* Fallback for cross-device moves (e.g. /tmp to working directory) *)
-      let content = In_channel.(with_open_bin src input_all) in
-      Out_channel.(with_open_bin dst (fun oc -> output_string oc content)) ;
-      Sys.remove src
-  in
-  let dst_html = Filename.remove_extension output ^ ".html" in
-  move md_path output ;
-  move html_path dst_html
+  let component = make_component ~name:component ~bucket ~path ~url in
+  render_page ~component ~asset_types ~filter_active ~title ~path ~file ~output
