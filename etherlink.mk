@@ -36,9 +36,22 @@ evm_kernel_unstripped.wasm::
 	@$(MAKE) -C ${KERNEL_DIR} build
 	@cp ${KERNEL_DIR}/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
 
-evm_kernel.wasm:: evm_kernel_unstripped.wasm
+evm_kernel.wasm:: kernel_sdk evm_kernel_unstripped.wasm
 	@cp evm_kernel_unstripped.wasm $@
 	@wasm-strip $@
+	@./smart-rollup-instrument $@
+	@mv evm_kernel.instr.wasm $@
+
+# Like evm_kernel.wasm but without stripping: keeps the name section for
+# debugging while carrying the same call-depth guard, so the unstripped
+# installer behaves like production rather than going Stuck on a stack overflow.
+# Instrumentation adds no functions, so the function names stay valid. Kept
+# separate from evm_kernel_unstripped.wasm, which evm_kernel.wasm derives from --
+# instrumenting that in place would double-instrument the production kernel.
+evm_kernel_unstripped_instr.wasm:: kernel_sdk evm_kernel_unstripped.wasm
+	@cp evm_kernel_unstripped.wasm $@
+	@./smart-rollup-instrument $@
+	@mv evm_kernel_unstripped_instr.instr.wasm $@
 
 .PHONY: kernel_sdk
 kernel_sdk:
@@ -58,7 +71,7 @@ endif
 	${CONFIG} \
 	${DISPLAY_CONFIG}
 
-evm_unstripped_installer.wasm:: kernel_sdk evm_kernel_unstripped.wasm
+evm_unstripped_installer.wasm:: kernel_sdk evm_kernel_unstripped_instr.wasm
 ifdef EVM_CONFIG
 	$(eval CONFIG := --setup-file ${EVM_CONFIG})
 endif
@@ -66,7 +79,7 @@ ifeq (${DISPLAY_ROOT_HASH}, true)
 	$(eval DISPLAY_CONFIG := --display-root-hash)
 endif
 	@./smart-rollup-installer get-reveal-installer \
-	--upgrade-to evm_kernel_unstripped.wasm \
+	--upgrade-to evm_kernel_unstripped_instr.wasm \
 	--preimages-dir ${EVM_UNSTRIPPED_KERNEL_PREIMAGES} \
 	--output $@ \
 	${CONFIG} \
@@ -115,7 +128,7 @@ check: build-dev-deps
 .PHONY: clean
 clean:
 	@$(MAKE) -f kernels.mk clean
-	@rm -f evm_kernel_unstripped.wasm evm_kernel.wasm evm_installer.wasm evm_unstripped_installer.wasm evm_installer.wasm evm_installer_dev.wasm evm_benchmark_kernel.wasm sequencer.wasm
+	@rm -f evm_kernel_unstripped.wasm evm_kernel_unstripped_instr.wasm evm_kernel_unstripped_instr.instr.wasm evm_kernel.wasm evm_installer.wasm evm_unstripped_installer.wasm evm_installer.wasm evm_installer_dev.wasm evm_benchmark_kernel.wasm sequencer.wasm
 	@$(MAKE) -C ${KERNEL_DIR} clean
 	@rm -rf ${EVM_KERNEL_PREIMAGES} ${EVM_UNSTRIPPED_KERNEL_PREIMAGES}
 

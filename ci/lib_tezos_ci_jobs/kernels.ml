@@ -108,6 +108,7 @@ let job_build_kernels =
          [
            "evm_kernel.wasm";
            "smart-rollup-installer";
+           "smart-rollup-instrument";
            "sequenced_kernel.wasm";
            "tx_kernel.wasm";
            "tx_kernel_dal.wasm";
