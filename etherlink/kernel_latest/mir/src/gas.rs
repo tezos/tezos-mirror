@@ -982,28 +982,49 @@ pub mod interpret_cost {
         (10 * Checked::from(list_size)).as_gas_cost()
     }
 
+    /// Per-byte allocation gas, charged as `max(time, alloc)` whenever an op
+    /// materialises a fresh contiguous `Bytes`/`String` buffer. The coefficient
+    /// ties gas to allocated memory so the *aggregate* an operation can fund
+    /// stays within the WASM heap:
+    ///   `MICHELSON_MAX_MILLIGAS_PER_OPERATION` (660_000_000 mg)
+    ///   / WASM linear-memory cap (4 GiB = 4_294_967_296 B)  ≈ 0.1537 mg/byte,
+    /// rounded up to `(n>>3)+(n>>5)` = 0.15625, so an operation runs out of gas
+    /// before the buffers it materialises can exhaust the 4 GiB heap.
+    ///
+    /// This bounds the *total* an operation allocates, not the length of any
+    /// single value: a `Bytes`/`String` is a `Vec<u8>`, itself capped at
+    /// `isize::MAX` (~2 GiB on wasm32); exceeding that is a separate concern.
+    fn alloc_cost(bytes: Checked<usize>) -> Result<u32, CostOverflow> {
+        ((bytes >> 3) + (bytes >> 5)).as_gas_cost()
+    }
+
     // corresponds to cost_N_IConcat_string in the Tezos protocol (the model's
     // list-length coefficient is 0; the per-element precheck above stays as a
     // MIR-specific protection)
     pub fn concat_string_list(total_len: Checked<usize>) -> Result<u32, CostOverflow> {
-        ((total_len >> 4) + (total_len >> 6) + 55).as_gas_cost()
+        let time = ((total_len >> 4) + (total_len >> 6) + 55).as_gas_cost()?;
+        Ok(time.max(alloc_cost(total_len)?))
     }
 
     // corresponds to cost_N_IConcat_bytes in the Tezos protocol
     pub fn concat_bytes_list(total_len: Checked<usize>) -> Result<u32, CostOverflow> {
-        ((total_len >> 4) + (total_len >> 6) + 55).as_gas_cost()
+        let time = ((total_len >> 4) + (total_len >> 6) + 55).as_gas_cost()?;
+        Ok(time.max(alloc_cost(total_len)?))
     }
 
     // corresponds to cost_N_IConcat_string_pair in the Tezos protocol
     pub fn concat_string_pair(len1: usize, len2: usize) -> Result<u32, CostOverflow> {
         let w = Checked::from(len1) + Checked::from(len2);
-        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 8) + 55).as_gas_cost()
+        let time = ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 8) + 55).as_gas_cost()?;
+        Ok(time.max(alloc_cost(w)?))
     }
 
     // corresponds to cost_N_IConcat_bytes_pair in the Tezos protocol
     pub fn concat_bytes_pair(len1: usize, len2: usize) -> Result<u32, CostOverflow> {
         let w = Checked::from(len1) + Checked::from(len2);
-        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + 65).as_gas_cost()
+        let time =
+            ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + 65).as_gas_cost()?;
+        Ok(time.max(alloc_cost(w)?))
     }
 
     /// Comparable byte size of a key, the size axis of the benchmarked
