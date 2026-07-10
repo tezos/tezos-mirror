@@ -40,6 +40,9 @@ let fail_decode_event tag =
   | "\x05" ->
       let event = "flush_delayed_inbox" in
       Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
+  | "\x06" ->
+      let event = "dropped_delayed_transaction" in
+      Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
   | _ ->
       let event = "unknown" in
       Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
@@ -287,12 +290,28 @@ module Flushed_blueprint = struct
          n)
 end
 
+module Dropped_delayed_transaction = struct
+  type t = Ethereum_types.hash
+
+  let of_rlp = function
+    | Rlp.List [Value hash] ->
+        let hash = decode_hash hash in
+        Some hash
+    | _ -> None
+
+  let to_input txn_hash =
+    Rlp.Value (Ethereum_types.hash_to_bytes txn_hash |> Bytes.unsafe_of_string)
+
+  let encoding = Ethereum_types.hash_encoding
+end
+
 type t =
   | Upgrade_event of Upgrade.t
   | Sequencer_upgrade_event of Sequencer_upgrade.t
   | Blueprint_applied of Blueprint_applied.t
   | New_delayed_transaction of Delayed_transaction.t
   | Flush_delayed_inbox of Flushed_blueprint.t
+  | Dropped_delayed_transaction of Dropped_delayed_transaction.t
 
 let of_bytes bytes =
   let open Lwt_syntax in
@@ -324,6 +343,9 @@ let of_bytes bytes =
         | "\x05" ->
             let flushed_blueprint = Flushed_blueprint.of_rlp rlp_content in
             Option.map (fun u -> Flush_delayed_inbox u) flushed_blueprint
+        | "\x06" ->
+            let dropped_txn = Dropped_delayed_transaction.of_rlp rlp_content in
+            Option.map (fun u -> Dropped_delayed_transaction u) dropped_txn
         | _ -> None
       in
 
@@ -377,6 +399,12 @@ let pp fmt = function
         level
         Time.Protocol.pp_hum
         timestamp
+  | Dropped_delayed_transaction txn_hash ->
+      Format.fprintf
+        fmt
+        "Dropped delayed transaction %a"
+        Ethereum_types.pp_hash
+        txn_hash
 
 let encoding =
   let open Data_encoding in
@@ -426,6 +454,13 @@ let encoding =
         ~proj:(function
           | Flush_delayed_inbox blueprint -> Some blueprint | _ -> None)
         ~inj:(fun blueprint -> Flush_delayed_inbox blueprint);
+      case
+        ~kind:"dropped_delayed_transaction"
+        ~tag:5
+        ~event_encoding:Dropped_delayed_transaction.encoding
+        ~proj:(function
+          | Dropped_delayed_transaction txn_hash -> Some txn_hash | _ -> None)
+        ~inj:(fun txn_hash -> Dropped_delayed_transaction txn_hash);
     ]
 
 let of_parts ~delayed_transactions ~kernel_upgrade ~sequencer_upgrade =

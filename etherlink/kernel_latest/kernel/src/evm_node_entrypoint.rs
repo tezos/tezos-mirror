@@ -27,8 +27,12 @@ use primitive_types::{H160, H256, U256};
 use rlp::{Rlp, RlpStream};
 use std::collections::HashMap;
 use tezos_data_encoding::enc::BinWriter;
-use tezos_ethereum::rlp_helpers::{
-    append_option_canonical, decode_field, decode_field_bool, next, FromRlpBytes,
+use tezos_ethereum::{
+    rlp_helpers::{
+        append_option_canonical, decode_field, decode_field_bool, decode_tx_hash, next,
+        FromRlpBytes,
+    },
+    transaction::TransactionHash,
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
@@ -71,6 +75,26 @@ where
         .unwrap();
 }
 
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn drop_delayed_transaction() {
+    let mut sdk_host = unsafe { RollupHost::new() };
+    drop_delayed_transaction_with_durable_storage(&mut sdk_host);
+}
+
+#[allow(dead_code)]
+pub fn drop_delayed_transaction_with_durable_storage<Host>(host: &mut Host)
+where
+    Host: tezos_smart_rollup_host::runtime::Runtime,
+{
+    let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
+    let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
+    let transaction_hash: TransactionHash = decode_tx_hash(Rlp::new(&payload)).unwrap();
+    let mut delayed_inbox = DelayedInbox::new(&mut host).unwrap();
+    delayed_inbox
+        .delete(&mut host, crate::delayed_inbox::Hash(transaction_hash))
+        .unwrap();
+}
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub extern "C" fn single_tx_execution() {

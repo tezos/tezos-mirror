@@ -65,12 +65,19 @@ module Flushed_blueprint : sig
   }
 end
 
+module Dropped_delayed_transaction : sig
+  type t = Ethereum_types.hash
+
+  val to_input : t -> Rlp.item
+end
+
 type t =
   | Upgrade_event of Upgrade.t
   | Sequencer_upgrade_event of Sequencer_upgrade.t
   | Blueprint_applied of Blueprint_applied.t
   | New_delayed_transaction of Delayed_transaction.t
   | Flush_delayed_inbox of Flushed_blueprint.t
+  | Dropped_delayed_transaction of Dropped_delayed_transaction.t
 
 val pp : Format.formatter -> t -> unit
 

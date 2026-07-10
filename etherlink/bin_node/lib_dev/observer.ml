@@ -306,7 +306,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
             filter_event =
               (function
               | New_delayed_transaction _ | Upgrade_event _
-              | Flush_delayed_inbox _ ->
+              | Flush_delayed_inbox _ | Dropped_delayed_transaction _ ->
                   false
               | _ -> true);
           }
