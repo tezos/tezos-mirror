@@ -80,6 +80,8 @@ pub enum ValidityError {
     FailedToSerializeOperation,
     #[error("Insufficient fee: the total fees for this batch do not cover DA cost.")]
     InsufficientFee,
+    #[error("The public key hash {0} is inconsistent with the public key provided.")]
+    InconsistentPublicKey(PublicKeyHash),
 }
 
 impl From<gas::OutOfGas> for ValidityError {

@@ -3447,7 +3447,11 @@ mod tests {
             &test_safe_roots(),
         );
 
-        let expected_error = OperationError::Validation(ValidityError::InvalidSignature);
+        // The mismatch between the payload key and the source is caught in
+        // `get_revealed_key` during validation, before the signature check.
+        let expected_error = OperationError::Validation(
+            ValidityError::InconsistentPublicKey(bootstrap1().pkh),
+        );
 
         assert_eq!(
             account.counter(&host).unwrap(),
@@ -3456,6 +3460,77 @@ mod tests {
         );
 
         assert_eq!(result, Err(expected_error));
+    }
+
+    // A permissionless attacker must not be able to charge a victim's
+    // fee/counter by submitting a Reveal-first batch whose source is the victim
+    // but whose payload key (and signature) are the attacker's own. Regression
+    // test for L2-1796: the mismatch is rejected during validation, before any
+    // fee is debited or counter promoted.
+    #[test]
+    fn validate_reveal_with_attacker_key_does_not_charge_source() {
+        let mut host = MockKernelHost::default();
+
+        let victim = bootstrap1();
+        let attacker = bootstrap2();
+
+        let account = init_account(&mut host, &victim.pkh, 50);
+
+        // source = victim, but the Reveal payload key is the attacker's, and the
+        // whole batch is signed by the attacker (so the signature check against
+        // that payload key would otherwise pass).
+        let branch = TezBlock::genesis_block_hash();
+        let content = vec![ManagerOperation {
+            source: victim.pkh.clone(),
+            fee: 15_u64.into(),
+            counter: 1_u64.into(),
+            operation: OperationContent::Reveal(RevealContent {
+                pk: attacker.pk.clone(),
+                proof: None,
+            }),
+            gas_limit: 1000_u64.into(),
+            storage_limit: 5_u64.into(),
+        }
+        .into_manager_operation_content()];
+        let signature = sign_operation(&attacker.sk, &branch, &content).unwrap();
+        let operation = Operation {
+            branch,
+            content,
+            signature,
+        };
+
+        let result = validate_and_apply_operation(
+            &mut host,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        );
+
+        assert_eq!(
+            result,
+            Err(OperationError::Validation(
+                ValidityError::InconsistentPublicKey(victim.pkh.clone())
+            )),
+            "attacker-signed reveal must be rejected during validation"
+        );
+
+        // The victim's fee must not be charged and its counter must not move.
+        assert_eq!(
+            account.balance(&host).unwrap(),
+            50_u64.into(),
+            "Victim balance must not be debited"
+        );
+        assert_eq!(
+            account.counter(&host).unwrap(),
+            0.into(),
+            "Victim counter must not be incremented"
+        );
     }
 
     // Test a valid reveal operation, the manager should go from NotRevealed to Revealed

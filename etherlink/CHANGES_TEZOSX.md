@@ -122,6 +122,13 @@
 
 ### Michelson Runtime
 
+- **Security fix:** a `Reveal`-first manager batch whose payload public
+  key does not hash to the batch source is now rejected during
+  validation, before any fee is debited or counter incremented.
+  Previously such a batch (signed by the payload key) charged the
+  source's fee and bumped its counter even though the reveal was later
+  rejected as inconsistent, letting an attacker grief any solvent
+  account. (!22446)
 - **Bug fix:** A cross-runtime call that runs out of gas after
   materialising its sender's alias forwarder but before serving no longer
   leaks that forwarder's origination into a later sibling cross-runtime
