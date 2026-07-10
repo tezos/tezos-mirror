@@ -69,7 +69,7 @@ riscv-check:
 
 .PHONY: build
 build: installer-template
-	@cargo build -p tezos-smart-rollup-installer \
+	@cargo build -p tezos-smart-rollup-installer -p tezos-smart-rollup-instrument \
                 --release \
                 $(NATIVE_OPT)
 

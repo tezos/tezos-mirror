@@ -1,0 +1,27 @@
+[package]
+name = "tezos-smart-rollup-instrument"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "tezos_smart_rollup_instrument"
+path = "src/lib.rs"
+
+[[bin]]
+name = "smart-rollup-instrument"
+path = "src/main.rs"
+
+[dependencies]
+# Modern wasm-tools stack: decodes the real current binary format (bulk-memory,
+# reference-types, etc.) that parity-wasm/wasm-instrument choke on.
+wasmparser = "0.253"
+# `wasmparser` feature enables the `reencode` module (RoundtripReencoder + the
+# Reencode trait) used by the instrumentation pass.
+wasm-encoder = { version = "0.253", features = ["wasmparser"] }
+
+[dev-dependencies]
+# Build fixture modules from WAT source. Version-matched to the wasm-tools stack.
+wat = "1.253"
+# Pure-Rust interpreter: lets the tests execute instrumented fixtures and assert
+# the guard actually traps, rather than only that the output validates.
+wasmi = "1.1"
