@@ -383,16 +383,10 @@ let jobs_for (distro : Distro.t) pipeline_type =
     (Cacio.Auto, job_apt_repo distro.name pipeline_type);
     (Cacio.Auto, job_lintian distro.name pipeline_type);
     (Cacio.Auto, job_install_bin distro pipeline_type);
+    (Cacio.Auto, job_install_bin_systemd distro pipeline_type);
+    (Cacio.Auto, job_upgrade_bin_systemd distro pipeline_type);
+    (Cacio.Auto, job_test_keyring distro pipeline_type);
   ]
-  @ (match distro with
-    | {name = Ubuntu; release = "22.04"} ->
-        (* Not sure why this exception? *)
-        []
-    | _ -> [(Cacio.Auto, job_install_bin_systemd distro pipeline_type)])
-  @ [
-      (Cacio.Auto, job_upgrade_bin_systemd distro pipeline_type);
-      (Cacio.Auto, job_test_keyring distro pipeline_type);
-    ]
 
 let jobs pipeline_type =
   match pipeline_type with
