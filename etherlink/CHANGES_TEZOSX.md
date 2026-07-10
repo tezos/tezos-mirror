@@ -141,6 +141,10 @@
   on EVM frame revert, so the orphaned origination is dropped with the
   reverted state instead of being re-attributed to the next call that
   drains it. (!22393)
+- **Bug fix:** `EXEC` of a lambda with a deeply nested body no longer
+  overflows the native stack, and no longer costs `O(D²)` work for `O(D)` gas.
+  The runtime body is walked borrowed from a keep-alive arena instead of
+  deep-cloning each opened sub-block. (!22444)
 - The typechecker now charges the gas for entrypoint resolution (a flat cost
   for `SELF`, the `CONTRACT` instruction, and contract-value parsing) and the
   `CHECK_PRINTABLE` cost (10·len+15) of string literals and view names, which
