@@ -1107,8 +1107,10 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
       name;
       after_script =
         Some
-          (". ./scripts/ci/datadog_send_job_cache_info.sh 'after'"
-         :: after_script);
+          (if datadog then
+             ". ./scripts/ci/datadog_send_job_cache_info.sh 'after'"
+             :: after_script
+           else after_script);
       allow_failure;
       artifacts;
       (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
