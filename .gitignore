@@ -213,6 +213,9 @@ node_modules/
 .cargo_targets
 
 # AI agent files
-.claude/*.local.md
+# .claude/ holds per-developer local config (settings, hooks, worktrees) and is
+# not committed -- except .claude/skills/, the shared team skills directory.
+.claude/*
+!.claude/skills/
 .opencode/
 .cue-store/
