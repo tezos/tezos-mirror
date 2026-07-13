@@ -632,7 +632,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
         (block_ro_codec
            ~path:
              (Durable_storage_path.Block.current_block
-                ~root:Durable_storage_path.tezosx_tezos_blocks_root)
+                ~root:Durable_storage_path.michelson_block_root)
            ~chain_family:Michelson)
   | Evm_legacy_block_by_hash block_hash ->
       static_ro
@@ -926,7 +926,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
       let (`Hex hash_hex) = Hex.of_bytes (Block_hash.to_bytes branch) in
       static_ro
         (unit_flag_ro_codec
-           ~path:(Durable_storage_path.tezosx_tez_live_block hash_hex))
+           ~path:(Durable_storage_path.michelson_live_block hash_hex))
   | Blueprint_current_generation ->
       versioned_ro (fun ~storage_version ->
           {

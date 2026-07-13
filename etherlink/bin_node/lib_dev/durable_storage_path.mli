@@ -99,13 +99,14 @@ val michelson_ledger_root : path
     shared Michelson implementation backing every Tezos X alias. *)
 val michelson_alias_implementation : path
 
-(** TezosX: root for Tezos blocks stored under the Michelson world state
-    ([/tez/world_state/tez_blocks]). *)
-val tezosx_tezos_blocks_root : path
+(** Root under which Michelson blocks are stored, directly under the
+    Michelson world state ([/tez/world_state]), mirroring the EVM layout
+    under [etherlink_root]. *)
+val michelson_block_root : path
 
 (** Presence marker for a recent Michelson block hash (the kernel's
     [live_blocks] set); the argument is the lowercase hex of the 32-byte hash. *)
-val tezosx_tez_live_block : string -> path
+val michelson_live_block : string -> path
 
 val block_root_of_chain_family : _ L2_types.chain_family -> path
 
@@ -293,11 +294,10 @@ end
 module Indexes : sig
   (** Make the path to the indexed block hash.
 
-      Phase 6 (V58) reorganized the EVM block-index path from
+      Phase 6 (V58) reorganized the block-index path from
       [<root>/indexes/blocks/{N}] to [<root>/blocks/indexes/{N}].
-      Only the EVM world-state root is affected; for the Michelson
-      block root [/tez/world_state/tez_blocks] we keep the legacy
-      layout. *)
+      This applies to every root (EVM and Michelson alike):
+      block_storage.rs uses the new layout unconditionally. *)
   val block_by_number : storage_version:int -> root:path -> Block.number -> path
 end
 
