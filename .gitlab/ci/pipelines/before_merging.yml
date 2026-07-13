@@ -11,7 +11,7 @@ stages:
 - publishing_tests
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -604,7 +604,7 @@ documentation.docgen:
     - docs/shell/p2p_api.rst
 
 documentation.install_python_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
   stage: test
   tags:
   - gcp
@@ -2782,7 +2782,7 @@ npm_audit:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
@@ -2826,7 +2826,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 oc.build-debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
@@ -2962,7 +2962,7 @@ oc.build-homebrew-formula-macosx:
       - macos-26-xcode-26
 
 oc.build-keyring_package:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
@@ -3984,7 +3984,7 @@ oc.check_lift_limits_patch:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.compile_sources_doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-25648bf0
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs
@@ -4255,7 +4255,7 @@ oc.docker:rust-toolchain:amd64:
       dotenv: rust_toolchain_image_tag.env
 
 oc.install_bin_debian_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -4334,7 +4334,7 @@ oc.install_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-25648bf0
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -4409,7 +4409,7 @@ oc.integration:compiler-rejections:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -4926,7 +4926,7 @@ oc.test_keyring_debian_trixie:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-25648bf0
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -5446,7 +5446,7 @@ oc.upgrade_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-25648bf0
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""

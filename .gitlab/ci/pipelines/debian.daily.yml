@@ -8,7 +8,7 @@ stages:
 - publishing_tests
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -43,7 +43,7 @@ apt_repo_debian:
   retry: 0
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-25648bf0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -99,7 +99,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
@@ -126,7 +126,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 oc.build-debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
@@ -168,7 +168,7 @@ oc.build-debian:
       - gcp_arm64
 
 oc.build-keyring_package:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
@@ -198,7 +198,7 @@ oc.build-keyring_package:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
 
 oc.build-ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
@@ -241,7 +241,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 oc.install_bin_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -286,14 +286,14 @@ oc.install_bin_debian_bookworm_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-25648bf0
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: bookworm
 
 oc.install_bin_debian_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -338,14 +338,14 @@ oc.install_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-25648bf0
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: trixie
 
 oc.install_bin_ubuntu_22_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -390,14 +390,14 @@ oc.install_bin_ubuntu_22_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-25648bf0
     DISTRIBUTION: ubuntu
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "22.04"
 
 oc.install_bin_ubuntu_24_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -442,14 +442,14 @@ oc.install_bin_ubuntu_24_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-25648bf0
     DISTRIBUTION: ubuntu
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "24.04"
 
 oc.install_bin_ubuntu_26_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:26.04-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:26.04-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -494,14 +494,14 @@ oc.install_bin_ubuntu_26_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-25648bf0
     DISTRIBUTION: ubuntu
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "26.04"
 
 oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -526,7 +526,7 @@ oc.lintian_debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.lintian_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -551,7 +551,7 @@ oc.lintian_ubuntu:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.reproducibility_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: publishing_tests
   tags:
   - $TAGS
@@ -616,7 +616,7 @@ oc.test_keyring_debian_bookworm:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-25648bf0
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -646,7 +646,7 @@ oc.test_keyring_debian_trixie:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-25648bf0
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -676,7 +676,7 @@ oc.test_keyring_ubuntu_22_04:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-25648bf0
     DISTRIBUTION: ubuntu
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -706,7 +706,7 @@ oc.test_keyring_ubuntu_24_04:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-25648bf0
     DISTRIBUTION: ubuntu
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -736,7 +736,7 @@ oc.test_keyring_ubuntu_26_04:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-25648bf0
     DISTRIBUTION: ubuntu
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -766,7 +766,7 @@ oc.upgrade_bin_debian_bookworm_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-25648bf0
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -796,7 +796,7 @@ oc.upgrade_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-25648bf0
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -826,7 +826,7 @@ oc.upgrade_bin_ubuntu_22_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-25648bf0
     DISTRIBUTION: ubuntu
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -856,7 +856,7 @@ oc.upgrade_bin_ubuntu_24_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-25648bf0
     DISTRIBUTION: ubuntu
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -886,7 +886,7 @@ oc.upgrade_bin_ubuntu_26_04_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-100afa6d
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:26.04-master-25648bf0
     DISTRIBUTION: ubuntu
     DOCKER_VERSION: 28.5.1
     PREFIX: ""

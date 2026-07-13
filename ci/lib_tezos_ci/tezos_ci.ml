@@ -1493,10 +1493,10 @@ module Base_images = struct
 
   (* DEB packaging *)
 
-  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2566178052
+  (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2660556657
      May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-     https://gitlab.com/tezos/tezos/-/commit/100afa6d/pipelines *)
-  let debian_version = "master-100afa6d"
+     https://gitlab.com/tezos/tezos/-/commit/25648bf0/pipelines *)
+  let debian_version = "master-25648bf0"
 
   let debian_bookworm = make_img "debian:bookworm" debian_version
 
