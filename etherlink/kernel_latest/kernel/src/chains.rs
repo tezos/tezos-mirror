@@ -69,22 +69,22 @@ pub use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
 pub const TEZ_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tez/world_state");
 
-/// Path for TezBlock storage. Sits under TEZ_SAFE_STORAGE_ROOT_PATH so it's
-/// included in SafeStorage transactions and snapshotted as part of the
-/// Michelson world state.
-pub const TEZ_BLOCKS_PATH: RefPath = RefPath::assert_from(b"/tez/world_state/tez_blocks");
-
 /// True if `branch` is a recent block of this instance; genesis is accepted only while the chain is under [`BLOCKS_STORED`] blocks.
 pub(crate) fn is_valid_tez_branch<Host: StorageV1>(
     host: &Host,
     branch: &H256,
 ) -> Result<bool, crate::Error> {
-    if crate::block_storage::is_recent_block_hash(host, &TEZ_BLOCKS_PATH, branch)? {
+    if crate::block_storage::is_recent_block_hash(
+        host,
+        &TEZ_SAFE_STORAGE_ROOT_PATH,
+        branch,
+    )? {
         return Ok(true);
     }
     if *branch == H256(*TezBlock::genesis_block_hash()) {
-        let current = crate::block_storage::read_current_number(host, &TEZ_BLOCKS_PATH)
-            .unwrap_or_else(|_| U256::zero());
+        let current =
+            crate::block_storage::read_current_number(host, &TEZ_SAFE_STORAGE_ROOT_PATH)
+                .unwrap_or_else(|_| U256::zero());
         return Ok(current < U256::from(BLOCKS_STORED));
     }
     Ok(false)

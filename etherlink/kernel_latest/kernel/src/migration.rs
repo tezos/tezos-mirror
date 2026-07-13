@@ -1180,6 +1180,37 @@ where
                 Ok(MigrationStatus::None)
             }
         }
+        StorageVersion::V62 => {
+            // Michelson blocks move from /tez/world_state/tez_blocks up to the
+            // world-state root /tez/world_state (mirroring the EVM layout).
+            // Move the existing block subtrees so a network that already
+            // produced Michelson blocks keeps them across the upgrade; the
+            // moves are no-ops (path not found) on a network that never
+            // activated the Michelson runtime.
+            let moves: &[(&[u8], &[u8])] = &[
+                (
+                    b"/tez/world_state/tez_blocks/blocks",
+                    b"/tez/world_state/blocks",
+                ),
+                (
+                    b"/tez/world_state/tez_blocks/live_blocks",
+                    b"/tez/world_state/live_blocks",
+                ),
+                (
+                    b"/tez/world_state/tez_blocks/current_chain_header",
+                    b"/tez/world_state/current_chain_header",
+                ),
+            ];
+            for (old, new) in moves {
+                allow_path_not_found(
+                    host.store_move(
+                        &RefPath::assert_from(old),
+                        &RefPath::assert_from(new),
+                    ),
+                )?;
+            }
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
