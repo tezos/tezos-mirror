@@ -268,7 +268,7 @@ let job_cargo_audit =
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~stage:Test
     ~allow_failure:Yes
-    ~only_if_changed:["**/Cargo.lock"; "**/Cargo.toml"]
+    ~only_if_changed:["**/Cargo.lock"; "**/Cargo.toml"; "**/.cargo/audit.toml"]
     ~script:
       (match mode with
       | `mr -> ["./scripts/ci/cargo_audit.sh"]

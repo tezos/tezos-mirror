@@ -180,12 +180,23 @@ else
   merge_base=$(./scripts/ci/git_merge_base.sh \
     "${TEZOS_CI_MR_TARGET}" "${TEZOS_CI_MR_HEAD}")
 
-  echo "Auditing directories with changed Cargo.lock files."
+  # A changed Cargo.lock means the dependency graph moved; a changed
+  # .cargo/audit.toml means the ignore list moved. Both must re-audit the
+  # affected workspace, so consider both. Map a matched path to its
+  # workspace directory: <dir>/Cargo.lock -> <dir>, and
+  # <dir>/.cargo/audit.toml -> <dir>.
+  echo "Auditing directories with a changed Cargo.lock or .cargo/audit.toml."
   dirs=$(git diff --name-only "${merge_base}" "${TEZOS_CI_MR_HEAD}" \
-    -- '**/Cargo.lock' | while IFS= read -r f; do dirname "$f"; done | sort -u)
+    -- '**/Cargo.lock' '**/.cargo/audit.toml' |
+    while IFS= read -r f; do
+      case "$f" in
+      */.cargo/audit.toml) echo "${f%/.cargo/audit.toml}" ;;
+      *) dirname "$f" ;;
+      esac
+    done | sort -u)
 
   if [ -z "$dirs" ]; then
-    echo "No Cargo.lock changes detected. Nothing to audit."
+    echo "No Cargo.lock or .cargo/audit.toml changes detected. Nothing to audit."
     exit 0
   fi
 fi

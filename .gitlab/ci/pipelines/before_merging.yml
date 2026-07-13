@@ -259,6 +259,7 @@ cargo_audit:
   - gcp
   rules:
   - changes:
+    - '**/.cargo/audit.toml'
     - '**/Cargo.lock'
     - '**/Cargo.toml'
     when: on_success
