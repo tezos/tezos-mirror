@@ -169,24 +169,23 @@ let michelson_ledger_root = TEZ.Tez_accounts.make "/tezosx"
 let michelson_alias_implementation =
   TEZ.Tez_accounts.make "/tezosx/__system__/alias_implementation"
 
-(** TezosX: Tezos blocks live in the Michelson world-state keyspace. *)
-let tezosx_tezos_blocks_root = TEZ.World_state.make "/tez_blocks"
+(** Michelson blocks live directly under the Michelson world state
+    ([/tez/world_state]), mirroring the EVM layout under [etherlink_root]. *)
+let michelson_block_root = TEZ.World_state.make ""
 
 (* Presence marker for a recent Michelson block hash (the kernel's [live_blocks]
    set, keyed by the lowercase hex of the 32-byte block hash). *)
-let tezosx_tez_live_block hash_hex =
-  tezosx_tezos_blocks_root ^ "/live_blocks/" ^ hash_hex
+let michelson_live_block hash_hex =
+  michelson_block_root ^ "/live_blocks/" ^ hash_hex
 
 let block_root_of_chain_family (type f) (chain_family : f L2_types.chain_family)
     =
   match chain_family with
   | L2_types.EVM -> etherlink_root
-  (* TezosX and standalone Tezlink both store Michelson block data at
-     /tez/world_state/tez_blocks (= tezosx_tezos_blocks_root). This is
+  (* Michelson block data lives at /tez/world_state (= michelson_block_root),
      the root the kernel passes to [block_storage::store_current] for
-     Michelson blocks, see [MichelsonChainConfig::finalize_and_store]
-     and [BlockInProgress::finalize_and_store]. *)
-  | L2_types.Michelson -> tezosx_tezos_blocks_root
+     Michelson blocks, see [BlockInProgress::finalize_and_store]. *)
+  | L2_types.Michelson -> michelson_block_root
 
 let chain_id ~storage_version =
   if Storage_version.evm_config_moved_to_world_state ~storage_version then
