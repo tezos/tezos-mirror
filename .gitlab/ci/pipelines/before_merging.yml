@@ -265,7 +265,8 @@ cargo_audit:
     when: on_success
   needs: []
   dependencies: []
-  allow_failure: true
+  allow_failure:
+    exit_codes: 2
   timeout: 60 minutes
   interruptible: true
   before_script:

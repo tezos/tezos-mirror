@@ -170,7 +170,8 @@ cargo_audit:
   - gcp
   needs: []
   dependencies: []
-  allow_failure: true
+  allow_failure:
+    exit_codes: 2
   timeout: 60 minutes
   interruptible: false
   before_script:
