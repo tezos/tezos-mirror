@@ -6,7 +6,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = 'evm_kernel_farfadet_r5_su'
+name = 'evm_kernel_farfadet_r6_su'
 version = '0.1.0'
 edition = '2021'
 build = "build.rs"

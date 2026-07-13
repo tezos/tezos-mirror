@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos-evm-logging-farfadet-r5-su"
+name = "tezos-evm-logging-farfadet-r6-su"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"

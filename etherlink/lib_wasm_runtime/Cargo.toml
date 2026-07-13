@@ -75,3 +75,7 @@ runtime-farfadet-r4-su = { package = "tezos-evm-runtime-farfadet-r4-su", path = 
 # Farfadet R5 SU
 kernel-farfadet-r5-su = { package = "evm_kernel_farfadet_r5_su", path = "../kernel_farfadet_r5_su/kernel", default-features = false }
 runtime-farfadet-r5-su = { package = "tezos-evm-runtime-farfadet-r5-su", path = "../kernel_farfadet_r5_su/runtime", default-features = false }
+
+# Farfadet R6 SU
+kernel-farfadet-r6-su = { package = "evm_kernel_farfadet_r6_su", path = "../kernel_farfadet_r6_su/kernel", default-features = false }
+runtime-farfadet-r6-su = { package = "tezos-evm-runtime-farfadet-r6-su", path = "../kernel_farfadet_r6_su/runtime", default-features = false }

@@ -30,6 +30,7 @@
   (source_tree ../kernel_farfadet_r3_su)
   (source_tree ../kernel_farfadet_r4_su)
   (source_tree ../kernel_farfadet_r5_su)
+  (source_tree ../kernel_farfadet_r6_su)
   (source_tree ../../src/rustzcash_deps)
   (source_tree ../../src/rust_deps/wasmer-3.3.0)
   (source_tree ../../src/riscv)

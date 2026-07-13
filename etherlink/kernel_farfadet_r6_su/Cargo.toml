@@ -63,14 +63,14 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 
 # kernel crates
 revm-etherlink = { package = "revm-etherlink", path = "./revm" }
-tezos_ethereum = { package = "tezos_ethereum_farfadet_r5_su", path = "./ethereum" }
-tezos_tezlink = { package = "tezos_tezlink_farfadet_r5_su", path = "./tezos" }
-tezos-execution = { package = "tezos-execution-farfadet-r5-su", path = "./tezos_execution" }
-tezos-evm-logging = { package = "tezos-evm-logging-farfadet-r5-su", path = "./logging" }
-tezos-tracing = { package = "tezos-tracing-farfadet-r5-su", path = "./tracing" }
-tezos-evm-runtime = { package = "tezos-evm-runtime-farfadet-r5-su", path = "./runtime" }
-tezos-indexable-storage = { package = "tezos-indexable-storage-farfadet-r5-su", path = "./indexable_storage" }
-tezos-storage = { package = "tezos-storage-farfadet-r5-su", path = "./storage" }
+tezos_ethereum = { package = "tezos_ethereum_farfadet_r6_su", path = "./ethereum" }
+tezos_tezlink = { package = "tezos_tezlink_farfadet_r6_su", path = "./tezos" }
+tezos-execution = { package = "tezos-execution-farfadet-r6-su", path = "./tezos_execution" }
+tezos-evm-logging = { package = "tezos-evm-logging-farfadet-r6-su", path = "./logging" }
+tezos-tracing = { package = "tezos-tracing-farfadet-r6-su", path = "./tracing" }
+tezos-evm-runtime = { package = "tezos-evm-runtime-farfadet-r6-su", path = "./runtime" }
+tezos-indexable-storage = { package = "tezos-indexable-storage-farfadet-r6-su", path = "./indexable_storage" }
+tezos-storage = { package = "tezos-storage-farfadet-r6-su", path = "./storage" }
 
 # SDK
 # we disable BLS, because we don’t need it and it is a roadblock for the native execution

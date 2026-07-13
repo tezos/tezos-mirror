@@ -1099,7 +1099,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm_kernel_farfadet_r5_su"
+name = "evm_kernel_farfadet_r6_su"
 version = "0.1.0"
 dependencies = [
  "alloy-consensus",
@@ -1124,10 +1124,10 @@ dependencies = [
  "rlp",
  "sha3",
  "softfloat",
- "tezos-evm-logging-farfadet-r5-su",
- "tezos-evm-runtime-farfadet-r5-su",
- "tezos-execution-farfadet-r5-su",
- "tezos-indexable-storage-farfadet-r5-su",
+ "tezos-evm-logging-farfadet-r6-su",
+ "tezos-evm-runtime-farfadet-r6-su",
+ "tezos-execution-farfadet-r6-su",
+ "tezos-indexable-storage-farfadet-r6-su",
  "tezos-protocol",
  "tezos-smart-rollup",
  "tezos-smart-rollup-core",
@@ -1139,12 +1139,12 @@ dependencies = [
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-panic-hook",
  "tezos-smart-rollup-storage",
- "tezos-storage-farfadet-r5-su",
- "tezos-tracing-farfadet-r5-su",
+ "tezos-storage-farfadet-r6-su",
+ "tezos-tracing-farfadet-r6-su",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum_farfadet_r5_su",
- "tezos_tezlink_farfadet_r5_su",
+ "tezos_ethereum_farfadet_r6_su",
+ "tezos_tezlink_farfadet_r6_su",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -2389,7 +2389,7 @@ dependencies = [
 
 [[package]]
 name = "revm-etherlink"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "alloy-sol-types",
  "ethereum",
@@ -2400,9 +2400,9 @@ dependencies = [
  "primitive-types",
  "revm",
  "rlp",
- "tezos-evm-logging-farfadet-r5-su",
- "tezos-evm-runtime-farfadet-r5-su",
- "tezos-indexable-storage-farfadet-r5-su",
+ "tezos-evm-logging-farfadet-r6-su",
+ "tezos-evm-runtime-farfadet-r6-su",
+ "tezos-indexable-storage-farfadet-r6-su",
  "tezos-protocol",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-encoding",
@@ -2410,7 +2410,7 @@ dependencies = [
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum_farfadet_r5_su",
+ "tezos_ethereum_farfadet_r6_su",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -2945,7 +2945,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-evm-logging-farfadet-r5-su"
+name = "tezos-evm-logging-farfadet-r6-su"
 version = "0.1.0"
 dependencies = [
  "nop-macros",
@@ -2957,11 +2957,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-evm-runtime-farfadet-r5-su"
+name = "tezos-evm-runtime-farfadet-r6-su"
 version = "0.1.0"
 dependencies = [
  "sha3",
- "tezos-evm-logging-farfadet-r5-su",
+ "tezos-evm-logging-farfadet-r6-su",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
@@ -2971,7 +2971,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-execution-farfadet-r5-su"
+name = "tezos-execution-farfadet-r6-su"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2982,31 +2982,31 @@ dependencies = [
  "num-traits",
  "pretty_assertions",
  "primitive-types",
- "tezos-evm-logging-farfadet-r5-su",
- "tezos-evm-runtime-farfadet-r5-su",
+ "tezos-evm-logging-farfadet-r6-su",
+ "tezos-evm-runtime-farfadet-r6-su",
  "tezos-protocol",
  "tezos-smart-rollup",
  "tezos-smart-rollup-host",
- "tezos-storage-farfadet-r5-su",
+ "tezos-storage-farfadet-r6-su",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_tezlink_farfadet_r5_su",
+ "tezos_tezlink_farfadet_r6_su",
  "thiserror 1.0.69",
  "typed-arena",
 ]
 
 [[package]]
-name = "tezos-indexable-storage-farfadet-r5-su"
+name = "tezos-indexable-storage-farfadet-r6-su"
 version = "0.1.0"
 dependencies = [
  "num-bigint",
  "rlp",
- "tezos-evm-logging-farfadet-r5-su",
- "tezos-evm-runtime-farfadet-r5-su",
+ "tezos-evm-logging-farfadet-r6-su",
+ "tezos-evm-runtime-farfadet-r6-su",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
- "tezos-storage-farfadet-r5-su",
+ "tezos-storage-farfadet-r6-su",
  "thiserror 1.0.69",
 ]
 
@@ -3186,7 +3186,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-storage-farfadet-r5-su"
+name = "tezos-storage-farfadet-r6-su"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3196,22 +3196,22 @@ dependencies = [
  "primitive-types",
  "rlp",
  "sha3",
- "tezos-evm-runtime-farfadet-r5-su",
+ "tezos-evm-runtime-farfadet-r6-su",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum_farfadet_r5_su",
+ "tezos_ethereum_farfadet_r6_su",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "tezos-tracing-farfadet-r5-su"
+name = "tezos-tracing-farfadet-r6-su"
 version = "0.1.0"
 dependencies = [
  "quote",
  "syn 2.0.103",
- "tezos-evm-logging-farfadet-r5-su",
+ "tezos-evm-logging-farfadet-r6-su",
 ]
 
 [[package]]
@@ -3270,7 +3270,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos_ethereum_farfadet_r5_su"
+name = "tezos_ethereum_farfadet_r6_su"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3290,7 +3290,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos_tezlink_farfadet_r5_su"
+name = "tezos_tezlink_farfadet_r6_su"
 version = "0.1.0"
 dependencies = [
  "fixed-hash",
