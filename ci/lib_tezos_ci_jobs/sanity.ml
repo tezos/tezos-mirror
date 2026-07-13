@@ -270,9 +270,12 @@ let job_cargo_audit =
     ~allow_failure:Yes
     ~only_if_changed:["**/Cargo.lock"; "**/Cargo.toml"; "**/.cargo/audit.toml"]
     ~script:
+      (* [|| exit $?] preserves the script's exit code (1 = critical/high,
+         2 = warnings only); GitLab otherwise masks any failure as 1. Needed
+         for a later [With_exit_codes [2]] switch. Same as [job_commit_titles]. *)
       (match mode with
-      | `mr -> ["./scripts/ci/cargo_audit.sh"]
-      | `all -> ["./scripts/ci/cargo_audit.sh --all"])
+      | `mr -> ["./scripts/ci/cargo_audit.sh || exit $?"]
+      | `all -> ["./scripts/ci/cargo_audit.sh --all || exit $?"])
 
 let register () =
   Cacio.register_merge_request_jobs

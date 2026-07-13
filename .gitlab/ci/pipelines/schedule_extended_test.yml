@@ -178,7 +178,7 @@ cargo_audit:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/cargo_audit.sh --all
+  - ./scripts/ci/cargo_audit.sh --all || exit $?
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
