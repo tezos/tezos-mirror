@@ -1199,7 +1199,7 @@ let test_nds_store_set_read_roundtrip () =
     QCheck.Gen.(
       pair
         (string_size ~gen:printable (1 -- 64))
-        (string_size ~gen:char (1 -- 256)))
+        (string_size ~gen:char (1 -- 255)))
   in
   (* Fixed seed for reproducibility — flip to Random.State.make_self_init ()
      locally to fuzz beyond the canonical samples. *)

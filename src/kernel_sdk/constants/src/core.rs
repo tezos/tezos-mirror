@@ -68,7 +68,7 @@ pub const NDS_RESIZE_INVALID: i32 = -15;
 pub const NDS_NOT_ENABLED: i32 = -16;
 
 /// NDS-only: the maximum size, in bytes, of a valid NDS key.
-pub const NDS_MAX_KEY_SIZE: usize = 256;
+pub const NDS_MAX_KEY_SIZE: usize = 255;
 
 /// None ValueType discriminant.
 pub const VALUE_TYPE_NONE: i32 = 0;

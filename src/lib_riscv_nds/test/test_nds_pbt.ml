@@ -62,7 +62,7 @@ let test_resize_too_large =
 let test_key_too_long =
   unit_test "key too long errors" @@ fun (module B : BACKEND) ->
   let r = B.create_registry_with_dbs 1 in
-  let key = Bytes.make 257 'x' in
+  let key = Bytes.make 256 'x' in
   let value = Bytes.of_string "v" in
   B.Database.set r ~db_index:0L ~key ~value
   |> check_error ~msg:"set" Key_too_long ;
