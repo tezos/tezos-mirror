@@ -1051,7 +1051,7 @@ oc.check_lift_limits_patch:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.compile_sources_doc_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-25648bf0
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs
@@ -1081,7 +1081,7 @@ oc.compile_sources_doc_debian:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.compile_sources_doc_deps_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1102,7 +1102,7 @@ oc.compile_sources_doc_deps_debian:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_deps_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-25648bf0
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1123,7 +1123,7 @@ oc.compile_sources_doc_deps_ubuntu:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-build:24.04-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-build:24.04-master-25648bf0
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs

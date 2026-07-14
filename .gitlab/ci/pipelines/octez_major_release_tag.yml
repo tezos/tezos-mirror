@@ -8,7 +8,7 @@ stages:
 - publish
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -43,7 +43,7 @@ apt_repo_debian:
   retry: 0
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-25648bf0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -291,7 +291,7 @@ grafazos.release-page-publish:
   retry: 0
 
 oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
@@ -318,7 +318,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 oc.build-debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
@@ -360,7 +360,7 @@ oc.build-debian:
       - gcp_arm64
 
 oc.build-keyring_package:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
@@ -390,7 +390,7 @@ oc.build-keyring_package:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
 
 oc.build-ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-100afa6d
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
   stage: build
   tags:
   - $TAGS
