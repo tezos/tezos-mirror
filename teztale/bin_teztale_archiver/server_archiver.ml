@@ -177,19 +177,29 @@ let replay_record ctx file =
           let*! () = Lwt_unix.unlink file in
           Log.debug logger (fun () -> "Replayed and purged " ^ path) ;
           Lwt.return_unit)
-    (fun _ -> Lwt.return_unit)
-(* send failed or record malformed: keep it for the next sweep *)
+    (function
+      (* Expected failures -- POST rejected ([Failure]), server unreachable
+         ([Unix_error]), timeout, or a malformed record ([Not_found] from a
+         missing key, [Parse_error] from a wrong-typed value) -- leave the file
+         in place for the next sweep. Anything else is unexpected and propagates
+         rather than being silently swallowed. *)
+      | Lwt_unix.Timeout | Failure _ | Unix.Unix_error _ | Not_found
+      | Ezjsonm.Parse_error _ ->
+          Lwt.return_unit
+      | exn -> Lwt.reraise exn)
 
 let replay_once ctx dir =
   let*! exists = Lwt_unix.file_exists dir in
   if not exists then Lwt.return_unit
   else
-    let files =
-      Sys.readdir dir |> Array.to_list
-      |> List.filter (fun f -> Filename.check_suffix f ".json")
-      |> List.map (Filename.concat dir)
-    in
-    Lwt_list.iter_s (replay_record ctx) files
+    (* [files_of_directory] yields a stream we drain sequentially, which plays
+       nicely with the Lwt scheduler (unlike the blocking [Sys.readdir]). *)
+    Lwt_stream.iter_s
+      (fun f ->
+        if Filename.check_suffix f ".json" then
+          replay_record ctx (Filename.concat dir f)
+        else Lwt.return_unit)
+      (Lwt_unix.files_of_directory dir)
 
 let rec replay_backups_loop ctx dir =
   let*! () =
