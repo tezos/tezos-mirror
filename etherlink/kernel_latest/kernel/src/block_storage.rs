@@ -21,42 +21,41 @@ use rlp::Encodable;
 mod path {
     use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
 
-    const EVM_CURRENT_BLOCK_PATH: RefPath =
-        RefPath::assert_from(b"/blocks/current/block");
-    const EVM_CURRENT_BLOCK_TRANSACTIONS_OBJECTS: RefPath =
+    const CURRENT_BLOCK_PATH: RefPath = RefPath::assert_from(b"/blocks/current/block");
+    const CURRENT_BLOCK_TRANSACTIONS_OBJECTS: RefPath =
         RefPath::assert_from(b"/blocks/current/transactions_objects");
-    const EVM_CURRENT_BLOCK_TRANSACTIONS_RECEIPTS: RefPath =
+    const CURRENT_BLOCK_TRANSACTIONS_RECEIPTS: RefPath =
         RefPath::assert_from(b"/blocks/current/transactions_receipts");
-    const EVM_CURRENT_BLOCK_NUMBER_PATH: RefPath =
+    const CURRENT_BLOCK_NUMBER_PATH: RefPath =
         RefPath::assert_from(b"/blocks/current/number");
-    const EVM_CURRENT_BLOCK_HASH_PATH: RefPath =
+    const CURRENT_BLOCK_HASH_PATH: RefPath =
         RefPath::assert_from(b"/blocks/current/hash");
     const INDEXES_PATH: RefPath = RefPath::assert_from(b"/blocks/indexes");
     // Recent block hashes (last `BLOCKS_STORED`), indexed by hash; Michelson runtime only.
     const LIVE_BLOCKS_PATH: RefPath = RefPath::assert_from(b"/live_blocks");
 
     pub fn current_number(root: &impl Path) -> Result<OwnedPath, PathError> {
-        concat(root, &EVM_CURRENT_BLOCK_NUMBER_PATH)
+        concat(root, &CURRENT_BLOCK_NUMBER_PATH)
     }
 
     pub fn current_hash(root: &impl Path) -> Result<OwnedPath, PathError> {
-        concat(root, &EVM_CURRENT_BLOCK_HASH_PATH)
+        concat(root, &CURRENT_BLOCK_HASH_PATH)
     }
 
     pub fn current_block(root: &impl Path) -> Result<OwnedPath, PathError> {
-        concat(root, &EVM_CURRENT_BLOCK_PATH)
+        concat(root, &CURRENT_BLOCK_PATH)
     }
 
     pub fn current_block_transactions_objects(
         root: &impl Path,
     ) -> Result<OwnedPath, PathError> {
-        concat(root, &EVM_CURRENT_BLOCK_TRANSACTIONS_OBJECTS)
+        concat(root, &CURRENT_BLOCK_TRANSACTIONS_OBJECTS)
     }
 
     pub fn current_block_transactions_receipts(
         root: &impl Path,
     ) -> Result<OwnedPath, PathError> {
-        concat(root, &EVM_CURRENT_BLOCK_TRANSACTIONS_RECEIPTS)
+        concat(root, &CURRENT_BLOCK_TRANSACTIONS_RECEIPTS)
     }
 
     pub fn block_indexes(root: &impl Path) -> Result<OwnedPath, PathError> {
@@ -230,8 +229,8 @@ pub fn read_current_hash(
 
 #[cfg(test)]
 pub fn read_tez_current_block(host: &mut impl StorageV1) -> anyhow::Result<Vec<u8>> {
-    use crate::chains::TEZ_BLOCKS_PATH;
-    let block_path = path::current_block(&TEZ_BLOCKS_PATH)?;
+    use crate::chains::TEZ_SAFE_STORAGE_ROOT_PATH;
+    let block_path = path::current_block(&TEZ_SAFE_STORAGE_ROOT_PATH)?;
     let bytes = host.store_read_all(&block_path)?;
     Ok(bytes)
 }
@@ -298,7 +297,7 @@ pub mod internal_for_tests {
 #[cfg(test)]
 mod live_blocks_tests {
     use super::*;
-    use crate::chains::TEZ_BLOCKS_PATH;
+    use crate::chains::TEZ_SAFE_STORAGE_ROOT_PATH;
     use crate::l2block::L2Block;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup::types::Timestamp;
@@ -324,8 +323,13 @@ mod live_blocks_tests {
         .expect("TezBlock::new");
         let block = L2Block::Tezlink(block);
         let hash = block.hash();
-        store_current(host, &TEZ_BLOCKS_PATH, &block, maintain_live_blocks)
-            .expect("store_current");
+        store_current(
+            host,
+            &TEZ_SAFE_STORAGE_ROOT_PATH,
+            &block,
+            maintain_live_blocks,
+        )
+        .expect("store_current");
         hash
     }
 
@@ -335,12 +339,12 @@ mod live_blocks_tests {
         let h0 = store_tez_block(&mut host, 0, true);
         let h1 = store_tez_block(&mut host, 1, true);
 
-        assert!(is_recent_block_hash(&host, &TEZ_BLOCKS_PATH, &h0).unwrap());
-        assert!(is_recent_block_hash(&host, &TEZ_BLOCKS_PATH, &h1).unwrap());
+        assert!(is_recent_block_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH, &h0).unwrap());
+        assert!(is_recent_block_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH, &h1).unwrap());
         // A branch that is not a recent block of this instance (the replay case) is not a member.
         assert!(!is_recent_block_hash(
             &host,
-            &TEZ_BLOCKS_PATH,
+            &TEZ_SAFE_STORAGE_ROOT_PATH,
             &H256::from([0xABu8; 32])
         )
         .unwrap());
@@ -356,12 +360,17 @@ mod live_blocks_tests {
         }
 
         // Block 0 fell out of the window and is no longer a valid branch.
-        assert!(!is_recent_block_hash(&host, &TEZ_BLOCKS_PATH, &hashes[0]).unwrap());
+        assert!(
+            !is_recent_block_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH, &hashes[0])
+                .unwrap()
+        );
         // The oldest still-in-window block and the latest one remain members.
-        assert!(is_recent_block_hash(&host, &TEZ_BLOCKS_PATH, &hashes[1]).unwrap());
+        assert!(
+            is_recent_block_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH, &hashes[1]).unwrap()
+        );
         assert!(is_recent_block_hash(
             &host,
-            &TEZ_BLOCKS_PATH,
+            &TEZ_SAFE_STORAGE_ROOT_PATH,
             &hashes[BLOCKS_STORED as usize]
         )
         .unwrap());
@@ -372,6 +381,8 @@ mod live_blocks_tests {
         // The EVM path (maintain_live_blocks = false) must not populate live_blocks.
         let mut host = MockKernelHost::default();
         let hash = store_tez_block(&mut host, 0, false);
-        assert!(!is_recent_block_hash(&host, &TEZ_BLOCKS_PATH, &hash).unwrap());
+        assert!(
+            !is_recent_block_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH, &hash).unwrap()
+        );
     }
 }

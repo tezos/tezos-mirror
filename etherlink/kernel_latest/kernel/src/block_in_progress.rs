@@ -15,7 +15,7 @@ use crate::blueprint_storage::{
 };
 use crate::chains::{
     TezosXBlockConstants, TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-    TEZ_BLOCKS_PATH,
+    TEZ_SAFE_STORAGE_ROOT_PATH,
 };
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
@@ -571,7 +571,7 @@ impl BlockInProgress {
             // Maintain the live_blocks set for the Michelson runtime (branch validation).
             block_storage::store_current(
                 host,
-                &TEZ_BLOCKS_PATH,
+                &TEZ_SAFE_STORAGE_ROOT_PATH,
                 &tez_block,
                 true, // maintain_live_blocks
             )
