@@ -1010,6 +1010,160 @@ let test_get_address_index ~protocols =
       unit)
     protocols
 
+(* A view cannot contain INDEX_ADDRESS directly (see
+   [test_forbidden_op_in_view] in test_typechecking.ml), but the restriction
+   does not cross lambda boundaries: a lambda EXEC'd by the view reaches the
+   instruction at runtime and registers the address. Pin the resulting L1
+   semantics — the registration made inside the view shares the fate of the
+   calling operation — so the Tezos X runtime can be compared against it (see
+   "Michelson INDEX_ADDRESS in a view lambda on Tezos X" in
+   etherlink/tezt/tests/tezosx.ml):
+   - if the caller fails after the view returns, the operation is included as
+     failed and the registration is reverted with it: no registry entry, and
+     the registry counter does not advance;
+   - if the caller succeeds, the registration persists and is reported on the
+     caller's address_registry_diff. *)
+let test_index_address_in_view_lambda ~protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Contract onchain opcodes: INDEX_ADDRESS in a view lambda"
+    ~tags:["contract"; "onchain"; "opcodes"; "view"]
+    ~supports:(Protocol.From_protocol 24)
+    (fun protocol ->
+      let* _node, client = Client.init_with_protocol ~protocol `Client () in
+      let src = Account.Bootstrap.keys.(0).alias in
+      let* _target_alias, target =
+        Client.originate_contract_at
+          ~amount:Tez.zero
+          ~src
+          ~init:"Unit"
+          ~burn_cap:Tez.one
+          client
+          ["opcodes"; "index_address_view_lambda"]
+          protocol
+      in
+      let* () = Client.bake_for_and_wait client in
+      let* caller, _caller_address =
+        Client.originate_contract_at
+          ~amount:Tez.zero
+          ~src
+          ~init:"None"
+          ~burn_cap:Tez.one
+          client
+          ["opcodes"; "index_address_view_lambda_caller"]
+          protocol
+      in
+      let* () = Client.bake_for_and_wait client in
+      (* Registers its parameter addresses directly (not through a view);
+         used below to observe the registry counter. *)
+      let* probe, _probe_address =
+        Client.originate_contract_at
+          ~amount:Tez.zero
+          ~src
+          ~init:"{}"
+          ~burn_cap:Tez.one
+          client
+          ["opcodes"; "index_addresses"]
+          protocol
+      in
+      let* () = Client.bake_for_and_wait client in
+      let registrand = Account.Bootstrap.keys.(2).public_key_hash in
+      let check_registry_index ~__LOC__ address expected =
+        let* index =
+          Client.RPC.call client
+          @@ RPC.get_chain_block_context_destination_index address
+        in
+        Check.(
+          (index = expected)
+            (option int)
+            ~__LOC__
+            ~error_msg:"Expected registry index %R but got %L") ;
+        unit
+      in
+      (* Failure leg: the caller FAILWITHs (with the index the view just
+         returned) after the view call. [~force] injects the operation the
+         client predicts will fail, so the failed operation is actually
+         included in a block and its revert is exercised. *)
+      let* () =
+        Client.transfer
+          ~force:true
+          ~giver:src
+          ~receiver:caller
+          ~amount:Tez.zero
+          ~arg:(sf {|Pair "%s" "%s" True|} target registrand)
+          ~gas_limit:100_000
+          ~storage_limit:100
+          ~fee:Tez.one
+          client
+      in
+      let* () = Client.bake_for_and_wait client in
+      let* operations =
+        Client.RPC.call client
+        @@ RPC.get_chain_block_operations ~metadata:true ~force_metadata:true ()
+      in
+      let operation_result =
+        JSON.(
+          operations |=> 3 |=> 0 |-> "contents" |=> 0 |-> "metadata"
+          |-> "operation_result")
+      in
+      Check.(
+        (JSON.(operation_result |-> "status" |> as_string) = "failed")
+          string
+          ~__LOC__
+          ~error_msg:"Expected operation status %R but got %L") ;
+      (* The rejection value is the index INDEX_ADDRESS assigned inside the
+         view before the operation was reverted: index 0 is the pre-registered
+         zero address, so the first fresh registration takes 1. This pins that
+         the instruction did run and the write was then undone — rather than
+         never having happened. *)
+      let reject_value =
+        JSON.(operation_result |-> "errors" |> as_list)
+        |> List.find_map (fun err ->
+               JSON.(err |-> "with" |-> "int" |> as_string_opt))
+      in
+      Check.(
+        (reject_value = Some "1")
+          (option string)
+          ~__LOC__
+          ~error_msg:"Expected the operation to be rejected with %R, got %L") ;
+      (* The reverted registration left no trace: no entry for the address... *)
+      let* () = check_registry_index ~__LOC__ registrand None in
+      (* ...and the counter did not advance: the next fresh registration still
+         takes index 1. *)
+      let counter_probe = "tz1TXhefsLkdNcoFA3pFW7t1oxs2UQrkGQQr" in
+      let* () =
+        call_and_check_diff client probe [counter_probe] [(counter_probe, 1)]
+      in
+      (* Success leg: same call without the deliberate failure. The
+         registration made inside the view persists, is reported on the
+         *caller*'s address_registry_diff... *)
+      let* () =
+        Client.transfer
+          ~giver:src
+          ~receiver:caller
+          ~amount:Tez.zero
+          ~arg:(sf {|Pair "%s" "%s" False|} target registrand)
+          ~burn_cap:Tez.one
+          client
+      in
+      let* () = Client.bake_for_and_wait client in
+      let* diffs = get_first_transaction_address_registry_diff client in
+      Check.(
+        (diffs = [(registrand, 2)])
+          (list (tuple2 string int))
+          ~__LOC__
+          ~error_msg:"Expected diff %R, but got %L") ;
+      (* ...lands in the caller's storage... *)
+      let* storage = Client.contract_storage caller client in
+      Check.(
+        (String.trim storage = "Some 2")
+          string
+          ~__LOC__
+          ~error_msg:"Expected caller storage %R but got %L") ;
+      (* ...and is durably visible in the registry. *)
+      check_registry_index ~__LOC__ registrand (Some 2))
+    protocols
+
 let register ~protocols =
   List.iter
     (fun (title, body) ->
@@ -1044,4 +1198,5 @@ let register ~protocols =
     ] ;
   Tickets.register ~protocols ;
   test_index_address_diffs ~protocols ;
-  test_get_address_index ~protocols
+  test_get_address_index ~protocols ;
+  test_index_address_in_view_lambda ~protocols
