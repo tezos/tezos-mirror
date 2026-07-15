@@ -815,6 +815,7 @@ module Attestable_event = struct
     | No_shards_assigned of {committee_level : level}
     | Slot_has_trap of {slot_id : slot_id}
     | Backfill of {backfill_payload : backfill_payload}
+    | Heartbeat
 
   let backfill_payload_encoding =
     let open Data_encoding in
@@ -869,5 +870,11 @@ module Attestable_event = struct
             | Backfill {backfill_payload} -> Some ((), backfill_payload)
             | _ -> None)
           (fun ((), backfill_payload) -> Backfill {backfill_payload});
+        case
+          ~title:"heartbeat"
+          (Tag 4)
+          (obj1 (req "kind" (constant "heartbeat")))
+          (function Heartbeat -> Some () | _ -> None)
+          (fun () -> Heartbeat);
       ]
 end
