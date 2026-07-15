@@ -169,23 +169,28 @@ let michelson_ledger_root = TEZ.Tez_accounts.make "/tezosx"
 let michelson_alias_implementation =
   TEZ.Tez_accounts.make "/tezosx/__system__/alias_implementation"
 
-(** Michelson blocks live directly under the Michelson world state
-    ([/tez/world_state]), mirroring the EVM layout under [etherlink_root]. *)
-let michelson_block_root = TEZ.World_state.make ""
+(** Root under which Michelson blocks are stored. From storage version 62 they
+    live directly under the Michelson world state ([/tez/world_state]),
+    mirroring the EVM layout under [etherlink_root]; a pre-V62 kernel
+    (Previewnet is V60) still writes the legacy [/tez/world_state/tez_blocks]
+    root, so the node reads blocks there while such a kernel is running. *)
+let michelson_block_root ~storage_version =
+  if Storage_version.michelson_blocks_at_world_state_root ~storage_version then
+    TEZ.World_state.make ""
+  else TEZ.World_state.make "/tez_blocks"
 
 (* Presence marker for a recent Michelson block hash (the kernel's [live_blocks]
    set, keyed by the lowercase hex of the 32-byte block hash). *)
-let michelson_live_block hash_hex =
-  michelson_block_root ^ "/live_blocks/" ^ hash_hex
+let michelson_live_block ~storage_version hash_hex =
+  michelson_block_root ~storage_version ^ "/live_blocks/" ^ hash_hex
 
-let block_root_of_chain_family (type f) (chain_family : f L2_types.chain_family)
-    =
+let block_root_of_chain_family (type f) ~storage_version
+    (chain_family : f L2_types.chain_family) =
   match chain_family with
   | L2_types.EVM -> etherlink_root
-  (* Michelson block data lives at /tez/world_state (= michelson_block_root),
-     the root the kernel passes to [block_storage::store_current] for
-     Michelson blocks, see [BlockInProgress::finalize_and_store]. *)
-  | L2_types.Michelson -> michelson_block_root
+  (* Michelson block data lives at the root the kernel passes to
+     [block_storage::store_current], see [BlockInProgress::finalize_and_store]. *)
+  | L2_types.Michelson -> michelson_block_root ~storage_version
 
 let chain_id ~storage_version =
   if Storage_version.evm_config_moved_to_world_state ~storage_version then
