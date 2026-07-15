@@ -99,16 +99,19 @@ val michelson_ledger_root : path
     shared Michelson implementation backing every Tezos X alias. *)
 val michelson_alias_implementation : path
 
-(** Root under which Michelson blocks are stored, directly under the
-    Michelson world state ([/tez/world_state]), mirroring the EVM layout
-    under [etherlink_root]. *)
-val michelson_block_root : path
+(** Root under which Michelson blocks are stored. From storage version 62 they
+    live directly under the Michelson world state ([/tez/world_state]),
+    mirroring the EVM layout under [etherlink_root]; a pre-V62 kernel
+    (Previewnet is V60) still writes the legacy [/tez/world_state/tez_blocks]
+    root, so the node reads blocks there while such a kernel is running. *)
+val michelson_block_root : storage_version:int -> path
 
 (** Presence marker for a recent Michelson block hash (the kernel's
     [live_blocks] set); the argument is the lowercase hex of the 32-byte hash. *)
-val michelson_live_block : string -> path
+val michelson_live_block : storage_version:int -> string -> path
 
-val block_root_of_chain_family : _ L2_types.chain_family -> path
+val block_root_of_chain_family :
+  storage_version:int -> _ L2_types.chain_family -> path
 
 val reboot_counter : string
 
