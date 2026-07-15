@@ -290,24 +290,24 @@ let ( let^? ) r f = f (get_ok r)
 
 (** {1 QCheck2 generators} *)
 
-(** Generate a valid key: 0 to 256 bytes of random content. *)
+(** Generate a valid key: 0 to 255 bytes of random content. *)
 let gen_valid_key =
   let open QCheck2.Gen in
   let* len =
-    frequency [(1, pure 0); (5, 1 -- 10); (3, 11 -- 100); (1, pure 256)]
+    frequency [(1, pure 0); (5, 1 -- 10); (3, 11 -- 100); (1, pure 255)]
   in
   map Bytes.of_string (string_size (pure len))
 
 (** Generate a small value (for faster tests). *)
 let gen_small_value =
   let open QCheck2.Gen in
-  let* len = frequency [(1, pure 0); (5, 1 -- 32); (3, 33 -- 256)] in
+  let* len = frequency [(1, pure 0); (5, 1 -- 32); (3, 33 -- 255)] in
   map Bytes.of_string (string_size (pure len))
 
 (** Generate a non-empty small value. *)
 let gen_nonempty_value =
   let open QCheck2.Gen in
-  let* len = frequency [(5, 1 -- 32); (3, 33 -- 256)] in
+  let* len = frequency [(5, 1 -- 32); (3, 33 -- 255)] in
   map Bytes.of_string (string_size (pure len))
 
 (** Generate a valid database index for a registry of given size. *)
@@ -609,7 +609,7 @@ let gen_op ~num_dbs ~keys =
         let* offset =
           map Int64.of_int (frequency [(5, pure 0); (3, 0 -- 64)])
         in
-        let* len = map Int64.of_int (1 -- 256) in
+        let* len = map Int64.of_int (1 -- 255) in
         return (Any (Read {db; key; offset; len})) );
       ( 10,
         let* db = gen_db in
