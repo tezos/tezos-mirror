@@ -467,9 +467,6 @@ let static_rw : type a. a rw_resolved -> (a, rw) resolution =
 let static_ro : type a. a ro_resolved -> (a, ro) resolution =
  fun r -> Static (Readable (Read_only r))
 
-let static_read_delete : type a. a ro_resolved -> (a, read_delete) resolution =
- fun r -> Static (Readable (Read_delete r))
-
 let versioned_rw : type a.
     (storage_version:int -> a rw_resolved) -> (a, rw) resolution =
  fun f ->
@@ -479,6 +476,12 @@ let versioned_ro : type a.
     (storage_version:int -> a ro_resolved) -> (a, ro) resolution =
  fun f ->
   Versioned (fun ~storage_version -> Readable (Read_only (f ~storage_version)))
+
+let versioned_read_delete : type a.
+    (storage_version:int -> a ro_resolved) -> (a, read_delete) resolution =
+ fun f ->
+  Versioned
+    (fun ~storage_version -> Readable (Read_delete (f ~storage_version)))
 
 let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
   | Raw_path key ->
@@ -544,17 +547,25 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               (Durable_storage_path.michelson_runtime_sunrise_level
                  ~storage_version))
   | Current_block_number chain_family ->
-      let root = Durable_storage_path.block_root_of_chain_family chain_family in
-      static_ro
-        (qty_le_ro_codec
-           ~path:(Durable_storage_path.Block.current_number ~root))
+      versioned_ro (fun ~storage_version ->
+          let root =
+            Durable_storage_path.block_root_of_chain_family
+              ~storage_version
+              chain_family
+          in
+          qty_le_ro_codec
+            ~path:(Durable_storage_path.Block.current_number ~root))
   | Current_block_hash chain_family ->
-      let root = Durable_storage_path.block_root_of_chain_family chain_family in
-      static_ro
-        {
-          path = Durable_storage_path.Block.current_hash ~root;
-          decode = infallible_decode Ethereum_types.decode_block_hash;
-        }
+      versioned_ro (fun ~storage_version ->
+          let root =
+            Durable_storage_path.block_root_of_chain_family
+              ~storage_version
+              chain_family
+          in
+          {
+            path = Durable_storage_path.Block.current_hash ~root;
+            decode = infallible_decode Ethereum_types.decode_block_hash;
+          })
   | Evm_node_flag ->
       versioned_rw (fun ~storage_version ->
           unit_flag_codec
@@ -602,23 +613,35 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
           rlp_codec
             ~path:(Durable_storage_path.Assemble_block.input ~storage_version))
   | Current_block chain_family ->
-      let root = Durable_storage_path.block_root_of_chain_family chain_family in
-      static_ro
-        (block_ro_codec
-           ~path:(Durable_storage_path.Block.current_block ~root)
-           ~chain_family)
+      versioned_ro (fun ~storage_version ->
+          let root =
+            Durable_storage_path.block_root_of_chain_family
+              ~storage_version
+              chain_family
+          in
+          block_ro_codec
+            ~path:(Durable_storage_path.Block.current_block ~root)
+            ~chain_family)
   | Block_by_hash (chain_family, block_hash) ->
-      let root = Durable_storage_path.block_root_of_chain_family chain_family in
-      static_read_delete
-        {
-          path = Durable_storage_path.Block.by_hash ~root block_hash;
-          decode =
-            (fun bytes -> Ok (L2_types.block_from_bytes ~chain_family bytes));
-        }
+      versioned_read_delete (fun ~storage_version ->
+          let root =
+            Durable_storage_path.block_root_of_chain_family
+              ~storage_version
+              chain_family
+          in
+          {
+            path = Durable_storage_path.Block.by_hash ~root block_hash;
+            decode =
+              (fun bytes -> Ok (L2_types.block_from_bytes ~chain_family bytes));
+          })
   | Block_index (chain_family, block_number) ->
-      let root = Durable_storage_path.block_root_of_chain_family chain_family in
       Versioned
         (fun ~storage_version ->
+          let root =
+            Durable_storage_path.block_root_of_chain_family
+              ~storage_version
+              chain_family
+          in
           Delete_only
             {
               path =
@@ -628,12 +651,13 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
                   block_number;
             })
   | Tezosx_tezos_current_block ->
-      static_ro
-        (block_ro_codec
-           ~path:
-             (Durable_storage_path.Block.current_block
-                ~root:Durable_storage_path.tezosx_tezos_blocks_root)
-           ~chain_family:Michelson)
+      versioned_ro (fun ~storage_version ->
+          block_ro_codec
+            ~path:
+              (Durable_storage_path.Block.current_block
+                 ~root:
+                   (Durable_storage_path.michelson_block_root ~storage_version))
+            ~chain_family:Michelson)
   | Evm_legacy_block_by_hash block_hash ->
       static_ro
         {
@@ -924,9 +948,12 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
         }
   | Tezos_live_block branch ->
       let (`Hex hash_hex) = Hex.of_bytes (Block_hash.to_bytes branch) in
-      static_ro
-        (unit_flag_ro_codec
-           ~path:(Durable_storage_path.tezosx_tez_live_block hash_hex))
+      versioned_ro (fun ~storage_version ->
+          unit_flag_ro_codec
+            ~path:
+              (Durable_storage_path.michelson_live_block
+                 ~storage_version
+                 hash_hex))
   | Blueprint_current_generation ->
       versioned_ro (fun ~storage_version ->
           {

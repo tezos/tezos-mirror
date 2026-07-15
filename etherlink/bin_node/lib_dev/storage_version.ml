@@ -47,3 +47,12 @@ let evm_config_moved_to_world_state ~storage_version = storage_version >= 58
 let evm_accounts_isolated ~storage_version = storage_version >= 59
 
 let simulation_trace_ipc_moved_to_base ~storage_version = storage_version >= 60
+
+(* Version gate: Michelson blocks moved from [/tez/world_state/tez_blocks] to
+   the world-state root [/tez/world_state] at storage version 62; the V62
+   kernel migration moves the existing block subtrees to the new root. A
+   pre-V62 kernel still writes the legacy root, so the node reads blocks there
+   while such a kernel is running (e.g. the Previewnet V60 kernel, before the
+   upgrade migrates the blocks). *)
+let michelson_blocks_at_world_state_root ~storage_version =
+  storage_version >= 62
