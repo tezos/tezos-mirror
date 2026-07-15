@@ -1001,6 +1001,9 @@ let new_finalized_head ctxt cctxt l1_crawler finalized_block_hash ~launch_time
         ~committee_level ;
       return_unit
   in
+  (* Per-level liveness signal on every open monitoring stream, so that a
+         baker can detect a dead stream even during quiet periods. *)
+  Attestable_slots.notify_heartbeat ctxt ;
   let*? cryptobox, _ =
     Node_context.get_cryptobox_and_precomputations ~level ctxt
   in

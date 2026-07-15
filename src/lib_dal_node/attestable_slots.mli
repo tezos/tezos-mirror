@@ -46,6 +46,10 @@ val may_notify_attestable_slot_or_trap :
 val may_notify_not_in_committee :
   Node_context.t -> Committee_cache.committee -> committee_level:int32 -> unit
 
+(** [notify_heartbeat ctxt] pushes a [Heartbeat] liveness event to every
+    subscribed pkh's stream. *)
+val notify_heartbeat : Node_context.t -> unit
+
 (** [subscribe ctxt ~pkh] opens a [Resto_directory.Answer] stream that yields
     [Types.Attestable_event.t] values. The stream
     only emits items produced after subscription. *)
