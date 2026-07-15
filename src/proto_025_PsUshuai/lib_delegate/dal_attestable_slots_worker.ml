@@ -44,6 +44,16 @@ module Events = struct
       ~msg:"DAL monitor stream ended for {delegate_id}"
       ("delegate_id", Delegate_id.encoding)
 
+  let stale_stream_reconnect =
+    declare_1
+      ~section
+      ~name:"dal_stream_stale_reconnect"
+      ~level:Warning
+      ~msg:
+        "DAL monitor stream for {delegate_id} was silent past the heartbeat \
+         threshold; forcing reconnection"
+      ("delegate_id", Delegate_id.encoding)
+
   let consume_streams_ended =
     declare_1
       ~section
@@ -70,7 +80,20 @@ module DelegateSet = Set.Make (Delegate_id)
 type stream_handle = {
   stream : Types.Attestable_event.t Lwt_stream.t;
   stopper : Tezos_rpc.Context.stopper;
+  mutable silent_levels : int;
+      (** Number of consecutive [update_streams_subscriptions] calls (i.e. new
+          levels) during which no event was received on this stream. Reset to 0
+          whenever an event (of any kind, including [Heartbeat]) is received, and
+          incremented by the watchdog on each new level. Used to detect a dead
+          stream. *)
 }
+
+(** A monitoring stream is considered dead once it has been silent for strictly
+    more than this many consecutive levels. The DAL node emits one [Heartbeat]
+    per level, so in steady state [silent_levels] oscillates between 0 and 1; a
+    threshold of 3 leaves margin for jitter without triggering spurious
+    reconnections. *)
+let stale_stream_threshold = 3
 
 type slot_attestation_status = Attestable | Trap | Unknown
 
@@ -106,7 +129,7 @@ type t = {
 
 let create_delegate_table () = Delegate_id.Table.create 10
 
-(** [get_or_create_bit_array state ~published_level ~delegate_id] returns 
+(** [get_or_create_bit_array state ~published_level ~delegate_id] returns
     the bitset for the given [~delegate_id] at the given [~published_level],
     creating empty entries (all false) if needed. *)
 let get_or_create_bit_array state ~published_level ~delegate_id =
@@ -176,6 +199,18 @@ let update_cache_backfill_payload state ~delegate_id ~backfill_payload =
       update_committee_cache state ~delegate_id ~committee_level)
     no_shards_committee_levels
 
+(** [remove_stream_if_current state ~delegate_id stream_handle] removes the
+    subscription entry for [~delegate_id] only if it still points to
+    [stream_handle]. This guards against a late [None] delivered on a handle that
+    the watchdog has already force-closed and replaced by a fresh subscription:
+    such a stale [None] must not evict the new handle. Must be called while
+    holding [state.subscriptions_lock]. *)
+let remove_stream_if_current state ~delegate_id stream_handle =
+  match Delegate_id.Table.find_opt state.streams delegate_id with
+  | Some handle when handle == stream_handle ->
+      Delegate_id.Table.remove state.streams delegate_id
+  | _ -> ()
+
 (** [consume_backfill_stream state stream_handle ~delegate_id] consumes the initial [Backfill]
     event from a freshly opened DAL monitoring stream. This function is meant to be called
     immediatelly after subscribing to the DAL node stream for a [~delegate_id]
@@ -186,13 +221,14 @@ let consume_backfill_stream state stream_handle ~delegate_id =
   let* attestable_event_opt = Lwt_stream.get stream_handle.stream in
   match attestable_event_opt with
   | Some (E.Backfill {backfill_payload}) ->
+      stream_handle.silent_levels <- 0 ;
       update_cache_backfill_payload state ~delegate_id ~backfill_payload ;
       let* () = Events.(emit consumed_backfill_stream delegate_id) in
       return_unit
   | None ->
       let* () = Events.(emit stream_ended delegate_id) in
       Lwt_mutex.with_lock state.subscriptions_lock @@ fun () ->
-      Delegate_id.Table.remove state.streams delegate_id ;
+      remove_stream_if_current state ~delegate_id stream_handle ;
       return_unit
   | _ ->
       Lwt.fail_with
@@ -210,33 +246,41 @@ let rec consume_stream state stream_handle ~delegate_id =
   let* attestable_event_opt = Lwt_stream.get stream_handle.stream in
   match attestable_event_opt with
   | None ->
-      (* Stream gets closed, as we deliberately drop the subscription here; the consumer
-         will detect (e.g. via [update_streams_subscriptions]) the missing entry and
-         re-subscribe with backfill on the next level. *)
+      (* Stream gets closed, as we deliberately drop the subscription here
+         (guarding against a late [None] on a handle the watchdog already
+         replaced); the consumer will detect (e.g. via
+         [update_streams_subscriptions]) the missing entry and re-subscribe with
+         backfill on the next level. *)
       let* () = Events.(emit stream_ended delegate_id) in
       Lwt_mutex.with_lock state.subscriptions_lock @@ fun () ->
-      Delegate_id.Table.remove state.streams delegate_id ;
+      remove_stream_if_current state ~delegate_id stream_handle ;
       return_unit
-  | Some (E.Attestable_slot {slot_id}) ->
-      update_slots_cache
-        state
-        ~delegate_id
-        ~slot_id
-        ~is_trap:false
-      [@profiler.aggregate_f {verbosity = Debug} "update_slots_cache"] ;
-      consume_stream state ~delegate_id stream_handle
-  | Some (No_shards_assigned {committee_level}) ->
-      update_committee_cache state ~delegate_id ~committee_level ;
-      consume_stream state ~delegate_id stream_handle
-  | Some (Slot_has_trap {slot_id}) ->
-      update_slots_cache state ~delegate_id ~slot_id ~is_trap:true ;
-      consume_stream state ~delegate_id stream_handle
-  | Some (Backfill _backfill_payload) ->
-      (* This case should never be reached as the [Backfill] is always the first element of the
-         stream, and is to be consumed in [consume_backfill_stream]. *)
-      Lwt.fail_with
-        "Backfill events should always be consumed synchronously at the \
-         beginning of a subscription."
+  | Some event -> (
+      (* Any received event, [Heartbeat] included, resets the silence counter
+         used by the watchdog in [update_streams_subscriptions]. *)
+      stream_handle.silent_levels <- 0 ;
+      match event with
+      | E.Attestable_slot {slot_id} ->
+          update_slots_cache
+            state
+            ~delegate_id
+            ~slot_id
+            ~is_trap:false
+          [@profiler.aggregate_f {verbosity = Debug} "update_slots_cache"] ;
+          consume_stream state ~delegate_id stream_handle
+      | No_shards_assigned {committee_level} ->
+          update_committee_cache state ~delegate_id ~committee_level ;
+          consume_stream state ~delegate_id stream_handle
+      | Slot_has_trap {slot_id} ->
+          update_slots_cache state ~delegate_id ~slot_id ~is_trap:true ;
+          consume_stream state ~delegate_id stream_handle
+      | Heartbeat -> consume_stream state ~delegate_id stream_handle
+      | Backfill _backfill_payload ->
+          (* This case should never be reached as the [Backfill] is always the first element of the
+             stream, and is to be consumed in [consume_backfill_stream]. *)
+          Lwt.fail_with
+            "Backfill events should always be consumed synchronously at the \
+             beginning of a subscription.")
 
 (** [subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add]
     opens new monitoring DAL streams for each entry in [~delegate_ids_to_add],
@@ -258,7 +302,8 @@ let subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add =
                   delegate_id)])
         in
         match res with
-        | Ok (stream, stopper) -> return_some (delegate_id, {stream; stopper})
+        | Ok (stream, stopper) ->
+            return_some (delegate_id, {stream; stopper; silent_levels = 0})
         | Error trace ->
             let* () =
               Events.(emit monitor_attestable_slots_failed (delegate_id, trace))
@@ -301,14 +346,45 @@ let subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add =
 
 let update_streams_subscriptions state dal_node_rpc_ctxt ~delegate_ids =
   let open Lwt_syntax in
-  let* delegate_ids_to_add =
+  let* stale_delegates, delegate_ids_to_add =
     Lwt_mutex.with_lock state.subscriptions_lock @@ fun () ->
+    (* Watchdog: age every stream by one level and drop those that have been
+       silent for too long. The DAL node emits a [Heartbeat] on every level, so a
+       stream with no event for more than [stale_stream_threshold] levels is
+       considered dead (e.g. the DAL node crashed and the connection is half-open
+       or was reset). Dropping it here makes the [diff] below re-subscribe it in
+       the same pass. The whole snapshot is computed synchronously (no [Lwt]
+       await between reading and mutating [silent_levels]), so it cannot race
+       with the consumer fibers that reset the counter. *)
+    let stale =
+      Delegate_id.Table.fold
+        (fun delegate_id handle acc ->
+          handle.silent_levels <- handle.silent_levels + 1 ;
+          if handle.silent_levels > stale_stream_threshold then
+            (delegate_id, handle) :: acc
+          else acc)
+        state.streams
+        []
+    in
+    List.iter
+      (fun (delegate_id, handle) ->
+        (* Tear down the (possibly hung) connection; this pushes [None] to the
+           consumer stream and wakes up the blocked [consume_stream] fiber. *)
+        handle.stopper () ;
+        Delegate_id.Table.remove state.streams delegate_id)
+      stale ;
     let new_delegate_ids = DelegateSet.of_list delegate_ids in
     let current_delegate_ids =
       DelegateSet.of_seq @@ Delegate_id.Table.to_seq_keys state.streams
     in
     return
-    @@ DelegateSet.(elements (diff new_delegate_ids current_delegate_ids))
+      ( List.map fst stale,
+        DelegateSet.(elements (diff new_delegate_ids current_delegate_ids)) )
+  in
+  let* () =
+    List.iter_s
+      (fun delegate_id -> Events.(emit stale_stream_reconnect delegate_id))
+      stale_delegates
   in
   subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add
 
