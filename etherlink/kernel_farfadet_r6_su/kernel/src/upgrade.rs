@@ -37,6 +37,7 @@ use tezos_storage::read_optional_rlp;
 const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/evm/kernel_upgrade");
 pub const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/evm/kernel_root_hash");
 const SEQUENCER_UPGRADE: RefPath = RefPath::assert_from(b"/evm/sequencer_upgrade");
+use revm_etherlink::storage::sequencer_key_change::increment_sequencer_change_counter;
 pub use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH as SEQUENCER_KEY_CHANGE;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -225,6 +226,13 @@ fn sequencer_upgrade<Host: Runtime>(
     log!(host, Info, "sequencer upgrade initialisation.");
 
     store_sequencer(host, sequencer)?;
+    // Governance changes bump the counter at apply-time. Unlike the precompile
+    // path -- whose signed calldata could otherwise be replayed and so must be
+    // invalidated as soon as a change is *stored* -- a governance upgrade carries
+    // no replayable signature, and the pending upgrade can be re-scheduled from
+    // L1 before activation. Bumping here (rather than at store-time) thus keeps
+    // the counter at exactly +1 per applied governance change.
+    increment_sequencer_change_counter(host)?;
     store_sequencer_pool_address(host, pool_address)?;
     delete_sequencer_upgrade(host)?;
     delete_sequencer_key_change(host)?;
@@ -254,7 +262,7 @@ pub fn read_sequencer_key_change<Host: Runtime>(
 }
 
 fn delete_sequencer_key_change<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
-    host.store_delete(&SEQUENCER_KEY_CHANGE)
+    host.store_delete_value(&SEQUENCER_KEY_CHANGE)
         .context("Failed to delete sequencer key change")
 }
 
@@ -283,4 +291,82 @@ pub fn possible_sequencer_key_change<Host: Runtime>(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use revm::primitives::U256;
+    use revm_etherlink::storage::sequencer_key_change::{
+        read_sequencer_change_counter, store_sequencer_key_change,
+    };
+    use tezos_evm_runtime::runtime::MockKernelHost;
+
+    fn test_public_key() -> PublicKey {
+        PublicKey::from_b58check("edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2")
+            .unwrap()
+    }
+
+    // A governance change advances the change counter by exactly one, and
+    // does so when the upgrade is *applied*. Governance carries no replayable
+    // signed calldata (and its pending upgrade can be re-scheduled from L1
+    // before activation), so there is nothing to invalidate at store-time.
+    #[test]
+    fn governance_change_increments_counter_once_on_apply() {
+        let mut host = MockKernelHost::default();
+
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
+
+        store_sequencer_upgrade(
+            &mut host,
+            SequencerUpgrade {
+                sequencer: test_public_key(),
+                pool_address: H160::zero(),
+                activation_timestamp: Timestamp::from(100i64),
+            },
+        )
+        .unwrap();
+
+        // Merely scheduling the upgrade must not move the counter.
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
+
+        // Before activation nothing applies, so the counter stays put.
+        storage::store_last_info_per_level_timestamp(&mut host, Timestamp::from(50i64))
+            .unwrap();
+        possible_sequencer_upgrade(&mut host).unwrap();
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
+
+        // At/after activation the upgrade applies exactly once: counter is +1.
+        storage::store_last_info_per_level_timestamp(&mut host, Timestamp::from(100i64))
+            .unwrap();
+        possible_sequencer_upgrade(&mut host).unwrap();
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+    }
+
+    // The precompile path bumps the counter at store-time (in
+    // `EtherlinkVMDB::commit`). Applying the pending change later must *not* bump
+    // it again -- otherwise a single change advances the counter by two and a
+    // legitimately pre-signed next change would verify against a stale value.
+    #[test]
+    fn precompile_change_apply_does_not_increment_counter() {
+        let mut host = MockKernelHost::default();
+
+        // Simulate the precompile store-time effects: the pending change is
+        // stored and the counter is bumped exactly once.
+        store_sequencer_key_change(
+            &mut host,
+            EVMBasedSequencerKeyChange::new(test_public_key(), Timestamp::from(100i64)),
+        )
+        .unwrap();
+        increment_sequencer_change_counter(&mut host).unwrap();
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+
+        // Before activation nothing applies.
+        possible_sequencer_key_change(&mut host, Timestamp::from(50i64)).unwrap();
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+
+        // At/after activation the change applies but the counter is unchanged.
+        possible_sequencer_key_change(&mut host, Timestamp::from(100i64)).unwrap();
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+    }
 }

@@ -5,7 +5,7 @@
 
 use alloy_sol_types::{sol, SolInterface};
 use revm::{
-    context::{Block, ContextTr},
+    context::{Block, Cfg, ContextTr},
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
     primitives::{alloy_primitives::IntoLogData, Bytes, Log, U256},
 };
@@ -21,8 +21,8 @@ use crate::{
     precompiles::{
         change_sequencer_key::ChangeSequencerKey::ChangeSequencerKeyCalls,
         constants::{
-            CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, SEQUENCER_UPGRADE_DELAY,
-            UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST,
+            CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, SEQUENCER_KEY_CHANGE_SIGN_TAG,
+            SEQUENCER_UPGRADE_DELAY, UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST,
         },
         error::CustomPrecompileError,
         guard::out_of_gas,
@@ -115,8 +115,46 @@ where
                 )));
             };
 
+            // The sequencer does not sign the raw new key but the new key bound
+            // to this chain and to the current change counter. This makes the
+            // captured `(publicKey, signature)` calldata single-use: the counter
+            // is bumped as soon as a key change is stored (see the commit path in
+            // `EtherlinkVMDB`), not only when it is applied, so resubmitting the
+            // same calldata fails signature verification. Consequently a pending
+            // change can be safely overwritten by its owner (sign against the new
+            // counter with the still-current key) -- which is why no "a change is
+            // already pending" guard is needed -- while a third party cannot
+            // replay it to reset the delay, nor replay it on another chain or
+            // after the key cycled back to a former value. Counter and chain_id
+            // are recomputed by the kernel and are *not* part of the calldata, so
+            // they cannot be forged by the caller.
+            //
+            // The payload is prefixed with `SEQUENCER_KEY_CHANGE_SIGN_TAG`, a
+            // unique domain-separation label, so a signature captured over any
+            // other message the sequencer key signs (e.g. an RLP-encoded
+            // blueprint chunk) can never be replayed as a change signature.
+            let chain_id = context.cfg().chain_id();
+            // Read through the journal (not `db()` directly) so a second inner
+            // call in the same transaction sees the in-memory value; within a
+            // transaction this equals the durable counter, so the value signed
+            // against is unchanged.
+            let change_counter = context.journal().sequencer_change_counter()?;
+
+            let mut signed_payload = Vec::with_capacity(
+                SEQUENCER_KEY_CHANGE_SIGN_TAG.len()
+                    + call.publicKey.len()
+                    + 2 * U256::BYTES,
+            );
+            signed_payload.extend_from_slice(SEQUENCER_KEY_CHANGE_SIGN_TAG);
+            signed_payload.extend_from_slice(&call.publicKey);
+            signed_payload.extend_from_slice(
+                &U256::from(chain_id).to_be_bytes::<{ U256::BYTES }>(),
+            );
+            signed_payload
+                .extend_from_slice(&change_counter.to_be_bytes::<{ U256::BYTES }>());
+
             if !sequencer_key
-                .verify_signature(&signature, &call.publicKey)
+                .verify_signature(&signature, &signed_payload)
                 .unwrap_or(false)
             {
                 return Err(CustomPrecompileError::Revert(String::from(
@@ -136,12 +174,17 @@ where
             };
 
             let public_key_b58 = public_key.to_b58check();
-            context
-                .journal_mut()
-                .store_sequencer_key_change(SequencerKeyChange::new(
+            // Store the change and bump the replay counter (to `change_counter
+            // + 1`) atomically in the layered state, so a reverting transaction
+            // rolls back both. Bumping at store-time invalidates the signature
+            // just verified above, making the captured calldata single-use.
+            context.journal_mut().store_sequencer_key_change(
+                SequencerKeyChange::new(
                     public_key,
                     Timestamp::from(update_timestamp_i64),
-                ));
+                ),
+                change_counter,
+            )?;
 
             let log_data = ChangeSequencerKeyEvent {
                 oldPublicKey: sequencer_key.to_b58check(),

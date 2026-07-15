@@ -5,16 +5,19 @@
 
 use crate::{
     custom,
-    helpers::legacy::FaDepositWithProxy,
+    helpers::{legacy::FaDepositWithProxy, storage::read_u256_le_default},
     journal::PrecompileStateChanges,
     precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
     storage::{
         block::{get_block_hash, BLOCKS_STORED},
         code::CodeStorage,
-        sequencer_key_change::store_sequencer_key_change,
+        sequencer_key_change::{
+            store_sequencer_key_change, write_sequencer_change_counter,
+        },
         world_state_handler::{
             StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_PATH, KT1_B58_SIZE,
-            SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
+            SEQUENCER_KEY_CHANGE_COUNTER_PATH, SEQUENCER_KEY_PATH,
+            WITHDRAWALS_TICKETER_PATH,
         },
     },
     Error,
@@ -83,6 +86,9 @@ pub trait DatabasePrecompileStateChanges {
     ) -> Result<U256, CustomPrecompileError>;
     fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError>;
     fn governance_sequencer_upgrade_exists(&self) -> Result<bool, CustomPrecompileError>;
+    /// Counter the next sequencer key change must be signed against, used to
+    /// make a captured change calldata non-replayable once the key rotates again.
+    fn sequencer_change_counter(&self) -> Result<U256, CustomPrecompileError>;
     fn deposit_in_queue(
         &self,
         deposit_id: &U256,
@@ -240,6 +246,14 @@ impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
             Err(e) => Err(CustomPrecompileError::from(e)),
         }
     }
+
+    fn sequencer_change_counter(&self) -> Result<U256, CustomPrecompileError> {
+        Ok(read_u256_le_default(
+            self.host,
+            &SEQUENCER_KEY_CHANGE_COUNTER_PATH,
+            U256::ZERO,
+        )?)
+    }
 }
 
 impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
@@ -292,6 +306,20 @@ impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, H
                 self,
                 store_sequencer_key_change(self.host, new_sequencer_key_change),
                 "DatabaseCommitPrecompileStateChanges `store_sequencer_key_change`"
+            );
+        }
+        // Persist the replay counter finalized by the layered state. The bump
+        // happens at store-time (see `LayeredState::store_sequencer_key_change`)
+        // so the counter -- like the change itself -- is rolled back by a
+        // reverting transaction, and `commit` only writes the finalized value
+        // rather than doing a durable read-modify-write. This is the only bump
+        // on the precompile path (application via `store_sequencer` does not bump
+        // again), so a single change advances the counter by exactly one.
+        if let Some(sequencer_change_counter) = etherlink_data.sequencer_change_counter {
+            abort_on_error!(
+                self,
+                write_sequencer_change_counter(self.host, sequencer_change_counter),
+                "DatabaseCommitPrecompileStateChanges `write_sequencer_change_counter`"
             );
         }
         if let Some(global_counter) = etherlink_data.global_counter {

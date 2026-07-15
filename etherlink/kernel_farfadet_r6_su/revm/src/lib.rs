@@ -455,12 +455,13 @@ mod test {
             },
             constants::{
                 CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, FA_BRIDGE_SOL_ADDR,
-                PRECOMPILE_BURN_ADDRESS, WITHDRAWAL_SOL_ADDR,
+                PRECOMPILE_BURN_ADDRESS, SEQUENCER_KEY_CHANGE_SIGN_TAG,
+                WITHDRAWAL_SOL_ADDR,
             },
             initializer::init_precompile_bytecodes,
         },
         storage::{
-            sequencer_key_change::SequencerKeyChange,
+            sequencer_key_change::{read_sequencer_change_counter, SequencerKeyChange},
             world_state_handler::{
                 StorageAccount, SEQUENCER_KEY_CHANGE_PATH, SEQUENCER_KEY_PATH,
                 WITHDRAWALS_TICKETER_PATH,
@@ -835,32 +836,49 @@ mod test {
         let storage_bytes = String::as_bytes(&pk_b58);
         host.store_write_all(&SEQUENCER_KEY_PATH, storage_bytes)
             .unwrap();
-        let signature = private_key.sign(public_key_bytes.clone()).unwrap();
-        let signature_bytes = signature.to_bytes().unwrap();
-        let calldata =
+
+        // The sequencer signs the new key bound to the chain id and the current
+        // change counter; these are recomputed by the precompile and are not
+        // part of the calldata. See `change_sequencer_key_precompile`.
+        let chain_id = block_constants.chain_id.as_u64();
+        let build_calldata = |change_counter: U256| {
+            let mut signed_payload = SEQUENCER_KEY_CHANGE_SIGN_TAG.to_vec();
+            signed_payload.extend_from_slice(&public_key_bytes);
+            signed_payload.extend_from_slice(&U256::from(chain_id).to_be_bytes::<32>());
+            signed_payload.extend_from_slice(&change_counter.to_be_bytes::<32>());
+            let signature = private_key.sign(signed_payload).unwrap();
+            let signature_bytes = signature.to_bytes().unwrap();
             ChangeSequencerKeyCalls::change_sequencer_key(change_sequencer_keyCall {
                 publicKey: Bytes::copy_from_slice(&public_key_bytes),
                 signature: Bytes::copy_from_slice(&signature_bytes),
             })
-            .abi_encode();
+            .abi_encode()
+        };
 
-        let ExecutionOutcome { result, .. } = run_transaction(
-            &mut host,
-            DEFAULT_SPEC_ID,
-            &block_constants,
-            None,
-            caller,
-            Some(CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS),
-            Bytes::copy_from_slice(&calldata),
-            GasData::new(10_000_000, 0, GAS_LIMIT),
-            U256::MAX,
-            AccessList(vec![]),
-            None,
-            None,
-            false,
-        )
-        .unwrap();
+        let submit = |host: &mut MockKernelHost, calldata: Vec<u8>| {
+            run_transaction(
+                host,
+                DEFAULT_SPEC_ID,
+                &block_constants,
+                None,
+                caller,
+                Some(CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS),
+                Bytes::copy_from_slice(&calldata),
+                GasData::new(10_000_000, 0, GAS_LIMIT),
+                U256::ZERO,
+                AccessList(vec![]),
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+        };
 
+        // No change has happened yet on this fresh host, so the counter is 0.
+        let initial_calldata = build_calldata(U256::ZERO);
+        let ExecutionOutcome { result, .. } = submit(&mut host, initial_calldata.clone());
+
+        assert!(result.is_success());
         assert!(result.logs().len() == 1);
         assert!(
             result
@@ -875,13 +893,29 @@ mod test {
         );
         let value = host.store_read_all(&SEQUENCER_KEY_CHANGE_PATH).unwrap();
         let stored_change = SequencerKeyChange::decode(&rlp::Rlp::new(&value)).unwrap();
-        match stored_change {
-            change => {
-                assert_eq!(change.sequencer_key(), &public_key);
-            }
-            #[allow(unreachable_patterns)]
-            _ => panic!("Expected a Key change"),
-        }
+        assert_eq!(stored_change.sequencer_key(), &public_key);
+
+        // Storing the pending change bumps the change counter immediately,
+        // even though the change has not been applied yet.
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+
+        // Replaying the exact same calldata is now rejected: its signature was
+        // made against counter 0, which is stale, so it can no longer be used to
+        // grief the pending change (e.g. resetting its activation delay).
+        let ExecutionOutcome { result, .. } = submit(&mut host, initial_calldata);
+        assert!(!result.is_success());
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+
+        // The owner can still overwrite their own pending change by signing
+        // against the new counter with the (still unchanged) current key. No
+        // "a change is already pending" guard stands in the way.
+        let overwrite_calldata = build_calldata(U256::ONE);
+        let ExecutionOutcome { result, .. } = submit(&mut host, overwrite_calldata);
+        assert!(result.is_success());
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::from(2));
+        let value = host.store_read_all(&SEQUENCER_KEY_CHANGE_PATH).unwrap();
+        let stored_change = SequencerKeyChange::decode(&rlp::Rlp::new(&value)).unwrap();
+        assert_eq!(stored_change.sequencer_key(), &public_key);
     }
 
     #[test]

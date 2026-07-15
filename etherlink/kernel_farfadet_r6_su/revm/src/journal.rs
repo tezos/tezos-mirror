@@ -45,6 +45,7 @@ pub struct PrecompileStateChanges {
     pub withdrawals: Vec<Withdrawal>,
     pub global_counter: Option<U256>,
     pub sequencer_key_change: Option<SequencerKeyChange>,
+    pub sequencer_change_counter: Option<U256>,
 }
 
 /// A journal of state changes internal to the EVM
@@ -467,8 +468,21 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
         self.database.deposit_in_queue(deposit_id)
     }
 
-    pub fn store_sequencer_key_change(&mut self, upgrade: SequencerKeyChange) {
-        self.layered_state.store_sequencer_key_change(upgrade)
+    /// Counter the next sequencer key change must be signed against, read
+    /// through the layered state so a second inner precompile call in the same
+    /// transaction sees the in-memory value (see
+    /// `LayeredState::sequencer_change_counter`).
+    pub fn sequencer_change_counter(&self) -> Result<U256, CustomPrecompileError> {
+        self.layered_state.sequencer_change_counter(&self.database)
+    }
+
+    pub fn store_sequencer_key_change(
+        &mut self,
+        upgrade: SequencerKeyChange,
+        base_counter: U256,
+    ) -> Result<(), CustomPrecompileError> {
+        self.layered_state
+            .store_sequencer_key_change(upgrade, base_counter)
     }
 
     pub fn log(&mut self, log: Log) {

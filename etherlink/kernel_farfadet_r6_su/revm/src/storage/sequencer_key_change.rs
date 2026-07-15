@@ -13,7 +13,15 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::OwnedPath;
 
-use crate::{storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH, Error};
+use revm::primitives::U256;
+
+use crate::{
+    helpers::storage::{read_u256_le_default, write_u256_le},
+    storage::world_state_handler::{
+        SEQUENCER_KEY_CHANGE_COUNTER_PATH, SEQUENCER_KEY_CHANGE_PATH,
+    },
+    Error,
+};
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct SequencerKeyChange {
@@ -86,4 +94,38 @@ pub fn store_sequencer_key_change<Host: Runtime>(
     let path = OwnedPath::from(SEQUENCER_KEY_CHANGE_PATH);
     host.store_write_all(&path, bytes)?;
     Ok(())
+}
+
+/// Reads the sequencer key change counter, defaulting to zero when no
+/// change has happened yet. This is the counter value the *next* change
+/// must be signed against.
+pub fn read_sequencer_change_counter<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+    Ok(read_u256_le_default(
+        host,
+        &SEQUENCER_KEY_CHANGE_COUNTER_PATH,
+        U256::ZERO,
+    )?)
+}
+
+/// Writes the sequencer key change counter to durable storage.
+pub fn write_sequencer_change_counter<Host: Runtime>(
+    host: &mut Host,
+    value: U256,
+) -> Result<(), Error> {
+    write_u256_le(host, &SEQUENCER_KEY_CHANGE_COUNTER_PATH, value)?;
+    Ok(())
+}
+
+/// Increments the sequencer key change counter, so that the calldata of past
+/// changes cannot be replayed. Signed (precompile) changes bump at store-time
+/// — as soon as the change is stored, invalidating the captured signature —
+/// through the layered state (see `LayeredState::store_sequencer_key_change`).
+/// This helper is used by unsigned governance changes, which carry no
+/// replayable signature and bump at apply-time. Either way a single change
+/// advances the counter by exactly one.
+pub fn increment_sequencer_change_counter<Host: Runtime>(
+    host: &mut Host,
+) -> Result<(), Error> {
+    let next = read_sequencer_change_counter(host)?.saturating_add(U256::ONE);
+    write_sequencer_change_counter(host, next)
 }

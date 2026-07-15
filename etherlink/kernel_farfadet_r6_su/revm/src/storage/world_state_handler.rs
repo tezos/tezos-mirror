@@ -51,6 +51,15 @@ pub const GOVERNANCE_SEQUENCER_UPGRADE_PATH: RefPath =
 /// Path where the sequencer key is stored. (Must be read through `internal_store_read_all`)
 pub(crate) const SEQUENCER_KEY_PATH: RefPath = RefPath::assert_from(b"/evm/sequencer");
 
+/// Monotonic counter incremented on every sequencer key change (whether it
+/// went through the [`change_sequencer_key`] precompile or a governance
+/// upgrade). It is folded into the payload signed by the current sequencer when
+/// rotating, so a captured `(publicKey, signature)` calldata is bound to one
+/// specific counter value and cannot be replayed once the key has rotated again
+/// (e.g. after cycling back to a previously-used key).
+pub const SEQUENCER_KEY_CHANGE_COUNTER_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state/sequencer_change_counter");
+
 /// Path where an account nonce is stored. This should be prefixed with the path to
 /// where the account is stored for the world state or for the current transaction.
 const NONCE_PATH: RefPath = RefPath::assert_from(b"/nonce");
