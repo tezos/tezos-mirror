@@ -15,6 +15,26 @@
 
 set -eu
 
+# GCP_SIGNER_SERVICE_ACCOUNT comes from one of two distinct service accounts:
+#  - the production signer ([image-signer@]): defined at the project level
+#    (tezos/tezos), scoped to the [docker-publish] environment and Protected. It
+#    signs released images and is only exposed to publishing jobs on protected
+#    refs.
+#  - the dev-only signer ([image-signer-dev-only@]): defined at the [tezos]
+#    GROUP level with wildcard scope and NOT protected, on purpose. It has access
+#    only to the dev signing keys and is used to sign dev/test images on
+#    unprotected pipelines. It is intentionally left unscoped and unprotected --
+#    that is expected, not a scoping oversight, so do not "fix" it.
+# In every real pipeline GCP_SIGNER_SERVICE_ACCOUNT is set (production signer on
+# protected refs, dev-only signer otherwise), so an empty value means a
+# misconfiguration. Fail with a clear error rather than crash on the unbound
+# variable under [set -eu]. We must not skip silently: that would ship an
+# unsigned image.
+if [ -z "${GCP_SIGNER_SERVICE_ACCOUNT:-}" ]; then
+  echo "GCP_SIGNER_SERVICE_ACCOUNT is not set; cannot sign the Docker images." >&2
+  exit 1
+fi
+
 echo "Starting Docker image signing process..."
 
 # In case Cosign crashes during signature process especially during TLog upload
