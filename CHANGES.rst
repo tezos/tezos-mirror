@@ -44,6 +44,13 @@ Signer
 Baker
 -----
 
+- Fixed the baker silently stopping to include DAL attestations after its DAL
+  node restarted or the connection to it was reset or left half-open. The baker
+  now detects a stalled ``/profiles/<pkh>/monitor/attestable_slots`` stream (via
+  a periodic heartbeat) and reconnects on its own, instead of relying on a clean
+  end-of-stream that a reset or half-open connection never delivers. (MR
+  :gl:`!22471`)
+
 Accuser
 -------
 
@@ -73,6 +80,10 @@ Data Availability Layer (DAL)
 
 DAL node
 ~~~~~~~~
+
+- The ``/profiles/<pkh>/monitor/attestable_slots`` streaming RPC now emits a
+  periodic heartbeat event (one per level), letting consumers detect a stalled
+  connection during periods with no attestable-slot activity. (MR :gl:`!22471`)
 
 - Fixed a DAL node crash that could occur after a restart with a persisted
   store: the startup status backfill could leave a slot's status inconsistent
