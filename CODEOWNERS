@@ -78,6 +78,26 @@
 #
 * @abate @ACoquereau @onurb @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.sagot.nl @julien.t @Killian-Delarue @lrand @lthms @MBourgoin @mattiasdrp @mebsout @murbard @naih @NicVolanschi @pe.cornilleau @phink @picdc @polubelova @rafoo_ @rodibozman @romain.nl @Saroupille @sribaroud @thomas.athorne @vch9 @vect0r @victor-dumitrescu @yrg @4dam @gabriel.moise
 
+# Platform Engineering
+#
+# The Platform Engineering team owns the CI, build/base images, release tooling
+# and PE monitoring perimeter, plus the shared Claude Code skills
+# committed under .claude/skills/platform-engineering/ (see !22384).
+#
+# CI pipeline generation & configuration (source; .gitlab/ci/ is auto-generated)
+/ci/                       @abate @onurb @Killian-Delarue @pierre.mary1 @romain.nl
+/scripts/ci/               @abate @onurb @Killian-Delarue @pierre.mary1 @romain.nl
+# CI/build/base Docker images
+/images/                   @abate @onurb @Killian-Delarue @pierre.mary1 @romain.nl
+/Dockerfile                @abate @onurb @Killian-Delarue @pierre.mary1 @romain.nl
+# Release tooling
+/scripts/releases/         @abate @onurb @Killian-Delarue @pierre.mary1 @romain.nl
+# PE monitoring
+/teztale/                  @abate @onurb @Killian-Delarue @pierre.mary1 @romain.nl
+/grafazos/                 @abate @onurb @Killian-Delarue @pierre.mary1 @romain.nl
+# Shared Claude Code skills
+/.claude/skills/platform-engineering/    @abate @onurb @Killian-Delarue @pierre.mary1 @romain.nl
+
 # CODEOWNERS Owners
 #
 # These users are authorized to change authorizations.
