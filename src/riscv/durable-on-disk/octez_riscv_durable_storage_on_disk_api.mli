@@ -5,6 +5,7 @@ open! Bigarray
 (* file: lib.rs *)
 
 type registry
+type imm_registry
 type repo
 type registry_prove
 type registry_verify
@@ -14,6 +15,8 @@ type verification_error = Not_found
 type verification_argument_error = Invalid_argument of invalid_argument_error | Verification of verification_error
 external octez_riscv_durable_on_disk_repo_new: bytes -> repo = "octez_riscv_durable_on_disk_repo_new"
 external octez_riscv_durable_on_disk_registry_new: repo -> registry = "octez_riscv_durable_on_disk_registry_new"
+external octez_riscv_durable_on_disk_registry_to_imm: registry -> imm_registry = "octez_riscv_durable_on_disk_registry_to_imm"
+external octez_riscv_durable_on_disk_registry_from_imm: imm_registry -> registry = "octez_riscv_durable_on_disk_registry_from_imm"
 external octez_riscv_durable_on_disk_registry_commit: registry -> bytes = "octez_riscv_durable_on_disk_registry_commit"
 external octez_riscv_durable_on_disk_registry_checkout: repo -> bytes -> registry = "octez_riscv_durable_on_disk_registry_checkout"
 external octez_riscv_durable_on_disk_registry_hash: registry -> bytes = "octez_riscv_durable_on_disk_registry_hash"

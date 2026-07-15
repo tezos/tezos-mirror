@@ -190,6 +190,351 @@ let test_checkout_unknown_commit =
     ~error_msg:"checkout with bogus commit should raise" ;
   unit
 
+(** Independence tests for {!Registry.duplicate} / {!Registry.to_imm} /
+    {!Registry.from_imm}, shared between the memory and disk backends.
+    The dual-state WASM PVM snapshots its states through these
+    primitives (dissection cache), so a mutation leaking across handles
+    would silently corrupt a refutation-game snapshot.
+
+    Properties covered (unit tests then PBT):
+    - roundtrip identity: [from_imm (to_imm r)] hashes like [r];
+    - snapshot immunity: mutations to the source never reach a snapshot;
+    - source immunity: mutations to a duplicate never reach the source;
+    - sibling independence: two [from_imm] of one [imm] are independent;
+    - duplicate bisimulation: a duplicate is observationally equal to
+      its source under any operation sequence (results and per-db
+      hashes agree step by step);
+    - temporal correctness: with snapshots interleaved among mutations,
+      each snapshot recovers the hash recorded at {e its} capture point. *)
+module Make_duplicate_tests (B : sig
+  val name : string
+
+  module Registry : sig
+    include Intf.REGISTRY
+
+    type imm
+
+    val to_imm : t -> imm
+
+    val from_imm : imm -> t
+
+    val duplicate : t -> t
+  end
+
+  module Database : Intf.DATABASE with type registry := Registry.t
+
+  val create_registry_with_dbs : int -> Registry.t
+end) =
+struct
+  (* [BACKEND] view over [B], so the generic op harness ([apply_ops],
+     [check_op], [gen_scenario]) can drive it. *)
+  module View : BACKEND with type Registry.t = B.Registry.t = struct
+    let name = B.name
+
+    module Registry = B.Registry
+    module Database = B.Database
+
+    let create_registry_with_dbs = B.create_registry_with_dbs
+  end
+
+  let set_exn r ~key ~value =
+    match
+      B.Database.set
+        r
+        ~db_index:0L
+        ~key:(Bytes.of_string key)
+        ~value:(Bytes.of_string value)
+    with
+    | Ok () -> ()
+    | Error _ -> assert false
+
+  let hash_str r = Bytes.to_string (B.Registry.hash r)
+
+  let test_duplicate_independence =
+    unit_test "duplicate yields an independent registry" @@ fun () ->
+    let r = B.create_registry_with_dbs 1 in
+    set_exn r ~key:"k" ~value:"v0" ;
+    let h0 = hash_str r in
+    let d = B.Registry.duplicate r in
+    Check.((hash_str d = h0) string)
+      ~error_msg:"duplicate hash %L differs from source hash %R" ;
+    set_exn r ~key:"k" ~value:"v1" ;
+    let h1 = hash_str r in
+    Check.((h1 <> h0) string)
+      ~error_msg:"mutation should have changed the source hash" ;
+    Check.((hash_str d = h0) string)
+      ~error_msg:"mutating the source changed the duplicate: %L, expected %R" ;
+    set_exn d ~key:"k" ~value:"v2" ;
+    Check.((hash_str r = h1) string)
+      ~error_msg:"mutating the duplicate changed the source: %L, expected %R" ;
+    unit
+
+  let test_to_imm_snapshot_stable =
+    unit_test "to_imm snapshot is unaffected by later mutations" @@ fun () ->
+    let r = B.create_registry_with_dbs 1 in
+    set_exn r ~key:"k" ~value:"v0" ;
+    let h0 = hash_str r in
+    let imm = B.Registry.to_imm r in
+    set_exn r ~key:"k" ~value:"v1" ;
+    set_exn r ~key:"k2" ~value:"v2" ;
+    let recovered = B.Registry.from_imm imm in
+    Check.((hash_str recovered = h0) string)
+      ~error_msg:
+        "registry recovered from the snapshot hashes to %L, expected the \
+         pre-mutation hash %R" ;
+    unit
+
+  let tests = [test_duplicate_independence; test_to_imm_snapshot_stable]
+
+  (* ------------------------------------------------------------------ *)
+  (* Property-based variants over random operation sequences            *)
+  (* ------------------------------------------------------------------ *)
+
+  (** Scenario split at a random point: [before] sets up an arbitrary
+      registry state, [after] is the mutation the snapshot must be
+      immune to. *)
+  let gen_split_scenario =
+    let open QCheck2.Gen in
+    let* num_dbs, ops = gen_scenario ~max_dbs:2 ~max_keys:4 ~max_ops:30 in
+    let* split = 0 -- List.length ops in
+    return (num_dbs, ops, split)
+
+  let print_split_scenario (num_dbs, ops, split) =
+    Format.asprintf "split=%d %s" split (print_scenario (num_dbs, ops))
+
+  let split_at n l =
+    let rec aux acc n = function
+      | rest when n = 0 -> (List.rev acc, rest)
+      | [] -> (List.rev acc, [])
+      | x :: rest -> aux (x :: acc) (n - 1) rest
+    in
+    aux [] n l
+
+  (** Roundtrip identity: [from_imm (to_imm r)] hashes like [r], for a
+      registry in an arbitrary state. *)
+  let pbt_roundtrip_identity =
+    QCheck2.Test.make
+      ~name:(B.name ^ ": from_imm (to_imm r) has r's registry hash")
+      ~print:print_scenario
+      (gen_scenario ~max_dbs:2 ~max_keys:4 ~max_ops:30)
+    @@ fun (num_dbs, ops) ->
+    let r = B.create_registry_with_dbs num_dbs in
+    apply_ops (module View) r ops ;
+    Bytes.equal
+      (B.Registry.hash (B.Registry.from_imm (B.Registry.to_imm r)))
+      (B.Registry.hash r)
+
+  (** Snapshot immunity: no operation sequence applied to the source
+      after [to_imm] changes what the snapshot recovers. *)
+  let pbt_snapshot_immunity =
+    QCheck2.Test.make
+      ~name:(B.name ^ ": snapshot is immune to source mutations")
+      ~print:print_split_scenario
+      gen_split_scenario
+    @@ fun (num_dbs, ops, split) ->
+    let before, after = split_at split ops in
+    let r = B.create_registry_with_dbs num_dbs in
+    apply_ops (module View) r before ;
+    let h0 = B.Registry.hash r in
+    let imm = B.Registry.to_imm r in
+    apply_ops (module View) r after ;
+    Bytes.equal (B.Registry.hash (B.Registry.from_imm imm)) h0
+
+  (** Source immunity: no operation sequence applied to a duplicate
+      changes the source's hash. *)
+  let pbt_source_immunity =
+    QCheck2.Test.make
+      ~name:(B.name ^ ": source is immune to duplicate mutations")
+      ~print:print_split_scenario
+      gen_split_scenario
+    @@ fun (num_dbs, ops, split) ->
+    let before, after = split_at split ops in
+    let r = B.create_registry_with_dbs num_dbs in
+    apply_ops (module View) r before ;
+    let h0 = B.Registry.hash r in
+    let d = B.Registry.duplicate r in
+    apply_ops (module View) d after ;
+    Bytes.equal (B.Registry.hash r) h0
+
+  (** Sibling independence: two registries recovered from the same
+      snapshot are independent of each other — both start
+      copy-on-write-shared, so the first writer must clone. *)
+  let pbt_sibling_independence =
+    QCheck2.Test.make
+      ~name:(B.name ^ ": two from_imm of one snapshot are independent")
+      ~print:print_split_scenario
+      gen_split_scenario
+    @@ fun (num_dbs, ops, split) ->
+    let before, after = split_at split ops in
+    let r = B.create_registry_with_dbs num_dbs in
+    apply_ops (module View) r before ;
+    let imm = B.Registry.to_imm r in
+    let h0 = B.Registry.hash r in
+    let a = B.Registry.from_imm imm in
+    let b = B.Registry.from_imm imm in
+    apply_ops (module View) a after ;
+    Bytes.equal (B.Registry.hash b) h0
+    && Bytes.equal (B.Registry.hash (B.Registry.from_imm imm)) h0
+
+  (** Duplicate bisimulation: a duplicate is observationally equal to
+      its source — the same operation sequence applied to both yields
+      identical results and identical per-database hashes at every
+      step.  Stronger than hash immunity: read results must agree. *)
+  let pbt_duplicate_bisimulation =
+    QCheck2.Test.make
+      ~name:(B.name ^ ": duplicate bisimulates the source")
+      ~print:print_split_scenario
+      gen_split_scenario
+    @@ fun (num_dbs, ops, split) ->
+    let setup, run = split_at split ops in
+    let r = B.create_registry_with_dbs num_dbs in
+    apply_ops (module View) r setup ;
+    let d = B.Registry.duplicate r in
+    List.iteri
+      (fun idx op ->
+        let (_ : bool) =
+          check_op
+            ~check_state:(check_state_hash (module View) r (module View) d)
+            ~label:(B.name ^ " duplicate bisimulation")
+            (module View)
+            r
+            (module View)
+            d
+            idx
+            op
+        in
+        ())
+      run ;
+    true
+
+  (** Temporal correctness: snapshots taken between chunks of an
+      operation sequence each recover the hash recorded at their own
+      capture point — not the initial state and not the final one. *)
+  let pbt_snapshot_points =
+    QCheck2.Test.make
+      ~name:(B.name ^ ": interleaved snapshots each recover their capture")
+      ~print:
+        (Format.asprintf
+           "%a"
+           (Format.pp_print_list (fun fmt (num_dbs, ops) ->
+                Format.fprintf fmt "chunk: %s@." (print_scenario (num_dbs, ops)))))
+      QCheck2.Gen.(
+        let* num_dbs, ops = gen_scenario ~max_dbs:2 ~max_keys:4 ~max_ops:30 in
+        let* nb_chunks = 1 -- 4 in
+        let chunk_size = 1 + (List.length ops / nb_chunks) in
+        let rec chunks l =
+          match split_at chunk_size l with
+          | c, [] -> [(num_dbs, c)]
+          | c, rest -> (num_dbs, c) :: chunks rest
+        in
+        return (chunks ops))
+    @@ fun chunks ->
+    match chunks with
+    | [] -> true
+    | (num_dbs, _) :: _ ->
+        let r = B.create_registry_with_dbs num_dbs in
+        let captures =
+          List.map
+            (fun (_, chunk) ->
+              apply_ops (module View) r chunk ;
+              (B.Registry.to_imm r, B.Registry.hash r))
+            chunks
+        in
+        List.for_all
+          (fun (imm, h) ->
+            Bytes.equal (B.Registry.hash (B.Registry.from_imm imm)) h)
+          captures
+
+  let pbt_tests =
+    [
+      pbt_roundtrip_identity;
+      pbt_snapshot_immunity;
+      pbt_source_immunity;
+      pbt_sibling_independence;
+      pbt_duplicate_bisimulation;
+      pbt_snapshot_points;
+    ]
+end
+
+module Memory_duplicate_tests = Make_duplicate_tests (Memory_backend)
+module Disk_duplicate_tests = Make_duplicate_tests (Disk_backend)
+
+(** Disk-specific: [duplicate] shares the repository, and captures
+    uncommitted in-memory operations — committing the duplicate then
+    checking the commit id out restores the duplicated state. *)
+let test_duplicate_commit_checkout =
+  unit_test "duplicate shares the repo and captures uncommitted state"
+  @@ fun () ->
+  let repo = get_disk_repo () in
+  let module N = Octez_riscv_nds_disk.Normal in
+  let r = N.Registry.create repo in
+  (match N.Registry.resize r 1L with Ok () -> () | Error _ -> assert false) ;
+  (match
+     N.Database.set
+       r
+       ~db_index:0L
+       ~key:(Bytes.of_string "k")
+       ~value:(Bytes.of_string "v")
+   with
+  | Ok () -> ()
+  | Error _ -> assert false) ;
+  (* [r] has uncommitted operations; the duplicate must capture them. *)
+  let d = N.Registry.duplicate r in
+  Check.(
+    (Bytes.to_string (N.Registry.hash d) = Bytes.to_string (N.Registry.hash r))
+      string)
+    ~error_msg:"duplicate of an uncommitted registry hashes to %L, expected %R" ;
+  let commit_id = N.Registry.commit d in
+  let checked_out = N.Registry.checkout repo commit_id in
+  Check.(
+    (Bytes.to_string (N.Registry.hash checked_out)
+    = Bytes.to_string (N.Registry.hash d))
+      string)
+    ~error_msg:"checkout of the duplicate's commit hashes to %L, expected %R" ;
+  unit
+
+(** Disk-specific: after a duplicate diverges from its source, both
+    handles commit to the shared repository and each commit checks out
+    to its own content — the divergence is preserved end to end. *)
+let test_divergent_duplicates_commit_independently =
+  unit_test "divergent duplicates commit and check out independently"
+  @@ fun () ->
+  let repo = get_disk_repo () in
+  let module N = Octez_riscv_nds_disk.Normal in
+  let set_exn r key value =
+    match
+      N.Database.set
+        r
+        ~db_index:0L
+        ~key:(Bytes.of_string key)
+        ~value:(Bytes.of_string value)
+    with
+    | Ok () -> ()
+    | Error _ -> assert false
+  in
+  let r = N.Registry.create repo in
+  (match N.Registry.resize r 1L with Ok () -> () | Error _ -> assert false) ;
+  set_exn r "k" "v0" ;
+  let d = N.Registry.duplicate r in
+  (* Diverge the two handles. *)
+  set_exn r "k" "v_source" ;
+  set_exn d "k" "v_duplicate" ;
+  let h_r = Bytes.to_string (N.Registry.hash r) in
+  let h_d = Bytes.to_string (N.Registry.hash d) in
+  Check.((h_r <> h_d) string)
+    ~error_msg:"sanity: the two handles should have diverged" ;
+  let c_r = N.Registry.commit r in
+  let c_d = N.Registry.commit d in
+  Check.(
+    (Bytes.to_string (N.Registry.hash (N.Registry.checkout repo c_r)) = h_r)
+      string)
+    ~error_msg:"source commit checks out to %L, expected %R" ;
+  Check.(
+    (Bytes.to_string (N.Registry.hash (N.Registry.checkout repo c_d)) = h_d)
+      string)
+    ~error_msg:"duplicate commit checks out to %L, expected %R" ;
+  unit
+
 (** {1 Property-based tests}
 
     Randomized tests for properties where varying inputs improves
@@ -883,6 +1228,13 @@ let register_unit_disk (name, f) =
     ~tags:["unit"; "nds"; "disk"]
     (with_disk_gc f)
 
+let register_unit_memory (name, f) =
+  Test.register
+    ~__FILE__
+    ~title:("memory: " ^ name)
+    ~tags:["unit"; "nds"; "memory"]
+    f
+
 let register_pbt ?(long = false) ?long_factor ?(extra_tags = [])
     (module B : BACKEND) f =
   let register =
@@ -984,6 +1336,16 @@ let () =
   register_with_backend (module Memory_verify_backend) ;
   register_with_backend (module Disk_verify_backend) ;
   register_unit_disk test_checkout_unknown_commit ;
+  List.iter register_unit_memory Memory_duplicate_tests.tests ;
+  List.iter register_unit_disk Disk_duplicate_tests.tests ;
+  register_unit_disk test_duplicate_commit_checkout ;
+  register_unit_disk test_divergent_duplicates_commit_independently ;
+  List.iter
+    (Qcheck_tezt.register ~__FILE__ ~seed:Random ~tags:["nds"; "memory"])
+    Memory_duplicate_tests.pbt_tests ;
+  List.iter
+    (register_pbt_with_disk_gc ~__FILE__ ~seed:Random ~tags:["nds"; "disk"])
+    Disk_duplicate_tests.pbt_tests ;
   List.iter
     register_pbt_disk
     [

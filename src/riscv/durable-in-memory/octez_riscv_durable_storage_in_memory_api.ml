@@ -5,6 +5,7 @@ open! Bigarray
 (* file: lib.rs *)
 
 type registry
+type imm_registry
 type registry_prove
 type registry_verify
 type proof
@@ -12,6 +13,8 @@ type invalid_argument_error = Key_not_found | Key_too_long | Io_request_too_larg
 type verification_error = Not_found
 type verification_argument_error = Invalid_argument of invalid_argument_error | Verification of verification_error
 external octez_riscv_durable_in_memory_registry_new: unit -> registry = "octez_riscv_durable_in_memory_registry_new"
+external octez_riscv_durable_in_memory_registry_to_imm: registry -> imm_registry = "octez_riscv_durable_in_memory_registry_to_imm"
+external octez_riscv_durable_in_memory_registry_from_imm: imm_registry -> registry = "octez_riscv_durable_in_memory_registry_from_imm"
 external octez_riscv_durable_in_memory_registry_hash: registry -> bytes = "octez_riscv_durable_in_memory_registry_hash"
 external octez_riscv_durable_in_memory_registry_size: registry -> int64 = "octez_riscv_durable_in_memory_registry_size"
 external octez_riscv_durable_in_memory_registry_resize: registry -> int64 -> (unit, invalid_argument_error) result = "octez_riscv_durable_in_memory_registry_resize"
