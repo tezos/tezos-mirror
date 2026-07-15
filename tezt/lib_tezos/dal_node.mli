@@ -156,6 +156,9 @@ val kill : t -> unit Lwt.t
 (** Send SIGSTOP to a daemon. Do not wait for the process to terminate. *)
 val stop : t -> unit Lwt.t
 
+(** Send SIGCONT to a daemon previously suspended with {!stop}. *)
+val continue : t -> unit Lwt.t
+
 (** Shows in stdout every events sent by the node *)
 val log_events : ?max_length:int -> t -> unit
 
