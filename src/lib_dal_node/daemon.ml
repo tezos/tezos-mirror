@@ -435,10 +435,11 @@ let update_and_register_profiles ctxt =
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
 
-(* This back-fills the store with slot headers at levels from [from_level] to
-   [from_level - attestation_lag]. *)
-let backfill_slot_statuses cctxt store (module Plugin : Dal_plugin.T)
-    proto_parameters ~from_level =
+(* Re-populates the DAL node's in-memory slot state for the window of levels
+   [from_level] down to [from_level - attestation_lag + 1], skipping levels
+   below the L1 savepoint. *)
+let backfill_slot_headers_and_statuses cctxt store
+    (module Plugin : Dal_plugin.T) proto_parameters ~from_level =
   let open Lwt_result_syntax in
   let number_of_slots = proto_parameters.Types.number_of_slots in
   let* _block_hash, l1_savepoint_level =
@@ -860,13 +861,19 @@ let run ?(disable_shard_validation = false) ?(ignore_l1_history_check = false)
   in
   let* () =
     let from_level = Int32.pred head_level in
-    (backfill_slot_statuses
+    (* The in-memory slot state (statuses and commitments) is not persisted, and
+       the crawler resumes forward from the last processed level, so it will not
+       rebuild the recent window below the head. Restore it now, before
+       activating the p2p layer, so GossipSub validation and status queries have
+       it. *)
+    (backfill_slot_headers_and_statuses
        cctxt
        store
        (module Plugin)
        proto_parameters
        ~from_level
-     [@profiler.record_s {verbosity = Notice} "backfill_slot_statuses"])
+     [@profiler.record_s
+       {verbosity = Notice} "backfill_slot_headers_and_statuses"])
   in
   (* Fetch the committees for the first levels. Note that that committees are
      fetched on a "regular basis" by {!Block_handler.may_update_topics} with a
