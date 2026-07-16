@@ -306,23 +306,31 @@ where
     )
 }
 
-pub fn fetch_configuration<Host>(host: &mut Host, base: &impl KeySpace) -> Configuration
+pub fn fetch_common_config<Host>(host: &mut Host, base: &impl KeySpace) -> CommonConfig
 where
     Host: StorageV1 + IsEvmNode,
 {
     let tezos_contracts = fetch_tezos_contracts(host, base);
     let maximum_allowed_ticks =
         read_maximum_allowed_ticks(base).unwrap_or(MAX_ALLOWED_TICKS);
-    let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(base);
     let evm_node_flag = host.is_evm_node();
-    let common = CommonConfig {
+    CommonConfig {
         tezos_contracts,
         maximum_allowed_ticks,
         enable_fa_bridge,
         evm_node_flag,
-    };
-    let dal: Option<DalConfiguration> = fetch_dal_configuration(base, evm_node_flag);
+    }
+}
+
+pub fn fetch_configuration<Host>(host: &mut Host, base: &impl KeySpace) -> Configuration
+where
+    Host: StorageV1 + IsEvmNode,
+{
+    let sequencer = sequencer(host).unwrap_or_default();
+    let common = fetch_common_config(host, base);
+    let dal: Option<DalConfiguration> =
+        fetch_dal_configuration(base, common.evm_node_flag);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(base)

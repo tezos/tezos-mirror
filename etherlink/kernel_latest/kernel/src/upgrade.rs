@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint_storage;
+use crate::configuration::CommonConfig;
 use crate::fallback_upgrade::backup_current_kernel;
 use core::fmt;
 
@@ -83,21 +84,18 @@ impl Encodable for KernelUpgrade {
     }
 }
 
-pub fn store_kernel_upgrade<Host>(
-    host: &mut Host,
+pub fn store_kernel_upgrade(
     base: &mut impl KeySpace,
     kernel_upgrade: &KernelUpgrade,
-) -> anyhow::Result<()>
-where
-    Host: StorageV1 + IsEvmNode,
-{
+    common: &CommonConfig,
+) -> anyhow::Result<()> {
     log!(
         Info,
         "An upgrade to {} is planned for {}",
         hex::encode(kernel_upgrade.preimage_hash),
         kernel_upgrade.activation_timestamp
     );
-    Event::Upgrade(kernel_upgrade.clone()).store(host, base)?;
+    Event::Upgrade(kernel_upgrade.clone()).store(base, common)?;
     keyspace::store_rlp(kernel_upgrade, base, &KERNEL_UPGRADE_KEY)
         .context("Failed to store kernel upgrade")
 }
@@ -193,6 +191,7 @@ pub fn store_sequencer_upgrade<Host>(
     host: &mut Host,
     base: &mut impl KeySpace,
     sequencer_upgrade: SequencerUpgrade,
+    common: &CommonConfig,
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + IsEvmNode,
@@ -204,7 +203,7 @@ where
         sequencer_upgrade.activation_timestamp
     );
     let bytes = &sequencer_upgrade.rlp_bytes();
-    Event::SequencerUpgrade(sequencer_upgrade).store(host, base)?;
+    Event::SequencerUpgrade(sequencer_upgrade).store(base, common)?;
     let path = OwnedPath::from(GOVERNANCE_SEQUENCER_UPGRADE_PATH);
     host.store_write_all(&path, bytes)
         .context("Failed to store sequencer upgrade")
@@ -346,6 +345,7 @@ mod tests {
                 pool_address: H160::zero(),
                 activation_timestamp: Timestamp::from(100i64),
             },
+            &CommonConfig::default(),
         )
         .unwrap();
 

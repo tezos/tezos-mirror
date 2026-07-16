@@ -60,14 +60,11 @@ where
     }
 }
 
-fn fetch_delayed_transactions<Host>(
-    host: &mut Host,
+fn fetch_delayed_transactions(
     base: &mut impl KeySpace,
     delayed_inbox: &mut DelayedInbox,
-) -> anyhow::Result<()>
-where
-    Host: StorageV1 + IsEvmNode,
-{
+    common: &CommonConfig,
+) -> anyhow::Result<()> {
     let timestamp = read_last_info_per_level_timestamp(base)?;
     // Number and minimal timestamp for the first forced blueprint
     let (base_number, minimal_timestamp) = match read_current_blueprint_header(base) {
@@ -96,7 +93,7 @@ where
             timestamp,
             level,
         }
-        .store(host, base)?;
+        .store(base, common)?;
 
         // Clean existing blueprints
         if offset == 0 {
@@ -142,9 +139,9 @@ where
             let timed_out = config_sequencer.delayed_inbox.first_has_timed_out(base)?;
             if timed_out {
                 fetch_delayed_transactions(
-                    host,
                     base,
                     &mut config_sequencer.delayed_inbox,
+                    config_common,
                 )?
             };
             // Force the kernel to reboot, so that the first blueprint will have

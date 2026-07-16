@@ -15,7 +15,7 @@ use crate::{
     blueprint::Blueprint,
     blueprint_storage::read_current_blueprint_header,
     chains::{self, TezosXChainConfig},
-    configuration::fetch_tezosx_configuration,
+    configuration::{fetch_common_config, fetch_tezosx_configuration},
     delayed_inbox::DelayedInbox,
     sub_block,
     transaction::Transaction,
@@ -73,8 +73,9 @@ where
     let payload = base.get(&DELAYED_INPUT_KEY).unwrap();
     let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
     let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
+    let common = fetch_common_config(&mut host, &base);
     delayed_inbox
-        .save_transaction(&host, &mut base, transaction, 0.into(), 0u32)
+        .save_transaction(&host, &mut base, transaction, 0.into(), 0u32, &common)
         .unwrap();
 }
 

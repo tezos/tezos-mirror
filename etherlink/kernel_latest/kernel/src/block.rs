@@ -469,7 +469,8 @@ where
 
                         for hash in potential_culprits {
                             delayed_inbox.delete(base, Hash(hash))?;
-                            Event::DroppedDelayedTransaction(hash).store(host, base)?;
+                            Event::DroppedDelayedTransaction(hash)
+                                .store(base, &config.common)?;
                         }
                     }
                 }
@@ -520,7 +521,7 @@ where
 
     let event = Event::blueprint_applied(block_header);
 
-    event.store(safe_host.host, base)?;
+    event.store(base, &config.common)?;
 
     let written = outbox_queue.flush_queue(safe_host.host);
     // Log to Info only if we flushed messages.

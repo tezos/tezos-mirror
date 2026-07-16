@@ -5,6 +5,7 @@
 
 use crate::{
     blueprint_storage::{BlockHeader, BlueprintHeader, ChainHeader},
+    configuration::CommonConfig,
     storage,
     transaction::Transaction,
     upgrade,
@@ -13,7 +14,6 @@ use primitive_types::{H256, U256};
 use rlp::{Encodable, RlpStream};
 use tezos_ethereum::rlp_helpers::{append_timestamp, append_u256_le};
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_keyspace::KeySpace;
 
@@ -86,10 +86,10 @@ impl Encodable for Event<'_> {
 impl Event<'_> {
     pub fn store(
         &self,
-        host: &impl IsEvmNode,
         base: &mut impl KeySpace,
+        common: &CommonConfig,
     ) -> anyhow::Result<()> {
-        if !host.is_evm_node() {
+        if !common.evm_node_flag {
             storage::store_event(base, self)?;
         }
 

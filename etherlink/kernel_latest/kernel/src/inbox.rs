@@ -89,6 +89,7 @@ where
         base: &mut impl KeySpace,
         input: Self,
         inbox_content: &mut Self::Inbox,
+        common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal + IsEvmNode;
@@ -99,6 +100,7 @@ where
         deposit: Deposit,
         chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
+        common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal + IsEvmNode;
@@ -109,6 +111,7 @@ where
         fa_deposit: FaDeposit,
         chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
+        common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal + IsEvmNode;
@@ -124,6 +127,7 @@ impl InputHandler for ProxyInput {
         _base: &mut impl KeySpace,
         input: Self,
         inbox_content: &mut Self::Inbox,
+        _common_config: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1,
@@ -159,6 +163,7 @@ impl InputHandler for ProxyInput {
         deposit: Deposit,
         _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
+        _common_config: &CommonConfig,
     ) -> anyhow::Result<()> {
         inbox_content
             .transactions
@@ -173,6 +178,7 @@ impl InputHandler for ProxyInput {
         fa_deposit: FaDeposit,
         _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
+        _common_config: &CommonConfig,
     ) -> anyhow::Result<()> {
         inbox_content
             .transactions
@@ -206,6 +212,7 @@ impl InputHandler for SequencerInput {
         base: &mut impl KeySpace,
         input: Self,
         delayed_inbox: &mut Self::Inbox,
+        common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal + IsEvmNode,
@@ -222,6 +229,7 @@ impl InputHandler for SequencerInput {
                     TezosXTransaction::Ethereum(tx),
                     previous_timestamp,
                     level,
+                    common,
                 )
             }
             Self::SequencerBlueprint(SequencerBlueprint(seq_blueprint)) => {
@@ -285,6 +293,7 @@ impl InputHandler for SequencerInput {
         deposit: Deposit,
         _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
+        common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal + IsEvmNode,
@@ -292,7 +301,7 @@ impl InputHandler for SequencerInput {
         let previous_timestamp = read_last_info_per_level_timestamp(base)?;
         let level = read_l1_level(base)?;
         let tx = handle_deposit(host, deposit)?;
-        delayed_inbox.save_transaction(host, base, tx, previous_timestamp, level)
+        delayed_inbox.save_transaction(host, base, tx, previous_timestamp, level, common)
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
@@ -302,6 +311,7 @@ impl InputHandler for SequencerInput {
         fa_deposit: FaDeposit,
         _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
+        common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal + IsEvmNode,
@@ -309,7 +319,7 @@ impl InputHandler for SequencerInput {
         let previous_timestamp = read_last_info_per_level_timestamp(base)?;
         let level = read_l1_level(base)?;
         let tx = handle_fa_deposit(host, fa_deposit)?;
-        delayed_inbox.save_transaction(host, base, tx, previous_timestamp, level)
+        delayed_inbox.save_transaction(host, base, tx, previous_timestamp, level, common)
     }
 }
 
@@ -490,6 +500,7 @@ pub fn handle_input<Host, Mode>(
     base: &mut impl KeySpace,
     input: Input<Mode>,
     inbox_content: &mut Mode::Inbox,
+    common: &CommonConfig,
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
@@ -497,13 +508,13 @@ where
 {
     match input {
         Input::ModeSpecific(input) => {
-            Mode::handle_input(host, base, input, inbox_content)?
+            Mode::handle_input(host, base, input, inbox_content, common)?
         }
         Input::Upgrade(kernel_upgrade) => {
-            store_kernel_upgrade(host, base, &kernel_upgrade)?
+            store_kernel_upgrade(base, &kernel_upgrade, common)?
         }
         Input::SequencerUpgrade(sequencer_upgrade) => {
-            store_sequencer_upgrade(host, base, sequencer_upgrade)?
+            store_sequencer_upgrade(host, base, sequencer_upgrade, common)?
         }
         Input::RemoveSequencer => remove_sequencer(host)?,
         Input::Info(info) => {
@@ -513,11 +524,16 @@ where
             store_l1_level(base, info.level)?
         }
         Input::Deposit((deposit, chain_id)) => {
-            Mode::handle_deposit(host, base, deposit, chain_id, inbox_content)?
+            Mode::handle_deposit(host, base, deposit, chain_id, inbox_content, common)?
         }
-        Input::FaDeposit((fa_deposit, chain_id)) => {
-            Mode::handle_fa_deposit(host, base, fa_deposit, chain_id, inbox_content)?
-        }
+        Input::FaDeposit((fa_deposit, chain_id)) => Mode::handle_fa_deposit(
+            host,
+            base,
+            fa_deposit,
+            chain_id,
+            inbox_content,
+            common,
+        )?,
         Input::ForceKernelUpgrade => force_kernel_upgrade(host, base)?,
         Input::DalAttestedSlots {
             published_level,
@@ -592,7 +608,7 @@ where
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
-            handle_input(host, base, input, res)?;
+            handle_input(host, base, input, res, common)?;
             Ok(ReadStatus::Ongoing)
         }
     }
