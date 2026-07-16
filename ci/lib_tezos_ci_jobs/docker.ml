@@ -12,15 +12,16 @@ module CI = Cacio.Shared
    During the migration to Cacio however, those other instances will continue to exist. *)
 let version = Tezos_ci.Images.Base_images.docker_version
 
-(* [docker_release.sh] invocation. For with-EVM builds the rust-toolchain image
-   (L2 builder) that the distribution is built FROM is stated explicitly; its
-   tag is resolved at runtime by the shell from the [Images.rust_toolchain]
-   dependency dotenv. Builds without EVM artifacts do not use that image. *)
+(* [docker_release.sh] invocation. For with-EVM builds the L2 builder image the
+   distribution is built FROM is stated explicitly: the [debian-rust:trixie]
+   base image, used directly. Builds without EVM artifacts do not use it. *)
 let docker_release_script contents =
   match contents with
   | `experimental_with_evm ->
-      "./scripts/ci/docker_release.sh --rust-toolchain-image \
-       ${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
+      Format.asprintf
+        "./scripts/ci/docker_release.sh --rust-toolchain-image %a"
+        Tezos_ci.Image.pp
+        Tezos_ci.Images.Base_images.debian_rust_trixie
   | `released | `experimental -> "./scripts/ci/docker_release.sh"
 
 let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
@@ -50,11 +51,10 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
       }
     ~arch
     ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
-    ~image_dependencies:
-      (match contents with
-      | `experimental_with_evm ->
-          [Tezos_ci.Images.CI.runtime; Tezos_ci.Images.rust_toolchain]
-      | `released | `experimental -> [Tezos_ci.Images.CI.runtime])
+      (* The L2 builder image (used for with-EVM builds) is the
+         [debian-rust:trixie] base image, pulled directly by the build, so it is
+         not a job dependency. *)
+    ~image_dependencies:[Tezos_ci.Images.CI.runtime]
     ~services:[{name = Tezos_ci.Images.Base_images.dind_service}]
     ~variables:
       [

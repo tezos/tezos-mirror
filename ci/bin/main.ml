@@ -26,17 +26,15 @@ let variables : variables =
        always contains the path to the unprotected Docker registry
        (unlike [GCP_REGISTRY], see below). This is used to locate the
        CI images, which are always pushed to the public repository. *)
-    ("ci_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/ci");
-    ( "ci_image_name_protected",
-      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/ci" );
     (* /!\ GCP_REGISTRY is the variable containing the name of the registry to and from
        which docker images are produced and consumed. This variable is defined at tezos
        level with the value unprotected registry and at tezos/tezos level in its protected
        version. This mechanism allows pipelines from a protected tezos/tezos branch to
        read the protected variable from tezos/tezos and for others to not have access to
        the variable tezos/tezos but tezos. *)
-    ( "rust_toolchain_image_name",
-      "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
+    ("ci_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/ci");
+    ( "ci_image_name_protected",
+      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/ci" );
     ("GIT_STRATEGY", "fetch");
     ("GIT_DEPTH", "1");
     ("GET_SOURCES_ATTEMPTS", "2");

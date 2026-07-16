@@ -15,7 +15,7 @@ Note that the tag of an image on changes if changes to its input are
 staged or committed in git.
 
 Example:
-  $0 images/rust-toolchain/
+  $0 images/ci/
 
 EOT
   exit 1

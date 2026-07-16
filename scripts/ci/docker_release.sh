@@ -14,9 +14,8 @@ ci_image_name=${ci_image_name:?"ci_image_name: is unset"}
 # (currently: 'oc.docker:ci:*')
 ci_image_version=${ci_image_tag:?"ci_image_tag: is unset"}
 
-# The rust-toolchain image (L2 builder) may be passed explicitly by the job via
-# --rust-toolchain-image; otherwise fall back to the name/tag provided by the
-# [rust_toolchain] image dependency dotenv (present for with-EVM builds).
+# The rust-toolchain image (L2 builder) used for with-EVM builds is passed
+# explicitly by the job via --rust-toolchain-image.
 rust_toolchain_image=""
 options=$(getopt -o '' -l rust-toolchain-image: -- "$@")
 eval set - "$options"
@@ -37,9 +36,6 @@ while true; do
   esac
   shift
 done
-if [ -z "${rust_toolchain_image}" ] && [ -n "${rust_toolchain_image_name:-}" ]; then
-  rust_toolchain_image="${rust_toolchain_image_name}:${rust_toolchain_image_tag:-master}"
-fi
 
 cd "${CI_PROJECT_DIR}" || exit 1
 

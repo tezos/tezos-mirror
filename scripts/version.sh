@@ -98,5 +98,3 @@ export GCP_PUBLIC_REGISTRY='us-central1-docker.pkg.dev/nl-gitlab-runner/registry
 
 export ci_image_name="${GCP_REGISTRY}/tezos/tezos/ci"
 export ci_image_name_protected="${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci"
-
-export rust_toolchain_image_name="${GCP_REGISTRY}/tezos/tezos/rust-toolchain"
