@@ -9,7 +9,7 @@ stages:
 - test
 
 audit_riscv_deps:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
   stage: test
   tags:
   - gcp
@@ -164,7 +164,7 @@ build_octez_source:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 cargo_audit:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
   stage: sanity
   tags:
   - gcp
@@ -184,7 +184,7 @@ cargo_audit:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_jsonnet:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-d70f7d37
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-25648bf0
   stage: sanity
   tags:
   - gcp
@@ -207,7 +207,7 @@ check_jsonnet:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_riscv_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
   stage: test
   tags:
   - gcp
@@ -248,7 +248,7 @@ check_riscv_kernels:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 check_rust_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
   stage: sanity
   tags:
   - gcp
@@ -763,7 +763,7 @@ oc.build_arm64-released:
     when: on_success
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -1153,7 +1153,7 @@ oc.compile_sources_doc_ubuntu:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: images
   tags:
   - gcp
@@ -1181,7 +1181,7 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: images
   tags:
   - gcp_arm64
@@ -2064,7 +2064,7 @@ sanity_ci:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 sdk_bindings.test:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-a8af426e
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-25648bf0
   stage: test
   tags:
   - gcp
@@ -2102,7 +2102,7 @@ sdk_bindings.test:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 test_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
   stage: test
   tags:
   - gcp
@@ -2142,7 +2142,7 @@ test_kernels:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 test_sdk_rust:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-23205065
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
   stage: test
   tags:
   - gcp

@@ -263,7 +263,7 @@ oc.install_bin_debian_bookworm:
     PREFIX: ""
 
 oc.install_bin_debian_bookworm_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -315,7 +315,7 @@ oc.install_bin_debian_trixie:
     PREFIX: ""
 
 oc.install_bin_debian_trixie_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -367,7 +367,7 @@ oc.install_bin_ubuntu_22_04:
     PREFIX: ""
 
 oc.install_bin_ubuntu_22_04_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -419,7 +419,7 @@ oc.install_bin_ubuntu_24_04:
     PREFIX: ""
 
 oc.install_bin_ubuntu_24_04_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -471,7 +471,7 @@ oc.install_bin_ubuntu_26_04:
     PREFIX: ""
 
 oc.install_bin_ubuntu_26_04_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -593,7 +593,7 @@ oc.reproducibility_debian:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
 
 oc.test_keyring_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -623,7 +623,7 @@ oc.test_keyring_debian_bookworm:
     RELEASE: bookworm
 
 oc.test_keyring_debian_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -653,7 +653,7 @@ oc.test_keyring_debian_trixie:
     RELEASE: trixie
 
 oc.test_keyring_ubuntu_22_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -683,7 +683,7 @@ oc.test_keyring_ubuntu_22_04:
     RELEASE: "22.04"
 
 oc.test_keyring_ubuntu_24_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -713,7 +713,7 @@ oc.test_keyring_ubuntu_24_04:
     RELEASE: "24.04"
 
 oc.test_keyring_ubuntu_26_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -743,7 +743,7 @@ oc.test_keyring_ubuntu_26_04:
     RELEASE: "26.04"
 
 oc.upgrade_bin_debian_bookworm_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -773,7 +773,7 @@ oc.upgrade_bin_debian_bookworm_systemd:
     RELEASE: bookworm
 
 oc.upgrade_bin_debian_trixie_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -803,7 +803,7 @@ oc.upgrade_bin_debian_trixie_systemd:
     RELEASE: trixie
 
 oc.upgrade_bin_ubuntu_22_04_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -833,7 +833,7 @@ oc.upgrade_bin_ubuntu_22_04_systemd:
     RELEASE: "22.04"
 
 oc.upgrade_bin_ubuntu_24_04_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
@@ -863,7 +863,7 @@ oc.upgrade_bin_ubuntu_24_04_systemd:
     RELEASE: "24.04"
 
 oc.upgrade_bin_ubuntu_26_04_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
   stage: publishing_tests
   tags:
   - gcp
