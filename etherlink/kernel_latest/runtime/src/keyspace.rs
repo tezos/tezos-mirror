@@ -175,6 +175,10 @@ impl<Host> StorageV1KeySpaceCompat<Host> {
 }
 
 impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
+    fn name(&self) -> &Name {
+        &self.prefix
+    }
+
     fn get(&self, key: &Key) -> Option<Vec<u8>> {
         let path = self.full_path(key);
         self.host
