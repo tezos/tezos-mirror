@@ -1425,6 +1425,7 @@ mod tests {
             tezos_contracts: TezosContracts::default(),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
+            evm_node_flag: false,
         };
         let mut seq = SequencerConfig {
             delayed_bridge: ContractKt1Hash::from_b58check(
@@ -1434,7 +1435,6 @@ mod tests {
             delayed_inbox: Box::new(delayed_inbox),
             sequencer: pk.clone(),
             dal: None,
-            evm_node_flag: false,
             max_blueprint_lookahead_in_seconds: 100_000i64,
         };
         let _ = read_sequencer_inbox(

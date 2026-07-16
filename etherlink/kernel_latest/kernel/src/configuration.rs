@@ -44,7 +44,6 @@ pub struct SequencerConfig {
     pub delayed_inbox: Box<DelayedInbox>,
     pub sequencer: PublicKey,
     pub dal: Option<DalConfiguration>,
-    pub evm_node_flag: bool,
     pub max_blueprint_lookahead_in_seconds: i64,
 }
 
@@ -53,21 +52,27 @@ pub enum ConfigurationMode {
     Sequencer(SequencerConfig),
 }
 
+impl std::fmt::Display for SequencerConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let SequencerConfig {
+            delayed_bridge,
+            delayed_inbox: _, // Ignoring delayed_inbox
+            sequencer,
+            dal,
+            max_blueprint_lookahead_in_seconds,
+        } = self;
+        write!(
+            f,
+            "Sequencer {{ delayed_bridge: {delayed_bridge:?}, sequencer: {sequencer:?}, dal: {dal:?}, max_blueprints_lookahead_in_seconds: {max_blueprint_lookahead_in_seconds} }}"
+        )
+    }
+}
+
 impl std::fmt::Display for ConfigurationMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ConfigurationMode::Proxy => write!(f, "Proxy"),
-            ConfigurationMode::Sequencer(SequencerConfig {
-                delayed_bridge,
-                delayed_inbox: _, // Ignoring delayed_inbox
-                sequencer,
-                dal,
-                evm_node_flag,
-                max_blueprint_lookahead_in_seconds,
-            }) => write!(
-                f,
-                "Sequencer {{ delayed_bridge: {delayed_bridge:?}, sequencer: {sequencer:?}, dal: {dal:?}, evm_node_flag: {evm_node_flag}, max_blueprints_lookahead_in_seconds: {max_blueprint_lookahead_in_seconds} }}"
-            ),
+            ConfigurationMode::Sequencer(seq) => write!(f, "{seq}"),
         }
     }
 }
@@ -77,6 +82,7 @@ pub struct CommonConfig {
     pub tezos_contracts: TezosContracts,
     pub maximum_allowed_ticks: u64,
     pub enable_fa_bridge: bool,
+    pub evm_node_flag: bool,
 }
 
 impl Default for CommonConfig {
@@ -85,6 +91,7 @@ impl Default for CommonConfig {
             tezos_contracts: TezosContracts::default(),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
+            evm_node_flag: false,
         }
     }
 }
@@ -313,6 +320,7 @@ where
         tezos_contracts,
         maximum_allowed_ticks,
         enable_fa_bridge,
+        evm_node_flag,
     };
     let dal: Option<DalConfiguration> = fetch_dal_configuration(base, evm_node_flag);
     match sequencer {
@@ -338,7 +346,6 @@ where
                         delayed_inbox: Box::new(delayed_inbox),
                         sequencer,
                         dal,
-                        evm_node_flag,
                         max_blueprint_lookahead_in_seconds,
                     }),
                 },

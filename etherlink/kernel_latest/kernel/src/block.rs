@@ -690,7 +690,7 @@ where
             }
             upgrade::possible_sequencer_key_change(safe_host.host, base, timestamp)?;
 
-            if safe_host.is_evm_node() {
+            if config.common.evm_node_flag {
                 Ok(ComputationResult::Finished)
             } else {
                 Ok(ComputationResult::RebootNeeded)

@@ -266,13 +266,13 @@ mod tests {
                 },
                 maximum_allowed_ticks: MAX_ALLOWED_TICKS,
                 enable_fa_bridge: false,
+                evm_node_flag: false,
             },
             mode: ConfigurationMode::Sequencer(SequencerConfig {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
                 dal,
-                evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             }),
         }
@@ -288,6 +288,7 @@ mod tests {
                 },
                 maximum_allowed_ticks: MAX_ALLOWED_TICKS,
                 enable_fa_bridge: false,
+                evm_node_flag: false,
             },
             mode: ConfigurationMode::Proxy,
         }

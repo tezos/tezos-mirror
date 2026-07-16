@@ -336,7 +336,7 @@ where
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it
     // before the stage one because stage one reboots and would clear the flag.
-    if !host.is_evm_node() {
+    if !configuration.common.evm_node_flag {
         health_check(host, base, &mut configuration)?;
     }
 

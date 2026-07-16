@@ -832,7 +832,6 @@ fn read_all_chunks_and_validate(
         ConfigurationMode::Proxy => Ok((None, size)),
         ConfigurationMode::Sequencer(SequencerConfig {
             delayed_inbox,
-            evm_node_flag,
             max_blueprint_lookahead_in_seconds,
             ..
         }) => {
@@ -842,7 +841,7 @@ fn read_all_chunks_and_validate(
                 chunks.concat().as_slice(),
                 delayed_inbox,
                 size,
-                *evm_node_flag,
+                config.common.evm_node_flag,
                 *max_blueprint_lookahead_in_seconds,
                 previous_chain_header,
                 previous_timestamp,
@@ -1017,13 +1016,13 @@ mod tests {
                 tezos_contracts: TezosContracts::default(),
                 maximum_allowed_ticks: MAX_ALLOWED_TICKS,
                 enable_fa_bridge: false,
+                evm_node_flag: false,
             },
             mode: ConfigurationMode::Sequencer(SequencerConfig {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
                 dal,
-                evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             }),
         };
