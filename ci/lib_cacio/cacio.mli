@@ -437,7 +437,13 @@ module Shared : COMPONENT_API
 
 (** Global pipelines.
 
-    Global pipelines are shared between components. *)
+    Global pipelines are shared between components.
+
+    Note that [Manual] jobs are not allowed in [Merge_train] pipelines,
+    because this pipeline must finish ASAP so as to not block other MRs
+    so it doesn't make sense to have to wait on a manual action.
+    Manual, allowed to fail jobs would not block the pipeline,
+    but they are better reserved for other pipelines. *)
 type global_pipeline =
   | Before_merging
   | Merge_train
@@ -480,7 +486,9 @@ val register_jobs : global_pipeline -> (trigger * job) list -> unit
 (** Register jobs to be included in [before_merging] and [merge_train] pipelines.
 
     This is equivalent to registering the job with both
-    [register_jobs Before_merging] and [register_jobs Merge_train]. *)
+    [register_jobs Before_merging] and [register_jobs Merge_train].
+
+    If a job is [Manual], this function only registers it into [Before_merging]. *)
 val register_merge_request_jobs : (trigger * job) list -> unit
 
 (** Register jobs to be included in release pipelines.
