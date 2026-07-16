@@ -29,4 +29,10 @@ type ctx = {
 
 val extract_auth : Uri.t -> endpoint
 
+(** [backup_post dir chunk] persists the POST that would ship [chunk] (its
+    request path and JSON body) as a single record file under [dir], so it can
+    be replayed later. Used as the on-failure backup when [--backup-dir] is set;
+    handles every chunk kind and never raises. *)
+val backup_post : string -> chunk -> unit Lwt.t
+
 include Archiver.S with type t = ctx

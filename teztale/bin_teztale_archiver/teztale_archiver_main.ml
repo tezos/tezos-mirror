@@ -73,25 +73,6 @@ let main_server state cctxt =
   let*! out = Lwt.join [dumper; main] in
   return out
 
-let server_to_json_chunk : Server_archiver.chunk -> Json_archiver.chunk option =
-  function
-  | Block (level, (block, cycle_info, (endos, preendos), baking_rights)) ->
-      Some
-        (Block
-           ( level,
-             block.Data.Block.hash,
-             block.Data.Block.predecessor,
-             block.round,
-             block.timestamp,
-             block.reception_times,
-             block.delegate,
-             cycle_info,
-             endos @ preendos,
-             baking_rights ))
-  | Mempool (level, ops) -> Some (Mempool (None, level, ops))
-  | Rights (_, _) -> None
-  | Dal_shards (_, _) -> None
-
 let select_commands _ctxt Client_config.{chain; _} =
   return
     [
@@ -241,10 +222,7 @@ let select_commands _ctxt Client_config.{chain; _} =
                             level
                             kind) ;
                       Lwt.return_unit)
-                    ~some:(fun prefix chunk ->
-                      match server_to_json_chunk chunk with
-                      | None -> Lwt.return_unit
-                      | Some chunk -> Json_archiver.dump prefix chunk)
+                    ~some:Server_archiver.backup_post
                     backup_path;
               }
           in
