@@ -9,6 +9,11 @@ Version 25.0
 General
 -------
 
+- Improved the handling of the in-memory protocol cache across chain
+  reorganizations: it is now reused only when it corresponds to the block's
+  predecessor, and is otherwise rebuilt from the committed context. (MR
+  :gl:`!22462`)
+
 - Fixed a file descriptor leak in the RPC client: the connection of each
   followed HTTP redirect was never released. This affected every Octez
   executable issuing RPC calls through an endpoint answering redirects

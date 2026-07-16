@@ -177,14 +177,17 @@ module Context : sig
     | `Inherited of block_cache * Tezos_crypto.Hashed.Context_hash.t
       (** When we already have some [block_cache.cache] in memory coming
           from the validation of some block [block_cache.context_hash],
-          we can reuse or recycle its entries to reconstruct a cache to
-          check some other block identified by a given [Context_hash.t],
-          which typically comes after [block_cache.context_hash] in the
-          chain.
+          and we are about to validate a block whose predecessor's
+          resulting context is [Context_hash.t], we can reuse that cache
+          directly {e iff} [block_cache.context_hash] equals the given
+          [Context_hash.t] — i.e. the in-memory cache really is the
+          predecessor's. This is the common, linear case and the most
+          efficient way to build a cache in memory.
 
-          This source is usually the most efficient way to build a
-          cache in memory since the cache entries only change
-          marginally from one block to one of its close descendants.
+          When the two hashes differ (for instance after a reorg, where the
+          last-applied block is on a sibling branch), the in-memory cache is
+          not recycled but rebuilt from the committed context, exactly as
+          [`Load].
 
       *)
     ]

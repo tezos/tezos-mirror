@@ -297,9 +297,27 @@ let register_exn (type cvalue)
     let identifier_rank ctxt id = Admin.key_rank ctxt (mk ~id)
   end)
 
-let cache_nonce_from_block_header (shell : Block_header.shell_header) contents :
-    cache_nonce =
+let cache_nonce_from_block_header ~round (shell : Block_header.shell_header)
+    contents : cache_nonce =
   let open Block_header_repr in
+  (* The [round] is folded into the nonce (through the otherwise-zeroed
+     fitness slot) so that two blocks that share the same payload but are
+     baked at different rounds obtain distinct nonces.
+
+     Only the round is added: the full fitness/timestamp/level are still
+     zeroed because they are not known (or not final) while the block is being
+     constructed by the baker, and the nonce must be identical at construction
+     and application time. The round IS known in both phases (from the
+     [Full_construction] round field and from [Fitness.round] at application),
+     so folding it in keeps that invariant.
+
+     Note that the shell_header passed in Full_construction mode has an empty 
+     fitness. Thus the fitness in the shell header MUST NOT be used.
+
+ *)
+  let round_fitness =
+    Data_encoding.Binary.to_bytes_exn Round_repr.encoding round
+  in
   let shell : Block_header.shell_header =
     {
       level = 0l;
@@ -308,7 +326,7 @@ let cache_nonce_from_block_header (shell : Block_header.shell_header) contents :
       timestamp = Time.of_seconds 0L;
       validation_passes = 0;
       operations_hash = shell.operations_hash;
-      fitness = [];
+      fitness = [round_fitness];
       context = Context_hash.zero;
     }
   in
