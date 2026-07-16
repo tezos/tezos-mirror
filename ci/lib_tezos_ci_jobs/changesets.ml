@@ -27,25 +27,6 @@ let changeset_octez =
           "tzt_reference_test_suite/**/*";
         ])
 
-let changeset_debian_packages =
-  Changeset.(
-    make
-      [
-        "scripts/packaging/build-deb-local.sh";
-        "scripts/packaging/Release.conf";
-        "scripts/packaging/octez/debian/*";
-        "scripts/ci/build-debian-packages_current.sh";
-        "scripts/ci/build-debian-packages.sh";
-        "scripts/ci/prepare-apt-repo.sh";
-        "scripts/ci/create_debian_repo.sh";
-        "scripts/packaging/octez-archive-keyring/**/*";
-        "scripts/ci/build-keyring-deb.sh";
-        "scripts/packaging/tests/deb/test-keyring*";
-        "docs/introduction/install-bin-deb.sh";
-        "scripts/version.sh";
-        "manifest/**/*.ml*";
-      ])
-
 let changeset_homebrew =
   Changeset.(
     make
