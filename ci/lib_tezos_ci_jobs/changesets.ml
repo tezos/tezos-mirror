@@ -26,16 +26,3 @@ let changeset_octez =
           "michelson_test_scripts/**/*";
           "tzt_reference_test_suite/**/*";
         ])
-
-let changeset_homebrew =
-  Changeset.(
-    make
-      [
-        "scripts/packaging/test_homebrew_install.sh";
-        "scripts/packaging/homebrew_release.sh";
-        "images/scripts/install-gcloud.sh";
-        "scripts/packaging/homebrew_install.sh";
-        "scripts/packaging/octez/homebrew/Formula/*";
-        "scripts/version.sh";
-        "manifest/**/*.ml*";
-      ])
