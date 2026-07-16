@@ -105,3 +105,29 @@ command:
 ```
 dune exec tezt/tests/cloud/main.exe -- cloud clean up -v
 ```
+
+## Maintaining the Tezlink npm/pnpm dependencies
+
+The Tezlink scenario clones several Node.js sub-projects from GitHub at
+run time and builds them. Installs are anchored to the upstream lockfiles
+so the dependency tree is deterministic with respect to the cloned commit
+and the build fails loudly when an upstream `package.json` drifts from its
+lockfile (the clones themselves still track moving refs; SHA-pinning them
+is a follow-up tracked in #8303):
+
+- **`faucet-backend`** (`rafoo/tezos-faucet-backend`) and
+  **`faucet-frontend`** (`rafoo/tezos-faucet`) ship a
+  `package-lock.json`, so the test runs `npm ci` against it.
+- **`bridge-tezlink`** (`luciano-fs/tezlink_deposit`) ships no lockfile
+  and its `package.json` is internally inconsistent, so `npm ci` cannot
+  be used; the test stays on `npm install`. See `tezlink.ml` and #8303.
+- **Umami** (`trilitech/umami-v2`, built in
+  `tezt/lib_cloud/dockerfiles/tezlink.Dockerfile`) ships a
+  `pnpm-lock.yaml`. The image runs `pnpm install --frozen-lockfile` with
+  pnpm pinned to the version declared in umami-v2's `packageManager`
+  field (`pnpm@9.9.0`).
+
+When a build starts failing because upstream changed its dependencies,
+the fix is usually upstream-side (refresh its lockfile), not here. The one
+exception is the pnpm pin: if umami-v2 bumps its `packageManager`, update
+the pinned pnpm version in `tezlink.Dockerfile` to match.
