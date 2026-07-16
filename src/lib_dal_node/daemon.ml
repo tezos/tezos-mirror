@@ -439,11 +439,19 @@ let update_and_register_profiles ctxt =
    [from_level] down to [from_level - attestation_lag + 1], skipping levels
    below the L1 savepoint. It reconciles the seeded statuses against the
    skip-list store via [Slot_manager.get_slot_status_from_skip_list], promoting
-   any slot already attested at a shorter lag to its terminal status. *)
+   any slot already attested at a shorter lag to its terminal status. Only
+   decisions recorded at levels the crawler will not process again (i.e. at
+   most [last_notified_level]) are promoted; the crawler applies the later
+   ones itself when processing their level. *)
 let backfill_slot_headers_and_statuses cctxt ctxt (module Plugin : Dal_plugin.T)
-    proto_parameters ~from_level =
+    proto_parameters ~from_level ~last_notified_level =
   let open Lwt_result_syntax in
   let store = Node_context.get_store ctxt in
+  (* The crawler processes finalized blocks from [last_notified_level + 1]:
+     only cells recorded at levels up to [last_notified_level] will not be
+     seen (again) by the crawler. With a fresh store ([None]), the skip-list
+     store is empty and there is nothing to reconcile. *)
+  let last_notified_level = Option.value last_notified_level ~default:0l in
   let number_of_slots = proto_parameters.Types.number_of_slots in
   let* _block_hash, l1_savepoint_level =
     Chain_services.Levels.savepoint cctxt ()
@@ -472,12 +480,23 @@ let backfill_slot_headers_and_statuses cctxt ctxt (module Plugin : Dal_plugin.T)
               Slot_manager.get_slot_status_from_skip_list ~slot_id ctxt
             in
             match skip_list_status with
-            | Some ((`Attested _ | `Unattested) as status) ->
+            | Some (((`Attested _ | `Unattested) as status), attested_level)
+              when attested_level <= last_notified_level ->
                 let*? () =
                   Slot_manager.update_slot_header_status store slot_id status
                 in
                 return_unit
-            | Some (`Unpublished | `Waiting_attestation) | None ->
+            | Some ((`Attested _ | `Unattested), _) ->
+                (* The decision cell sits at a level the crawler will
+                   (re-)process. This can happen when the node previously
+                   stopped after storing the cells of a block but before
+                   recording the block as processed. Do not apply the status
+                   now: the crawler performs the (legal) [Waiting_attestation
+                   -> decided] transition itself when it re-processes that
+                   level, and applying the status here would make that
+                   transition fail, and the daemon with it. *)
+                return_unit
+            | Some ((`Unpublished | `Waiting_attestation), _) | None ->
                 (* No terminal status recorded yet: the slot is genuinely still
                    waiting, leave it as seeded by [store_slot_headers]. *)
                 return_unit)
@@ -893,6 +912,7 @@ let run ?(disable_shard_validation = false) ?(ignore_l1_history_check = false)
        (module Plugin)
        proto_parameters
        ~from_level
+       ~last_notified_level
      [@profiler.record_s
        {verbosity = Notice} "backfill_slot_headers_and_statuses"])
   in
