@@ -10,7 +10,7 @@ use crate::blueprint_storage::{
 };
 use crate::chains::{TezosXChainConfig, TezosXTransaction};
 use crate::configuration::{
-    Configuration, ConfigurationMode, DalConfiguration, SequencerConfig, TezosContracts,
+    CommonConfig, Configuration, ConfigurationMode, SequencerConfig,
 };
 use crate::delayed_inbox::DelayedInbox;
 use crate::event::Event;
@@ -19,11 +19,9 @@ use crate::inbox::{ProxyInboxContent, StageOneStatus};
 use crate::storage::read_last_info_per_level_timestamp;
 use anyhow::Ok;
 use std::ops::Add;
-use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
 
 use tezos_evm_runtime::runtime::IsEvmNode;
-use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 use tezos_smart_rollup_host::reveal::HostReveal;
@@ -35,9 +33,8 @@ pub fn fetch_proxy_blueprints<Host>(
     host: &mut Host,
     base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    tezos_contracts: &TezosContracts,
-    enable_fa_bridge: bool,
     chain_configuration: &TezosXChainConfig,
+    common: &CommonConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
@@ -46,8 +43,7 @@ where
         host,
         base,
         smart_rollup_address,
-        tezos_contracts,
-        enable_fa_bridge,
+        common,
         chain_configuration,
     )? {
         let timestamp =
@@ -121,19 +117,13 @@ where
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn fetch_sequencer_blueprints<Host>(
     host: &mut Host,
     base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
-    tezos_contracts: &TezosContracts,
-    delayed_bridge: ContractKt1Hash,
-    delayed_inbox: &mut DelayedInbox,
-    sequencer: PublicKey,
-    dal: Option<DalConfiguration>,
-    maximum_allowed_ticks: u64,
-    enable_fa_bridge: bool,
     config_chain: &TezosXChainConfig,
+    config_common: &CommonConfig,
+    config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
@@ -142,21 +132,20 @@ where
         host,
         base,
         smart_rollup_address,
-        tezos_contracts,
-        delayed_bridge,
-        sequencer,
-        delayed_inbox,
-        enable_fa_bridge,
-        maximum_allowed_ticks,
-        dal,
         config_chain,
+        config_common,
+        config_sequencer,
     )? {
         StageOneStatus::Done => {
             log!(Debug, "Stage one done, rebooting");
             // Check if there are timed-out transactions in the delayed inbox
-            let timed_out = delayed_inbox.first_has_timed_out(base)?;
+            let timed_out = config_sequencer.delayed_inbox.first_has_timed_out(base)?;
             if timed_out {
-                fetch_delayed_transactions(host, base, delayed_inbox)?
+                fetch_delayed_transactions(
+                    host,
+                    base,
+                    &mut config_sequencer.delayed_inbox,
+                )?
             };
             // Force the kernel to reboot, so that the first blueprint will have
             // the maximum tick capacity
@@ -181,33 +170,20 @@ where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     match &mut config.mode {
-        ConfigurationMode::Sequencer(SequencerConfig {
-            delayed_bridge,
-            delayed_inbox,
-            sequencer,
-            dal,
-            evm_node_flag: _,
-            max_blueprint_lookahead_in_seconds: _,
-        }) => fetch_sequencer_blueprints(
+        ConfigurationMode::Sequencer(seq) => fetch_sequencer_blueprints(
             host,
             base,
             smart_rollup_address,
-            &config.common.tezos_contracts,
-            delayed_bridge.clone(),
-            delayed_inbox,
-            sequencer.clone(),
-            dal.clone(),
-            config.common.maximum_allowed_ticks,
-            config.common.enable_fa_bridge,
             chain_config,
+            &config.common,
+            seq,
         ),
         ConfigurationMode::Proxy => fetch_proxy_blueprints(
             host,
             base,
             smart_rollup_address,
-            &config.common.tezos_contracts,
-            config.common.enable_fa_bridge,
             chain_config,
+            &config.common,
         ),
     }
 }
@@ -217,7 +193,7 @@ mod tests {
     use crate::{
         blueprint_storage::EVMBlockHeader,
         chains::{test_tezosx_chain_config, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
-        configuration::CommonConfig,
+        configuration::{DalConfiguration, TezosContracts},
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
             UnsignedDalSlotSignals,
@@ -227,7 +203,9 @@ mod tests {
     };
     use primitive_types::U256;
     use rlp::Encodable;
-    use tezos_crypto_rs::hash::{HashTrait, SecretKeyEd25519, UnknownSignature};
+    use tezos_crypto_rs::hash::{
+        ContractKt1Hash, HashTrait, SecretKeyEd25519, UnknownSignature,
+    };
     use tezos_data_encoding::types::Bytes;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
@@ -238,6 +216,7 @@ mod tests {
         },
         types::PublicKeyHash,
     };
+    use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_smart_rollup_host::reveal::HostReveal;
     use tezos_smart_rollup_mock::TransferMetadata;
 
@@ -634,8 +613,7 @@ mod tests {
             &mut host,
             &mut base,
             DEFAULT_SR_ADDRESS,
-            &conf.common.tezos_contracts,
-            false,
+            &conf.common,
             &chain_config,
         )
         .unwrap()

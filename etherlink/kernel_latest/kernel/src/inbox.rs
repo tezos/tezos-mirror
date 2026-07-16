@@ -8,7 +8,7 @@
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
 use crate::chains::{ExperimentalFeatures, TezosXChainConfig, TezosXTransaction};
-use crate::configuration::{DalConfiguration, TezosContracts};
+use crate::configuration::{CommonConfig, SequencerConfig, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
 use crate::delayed_inbox::DelayedInbox;
@@ -33,13 +33,11 @@ use crate::Error;
 use primitive_types::U256;
 use revm_etherlink::helpers::legacy::FaDeposit;
 use sha3::{Digest, Keccak256};
-use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 
 use tezos_evm_runtime::runtime::IsEvmNode;
-use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
@@ -551,11 +549,10 @@ fn read_and_dispatch_input<Host, Mode>(
     host: &mut Host,
     base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
-    tezos_contracts: &TezosContracts,
+    common: &CommonConfig,
     parsing_context: &mut Mode::Context,
     inbox_is_empty: &mut bool,
     res: &mut Mode::Inbox,
-    enable_fa_bridge: bool,
     chain_configuration: &TezosXChainConfig,
 ) -> anyhow::Result<ReadStatus>
 where
@@ -565,10 +562,10 @@ where
     let input: InputResult<Mode> = read_input(
         host,
         smart_rollup_address,
-        tezos_contracts,
+        &common.tezos_contracts,
         inbox_is_empty,
         parsing_context,
-        enable_fa_bridge,
+        common.enable_fa_bridge,
     )?;
     match input {
         InputResult::NoInput => {
@@ -605,8 +602,7 @@ pub fn read_proxy_inbox<Host>(
     host: &mut Host,
     base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
-    tezos_contracts: &TezosContracts,
-    enable_fa_bridge: bool,
+    common: &CommonConfig,
     chain_configuration: &TezosXChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
@@ -625,11 +621,10 @@ where
             host,
             base,
             smart_rollup_address,
-            tezos_contracts,
+            common,
             &mut (),
             &mut inbox_is_empty,
             &mut res,
-            enable_fa_bridge,
             chain_configuration,
         ) {
             Err(err) =>
@@ -675,14 +670,9 @@ pub fn read_sequencer_inbox<Host>(
     host: &mut Host,
     base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
-    tezos_contracts: &TezosContracts,
-    delayed_bridge: ContractKt1Hash,
-    sequencer: PublicKey,
-    delayed_inbox: &mut DelayedInbox,
-    enable_fa_bridge: bool,
-    maximum_allowed_ticks: u64,
-    dal: Option<DalConfiguration>,
-    chain_configuration: &TezosXChainConfig,
+    config_chain: &TezosXChainConfig,
+    config_common: &CommonConfig,
+    config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
@@ -699,12 +689,13 @@ where
         crate::storage::is_legacy_dal_signals_disabled(base),
         crate::storage::read_dal_publishers_whitelist(base).unwrap_or_default(),
     );
+    let maximum_allowed_ticks = config_common.maximum_allowed_ticks;
     let mut parsing_context = SequencerParsingContext {
-        sequencer,
-        delayed_bridge,
+        sequencer: config_sequencer.sequencer.clone(),
+        delayed_bridge: config_sequencer.delayed_bridge.clone(),
         allocated_ticks: maximum_allowed_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
-        dal_configuration: dal,
+        dal_configuration: config_sequencer.dal.clone(),
         buffer_transaction_chunks: None,
         next_blueprint_number,
         experimental_features,
@@ -726,12 +717,11 @@ where
             host,
             base,
             smart_rollup_address,
-            tezos_contracts,
+            config_common,
             &mut parsing_context,
             &mut inbox_is_empty,
-            delayed_inbox,
-            enable_fa_bridge,
-            chain_configuration,
+            &mut config_sequencer.delayed_inbox,
+            config_chain,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -780,7 +770,7 @@ mod tests {
     use std::fmt::Write;
     use tezos_crypto_rs::hash::SmartRollupHash;
     use tezos_crypto_rs::hash::UnknownSignature;
-    use tezos_crypto_rs::hash::{HashTrait, SecretKeyEd25519};
+    use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait, SecretKeyEd25519};
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -788,6 +778,7 @@ mod tests {
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::michelson::{MichelsonBytes, MichelsonOr};
+    use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -921,8 +912,7 @@ mod tests {
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            false,
+            &CommonConfig::default(),
             &test_tezosx_chain_config(),
         )
         .unwrap()
@@ -955,8 +945,7 @@ mod tests {
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            false,
+            &CommonConfig::default(),
             &test_tezosx_chain_config(),
         )
         .unwrap()
@@ -1008,14 +997,16 @@ mod tests {
             &mut host,
             &mut base,
             [0; 20],
-            &TezosContracts {
-                ticketer: None,
-                admin: Some(sender),
-                sequencer_governance: None,
-                kernel_governance: None,
-                kernel_security_governance: None,
+            &CommonConfig {
+                tezos_contracts: TezosContracts {
+                    ticketer: None,
+                    admin: Some(sender),
+                    sequencer_governance: None,
+                    kernel_governance: None,
+                    kernel_security_governance: None,
+                },
+                ..CommonConfig::default()
             },
-            false,
             &test_tezosx_chain_config(),
         )
         .unwrap()
@@ -1062,8 +1053,7 @@ mod tests {
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            false,
+            &CommonConfig::default(),
             &test_tezosx_chain_config(),
         )
         .unwrap();
@@ -1115,8 +1105,7 @@ mod tests {
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            false,
+            &CommonConfig::default(),
             &test_tezosx_chain_config(),
         )
         .unwrap();
@@ -1156,8 +1145,7 @@ mod tests {
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            false,
+            &CommonConfig::default(),
             &test_tezosx_chain_config(),
         )
         .unwrap();
@@ -1214,8 +1202,7 @@ mod tests {
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            false,
+            &CommonConfig::default(),
             &test_tezosx_chain_config(),
         )
         .unwrap()
@@ -1236,8 +1223,7 @@ mod tests {
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            false,
+            &CommonConfig::default(),
             &test_tezosx_chain_config(),
         )
         .unwrap()
@@ -1301,8 +1287,7 @@ mod tests {
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            false,
+            &CommonConfig::default(),
             &test_tezosx_chain_config(),
         )
         .unwrap()
@@ -1328,8 +1313,7 @@ mod tests {
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            false,
+            &CommonConfig::default(),
             &test_tezosx_chain_config(),
         )
         .unwrap();
@@ -1340,8 +1324,7 @@ mod tests {
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            false,
+            &CommonConfig::default(),
             &test_tezosx_chain_config(),
         )
         .unwrap();
@@ -1437,20 +1420,30 @@ mod tests {
         // Add to the inbox.
         host.host.add_external(framed);
         // Consume the inbox
-        let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
+        let delayed_inbox = DelayedInbox::from_base(&base).unwrap();
+        let common = CommonConfig {
+            tezos_contracts: TezosContracts::default(),
+            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
+            enable_fa_bridge: false,
+        };
+        let mut seq = SequencerConfig {
+            delayed_bridge: ContractKt1Hash::from_b58check(
+                "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+            )
+            .unwrap(),
+            delayed_inbox: Box::new(delayed_inbox),
+            sequencer: pk.clone(),
+            dal: None,
+            evm_node_flag: false,
+            max_blueprint_lookahead_in_seconds: 100_000i64,
+        };
         let _ = read_sequencer_inbox(
             &mut host,
             &mut base,
             SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            ContractKt1Hash::from_b58check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
-                .unwrap(),
-            pk.clone(),
-            &mut delayed_inbox,
-            false,
-            MAX_ALLOWED_TICKS,
-            None,
             &test_tezosx_chain_config(),
+            &common,
+            &mut seq,
         )
         .unwrap();
 
