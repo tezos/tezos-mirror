@@ -33,6 +33,25 @@ let reconstruct_replace_mainnet_kernel =
     ~level:Info
     ()
 
+let gc_scheduled =
+  declare_1
+    ~section
+    ~name:"evm_context_gc_scheduled"
+    ~msg:"history garbage collection scheduled daily at {time_of_day} (UTC)"
+    ~level:Notice
+    ("time_of_day", Data_encoding.string)
+    ~pp1:Format.pp_print_string
+
+let gc_time_ignored_in_archive =
+  declare_0
+    ~section
+    ~name:"evm_context_gc_time_ignored_in_archive"
+    ~msg:
+      "history mode is archive: no garbage collection is performed, the \
+       configured GC time of day is discarded"
+    ~level:Warning
+    ()
+
 let gc_split =
   declare_2
     ~section
@@ -268,6 +287,10 @@ let shutdown () = emit shutdown ()
 
 let reconstruct_replace_mainnet_kernel () =
   emit reconstruct_replace_mainnet_kernel ()
+
+let gc_scheduled ~time_of_day = emit gc_scheduled time_of_day
+
+let gc_time_ignored_in_archive () = emit gc_time_ignored_in_archive ()
 
 let gc_split level timestamp = emit gc_split (level, timestamp)
 

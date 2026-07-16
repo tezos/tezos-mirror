@@ -153,6 +153,7 @@ Run commands:
       [--catch-up-cooldown <COOLDOWN>] [--genesis-timestamp <[TIMESTAMP]>]
       [--initial-kernel <evm_installer.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--dal-slots <slot indices>] [--sunset-sec <SEC>]
+      [--gc-time <HH:MM>]
     Start the EVM node in sequencer mode.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
@@ -230,6 +231,9 @@ Run commands:
       the current sequencer stops producing blocks
       If set, defaults to the value of the environment variable
       `$EVM_NODE_SEQUENCER_SUNSET_SEC`.
+    --gc-time <HH:MM>: Time of day, in UTC, at which the EVM node performs its daily history
+      garbage collection, e.g. `03:00`. Only relevant for `full`, `rolling` and `seed` history
+      modes. When unset, the garbage collection drifts relative to the previous one.
   
   run observer [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
       [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
@@ -244,7 +248,8 @@ Run commands:
       [-n --native-execution-policy <policy>] [--initial-kernel <evm_installer.wasm>]
       [--dont-track-rollup-node] [--no-sync]
       [--init-from-snapshot [snapshot url or file path]]
-      [--history <archive|full:N|rolling:N|seed:N>] [--network <network>] [--sandbox]
+      [--history <archive|full:N|rolling:N|seed:N>] [--gc-time <HH:MM>] [--network <network>]
+      [--sandbox]
     Start the EVM node in observer mode.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
@@ -317,6 +322,9 @@ Run commands:
       days (context, blocks, transactions, blueprints). `seed:N`: minimal mode for sequencers
       — prunes context, blocks and transactions older than N days, keeps only blueprints and
       their events.
+    --gc-time <HH:MM>: Time of day, in UTC, at which the EVM node performs its daily history
+      garbage collection, e.g. `03:00`. Only relevant for `full`, `rolling` and `seed` history
+      modes. When unset, the garbage collection drifts relative to the previous one.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet`,
       `testnet`, `shadownet` or `previewnet`. If set, additional sanity checks are performed
       on the node’s startup.
@@ -419,7 +427,7 @@ Configuration commands:
       [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
       [--maximum-blueprints-ahead <AHEAD>] [--maximum-blueprints-catch-up <CATCH_UP>]
       [--catch-up-cooldown <COOLDOWN>] [--evm-node-endpoint <url>]
-      [--history <archive|full:N|rolling:N|seed:N>] [--fail-on-divergence]
+      [--history <archive|full:N|rolling:N|seed:N>] [--gc-time <HH:MM>] [--fail-on-divergence]
       [--dont-track-rollup-node] [-d --wallet-dir <path>] [-f --force]
       [--dal-slots <slot indices>] [--network <network>] [--sunset-sec <SEC>]
     Create an initial config with default value.
@@ -495,6 +503,9 @@ Configuration commands:
       days (context, blocks, transactions, blueprints). `seed:N`: minimal mode for sequencers
       — prunes context, blocks and transactions older than N days, keeps only blueprints and
       their events.
+    --gc-time <HH:MM>: Time of day, in UTC, at which the EVM node performs its daily history
+      garbage collection, e.g. `03:00`. Only relevant for `full`, `rolling` and `seed` history
+      modes. When unset, the garbage collection drifts relative to the previous one.
     --fail-on-divergence: Instant confirmation observer hard fails on block hash divergence
     --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state
       of a rollup node allows to confirm the blocks received from the upstream EVM node.

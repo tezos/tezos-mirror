@@ -271,6 +271,10 @@ type t = {
   fee_history : fee_history;
   finalized_view : bool;
   history_mode : history_mode option;
+  gc_time_of_day : int option;
+      (* Time of day, in seconds since UTC midnight (0..86399), at which the
+         daily history garbage collection should be performed. When [None], the
+         GC drifts relative to the previous split. *)
   db : db;
   opentelemetry : telemetry_config;
   tx_queue : tx_queue;
@@ -293,6 +297,8 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
 let default_enable_send_raw_transaction = true
 
 let default_history_mode = Archive
+
+let default_gc_time_of_day = None
 
 let gc_param_from_retention_period ~days =
   {split_frequency_in_seconds = 86_400; number_of_chunks = days}
@@ -326,6 +332,49 @@ let string_of_history_mode_info = function
   | Rolling _ -> "Rolling"
   | Full _ -> "Full"
   | Seed _ -> "Seed"
+
+let gc_time_of_day_of_string str =
+  let open Option_syntax in
+  let parse_ranged max s =
+    (* Guard against [int_of_string_opt] accepting non-decimal literals such as
+       ["0x12"], ["+8"] or ["1_2"], which are not part of the [HH:MM] grammar. *)
+    let* n =
+      if s <> "" && String.for_all (fun c -> c >= '0' && c <= '9') s then
+        int_of_string_opt s
+      else None
+    in
+    if n < max then return n else None
+  in
+  let* hours, minutes, seconds =
+    match String.split_on_char ':' str with
+    | [hours; minutes] ->
+        let* hours = parse_ranged 24 hours in
+        let* minutes = parse_ranged 60 minutes in
+        return (hours, minutes, 0)
+    | [hours; minutes; seconds] ->
+        let* hours = parse_ranged 24 hours in
+        let* minutes = parse_ranged 60 minutes in
+        let* seconds = parse_ranged 60 seconds in
+        return (hours, minutes, seconds)
+    | _ -> None
+  in
+  return ((((hours * 60) + minutes) * 60) + seconds)
+
+let string_of_gc_time_of_day seconds =
+  let hours = seconds / 3600 in
+  let minutes = seconds mod 3600 / 60 in
+  let seconds = seconds mod 60 in
+  if seconds = 0 then Format.sprintf "%02d:%02d" hours minutes
+  else Format.sprintf "%02d:%02d:%02d" hours minutes seconds
+
+let gc_time_of_day_encoding =
+  Data_encoding.conv_with_guard
+    string_of_gc_time_of_day
+    (fun str ->
+      Option.to_result
+        ~none:"Invalid GC time of day, expected HH:MM (or HH:MM:SS) in UTC"
+        (gc_time_of_day_of_string str))
+    Data_encoding.string
 
 let pp_history_mode_debug fmt h =
   Format.pp_print_string fmt @@ string_of_history_mode_debug h
@@ -1712,6 +1761,7 @@ let encoding ?network () : t Data_encoding.t =
            kernel_execution;
            finalized_view;
            history_mode;
+           gc_time_of_day;
            db;
            opentelemetry;
            tx_queue;
@@ -1726,16 +1776,17 @@ let encoding ?network () : t Data_encoding.t =
             experimental_features,
             gcp_kms,
             fee_history ),
-          ( kernel_execution,
-            public_rpc,
-            private_rpc,
-            websockets,
-            finalized_view,
-            history_mode,
-            db,
-            opentelemetry,
-            tx_queue,
-            performance_profile ) ) ))
+          ( ( kernel_execution,
+              public_rpc,
+              private_rpc,
+              websockets,
+              finalized_view,
+              history_mode,
+              db,
+              opentelemetry,
+              tx_queue,
+              performance_profile ),
+            gc_time_of_day ) ) ))
     (fun ( ( data_dir,
              log_filter,
              sequencer,
@@ -1750,16 +1801,17 @@ let encoding ?network () : t Data_encoding.t =
                experimental_features,
                gcp_kms,
                fee_history ),
-             ( kernel_execution,
-               public_rpc,
-               private_rpc,
-               websockets,
-               finalized_view,
-               history_mode,
-               db,
-               opentelemetry,
-               tx_queue,
-               performance_profile ) ) )
+             ( ( kernel_execution,
+                 public_rpc,
+                 private_rpc,
+                 websockets,
+                 finalized_view,
+                 history_mode,
+                 db,
+                 opentelemetry,
+                 tx_queue,
+                 performance_profile ),
+               gc_time_of_day ) ) )
        ->
       {
         data_dir;
@@ -1779,6 +1831,7 @@ let encoding ?network () : t Data_encoding.t =
         kernel_execution;
         finalized_view;
         history_mode;
+        gc_time_of_day;
         db;
         opentelemetry;
         tx_queue;
@@ -1848,51 +1901,62 @@ let encoding ?network () : t Data_encoding.t =
                 default_experimental_features)
              (dft "gcp_kms" gcp_kms_encoding default_gcp_kms)
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj10
-             (dft
-                "kernel_execution"
-                (kernel_execution_encoding ?network ())
-                (kernel_execution_config_dft
-                   ?preimages_endpoint:
-                     (Option.map default_preimages_endpoint network)
-                   ()))
-             (dft "public_rpc" rpc_encoding (default_rpc ()))
-             (opt "private_rpc" rpc_encoding)
-             (opt "websockets" websockets_config_encoding)
-             (dft
-                ~description:
-                  "When enabled, the node only expose blocks that are \
-                   finalized, i.e., the `latest` block parameter becomes a \
-                   synonym for `finalized`."
-                "finalized_view"
-                bool
-                false)
-             (opt
-                "history"
-                ~description:
-                  "History mode of the EVM node (archive, full:N, rolling:N, \
-                   or seed:N)"
-                history_mode_encoding)
-             (dft
-                "db"
-                ~description:"Database connection configuration"
-                db_encoding
-                default_db)
-             (dft
-                "opentelemetry"
-                ~description:"Enable or disable opentelemetry profiling"
-                telemetry_config_encoding
-                default_telemetry_config)
-             (dft
-                "tx_pool"
-                ~description:"Configuration for the tx pool"
-                tx_queue_encoding
-                default_tx_queue)
-             (dft
-                "performance_profile"
-                ~description:"Performance profile for EVM node GC"
-                performance_profile_encoding
-                default_performance_profile))))
+          (merge_objs
+             (obj10
+                (dft
+                   "kernel_execution"
+                   (kernel_execution_encoding ?network ())
+                   (kernel_execution_config_dft
+                      ?preimages_endpoint:
+                        (Option.map default_preimages_endpoint network)
+                      ()))
+                (dft "public_rpc" rpc_encoding (default_rpc ()))
+                (opt "private_rpc" rpc_encoding)
+                (opt "websockets" websockets_config_encoding)
+                (dft
+                   ~description:
+                     "When enabled, the node only expose blocks that are \
+                      finalized, i.e., the `latest` block parameter becomes a \
+                      synonym for `finalized`."
+                   "finalized_view"
+                   bool
+                   false)
+                (opt
+                   "history"
+                   ~description:
+                     "History mode of the EVM node (archive, full:N, \
+                      rolling:N, or seed:N)"
+                   history_mode_encoding)
+                (dft
+                   "db"
+                   ~description:"Database connection configuration"
+                   db_encoding
+                   default_db)
+                (dft
+                   "opentelemetry"
+                   ~description:"Enable or disable opentelemetry profiling"
+                   telemetry_config_encoding
+                   default_telemetry_config)
+                (dft
+                   "tx_pool"
+                   ~description:"Configuration for the tx pool"
+                   tx_queue_encoding
+                   default_tx_queue)
+                (dft
+                   "performance_profile"
+                   ~description:"Performance profile for EVM node GC"
+                   performance_profile_encoding
+                   default_performance_profile))
+             (obj1
+                (opt
+                   "gc_time_of_day"
+                   ~description:
+                     "Time of day (HH:MM, or HH:MM:SS, in UTC) at which the \
+                      daily history garbage collection is performed. Only \
+                      relevant for full/rolling/seed history modes. When \
+                      unset, the GC drifts relative to the previous garbage \
+                      collection."
+                   gc_time_of_day_encoding)))))
 
 let pp_print_json fmt config =
   let json =
@@ -2125,6 +2189,7 @@ module Cli = struct
       fee_history = default_fee_history;
       finalized_view = default_finalized_view;
       history_mode = None;
+      gc_time_of_day = default_gc_time_of_day;
       db = default_db;
       opentelemetry = default_telemetry_config;
       tx_queue = default_tx_queue;
@@ -2167,8 +2232,8 @@ module Cli = struct
       ?sequencer_keys ?evm_node_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?restricted_rpcs ?finalized_view ?history_mode ?dal_slots ?sunset_sec
-      ?rpc_timeout ?fail_on_divergence configuration =
+      ?restricted_rpcs ?finalized_view ?history_mode ?gc_time_of_day ?dal_slots
+      ?sunset_sec ?rpc_timeout ?fail_on_divergence configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -2356,6 +2421,7 @@ module Cli = struct
       fee_history = configuration.fee_history;
       finalized_view = finalized_view || configuration.finalized_view;
       history_mode = Option.either history_mode configuration.history_mode;
+      gc_time_of_day = Option.either gc_time_of_day configuration.gc_time_of_day;
       db = configuration.db;
       opentelemetry;
       tx_queue;
@@ -2371,7 +2437,8 @@ module Cli = struct
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?restricted_rpcs ?finalized_view ?dal_slots ?network
-      ?history_mode ?sunset_sec ?rpc_timeout ?fail_on_divergence () =
+      ?history_mode ?gc_time_of_day ?sunset_sec ?rpc_timeout ?fail_on_divergence
+      () =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
          ~data_dir
@@ -2408,6 +2475,7 @@ module Cli = struct
          ?finalized_view
          ?dal_slots
          ?history_mode
+         ?gc_time_of_day
          ?sunset_sec
          ?rpc_timeout
          ?fail_on_divergence
@@ -2422,7 +2490,7 @@ module Cli = struct
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?restricted_rpcs ?finalized_view ?dal_slots ?network ?history_mode
-      ?sunset_sec ?rpc_timeout ?fail_on_divergence config_file =
+      ?gc_time_of_day ?sunset_sec ?rpc_timeout ?fail_on_divergence config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -2479,6 +2547,7 @@ module Cli = struct
           ?restricted_rpcs
           ?finalized_view
           ?history_mode
+          ?gc_time_of_day
           ?dal_slots
           ?sunset_sec
           ?rpc_timeout
@@ -2524,6 +2593,7 @@ module Cli = struct
           ?dal_slots
           ?network
           ?history_mode
+          ?gc_time_of_day
           ?sunset_sec
           ?rpc_timeout
           ?fail_on_divergence
