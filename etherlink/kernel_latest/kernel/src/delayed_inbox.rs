@@ -20,7 +20,6 @@ use tezos_ethereum::{
     tx_common::EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
@@ -212,7 +211,7 @@ impl DelayedInbox {
 
     pub fn save_transaction(
         &mut self,
-        host: &(impl StorageV1 + IsEvmNode),
+        host: &impl StorageV1,
         base: &mut impl KeySpace,
         tx: TezosXTransaction,
         timestamp: Timestamp,

@@ -13,7 +13,6 @@ use rlp::{Decodable, DecoderError, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, next, FromRlpBytes};
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -68,7 +67,7 @@ pub fn reveal_storage<Host>(
     sequencer: Option<PublicKey>,
     admin: Option<ContractKt1Hash>,
 ) where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1,
 {
     log!(Info, "Starting the reveal dump");
 

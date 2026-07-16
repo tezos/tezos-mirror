@@ -25,7 +25,6 @@ use tezos_ethereum::rlp_helpers::decode_public_key;
 use tezos_ethereum::rlp_helpers::decode_timestamp;
 use tezos_ethereum::rlp_helpers::next;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -194,7 +193,7 @@ pub fn store_sequencer_upgrade<Host>(
     common: &CommonConfig,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1,
 {
     log!(
         Info,

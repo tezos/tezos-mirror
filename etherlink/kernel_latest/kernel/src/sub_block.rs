@@ -38,7 +38,6 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::OwnedPath;
@@ -332,7 +331,7 @@ pub fn assemble_block<Host>(
     input_data: AssembleBlockInput,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost,
 {
     let __attrs = [
         (

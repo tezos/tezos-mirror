@@ -25,7 +25,7 @@ use tezos_crypto_rs::{
     hash::{ChainId, ContractKt1Hash},
 };
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::IsEvmNode;
+use tezos_evm_runtime::runtime::evm_node_flag;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpace;
@@ -308,13 +308,13 @@ where
 
 pub fn fetch_common_config<Host>(host: &mut Host, base: &impl KeySpace) -> CommonConfig
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1,
 {
     let tezos_contracts = fetch_tezos_contracts(host, base);
     let maximum_allowed_ticks =
         read_maximum_allowed_ticks(base).unwrap_or(MAX_ALLOWED_TICKS);
     let enable_fa_bridge = is_enable_fa_bridge(base);
-    let evm_node_flag = host.is_evm_node();
+    let evm_node_flag = evm_node_flag(host);
     CommonConfig {
         tezos_contracts,
         maximum_allowed_ticks,
@@ -325,7 +325,7 @@ where
 
 pub fn fetch_configuration<Host>(host: &mut Host, base: &impl KeySpace) -> Configuration
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1,
 {
     let sequencer = sequencer(host).unwrap_or_default();
     let common = fetch_common_config(host, base);

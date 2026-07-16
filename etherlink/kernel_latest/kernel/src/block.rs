@@ -35,7 +35,6 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_evm_runtime::safe_storage::{SafeStorage, TMP_PATH};
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
@@ -419,7 +418,7 @@ pub fn health_check<Host>(
     config: &mut Configuration,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost,
 {
     if host.last_run_aborted()? {
         log!(Error, "Something went wrong during previous kernel_run");
@@ -508,7 +507,7 @@ pub fn promote_block<Host>(
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost,
 {
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
         storage::delete_block_in_progress(safe_host)?;
@@ -548,7 +547,7 @@ pub fn produce<Host>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas,
 {
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
@@ -1183,7 +1182,7 @@ mod tests {
         host: &mut Host,
         base: &mut impl KeySpace,
     ) where
-        Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode + KeySpaceLoader,
+        Host: HostReveal + StorageV1 + WasmHost + WithGas + KeySpaceLoader,
     {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];

@@ -37,7 +37,6 @@ use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
@@ -92,7 +91,7 @@ where
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal;
 
     fn handle_deposit<Host>(
         host: &mut Host,
@@ -103,7 +102,7 @@ where
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal;
 
     fn handle_fa_deposit<Host>(
         host: &mut Host,
@@ -114,7 +113,7 @@ where
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal;
 }
 
 impl InputHandler for ProxyInput {
@@ -215,7 +214,7 @@ impl InputHandler for SequencerInput {
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal,
     {
         log!(Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
@@ -296,7 +295,7 @@ impl InputHandler for SequencerInput {
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal,
     {
         let previous_timestamp = read_last_info_per_level_timestamp(base)?;
         let level = read_l1_level(base)?;
@@ -314,7 +313,7 @@ impl InputHandler for SequencerInput {
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal,
     {
         let previous_timestamp = read_last_info_per_level_timestamp(base)?;
         let level = read_l1_level(base)?;
@@ -503,7 +502,7 @@ pub fn handle_input<Host, Mode>(
     common: &CommonConfig,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost,
     Mode: Parsable + InputHandler,
 {
     match input {
@@ -572,7 +571,7 @@ fn read_and_dispatch_input<Host, Mode>(
     chain_configuration: &TezosXChainConfig,
 ) -> anyhow::Result<ReadStatus>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost,
     Mode: Parsable + InputHandler,
 {
     let input: InputResult<Mode> = read_input(
@@ -622,7 +621,7 @@ pub fn read_proxy_inbox<Host>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     let mut res = ProxyInboxContent {
         transactions: vec![],
@@ -691,7 +690,7 @@ pub fn read_sequencer_inbox<Host>(
     config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the

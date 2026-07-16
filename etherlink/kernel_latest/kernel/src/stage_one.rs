@@ -21,7 +21,6 @@ use anyhow::Ok;
 use std::ops::Add;
 use tezos_evm_logging::{log, Level::*};
 
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 use tezos_smart_rollup_host::reveal::HostReveal;
@@ -37,7 +36,7 @@ pub fn fetch_proxy_blueprints<Host>(
     common: &CommonConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
@@ -123,7 +122,7 @@ fn fetch_sequencer_blueprints<Host>(
     config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     match read_sequencer_inbox(
         host,
@@ -164,7 +163,7 @@ pub fn fetch_blueprints<Host>(
     config: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     match &mut config.mode {
         ConfigurationMode::Sequencer(seq) => fetch_sequencer_blueprints(
