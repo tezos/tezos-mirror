@@ -120,9 +120,6 @@ build-layer1-profiling:
   - gcp_very_high_cpu
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -948,9 +945,6 @@ etherlink.build_tezt:
   - gcp
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1349,9 +1343,6 @@ etherlink.tezt:
   - gcp_tezt
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1445,9 +1436,6 @@ etherlink.tezt-extra:
   - gcp_tezt
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1541,9 +1529,6 @@ etherlink.tezt-flaky:
   - gcp_tezt
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1638,9 +1623,6 @@ etherlink.tezt-slow:
   - gcp_tezt
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3015,9 +2997,6 @@ oc.build:static-arm64-linux-experimental-binaries:
   - gcp_arm64
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3090,9 +3069,6 @@ oc.build:static-arm64-linux-released-binaries:
   - gcp_arm64
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3164,9 +3140,6 @@ oc.build:static-x86_64-linux-experimental-binaries:
   - gcp_very_high_cpu_ramfs
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3239,9 +3212,6 @@ oc.build:static-x86_64-linux-released-binaries:
   - gcp_very_high_cpu_ramfs
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3313,9 +3283,6 @@ oc.build_arm64-exp:
   - gcp_arm64
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3399,9 +3366,6 @@ oc.build_arm64-extra-dev:
   - gcp_arm64
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3483,9 +3447,6 @@ oc.build_arm64-released:
   - gcp_arm64
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3570,9 +3531,6 @@ oc.build_kernels:
   - gcp_very_high_cpu
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3653,9 +3611,6 @@ oc.build_x86_64-exp:
   - gcp_very_high_cpu
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3751,9 +3706,6 @@ oc.build_x86_64-extra-dev:
     when: on_success
   - changes:
     - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3851,9 +3803,6 @@ oc.build_x86_64-released:
     when: on_success
   - changes:
     - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -4318,9 +4267,6 @@ oc.integration:compiler-rejections:
   - gcp
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -4710,9 +4656,6 @@ oc.script:test-gen-genesis:
   - gcp
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -4910,9 +4853,6 @@ oc.unit:non-proto-arm64:
   - gcp_arm64
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -4992,9 +4932,6 @@ oc.unit:non-proto-x86_64:
   - gcp
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -5081,9 +5018,6 @@ oc.unit:other-x86_64:
   - gcp_high_cpu
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -5168,9 +5102,6 @@ oc.unit:proto-x86_64:
   - gcp_very_high_cpu
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -5255,9 +5186,6 @@ oc.unit:protocol_compiles:
   - gcp_very_high_cpu
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -5323,9 +5251,6 @@ oc.unit:webassembly-x86_64:
   - gcp
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -5776,9 +5701,6 @@ select_tezts:
   - gcp
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -5932,9 +5854,6 @@ tezt:
   - gcp_tezt
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -6026,9 +5945,6 @@ tezt-extra:
   - gcp_tezt
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -6119,9 +6035,6 @@ tezt-flaky:
   - gcp_tezt
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -6214,9 +6127,6 @@ tezt-riscv-slow:
   - gcp_tezt
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -6307,9 +6217,6 @@ tezt-slow:
   - gcp_tezt
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -6401,9 +6308,6 @@ tezt-static-binaries:
   - gcp
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -6495,9 +6399,6 @@ tezt-time-sensitive:
   - gcp_tezt
   rules:
   - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*

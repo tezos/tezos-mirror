@@ -9,26 +9,6 @@ open Tezos_ci
 
 (** {2 Changesets} *)
 
-(** Modifying these files will unconditionally execute all conditional jobs.
-
-    If the CI configuration of [before_merging] or [merge_train]
-    pipelines change, we execute all jobs of these merge request
-    pipelines. (We cannot currently have a finer grain and run only
-    the jobs that are modified.)
-
-    As Changesets should only be present in merge request pipelines,
-    other pipelines' files need not be in the changeset.
-
-    [changeset_base] should be included in all Changesets below, any
-    exceptions should be explained. *)
-let changeset_base =
-  Changeset.make
-    [
-      ".gitlab/ci/pipelines/merge_train.yml";
-      ".gitlab/ci/pipelines/before_merging.yml";
-      ".gitlab-ci.yml";
-    ]
-
 (** Only if octez source code has changed *)
 let changeset_octez =
   let octez_source_content =
@@ -39,7 +19,7 @@ let changeset_octez =
     |> Changeset.make
   in
   Changeset.(
-    changeset_base @ octez_source_content
+    octez_source_content
     @ make
         [
           "etherlink/**/*";
@@ -78,6 +58,3 @@ let changeset_homebrew =
         "scripts/version.sh";
         "manifest/**/*.ml*";
       ])
-
-let changeset_test_sdk_bindings =
-  Changeset.(changeset_base @ Sdk_bindings_ci.changeset)

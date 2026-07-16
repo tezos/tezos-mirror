@@ -30,9 +30,6 @@ module CI = Cacio.Make (struct
   let paths = Files.all
 end)
 
-(** Set of SDK-bindings related files *)
-let changeset = Changeset.make Files.all
-
 let job_test =
   CI.job
     "test"
@@ -48,12 +45,6 @@ let job_test =
         "make -C contrib/sdk-bindings check";
         "make -C contrib/sdk-bindings test";
       ]
-
-let () =
-  Cacio.register_merge_request_jobs [(Auto, job_test)] ;
-  (* TODO: split into a new pipeline [sdk_bindings.daily] *)
-  Cacio.register_jobs Schedule_extended_test [(Auto, job_test)] ;
-  ()
 
 module Release = struct
   (** Jobs and pipelines to release SDK bindings for each supported language *)
@@ -177,10 +168,14 @@ module Release = struct
         ]
       ~script:
         [". $HOME/.venv/bin/activate"; "make -C contrib/sdk-bindings publish"]
-
-  let () =
-    (* [~tag_rex] matches Tezos SDK release tags, e.g. [tezos-sdk-v1.2.0]. *)
-    CI.register_dedicated_release_pipeline
-      ~tag_rex:"/^tezos-sdk-v\\d+\\.\\d+\\.\\d+$/"
-      [(Auto, job_publish_sdk)]
 end
+
+let register () =
+  Cacio.register_merge_request_jobs [(Auto, job_test)] ;
+  (* TODO: split into a new pipeline [sdk_bindings.daily] *)
+  Cacio.register_jobs Schedule_extended_test [(Auto, job_test)] ;
+  (* [~tag_rex] matches Tezos SDK release tags, e.g. [tezos-sdk-v1.2.0]. *)
+  CI.register_dedicated_release_pipeline
+    ~tag_rex:"/^tezos-sdk-v\\d+\\.\\d+\\.\\d+$/"
+    [(Auto, Release.job_publish_sdk)] ;
+  ()

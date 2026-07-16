@@ -119,6 +119,8 @@ let () = Tezos_ci_jobs.Security_scans.register ()
 
 let () = Release_tag.register ()
 
+let () = Sdk_bindings_ci.register ()
+
 (** {3 General pipelines} *)
 
 let () =
