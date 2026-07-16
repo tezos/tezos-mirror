@@ -30,3 +30,6 @@ default-features = false
 
 [build-dependencies.tezos-smart-rollup-build-utils]
 path = "../build-utils"
+
+[dev-dependencies.tezos-smart-rollup-mock]
+path = "../mock"
