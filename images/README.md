@@ -7,7 +7,6 @@ The images, their content and indented usage, are:
 
 | Image                      | Contents                                | Usage                          |
 |----------------------------|-----------------------------------------|--------------------------------|
-| `rust-toolchain`           | cargo                                   | CI: kernel build, test and SDK |
 | `jsonnet`                  | jsonnet                                 | CI: Grafazos jobs              |
 | `ci`                       | ocaml, cargo, npm, python ...           | CI: the majority of jobs       |
 
@@ -58,13 +57,6 @@ artifact](https://docs.gitlab.com/ee/ci/yaml/artifacts_reports.html#artifactsrep
 Jobs that use the image refer to this variable in their `image:`
 field and thus reuse the image directly.
 
-# `rust-toolchain` image
-
-The `rust-toolchain` image is used in the CI to build and test
-kernels, and to build the kernel SDK. It is also used to build the
-`evm_kernel` included in the Octez Docker distribution. To build this
-image for local use, run `create_image.sh "rust-toolchain"`.
-
 # `jsonnet` image
 
 The `jsonnet` image is used in the CI to build and test Grafazos.  It
@@ -113,13 +105,14 @@ pipeline, see the parameters `--ci-image-name` and
 
 To build the Octez Docker Distribution with EVM artifacts, pass
 `--docker-target with-evm-artifacts` to
-`./scripts/create_docker_image.sh`. In addition the the CI images,
-building the EVM artifacts requires the rust-toolchain image as
-input. By default, the script will attempt to re-use the latest
-version of this image built on the `master` branch of the tezos/tezos
-CI. If you need to use a different image for the rust-toolchain image,
-specify the `--rust-toolchain-image` parameter to
-`./scripts/create_docker_image.sh` accordingly.
+`./scripts/create_docker_image.sh`. In addition to the CI images,
+building the EVM artifacts requires a rust-toolchain image as input,
+supplied with `--rust-toolchain-image` (required for
+`--docker-target with-evm-artifacts`). The CI distribution jobs pass
+the `debian-rust:trixie` base-image reference; that reference lives in
+the protected registry, so for a local build pass any
+`debian-rust:trixie`-compatible image (defined by
+`images/base-images/Dockerfile.rust`): `--rust-toolchain-image <ref>`.
 
 For more info on how to configure:
  - naming of the built images in the Octez Docker distribution,

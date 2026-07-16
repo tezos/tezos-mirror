@@ -465,8 +465,6 @@ module Images : sig
 
   val macosx_15 : Image.t
 
-  val rust_toolchain : Image.t
-
   val trivy : Image.t
 
   val node_alpine : Image.t

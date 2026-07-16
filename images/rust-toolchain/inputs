@@ -1,3 +1,0 @@
-scripts/ci/docker_rust_toolchain_build.sh
-images/rust-toolchain
-images/create_image.sh

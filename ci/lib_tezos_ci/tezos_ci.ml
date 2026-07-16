@@ -1534,8 +1534,6 @@ module Base_images = struct
   (* [ci-release] is built on top of the internal [debian] base image (so it
      inherits jq, gcloud, datadog, ...). Since !22370. *)
   let ci_release = make_img "ci-release:trixie"
-
-  let pp = Image.pp
 end
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
@@ -1672,8 +1670,7 @@ end
     transparent to job definitions, this module also includes
     {!Images_external}.
 
-    For documentation on the [CI] images and the [rust_toolchain]
-    images, refer to [images/README.md]. *)
+    For documentation on the [CI] images, refer to [images/README.md]. *)
 module Images = struct
   (* Include external images here for convenience. *)
   include Images_external
@@ -1681,38 +1678,6 @@ module Images = struct
 
   (* Internal images are built in the stage {!Stages.images}. *)
   let stage = Stages.images
-
-  (** The rust toolchain image *)
-  let rust_toolchain =
-    (* The job that builds the rust_toolchain image.
-       This job is automatically included in any pipeline that uses this image. *)
-    let image_builder arch ?storage () =
-      job_docker_authenticated
-        ~__POS__
-        ~arch
-        ?storage
-        ~stage
-        ~name:("oc.docker:rust-toolchain:" ^ Runner.Arch.show_uniform arch)
-        ~description:
-          ("Build internal rust-toolchain images for "
-          ^ Runner.Arch.show_uniform arch)
-        ~ci_docker_hub:false
-        ~variables:
-          [("IMAGE", Base_images.(Format.asprintf "%a" pp debian_rust_trixie))]
-        ~artifacts:
-          (artifacts
-             ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
-             [])
-        ["./scripts/ci/docker_rust_toolchain_build.sh"]
-    in
-    let image_path =
-      "${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
-    in
-    Image.mk_internal
-      ~image_builder_amd64:(image_builder Amd64 ())
-      ~image_builder_arm64:(image_builder Arm64 ~storage:Ramfs ())
-      ~image_path
-      ()
 
   module CI = struct
     (* The job that builds the CI images.
