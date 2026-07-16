@@ -227,7 +227,7 @@ let job_apt_repo =
     ~variables:
       (archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:Tezos_ci.no_retry
     ~id_tokens:Tezos_ci.id_tokens
     ~script:
       [

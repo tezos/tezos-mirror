@@ -20,10 +20,6 @@ open Tezos_ci
 (* Some jobs have been migrated to Cacio, in the shared component. *)
 module CI = Cacio.Shared
 
-(* Release jobs must not be retried: they publish artifacts and retrying could
-   result in publishing the same artifact twice. *)
-let no_retry = Gitlab_ci.Types.{max = 0; when_ = []}
-
 let job_docker = Docker.job_docker `released
 
 let job_docker_merge_manifests = Docker.job_docker_merge_manifests `released
@@ -90,7 +86,7 @@ let job_docker_promote_to_latest =
           (* In latest release pipelines, the Docker image already exists,
              as it was created by another pipeline (the tag pipeline). *)
           [])
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:no_retry
     ~services:[{name = Images.Base_images.dind_service}]
     ~variables:
       ([
@@ -395,7 +391,7 @@ let job_docker_promote_to_version =
     ~stage:Publish
     ~allow_failure:No
     ~needs:[(Job, job_docker_merge_manifests mode)]
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:no_retry
     ~services:[{name = Images.Base_images.dind_service}]
     ~variables:
       [

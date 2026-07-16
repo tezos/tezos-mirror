@@ -202,7 +202,7 @@ let job_unit_tests =
     ~sccache:(Cacio.sccache ())
     ~dune_cache:true
     ~variables:[("DUNE_ARGS", "-j 12")]
-    ~retry:{max = 2; when_ = []}
+    ~retry:retry_twice
     ~script:
       [". ./scripts/version.sh"; "eval $(opam env)"; "make test-etherlink-unit"]
 
@@ -457,7 +457,7 @@ let job_docker_merge =
       | `real ->
           Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
       | `test -> None)
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:no_retry
     ~services:[{name = Images.Base_images.dind_service}]
     ~description:"Merge manifest for arm64 and arm64 docker images."
     ~script:

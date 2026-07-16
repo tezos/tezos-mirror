@@ -658,7 +658,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 | None -> (
                     match stage with
                     | Build | Test | Test_publication -> None
-                    | Publish -> Some {max = 0; when_ = []})
+                    | Publish -> Some Tezos_ci.no_retry)
               in
               let dev_infra =
                 match provider with

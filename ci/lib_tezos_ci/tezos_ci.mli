@@ -350,6 +350,15 @@ val job :
   string list ->
   tezos_job
 
+(** Retry policy that disables automatic retry ([max = 0]).
+
+    Used e.g. by release jobs, which publish artifacts: retrying could
+    republish the same artifact twice. *)
+val no_retry : Gitlab_ci.Types.retry
+
+(** Retry policy that retries up to twice on any failure ([max = 2]). *)
+val retry_twice : Gitlab_ci.Types.retry
+
 (** Define a trigger job for a child pipeline.
 
     The trigger job will be named [trigger:CHILD_PIPELINE_NAME].

@@ -1155,6 +1155,11 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     template;
   }
 
+(* Convenience retry policies used across job builders. *)
+let no_retry = Gitlab_ci.Types.{max = 0; when_ = []}
+
+let retry_twice = Gitlab_ci.Types.{max = 2; when_ = []}
+
 (* helper function to merge two list of variables, giving the precedence
    to the values in [variables] over the [default_variables] *)
 let merge_variables ~default_variables variables =
