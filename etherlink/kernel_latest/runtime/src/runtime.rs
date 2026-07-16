@@ -15,7 +15,6 @@ use std::{
 };
 
 use crate::extensions::WithGas;
-use crate::keyspace::StorageV1KeySpaceCompat;
 use tezos_evm_logging::{tracing::instrument, Level};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
@@ -29,6 +28,7 @@ use tezos_smart_rollup_host::{
     storage::{CoreStorage, StorageV1},
     wasm::WasmHost,
 };
+use tezos_smart_rollup_keyspace::irmin_ds::StorageV1KeySpaceCompat;
 use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
 use tezos_smart_rollup_mock::MockHost;
 

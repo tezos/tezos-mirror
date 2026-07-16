@@ -18,7 +18,8 @@ use tezos_smart_rollup_host::{
     storage::StorageV1,
     Error as HostError,
 };
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceWriteError, Name};
+
+use crate::{Key, KeySpace, KeySpaceWriteError, Name};
 
 /// Blake2B hash of an empty irmin tree (`Context.Tree.empty` in OCaml).
 const EMPTY_TREE_HASH: [u8; 32] =

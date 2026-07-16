@@ -15,6 +15,8 @@ use std::str::FromStr;
 use tezos_smart_rollup_host::storage::v2;
 
 #[cfg(feature = "irmin-compat")]
+pub mod irmin_ds;
+#[cfg(feature = "irmin-compat")]
 mod irmin_path_validator;
 pub mod wasm_nds;
 
