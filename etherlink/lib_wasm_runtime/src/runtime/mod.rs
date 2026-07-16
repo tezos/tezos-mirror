@@ -174,10 +174,8 @@ const FARFADET_R4_ROOT_HASH_HEX: &'static str =
     "076353bedb639a3f3a75389180d7b2b0ff891271e5a89be57862f5fc2c63c84e";
 const FARFADET_R5_ROOT_HASH_HEX: &'static str =
     "fca436efba329d9433a27feac8a9477d0a802eb24dfeb36afd2f919a3957fca1";
-// FIXME: placeholder, to be replaced by the actual root hash once the
-// farfadet-r6 kernel is released.
 const FARFADET_R6_ROOT_HASH_HEX: &'static str =
-    "0000000000000000000000000000000000000000000000000000000000000000";
+    "14f3cacf5eba7f76c88a5a5af2a8b2ad48591a7d6cee192db56f2f0dc3f973ad";
 
 impl NativeKernel {
     fn of_root_hash(root_hash: &ContextHash) -> Option<NativeKernel> {
