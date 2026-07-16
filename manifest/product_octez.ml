@@ -8718,7 +8718,7 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
 
   let _024_PtTALLiN = active (Name.v "PtTALLiN" 024)
 
-  let _025_PsUshuai = active (Name.dev "025_PsUshuai")
+  let _025_PsUshuai = active (Name.v "PsUshuai" 025)
 
   let alpha = active (Name.dev "alpha")
 
