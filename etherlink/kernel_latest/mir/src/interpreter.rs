@@ -4211,6 +4211,73 @@ mod interpreter_tests {
             .expect("EXEC of a deeply nested lambda must not overflow the stack");
     }
 
+    /// Regression (L2-1790): `VIEW`, like `EXEC`, walks the callee's body
+    /// borrowed from the keep-alive arena. A deeply nested singleton-sequence
+    /// view body `{ { … {} … } }` used to overflow the stack by deep-cloning
+    /// each opened sub-block. Drives the full typecheck-and-interpret `VIEW`
+    /// path on a 1 MiB worker stack (the kernel's size) so a reintroduced
+    /// recursion traps here.
+    #[test]
+    fn view_deeply_nested_body_does_not_overflow() {
+        use crate::ast::View;
+
+        // Far beyond the ~2240 depth that trapped the kernel.
+        const DEPTH: usize = 100_000;
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                // DEPTH nested singleton `Seq`s as the view body, built
+                // bottom-up so construction itself never recurses. Held in a
+                // local arena that outlives `ctx`.
+                let arena: Arena<Micheline> = Arena::new();
+                let mut code: Micheline = Micheline::Seq(&[]);
+                for _ in 0..DEPTH {
+                    code = Micheline::Seq(std::slice::from_ref(arena.alloc(code)));
+                }
+
+                // A no-op body leaves the `(arg, storage)` pair untouched, so
+                // the view's declared output is that pair type.
+                let kt1: AddressHash =
+                    "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye".try_into().unwrap();
+                let view = View {
+                    input_type: Type::Unit,
+                    output_type: Type::new_pair(Type::Unit, Type::Unit),
+                    code,
+                };
+                let mut ctx = Ctx::default();
+                ctx.gas = Gas::new(u32::MAX);
+                ctx.views = HashMap::from([(
+                    kt1.clone(),
+                    HashMap::from([("v".to_string(), view)]),
+                )]);
+                ctx.storage = HashMap::from([(kt1.clone(), (Type::Unit, V::Unit))]);
+
+                let address = V::Address(addr::Address {
+                    hash: kt1,
+                    entrypoint: Entrypoint::default(),
+                });
+                let mut stack = stk![address, V::Unit];
+                interpret(
+                    &[IView {
+                        name: "v".to_string(),
+                        arg_type: Type::Unit,
+                        return_type: Type::new_pair(Type::Unit, Type::Unit),
+                    }],
+                    &mut ctx,
+                    &mut stack,
+                )
+                .unwrap();
+                assert_eq!(
+                    stack,
+                    stk![V::new_option(Some(V::new_pair(V::Unit, V::Unit)))],
+                    "the view returns the untouched (arg, storage) pair"
+                );
+            })
+            .unwrap()
+            .join()
+            .expect("VIEW of a deeply nested body must not overflow the stack");
+    }
+
     mod sub {
         use super::*;
 
