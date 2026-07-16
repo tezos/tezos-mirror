@@ -3467,6 +3467,18 @@ fn interpret_one<'a>(
                 _ => None,
             }));
         }
+        I::IndexAddress => {
+            ctx.gas().consume(interpret_cost::INDEX_ADDRESS)?;
+            let addr = pop!(V::Address);
+            let index = ctx.index_address(&addr.hash)?;
+            stack.push(TypedValue::Nat(index));
+        }
+        I::GetAddressIndex => {
+            ctx.gas().consume(interpret_cost::GET_ADDRESS_INDEX)?;
+            let addr = pop!(V::Address);
+            let result = ctx.get_address_index(&addr.hash)?;
+            stack.push(TypedValue::new_option(result.map(TypedValue::Nat)));
+        }
         I::VotingPower => {
             ctx.gas().consume(interpret_cost::VOTING_POWER)?;
             let keyhash = pop!(V::KeyHash);
@@ -10820,5 +10832,171 @@ mod interpreter_tests {
 
         // The small-order key/signature is rejected in MIR.
         assert_eq!(stack, stk![V::Bool(false)]);
+    }
+
+    mod address_registry {
+        use super::*;
+        use crate::ast::byte_repr_trait::ByteReprTrait;
+        use crate::gas::interpret_cost;
+
+        fn tz1() -> addr::Address {
+            addr::Address::from_base58_check("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw")
+                .unwrap()
+        }
+
+        fn kt1() -> addr::Address {
+            addr::Address::from_base58_check("KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi")
+                .unwrap()
+        }
+
+        fn nat(n: u32) -> V<'static> {
+            V::Nat(BigUint::from(n))
+        }
+
+        fn some_nat(n: u32) -> V<'static> {
+            V::new_option(Some(nat(n)))
+        }
+
+        fn none_nat() -> V<'static> {
+            V::new_option(None)
+        }
+
+        #[test]
+        fn index_allocates_sequentially_and_is_idempotent() {
+            // Index 0 is the pre-registered null address, so user addresses
+            // start at 1; re-indexing returns the original index.
+            let mut ctx = Ctx::default();
+            let mut s = stk![V::Address(tz1())];
+            interpret_one(&IndexAddress, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![nat(1)]);
+            let mut s = stk![V::Address(kt1())];
+            interpret_one(&IndexAddress, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![nat(2)]);
+            let mut s = stk![V::Address(tz1())];
+            interpret_one(&IndexAddress, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![nat(1)]);
+        }
+
+        #[test]
+        fn get_returns_none_before_and_some_after_indexing() {
+            let mut ctx = Ctx::default();
+            let mut s = stk![V::Address(tz1())];
+            interpret_one(&GetAddressIndex, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![none_nat()]);
+            let mut s = stk![V::Address(tz1())];
+            interpret_one(&IndexAddress, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![nat(1)]);
+            let mut s = stk![V::Address(tz1())];
+            interpret_one(&GetAddressIndex, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![some_nat(1)]);
+        }
+
+        #[test]
+        fn null_address_has_index_zero() {
+            // GET returns Some 0 without any prior registration.
+            let mut ctx = Ctx::default();
+            let null =
+                addr::Address::from_base58_check("tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU")
+                    .unwrap();
+            let mut s = stk![V::Address(null)];
+            interpret_one(&GetAddressIndex, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![some_nat(0)]);
+        }
+
+        #[test]
+        fn get_does_not_register() {
+            // GET is read-only: it must not allocate, so the following
+            // INDEX_ADDRESS still assigns the first index.
+            let mut ctx = Ctx::default();
+            let mut s = stk![V::Address(tz1())];
+            interpret_one(&GetAddressIndex, &mut ctx, &mut s).unwrap();
+            let mut s = stk![V::Address(tz1())];
+            interpret_one(&IndexAddress, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![nat(1)]);
+        }
+
+        #[test]
+        fn entrypoint_is_ignored() {
+            // The registry key is the address hash without entrypoint, so
+            // addresses differing only in entrypoint share one index.
+            let with_do = addr::Address::from_base58_check(
+                "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%do",
+            )
+            .unwrap();
+            let with_other = addr::Address::from_base58_check(
+                "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%other",
+            )
+            .unwrap();
+            let mut ctx = Ctx::default();
+            let mut s = stk![V::Address(with_do)];
+            interpret_one(&IndexAddress, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![nat(1)]);
+            let mut s = stk![V::Address(with_other)];
+            interpret_one(&GetAddressIndex, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![some_nat(1)]);
+            let mut s = stk![V::Address(kt1())];
+            interpret_one(&GetAddressIndex, &mut ctx, &mut s).unwrap();
+            assert_eq!(s, stk![some_nat(1)]);
+        }
+
+        #[test]
+        fn index_gas() {
+            // Exact budget succeeds; one milligas short fails with OutOfGas and
+            // leaves the stack untouched.
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(interpret_cost::INDEX_ADDRESS);
+            assert!(
+                interpret_one(&IndexAddress, &mut ctx, &mut stk![V::Address(tz1())])
+                    .is_ok()
+            );
+
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(interpret_cost::INDEX_ADDRESS - 1);
+            let mut s = stk![V::Address(tz1())];
+            let before = s.clone();
+            assert!(matches!(
+                interpret_one(&IndexAddress, &mut ctx, &mut s),
+                Err(InterpretError::OutOfGas)
+            ));
+            assert_eq!(s, before);
+        }
+
+        #[test]
+        fn get_gas() {
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(interpret_cost::GET_ADDRESS_INDEX);
+            assert!(interpret_one(
+                &GetAddressIndex,
+                &mut ctx,
+                &mut stk![V::Address(tz1())]
+            )
+            .is_ok());
+
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(interpret_cost::GET_ADDRESS_INDEX - 1);
+            let mut s = stk![V::Address(tz1())];
+            let before = s.clone();
+            assert!(matches!(
+                interpret_one(&GetAddressIndex, &mut ctx, &mut s),
+                Err(InterpretError::OutOfGas)
+            ));
+            assert_eq!(s, before);
+        }
+
+        /// OutOfGas routes to `InterpretError::OutOfGas`; host I/O keeps the
+        /// dedicated variant.
+        #[test]
+        fn registry_error_routing_into_interpret_error() {
+            use crate::context::AddressRegistryError;
+            use crate::gas::OutOfGas;
+            assert!(matches!(
+                InterpretError::from(AddressRegistryError::OutOfGas(OutOfGas)),
+                InterpretError::OutOfGas
+            ));
+            assert!(matches!(
+                InterpretError::from(AddressRegistryError::HostError("io".into())),
+                InterpretError::AddressRegistryError(_)
+            ));
+        }
     }
 }

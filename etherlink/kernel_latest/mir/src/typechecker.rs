@@ -4545,6 +4545,28 @@ fn typecheck_instruction_step<'a, 'b>(
         (App(IS_IMPLICIT_ACCOUNT, [], _), []) => no_overload!(IS_IMPLICIT_ACCOUNT, len 1),
         (App(IS_IMPLICIT_ACCOUNT, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        // INDEX_ADDRESS mutates the shared registry, so it is forbidden in
+        // views (read-only), like TRANSFER_TOKENS / SET_DELEGATE.
+        // GET_ADDRESS_INDEX is read-only and always allowed.
+        (App(INDEX_ADDRESS, [], _), _) if in_view => {
+            Err(TcError::ForbiddenInView(Prim::INDEX_ADDRESS))?
+        }
+        (App(INDEX_ADDRESS, [], _), [.., T::Address]) => {
+            *stack_top_mut(stack)? = T::Nat;
+            I::IndexAddress
+        }
+        (App(INDEX_ADDRESS, [], _), [.., _]) => no_overload!(INDEX_ADDRESS),
+        (App(INDEX_ADDRESS, [], _), []) => no_overload!(INDEX_ADDRESS, len 1),
+        (App(INDEX_ADDRESS, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(GET_ADDRESS_INDEX, [], _), [.., T::Address]) => {
+            *stack_top_mut(stack)? = T::new_option(T::Nat);
+            I::GetAddressIndex
+        }
+        (App(GET_ADDRESS_INDEX, [], _), [.., _]) => no_overload!(GET_ADDRESS_INDEX),
+        (App(GET_ADDRESS_INDEX, [], _), []) => no_overload!(GET_ADDRESS_INDEX, len 1),
+        (App(GET_ADDRESS_INDEX, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(TOTAL_VOTING_POWER, [], _), ..) => {
             stack.push(T::Nat);
             I::TotalVotingPower
@@ -14525,7 +14547,23 @@ code { DROP ;
         );
     }
 
+    #[test]
+    fn index_address_forbidden_in_view() {
+        assert_eq!(
+            typecheck_script_with_view("INDEX_ADDRESS"),
+            Err(TcError::ForbiddenInView(Prim::INDEX_ADDRESS))
+        );
+    }
+
     // -- Allowed in view body --
+
+    #[test]
+    fn get_address_index_allowed_in_view() {
+        assert!(typecheck_script_with_view(
+            "CAR; PUSH address \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\"; GET_ADDRESS_INDEX; DROP; DROP; UNIT"
+        )
+        .is_ok());
+    }
 
     #[test]
     fn balance_allowed_in_view() {
@@ -14537,12 +14575,21 @@ code { DROP ;
         assert!(typecheck_script_with_view("DROP; AMOUNT; DROP; UNIT").is_ok());
     }
 
-    // -- Lambda escape: forbidden instruction inside LAMBDA in view is ok --
+    // -- Lambda escape: a view-forbidden instruction inside a LAMBDA in a view
+    //    is ok, because entering a lambda body resets `in_view` --
 
     #[test]
     fn set_delegate_in_lambda_in_view_ok() {
         assert!(typecheck_script_with_view(
             "DROP; LAMBDA (option key_hash) operation { SET_DELEGATE }; DROP; UNIT"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn index_address_in_lambda_in_view_ok() {
+        assert!(typecheck_script_with_view(
+            "DROP; LAMBDA address nat { INDEX_ADDRESS }; DROP; UNIT"
         )
         .is_ok());
     }
@@ -14569,6 +14616,43 @@ code { DROP ;
             ),
             Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))
         );
+    }
+
+    #[test]
+    fn index_address_in_nested_sequence_in_view_forbidden() {
+        // The in_view restriction propagates into nested sequences (MAP here
+        // stands in for IF/LOOP/ITER).
+        assert_eq!(
+            typecheck_script_with_view(
+                "DROP; \
+                 PUSH (list address) {}; \
+                 MAP { INDEX_ADDRESS }; \
+                 DROP; UNIT"
+            ),
+            Err(TcError::ForbiddenInView(Prim::INDEX_ADDRESS))
+        );
+    }
+
+    // -- GET_ADDRESS_INDEX is read-only: allowed in all nested view contexts --
+
+    #[test]
+    fn get_address_index_in_map_in_view_allowed() {
+        assert!(typecheck_script_with_view(
+            "DROP; \
+             PUSH (list address) {}; \
+             MAP { GET_ADDRESS_INDEX }; \
+             DROP; UNIT"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn get_address_index_wrong_input_type() {
+        // Wrong input type yields NoMatchingOverload, not ForbiddenInView.
+        assert!(matches!(
+            typecheck_script_with_view("DROP; PUSH nat 0; GET_ADDRESS_INDEX; DROP; UNIT"),
+            Err(TcError::NoMatchingOverload { .. })
+        ));
     }
 
     // -- Code after lambda in view still has restriction --

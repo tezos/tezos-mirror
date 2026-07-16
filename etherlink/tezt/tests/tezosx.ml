@@ -6432,6 +6432,274 @@ let test_native_branch_foreign_rejected_delayed =
        changed from %R to %L" ;
   unit
 
+(** Fetch the head block's first manager operation through the Tezlink RPC and
+    check its operation_result's address_registry_diff as [(address, index)]
+    pairs. The field is a dft in the protocol encoding, so it may be absent
+    when empty. *)
+let check_head_registry_diff ~__LOC__ sandbox expected =
+  let tezlink_endpoint =
+    Endpoint.{(Evm_node.rpc_endpoint_record sandbox) with path = "/tezlink"}
+  in
+  let* operation =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~validation_pass:3
+         ~operation_offset:0
+         ()
+  in
+  let open JSON in
+  let op_result =
+    operation |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+  in
+  Check.(
+    (op_result |-> "status" |> as_string = "applied")
+      string
+      ~__LOC__
+      ~error_msg:"Expected operation status %R but got %L") ;
+  let diff =
+    op_result |-> "address_registry_diff" |> as_list_opt
+    |> Option.value ~default:[]
+    |> List.map (fun entry ->
+           (entry |-> "address" |> as_string, entry |-> "index" |> as_string))
+  in
+  Check.(
+    (diff = expected)
+      (list (tuple2 string string))
+      ~__LOC__
+      ~error_msg:"Expected address_registry_diff %R but got %L") ;
+  unit
+
+let test_michelson_address_registry () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"Michelson INDEX_ADDRESS and GET_ADDRESS_INDEX on Tezos X"
+    ~tags:["michelson"; "address_registry"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sandbox in
+  let originate ~script_name =
+    sandbox_originate_michelson_contract
+      ~source
+      ~script_name
+      ~init_storage_data:"None"
+      sandbox
+  in
+  let call ~dest pkh =
+    sandbox_call_michelson_contract
+      ~source
+      ~dest
+      ~arg_data:(sf {|"%s"|} pkh)
+      sandbox
+  in
+  let check_storage ~__LOC__ kt1 expected =
+    let* storage = Client.contract_storage kt1 tez_client in
+    Check.(
+      (remove_whitespace storage = remove_whitespace expected)
+        string
+        ~__LOC__
+        ~error_msg:"Expected contract storage %R but got %L") ;
+    unit
+  in
+  let check_head_registry_diff ~__LOC__ expected =
+    check_head_registry_diff ~__LOC__ sandbox expected
+  in
+  (* Originate a contract that stores the result of INDEX_ADDRESS on its
+     parameter. *)
+  let* idx_kt1 = originate ~script_name:["opcodes"; "index_address"] in
+  Log.info "Originated index_address contract: %s" idx_kt1 ;
+  (* Index 0 is reserved for the pre-registered null address (as on L1), so the
+     first user-registered address gets index 1. *)
+  let bootstrap1_pkh = Constant.bootstrap1.public_key_hash in
+  let* () = call ~dest:idx_kt1 bootstrap1_pkh in
+  let* () = check_storage ~__LOC__ idx_kt1 "Some 1" in
+  (* The fresh registration is reported on the operation receipt. *)
+  let* () = check_head_registry_diff ~__LOC__ [(bootstrap1_pkh, "1")] in
+  (* Registering the same address again is idempotent. *)
+  let* () = call ~dest:idx_kt1 bootstrap1_pkh in
+  let* () = check_storage ~__LOC__ idx_kt1 "Some 1" in
+  (* ... and an idempotent re-registration emits no receipt diff. *)
+  let* () = check_head_registry_diff ~__LOC__ [] in
+  (* A distinct address gets the next index. *)
+  let* () = call ~dest:idx_kt1 Constant.bootstrap2.public_key_hash in
+  let* () = check_storage ~__LOC__ idx_kt1 "Some 2" in
+  let* () =
+    check_head_registry_diff
+      ~__LOC__
+      [(Constant.bootstrap2.public_key_hash, "2")]
+  in
+  (* Originate a contract that stores the result of GET_ADDRESS_INDEX on its
+     parameter. *)
+  let* get_kt1 = originate ~script_name:["opcodes"; "get_address_index"] in
+  Log.info "Originated get_address_index contract: %s" get_kt1 ;
+  (* The registry is shared: an address registered through the index_address
+     contract is visible from the get_address_index contract. *)
+  let* () = call ~dest:get_kt1 bootstrap1_pkh in
+  let* () = check_storage ~__LOC__ get_kt1 "Some 1" in
+  (* GET_ADDRESS_INDEX is read-only: no receipt diff. *)
+  let* () = check_head_registry_diff ~__LOC__ [] in
+  (* An address that was never registered yields None. *)
+  let* () = call ~dest:get_kt1 Constant.bootstrap3.public_key_hash in
+  let* () = check_storage ~__LOC__ get_kt1 "None" in
+  unit
+
+(** L2-1452 scenario: INDEX_ADDRESS is rejected by the typechecker directly in
+    a view, but the restriction does not cross lambda boundaries, so a lambda
+    EXEC'd by a view still reaches the instruction at runtime. Unlike Michelson
+    storage writes, the registry write goes straight to durable storage
+    (bypassing the journal), so this pins E2E that it nevertheless shares the
+    fate of the enclosing operation — the same semantics as L1's, tested by
+    "Contract onchain opcodes: INDEX_ADDRESS in a view lambda" in
+    tezt/tests/contract_onchain_opcodes.ml:
+    - if the operation fails after the view returned, the write is reverted
+      with the rest of the transaction (no registry entry, and the registry
+      counter does not advance) — the E2E counterpart of the
+      [index_address_write_is_reverted_on_transaction_revert] unit test in
+      tezos_execution/src/mir_ctx.rs;
+    - if the operation succeeds, the registration persists and is reported on
+      the caller's receipt diff — counterpart of
+      [index_address_write_persists_on_transaction_commit]. *)
+let test_michelson_address_registry_view_lambda () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"Michelson INDEX_ADDRESS in a view lambda on Tezos X"
+    ~tags:["michelson"; "address_registry"; "view"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sandbox in
+  let originate ~script_name ~init_storage_data =
+    sandbox_originate_michelson_contract
+      ~source
+      ~script_name
+      ~init_storage_data
+      sandbox
+  in
+  (* The contract whose view EXECs a lambda containing INDEX_ADDRESS, and the
+     caller that invokes the view on-chain through VIEW and then either fails
+     with the returned index or stores it. *)
+  let* target_kt1 =
+    originate
+      ~script_name:["opcodes"; "index_address_view_lambda"]
+      ~init_storage_data:"Unit"
+  in
+  let* caller_kt1 =
+    originate
+      ~script_name:["opcodes"; "index_address_view_lambda_caller"]
+      ~init_storage_data:"None"
+  in
+  (* Probes for the durable registry state: get_address_index reads an entry;
+     index_address registers a fresh address, so the index it reports reveals
+     the registry counter. *)
+  let* get_kt1 =
+    originate
+      ~script_name:["opcodes"; "get_address_index"]
+      ~init_storage_data:"None"
+  in
+  let* idx_kt1 =
+    originate
+      ~script_name:["opcodes"; "index_address"]
+      ~init_storage_data:"None"
+  in
+  let check_storage ~__LOC__ kt1 expected =
+    let* storage = Client.contract_storage kt1 tez_client in
+    Check.(
+      (remove_whitespace storage = remove_whitespace expected)
+        string
+        ~__LOC__
+        ~error_msg:"Expected contract storage %R but got %L") ;
+    unit
+  in
+  let registrand = Constant.bootstrap1.public_key_hash in
+  (* Failure leg: the caller FAILWITHs (with the index the view just returned)
+     after the view call. [~force:true] injects the operation the client
+     predicts will fail, so the failed operation is actually included in a
+     block and its revert is exercised. *)
+  let* () =
+    sandbox_call_michelson_contract
+      ~source
+      ~dest:caller_kt1
+      ~arg_data:(sf {|Pair "%s" "%s" True|} target_kt1 registrand)
+      ~force:true
+      ~gas_limit:500_000
+      ~storage_limit:100
+      ~fee:(Tez.of_int 1)
+      sandbox
+  in
+  let* ops =
+    Client.RPC.call tez_client (Node.RPC.get_chain_block_operations ())
+  in
+  let operation_result =
+    match JSON.as_list ops |> List.concat_map JSON.as_list with
+    | [op] ->
+        JSON.(op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result")
+    | _ -> Test.fail "Expected one operation in the block, got something else"
+  in
+  Check.(
+    (JSON.(operation_result |-> "status" |> as_string) = "failed")
+      string
+      ~__LOC__
+      ~error_msg:"Expected operation status %R but got %L") ;
+  (* The caller FAILWITH'd with the index INDEX_ADDRESS assigned inside the
+     view before the operation was reverted: index 0 is the pre-registered
+     zero address, so the first fresh registration takes 1. This pins that
+     the instruction did run and its durable write was then undone — rather
+     than never having happened. Tezlink receipts flatten errors into a
+     single {kind; id; error_message} object (L2-363), so unlike on L1 there
+     is no structured "with" field to read the rejection value from: look for
+     the interpreter's "failed with: Nat(1)" rendering instead. *)
+  let error_messages =
+    JSON.(operation_result |-> "errors" |> as_list)
+    |> List.map (fun err ->
+           JSON.(err |-> "error_message" |> as_string_opt)
+           |> Option.value ~default:(JSON.encode err))
+    |> String.concat "; "
+  in
+  Check.(error_messages =~ rex "failed with: Nat\\(1\\)")
+    ~error_msg:"Expected the failure receipt (%L) to mention %R" ;
+  (* The reverted registration left no durable trace: no entry for the
+     address... *)
+  let* () =
+    sandbox_call_michelson_contract
+      ~source
+      ~dest:get_kt1
+      ~arg_data:(sf {|"%s"|} registrand)
+      sandbox
+  in
+  let* () = check_storage ~__LOC__ get_kt1 "None" in
+  (* ...and the counter did not advance: the next fresh registration still
+     takes index 1. *)
+  let* () =
+    sandbox_call_michelson_contract
+      ~source
+      ~dest:idx_kt1
+      ~arg_data:(sf {|"%s"|} Constant.bootstrap2.public_key_hash)
+      sandbox
+  in
+  let* () = check_storage ~__LOC__ idx_kt1 "Some 1" in
+  (* Success leg: same call without the deliberate failure. The registration
+     made inside the view persists: it lands in the caller's storage (index 2,
+     the counter-probe above consumed 1)... *)
+  let* () =
+    sandbox_call_michelson_contract
+      ~source
+      ~dest:caller_kt1
+      ~arg_data:(sf {|Pair "%s" "%s" False|} target_kt1 registrand)
+      sandbox
+  in
+  let* () = check_storage ~__LOC__ caller_kt1 "Some 2" in
+  (* ...is reported on the *caller*'s receipt diff... *)
+  let* () = check_head_registry_diff ~__LOC__ sandbox [(registrand, "2")] in
+  (* ...and is durably visible from another contract. *)
+  let* () =
+    sandbox_call_michelson_contract
+      ~source
+      ~dest:get_kt1
+      ~arg_data:(sf {|"%s"|} registrand)
+      sandbox
+  in
+  check_storage ~__LOC__ get_kt1 "Some 2"
+
 let () =
   test_native_branch_valid_applied () ;
   test_native_branch_valid_delayed_applied [Alpha] ;
@@ -6518,4 +6786,6 @@ let () =
   test_eip1271_wrong_signature_rejected () ;
   test_p256_malleable_signature_drains_vault () ;
   test_meta_block_rpcs ~runtime:Tezos () ;
-  test_meta_block_rpcs_without_michelson_runtime ()
+  test_meta_block_rpcs_without_michelson_runtime () ;
+  test_michelson_address_registry () ;
+  test_michelson_address_registry_view_lambda ()

@@ -39,7 +39,7 @@ use tezos_tezlink::operation::{
     OriginationContent, Script,
 };
 use tezos_tezlink::operation_result::{
-    produce_skipped_receipt, BacktrackedResult, ContentResult,
+    produce_skipped_receipt, AddressRegistry, BacktrackedResult, ContentResult,
     InternalContentWithMetadata, InternalOperationSum, OperationKind, OperationResult,
     OperationWithMetadata, Originated, OriginationSuccess, TransferTarget,
 };
@@ -1050,15 +1050,20 @@ where
                 ExecCtx::create(tc_ctx.host, sender_account, &dest_account, amount)?;
 
             let delegated_storage_cost_before = operation_ctx.delegated_storage_cost;
-            let (internal_operations, new_storage): (Vec<OperationInfo<'a>>, Vec<u8>) = {
+            let (internal_operations, new_storage, address_registry_diff): (
+                Vec<OperationInfo<'a>>,
+                Vec<u8>,
+                Vec<AddressRegistry>,
+            ) = {
                 let mut ctx = Ctx {
                     tc_ctx: &mut *tc_ctx,
                     exec_ctx,
                     operation_ctx: &mut *operation_ctx,
                     journal: &mut *journal,
                     registry,
+                    address_registry_diff: Vec::new(),
                 };
-                let result = match code {
+                let (internal_operations, new_storage) = match code {
                     Code::Code(code_bytes) => {
                         let (iter, new_storage) = execute_smart_contract_originated(
                             code_bytes,
@@ -1078,8 +1083,8 @@ where
                         (ops, vec![])
                     }
                 };
-                drop(ctx);
-                result
+                let address_registry_diff = ctx.address_registry_diff;
+                (internal_operations, new_storage, address_registry_diff)
             };
             let delegated_storage_cost =
                 operation_ctx.delegated_storage_cost - delegated_storage_cost_before;
@@ -1207,6 +1212,7 @@ where
                     consumed_milligas,
                     storage_size: used_bytes,
                     paid_storage_size_diff,
+                    address_registry_diff,
                     ..receipt
                 },
                 delegated_storage_cost,
@@ -10818,6 +10824,700 @@ mod tests {
             50_u64.into(),
             "Destination should be unchanged after failed transfer"
         );
+    }
+
+    #[test]
+    fn index_address_receipt_diff_emitted_after_state_change() {
+        use crate::context::address_registry;
+        use crate::contract_from_address;
+        use mir::ast::ByteReprTrait;
+        use tezos_storage::read_optional_nom_value;
+
+        const DEST: &str = CONTRACT_1;
+        const A: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
+
+        let mut host = MockKernelHost::default();
+        // Real networks seed the registry at activation; do the same here.
+        crate::mir_ctx::init_address_registry(&mut host).unwrap();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 1_000_000);
+        reveal_account(&mut host, &src);
+
+        let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
+        let account = init_contract(
+            &mut host,
+            &dest,
+            INDEX_ADDRESS_SCRIPT,
+            &Micheline::from(999i128),
+            &0_u64.into(),
+        );
+
+        let a_hash = mir::ast::AddressHash::from_base58_check(A).unwrap();
+        let a_entry = address_registry::entry_path(&a_hash).unwrap();
+        let baseline_a: Option<Narith> =
+            read_optional_nom_value(&host, &a_entry).unwrap();
+        assert_eq!(baseline_a, None, "A must start unregistered");
+
+        let encode_address = |address: &str| {
+            mir::parser::Parser::new()
+                .parse(&format!("\"{address}\""))
+                .unwrap()
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap()
+        };
+
+        let first_operation = make_transfer_operation(
+            10,
+            1,
+            100_000,
+            100,
+            src.clone(),
+            0_u64.into(),
+            Contract::Originated(dest.clone()),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: encode_address(A),
+            },
+        );
+        let first_receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                OperationHash::default(),
+                first_operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("first indexing operation should apply"),
+        );
+
+        let first_index: Option<Narith> =
+            read_optional_nom_value(&host, &a_entry).unwrap();
+        let first_index = first_index.expect("first INDEX_ADDRESS must register A");
+        let first_storage = Micheline::from(first_index.0.clone())
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            account.storage(&host).unwrap(),
+            first_storage,
+            "contract storage must record the registered address index"
+        );
+
+        match &first_receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result:
+                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                        address_registry_diff,
+                        ..
+                    })),
+                ..
+            }) => {
+                assert_eq!(
+                    address_registry_diff.len(),
+                    1,
+                    "first fresh INDEX_ADDRESS should emit one registry diff"
+                );
+                assert_eq!(
+                    address_registry_diff[0].index,
+                    Zarith(first_index.0.clone().into()),
+                    "receipt diff should carry the allocated index"
+                );
+                assert_eq!(
+                    address_registry_diff[0].address,
+                    contract_from_address(a_hash.clone()).unwrap(),
+                    "receipt diff should carry the indexed address A"
+                );
+            }
+            receipt => panic!("first operation should apply, got {receipt:?}"),
+        }
+
+        let second_operation = make_transfer_operation(
+            10,
+            2,
+            100_000,
+            100,
+            src,
+            0_u64.into(),
+            Contract::Originated(dest),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: encode_address(A),
+            },
+        );
+        let second_receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                OperationHash::default(),
+                second_operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("second idempotent indexing operation should apply"),
+        );
+
+        let second_index: Option<Narith> =
+            read_optional_nom_value(&host, &a_entry).unwrap();
+        assert_eq!(
+            second_index,
+            Some(first_index),
+            "idempotent INDEX_ADDRESS should keep the first index"
+        );
+        match &second_receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result:
+                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                        address_registry_diff,
+                        ..
+                    })),
+                ..
+            }) => assert!(
+                address_registry_diff.is_empty(),
+                "idempotent second INDEX_ADDRESS should not emit a new diff"
+            ),
+            receipt => panic!("second operation should apply, got {receipt:?}"),
+        }
+    }
+
+    /// Script of a parent contract that indexes one address itself and then
+    /// emits an internal transfer of another address to a child contract
+    /// (`parameter (pair child (pair indexed_by_parent sent_to_child))`).
+    const INDEX_THEN_CALL_CHILD_SCRIPT: &str = r#"
+        parameter (pair address (pair address address));
+        storage nat;
+        code {
+            CAR;
+            UNPAIR;
+            CONTRACT address;
+            IF_NONE { PUSH string "Invalid child"; FAILWITH } {};
+            SWAP;
+            UNPAIR;
+            INDEX_ADDRESS;
+            DUG 2;
+            PUSH mutez 0;
+            SWAP;
+            TRANSFER_TOKENS;
+            NIL operation;
+            SWAP;
+            CONS;
+            PAIR
+        }"#;
+
+    const INDEX_ADDRESS_SCRIPT: &str = r#"
+        parameter address;
+        storage nat;
+        code {
+            CAR;
+            INDEX_ADDRESS;
+            NIL operation;
+            PAIR
+        }"#;
+
+    /// Each frame reports only its own registrations: a parent and a child
+    /// that both run INDEX_ADDRESS each keep their own entry on their own
+    /// receipt (as on L1, where the diff is captured at the end of each
+    /// script execution, before the returned internal operations are applied).
+    #[test]
+    fn parent_and_child_index_address_diffs_land_on_their_own_receipts() {
+        use crate::context::address_registry;
+        use crate::contract_from_address;
+        use tezos_storage::read_optional_nom_value;
+        use tezos_tezlink::operation_result::AddressRegistry;
+
+        const PARENT: &str = CONTRACT_1;
+        const CHILD: &str = CONTRACT_2;
+        const P: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
+        const C: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+
+        let mut host = MockKernelHost::default();
+        // Real networks seed the registry at activation; do the same here.
+        crate::mir_ctx::init_address_registry(&mut host).unwrap();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 1_000_000);
+        reveal_account(&mut host, &src);
+
+        let child = ContractKt1Hash::from_base58_check(CHILD).unwrap();
+        init_contract(
+            &mut host,
+            &child,
+            INDEX_ADDRESS_SCRIPT,
+            &Micheline::from(999i128),
+            &0_u64.into(),
+        );
+        let parent = ContractKt1Hash::from_base58_check(PARENT).unwrap();
+        init_contract(
+            &mut host,
+            &parent,
+            INDEX_THEN_CALL_CHILD_SCRIPT,
+            &Micheline::from(999i128),
+            &0_u64.into(),
+        );
+
+        let value = mir::parser::Parser::new()
+            .parse(&format!("Pair \"{CHILD}\" (Pair \"{P}\" \"{C}\")"))
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let operation = make_transfer_operation(
+            10,
+            1,
+            200_000,
+            100,
+            src,
+            0_u64.into(),
+            Contract::Originated(parent),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value,
+            },
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("parent operation should apply"),
+        );
+
+        let index_of = |address: &str| -> Zarith {
+            use mir::ast::ByteReprTrait;
+            let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
+            let entry = address_registry::entry_path(&hash).unwrap();
+            let index: Narith = read_optional_nom_value(&host, &entry)
+                .unwrap()
+                .expect("address must be registered");
+            Zarith(index.0.into())
+        };
+        let expected_diff = |address: &str| {
+            use mir::ast::ByteReprTrait;
+            vec![AddressRegistry {
+                address: contract_from_address(
+                    mir::ast::AddressHash::from_base58_check(address).unwrap(),
+                )
+                .unwrap(),
+                index: index_of(address),
+            }]
+        };
+
+        let internal_operation_results = match &receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result:
+                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                        address_registry_diff,
+                        ..
+                    })),
+                internal_operation_results,
+                ..
+            }) => {
+                assert_eq!(
+                    *address_registry_diff,
+                    expected_diff(P),
+                    "parent receipt must carry exactly the parent's registration"
+                );
+                internal_operation_results
+            }
+            receipt => panic!("parent operation should apply, got {receipt:?}"),
+        };
+        assert_eq!(internal_operation_results.len(), 1);
+        match &internal_operation_results[0] {
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                result:
+                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                        address_registry_diff,
+                        ..
+                    })),
+                ..
+            }) => {
+                assert_eq!(
+                    *address_registry_diff,
+                    expected_diff(C),
+                    "child receipt must carry exactly the child's registration"
+                );
+            }
+            receipt => panic!("internal operation should apply, got {receipt:?}"),
+        }
+    }
+
+    /// A child that registers an address and then fails must not leak its
+    /// (reverted) registration into any receipt: the parent's backtracked
+    /// receipt keeps only the parent's own entry, the child's receipt is
+    /// `Failed`, and the durable registry is rolled back entirely.
+    #[test]
+    fn failed_child_index_address_diff_is_not_reported() {
+        use crate::context::address_registry;
+        use crate::contract_from_address;
+        use mir::ast::ByteReprTrait;
+        use tezos_storage::read_optional_nom_value;
+
+        const PARENT: &str = CONTRACT_1;
+        const CHILD: &str = CONTRACT_2;
+        const P: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
+        const C: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+
+        let mut host = MockKernelHost::default();
+        // Real networks seed the registry at activation; do the same here.
+        crate::mir_ctx::init_address_registry(&mut host).unwrap();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 1_000_000);
+        reveal_account(&mut host, &src);
+
+        let child = ContractKt1Hash::from_base58_check(CHILD).unwrap();
+        init_contract(
+            &mut host,
+            &child,
+            r#"
+                parameter address;
+                storage nat;
+                code {
+                    CAR;
+                    INDEX_ADDRESS;
+                    DROP;
+                    PUSH string "child failed after registering";
+                    FAILWITH
+                }"#,
+            &Micheline::from(999i128),
+            &0_u64.into(),
+        );
+        let parent = ContractKt1Hash::from_base58_check(PARENT).unwrap();
+        init_contract(
+            &mut host,
+            &parent,
+            INDEX_THEN_CALL_CHILD_SCRIPT,
+            &Micheline::from(999i128),
+            &0_u64.into(),
+        );
+
+        let value = mir::parser::Parser::new()
+            .parse(&format!("Pair \"{CHILD}\" (Pair \"{P}\" \"{C}\")"))
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let operation = make_transfer_operation(
+            10,
+            1,
+            200_000,
+            100,
+            src,
+            0_u64.into(),
+            Contract::Originated(parent),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value,
+            },
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("operation should produce backtracked receipts"),
+        );
+
+        let internal_operation_results = match &receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result:
+                    ContentResult::BackTracked(BacktrackedResult {
+                        result:
+                            TransferTarget::ToContrat(TransferSuccess {
+                                address_registry_diff,
+                                ..
+                            }),
+                        ..
+                    }),
+                internal_operation_results,
+                ..
+            }) => {
+                assert_eq!(
+                    address_registry_diff.len(),
+                    1,
+                    "backtracked parent keeps exactly its own registration"
+                );
+                assert_eq!(
+                    address_registry_diff[0].address,
+                    contract_from_address(
+                        mir::ast::AddressHash::from_base58_check(P).unwrap()
+                    )
+                    .unwrap(),
+                    "the parent's entry must be the address the parent indexed"
+                );
+                internal_operation_results
+            }
+            receipt => panic!("parent should be backtracked, got {receipt:?}"),
+        };
+        assert_eq!(internal_operation_results.len(), 1);
+        assert!(
+            matches!(
+                &internal_operation_results[0],
+                InternalOperationSum::Transfer(InternalContentWithMetadata {
+                    result: ContentResult::Failed(_),
+                    ..
+                })
+            ),
+            "child receipt must be Failed, carrying no registry diff"
+        );
+
+        // The whole operation was reverted: neither address stays registered.
+        for address in [P, C] {
+            let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
+            let entry = address_registry::entry_path(&hash).unwrap();
+            assert_eq!(
+                read_optional_nom_value::<Narith>(&host, &entry).unwrap(),
+                None,
+                "registry write for {address} must be rolled back"
+            );
+        }
+    }
+
+    /// Multiple fresh registrations in one execution are reported in
+    /// registration order, and already-registered addresses contribute no
+    /// entry — mirroring L1's `test_index_address_diffs`
+    /// (tezt/tests/contract_onchain_opcodes.ml).
+    #[test]
+    fn index_address_receipt_diff_is_ordered_and_skips_registered() {
+        use crate::context::address_registry;
+        use crate::contract_from_address;
+        use mir::ast::ByteReprTrait;
+        use num_bigint::BigUint;
+        use tezos_storage::read_optional_nom_value;
+        use tezos_tezlink::operation_result::AddressRegistry;
+
+        const DEST: &str = CONTRACT_1;
+        const X: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
+        const A: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+        const B: &str = "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi";
+        const C: &str = CONTRACT_2;
+
+        let mut host = MockKernelHost::default();
+        // Real networks seed the registry at activation; do the same here.
+        crate::mir_ctx::init_address_registry(&mut host).unwrap();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 1_000_000);
+        reveal_account(&mut host, &src);
+
+        let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
+        let parser = mir::parser::Parser::new();
+        let empty_list = parser.parse("{}").unwrap();
+        init_contract(
+            &mut host,
+            &dest,
+            r#"
+                parameter (list address);
+                storage (list nat);
+                code {
+                    CAR;
+                    MAP { INDEX_ADDRESS };
+                    NIL operation;
+                    PAIR
+                }"#,
+            &empty_list,
+            &0_u64.into(),
+        );
+
+        let call = |host: &mut MockKernelHost, counter: u64, arg: &str| {
+            let value = mir::parser::Parser::new()
+                .parse(arg)
+                .unwrap()
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap();
+            let operation = make_transfer_operation(
+                10,
+                counter,
+                200_000,
+                100,
+                bootstrap1(),
+                0_u64.into(),
+                Contract::Originated(dest.clone()),
+                Parameters {
+                    entrypoint: mir::ast::Entrypoint::default(),
+                    value,
+                },
+            );
+            ProcessedOperation::into_receipts(
+                validate_and_apply_operation(
+                    host,
+                    &NotWiredRegistry,
+                    &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                    OperationHash::default(),
+                    operation,
+                    &block_ctx!(),
+                    false,
+                    None,
+                    None,
+                    &test_safe_roots(),
+                )
+                .expect("indexing operation should apply"),
+            )
+        };
+
+        // Index 0 is reserved for the pre-registered null address (as on L1),
+        // so the first call registers X at index 1.
+        let _ = call(&mut host, 1, &format!("{{ \"{X}\" }}"));
+
+        // Second call: X is already registered; A, B, C are fresh.
+        let receipts = call(
+            &mut host,
+            2,
+            &format!("{{ \"{X}\"; \"{A}\"; \"{B}\"; \"{C}\" }}"),
+        );
+
+        let expected: Vec<AddressRegistry> = [(A, 2), (B, 3), (C, 4)]
+            .into_iter()
+            .map(|(address, index)| AddressRegistry {
+                address: contract_from_address(
+                    mir::ast::AddressHash::from_base58_check(address).unwrap(),
+                )
+                .unwrap(),
+                index: Zarith(index.into()),
+            })
+            .collect();
+        match &receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result:
+                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                        address_registry_diff,
+                        ..
+                    })),
+                ..
+            }) => assert_eq!(
+                *address_registry_diff, expected,
+                "diff must list the fresh registrations in order, skipping X"
+            ),
+            receipt => panic!("second operation should apply, got {receipt:?}"),
+        }
+
+        // The durable registry matches the reported indices.
+        for (address, index) in [(X, 1u32), (A, 2), (B, 3), (C, 4)] {
+            let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
+            let entry = address_registry::entry_path(&hash).unwrap();
+            let stored: Narith = read_optional_nom_value(&host, &entry)
+                .unwrap()
+                .expect("address must be registered");
+            assert_eq!(stored.0, BigUint::from(index));
+        }
+    }
+
+    /// Sr1 addresses consume a registry index but are currently absent from
+    /// the receipt diff (see the TODO in `Ctx::index_address`). Pin the
+    /// behaviour so any change is deliberate.
+    #[test]
+    fn sr1_index_address_registers_but_emits_no_receipt_diff() {
+        use crate::context::address_registry;
+        use mir::ast::ByteReprTrait;
+        use num_bigint::BigUint;
+        use tezos_storage::read_optional_nom_value;
+
+        const DEST: &str = CONTRACT_1;
+        const SR1: &str = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf";
+
+        let mut host = MockKernelHost::default();
+        // Real networks seed the registry at activation; do the same here.
+        crate::mir_ctx::init_address_registry(&mut host).unwrap();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 1_000_000);
+        reveal_account(&mut host, &src);
+
+        let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
+        init_contract(
+            &mut host,
+            &dest,
+            INDEX_ADDRESS_SCRIPT,
+            &Micheline::from(999i128),
+            &0_u64.into(),
+        );
+
+        let value = mir::parser::Parser::new()
+            .parse(&format!("\"{SR1}\""))
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let operation = make_transfer_operation(
+            10,
+            1,
+            100_000,
+            100,
+            src,
+            0_u64.into(),
+            Contract::Originated(dest),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value,
+            },
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("sr1 indexing operation should apply"),
+        );
+
+        // Index 0 is reserved for the pre-registered null address, so sr1 is
+        // assigned index 1 and the counter advances to 2.
+        let sr1_hash = mir::ast::Address::from_base58_check(SR1).unwrap().hash;
+        let entry = address_registry::entry_path(&sr1_hash).unwrap();
+        let stored: Narith = read_optional_nom_value(&host, &entry)
+            .unwrap()
+            .expect("sr1 address must be registered");
+        assert_eq!(stored.0, BigUint::from(1u32));
+        let counter_path = address_registry::counter_path().unwrap();
+        let counter: Narith = read_optional_nom_value(&host, &counter_path)
+            .unwrap()
+            .expect("counter must be initialised");
+        assert_eq!(counter.0, BigUint::from(2u32));
+
+        // …but the receipt diff stays empty.
+        match &receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result:
+                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                        address_registry_diff,
+                        ..
+                    })),
+                ..
+            }) => assert!(
+                address_registry_diff.is_empty(),
+                "sr1 registrations are not reported in the receipt diff"
+            ),
+            receipt => panic!("sr1 operation should apply, got {receipt:?}"),
+        }
     }
 
     fn origination_success_from_receipts(

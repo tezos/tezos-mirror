@@ -1,0 +1,14 @@
+# Calls the "index_via_lambda" view of an index_address_view_lambda contract
+# (first parameter) on an address (second parameter), so INDEX_ADDRESS runs
+# inside the view. If the bool parameter is True, fails with the index the
+# view just returned — exercising the revert of the registration made inside
+# the view; otherwise stores the index.
+{ parameter (pair address address bool) ;
+  storage (option nat) ;
+  code { CAR ;
+         UNPAIR 3 ;
+         SWAP ;
+         VIEW "index_via_lambda" nat ;
+         IF_NONE { PUSH string "view call failed" ; FAILWITH } {} ;
+         SWAP ;
+         IF { FAILWITH } { SOME ; NIL operation ; PAIR } } }
