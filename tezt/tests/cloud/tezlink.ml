@@ -497,10 +497,13 @@ let init_faucet_backend ~agent ~sequencer_endpoint ~faucet_private_key
       (sf "%s/.env" faucet_backend_dir)
       (List.map (fun (arg, param) -> (arg, Some param)) config)
   in
+  (* Upstream ships a [package-lock.json], so [npm ci] installs exactly the
+     pinned dependency tree and fails loudly if [package.json] drifts from the
+     lockfile. [npm ci] installs dev dependencies (including [typescript],
+     needed by [npm run build]) by default, so the previous explicit
+     [npm install typescript] is no longer required. *)
   let* () =
-    run_cmd
-      agent
-      (sf "cd %s && npm install typescript && npm run build" faucet_backend_dir)
+    run_cmd agent (sf "cd %s && npm ci && npm run build" faucet_backend_dir)
   in
   let runner = Agent.runner agent in
   Faucet_backend_process.run ?runner ~path:faucet_backend_dir ()
@@ -528,6 +531,11 @@ let init_bridge_frontend ~agent ~network ~l1_endpoint ~bridge_contract
         ("VITE_NETWORK", network);
       ]
   in
+  (* [bridge-tezlink] (luciano-fs/tezlink_deposit) ships no lockfile and its
+     [package.json] is internally inconsistent (e.g. [ws@7.5.11] vs
+     [ws@8.21.0]), so [npm ci] cannot be used: it requires a [package-lock.json]
+     and rejects any lockfile generated from this [package.json]. Keep
+     [npm install] until the upstream defect is fixed. Tracked in #8303. *)
   let* () =
     run_cmd agent (sf "cd %s && npm install && npm run build" bridge_dir)
   in
@@ -596,12 +604,14 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
       faucet_pkh
       viewer
   in
+  (* Upstream ships a [package-lock.json] that resolves cleanly; [npm ci]
+     installs exactly that tree. *)
   let* () =
     run_cmd
       agent
       (sf
-         "cd %s && npm install && npm run build && npm run check-config && \
-          mkdir -p build && cp public/config.json build/"
+         "cd %s && npm ci && npm run build && npm run check-config && mkdir -p \
+          build && cp public/config.json build/"
          faucet_frontend_dir)
   in
   Faucet_frontend_process.run
