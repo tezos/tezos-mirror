@@ -586,9 +586,12 @@ let pre_filter info config
           (* Aggregate are built at baking time and shouldn't be broadcasted between
          mempools. *)
           `Refused [Environment.wrap_tzerror Wrong_operation]
+      | Single (Double_baking_evidence {bh1; bh2}) -> (
+          match Block_validation.check_double_baking_evidence bh1 bh2 with
+          | Ok () -> `Passed_prefilter other_prio
+          | Error err -> `Refused [Environment.wrap_tzerror err])
       | Single (Seed_nonce_revelation _)
       | Single (Double_consensus_operation_evidence _)
-      | Single (Double_baking_evidence _)
       | Single (Dal_entrapment_evidence _)
       | Single (Activate_account _)
       | Single (Proposals _)

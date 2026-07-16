@@ -32,6 +32,7 @@ type Environment.Error_monad.error +=
       rollup : Sr.Address.t;
       stakers : Game.Index.t;
     }
+  | Invalid_double_baking_evidence of {level : Int32.t}
 
 let () =
   let open Environment.Error_monad in
@@ -86,7 +87,18 @@ let () =
           Some (rollup, stakers)
       | _ -> None)
     (fun (rollup, stakers) ->
-      Sc_rollup_multiple_operations_for_game_in_block {rollup; stakers})
+      Sc_rollup_multiple_operations_for_game_in_block {rollup; stakers}) ;
+  register_error_kind
+    `Permanent
+    ~id:"block_validation_plugin.invalid_double_baking_evidence"
+    ~title:"invalid double baking evidence"
+    ~description:"Invalid double baking evidence."
+    ~pp:(fun ppf level ->
+      Format.fprintf ppf "Invalid double baking evidence at level %ld" level)
+    Data_encoding.(obj1 (req "level" int32))
+    (function
+      | Invalid_double_baking_evidence {level} -> Some level | _ -> None)
+    (fun level -> Invalid_double_baking_evidence {level})
 
 let game_key_equal (rollup1, stakers1) (rollup2, stakers2) =
   Sr.Address.equal rollup1 rollup2
@@ -239,6 +251,26 @@ let find_future_dal_refute ~level
       | Contents _ -> None)
     (Operation.to_list (Contents_list contents))
 
+let check_double_baking_evidence (bh1 : Block_header.t) (bh2 : Block_header.t) =
+  let open Result_syntax in
+  let unsigned_header1 =
+    Data_encoding.Binary.to_bytes_opt
+      Block_header.unsigned_encoding
+      (bh1.shell, bh1.protocol_data.contents)
+  in
+  let unsigned_header2 =
+    Data_encoding.Binary.to_bytes_opt
+      Block_header.unsigned_encoding
+      (bh2.shell, bh2.protocol_data.contents)
+  in
+  match (unsigned_header1, unsigned_header2) with
+  | Some unsigned_header1, Some unsigned_header2 ->
+      if Bytes.equal unsigned_header1 unsigned_header2 then
+        Error (Invalid_double_baking_evidence {level = bh1.shell.level})
+      else return_unit
+  | None, _ | _, None ->
+      Error (Invalid_double_baking_evidence {level = bh1.shell.level})
+
 let check_block_operation {context; seen_games}
     ({protocol_data = Operation_data {contents; _}; _} as packed_op :
       packed_operation) :
@@ -275,6 +307,12 @@ let check_block_operation {context; seen_games}
               | _ -> return_unit
             in
             return seen_games
+        | Contents
+            (Double_baking_evidence {bh1 : Block_header.t; bh2 : Block_header.t})
+          -> (
+            match check_double_baking_evidence bh1 bh2 with
+            | Ok () -> return seen_games
+            | Error err -> shell_fail err)
         | _ -> return seen_games)
       seen_games
       (Operation.to_list (Contents_list contents))

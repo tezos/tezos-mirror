@@ -198,37 +198,49 @@ let validate_operation inc op =
           return_none
       | Some _b -> return_some resulting_state)
 
-let filter_valid_operations_up_to_quota inc (ops, quota) =
+let filter_valid_operations_up_to_quota inc block_state (ops, quota) =
   let open Lwt_syntax in
   let {Tezos_protocol_environment.max_size; max_op} = quota in
-  let exception Full of (Baking_simulator.incremental * packed_operation list)
+  let exception
+    Full of
+      (Baking_simulator.incremental
+      * Block_validation.block_validation_state
+      * packed_operation list)
   in
   try
-    let* inc, _, _, l =
+    let* inc, block_state, _, _, l =
       List.fold_left_s
-        (fun (inc, curr_size, nb_ops, acc) op ->
+        (fun (inc, block_state, curr_size, nb_ops, acc) op ->
           let op_size =
             Data_encoding.Binary.length Alpha_context.Operation.encoding op
           in
           let new_size = curr_size + op_size in
-          if new_size > max_size then return (inc, curr_size, nb_ops, acc)
+          if new_size > max_size then
+            return (inc, block_state, curr_size, nb_ops, acc)
           else (
             Option.iter
               (fun max_op ->
-                if max_op = nb_ops + 1 then raise (Full (inc, acc)))
+                if max_op = nb_ops + 1 then raise (Full (inc, block_state, acc)))
               max_op ;
-            let* inc'_opt = validate_operation inc op in
-            match inc'_opt with
-            | None -> return (inc, curr_size, nb_ops, acc)
-            | Some inc' -> return (inc', new_size, nb_ops + 1, op :: acc)))
-        (inc, 0, 0, [])
+            let* block_state_res =
+              Plugin.Block_validation.check_block_operation block_state op
+            in
+            match block_state_res with
+            | Error _ -> return (inc, block_state, curr_size, nb_ops, acc)
+            | Ok block_state -> (
+                let* inc'_opt = validate_operation inc op in
+                match inc'_opt with
+                | None -> return (inc, block_state, curr_size, nb_ops, acc)
+                | Some inc' ->
+                    return (inc', block_state, new_size, nb_ops + 1, op :: acc))))
+        (inc, block_state, 0, 0, [])
         ops
     in
-    return (inc, List.rev l)
-  with Full (inc, l) -> return (inc, List.rev l)
+    return (inc, block_state, List.rev l)
+  with Full (inc, block_state, l) -> return (inc, block_state, List.rev l)
 
-let filter_valid_managers_up_to_quota inc ~hard_gas_limit_per_block (ops, quota)
-    =
+let filter_valid_managers_up_to_quota inc block_state ~hard_gas_limit_per_block
+    (ops, quota) =
   let open Lwt_syntax in
   let {Tezos_protocol_environment.max_size; max_op} = quota in
   let rec loop
@@ -322,13 +334,7 @@ let filter_valid_managers_up_to_quota inc ~hard_gas_limit_per_block (ops, quota)
                             packed_op :: acc )
                           l)))
   in
-  let init_block_state =
-    Plugin.Block_validation.init_block_validation_state
-      (fst inc.Baking_simulator.state)
-  in
-  loop
-    (inc, init_block_state, 0, 0, Int64.zero, hard_gas_limit_per_block, [])
-    ops
+  loop (inc, block_state, 0, 0, Int64.zero, hard_gas_limit_per_block, []) ops
 
 let filter_operations_with_simulation initial_inc fees_config
     ~hard_gas_limit_per_block {consensus; votes; anonymous; managers} =
@@ -340,19 +346,26 @@ let filter_operations_with_simulation initial_inc fees_config
   } =
     fees_config
   in
-  let*! inc, consensus =
+  let init_block_state =
+    Plugin.Block_validation.init_block_validation_state
+      (fst initial_inc.Baking_simulator.state)
+  in
+  let*! inc, block_state, consensus =
     filter_valid_operations_up_to_quota
       initial_inc
+      init_block_state
       (Prioritized_operation_set.operations consensus, consensus_quota)
   in
-  let*! inc, votes =
+  let*! inc, block_state, votes =
     filter_valid_operations_up_to_quota
       inc
+      block_state
       (Prioritized_operation_set.operations votes, votes_quota)
   in
-  let*! inc, anonymous =
+  let*! inc, block_state, anonymous =
     filter_valid_operations_up_to_quota
       inc
+      block_state
       (Prioritized_operation_set.operations anonymous, anonymous_quota)
   in
   (* Sort the managers *)
@@ -367,6 +380,7 @@ let filter_operations_with_simulation initial_inc fees_config
   let*! inc, manager_operation_number, total_fees, managers =
     filter_valid_managers_up_to_quota
       inc
+      block_state
       ~hard_gas_limit_per_block
       (PrioritizedManagerSet.elements prioritized_managers, managers_quota)
   in
@@ -463,8 +477,15 @@ let filter_operations_without_simulation fees_config ~hard_gas_limit_per_block
 let filter_consensus_operations_only inc
     ({consensus; votes; anonymous; managers} as ordered_pool) =
   let open Lwt_result_syntax in
-  let*! incremental, filtered_consensus =
-    filter_valid_operations_up_to_quota inc (consensus, consensus_quota)
+  let init_block_state =
+    Plugin.Block_validation.init_block_validation_state
+      (fst inc.Baking_simulator.state)
+  in
+  let*! incremental, _block_state, filtered_consensus =
+    filter_valid_operations_up_to_quota
+      inc
+      init_block_state
+      (consensus, consensus_quota)
   in
   let payload = Operation_pool.payload_of_ordered_pool ordered_pool in
   let* incremental =
