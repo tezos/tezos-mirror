@@ -95,11 +95,16 @@ RUN ARCH=$(dpkg --print-architecture) && \
     tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 && \
     rm /tmp/node.tar.xz
 
-# Build Umami
+# Build Umami. Upstream ships pnpm-lock.yaml; --frozen-lockfile makes the
+# build deterministic and fails loudly if upstream's package.json drifts from
+# its committed lockfile. pnpm is pinned to the version umami-v2's
+# packageManager field declares (pnpm@9.9.0) so --frozen-lockfile validates
+# against the lockfile that version produced, rather than whatever pnpm major
+# happens to be latest.
 RUN git clone https://github.com/trilitech/umami-v2 /tmp/umami-v2
 WORKDIR /tmp/umami-v2
-RUN npm install -g yarn pnpm turbo
-RUN pnpm install
+RUN npm install -g yarn pnpm@9.9.0 turbo
+RUN pnpm install --frozen-lockfile
 
 FROM base AS full
 # Path where binaries should be stored on the docker container
