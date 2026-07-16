@@ -82,6 +82,7 @@ let job_container_scanning =
     ~stage:Test
     ~image:Images.Base_images.alpine_docker_ci
     ~services:[{name = Images.Base_images.dind_service}]
+    ~retry:Tezos_ci.dind_retry
     ~artifacts:(artifacts [report])
     ~variables:[("FULL_IMAGE_NAME", full_image_name); ("REPORT", report)]
     ~script:

@@ -340,6 +340,7 @@ let make_systemd_test_job ~script ~(distro : Distro.t) ~pipeline_type =
     ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
     ~image:Images.Base_images.alpine_docker_ci
     ~services:[{name = Images.Base_images.dind_service}]
+    ~retry:Tezos_ci.dind_retry
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
       @ make_debian_variables

@@ -1865,6 +1865,11 @@ images.alpine-ci-all.merge:
     DOCKER_VERSION: 28.5.1
     REGISTRY: ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos
     TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 images.alpine-ci-all:amd64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -1909,6 +1914,11 @@ images.alpine-ci-all:amd64:
     DOCKER_VERSION: 28.5.1
     REGISTRY: ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos
     TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 images.alpine-ci-all:arm64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -1954,8 +1964,9 @@ images.alpine-ci-all:arm64:
     REGISTRY: ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos
     TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-arm64
   retry:
-    max: 1
+    max: 2
     when:
+    - script_failure
     - runner_system_failure
 
 images.alpine-docker-ci:
@@ -2001,6 +2012,11 @@ images.alpine-docker-ci:
     PLATFORM: linux/amd64,linux/arm64
     REGCTL_VERSION: v0.4.3
     RELEASE: 28.5.1
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 images.ci-release:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -2040,6 +2056,11 @@ images.ci-release:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2105,6 +2126,11 @@ images.debian:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: debian:$RELEASE
     PLATFORM: linux/amd64,linux/arm64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2159,6 +2185,11 @@ images.debian-build:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2214,6 +2245,11 @@ images.debian-build.merge:
   variables:
     DOCKER_VERSION: 28.5.1
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-build
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2258,6 +2294,11 @@ images.debian-homebrew:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2300,6 +2341,11 @@ images.debian-jsonnet:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2344,6 +2390,11 @@ images.debian-rust:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2390,6 +2441,11 @@ images.debian-rust-sdk-bindings:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2433,6 +2489,11 @@ images.debian-rust.merge:
     DOCKER_VERSION: 28.5.1
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
     RELEASE: trixie
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 images.debian-systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -2476,6 +2537,11 @@ images.debian-systemd:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2535,6 +2601,11 @@ images.ubuntu:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ubuntu:$RELEASE
     PLATFORM: linux/amd64,linux/arm64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2590,6 +2661,11 @@ images.ubuntu-build:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2646,6 +2722,11 @@ images.ubuntu-build.merge:
   variables:
     DOCKER_VERSION: 28.5.1
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/ubuntu-build
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -2695,6 +2776,11 @@ images.ubuntu-systemd:
     DOCKER_VERSION: 28.5.1
     IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -4057,7 +4143,7 @@ oc.docker:amd64:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     IMAGE_ARCH_PREFIX: amd64_
   retry:
-    max: 1
+    max: 2
     when:
     - script_failure
     - runner_system_failure
@@ -4114,7 +4200,7 @@ oc.docker:arm64:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     IMAGE_ARCH_PREFIX: arm64_
   retry:
-    max: 1
+    max: 2
     when:
     - script_failure
     - runner_system_failure
@@ -4146,6 +4232,11 @@ oc.docker:ci:amd64:
   artifacts:
     reports:
       dotenv: ci_image_tag.env
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.docker:ci:arm64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -4175,8 +4266,9 @@ oc.docker:ci:arm64:
     reports:
       dotenv: ci_image_tag.env
   retry:
-    max: 1
+    max: 2
     when:
+    - script_failure
     - runner_system_failure
 
 oc.install_bin_debian_trixie:
@@ -4264,6 +4356,11 @@ oc.install_bin_debian_trixie_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: trixie
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.integration:compiler-rejections:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -4526,6 +4623,11 @@ oc.script.docker_verify_image_amd64:
   variables:
     DOCKER_VERSION: 28.5.1
     IMAGE_ARCH_PREFIX: amd64_
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.script.docker_verify_image_arm64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -4572,6 +4674,11 @@ oc.script.docker_verify_image_arm64:
   variables:
     DOCKER_VERSION: 28.5.1
     IMAGE_ARCH_PREFIX: arm64_
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.script:b58_prefix:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -4850,6 +4957,11 @@ oc.test_keyring_debian_trixie:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: trixie
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.unit:non-proto-arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -5352,6 +5464,11 @@ oc.upgrade_bin_debian_trixie_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: trixie
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc:scripts:release_script_values:
   image: ${ci_image_name}/prebuild:${ci_image_tag}

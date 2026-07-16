@@ -186,11 +186,12 @@ end
    alpine_docker_ci image, dind service, DOCKER_VERSION variable, and
    docker_initialize.sh prepended to the script (Cacio has no before_script).
    All other [CI.job] arguments are left for the caller. *)
-let docker_job ?(extra_variables = []) ~script =
+let docker_job ?(extra_variables = []) ?(retry = Tezos_ci.dind_retry) ~script =
   CI.job
     ~stage:Cacio.Build
     ~image:Images.Base_images.alpine_docker_ci
     ~services:[{name = Images.Base_images.dind_service}]
+    ~retry
     ~variables:
       (("DOCKER_VERSION", Images.Base_images.docker_version) :: extra_variables)
     ~script:("./scripts/ci/docker_initialize.sh" :: script)
@@ -225,6 +226,7 @@ let base_image_job ~image_name ?(base_name = Upstream image_name) ~matrix
        ]
       @ extra_variables)
     ~script:[Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile]
+    ~retry:Tezos_ci.dind_retry
     ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
     ~parallel:(Matrix [matrix @ extra_tags])
 
@@ -289,6 +291,7 @@ let job_docker_ci_based_images =
     ~stage:Cacio.Build
     ~image:Images.upstream_docker
     ~services:[{name = Images.Base_images.dind_service}]
+    ~retry:Tezos_ci.dind_retry
     ~tag:Gcp_very_high_cpu
     ~only_if_changed:Files.alpine_docker_ci
     ~variables:
@@ -540,13 +543,8 @@ let job_alpine_ci =
       (match arch with
     | Runner.Arch.Arm64 -> Some Runner.Storage.Ramfs
     | _ -> None)
-      (* The arm64 CI jobs see runner-infrastructure flakiness, so retry once
-         on a runner system failure. *)
-    ?retry:
-      (match arch with
-      | Runner.Arch.Arm64 ->
-          Some Gitlab_ci.Types.{max = 1; when_ = [Runner_system_failure]}
-      | _ -> None)
+      (* Inherits [dind_retry] from [docker_job], which retries on both
+         [Script_failure] and [Runner_system_failure] to recover preemptions. *)
     ~only_if_changed:Files.ci_images
     ("images.alpine-ci-all:" ^ arch_str)
 

@@ -87,6 +87,7 @@ let job_docker_build =
           Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
       | `test -> None)
     ~services:[{name = Images.Base_images.dind_service}]
+    ~retry:dind_retry
     ~description:(sf "Build EVM node docker image for %s." arch_string)
     ~script:
       [

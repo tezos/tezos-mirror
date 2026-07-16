@@ -1160,6 +1160,12 @@ let no_retry = Gitlab_ci.Types.{max = 0; when_ = []}
 
 let retry_twice = Gitlab_ci.Types.{max = 2; when_ = []}
 
+(* Retry policy for Docker-in-Docker jobs: retries on both [Script_failure] and
+   [Runner_system_failure] to recover GCP runner preemptions. See the .mli and
+   https://gitlab.com/tezos/tezos/-/issues/8351 for the rationale. *)
+let dind_retry =
+  Gitlab_ci.Types.{max = 2; when_ = [Script_failure; Runner_system_failure]}
+
 (* helper function to merge two list of variables, giving the precedence
    to the values in [variables] over the [default_variables] *)
 let merge_variables ~default_variables variables =
@@ -1488,8 +1494,8 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
 let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
     ?(dependencies = Staged []) ?image_dependencies ?arch ?storage ?tag
-    ?allow_failure ?parallel ?environment ?timeout ?retry ?description
-    ?dev_infra ~__POS__ ~stage ~name script : tezos_job =
+    ?allow_failure ?parallel ?environment ?timeout ?(retry = dind_retry)
+    ?description ?dev_infra ~__POS__ ~stage ~name script : tezos_job =
   let docker_version = Base_images.docker_version in
   job
     ?rules
@@ -1503,7 +1509,7 @@ let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
     ?parallel
     ?environment
     ?timeout
-    ?retry
+    ~retry
     ?description
     ?dev_infra
     ~__POS__
@@ -1558,16 +1564,8 @@ module Images = struct
             ("GCLOUD_VERSION", "543.0.0");
           ]
       in
-      let retry =
-        match arch with
-        | Amd64 -> None
-        (* We're currently seeing flakiness in the arm64 jobs *)
-        | Arm64 ->
-            Some {Gitlab_ci.Types.max = 1; when_ = [Runner_system_failure]}
-      in
       job_docker_authenticated
         ?variables
-        ?retry
         ~__POS__
         ~arch
         ?storage

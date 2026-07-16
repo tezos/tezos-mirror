@@ -93,6 +93,11 @@ oc.docker:ci:amd64:
   artifacts:
     reports:
       dotenv: ci_image_tag.env
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 octez-smart-rollup-node.release-page-publish:
   image: ${ci_image_name}/release-page:${ci_image_tag}

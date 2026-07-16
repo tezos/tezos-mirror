@@ -359,6 +359,12 @@ val no_retry : Gitlab_ci.Types.retry
 (** Retry policy that retries up to twice on any failure ([max = 2]). *)
 val retry_twice : Gitlab_ci.Types.retry
 
+(** Retry policy for jobs that run a Docker-in-Docker service.
+
+    Retries (up to twice) on both [Script_failure] and [Runner_system_failure],
+    so that GCP runner preemptions are recovered. *)
+val dind_retry : Gitlab_ci.Types.retry
+
 (** Define a trigger job for a child pipeline.
 
     The trigger job will be named [trigger:CHILD_PIPELINE_NAME].
