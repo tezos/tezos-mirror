@@ -259,12 +259,14 @@ cargo_audit:
   - gcp
   rules:
   - changes:
+    - '**/.cargo/audit.toml'
     - '**/Cargo.lock'
     - '**/Cargo.toml'
     when: on_success
   needs: []
   dependencies: []
-  allow_failure: true
+  allow_failure:
+    exit_codes: 2
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -272,7 +274,7 @@ cargo_audit:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/cargo_audit.sh
+  - ./scripts/ci/cargo_audit.sh || exit $?
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

@@ -1,0 +1,34 @@
+# cargo-audit configuration for the vendored wasmer 3.3.0 runtime.
+#
+# Follow-up to !22298. Octez embeds wasmer solely as a deterministic,
+# in-process WebAssembly execution engine: src/rust_deps builds only
+# wasmer-c-api with `default-features = false` and features
+# ["singlepass", "cranelift", "wat", "middlewares"] — it never enables the
+# `wasi` / `webc_runner` features. The two high-severity advisories below
+# are both denial-of-service bugs in wasmer's TLS stack, which is pulled in
+# only by workspace members Octez does not build (lib/cli, lib/registry, and
+# lib/wasi / wasmer-wasix host networking). Those crates therefore appear in
+# this workspace's Cargo.lock but are not compiled into any Octez artifact,
+# so the DoS conditions (a TLS peer processing hostile network input) are
+# unreachable. The remaining lower-severity / unrated advisories this
+# workspace reports (h2, openssl, idna, mio, rkyv, ...) are left visible as
+# warnings rather than ignored.
+#
+# Tracked in https://gitlab.com/tezos/tezos/-/issues/8331.
+
+[advisories]
+ignore = [
+  # RUSTSEC-2024-0336 — rustls 0.20.8, CVSS 7.5.
+  # `ConnectionCommon::complete_io` can enter an infinite loop on crafted
+  # input, a completed-handshake DoS. Pulled in only via wasmer's networking
+  # members (lib/registry / wasmer-wasix), which Octez does not build. Fix
+  # requires bumping the vendored wasmer TLS stack (rustls 0.20 -> >=0.21.11).
+  "RUSTSEC-2024-0336",
+
+  # RUSTSEC-2023-0052 — webpki 0.22.0, CVSS 7.5.
+  # CPU denial of service in certificate path building on crafted
+  # certificate chains. Same reachability as above: only via wasmer's
+  # networking members, not compiled into Octez. Fix requires bumping the
+  # vendored wasmer TLS stack (to rustls-webpki).
+  "RUSTSEC-2023-0052",
+]

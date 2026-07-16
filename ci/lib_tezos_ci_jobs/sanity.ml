@@ -267,12 +267,19 @@ let job_cargo_audit =
       "Run cargo audit on Cargo.lock files to detect known vulnerabilities."
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~stage:Test
-    ~allow_failure:Yes
-    ~only_if_changed:["**/Cargo.lock"; "**/Cargo.toml"]
+      (* Exit 2 (only lower-severity / unrated advisories) is tolerated;
+         exit 1 (a critical/high advisory) blocks. See
+         scripts/ci/cargo_audit.sh for the tiering. *)
+    ~allow_failure:(With_exit_codes [2])
+    ~only_if_changed:["**/Cargo.lock"; "**/Cargo.toml"; "**/.cargo/audit.toml"]
     ~script:
+      (* [|| exit $?] preserves the script's exit code (1 = critical/high,
+         2 = warnings only); GitLab otherwise masks any failure as 1, which
+         would defeat the [With_exit_codes [2]] gate above. Same trick as
+         [job_commit_titles]. *)
       (match mode with
-      | `mr -> ["./scripts/ci/cargo_audit.sh"]
-      | `all -> ["./scripts/ci/cargo_audit.sh --all"])
+      | `mr -> ["./scripts/ci/cargo_audit.sh || exit $?"]
+      | `all -> ["./scripts/ci/cargo_audit.sh --all || exit $?"])
 
 let register () =
   Cacio.register_merge_request_jobs

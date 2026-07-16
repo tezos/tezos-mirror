@@ -1,0 +1,23 @@
+# cargo-audit configuration for the vendored Tezos context.
+#
+# Follow-up to !22298. This workspace vendors the Tezos context timing
+# stack; the single high-severity advisory below is the same libsqlite3
+# array-bounds bug already accepted for src/rollup_node_rust_deps and
+# src/rust_deps, with the same justification. The lower-severity / unrated
+# advisories this workspace also reports (bytes, crossbeam-epoch, time) are
+# left visible as warnings rather than ignored.
+#
+# Tracked in https://gitlab.com/tezos/tezos/-/issues/8331.
+
+[advisories]
+ignore = [
+  # RUSTSEC-2022-0090 (CVE-2022-35737) — libsqlite3-sys 0.22.2, CVSS 7.5.
+  # Bundled SQLite < 3.39.2 array-bounds overflow in printf when a string
+  # larger than ~1GB is passed to %Q/%q/%w. Reaches us via rusqlite 0.25.4
+  # ("bundled") in the vendored tezos_timing crate, a local SQLite file that
+  # only records context-access timing statistics and is never fed
+  # attacker-controlled >1GB strings (and is only populated when context
+  # timing profiling is enabled). Fix requires a rusqlite major bump in the
+  # vendored timing crate.
+  "RUSTSEC-2022-0090",
+]

@@ -15,11 +15,10 @@
 #   - lower / unrated advisory only            -> WARN, exit 2
 #   - no advisory                              -> PASS, exit 0
 #
-# The CI job currently sets allow_failure: true, so every non-zero exit
-# is reported as a warning (orange) without blocking.  Once the known
-# advisories tracked in https://gitlab.com/tezos/tezos/-/issues/8331 are
-# resolved, the job can switch to allow_failure: With_exit_codes [2] so
-# that exit 1 (critical/high) blocks while exit 2 (lower) stays allowed.
+# The CI job sets allow_failure: With_exit_codes [2], so exit 1
+# (critical/high) blocks the pipeline while exit 2 (lower/unrated) is
+# reported as a warning (orange) without blocking.  Remaining lower/unrated
+# advisories are tracked in https://gitlab.com/tezos/tezos/-/issues/8331.
 
 set -eu
 
@@ -180,12 +179,23 @@ else
   merge_base=$(./scripts/ci/git_merge_base.sh \
     "${TEZOS_CI_MR_TARGET}" "${TEZOS_CI_MR_HEAD}")
 
-  echo "Auditing directories with changed Cargo.lock files."
+  # A changed Cargo.lock means the dependency graph moved; a changed
+  # .cargo/audit.toml means the ignore list moved. Both must re-audit the
+  # affected workspace, so consider both. Map a matched path to its
+  # workspace directory: <dir>/Cargo.lock -> <dir>, and
+  # <dir>/.cargo/audit.toml -> <dir>.
+  echo "Auditing directories with a changed Cargo.lock or .cargo/audit.toml."
   dirs=$(git diff --name-only "${merge_base}" "${TEZOS_CI_MR_HEAD}" \
-    -- '**/Cargo.lock' | while IFS= read -r f; do dirname "$f"; done | sort -u)
+    -- '**/Cargo.lock' '**/.cargo/audit.toml' |
+    while IFS= read -r f; do
+      case "$f" in
+      */.cargo/audit.toml) echo "${f%/.cargo/audit.toml}" ;;
+      *) dirname "$f" ;;
+      esac
+    done | sort -u)
 
   if [ -z "$dirs" ]; then
-    echo "No Cargo.lock changes detected. Nothing to audit."
+    echo "No Cargo.lock or .cargo/audit.toml changes detected. Nothing to audit."
     exit 0
   fi
 fi
