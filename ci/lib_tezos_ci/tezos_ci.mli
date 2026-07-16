@@ -161,51 +161,9 @@ module Pipeline : sig
   val describe_pipeline : string -> unit
 end
 
-module Cache : sig
-  (** Adds a GitLab CI cache for the DUNE_CACHE_ROOT folder.
-
-    This function can be applied to jobs that run dune.
-
-    It adds variables enabling dune cache. It also adds a [cache] where
-    the {!cache_key} is the job name and with a [pull-push] cache policy: i.e. the
-    cache is pulled when the job starts, and is pushed when the job
-    finishes.
-
-   *)
-  val enable_dune_cache : tezos_job -> tezos_job
-
-  (** Add variable enabling sccache.
-
-    This function should be applied to jobs that build rust files and
-    which has a configured sccache Gitlab CI cache.
-
-    - [error_log] and [log] sets the environment
-    variables [SCCACHE_ERROR_LOG] and [SCCACHE_LOG] respectively.
-    See the sccache documentation for more information on these variables. *)
-  val enable_sccache :
-    ?error_log:string ->
-    ?log:string ->
-    ?policy:Gitlab_ci.Types.cache_policy ->
-    tezos_job ->
-    tezos_job
-
+module Cargo : sig
   (** Value of [CARGO_HOME] *)
-  val cargo_home : string
-
-  (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
-
-    This function should only be applied to jobs that have a GitLab CI
-    cache for [CARGO_HOME], as enabled through [enable_cache_cargo] (that
-    function calls this function, so there is no need to apply both).
-    Exceptions can be made for jobs that must have CARGO_HOME set to
-    something different than {!cargo_home}. *)
-  val enable_networked_cargo : tezos_job -> tezos_job
-
-  (** Adds a GitLab CI cache for the CARGO_HOME folder.
-
-    More precisely, we only cache the non-SCM dependencies in the
-    sub-directory [registry/cache]. *)
-  val enable_cargo_cache : tezos_job -> tezos_job
+  val home : string
 end
 
 (** A facility for registering images for [image:] keywords.

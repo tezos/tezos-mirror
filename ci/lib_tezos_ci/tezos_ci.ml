@@ -1222,40 +1222,6 @@ let map_non_trigger_job ?error_on_trigger (tezos_job : tezos_job)
       | None -> tezos_job
       | Some error_on_trigger -> failwith "%s" error_on_trigger)
 
-let append_variables ?(allow_overwrite = false) new_variables
-    (tezos_job : tezos_job) : tezos_job =
-  map_non_trigger_job
-    ~error_on_trigger:
-      (sf
-         "[append_variables] attempting to append variables to trigger job '%s'"
-         (name_of_tezos_job tezos_job))
-    tezos_job
-  @@ fun job ->
-  let variables =
-    let old_variables, new_variables =
-      List.fold_left
-        (fun (old_variables, new_variables) (name, value) ->
-          let old_variables =
-            match List.assoc_opt name old_variables with
-            | Some old_value ->
-                if not allow_overwrite then
-                  failwith
-                    "[Tezos_ci.append_variables] attempted to overwrite the \
-                     variable '%s' (old value: '%s', new value: '%s')"
-                    name
-                    old_value
-                    value ;
-                List.remove_assoc name old_variables
-            | None -> old_variables
-          in
-          (old_variables, (name, value) :: new_variables))
-        (Option.value ~default:[] job.variables, [])
-        new_variables
-    in
-    old_variables @ List.rev new_variables
-  in
-  {job with variables = Some variables}
-
 let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
   let all_files =
     let root = "." in
@@ -1311,41 +1277,6 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
         \  rm %s"
         (error_not_generated |> String_set.elements |> String.concat " ")) ;
   if !Cli.has_error then exit 1
-
-let append_cache cache tezos_job =
-  map_non_trigger_job
-    ~error_on_trigger:
-      (sf
-         "[append_cache] attempting to append a cache to trigger job '%s'"
-         (name_of_tezos_job tezos_job))
-    tezos_job
-  @@ fun job ->
-  let caches = Option.value ~default:[] job.cache in
-  {job with cache = Some (caches @ [cache])}
-
-let append_before_script script tezos_job =
-  map_non_trigger_job
-    ~error_on_trigger:
-      (sf
-         "[append_before_script] attempting to append before_script to trigger \
-          job '%s'"
-         (name_of_tezos_job tezos_job))
-    tezos_job
-  @@ fun job ->
-  let before_script = Option.value ~default:[] job.before_script in
-  {job with before_script = Some (before_script @ script)}
-
-let append_after_script script tezos_job =
-  map_non_trigger_job
-    ~error_on_trigger:
-      (sf
-         "[append_after_script] attempting to append after_script to trigger \
-          job '%s'"
-         (name_of_tezos_job tezos_job))
-    tezos_job
-  @@ fun job ->
-  let after_script = Option.value ~default:[] job.after_script in
-  {job with after_script = Some (after_script @ script)}
 
 (* The reason we don't use [error_on_trigger] here is that this is intended to be
    used with [List.map] on a whole pipeline, and it's just more convenient to
@@ -1582,82 +1513,14 @@ let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
     ~name
     script
 
-(** {2 Caches} *)
-module Cache = struct
-  let enable_dune_cache job =
-    let path = "$CI_PROJECT_DIR/_dune_cache" in
-    job
-    |> append_variables
-         [
-           ("DUNE_CACHE", "enabled");
-           ("DUNE_CACHE_STORAGE_MODE", "hardlink");
-           ("DUNE_CACHE_ROOT", path);
-         ]
-    |> append_cache
-         (cache
-            ~policy:Gitlab_ci.Types.Pull_push
-            ~key:
-              ("dune_cache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-            [path])
-    |> append_after_script ["eval $(opam env)"; "dune cache trim --size=5GB"]
-
-  let enable_sccache ?error_log ?log ?(policy = Gitlab_ci.Types.Pull) job =
-    let rw_mode =
-      match policy with Pull -> "READ_ONLY" | Pull_push | Push -> "READ_WRITE"
-    in
-    job
-    |> append_variables
-         ([
-            (* force incremental build in cargo
-
-              see https://github.com/mozilla/sccache?tab=readme-ov-file#known-caveats *)
-            ("CARGO_INCREMENTAL", "0");
-            (* we use GCP backend in r/w mode *)
-            ("SCCACHE_GCS_BUCKET", "$GCP_SCCACHE_BUCKET");
-            ("SCCACHE_GCS_RW_MODE", rw_mode);
-            ("SCCACHE_GCS_KEY_PREFIX", "sccache");
-            (* if network error, fail over local rust compiler instead of stopping *)
-            ("SCCACHE_IGNORE_SERVER_IO_ERROR", "1");
-            (* daemon does not stop if no client request *)
-            ("SCCACHE_IDLE_TIMEOUT", "0");
-          ]
-         @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
-         @ opt_var "SCCACHE_LOG" Fun.id log)
-    (* Starts sccache and sets [RUSTC_WRAPPER] *)
-    |> append_before_script [". ./scripts/ci/sccache-start.sh"]
-    |> append_after_script ["./scripts/ci/sccache-stop.sh"]
-
-  let cargo_home =
+module Cargo = struct
+  let home =
     (* Note:
        - We want [CARGO_HOME] to be in a sub-folder of
          {!ci_project_dir} to enable GitLab CI caching.
        - We want [CARGO_HOME] to be hidden from dune
          (thus the dot-prefix). *)
     Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
-
-  let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
-
-  let enable_cargo_cache job =
-    job
-    |> append_cache
-         (cache
-            ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-            [
-              (* The cache folder contains the .crate (tar.gz) files. *)
-              cargo_home // "registry/cache";
-              (* The index folder contains the database of all
-                 available crates on crates.io. *)
-              cargo_home // "registry/index";
-              (* The src folder contains the unzipped source code
-                 ready for compilation. *)
-              cargo_home // "registry/src";
-              (* cargo_home // "git/db";
-                 These are "bare" git repositories. They contain all
-                 the compressed git history and objects. We might
-                 agree to add them later *)
-            ])
-    (* Allow Cargo to access the network *)
-    |> enable_networked_cargo
 end
 
 (** A set of internally and externally built images.

@@ -66,7 +66,7 @@ let job_audit_riscv_deps =
           [
             (* Cache the RustSec advisory database to avoid
                cargo-audit failures when GitHub is down. *)
-            Tezos_ci.Cache.cargo_home // "advisory-db";
+            Tezos_ci.Cargo.home // "advisory-db";
           ];
       ]
     ~script:["make -C src/riscv audit"; "make -C src/lib_riscv/kernels audit"]

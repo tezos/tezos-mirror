@@ -211,9 +211,6 @@ type job = {
   after_script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
   cache : Gitlab_ci.Types.cache list;
-  cargo_cache : bool;
-  sccache : sccache_config option;
-  dune_cache : bool;
   disable_datadog : bool;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
@@ -580,9 +577,6 @@ let convert_graph ?(interruptible_pipeline = true)
                     after_script;
                     artifacts;
                     cache;
-                    cargo_cache;
-                    sccache;
-                    dune_cache;
                     disable_datadog;
                     allow_failure;
                     retry;
@@ -671,19 +665,6 @@ let convert_graph ?(interruptible_pipeline = true)
                 | None | Some GCP | Some AWS -> false
                 | Some GCP_dev -> true
               in
-              let maybe_enable_cargo_cache job =
-                if cargo_cache then Tezos_ci.Cache.enable_cargo_cache job
-                else job
-              in
-              let maybe_enable_sccache job =
-                match sccache with
-                | None -> job
-                | Some {error_log; log; policy} ->
-                    Tezos_ci.Cache.enable_sccache ?error_log ?log ?policy job
-              in
-              let maybe_enable_dune_cache job =
-                if dune_cache then Tezos_ci.Cache.enable_dune_cache job else job
-              in
               Tezos_ci.job
                 ~__POS__:source_location
                 ~name
@@ -715,8 +696,6 @@ let convert_graph ?(interruptible_pipeline = true)
                 ~before_script
                 script
                 ~after_script
-              |> maybe_enable_cargo_cache |> maybe_enable_sccache
-              |> maybe_enable_dune_cache
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -1103,6 +1082,101 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           (show_stage stage)
           dep.name
           (show_stage dep.stage) ) ;
+    (* ~dune_cache *)
+    let dune_cache_path = "$CI_PROJECT_DIR/_dune_cache" in
+    let cache =
+      if dune_cache then
+        Gitlab_ci.Util.cache
+          ~policy:Gitlab_ci.Types.Pull_push
+          ~key:
+            ("dune_cache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+          [dune_cache_path]
+        :: cache
+      else cache
+    in
+    let variables =
+      if dune_cache then
+        [
+          ("DUNE_CACHE", "enabled");
+          ("DUNE_CACHE_STORAGE_MODE", "hardlink");
+          ("DUNE_CACHE_ROOT", dune_cache_path);
+        ]
+        @ variables
+      else variables
+    in
+    let after_script =
+      if dune_cache then
+        ["eval $(opam env)"; "dune cache trim --size=5GB"] @ after_script
+      else after_script
+    in
+    (* ~cargo_cache *)
+    let cache =
+      if cargo_cache then
+        Gitlab_ci.Util.cache
+          ~policy:Gitlab_ci.Types.Pull_push
+          ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+          [
+            (* The cache folder contains the .crate (tar.gz) files. *)
+            Tezos_ci.Cargo.home // "registry/cache";
+            (* The index folder contains the database of all
+                 available crates on crates.io. *)
+            Tezos_ci.Cargo.home // "registry/index";
+            (* The src folder contains the unzipped source code
+                 ready for compilation. *)
+            Tezos_ci.Cargo.home // "registry/src";
+            (* cargo_home // "git/db";
+                 These are "bare" git repositories. They contain all
+                 the compressed git history and objects. We might
+                 agree to add them later *)
+          ]
+        :: cache
+      else cache
+    in
+    let variables =
+      if cargo_cache then [("CARGO_NET_OFFLINE", "false")] @ variables
+      else variables
+    in
+    (* ~sccache *)
+    let variables =
+      match sccache with
+      | None -> variables
+      | Some {error_log; log; policy} ->
+          List.flatten
+            [
+              [
+                (* force incremental build in cargo
+
+                   see https://github.com/mozilla/sccache?tab=readme-ov-file#known-caveats *)
+                ("CARGO_INCREMENTAL", "0");
+                (* we use GCP backend in r/w mode *)
+                ("SCCACHE_GCS_BUCKET", "$GCP_SCCACHE_BUCKET");
+                ( "SCCACHE_GCS_RW_MODE",
+                  match policy with
+                  | Some Pull | None -> "READ_ONLY"
+                  | Some (Pull_push | Push) -> "READ_WRITE" );
+                ("SCCACHE_GCS_KEY_PREFIX", "sccache");
+                (* if network error, fail over local rust compiler instead of stopping *)
+                ("SCCACHE_IGNORE_SERVER_IO_ERROR", "1");
+                (* daemon does not stop if no client request *)
+                ("SCCACHE_IDLE_TIMEOUT", "0");
+              ];
+              (match error_log with
+              | None -> []
+              | Some x -> [("SCCACHE_ERROR_LOG", x)]);
+              (match log with None -> [] | Some x -> [("SCCACHE_LOG", x)]);
+              variables;
+            ]
+    in
+    let before_script =
+      match sccache with
+      | None -> before_script
+      | Some _ -> ". ./scripts/ci/sccache-start.sh" :: before_script
+    in
+    let after_script =
+      match sccache with
+      | None -> after_script
+      | Some _ -> "./scripts/ci/sccache-stop.sh" :: after_script
+    in
     {
       uid = fresh_uid ();
       source_location;
@@ -1133,9 +1207,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       after_script;
       artifacts;
       cache;
-      cargo_cache;
-      sccache;
-      dune_cache;
       disable_datadog;
       allow_failure;
       retry;
