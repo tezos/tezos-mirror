@@ -984,9 +984,11 @@ struct
          (req "after" kinded_hash_encoding)
          (req "state" a)
 
-  let tree_proof_encoding =
+  let tree_proof_compact =
     let open Compact in
-    make ~tag_size:`Uint8 @@ encoding (payload tree_encoding)
+    encoding (payload tree_encoding)
+
+  let tree_proof_encoding = Compact.make ~tag_size:`Uint8 tree_proof_compact
 
   let stream_proof_encoding =
     let open Compact in
@@ -1004,6 +1006,15 @@ module V1 = struct
 end
 
 module V2 = struct
+  module type PROOF_ENCODING_COMPACT = sig
+    include Tezos_context_sigs.Context.PROOF_ENCODING
+
+    val tree_proof_compact :
+      Tezos_context_sigs.Context.Proof_types.tree
+      Tezos_context_sigs.Context.Proof_types.t
+      Data_encoding.Compact.t
+  end
+
   module Tree32 = Make_V2 (struct
     let entries = 32
   end)

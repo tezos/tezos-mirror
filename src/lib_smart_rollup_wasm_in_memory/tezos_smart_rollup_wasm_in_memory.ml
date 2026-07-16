@@ -41,6 +41,10 @@ module State_in_memory = struct
     Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
     .tree_proof_encoding
 
+  let proof_compact_encoding =
+    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
+    .tree_proof_compact
+
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash ->
         Tezos_crypto.Hashed.Smart_rollup_state_hash.context_hash_to_state_hash
