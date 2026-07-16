@@ -192,21 +192,21 @@ where
             host,
             base,
             smart_rollup_address,
-            &config.tezos_contracts,
+            &config.common.tezos_contracts,
             delayed_bridge.clone(),
             delayed_inbox,
             sequencer.clone(),
             dal.clone(),
-            config.maximum_allowed_ticks,
-            config.enable_fa_bridge,
+            config.common.maximum_allowed_ticks,
+            config.common.enable_fa_bridge,
             chain_config,
         ),
         ConfigurationMode::Proxy => fetch_proxy_blueprints(
             host,
             base,
             smart_rollup_address,
-            &config.tezos_contracts,
-            config.enable_fa_bridge,
+            &config.common.tezos_contracts,
+            config.common.enable_fa_bridge,
             chain_config,
         ),
     }
@@ -217,6 +217,7 @@ mod tests {
     use crate::{
         blueprint_storage::EVMBlockHeader,
         chains::{test_tezosx_chain_config, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
+        configuration::CommonConfig,
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
             UnsignedDalSlotSignals,
@@ -277,11 +278,15 @@ mod tests {
             None
         };
 
-        let contracts = TezosContracts::default();
+        let ticketer = ContractKt1Hash::from_b58check(DUMMY_TICKETER).unwrap();
         Configuration {
-            tezos_contracts: TezosContracts {
-                ticketer: Some(ContractKt1Hash::from_b58check(DUMMY_TICKETER).unwrap()),
-                ..contracts
+            common: CommonConfig {
+                tezos_contracts: TezosContracts {
+                    ticketer: Some(ticketer),
+                    ..TezosContracts::default()
+                },
+                maximum_allowed_ticks: MAX_ALLOWED_TICKS,
+                enable_fa_bridge: false,
             },
             mode: ConfigurationMode::Sequencer(SequencerConfig {
                 delayed_bridge,
@@ -291,21 +296,21 @@ mod tests {
                 evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             }),
-            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
-            enable_fa_bridge: false,
         }
     }
 
     fn dummy_proxy_configuration() -> Configuration {
-        let contracts = TezosContracts::default();
+        let ticketer = ContractKt1Hash::from_b58check(DUMMY_TICKETER).unwrap();
         Configuration {
-            tezos_contracts: TezosContracts {
-                ticketer: Some(ContractKt1Hash::from_b58check(DUMMY_TICKETER).unwrap()),
-                ..contracts
+            common: CommonConfig {
+                tezos_contracts: TezosContracts {
+                    ticketer: Some(ticketer),
+                    ..TezosContracts::default()
+                },
+                maximum_allowed_ticks: MAX_ALLOWED_TICKS,
+                enable_fa_bridge: false,
             },
             mode: ConfigurationMode::Proxy,
-            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
-            enable_fa_bridge: false,
         }
     }
 
@@ -629,7 +634,7 @@ mod tests {
             &mut host,
             &mut base,
             DEFAULT_SR_ADDRESS,
-            &conf.tezos_contracts,
+            &conf.common.tezos_contracts,
             false,
             &chain_config,
         )
@@ -788,11 +793,11 @@ mod tests {
         let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
-            conf.tezos_contracts.ticketer.clone().unwrap(),
+            conf.common.tezos_contracts.ticketer.clone().unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
         host.host.add_transfer(
-            dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
+            dummy_deposit(conf.common.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
         fetch_blueprints(
@@ -859,11 +864,11 @@ mod tests {
         let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_sequencer_config(enable_dal, None);
         let metadata = TransferMetadata::new(
-            conf.tezos_contracts.ticketer.clone().unwrap(),
+            conf.common.tezos_contracts.ticketer.clone().unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
         host.host.add_transfer(
-            dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
+            dummy_deposit(conf.common.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
         fetch_blueprints(
@@ -1144,11 +1149,11 @@ mod tests {
         // One deposit
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
-            conf.tezos_contracts.ticketer.clone().unwrap(),
+            conf.common.tezos_contracts.ticketer.clone().unwrap(),
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
         host.host.add_transfer(
-            dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
+            dummy_deposit(conf.common.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
 

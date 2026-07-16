@@ -979,7 +979,7 @@ mod tests {
 
     use super::*;
     use crate::block::GENESIS_PARENT_HASH;
-    use crate::configuration::{DalConfiguration, TezosContracts};
+    use crate::configuration::{CommonConfig, DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::{
         rlp_roundtrip, rlp_roundtrip_f, LATEST_BLUEPRINT_VERSION,
@@ -1013,7 +1013,11 @@ mod tests {
             None
         };
         let mut config = Configuration {
-            tezos_contracts: TezosContracts::default(),
+            common: CommonConfig {
+                tezos_contracts: TezosContracts::default(),
+                maximum_allowed_ticks: MAX_ALLOWED_TICKS,
+                enable_fa_bridge: false,
+            },
             mode: ConfigurationMode::Sequencer(SequencerConfig {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
@@ -1022,8 +1026,6 @@ mod tests {
                 evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             }),
-            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
-            enable_fa_bridge: false,
         };
 
         let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);
