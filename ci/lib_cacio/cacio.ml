@@ -205,10 +205,12 @@ type job = {
   needs_legacy : (need * Tezos_ci.tezos_job) list;
   parallel : Gitlab_ci.Types.parallel option;
   only_if : Condition.t;
-  variables : Gitlab_ci.Types.variables option;
+  variables : Gitlab_ci.Types.variables;
+  before_script : string list;
   script : string list;
+  after_script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
-  cache : Gitlab_ci.Types.cache list option;
+  cache : Gitlab_ci.Types.cache list;
   cargo_cache : bool;
   sccache : sccache_config option;
   dune_cache : bool;
@@ -573,7 +575,9 @@ let convert_graph ?(interruptible_pipeline = true)
                     parallel;
                     only_if = _;
                     variables;
+                    before_script;
                     script;
+                    after_script;
                     artifacts;
                     cache;
                     cargo_cache;
@@ -702,12 +706,15 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?interruptible_runner
                 ?retry
                 ?timeout
-                ?variables
+                ?variables:
+                  (match variables with [] -> None | _ :: _ -> Some variables)
                 ?artifacts
                 ~datadog:(not disable_datadog)
                 ?allow_failure
-                ?cache
+                ?cache:(match cache with [] -> None | _ :: _ -> Some cache)
+                ~before_script
                 script
+                ~after_script
               |> maybe_enable_cargo_cache |> maybe_enable_sccache
               |> maybe_enable_dune_cache
         in
@@ -1062,12 +1069,14 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ?tag ?image ?only_if_changed ?(force = false)
       ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
-      ?environment ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
-      ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
-      ?timeout ?(image_dependencies = []) ?services ?id_tokens ?(script = [])
-      name =
+      ?environment ?(variables = []) ?artifacts ?(cache = [])
+      ?(cargo_cache = false) ?sccache ?(dune_cache = false)
+      ?(disable_datadog = false) ?allow_failure ?retry ?timeout
+      ?(image_dependencies = []) ?services ?id_tokens ?(script = []) name =
     let name = make_name name in
     declared_jobs := String_map.add name source_location !declared_jobs ;
+    let before_script = [] in
+    let after_script = [] in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
       if compare_stages dep.stage stage > 0 then
@@ -1104,7 +1113,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
                 | Some list -> Tezos_ci.Changeset.make list))
              (Condition.label force_if_label));
       variables;
+      before_script;
       script;
+      after_script;
       artifacts;
       cache;
       cargo_cache;
