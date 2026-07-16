@@ -208,6 +208,10 @@ pub enum KeySpaceWriteError {
 /// A `KeySpace` is a flat key-value store. Instances are created via
 /// [`KeySpaceLoader::load_or_create`].
 pub trait KeySpace {
+    /// The name this key space was loaded under, i.e. the [`Name`] passed to
+    /// [`KeySpaceLoader::load_or_create`] when this handle was created.
+    fn name(&self) -> &Name;
+
     /// Read the whole value associated with the key.
     /// Returns `None` if the key does not exist.
     fn get(&self, key: &Key) -> Option<Vec<u8>>;
