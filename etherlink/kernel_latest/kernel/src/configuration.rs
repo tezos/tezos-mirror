@@ -39,30 +39,32 @@ pub struct DalConfiguration {
     pub slot_indices: Vec<u8>,
 }
 
+pub struct SequencerConfig {
+    pub delayed_bridge: ContractKt1Hash,
+    pub delayed_inbox: Box<DelayedInbox>,
+    pub sequencer: PublicKey,
+    pub dal: Option<DalConfiguration>,
+    pub evm_node_flag: bool,
+    pub max_blueprint_lookahead_in_seconds: i64,
+}
+
 pub enum ConfigurationMode {
     Proxy,
-    Sequencer {
-        delayed_bridge: ContractKt1Hash,
-        delayed_inbox: Box<DelayedInbox>,
-        sequencer: PublicKey,
-        dal: Option<DalConfiguration>,
-        evm_node_flag: bool,
-        max_blueprint_lookahead_in_seconds: i64,
-    },
+    Sequencer(SequencerConfig),
 }
 
 impl std::fmt::Display for ConfigurationMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ConfigurationMode::Proxy => write!(f, "Proxy"),
-            ConfigurationMode::Sequencer {
+            ConfigurationMode::Sequencer(SequencerConfig {
                 delayed_bridge,
                 delayed_inbox: _, // Ignoring delayed_inbox
                 sequencer,
                 dal,
                 evm_node_flag,
                 max_blueprint_lookahead_in_seconds,
-            } => write!(
+            }) => write!(
                 f,
                 "Sequencer {{ delayed_bridge: {delayed_bridge:?}, sequencer: {sequencer:?}, dal: {dal:?}, evm_node_flag: {evm_node_flag}, max_blueprints_lookahead_in_seconds: {max_blueprint_lookahead_in_seconds} }}"
             ),
@@ -313,14 +315,14 @@ where
             match DelayedInbox::from_base(base) {
                 Ok(delayed_inbox) => Configuration {
                     tezos_contracts,
-                    mode: ConfigurationMode::Sequencer {
+                    mode: ConfigurationMode::Sequencer(SequencerConfig {
                         delayed_bridge,
                         delayed_inbox: Box::new(delayed_inbox),
                         sequencer,
                         dal,
                         evm_node_flag,
                         max_blueprint_lookahead_in_seconds,
-                    },
+                    }),
                     maximum_allowed_ticks,
                     enable_fa_bridge,
                 },

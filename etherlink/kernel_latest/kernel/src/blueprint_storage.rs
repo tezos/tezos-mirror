@@ -5,7 +5,7 @@
 
 use crate::blueprint::Blueprint;
 use crate::chains::{ExperimentalFeatures, TezosXChainConfig, TezosXTransaction};
-use crate::configuration::{Configuration, ConfigurationMode};
+use crate::configuration::{Configuration, ConfigurationMode, SequencerConfig};
 use crate::error::{Error, StorageError};
 use crate::l2block::L2Block;
 use crate::sequencer_blueprint::{
@@ -830,12 +830,12 @@ fn read_all_chunks_and_validate(
     }
     match &config.mode {
         ConfigurationMode::Proxy => Ok((None, size)),
-        ConfigurationMode::Sequencer {
+        ConfigurationMode::Sequencer(SequencerConfig {
             delayed_inbox,
             evm_node_flag,
             max_blueprint_lookahead_in_seconds,
             ..
-        } => {
+        }) => {
             let validity: (BlueprintValidity, usize) = parse_and_validate_blueprint(
                 host,
                 base,
@@ -1014,14 +1014,14 @@ mod tests {
         };
         let mut config = Configuration {
             tezos_contracts: TezosContracts::default(),
-            mode: ConfigurationMode::Sequencer {
+            mode: ConfigurationMode::Sequencer(SequencerConfig {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
                 dal,
                 evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
-            },
+            }),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
         };

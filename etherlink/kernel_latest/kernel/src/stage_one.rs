@@ -10,7 +10,7 @@ use crate::blueprint_storage::{
 };
 use crate::chains::{TezosXChainConfig, TezosXTransaction};
 use crate::configuration::{
-    Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
+    Configuration, ConfigurationMode, DalConfiguration, SequencerConfig, TezosContracts,
 };
 use crate::delayed_inbox::DelayedInbox;
 use crate::event::Event;
@@ -133,7 +133,7 @@ fn fetch_sequencer_blueprints<Host>(
     dal: Option<DalConfiguration>,
     maximum_allowed_ticks: u64,
     enable_fa_bridge: bool,
-    chain_configuration: &TezosXChainConfig,
+    config_chain: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
@@ -149,7 +149,7 @@ where
         enable_fa_bridge,
         maximum_allowed_ticks,
         dal,
-        chain_configuration,
+        config_chain,
     )? {
         StageOneStatus::Done => {
             log!(Debug, "Stage one done, rebooting");
@@ -181,14 +181,14 @@ where
     Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     match &mut config.mode {
-        ConfigurationMode::Sequencer {
+        ConfigurationMode::Sequencer(SequencerConfig {
             delayed_bridge,
             delayed_inbox,
             sequencer,
             dal,
             evm_node_flag: _,
             max_blueprint_lookahead_in_seconds: _,
-        } => fetch_sequencer_blueprints(
+        }) => fetch_sequencer_blueprints(
             host,
             base,
             smart_rollup_address,
@@ -283,14 +283,14 @@ mod tests {
                 ticketer: Some(ContractKt1Hash::from_b58check(DUMMY_TICKETER).unwrap()),
                 ..contracts
             },
-            mode: ConfigurationMode::Sequencer {
+            mode: ConfigurationMode::Sequencer(SequencerConfig {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
                 dal,
                 evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
-            },
+            }),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
         }
@@ -311,10 +311,10 @@ mod tests {
 
     fn get_dal_slots(conf: &Configuration) -> Option<Vec<u8>> {
         match &conf.mode {
-            ConfigurationMode::Sequencer {
+            ConfigurationMode::Sequencer(SequencerConfig {
                 dal: Some(DalConfiguration { slot_indices }),
                 ..
-            } => Some(slot_indices.clone()),
+            }) => Some(slot_indices.clone()),
             _ => None,
         }
     }
@@ -393,14 +393,16 @@ mod tests {
     fn delayed_bridge(conf: &Configuration) -> ContractKt1Hash {
         match &conf.mode {
             ConfigurationMode::Proxy => panic!("No delayed bridge in proxy mode"),
-            ConfigurationMode::Sequencer { delayed_bridge, .. } => delayed_bridge.clone(),
+            ConfigurationMode::Sequencer(SequencerConfig { delayed_bridge, .. }) => {
+                delayed_bridge.clone()
+            }
         }
     }
 
     fn delayed_inbox_is_empty(conf: &Configuration, base: &impl KeySpace) -> bool {
         match &conf.mode {
             ConfigurationMode::Proxy => panic!("No delayed inbox in proxy mode"),
-            ConfigurationMode::Sequencer { delayed_inbox, .. } => {
+            ConfigurationMode::Sequencer(SequencerConfig { delayed_inbox, .. }) => {
                 delayed_inbox.is_empty(base).unwrap()
             }
         }

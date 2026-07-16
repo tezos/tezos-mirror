@@ -16,7 +16,7 @@ use crate::blueprint_storage::{
 use crate::chains::{
     EvmLimits, TezosXBlockConstants, TezosXChainConfig, TezosXTransaction,
 };
-use crate::configuration::ConfigurationMode;
+use crate::configuration::{ConfigurationMode, SequencerConfig};
 use crate::delayed_inbox::{DelayedInbox, Hash};
 use crate::error::Error;
 use crate::event::Event;
@@ -447,10 +447,10 @@ where
                     // transactions indeed trigger WASM traps. If said transaction is part of the
                     // delayed inbox, it can never been included in a valid blueprint by
                     // construction and should be dropped to protect the kernel.
-                    if let ConfigurationMode::Sequencer {
+                    if let ConfigurationMode::Sequencer(SequencerConfig {
                         ref mut delayed_inbox,
                         ..
-                    } = config.mode
+                    }) = config.mode
                     {
                         let potential_culprits: Vec<_> = blueprint
                             .transactions
@@ -527,7 +527,9 @@ where
     let level = if written > 0 { Info } else { Debug };
     log!(level, "Flushed outbox queue messages ({} flushed)", written);
 
-    if let ConfigurationMode::Sequencer { delayed_inbox, .. } = &mut config.mode {
+    if let ConfigurationMode::Sequencer(SequencerConfig { delayed_inbox, .. }) =
+        &mut config.mode
+    {
         clean_delayed_transactions(base, delayed_inbox, delayed_txs)?;
     }
 
