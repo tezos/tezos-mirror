@@ -626,8 +626,126 @@ let test_double_evidence () =
     | Validate_errors.Anonymous.Already_denounced _ -> true
     | _ -> false)
 
+(* --- P256 signature-malleability mitigation (lib_protocol regression) ------ *)
+(* Direct check of the block-validation plugin gate that rejects a
+   double_baking_evidence whose two headers have byte-identical UNSIGNED content
+   (a malleated P256 twin), while leaving a GENUINE denunciation untouched. This
+   exercises [check_block_operation] — the function the shell validator runs —
+   in both directions, which no tezt/system test covers. *)
+
+(* Order of the P256 (secp256r1) subgroup. *)
+let p256_order =
+  Z.of_string
+    "0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551"
+
+let z_of_be (b : bytes) : Z.t =
+  let acc = ref Z.zero in
+  Bytes.iter
+    (fun c -> acc := Z.add (Z.mul !acc (Z.of_int 256)) (Z.of_int (Char.code c)))
+    b ;
+  !acc
+
+let be_of_z (z : Z.t) (len : int) : bytes =
+  let b = Bytes.make len '\000' in
+  let cur = ref z in
+  for i = len - 1 downto 0 do
+    Bytes.set b i (Char.chr (Z.to_int (Z.logand !cur (Z.of_int 0xff)))) ;
+    cur := Z.shift_right !cur 8
+  done ;
+  b
+
+(* Replace a header's P256 signature (r, s) by its valid twin (r, n - s). *)
+let malleate_p256_signature (sg : Signature.t) : Signature.t =
+  match sg with
+  | Signature.P256 s -> (
+      let raw = Signature.P256.to_bytes s in
+      let r = Bytes.sub raw 0 32 in
+      let s_val = z_of_be (Bytes.sub raw 32 32) in
+      let raw' = Bytes.cat r (be_of_z (Z.sub p256_order s_val) 32) in
+      match Signature.P256.of_bytes_opt raw' with
+      | Some s' -> Signature.of_p256 s'
+      | None -> Stdlib.failwith "malleate_p256_signature: of_bytes_opt failed")
+  | _ -> Stdlib.failwith "malleate_p256_signature: expected a P256 signature"
+
+let plugin_state_at blk =
+  let open Lwt_result_syntax in
+  let* i = Incremental.begin_construction blk in
+  return
+    (Block_validation.init_block_validation_state
+       (Incremental.validation_state i))
+
+(** A double_baking_evidence forged from ONE honest tz3 block by malleating its
+    P256 signature (identical unsigned content) must be REFUSED by the plugin. *)
+let test_plugin_rejects_forged_p256_double_baking () =
+  let open Lwt_result_syntax in
+  let* genesis, _ =
+    Context.init_with_constants_n ~algo:Signature.P256 constants_no_rewards 2
+  in
+  let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
+  let* blk_cycle =
+    Block.bake_until_cycle_end ~policy:(By_account baker2) genesis
+  in
+  let* blk = Block.bake ~policy:(By_account baker1) blk_cycle in
+  let bh1 = blk.header in
+  let bh2 =
+    Block_header.
+      {
+        bh1 with
+        protocol_data =
+          {
+            bh1.protocol_data with
+            signature = malleate_p256_signature bh1.protocol_data.signature;
+          };
+      }
+  in
+  let operation = double_baking (B blk) bh1 bh2 in
+  let* plugin_state = plugin_state_at blk in
+  let*! r = Block_validation.check_block_operation plugin_state operation in
+  match r with
+  | Error _ -> return_unit
+  | Ok _ ->
+      failwith
+        "mitigation FAILED: check_block_operation accepted a malleated \
+         double_baking_evidence"
+
+(** POSITIVE CONTROL (red-on-mutation): a GENUINE double baking (two distinct
+    blocks, different unsigned content) must still be ACCEPTED by the plugin, so
+    legitimate slashing is not disabled. *)
+let test_plugin_accepts_genuine_double_baking () =
+  let open Lwt_result_syntax in
+  let* genesis, contracts =
+    Context.init_with_constants_n ~algo:Signature.P256 constants_no_rewards 2
+  in
+  let* contract_a, contract_b =
+    match contracts with a :: b :: _ -> return (a, b) | _ -> assert false
+  in
+  let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
+  let* blk_cycle =
+    Block.bake_until_cycle_end ~policy:(By_account baker2) genesis
+  in
+  let* blk_a, blk_b =
+    block_fork ~policy:(By_account baker1) (contract_a, contract_b) blk_cycle
+  in
+  let operation = double_baking (B blk_a) blk_a.header blk_b.header in
+  let* plugin_state = plugin_state_at blk_a in
+  let*! r = Block_validation.check_block_operation plugin_state operation in
+  match r with
+  | Ok _ -> return_unit
+  | Error _ ->
+      failwith
+        "control FAILED: check_block_operation rejected a GENUINE \
+         double_baking_evidence"
+
 let tests =
   [
+    Tztest.tztest
+      "plugin rejects malleated (P256) double baking evidence"
+      `Quick
+      test_plugin_rejects_forged_p256_double_baking;
+    Tztest.tztest
+      "plugin accepts genuine double baking evidence (positive control)"
+      `Quick
+      test_plugin_accepts_genuine_double_baking;
     Tztest.tztest
       "valid double baking evidence"
       `Quick
