@@ -99,7 +99,8 @@ impl<Handle: WasmNds> KeySpaceLoader for NdsKeySpaceLoader<Handle> {
 
                 return Ok(WasmNdsKeySpace {
                     registry: self.registry.clone(),
-                    db_index
+                    db_index,
+                    name,
                 });
             }
             Ok(_size) => return Err(KeySpaceLoaderError::InconsistentNameMapping(name)),
@@ -159,6 +160,7 @@ impl<Handle: WasmNds> KeySpaceLoader for NdsKeySpaceLoader<Handle> {
         Ok(WasmNdsKeySpace {
             registry: self.registry.clone(),
             db_index,
+            name,
         })
     }
 }
@@ -172,6 +174,8 @@ pub struct WasmNdsKeySpace<Handle: WasmNds> {
     /// Database index for this KeySpace index. All uses of this in conjuction with `store_` methods are guaranteed to
     /// *never* return an `DatabasesOutOfBounds` error.
     db_index: NonZeroUsize,
+    /// The name this key space was loaded under.
+    name: crate::Name,
 }
 
 impl<Handle: WasmNds> WasmNdsKeySpace<Handle> {
@@ -264,6 +268,10 @@ impl<Handle: WasmNds> WasmNdsKeySpace<Handle> {
 }
 
 impl<Handle: WasmNds> KeySpace for WasmNdsKeySpace<Handle> {
+    fn name(&self) -> &crate::Name {
+        &self.name
+    }
+
     fn get(&self, key: &crate::Key) -> Option<Vec<u8>> {
         let value_size = self.value_length(key)?;
 
