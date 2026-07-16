@@ -78,6 +78,3 @@ let changeset_homebrew =
         "scripts/version.sh";
         "manifest/**/*.ml*";
       ])
-
-let changeset_test_sdk_bindings =
-  Changeset.(changeset_base @ Sdk_bindings_ci.changeset)

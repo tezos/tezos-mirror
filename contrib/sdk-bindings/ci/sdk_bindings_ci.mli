@@ -5,8 +5,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Files that should trigger the jobs of this module. *)
-val changeset : Tezos_ci.Changeset.t
-
 (** Register jobs and pipelines for SDK bindings. *)
 val register : unit -> unit

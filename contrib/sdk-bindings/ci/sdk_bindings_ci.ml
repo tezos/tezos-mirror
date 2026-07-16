@@ -30,9 +30,6 @@ module CI = Cacio.Make (struct
   let paths = Files.all
 end)
 
-(** Set of SDK-bindings related files *)
-let changeset = Changeset.make Files.all
-
 let job_test =
   CI.job
     "test"
