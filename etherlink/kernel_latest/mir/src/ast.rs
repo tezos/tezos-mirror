@@ -2199,6 +2199,8 @@ pub enum Instruction<'a> {
     Now,
     ImplicitAccount,
     IsImplicitAccount,
+    IndexAddress,
+    GetAddressIndex,
     TotalVotingPower,
     VotingPower,
     /// Here entrypoint is not an optional value because explicit default entrypoints are forbidden

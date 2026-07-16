@@ -1,0 +1,8 @@
+# INDEX_ADDRESS is forbidden directly in a view, but the typechecker's
+# restriction does not cross lambda boundaries: a lambda EXEC'd by the view
+# reaches it at runtime and registers the address in the shared registry.
+{ parameter unit ;
+  storage unit ;
+  code { CDR ; NIL operation ; PAIR } ;
+  view "index_via_lambda" address nat
+       { CAR ; LAMBDA address nat { INDEX_ADDRESS } ; SWAP ; EXEC } }

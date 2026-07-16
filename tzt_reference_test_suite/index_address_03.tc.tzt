@@ -1,0 +1,3 @@
+code { INDEX_ADDRESS } ;
+input { Stack_elt nat 42 } ;
+output (StaticError _)

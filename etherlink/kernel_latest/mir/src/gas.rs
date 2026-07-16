@@ -493,6 +493,13 @@ pub mod interpret_cost {
     pub const NOW: u32 = 75;
     pub const IMPLICIT_ACCOUNT: u32 = 65;
     pub const IS_IMPLICIT_ACCOUNT: u32 = 65;
+    /// Flat cost of `INDEX_ADDRESS`, matching L1's `cost_N_IIndex_address`
+    /// (charged whether or not the address is newly registered).
+    /// https://gitlab.com/tezos/tezos/-/blob/5781c10e4e7d/src/proto_024_PtTALLiN/lib_protocol/michelson_v1_gas_costs_generated.ml#L1697
+    pub const INDEX_ADDRESS: u32 = 3480;
+    /// Cost of `GET_ADDRESS_INDEX`, matching L1's `cost_N_IGet_address_index`.
+    /// https://gitlab.com/tezos/tezos/-/blob/5781c10e4e7d/src/proto_024_PtTALLiN/lib_protocol/michelson_v1_gas_costs_generated.ml#L1589
+    pub const GET_ADDRESS_INDEX: u32 = 530;
     pub const VOTING_POWER: u32 = 45;
     pub const TOTAL_VOTING_POWER: u32 = 75;
     pub const EMIT: u32 = 75;

@@ -306,6 +306,7 @@ where
         operation_ctx: &mut operation_ctx,
         journal: &mut *journal,
         registry,
+        address_registry_diff: Vec::new(),
     };
 
     // Wrap the metered work so its gas can be read once after it runs. On

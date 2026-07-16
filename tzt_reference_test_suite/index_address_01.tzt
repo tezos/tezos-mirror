@@ -1,0 +1,3 @@
+code { DUP ; INDEX_ADDRESS ; SWAP ; GET_ADDRESS_INDEX } ;
+input { Stack_elt address "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw" } ;
+output { Stack_elt (option nat) (Some 1) ; Stack_elt nat 1 }

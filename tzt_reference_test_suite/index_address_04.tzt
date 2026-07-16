@@ -1,0 +1,3 @@
+code { INDEX_ADDRESS } ;
+input { Stack_elt address "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%do" } ;
+output { Stack_elt nat 1 }
