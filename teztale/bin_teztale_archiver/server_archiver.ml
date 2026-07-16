@@ -71,54 +71,72 @@ let send_something =
           Lwt.fail_with msg)
       ctx.endpoints
 
-let send_rights ctx level rights =
-  let body =
-    `String
-      (Ezjsonm.value_to_string
-         (Data_encoding.Json.construct Consensus_ops.rights_encoding rights))
-  in
-  let path = Int32.to_string level ^ "/rights" in
-  send_something ctx path body
-
-let send_block ctx level block_data =
-  let body =
-    `String
-      (Ezjsonm.value_to_string
-         (Data_encoding.Json.construct
-            Data.Archiver.raw_block_data_encoding
-            block_data))
-  in
-  let path = Int32.to_string level ^ "/block" in
-  send_something ctx path body
-
-let send_mempool ctx level ops =
-  let body =
-    `String
-      (Ezjsonm.value_to_string
-         (Data_encoding.Json.construct Consensus_ops.delegate_ops_encoding ops))
-  in
-  let path = Int32.to_string level ^ "/mempool" in
-  send_something ctx path body
-
-let send_dal_shards ctx level shard_assignments =
-  let body =
-    `String
-      (Ezjsonm.value_to_string
-         (Data_encoding.Json.construct
-            Data.Dal.shard_assignments_encoding
-            shard_assignments))
-  in
-  let path = Int32.to_string level ^ "/dal_shards" in
-  send_something ctx path body
+(* The request path and JSON body of the POST that ships a given chunk to the
+   teztale-server. Shared by [send] (live path) and [backup_post] (on failure)
+   so every chunk kind -- rights and dal_shards included -- is handled
+   uniformly. *)
+let chunk_to_post = function
+  | Block (level, block_data) ->
+      ( Int32.to_string level ^ "/block",
+        Ezjsonm.value_to_string
+          (Data_encoding.Json.construct
+             Data.Archiver.raw_block_data_encoding
+             block_data) )
+  | Mempool (level, ops) ->
+      ( Int32.to_string level ^ "/mempool",
+        Ezjsonm.value_to_string
+          (Data_encoding.Json.construct Consensus_ops.delegate_ops_encoding ops)
+      )
+  | Rights (level, rights) ->
+      ( Int32.to_string level ^ "/rights",
+        Ezjsonm.value_to_string
+          (Data_encoding.Json.construct Consensus_ops.rights_encoding rights) )
+  | Dal_shards (level, shard_assignments) ->
+      ( Int32.to_string level ^ "/dal_shards",
+        Ezjsonm.value_to_string
+          (Data_encoding.Json.construct
+             Data.Dal.shard_assignments_encoding
+             shard_assignments) )
 
 let chunk_stream, chunk_feeder = Lwt_stream.create ()
 
-let send actx = function
-  | Block (level, block) -> send_block actx level block
-  | Mempool (level, ops) -> send_mempool actx level ops
-  | Rights (level, rights) -> send_rights actx level rights
-  | Dal_shards (level, shard_assignments) ->
-      send_dal_shards actx level shard_assignments
+let send actx chunk =
+  let path, body = chunk_to_post chunk in
+  send_something actx path (`String body)
+
+(* On send failure, when --backup-dir is set, persist the failed POST verbatim
+   (path + JSON body) as one record per file. Unlike the previous json-archiver
+   dump, this preserves every chunk kind -- rights and dal_shards included -- so
+   no data is silently dropped, and the record can later be replayed as-is. *)
+let backup_post dir chunk =
+  let logger = Log.logger () in
+  let path, body = chunk_to_post chunk in
+  Lwt.catch
+    (fun () ->
+      let*! () = Lwt_utils_unix.create_dir dir in
+      let file = Filename.temp_file ~temp_dir:dir "post-" ".json" in
+      let*! out =
+        Lwt_utils_unix.Json.write_file
+          file
+          (`O [("path", `String path); ("body", `String body)])
+      in
+      match out with
+      | Ok () -> Lwt.return_unit
+      | Error err ->
+          Log.error logger (fun () ->
+              Format.asprintf
+                "Failed to back up %s data: %a"
+                path
+                Error_monad.pp_print_trace
+                err) ;
+          Lwt.return_unit)
+    (fun exn ->
+      Log.error logger (fun () ->
+          Format.asprintf
+            "Failed to back up %s data: %s"
+            path
+            (Printexc.to_string exn)) ;
+      Lwt.return_unit)
 
 let launch actx _source =
   Lwt_stream.iter_p

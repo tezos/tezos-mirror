@@ -123,3 +123,8 @@ DAL node
 
 Miscellaneous
 -------------
+
+- Teztale archiver: ``--backup-dir`` now backs up **every** failed POST,
+  including ``/rights`` and ``/dal_shards`` which were previously dropped
+  silently. Each failed POST is stored verbatim (path + body) as one record, so
+  no data is lost when the server is unreachable.
