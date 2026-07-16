@@ -7088,6 +7088,10 @@ end = struct
               octez_protocol_environment;
               octez_stdlib_unix;
               main |> open_;
+              (* Only [proto_alpha]'s unit tests use the block-validation plugin
+                 (the [test_sc_rollup_game] cases); other protocols have
+                 no such test, so the dependency is scoped to alpha. *)
+              plugin |> if_some |> if_ (String.equal name_dash "alpha") |> open_;
               octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
               alcotezt;

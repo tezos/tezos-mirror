@@ -16,6 +16,7 @@
   octez-proto-libs.protocol-environment
   octez-libs.stdlib-unix
   tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.plugin
   octez-libs.test-helpers
   octez-protocol-alpha-libs.test-helpers
   octez-alcotezt
@@ -36,6 +37,7 @@
   -open Tezos_client_alpha
   -open Tezos_protocol_alpha_parameters
   -open Tezos_protocol_alpha
+  -open Tezos_protocol_plugin_alpha
   -open Tezos_test_helpers
   -open Tezos_alpha_test_helpers
   -open Octez_alcotezt
