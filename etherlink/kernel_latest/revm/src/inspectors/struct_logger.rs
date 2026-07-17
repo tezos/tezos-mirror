@@ -25,7 +25,6 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::rlp_helpers::{check_list, decode_field, decode_option, next};
 use tezos_evm_logging::{log, tracing::instrument, Level::Debug};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_interfaces::Registry;
 
 use super::storage::{
     store_return_value, store_struct_log, store_trace_failed, store_trace_gas,
@@ -218,8 +217,8 @@ fn to_structured_stack(st: &Stack) -> Vec<B256> {
 
 impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for StructLogger
 where
+    R: 'a,
     Host: StorageV1 + 'a,
-    R: Registry + 'a,
     CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl, Memory: MemoryTr>,
 {

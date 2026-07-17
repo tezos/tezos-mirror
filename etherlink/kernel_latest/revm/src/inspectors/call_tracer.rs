@@ -30,7 +30,6 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::{log, Level::Debug};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_interfaces::Registry;
 
 const CALL_TRACER_CONFIG_SIZE: usize = 3;
 
@@ -244,7 +243,7 @@ impl CallTracer {
         instruction_result: &InstructionResult,
     ) where
         Host: StorageV1 + 'a,
-        R: Registry + 'a,
+        R: 'a,
         CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     {
         let depth = context.journal().depth() as u16;
@@ -280,7 +279,7 @@ impl CallTracer {
 impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for CallTracer
 where
     Host: StorageV1 + 'a,
-    R: Registry + 'a,
+    R: 'a,
     CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     INTR: InterpreterTypes<ReturnData = ReturnDataImpl>,
 {

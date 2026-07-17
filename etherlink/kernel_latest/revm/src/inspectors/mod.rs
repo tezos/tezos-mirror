@@ -26,7 +26,6 @@ use revm::{
 };
 use struct_logger::{StructLogger, StructLoggerInput};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_interfaces::Registry;
 
 pub mod call_tracer;
 pub mod storage;
@@ -218,7 +217,7 @@ impl Tracer {
 impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for Tracer
 where
     Host: StorageV1 + 'a,
-    R: Registry + 'a,
+    R: 'a,
     CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl>,
 {
