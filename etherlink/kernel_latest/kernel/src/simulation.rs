@@ -41,6 +41,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::{CracId, TezosXJournal};
 
@@ -392,7 +393,7 @@ impl Evaluation {
         Error,
     >
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let evm_chain_id = fetch_evm_chain_id(host);
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
@@ -702,7 +703,7 @@ pub fn start_simulation_mode<Host>(
     spec_id: &SpecId,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost,
+    Host: StorageV1 + WasmHost + KeySpaceLoader,
 {
     log!(Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
@@ -803,7 +804,7 @@ mod tests {
 
     fn create_contract<Host>(host: &mut Host) -> H160
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));

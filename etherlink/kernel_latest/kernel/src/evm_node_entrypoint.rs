@@ -64,7 +64,8 @@ pub extern "C" fn populate_delayed_inbox() {
 #[allow(dead_code)]
 pub fn populate_delayed_inbox_with_durable_storage<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
@@ -85,7 +86,8 @@ pub extern "C" fn drop_delayed_transaction() {
 #[allow(dead_code)]
 pub fn drop_delayed_transaction_with_durable_storage<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
@@ -105,7 +107,8 @@ pub extern "C" fn single_tx_execution() {
 #[allow(dead_code)]
 pub fn single_tx_execution_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let tx_input = match sub_block::read_single_tx_execution_input(&mut host) {
@@ -148,7 +151,8 @@ pub extern "C" fn assemble_block() {
 #[allow(dead_code)]
 pub fn assemble_block_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let assemble_block_input = match sub_block::read_assemble_block_input(&mut host) {
@@ -180,7 +184,8 @@ pub extern "C" fn tezosx_simulate() {
 #[allow(dead_code)]
 pub fn tezosx_simulate_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let input = match host.store_read_all(&TEZOSX_SIMULATION_INPUT) {
@@ -234,7 +239,7 @@ where
     );
 
     let chain_config = fetch_tezosx_configuration(&mut host);
-    let blueprint_header = match read_current_blueprint_header(&host) {
+    let blueprint_header = match read_current_blueprint_header(&mut host) {
         Ok(h) => h,
         Err(err) => {
             log!(

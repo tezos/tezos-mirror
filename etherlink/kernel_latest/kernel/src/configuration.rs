@@ -9,9 +9,9 @@ use crate::{
     delayed_inbox::DelayedInbox,
     retrieve_minimum_base_fee_per_gas,
     storage::{
-        dal_slots, enable_dal, is_enable_fa_bridge, max_blueprint_lookahead_in_seconds,
-        read_admin, read_delayed_transaction_bridge, read_evm_chain_id,
-        read_kernel_governance, read_kernel_security_governance,
+        dal_slots, enable_dal, is_enable_fa_bridge, load_base_keyspace,
+        max_blueprint_lookahead_in_seconds, read_admin, read_delayed_transaction_bridge,
+        read_evm_chain_id, read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_michelson_runtime_chain_id,
         read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
         store_evm_chain_id, store_michelson_runtime_chain_id,
@@ -28,6 +28,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
@@ -144,22 +145,27 @@ impl TezosContracts {
     }
 }
 
-fn fetch_tezos_contracts(host: &mut impl StorageV1) -> TezosContracts {
+// The `/evm` contracts are read through the raw host; the `/base` ones go
+// through the keyspace handle.
+fn fetch_tezos_contracts(
+    host: &mut impl StorageV1,
+    base: &impl KeySpace,
+) -> TezosContracts {
     // 1. Fetch the kernel's ticketer, returns `None` if it is badly
     //    encoded or absent.
     let ticketer = read_ticketer(host);
     // 2. Fetch the kernel's administrator, returns `None` if it is badly
     //    encoded or absent.
-    let admin = read_admin(host);
+    let admin = read_admin(base);
     // 3. Fetch the sequencer governance, returns `None` if it is badly
     //    encoded or absent.
     let sequencer_governance = read_sequencer_governance(host);
     // 4. Fetch the kernel_governance contract, returns `None` if it is badly
     //    encoded or absent.
-    let kernel_governance = read_kernel_governance(host);
+    let kernel_governance = read_kernel_governance(base);
     // 5. Fetch the kernel_security_governance contract, returns `None` if it is badly
     //    encoded or absent.
-    let kernel_security_governance = read_kernel_security_governance(host);
+    let kernel_security_governance = read_kernel_security_governance(base);
 
     TezosContracts {
         ticketer,
@@ -185,13 +191,12 @@ where
     }
 }
 
-fn fetch_dal_configuration<Host>(host: &mut Host) -> Option<DalConfiguration>
-where
-    Host: StorageV1 + IsEvmNode,
-{
-    let enable_dal = enable_dal(host).unwrap_or(false);
-    if enable_dal {
-        let slot_indices: Vec<u8> = dal_slots(host).unwrap_or(None)?;
+fn fetch_dal_configuration(
+    base: &impl KeySpace,
+    is_evm_node: bool,
+) -> Option<DalConfiguration> {
+    if enable_dal(base, is_evm_node) {
+        let slot_indices: Vec<u8> = dal_slots(base)?;
         Some(DalConfiguration { slot_indices })
     } else {
         None
@@ -255,7 +260,7 @@ fn fetch_michelson_runtime_chain_id(
 
 pub fn fetch_tezosx_configuration<Host>(host: &mut Host) -> TezosXChainConfig
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     // Read both runtime chain ids from storage. The EVM chain id falls back to
     // the default and is persisted on first use; the Michelson runtime chain id
@@ -278,18 +283,22 @@ where
 
 pub fn fetch_configuration<Host>(host: &mut Host) -> Configuration
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
-    let tezos_contracts = fetch_tezos_contracts(host);
+    // Loaded once for the whole configuration fetch and threaded down.
+    let base = load_base_keyspace(host).expect(
+        "no other `/base` keyspace handle may be live during the configuration fetch",
+    );
+    let tezos_contracts = fetch_tezos_contracts(host, &base);
     let maximum_allowed_ticks =
-        read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);
+        read_maximum_allowed_ticks(&base).unwrap_or(MAX_ALLOWED_TICKS);
     let sequencer = sequencer(host).unwrap_or_default();
-    let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
-    let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
+    let enable_fa_bridge = is_enable_fa_bridge(&base);
     let evm_node_flag = host.is_evm_node();
+    let dal: Option<DalConfiguration> = fetch_dal_configuration(&base, evm_node_flag);
     match sequencer {
         Some(sequencer) => {
-            let delayed_bridge = read_delayed_transaction_bridge(host)
+            let delayed_bridge = read_delayed_transaction_bridge(&base)
                 // The sequencer must declare a delayed transaction bridge. This
                 // default value is only to facilitate the testing.
                 .unwrap_or_else(|| {
@@ -300,9 +309,11 @@ where
                 });
             // Default to 5 minutes.
             let max_blueprint_lookahead_in_seconds =
-                max_blueprint_lookahead_in_seconds(host)
+                max_blueprint_lookahead_in_seconds(&base)
                     .unwrap_or(DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS);
-            match DelayedInbox::new(host) {
+            // Reuse the live `/base` handle; re-loading would fail with
+            // `AlreadyLoaded`.
+            match DelayedInbox::from_base(&base) {
                 Ok(delayed_inbox) => Configuration {
                     tezos_contracts,
                     mode: ConfigurationMode::Sequencer {

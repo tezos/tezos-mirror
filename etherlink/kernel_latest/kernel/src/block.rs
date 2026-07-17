@@ -43,6 +43,7 @@ use tezos_smart_rollup_host::path::{OwnedPath, Path};
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::Registry;
 
@@ -261,7 +262,7 @@ where
 
 fn get_next_bip_info<Host>(host: &mut Host) -> (U256, Timestamp, EVMBlockHeader)
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     match read_current_block_header(host) {
         Err(_) => (
@@ -291,7 +292,7 @@ fn build_next_bip_from_blueprints<Host>(
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> anyhow::Result<BlueprintParsing<BlockInProgress>>
 where
-    Host: HostReveal + StorageV1 + WasmHost,
+    Host: HostReveal + StorageV1 + WasmHost + KeySpaceLoader,
 {
     log!(Debug, "Next blueprint number: {:?}", next_bip_number);
     let (blueprint, size) =
@@ -391,7 +392,7 @@ fn revert_block<Host>(
     error: anyhow::Error,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     log!(
         Error,
@@ -417,7 +418,7 @@ pub fn health_check<Host>(
     config: &mut Configuration,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     if host.last_run_aborted()? {
         log!(Error, "Something went wrong during previous kernel_run");
@@ -488,7 +489,7 @@ fn clean_delayed_transactions<Host>(
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     for hash in delayed_txs {
         delayed_inbox.delete(host, hash.into())?;
@@ -505,7 +506,7 @@ pub fn promote_block<Host>(
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
         storage::delete_block_in_progress(safe_host)?;
@@ -541,7 +542,7 @@ pub fn produce<Host>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode + KeySpaceLoader,
 {
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
@@ -769,9 +770,9 @@ mod tests {
     use tezos_tezlink::operation::Parameters;
     use tezos_tezlink::protocol::{Protocol, TARGET_TEZOS_PROTOCOL};
 
-    fn read_current_number<Host>(host: &Host) -> anyhow::Result<U256>
+    fn read_current_number<Host>(host: &mut Host) -> anyhow::Result<U256>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
     }
@@ -1145,7 +1146,7 @@ mod tests {
         start_number: U256,
         blueprints: Vec<Blueprint>,
     ) where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
             store_inbox_blueprint_by_number(
@@ -1159,7 +1160,7 @@ mod tests {
 
     fn store_blueprints<Host>(host: &mut Host, blueprints: Vec<Blueprint>)
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         store_blueprints_from_number::<Host>(host, U256::zero(), blueprints)
     }
@@ -1178,7 +1179,7 @@ mod tests {
 
     fn produce_block_with_several_valid_txs<Host>(host: &mut Host)
     where
-        Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+        Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode + KeySpaceLoader,
     {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -1220,7 +1221,7 @@ mod tests {
     }
 
     fn dummy_tezosx_config_with_tezos_runtime(
-        host: &mut impl StorageV1,
+        host: &mut (impl StorageV1 + KeySpaceLoader),
     ) -> TezosXChainConfig {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
@@ -1848,7 +1849,7 @@ mod tests {
         let expected_level = 1;
         assert_eq!(
             U256::from(expected_level),
-            read_current_number(&host).unwrap()
+            read_current_number(&mut host).unwrap()
         );
         let expected_timestamp = timestamp_of_call;
         // The chain id observed by the contract is the michelson runtime
@@ -2381,7 +2382,7 @@ mod tests {
 
     fn first_block<MockHost>(host: &mut MockHost) -> TezosXBlockConstants
     where
-        MockHost: StorageV1,
+        MockHost: StorageV1 + KeySpaceLoader,
     {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
@@ -2691,7 +2692,7 @@ mod tests {
 
     fn check_current_block_number<Host>(host: &mut Host, nb: usize)
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let current_nb =
             read_current_number(host).expect("Should have manage to check block number");
@@ -2815,7 +2816,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            read_current_number(&host).is_err(),
+            read_current_number(&mut host).is_err(),
             "Should not have found current block number"
         );
 
@@ -2862,7 +2863,7 @@ mod tests {
 
         // test no new block
         assert!(
-            read_current_number(&host).is_err(),
+            read_current_number(&mut host).is_err(),
             "Should not have found current block number"
         );
 
@@ -2910,7 +2911,7 @@ mod tests {
 
         // sanity check: no current block
         assert!(
-            read_current_number(&host).is_err(),
+            read_current_number(&mut host).is_err(),
             "Should not have found current block number"
         );
         //provision sender account
@@ -2963,7 +2964,7 @@ mod tests {
 
         // test no new block
         assert_eq!(
-            read_current_number(&host).expect("should have found a block number"),
+            read_current_number(&mut host).expect("should have found a block number"),
             U256::zero(),
             "There should have been one block registered"
         );

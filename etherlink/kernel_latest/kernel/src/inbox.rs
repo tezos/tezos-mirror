@@ -43,6 +43,7 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 #[derive(Debug, PartialEq)]
 pub struct ProxyInboxContent {
@@ -91,7 +92,7 @@ where
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader;
 
     fn handle_deposit<Host>(
         host: &mut Host,
@@ -100,7 +101,7 @@ where
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader;
 
     fn handle_fa_deposit<Host>(
         host: &mut Host,
@@ -109,7 +110,7 @@ where
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader;
 }
 
 impl InputHandler for ProxyInput {
@@ -181,7 +182,7 @@ fn handle_blueprint_chunk<Host>(
     blueprint: UnsignedSequencerBlueprint,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     log!(Benchmarking, "Handling a blueprint input");
     log!(
@@ -205,7 +206,7 @@ impl InputHandler for SequencerInput {
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader,
     {
         log!(Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
@@ -282,7 +283,7 @@ impl InputHandler for SequencerInput {
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader,
     {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
@@ -298,7 +299,7 @@ impl InputHandler for SequencerInput {
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader,
     {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
@@ -389,7 +390,7 @@ fn handle_fa_deposit(
 
 fn force_kernel_upgrade<Host>(host: &mut Host) -> anyhow::Result<()>
 where
-    Host: StorageV1 + HostReveal + WasmHost,
+    Host: StorageV1 + HostReveal + WasmHost + KeySpaceLoader,
 {
     match upgrade::read_kernel_upgrade(host)? {
         Some(kernel_upgrade) => {
@@ -417,7 +418,7 @@ fn import_dal_attested_slots<Host>(
     slot_indices: &[u8],
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + HostReveal,
+    Host: StorageV1 + HostReveal + KeySpaceLoader,
 {
     // Skip if there are no attested slots
     if slot_indices.is_empty() {
@@ -481,7 +482,7 @@ pub fn handle_input<Host, Mode>(
     inbox_content: &mut Mode::Inbox,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
     Mode: Parsable + InputHandler,
 {
     match input {
@@ -540,7 +541,7 @@ fn read_and_dispatch_input<Host, Mode>(
     chain_configuration: &TezosXChainConfig,
 ) -> anyhow::Result<ReadStatus>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
     Mode: Parsable + InputHandler,
 {
     let input: InputResult<Mode> = read_input(
@@ -590,7 +591,7 @@ pub fn read_proxy_inbox<Host>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     let mut res = ProxyInboxContent {
         transactions: vec![],
@@ -663,7 +664,7 @@ pub fn read_sequencer_inbox<Host>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -673,10 +674,14 @@ where
     let next_blueprint_number: U256 =
         crate::blueprint_storage::read_next_blueprint_number(host)?;
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    let legacy_dal_signals_disabled =
-        crate::storage::is_legacy_dal_signals_disabled(host).unwrap_or(false);
-    let dal_publishers_whitelist =
-        crate::storage::read_dal_publishers_whitelist(host).unwrap_or_default();
+    let (legacy_dal_signals_disabled, dal_publishers_whitelist) = {
+        let base = crate::storage::load_base_keyspace(host)
+            .map_err(|e| anyhow::anyhow!("failed to load the `/base` keyspace: {e}"))?;
+        (
+            crate::storage::is_legacy_dal_signals_disabled(&base),
+            crate::storage::read_dal_publishers_whitelist(&base).unwrap_or_default(),
+        )
+    };
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,

@@ -35,6 +35,7 @@ use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_storage::read_optional_rlp;
 
 const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/base/kernel_upgrade");
@@ -88,7 +89,7 @@ pub fn store_kernel_upgrade<Host>(
     kernel_upgrade: &KernelUpgrade,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     log!(
         Info,
@@ -195,7 +196,7 @@ pub fn store_sequencer_upgrade<Host>(
     sequencer_upgrade: SequencerUpgrade,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     log!(
         Info,
@@ -242,7 +243,7 @@ where
 
 pub fn possible_sequencer_upgrade<Host>(host: &mut Host) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let upgrade = read_sequencer_upgrade(host)?;
     if let Some(upgrade) = upgrade {
@@ -290,7 +291,7 @@ pub fn possible_sequencer_key_change<Host>(
     evm_timestamp: Timestamp,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let upgrade = read_sequencer_key_change(host)?;
     if let Some(upgrade) = upgrade {

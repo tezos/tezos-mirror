@@ -21,22 +21,28 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_storage::read_u16_le_default;
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
+use tezos_storage::keyspace;
+
+use crate::storage::load_base_keyspace;
 use tezos_tezlink::operation::Operation;
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedInboxItem>);
 
-pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/base/delayed-inbox");
+/// Relative key of the delayed inbox inside the `/base` keyspace. It resolves
+/// to the historical absolute path `/base/delayed-inbox`, so an existing
+/// on-chain delayed inbox keeps being read after the upgrade.
+pub const DELAYED_INBOX_KEY: Key = Key::from_static(b"/delayed-inbox");
 
 // Maximum number of transaction included in a blueprint when
 // forcing timed-out transactions from the delayed inbox.
 pub const DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH: u16 = 1000;
 
-// Path to override the default value.
-pub const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_PATH: RefPath =
-    RefPath::assert_from(b"/base/max_delayed_inbox_blueprint_length");
+// Key to override the default value, inside the `/base` keyspace. Resolves to
+// the durable path `/base/max_delayed_inbox_blueprint_length`.
+const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY: Key =
+    Key::from_static(b"/max_delayed_inbox_blueprint_length");
 
 // Tag that indicates the delayed transaction is a eth transaction.
 pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;
@@ -198,12 +204,21 @@ impl Decodable for DelayedInboxItem {
 }
 
 impl DelayedInbox {
+    /// Construct from an already-live `/base` handle (e.g. inside the
+    /// configuration fetch).
+    pub fn from_base(base: &impl KeySpace) -> Result<Self> {
+        let linked_list = LinkedList::new(&DELAYED_INBOX_KEY, base)?;
+        Ok(Self(linked_list))
+    }
+
+    /// Transient-load constructor for isolated callers that do not already
+    /// hold a `/base` handle.
     pub fn new<Host>(host: &mut Host) -> Result<Self>
     where
-        Host: StorageV1,
+        Host: KeySpaceLoader,
     {
-        let linked_list = LinkedList::new(&DELAYED_INBOX_PATH, host)?;
-        Ok(Self(linked_list))
+        let base = load_base_keyspace(host)?;
+        Self::from_base(&base)
     }
 
     pub fn save_transaction<Host>(
@@ -214,7 +229,7 @@ impl DelayedInbox {
         level: u32,
     ) -> Result<()>
     where
-        Host: StorageV1 + IsEvmNode,
+        Host: StorageV1 + IsEvmNode + KeySpaceLoader,
     {
         match tx {
             TezosXTransaction::Ethereum(tx) => {
@@ -246,7 +261,8 @@ impl DelayedInbox {
 
                 Event::NewDelayedTransaction(tx).store(host)?;
 
-                self.0.push(host, &Hash(tx_hash), &item)?;
+                let mut base = load_base_keyspace(host)?;
+                self.0.push(&mut base, &Hash(tx_hash), &item)?;
                 log!(
                     Info,
                     "Saved transaction {} in the delayed inbox",
@@ -286,10 +302,11 @@ impl DelayedInbox {
 
     pub fn find_transaction(
         &self,
-        host: &mut impl StorageV1,
+        host: &mut impl KeySpaceLoader,
         tx_hash: Hash,
     ) -> Result<Option<(Transaction, Timestamp)>> {
-        let tx = self.0.find(host, &tx_hash)?.map(
+        let base = load_base_keyspace(host)?;
+        let tx = self.0.find(&base, &tx_hash)?.map(
             |DelayedInboxItem {
                  transaction,
                  timestamp,
@@ -307,18 +324,15 @@ impl DelayedInbox {
 
     // Returns the oldest tx in the delayed inbox (and its hash) if it
     // timed out
-    fn first_if_timed_out<Host>(
+    fn first_if_timed_out(
         &mut self,
-        host: &mut Host,
+        base: &impl KeySpace,
         now: Timestamp,
         timeout: u64,
         current_level: u32,
         min_levels: u32,
-    ) -> Result<Option<(Hash, DelayedTransaction)>>
-    where
-        Host: StorageV1,
-    {
-        let to_pop = self.0.first_with_id(host)?.and_then(
+    ) -> Result<Option<(Hash, DelayedTransaction)>> {
+        let to_pop = self.0.first_with_id(base)?.and_then(
             |(
                 tx_hash,
                 DelayedInboxItem {
@@ -345,17 +359,18 @@ impl DelayedInbox {
     }
 
     #[cfg(test)]
-    pub fn is_empty(&self, host: &mut impl StorageV1) -> Result<bool> {
-        let first = self.0.first_with_id(host)?;
+    pub fn is_empty(&self, host: &mut impl KeySpaceLoader) -> Result<bool> {
+        let base = load_base_keyspace(host)?;
+        let first = self.0.first_with_id(&base)?;
         Ok(first.is_none())
     }
 
-    fn pop_first(&mut self, host: &mut impl StorageV1) -> Result<Option<Transaction>> {
-        let to_pop = self.0.first_with_id(host)?;
+    fn pop_first(&mut self, base: &mut impl KeySpace) -> Result<Option<Transaction>> {
+        let to_pop = self.0.first_with_id(base)?;
         match to_pop {
             None => Ok(None),
             Some((hash, delayed)) => {
-                let _ = self.0.remove(host, &hash)?;
+                let _ = self.0.remove(base, &hash)?;
                 let transaction =
                     Self::transaction_from_delayed(hash, delayed.transaction);
                 Ok(Some(transaction))
@@ -366,14 +381,17 @@ impl DelayedInbox {
     /// Returns whether the oldest tx in the delayed inbox has timed out.
     pub fn first_has_timed_out<Host>(&mut self, host: &mut Host) -> Result<bool>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
+        // The scalar reads load and drop their own `/base` handle (or read a
+        // raw path), so none is alive when we load `/base` for the list below.
         let now = read_last_info_per_level_timestamp(host)?;
         let timeout = storage::delayed_inbox_timeout(host)?;
         let current_level = storage::read_l1_level(host)?;
         let min_levels = storage::delayed_inbox_min_levels(host)?;
+        let base = load_base_keyspace(host)?;
         let popped =
-            self.first_if_timed_out(host, now, timeout, current_level, min_levels)?;
+            self.first_if_timed_out(&base, now, timeout, current_level, min_levels)?;
         Ok(popped.is_some())
     }
 
@@ -384,15 +402,18 @@ impl DelayedInbox {
     /// which should be checked before calling it.
     pub fn next_delayed_inbox_blueprint(
         &mut self,
-        host: &mut impl StorageV1,
+        host: &mut (impl StorageV1 + KeySpaceLoader),
     ) -> Result<Option<Vec<Transaction>>> {
-        let max_delayed_inbox_blueprint_length = read_u16_le_default(
-            host,
-            &MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_PATH,
+        // Load `/base` once and read the override plus pop the whole batch
+        // against the same handle.
+        let mut base = load_base_keyspace(host)?;
+        let max_delayed_inbox_blueprint_length = keyspace::read_u16_le_default(
+            &base,
+            &MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
             DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH,
         )?;
         let mut popped: Vec<Transaction> = vec![];
-        while let Some(tx) = self.pop_first(host)? {
+        while let Some(tx) = self.pop_first(&mut base)? {
             popped.push(tx);
             // Check if the number of transactions has reached the limit per
             // blueprint
@@ -413,14 +434,15 @@ impl DelayedInbox {
     /// after the call.
     pub fn delete<Host>(&mut self, host: &mut Host, tx_hash: Hash) -> Result<()>
     where
-        Host: StorageV1,
+        Host: KeySpaceLoader,
     {
         log!(
             Info,
             "Removing transaction {} from the delayed inbox",
             hex::encode(tx_hash)
         );
-        let _found = self.0.remove(host, &tx_hash)?;
+        let mut base = load_base_keyspace(host)?;
+        let _found = self.0.remove(&mut base, &tx_hash)?;
         Ok(())
     }
 }
@@ -498,7 +520,7 @@ mod tests {
         let tx: Transaction = dummy_transaction(0);
 
         let timestamp: Timestamp =
-            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
             .expect("Tx should be saved in the delayed inbox");
@@ -533,7 +555,7 @@ mod tests {
         };
 
         let timestamp =
-            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
             .expect("Tezos operation should be saved in the delayed inbox");
@@ -564,7 +586,7 @@ mod tests {
         };
 
         let timestamp =
-            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         // Dropping is not an error: the call succeeds but nothing is stored.
         delayed_inbox
             .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
@@ -593,9 +615,53 @@ mod tests {
         };
 
         let timestamp: Timestamp =
-            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         let res = delayed_inbox.save_transaction(&mut host, tx.into(), timestamp, 0);
 
         assert!(res.is_err());
+    }
+
+    // The max-blueprint-length override is now read through the `/base`
+    // keyspace inside `next_delayed_inbox_blueprint`. A value seeded at its
+    // historical absolute path must read back through the keyspace key,
+    // proving the resolved durable path never moved; an absent key falls back
+    // to the default.
+    #[test]
+    fn max_delayed_inbox_blueprint_length_resolves_to_absolute_path() {
+        use crate::storage::load_base_keyspace;
+        use tezos_smart_rollup_host::path::RefPath;
+        use tezos_smart_rollup_host::storage::StorageV1;
+        use tezos_storage::keyspace;
+
+        let mut host = MockKernelHost::default();
+
+        {
+            let base = load_base_keyspace(&mut host).unwrap();
+            assert_eq!(
+                keyspace::read_u16_le_default(
+                    &base,
+                    &super::MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
+                    super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH,
+                )
+                .unwrap(),
+                super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH
+            );
+        }
+
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/max_delayed_inbox_blueprint_length"),
+            &42u16.to_le_bytes(),
+        )
+        .unwrap();
+        let base = load_base_keyspace(&mut host).unwrap();
+        assert_eq!(
+            keyspace::read_u16_le_default(
+                &base,
+                &super::MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
+                super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH,
+            )
+            .unwrap(),
+            42
+        );
     }
 }

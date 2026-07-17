@@ -29,6 +29,7 @@ use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 pub fn fetch_proxy_blueprints<Host>(
     host: &mut Host,
@@ -38,7 +39,7 @@ pub fn fetch_proxy_blueprints<Host>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
@@ -66,7 +67,7 @@ fn fetch_delayed_transactions<Host>(
     delayed_inbox: &mut DelayedInbox,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     let timestamp = read_last_info_per_level_timestamp(host)?;
     // Number and minimal timestamp for the first forced blueprint
@@ -131,7 +132,7 @@ fn fetch_sequencer_blueprints<Host>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     match read_sequencer_inbox(
         host,
@@ -171,7 +172,7 @@ pub fn fetch_blueprints<Host>(
     config: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     match &mut config.mode {
         ConfigurationMode::Sequencer {
@@ -388,7 +389,9 @@ mod tests {
         }
     }
 
-    fn delayed_inbox_is_empty<Host: StorageV1>(
+    fn delayed_inbox_is_empty<
+        Host: StorageV1 + tezos_smart_rollup_keyspace::KeySpaceLoader,
+    >(
         conf: &Configuration,
         host: &mut Host,
     ) -> bool {
@@ -1144,7 +1147,7 @@ mod tests {
 
         // Read back the timestamp that fetch_blueprints stored from
         // the info-per-level message.
-        let stored_ts = read_last_info_per_level_timestamp(&host)
+        let stored_ts = read_last_info_per_level_timestamp(&mut host)
             .expect("timestamp should be readable after fetch");
 
         match read_next_blueprint(&mut host, &mut conf)

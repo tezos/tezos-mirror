@@ -12,7 +12,7 @@ use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
 use crate::stage_one::fetch_blueprints;
-use crate::storage::{read_sequencer_pool_address, PRIVATE_FLAG_PATH};
+use crate::storage::{load_base_keyspace, read_sequencer_pool_address, PRIVATE_FLAG_KEY};
 use anyhow::Context;
 use block::health_check;
 use chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
@@ -27,7 +27,6 @@ use storage::{
     enter_stage_one, leave_stage_one, read_da_fee, read_kernel_version,
     read_minimum_base_fee_per_gas, read_tracer_input, store_da_fee, store_kernel_version,
     store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
-    STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -40,9 +39,9 @@ use tezos_smart_rollup::outbox::{
 };
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
-use tezos_smart_rollup_host::runtime::ValueType;
-use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tracing::trace_kernel;
 
 mod apply;
@@ -87,9 +86,10 @@ const KERNEL_VERSION: &str = env!("GIT_HASH");
 
 fn switch_to_public_rollup<Host>(host: &mut Host) -> Result<(), Error>
 where
-    Host: StorageV1 + WasmHost,
+    Host: StorageV1 + WasmHost + KeySpaceLoader,
 {
-    if let Some(ValueType::Value) = host.store_has(&PRIVATE_FLAG_PATH)? {
+    let mut base = load_base_keyspace(host)?;
+    if base.contains(&PRIVATE_FLAG_KEY) {
         log!(Info, "Submitting outbox message to make the rollup public.");
         let whitelist_update: OutboxMessage<_> =
             OutboxMessage::<MichelsonUnit>::WhitelistUpdate(
@@ -97,17 +97,15 @@ where
             );
         OUTBOX_QUEUE.queue_message(host, whitelist_update)?;
         OUTBOX_QUEUE.flush_queue(host);
-        host.store_delete_value(&PRIVATE_FLAG_PATH)
-            .map_err(Error::from)
-    } else {
-        Ok(())
+        base.delete(&PRIVATE_FLAG_KEY);
     }
+    Ok(())
 }
 
 #[trace_kernel]
 pub fn stage_zero<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     log!(Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
@@ -127,7 +125,7 @@ pub fn stage_one<Host>(
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     log!(Debug, "Entering stage one.");
     log!(Debug, "Chain Configuration: {chain_config:?}");
@@ -139,7 +137,7 @@ where
     res
 }
 
-fn set_kernel_version(host: &mut impl StorageV1) -> Result<(), Error> {
+fn set_kernel_version(host: &mut (impl StorageV1 + KeySpaceLoader)) -> Result<(), Error> {
     match read_kernel_version(host) {
         Ok(kernel_version) => {
             if kernel_version != KERNEL_VERSION {
@@ -151,17 +149,24 @@ fn set_kernel_version(host: &mut impl StorageV1) -> Result<(), Error> {
     }
 }
 
-fn init_storage_versioning(host: &mut impl StorageV1) -> Result<(), Error> {
-    // Check both the new /base/ path and the legacy /evm/ path.
+fn init_storage_versioning(
+    host: &mut (impl StorageV1 + KeySpaceLoader),
+) -> Result<(), Error> {
+    // Check both the `/base` keyspace and the legacy /evm/ path.
     // If either exists, storage versioning is already initialised and the
     // migration framework will take it from here.
-    use crate::storage::LEGACY_STORAGE_VERSION_PATH;
-    match host.store_read(&STORAGE_VERSION_PATH, 0, 0) {
-        Ok(_) => Ok(()),
-        Err(_) => match host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, 0) {
+    use crate::storage::{is_storage_version_initialised, LEGACY_STORAGE_VERSION_PATH};
+    let initialised = {
+        let base = load_base_keyspace(host)?;
+        is_storage_version_initialised(&base)
+    };
+    if initialised {
+        Ok(())
+    } else {
+        match host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, 0) {
             Ok(_) => Ok(()),
             Err(_) => store_storage_version(host, STORAGE_VERSION),
-        },
+        }
     }
 }
 
@@ -233,7 +238,7 @@ where
 
 pub fn run<Host>(host: &mut Host) -> Result<(), anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode + KeySpaceLoader,
 {
     // Reboot by default, to ensure the health check implemented before the stage 2 is executed in
     // the same L1 level
@@ -261,7 +266,7 @@ pub enum SingleRunStatus {
 
 pub fn single_run<Host>(host: &mut Host) -> Result<SingleRunStatus, anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode + KeySpaceLoader,
 {
     // We always start by doing the migration if needed.
     match stage_zero(host) {
@@ -374,13 +379,15 @@ where
 // `kernel_loop` shouldn't be called in tests, as it won't use `MockInternal` for the
 // internal runtime. Use `kernel` instead.
 #[entrypoint::main]
-pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut Host) {
+pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime + CoreStorage>(
+    host: &mut Host,
+) {
     kernel(host)
 }
 
 pub fn kernel<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime + CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
 
