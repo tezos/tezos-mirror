@@ -2,9 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::storage::flush_call_traces;
+use super::{storage::flush_call_traces, HasHost};
 use crate::{
-    database::EtherlinkVMDB,
     helpers::rlp::{
         append_address, append_option_address, append_option_canonical,
         append_option_u64_le, append_u16_le, append_u256_le, append_u64_le,
@@ -235,16 +234,14 @@ impl CallTracer {
         self.initial_gas = initial_gas;
     }
 
-    fn end_transaction_layer<'a, Host, R, CTX>(
+    fn end_transaction_layer<CTX>(
         &mut self,
         context: &mut CTX,
         gas_spent: u64,
         output: &Bytes,
         instruction_result: &InstructionResult,
     ) where
-        Host: StorageV1 + 'a,
-        R: 'a,
-        CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
+        CTX: ContextTr<Db: HasHost<H: StorageV1>>,
     {
         let depth = context.journal().depth() as u16;
 
@@ -267,20 +264,22 @@ impl CallTracer {
         // traces to storage in a single batch operation.
         if depth == 0 && !self.pending_traces.is_empty() {
             let traces = std::mem::take(&mut self.pending_traces);
-            flush_call_traces(context.db_mut().host, &traces, &self.transaction_hash)
-                .inspect_err(|err| {
-                    log!(Debug, "Flushing call traces failed with: {err:?}");
-                })
-                .ok();
+            flush_call_traces(
+                context.db_mut().as_host_mut(),
+                &traces,
+                &self.transaction_hash,
+            )
+            .inspect_err(|err| {
+                log!(Debug, "Flushing call traces failed with: {err:?}");
+            })
+            .ok();
         }
     }
 }
 
-impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for CallTracer
+impl<CTX, INTR> Inspector<CTX, INTR> for CallTracer
 where
-    Host: StorageV1 + 'a,
-    R: 'a,
-    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
+    CTX: ContextTr<Db: HasHost<H: StorageV1>>,
     INTR: InterpreterTypes<ReturnData = ReturnDataImpl>,
 {
     fn call(

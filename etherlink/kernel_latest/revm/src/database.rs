@@ -5,6 +5,7 @@
 
 use crate::error::EvmDbError;
 use crate::helpers::storage::read_u256_le_default;
+use crate::inspectors::HasHost;
 use crate::storage::{
     block::{get_block_hash, BLOCKS_STORED},
     code::CodeStorage,
@@ -70,6 +71,14 @@ pub struct EtherlinkVMDB<'a, Host, R> {
     /// account untouched by the EVM run) are written at the end of the
     /// commit.
     staged_alias_origins: HashMap<Address, AliasInfo>,
+}
+
+impl<'a, Host, R> HasHost for EtherlinkVMDB<'a, Host, R> {
+    type H = Host;
+
+    fn as_host_mut(&mut self) -> &mut Self::H {
+        self.host
+    }
 }
 
 enum AccountState {
