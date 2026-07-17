@@ -9,17 +9,15 @@ use crate::{
         append_address, append_option_address, append_option_canonical,
         append_option_u64_le, append_u16_le, append_u256_le, append_u64_le,
     },
-    inspectors::EtherlinkInspector,
     precompiles::provider::EtherlinkPrecompiles,
 };
 
 use revm::{
     context::{ContextTr, CreateScheme, JournalTr, Transaction},
     interpreter::{
-        gas::calculate_initial_tx_gas_for_tx, interpreter::ReturnDataImpl,
-        interpreter_types::StackTr, CallInputs, CallOutcome, CallScheme, CreateInputs,
-        CreateOutcome, Gas, InitialAndFloorGas, InstructionResult, InterpreterResult,
-        InterpreterTypes,
+        gas::calculate_initial_tx_gas_for_tx, interpreter::ReturnDataImpl, CallInputs,
+        CallOutcome, CallScheme, CreateInputs, CreateOutcome, Gas, InitialAndFloorGas,
+        InstructionResult, InterpreterResult, InterpreterTypes,
     },
     primitives::{hardfork::SpecId, hash_map::HashMap, Address, Bytes, Log, B256, U256},
     Inspector,
@@ -117,20 +115,6 @@ impl Encodable for CallTrace {
         });
         append_option_canonical(stream, &logs, |s, logs| s.append_list(logs));
         append_u16_le(stream, &self.depth);
-    }
-}
-
-impl<'a, Host, R> EtherlinkInspector<'a, Host, R> for CallTracer
-where
-    Host: StorageV1 + 'a,
-    R: Registry + 'a,
-{
-    fn is_struct_logger(&self) -> bool {
-        false
-    }
-
-    fn get_transaction_hash(&self) -> Option<B256> {
-        self.transaction_hash
     }
 }
 
@@ -298,7 +282,7 @@ where
     Host: StorageV1 + 'a,
     R: Registry + 'a,
     CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
-    INTR: InterpreterTypes<Stack: StackTr, ReturnData = ReturnDataImpl>,
+    INTR: InterpreterTypes<ReturnData = ReturnDataImpl>,
 {
     fn call(
         &mut self,
