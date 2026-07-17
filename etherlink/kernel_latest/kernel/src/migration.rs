@@ -9,7 +9,6 @@ use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
-use crate::storage::SEQUENCER_GOVERNANCE;
 use crate::storage::{
     read_evm_chain_id, read_storage_version, store_storage_version, StorageVersion,
 };
@@ -76,19 +75,7 @@ where
 {
     log!(Info, "Migrating to {:?}", version);
     match version {
-        StorageVersion::V46 => Ok(MigrationStatus::Done),
-        StorageVersion::V47 => {
-            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
-                const SEQUENCER_GOVERNANCE_KT: &[u8] =
-                    b"KT1DkQFmACvsUtnx8B4jirnp2CRi1cWSiELw";
-
-                host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
-
-                Ok(MigrationStatus::Done)
-            } else {
-                Ok(MigrationStatus::None)
-            }
-        }
+        StorageVersion::V47 => Ok(MigrationStatus::Done),
         StorageVersion::V48 => {
             // Clean remaining leftover block indexes from V41.
             if let Ok(current_number) =
