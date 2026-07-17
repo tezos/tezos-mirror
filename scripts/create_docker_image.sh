@@ -28,6 +28,13 @@ rust_toolchain_image=""
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
 sccache_bucket=""
+# Full image references (name:tag) for the runtime and build-dependencies images
+# the distribution builds FROM. Default (after option parsing) to the images
+# matching the local checkout (via 'ci_image_name'/version.sh); overridable via
+# --runtime-image / --build-deps-image (the distribution jobs pass them
+# explicitly).
+runtime_image=""
+build_deps_image=""
 
 # usage and help
 usage() {
@@ -35,8 +42,8 @@ usage() {
 Usage:  $(basename "$0") [-h|--help]
   [--image-name <IMAGE_NAME> ]
   [--image-version <IMAGE_TAG> ]
-  [--ci-image-name <IMAGE_NAME> ]
-  [--ci-image-version <IMAGE_TAG> ]
+  [--runtime-image <IMAGE> ]
+  [--build-deps-image <IMAGE> ]
   [--variants VARIANTS]
   [--docker-target <TARGET> ]
   [--rust-toolchain-image <IMAGE> ]
@@ -58,14 +65,11 @@ DESCRIPTION
     of the distribution are documented at
     https://hub.docker.com/r/tezos/tezos.
 
-    The build uses following images from the CI image suite:
-     - CI_IMAGE_NAME/runtime:CI_IMAGE_VERSION
-     - CI_IMAGE_NAME/build:CI_IMAGE_VERSION
-    The CI images are defined in images/ci,
-    and by default, CI_IMAGE_NAME refers to the images build from
-    directory in the tezos/tezos CI. CI_IMAGE_VERSION is set using
-    images/image_tag.sh such that a version corresponding to the local checkout
-    is used.
+    The build starts FROM a runtime image (base of the variants) and a
+    build-dependencies image (build environment). By default these are the
+    images/ci runtime and build images matching the local checkout, resolved
+    via scripts/version.sh and images/image_tag.sh; they can be overridden with
+    --runtime-image and --build-deps-image.
 
     If TARGET is 'with-evm-artifacts' then EVM artifacts are
     included. The rust-toolchain image is used to build these
@@ -90,11 +94,15 @@ OPTIONS
             Tag of built images.
 
     Base image location
-        --ci-image-name CI_IMAGE_NAME
-            Name of the CI image.
+        --runtime-image IMAGE
+            Full reference (name:tag) of the runtime image the variants are
+            built FROM. Default: the images/ci runtime image matching the
+            local checkout.
 
-        --ci-image-version CI_IMAGE_VERSION
-            Version of the CI image.
+        --build-deps-image IMAGE
+            Full reference (name:tag) of the build-dependencies image (build
+            environment, also used by the stripper stage). Default: the
+            images/ci build image matching the local checkout.
 
         --rust-toolchain-image RUST_TOOLCHAIN_IMAGE
             Full reference (name:tag) of the rust-toolchain image (L2
@@ -136,8 +144,8 @@ OPTIONS
 CURRENT VALUES
     IMAGE_NAME: $image_name
     IMAGE_VERSION: $image_version
-    CI_IMAGE_NAME: $ci_image_name
-    CI_IMAGE_VERSION: $ci_image_version
+    RUNTIME_IMAGE (default): $ci_image_name/runtime:$ci_image_version
+    BUILD_DEPS_IMAGE (default): $ci_image_name/build:$ci_image_version
     VARIANTS: $variants
     DOCKER_TARGET: $docker_target
     RUST_TOOLCHAIN_IMAGE: $rust_toolchain_image
@@ -154,7 +162,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,ci-image-name:,ci-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image:,commit-datetime:,commit-tag:,sccache-bucket: -- "$@")
+  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image:,commit-datetime:,commit-tag:,sccache-bucket: -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -166,14 +174,6 @@ while true; do
   --image-version)
     shift
     image_version="$1"
-    ;;
-  --ci-image-name)
-    shift
-    ci_image_name="$1"
-    ;;
-  --ci-image-version)
-    shift
-    ci_image_version="$1"
     ;;
   --executables)
     shift
@@ -204,6 +204,14 @@ while true; do
   --rust-toolchain-image)
     shift
     rust_toolchain_image="$1"
+    ;;
+  --runtime-image)
+    shift
+    runtime_image="$1"
+    ;;
+  --build-deps-image)
+    shift
+    build_deps_image="$1"
     ;;
   --commit-datetime)
     shift
@@ -256,14 +264,20 @@ case "$docker_target" in
   ;;
 esac
 
-image_test="${ci_image_name}/build:${ci_image_version}"
+# Default the image references to the ones matching the local checkout (via
+# 'ci_image_name'/version.sh) when not overridden, so callers that omit the
+# '--*-image' options keep working unchanged.
+runtime_image="${runtime_image:-${ci_image_name}/runtime:${ci_image_version}}"
+build_deps_image="${build_deps_image:-${ci_image_name}/build:${ci_image_version}}"
+
+image_test="${build_deps_image}"
 if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
-  echo "CI image $image_test does not exist locally, attempt pull."
+  echo "Image $image_test does not exist locally, attempt pull."
   # This pull is just to check whether the image exists
   # remotely. Although costly, it would've been pulled regardless in
   # the docker builds below.
   if ! docker pull "$image_test" > /dev/null 2>&1; then
-    echo "Failed to pull CI image $image_test."
+    echo "Failed to pull image $image_test."
     echo "If you have modified any inputs to the CI images, then you have to rebuild them locally through ./images/create_ci_images.sh."
     exit 1
   else
@@ -302,8 +316,8 @@ echo "### Building tezos via docker buildx bake (targets: ${bake_targets})..."
 IMAGE_NAME="$image_name" \
   MINIMAL_IMAGE_NAME="${image_name%?}" \
   IMAGE_VERSION="$image_version" \
-  CI_IMAGE_NAME="$ci_image_name" \
-  CI_IMAGE_VERSION="$ci_image_version" \
+  RUNTIME_IMAGE="$runtime_image" \
+  BUILD_DEPS_IMAGE="$build_deps_image" \
   DOCKER_TARGET="$docker_target" \
   OCTEZ_EXECUTABLES="$executables" \
   GIT_SHORTREF="$commit_short_sha" \

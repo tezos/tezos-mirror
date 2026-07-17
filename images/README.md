@@ -96,12 +96,12 @@ as input. The definition of these input images can be found in
 `images/ci`, and they can be built locally using
 `./images/create_ci_images.sh.`
 
-By default, the script `./scripts/create_docker_image.sh` looks for a
-version of the CI images that corresponds to the current state
-of the checkout (see `images/image_tag.sh` for more info). To use a
-custom version, for instance the CI images built in a specific
-pipeline, see the parameters `--ci-image-name` and
-`--ci-image-version`.
+By default, the script `./scripts/create_docker_image.sh` uses the
+CI images that correspond to the current state of the checkout (see
+`images/image_tag.sh` for more info). To use other images, for
+instance the CI images built in a specific pipeline, pass their full
+references (`name:tag`) with the parameters `--runtime-image` and
+`--build-deps-image`.
 
 To build the Octez Docker Distribution with EVM artifacts, pass
 `--docker-target with-evm-artifacts` to
@@ -135,8 +135,11 @@ Docker registry, but in the public one. To configure the script to use
 the public registry:
 
 ```
+$ ci_image_name="$(. ./scripts/version.sh; echo "$GCP_PUBLIC_REGISTRY")/tezos/tezos/ci"
+$ ci_image_tag="${ARCH:-amd64}--$(./images/image_tag.sh images/ci)"
 $ ./scripts/create_docker_image.sh \
-    --ci-image-name $(. ./scripts/version.sh; echo $GCP_PUBLIC_REGISTRY)/tezos/tezos/ci
+    --runtime-image "${ci_image_name}/runtime:${ci_image_tag}" \
+    --build-deps-image "${ci_image_name}/build:${ci_image_tag}"
 ```
 
 ## Using local CI images
@@ -163,8 +166,8 @@ $ ./images/create_ci_images.sh \
     --image-base octez-local-ci \
     --tag-suffix ""
 $ ./scripts/create_docker_image.sh \
-    --ci-image-name octez-local-ci \
-    --ci-image-version "amd64"
+    --runtime-image octez-local-ci/runtime:amd64 \
+    --build-deps-image octez-local-ci/build:amd64
 ```
 
 The first command will create the set of CI images on the following naming scheme:
@@ -175,5 +178,5 @@ The first command will create the set of CI images on the following naming schem
 
 (These images are always tagged by architecture, and the architecture defaults to amd64).
 
-The parameters to the second command instructs
-`create_docker_image.sh` to use these images as base images.
+The parameters to the second command state the full references of the
+images `create_docker_image.sh` builds FROM.

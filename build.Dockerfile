@@ -1,17 +1,18 @@
 # check=skip=InvalidDefaultArgInFrom,SecretsUsedInArgOrEnv
 # Note: `check=skip` is file-global (BuildKit cannot scope it per line). It
-# suppresses InvalidDefaultArgInFrom (the `FROM ${BASE_IMAGE}/...` ARGs are
-# always supplied at build time) and the SecretsUsedInArgOrEnv false positive on
+# suppresses InvalidDefaultArgInFrom (the `FROM ${BUILD_DEPS_IMAGE}` /
+# `${RUST_TOOLCHAIN_IMAGE}` ARGs are always supplied at build time) and the
+# SecretsUsedInArgOrEnv false positive on
 # `ARG SCCACHE_GCS_KEY_PREFIX` (a path prefix, not a secret). A genuinely bad
 # FROM or a real secret in ARG/ENV added later will therefore not be flagged.
-ARG BASE_IMAGE
-ARG BASE_IMAGE_VERSION
-# Full image reference (name:tag) for the rust-toolchain image (L2 builder),
-# passed by docker-bake.hcl.
+# Full image references (name:tag) for the build-dependencies image (build
+# environment) and the rust-toolchain image (L2 builder), passed by
+# docker-bake.hcl.
+ARG BUILD_DEPS_IMAGE
 ARG RUST_TOOLCHAIN_IMAGE
 
 # hadolint ignore=DL3006
-FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} AS without-evm-artifacts
+FROM ${BUILD_DEPS_IMAGE} AS without-evm-artifacts
 # use alpine /bin/ash and set pipefail.
 # see https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]

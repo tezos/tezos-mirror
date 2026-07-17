@@ -23,8 +23,10 @@
 variable "IMAGE_NAME" { default = "tezos-" } # base name; the minimal variant uses MINIMAL_IMAGE_NAME
 variable "MINIMAL_IMAGE_NAME" { default = "tezos" }
 variable "IMAGE_VERSION" { default = "latest" }
-variable "CI_IMAGE_NAME" { default = "" }    # BASE_IMAGE
-variable "CI_IMAGE_VERSION" { default = "" } # e.g. amd64--<hash>
+# Full image references (name:tag) for the images the distribution builds FROM.
+# Set by scripts/create_docker_image.sh.
+variable "RUNTIME_IMAGE" { default = "" }    # base of the published variants
+variable "BUILD_DEPS_IMAGE" { default = "" } # build environment (+ stripper stage)
 variable "DOCKER_TARGET" { default = "without-evm-artifacts" }
 variable "OCTEZ_EXECUTABLES" { default = "" }
 variable "GIT_SHORTREF" { default = "" }
@@ -48,8 +50,7 @@ target "build" {
   dockerfile = "build.Dockerfile"
   target     = DOCKER_TARGET
   args = {
-    BASE_IMAGE                = CI_IMAGE_NAME
-    BASE_IMAGE_VERSION        = "build:${CI_IMAGE_VERSION}"
+    BUILD_DEPS_IMAGE          = BUILD_DEPS_IMAGE
     OCTEZ_EXECUTABLES         = OCTEZ_EXECUTABLES
     GIT_SHORTREF              = GIT_SHORTREF
     GIT_DATETIME              = GIT_DATETIME
@@ -74,9 +75,8 @@ target "_variant" {
   context    = "."
   dockerfile = "Dockerfile"
   args = {
-    BASE_IMAGE                 = CI_IMAGE_NAME
-    BASE_IMAGE_VERSION         = "runtime:${CI_IMAGE_VERSION}"
-    BASE_IMAGE_VERSION_NON_MIN = "build:${CI_IMAGE_VERSION}"
+    RUNTIME_IMAGE              = RUNTIME_IMAGE
+    BUILD_DEPS_IMAGE           = BUILD_DEPS_IMAGE
     BUILD_IMAGE                = "localhost/octez-build"
     BUILD_IMAGE_VERSION        = "local"
     COMMIT_SHORT_SHA           = COMMIT_SHORT_SHA

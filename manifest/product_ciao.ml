@@ -150,7 +150,12 @@ let ci_rollup_node =
     ~path:"rollup_node/ci"
     ~bisect_ppx:No
     ~deps:
-      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
+      [
+        ci_lib_gitlab_ci_main |> open_ ~m:"Base";
+        ci_lib_tezos_ci;
+        ci_lib_cacio;
+        ci_lib_tezos_ci_jobs;
+      ]
     ~release_status:Unreleased
 
 let ci_etherlink =

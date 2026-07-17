@@ -1,11 +1,14 @@
 # check=skip=InvalidDefaultArgInFrom
 # Note: `check=skip` is file-global (BuildKit cannot scope it per line), so this
 # also suppresses InvalidDefaultArgInFrom on any FROM added later. The only
-# expected case is the `FROM ${BASE_IMAGE}/...` stages below, whose ARGs are
-# always supplied at build time by docker-bake.hcl.
-ARG BASE_IMAGE
-ARG BASE_IMAGE_VERSION
-ARG BASE_IMAGE_VERSION_NON_MIN
+# expected case is the `FROM ${RUNTIME_IMAGE}` / `${BUILD_DEPS_IMAGE}` stages
+# below, whose ARGs are always supplied at build time by docker-bake.hcl.
+# Full image references (name:tag) for the runtime image (base of the published
+# variants) and the build-dependencies image (used by the stripper stage),
+# passed by docker-bake.hcl. BUILD_IMAGE is the in-graph intermediate build
+# target.
+ARG RUNTIME_IMAGE
+ARG BUILD_DEPS_IMAGE
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 
@@ -13,7 +16,7 @@ FROM ${BUILD_IMAGE}:${BUILD_IMAGE_VERSION} AS builder
 
 
 # hadolint ignore=DL3006
-FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} AS intermediate
+FROM ${RUNTIME_IMAGE} AS intermediate
 # Pull in built binaries
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/bin /home/tezos/bin
 # Add parameters for active protocols
@@ -31,7 +34,7 @@ COPY --chown=tezos:nogroup scripts/docker/entrypoint.* /home/tezos/bin/
 COPY --chown=tezos:nogroup scripts/alphanet_version src/bin_client/bash-completion.sh script-inputs/active_protocol_versions /home/tezos/scripts/
 
 # hadolint ignore=DL3006
-FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} AS debug
+FROM ${RUNTIME_IMAGE} AS debug
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 ARG COMMIT_SHORT_SHA
@@ -60,7 +63,7 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 
 # hadolint ignore=DL3006
-FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION_NON_MIN} AS stripper
+FROM ${BUILD_DEPS_IMAGE} AS stripper
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin /home/tezos/bin
 RUN rm /home/tezos/bin/*.sh && chmod +rw /home/tezos/bin/* && strip /home/tezos/bin/*
 # hadolint ignore=DL3003,DL4006,SC2046
@@ -68,7 +71,7 @@ RUN cd /home/tezos/bin && for b in $(ls octez*); do ln -s "$b" $(echo "$b" | sed
 
 
 # hadolint ignore=DL3006
-FROM  ${BASE_IMAGE}/${BASE_IMAGE_VERSION} AS bare
+FROM ${RUNTIME_IMAGE} AS bare
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 ARG COMMIT_SHORT_SHA
@@ -90,7 +93,7 @@ COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/s
 
 
 # hadolint ignore=DL3006
-FROM  ${BASE_IMAGE}/${BASE_IMAGE_VERSION} AS minimal
+FROM ${RUNTIME_IMAGE} AS minimal
 ARG BUILD_IMAGE
 ARG BUILD_IMAGE_VERSION
 ARG COMMIT_SHORT_SHA
