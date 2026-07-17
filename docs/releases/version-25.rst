@@ -17,10 +17,11 @@ v25 can be found :ref:`here <v25_breaking_changes>`.
 Octez v25.1
 ~~~~~~~~~~~
 
-Octez v25.1 fixes three security issues: a bug where the node's in-memory
-protocol cache could be reused across a chain reorganization, a vulnerability
-in the validation of smart rollup refutation game moves, and a vulnerability
-where malformed double-baking evidence was not rejected. Node operators and
+Octez v25.1 hardens the Octez node against three security threats: by
+addressing a bug where the node's in-memory protocol cache could be reused
+across a chain reorganization, by introducing a stricter validation of smart
+rollup refutation game moves to reject malformed inputs, and by introducing a
+stricter validation for illegitimate double-baking evidence. Node operators and
 bakers should upgrade at their earliest convenience.
 
 It also contains bug fixes and improvements to the node, the smart rollup node
