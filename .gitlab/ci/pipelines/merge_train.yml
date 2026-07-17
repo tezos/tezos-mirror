@@ -2776,8 +2776,6 @@ oc.build_x86_64-exp:
     - octez-evm-node
     - octez-accuser-alpha
     - octez-baker-alpha
-    - octez-accuser-PsUshuai
-    - octez-baker-PsUshuai
     - octez-teztale-snitch
     - octez-teztale-archiver
     - octez-teztale-server
@@ -2964,6 +2962,8 @@ oc.build_x86_64-released:
     - octez-accuser
     - octez-baker
     - octez-node
+    - octez-accuser-PsUshuai
+    - octez-baker-PsUshuai
     - octez-accuser-PtTALLiN
     - octez-baker-PtTALLiN
     - src/proto_*/parameters/*.json
