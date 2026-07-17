@@ -46,42 +46,13 @@ use primitive_types::{H160, U256};
 )]
 #[repr(u64)]
 pub enum StorageVersion {
-    V11 = 11,
-    V12,
-    V13,
-    V14,
-    V15,
-    V16,
-    V17,
-    V18,
-    V19,
-    V20,
-    V21,
-    V22,
-    V23,
-    V24,
-    V25,
-    V26,
-    V27,
-    V28,
-    V29,
-    V30,
-    V31,
-    V32,
-    V33,
-    V34,
-    V35,
-    V36,
-    V37,
-    V38,
-    V39,
-    V40,
-    V41,
-    V42,
-    V43,
-    V44,
-    V45,
-    V46,
+    // V46 is the lowest storage version any live/tested network holds (the
+    // `farfadet-r3` mainnet kernel exercised by the migration tezt is at 46).
+    // Keep the variant (its migration body is cleared) so `read_storage_version`
+    // can map the on-chain `46` and step to V47; otherwise `FromPrimitive::from_u64`
+    // fails with `InvalidConversion` and migration aborts. Pre-V46 variants are
+    // dropped as no live network is below V46. Don't remove until all are >= V47.
+    V46 = 46,
     V47,
     V48,
     V49,
@@ -185,12 +156,6 @@ pub const EVM_BLOCK_IN_PROGRESS: RefPath =
 /// resolves to the absolute durable path `/base/rollup_events`, where the
 /// push-only counter (`length`) and indexed values are stored.
 const EVENTS_KEY: Key = Key::from_static(b"/rollup_events");
-
-pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
-    RefPath::assert_from(b"/evm/world_state/transactions_receipts");
-
-pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
-    RefPath::assert_from(b"/evm/world_state/transactions_objects");
 
 const EVM_CHAIN_ID_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/chain_id");
 
@@ -346,11 +311,10 @@ const DAL_PUBLISHERS_WHITELIST_KEY: Key = Key::from_static(b"/dal_publishers_whi
 // Path where the input for the tracer is stored by the sequencer.
 const TRACER_INPUT: RefPath = RefPath::assert_from(b"/base/trace/input");
 
-// If this path contains a value, the fa bridge is enabled in the kernel.
-// The absolute form remains for its writers (migration, tests); the reader
-// goes through the `/base` keyspace.
+#[cfg(test)]
 pub const ENABLE_FA_BRIDGE: RefPath =
     RefPath::assert_from(b"/base/feature_flags/enable_fa_bridge");
+
 const ENABLE_FA_BRIDGE_KEY: Key = Key::from_static(b"/feature_flags/enable_fa_bridge");
 
 const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS_KEY: Key =
@@ -1076,30 +1040,6 @@ pub fn enable_michelson_gas_refund(base: &impl KeySpace) -> bool {
     base.contains(&ENABLE_MICHELSON_GAS_REFUND_KEY)
 }
 
-pub fn tweak_dal_activation(
-    host: &mut (impl StorageV1 + KeySpaceLoader),
-    activate_dal: bool,
-) -> anyhow::Result<()> {
-    // The reader (`enable_dal`) tests key presence, so an empty value enables
-    // the flag and deleting it disables it.
-    let mut base = load_base_keyspace(host)?;
-    if activate_dal {
-        base.set(&ENABLE_DAL_KEY, b"")?;
-    } else {
-        base.delete(&ENABLE_DAL_KEY);
-    }
-    Ok(())
-}
-
-pub fn store_dal_slots(
-    host: &mut (impl StorageV1 + KeySpaceLoader),
-    slots: &[u8],
-) -> anyhow::Result<()> {
-    let mut base = load_base_keyspace(host)?;
-    base.set(&DAL_SLOTS_KEY, slots)?;
-    Ok(())
-}
-
 /// Returns true if legacy DAL slot import signals are disabled.
 /// When disabled, the kernel ignores `DalSlotImportSignals` external messages
 /// and instead relies on `DalAttestedSlots` internal messages.
@@ -1290,7 +1230,37 @@ mod tests {
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_smart_rollup_keyspace::KeySpace;
+    use tezos_smart_rollup_keyspace::KeySpaceLoader;
     use tezosx_journal::{CracId, TezosXJournal};
+
+    use crate::storage::DAL_SLOTS_KEY;
+    use crate::storage::ENABLE_FA_BRIDGE;
+    use crate::storage::{load_base_keyspace, ENABLE_DAL_KEY};
+
+    fn tweak_dal_activation(
+        host: &mut (impl StorageV1 + KeySpaceLoader),
+        activate_dal: bool,
+    ) -> anyhow::Result<()> {
+        // The reader (`enable_dal`) tests key presence, so an empty value enables
+        // the flag and deleting it disables it.
+        let mut base = load_base_keyspace(host)?;
+        if activate_dal {
+            base.set(&ENABLE_DAL_KEY, b"")?;
+        } else {
+            base.delete(&ENABLE_DAL_KEY);
+        }
+        Ok(())
+    }
+
+    fn store_dal_slots(
+        host: &mut (impl StorageV1 + KeySpaceLoader),
+        slots: &[u8],
+    ) -> anyhow::Result<()> {
+        let mut base = load_base_keyspace(host)?;
+        base.set(&DAL_SLOTS_KEY, slots)?;
+        Ok(())
+    }
 
     // RLP-encode a list of public key hashes the way the DAL publishers
     // whitelist is stored: an RLP list whose items are the binary-encoded PKHs.
@@ -1336,8 +1306,7 @@ mod tests {
             &300i64.to_le_bytes(),
         )
         .unwrap();
-        host.store_write_all(&super::ENABLE_FA_BRIDGE, &[1u8])
-            .unwrap();
+        host.store_write_all(&ENABLE_FA_BRIDGE, &[1u8]).unwrap();
 
         // DAL readers go through `/base`; seed their durable paths raw here
         // so the reader side is exercised against a known on-chain layout.
@@ -1455,21 +1424,21 @@ mod tests {
         let enable_dal_path = RefPath::assert_from(b"/base/feature_flags/enable_dal");
         let dal_slots_path = RefPath::assert_from(b"/base/dal_slots");
 
-        super::tweak_dal_activation(&mut host, true).unwrap();
+        tweak_dal_activation(&mut host, true).unwrap();
         assert!(host.store_read_all(&enable_dal_path).is_ok());
         {
             let base = super::load_base_keyspace(&mut host).unwrap();
             assert!(super::enable_dal(&base, false));
         }
 
-        super::tweak_dal_activation(&mut host, false).unwrap();
+        tweak_dal_activation(&mut host, false).unwrap();
         assert!(host.store_read_all(&enable_dal_path).is_err());
         {
             let base = super::load_base_keyspace(&mut host).unwrap();
             assert!(!super::enable_dal(&base, false));
         }
 
-        super::store_dal_slots(&mut host, &[0, 1, 2]).unwrap();
+        store_dal_slots(&mut host, &[0, 1, 2]).unwrap();
         assert_eq!(host.store_read_all(&dal_slots_path).unwrap(), vec![0, 1, 2]);
         let base = super::load_base_keyspace(&mut host).unwrap();
         assert_eq!(super::dal_slots(&base), Some(vec![0, 1, 2]));
