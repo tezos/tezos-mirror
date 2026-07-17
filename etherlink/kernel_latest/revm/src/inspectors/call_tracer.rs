@@ -2,10 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{storage::flush_call_traces, HasHost};
-use crate::helpers::rlp::{
-    append_address, append_option_address, append_option_canonical, append_option_u64_le,
-    append_u16_le, append_u256_le, append_u64_le,
+use super::{
+    rlp_helpers::{
+        append_address, append_option_address, append_option_canonical,
+        append_option_u64_le, append_u16_le, append_u256_le, append_u64_le,
+    },
+    storage::flush_call_traces,
+    HasHost,
 };
 
 use revm::{
