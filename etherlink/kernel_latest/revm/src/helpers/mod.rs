@@ -3,5 +3,4 @@
 // SPDX-License-Identifier: MIT
 
 pub mod legacy;
-pub mod rlp;
 pub mod storage;

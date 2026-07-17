@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::error::InspectorError;
-use crate::helpers::rlp::{append_option_canonical, append_u16_le, append_u64_le};
+use super::{
+    error::InspectorError,
+    rlp_helpers::{append_option_canonical, append_u16_le, append_u64_le},
+};
 
 use revm::{
     context::{ContextTr, JournalTr},
