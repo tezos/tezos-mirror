@@ -3,16 +3,33 @@
 Changelog
 '''''''''
 
-Version 25.0
+Version 25.1
 ============
 
 General
 -------
 
-- Improved the handling of the in-memory protocol cache across chain
-  reorganizations: it is now reused only when it corresponds to the block's
-  predecessor, and is otherwise rebuilt from the committed context. (MR
-  :gl:`!22462`)
+- **Security**: Fixed a bug where the in-memory protocol cache could be reused
+  across a chain reorganization even though it did not belong to the block's
+  predecessor, risking validation against stale entries. The cache is now
+  rebuilt from the committed context whenever this is detected. Node operators
+  should upgrade promptly. (MR :gl:`!22462`)
+
+- **Security**: Fixed a vulnerability in smart rollup refutation game validation
+  (protocols PtTALLiN, PsUshuai, Alpha) that could allow an invalid refutation
+  move to bypass block validation. Node operators and bakers should upgrade
+  promptly. (MR :gl:`!22476`)
+
+- **Security**: Fixed a vulnerability (protocol PsUshuai) where malformed
+  double-baking evidence was not rejected by block validation, the mempool, or
+  the baker. Node operators and bakers should upgrade promptly. (MR
+  :gl:`!22484`)
+
+Version 25.0
+============
+
+General
+-------
 
 - Fixed a file descriptor leak in the RPC client: the connection of each
   followed HTTP redirect was never released. This affected every Octez
