@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    database::EtherlinkVMDB,
     error::EvmKernelError,
     helpers::rlp::{append_option_canonical, append_u16_le, append_u64_le},
 };
@@ -26,8 +25,11 @@ use tezos_ethereum::rlp_helpers::{check_list, decode_field, decode_option, next}
 use tezos_evm_logging::{log, tracing::instrument, Level::Debug};
 use tezos_smart_rollup_host::storage::StorageV1;
 
-use super::storage::{
-    store_return_value, store_struct_log, store_trace_failed, store_trace_gas,
+use super::{
+    storage::{
+        store_return_value, store_struct_log, store_trace_failed, store_trace_gas,
+    },
+    HasHost,
 };
 
 const STRUCT_LOGGER_CONFIG_SIZE: usize = 5;
@@ -215,11 +217,9 @@ fn to_structured_stack(st: &Stack) -> Vec<B256> {
     stack
 }
 
-impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for StructLogger
+impl<CTX, INTR> Inspector<CTX, INTR> for StructLogger
 where
-    R: 'a,
-    Host: StorageV1 + 'a,
-    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
+    CTX: ContextTr<Db: HasHost<H: StorageV1>>,
     INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl, Memory: MemoryTr>,
 {
     fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, _: &mut CTX) {
@@ -301,7 +301,7 @@ where
 
             let struct_log =
                 struct_log.complete(depth, self.gas_inspector.last_gas_cost(), error);
-            struct_log.store(context.db_mut().host, &self.transaction_hash);
+            struct_log.store(context.db_mut().as_host_mut(), &self.transaction_hash);
         }
     }
 

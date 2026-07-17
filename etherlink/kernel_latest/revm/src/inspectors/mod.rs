@@ -2,17 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    database::EtherlinkVMDB, precompiles::provider::EtherlinkPrecompiles, EVMInnerContext,
-};
+use crate::precompiles::provider::EtherlinkPrecompiles;
 use call_tracer::{CallTracer, CallTracerInput};
 use revm::{
-    context::{ContextTr, Evm},
-    handler::{instructions::EthInstructions, EthFrame},
+    context::ContextTr,
     interpreter::{
-        interpreter::{EthInterpreter, ReturnDataImpl},
-        CallInputs, CallOutcome, CreateInputs, CreateOutcome, Interpreter,
-        InterpreterTypes, Stack,
+        interpreter::ReturnDataImpl, CallInputs, CallOutcome, CreateInputs,
+        CreateOutcome, Interpreter, InterpreterTypes, Stack,
     },
     primitives::{hardfork::SpecId, Address, Log, B256, U256},
     Inspector,
@@ -20,19 +16,17 @@ use revm::{
 use struct_logger::{StructLogger, StructLoggerInput};
 use tezos_smart_rollup_host::storage::StorageV1;
 
+pub trait HasHost {
+    type H;
+
+    fn as_host_mut(&mut self) -> &mut Self::H;
+}
+
 pub mod call_tracer;
 pub mod storage;
 pub mod struct_logger;
 
 pub const CALL_TRACER_CONFIG_PREFIX: u8 = 0x01;
-
-pub type EvmInspection<'a, Host, INSP, R> = Evm<
-    EVMInnerContext<'a, Host, R>,
-    INSP,
-    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, R>>,
-    EtherlinkPrecompiles,
-    EthFrame<EthInterpreter>,
->;
 
 #[derive(Debug, Clone, Copy)]
 pub enum TracerInput {
@@ -91,11 +85,9 @@ impl Tracer {
     }
 }
 
-impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for Tracer
+impl<CTX, INTR> Inspector<CTX, INTR> for Tracer
 where
-    Host: StorageV1 + 'a,
-    R: 'a,
-    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
+    CTX: ContextTr<Db: HasHost<H: StorageV1>>,
     INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl>,
 {
     fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
