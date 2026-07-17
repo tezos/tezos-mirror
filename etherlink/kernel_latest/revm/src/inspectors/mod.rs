@@ -3,14 +3,11 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    error::EvmDbError, precompiles::provider::EtherlinkPrecompiles, EVMInnerContext,
+    database::EtherlinkVMDB, precompiles::provider::EtherlinkPrecompiles, EVMInnerContext,
 };
-use call_tracer::CallTracerInput;
+use call_tracer::{CallTracer, CallTracerInput};
 use revm::{
-    context::{
-        result::{EVMError, ExecutionResult, HaltReason},
-        ContextSetters, ContextTr, Evm, JournalTr,
-    },
+    context::{result::HaltReason, ContextTr, Evm, JournalTr},
     context_interface::{Cfg, LocalContextTr, Transaction},
     handler::{
         execution::create_init_frame, instructions::EthInstructions, EthFrame, EvmTr,
@@ -18,15 +15,16 @@ use revm::{
     },
     inspector::InspectorHandler,
     interpreter::{
-        interpreter::EthInterpreter,
+        interpreter::{EthInterpreter, ReturnDataImpl},
         interpreter_action::{FrameInit, FrameInput},
-        SharedMemory, Stack,
+        CallInputs, CallOutcome, CreateInputs, CreateOutcome, Interpreter,
+        InterpreterTypes, SharedMemory, Stack,
     },
-    primitives::B256,
+    primitives::{hardfork::SpecId, Address, Log, B256, U256},
     state::{Bytecode, EvmState},
-    ExecuteCommitEvm, ExecuteEvm, InspectEvm, Inspector,
+    Inspector,
 };
-use struct_logger::StructLoggerInput;
+use struct_logger::{StructLogger, StructLoggerInput};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
@@ -43,63 +41,6 @@ pub type EvmInspection<'a, Host, INSP, R> = Evm<
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
-
-pub struct EtherlinkEvmInspector<'a, Host, R, INSP>
-where
-    Host: StorageV1,
-    R: Registry,
-    INSP: EtherlinkInspector<'a, Host, R>,
-{
-    inner: EvmInspection<'a, Host, INSP, R>,
-}
-
-impl<'a, Host, R, INSP> ExecuteEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
-where
-    Host: StorageV1,
-    R: Registry,
-    INSP: EtherlinkInspector<'a, Host, R>,
-{
-    type ExecutionResult = ExecutionResult;
-    type State = EvmState;
-    type Error = EVMError<EvmDbError>;
-    type Tx = <EVMInnerContext<'a, Host, R> as ContextTr>::Tx;
-    type Block = <EVMInnerContext<'a, Host, R> as ContextTr>::Block;
-
-    fn set_block(&mut self, block: Self::Block) {
-        self.inner.set_block(block);
-    }
-
-    fn transact_one(
-        &mut self,
-        tx: Self::Tx,
-    ) -> Result<Self::ExecutionResult, Self::Error> {
-        self.inner.transact_one(tx)
-    }
-
-    fn finalize(&mut self) -> Self::State {
-        self.inner.finalize()
-    }
-
-    fn replay(
-        &mut self,
-    ) -> Result<
-        revm::context::result::ExecResultAndState<Self::ExecutionResult, Self::State>,
-        Self::Error,
-    > {
-        self.inner.replay()
-    }
-}
-
-impl<'a, Host, R, INSP> ExecuteCommitEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
-where
-    Host: StorageV1,
-    R: Registry,
-    INSP: EtherlinkInspector<'a, Host, R>,
-{
-    fn commit(&mut self, state: Self::State) {
-        self.inner.commit(state);
-    }
-}
 
 #[derive(Debug)]
 pub struct EtherlinkHandler<CTX, ERROR, FRAME> {
@@ -217,31 +158,30 @@ where
     type IT = EthInterpreter;
 }
 
-impl<'a, Host, R, INSP> InspectEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
-where
-    Host: StorageV1,
-    R: Registry,
-    INSP: EtherlinkInspector<'a, Host, R>,
-{
-    type Inspector = INSP;
-
-    fn set_inspector(&mut self, inspector: Self::Inspector) {
-        self.inner.inspector = inspector;
-    }
-
-    fn inspect_one_tx(
-        &mut self,
-        tx: Self::Tx,
-    ) -> Result<Self::ExecutionResult, Self::Error> {
-        self.inner.set_tx(tx);
-        EtherlinkHandler::default().inspect_run(&mut self.inner)
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum TracerInput {
     CallTracer(CallTracerInput),
     StructLogger(StructLoggerInput),
+}
+
+impl TracerInput {
+    pub fn tracer(&self, precompiles: EtherlinkPrecompiles, spec_id: SpecId) -> Tracer {
+        match self {
+            TracerInput::CallTracer(CallTracerInput {
+                config,
+                transaction_hash,
+            }) => Tracer::CallTracer(CallTracer::new(
+                *config,
+                precompiles,
+                spec_id,
+                *transaction_hash,
+            )),
+            TracerInput::StructLogger(StructLoggerInput {
+                config,
+                transaction_hash,
+            }) => Tracer::StructLogger(StructLogger::new(*config, *transaction_hash)),
+        }
+    }
 }
 
 impl TracerInput {
@@ -253,43 +193,166 @@ impl TracerInput {
     }
 }
 
-pub trait EtherlinkInspector<'a, Host, R>:
-    Inspector<EVMInnerContext<'a, Host, R>>
-where
-    Host: StorageV1 + 'a,
-    R: Registry + 'a,
-{
-    fn is_struct_logger(&self) -> bool;
-    fn get_transaction_hash(&self) -> Option<B256>;
+pub enum Tracer {
+    CallTracer(CallTracer),
+    StructLogger(StructLogger),
 }
 
-impl<'a, Host, R> EtherlinkInspector<'a, Host, R>
-    for Box<dyn EtherlinkInspector<'a, Host, R>>
-where
-    Host: StorageV1 + 'a,
-    R: Registry + 'a,
-{
-    fn is_struct_logger(&self) -> bool {
-        self.as_ref().is_struct_logger()
+impl Tracer {
+    pub fn is_struct_logger(&self) -> bool {
+        matches!(self, Tracer::StructLogger(_))
     }
 
-    fn get_transaction_hash(&self) -> Option<B256> {
-        self.as_ref().get_transaction_hash()
+    pub fn transaction_hash(&self) -> Option<B256> {
+        match self {
+            Tracer::CallTracer(CallTracer {
+                transaction_hash, ..
+            }) => *transaction_hash,
+            Tracer::StructLogger(StructLogger {
+                transaction_hash, ..
+            }) => *transaction_hash,
+        }
     }
 }
 
-pub trait StructStack {
-    fn to_structured_stack(&self) -> Vec<B256>;
-}
+impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for Tracer
+where
+    Host: StorageV1 + 'a,
+    R: Registry + 'a,
+    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
+    INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl>,
+{
+    fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
+        match self {
+            Tracer::CallTracer(t) => t.initialize_interp(interp, context),
+            Tracer::StructLogger(t) => t.initialize_interp(interp, context),
+        }
+    }
 
-impl StructStack for Stack {
-    fn to_structured_stack(&self) -> Vec<B256> {
-        let stack: Vec<B256> = self
-            .data()
-            .iter()
-            .map(|e| B256::from_slice(e.to_be_bytes::<32>().as_slice()))
-            .collect();
-        stack
+    fn step(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
+        match self {
+            Tracer::CallTracer(t) => t.step(interp, context),
+            Tracer::StructLogger(t) => t.step(interp, context),
+        }
+    }
+
+    fn step_end(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
+        match self {
+            Tracer::CallTracer(t) => t.step_end(interp, context),
+            Tracer::StructLogger(t) => t.step_end(interp, context),
+        }
+    }
+
+    fn call(
+        &mut self,
+        context: &mut CTX,
+        inputs: &mut CallInputs,
+    ) -> Option<CallOutcome> {
+        match self {
+            Tracer::CallTracer(t) => {
+                <CallTracer as Inspector<CTX, INTR>>::call(t, context, inputs)
+            }
+            Tracer::StructLogger(t) => {
+                <StructLogger as Inspector<CTX, INTR>>::call(t, context, inputs)
+            }
+        }
+    }
+
+    fn call_end(
+        &mut self,
+        context: &mut CTX,
+        inputs: &CallInputs,
+        outcome: &mut CallOutcome,
+    ) {
+        match self {
+            Tracer::CallTracer(t) => <CallTracer as Inspector<CTX, INTR>>::call_end(
+                t, context, inputs, outcome,
+            ),
+            Tracer::StructLogger(t) => <StructLogger as Inspector<CTX, INTR>>::call_end(
+                t, context, inputs, outcome,
+            ),
+        }
+    }
+
+    fn create(
+        &mut self,
+        context: &mut CTX,
+        inputs: &mut CreateInputs,
+    ) -> Option<CreateOutcome> {
+        match self {
+            Tracer::CallTracer(t) => {
+                <CallTracer as Inspector<CTX, INTR>>::create(t, context, inputs)
+            }
+            Tracer::StructLogger(t) => {
+                <StructLogger as Inspector<CTX, INTR>>::create(t, context, inputs)
+            }
+        }
+    }
+
+    fn create_end(
+        &mut self,
+        context: &mut CTX,
+        inputs: &CreateInputs,
+        outcome: &mut CreateOutcome,
+    ) {
+        match self {
+            Tracer::CallTracer(t) => <CallTracer as Inspector<CTX, INTR>>::create_end(
+                t, context, inputs, outcome,
+            ),
+            Tracer::StructLogger(t) => {
+                <StructLogger as Inspector<CTX, INTR>>::create_end(
+                    t, context, inputs, outcome,
+                )
+            }
+        }
+    }
+
+    #[inline]
+    fn log(&mut self, context: &mut CTX, log: Log) {
+        match self {
+            Tracer::CallTracer(t) => {
+                <CallTracer as Inspector<CTX, INTR>>::log(t, context, log)
+            }
+            Tracer::StructLogger(t) => {
+                <StructLogger as Inspector<CTX, INTR>>::log(t, context, log)
+            }
+        }
+    }
+
+    fn log_full(
+        &mut self,
+        interpreter: &mut Interpreter<INTR>,
+        context: &mut CTX,
+        log: Log,
+    ) {
+        match self {
+            Tracer::CallTracer(t) => <CallTracer as Inspector<CTX, INTR>>::log_full(
+                t,
+                interpreter,
+                context,
+                log,
+            ),
+            Tracer::StructLogger(t) => <StructLogger as Inspector<CTX, INTR>>::log_full(
+                t,
+                interpreter,
+                context,
+                log,
+            ),
+        }
+    }
+
+    #[inline]
+    fn selfdestruct(&mut self, contract: Address, target: Address, value: U256) {
+        match self {
+            Tracer::CallTracer(t) => <CallTracer as Inspector<CTX, INTR>>::selfdestruct(
+                t, contract, target, value,
+            ),
+            Tracer::StructLogger(t) => {
+                <StructLogger as Inspector<CTX, INTR>>::selfdestruct(
+                    t, contract, target, value,
+                )
+            }
+        }
     }
 }
 

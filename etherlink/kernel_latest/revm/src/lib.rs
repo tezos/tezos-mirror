@@ -3,18 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    inspectors::EtherlinkInspector, journal::Journal,
-    storage::world_state_handler::StorageAccount,
-};
+use crate::{journal::Journal, storage::world_state_handler::StorageAccount};
 use database::EtherlinkVMDB;
 pub use error::{EvmDbError, EvmKernelError, EvmRunError};
 use helpers::storage::u256_to_le_bytes;
-use inspectors::{
-    call_tracer::{CallTracer, CallTracerInput},
-    struct_logger::{StructLogger, StructLoggerInput},
-    EtherlinkHandler, EvmInspection, TracerInput,
-};
+use inspectors::struct_logger::StructLogger;
+use inspectors::{EtherlinkHandler, EvmInspection, Tracer, TracerInput};
 pub use michelson_types::Withdrawal;
 use precompiles::constants::{
     alias_forwarder_delegation, alias_forwarder_delegation_code_hash,
@@ -222,34 +216,6 @@ fn tx_env(
     Ok(tx_env)
 }
 
-#[instrument(skip_all)]
-fn get_inspector_from<'a, Host, R>(
-    tracer_input: TracerInput,
-    precompiles: EtherlinkPrecompiles,
-    spec_id: SpecId,
-) -> Box<dyn EtherlinkInspector<'a, Host, R>>
-where
-    Host: StorageV1 + 'a,
-    R: Registry + 'a,
-{
-    match tracer_input {
-        TracerInput::CallTracer(CallTracerInput {
-            config,
-            transaction_hash,
-        }) => Box::new(CallTracer::new(
-            config,
-            precompiles,
-            spec_id,
-            transaction_hash,
-        )) as Box<dyn EtherlinkInspector<'a, Host, R>>,
-        TracerInput::StructLogger(StructLoggerInput {
-            config,
-            transaction_hash,
-        }) => Box::new(StructLogger::new(config, transaction_hash))
-            as Box<dyn EtherlinkInspector<'a, Host, R>>,
-    }
-}
-
 /// EVM opcode for `ORIGIN` (0x32). Stable across all hardforks since
 /// Frontier; named here so the override site reads as code, not magic.
 const ORIGIN_OPCODE: u8 = 0x32;
@@ -372,12 +338,7 @@ fn install_etherlink_gasprice<'a, Host, R, INSP>(
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn build_evm_inspector_context<
-    'a,
-    Host,
-    R: Registry,
-    INSP: EtherlinkInspector<'a, Host, R>,
->(
+fn build_evm_inspector_context<'a, Host, R>(
     db: EtherlinkVMDB<'a, Host, R>,
     journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
@@ -386,13 +347,14 @@ fn build_evm_inspector_context<
     precompiles: EtherlinkPrecompiles,
     chain_id: u64,
     spec_id: SpecId,
-    inspector: INSP,
+    inspector: &'a mut Tracer,
     is_simulation: bool,
     is_cross_runtime: bool,
     alias_delegation: Option<Address>,
-) -> Result<EvmInspection<'a, Host, INSP, R>, EvmRunError>
+) -> Result<EvmInspection<'a, Host, &'a mut Tracer, R>, EvmRunError>
 where
     Host: StorageV1,
+    R: Registry,
 {
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
@@ -607,6 +569,10 @@ where
     let db = EtherlinkVMDB::new(host, registry, block_constants, classify_native)?;
 
     if let Some(tracer_input) = tracer_input {
+        let mut tracer = tracer_input.tracer(
+            EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled()),
+            spec_id,
+        );
         let mut evm_context = build_evm_inspector_context(
             db,
             journal,
@@ -616,11 +582,7 @@ where
             EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled()),
             block_constants.chain_id.as_u64(),
             spec_id,
-            get_inspector_from::<Host, R>(
-                tracer_input,
-                EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled()),
-                spec_id,
-            ),
+            &mut tracer,
             is_simulation,
             is_cross_runtime,
             alias_delegation,
@@ -672,7 +634,7 @@ where
                 result.is_success(),
                 result.output(),
                 result.gas_used(),
-                evm_context.inspector.get_transaction_hash(),
+                evm_context.inspector.transaction_hash(),
             )?
         }
 

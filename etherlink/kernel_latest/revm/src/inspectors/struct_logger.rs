@@ -6,7 +6,6 @@ use crate::{
     database::EtherlinkVMDB,
     error::EvmKernelError,
     helpers::rlp::{append_option_canonical, append_u16_le, append_u64_le},
-    inspectors::EtherlinkInspector,
 };
 
 use revm::{
@@ -14,9 +13,9 @@ use revm::{
     inspector::inspectors::GasInspector,
     interpreter::{
         interpreter::ReturnDataImpl,
-        interpreter_types::{Jumps, LoopControl, MemoryTr, StackTr},
+        interpreter_types::{Jumps, LoopControl, MemoryTr},
         CallInputs, CallOutcome, CreateInputs, CreateOutcome, InstructionResult,
-        Interpreter, InterpreterTypes,
+        Interpreter, InterpreterTypes, Stack,
     },
     primitives::{Address, Bytes, B256},
     state::AccountInfo,
@@ -28,11 +27,8 @@ use tezos_evm_logging::{log, tracing::instrument, Level::Debug};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
-use super::{
-    storage::{
-        store_return_value, store_struct_log, store_trace_failed, store_trace_gas,
-    },
-    StructStack,
+use super::storage::{
+    store_return_value, store_struct_log, store_trace_failed, store_trace_gas,
 };
 
 const STRUCT_LOGGER_CONFIG_SIZE: usize = 5;
@@ -211,18 +207,13 @@ impl StructLogger {
     }
 }
 
-impl<'a, Host, R> EtherlinkInspector<'a, Host, R> for StructLogger
-where
-    Host: StorageV1 + 'a,
-    R: Registry + 'a,
-{
-    fn is_struct_logger(&self) -> bool {
-        true
-    }
-
-    fn get_transaction_hash(&self) -> Option<B256> {
-        self.transaction_hash
-    }
+fn to_structured_stack(st: &Stack) -> Vec<B256> {
+    let stack: Vec<B256> = st
+        .data()
+        .iter()
+        .map(|e| B256::from_slice(e.to_be_bytes::<32>().as_slice()))
+        .collect();
+    stack
 }
 
 impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for StructLogger
@@ -230,11 +221,7 @@ where
     Host: StorageV1 + 'a,
     R: Registry + 'a,
     CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
-    INTR: InterpreterTypes<
-        Stack: StackTr + StructStack,
-        ReturnData = ReturnDataImpl,
-        Memory: MemoryTr,
-    >,
+    INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl, Memory: MemoryTr>,
 {
     fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, _: &mut CTX) {
         self.gas_inspector.initialize_interp(&interp.gas);
@@ -252,7 +239,7 @@ where
             interp.gas.remaining(),
             depth,
             if !self.config.disable_stack {
-                Some(interp.stack.to_structured_stack())
+                Some(to_structured_stack(&interp.stack))
             } else {
                 None
             },
@@ -275,7 +262,7 @@ where
                     vec![]
                 } else {
                     let address = self.execution_address;
-                    let mut stack = interp.stack.to_structured_stack();
+                    let mut stack = to_structured_stack(&interp.stack);
                     let index = stack.pop().unwrap_or_default();
                     let value = stack.pop().unwrap_or_default();
                     let storage_map_item = StorageMapItem {
