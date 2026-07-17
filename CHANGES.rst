@@ -32,26 +32,8 @@ Release".
 General
 -------
 
-- Fixed a file descriptor leak in the RPC client: the connection of each
-  followed HTTP redirect was never released. This affected every Octez
-  executable issuing RPC calls through an endpoint answering redirects
-  (e.g. behind a reverse proxy).
-
-- RPC servers now enable TCP keepalive on accepted connections, so that
-  connections whose peer has disappeared without closing (e.g. behind a
-  NAT or load balancer that drops idle flows) are eventually closed and
-  their resources released, instead of being retained until restart.
-
 Node
 ----
-
-- **Breaking change** The node ``/metrics`` endpoint is no longer served
-  on the ``--rpc-addr`` (or ``--external-rpc-addr``) listener; querying
-  ``/metrics`` on the RPC port now returns ``404``. Metrics are served
-  only by the dedicated metrics server enabled with ``--metrics-addr``.
-  This aligns the node with the smart rollup and
-  DAL nodes. Setups scraping ``/metrics`` on the RPC port must now run the
-  node with ``--metrics-addr``.
 
 Client
 ------
@@ -83,29 +65,6 @@ Packaging
 Smart Rollup node
 -----------------
 
-- Registered the missing handler for the ``/global/last_cemented_commitment``
-  RPC, which previously returned 404 even though the service was declared. (MR
-  :gl:`!21757`)
-
-- Skip context reconstruction during ``snapshot import`` when the head's commit
-  is already present in the imported context, so non-compact snapshots no longer
-  pay for unnecessary PVM replay. Fixes a regression. (MR :gl:`!21810`)
-
-- Add a ``--dal-node`` option to ``snapshot import`` so reconstruction of
-  compact snapshots can fetch DAL pages from a DAL node. (MR :gl:`!21810`)
-
-- Make ``snapshot import`` more robust when verifying that the snapshot's
-  commitment is published on L1: search around the snapshot's head level
-  rather than only at the L1 head, and report a clear error suggesting an
-  archive L1 node when the snapshot is older than the savepoint. (MR
-  :gl:`!21841`)
-
-- The rollup node no longer exits when the L1 RPC is unreachable at startup;
-  the initial connection is retried with the configured
-  ``--reconnection-delay`` exponential backoff, matching the existing behaviour
-  for runtime disconnections. A ``reconnected`` notice is emitted once the
-  connection is re-established. (MR :gl:`!21854`)
-
 Smart Rollup WASM Debugger
 --------------------------
 
@@ -114,17 +73,6 @@ Data Availability Layer (DAL)
 
 DAL node
 ~~~~~~~~
-- **Breaking change**: The DAL node RPC server now binds to ``127.0.0.1:10732``
-  by default instead of ``0.0.0.0:10732``. Operators who need to expose the RPC
-  interface publicly must explicitly pass ``--rpc-addr 0.0.0.0:10732``. When
-  bound to a non-loopback address, a warning is emitted and a restrictive ACL is
-  applied (only safe/read-only endpoints are accessible). The ACL can be
-  overridden per-bind-address via the new ``acl`` field in ``config.json``,
-  using the same policy syntax as the L1 node's ``rpc.acl``.
-
-- Added a ``--skip-shards`` flag to the ``snapshot export`` and ``snapshot
-  import`` commands. When set, shards are neither exported nor imported,
-  producing smaller snapshots for nodes that only need slot data.
 
 Miscellaneous
 -------------

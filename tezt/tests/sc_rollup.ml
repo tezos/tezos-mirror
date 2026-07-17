@@ -4828,6 +4828,332 @@ let test_valid_dispute_dissection =
      ended. *)
   cement [c31; c32] ~fail:"Attempted to cement a disputed commitment"
 
+(** End-to-end reproduction of the block validation plugin mitigation,
+    mirroring the protocol-unit test
+    [test_multitick_proof_forces_indefensible_final_move] in
+    [src/proto_alpha/lib_protocol/test/unit/test_sc_rollup_game.ml].
+
+    A [Proof] move submitted while the game is still [Dissecting] over a
+    section whose tick distance is greater than one must be rejected. The
+    (unfixed) protocol instead collapses that error to [false] and stores a
+    [Final_move], which is indefensible for the honest opponent: a [Final_move]
+    timeout resolves to [Draw], and [Draw] removes BOTH stakes — slashing the
+    honest defender.
+
+    The mitigation lives in the block validation plugin
+    ([src/proto_alpha/lib_plugin/block_validation.ml],
+    [Sc_rollup_proof_on_multi_tick_section_during_dissecting]). The plugin runs
+    at block construction/validation, NOT in the mempool, so the offending
+    operation is still accepted by [validate_operation] (that acceptance is the
+    bug). This test therefore checks the realistic baker behaviour: the
+    operation is injected successfully (it passes mempool validation), but the
+    plugin refuses it at block construction, so it never makes it into a block
+    and the game stays [Dissecting]. *)
+let test_multitick_proof_rejected_by_plugin =
+  test_forking_scenario ~variant:"multi-tick proof rejected by plugin"
+  @@
+  fun client
+      _node
+      protocol
+      ~sc_rollup
+      ~operator1
+      ~operator2
+      commits
+      _level0
+      _level1
+    ->
+  let c1, c2, c31, c32, _c311, _c321 = commits in
+  let cement = cement_commitments protocol client sc_rollup in
+  let* constants = get_sc_rollup_constants client in
+  let challenge_window = constants.challenge_window_in_blocks in
+  let commitment_period = constants.commitment_period_in_blocks in
+  let* () =
+    (* Be able to cement both c1 and c2 *)
+    repeat (challenge_window + commitment_period) (fun () ->
+        Client.bake_for_and_wait client)
+  in
+  let* () = cement [c1; c2] in
+  let module M = Operation.Manager in
+  let source = operator2 in
+  let opponent = operator1.public_key_hash in
+  (* Open the game between the conflicting commitments c32 (player) and c31
+     (opponent). It is now in the [Dissecting] phase over the initial wide
+     section [0; number_of_ticks], so choice=0 selects a multi-tick section. *)
+  let* () =
+    start_refute
+      client
+      ~source
+      ~opponent
+      ~sc_rollup
+      ~player_commitment_hash:c32
+      ~opponent_commitment_hash:c31
+  in
+  (* Build the offending operation: a [Proof] move on choice 0. The proof is
+     structurally well-formed (so it parses and is accepted by the mempool)
+     but its contents are irrelevant — the plugin's distance guard
+     short-circuits before the proof is ever examined. A minimal valid proof
+     is just a (hex) [pvm_step] with the optional [input_proof] omitted. *)
+  let proof = `O [("pvm_step", `String "00")] in
+  let refutation = M.Move {choice_tick = 0; refutation_step = Proof proof} in
+  let op =
+    M.make ~source @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
+  in
+  (* The operation passes mempool validation (this acceptance is precisely the
+     bug the plugin mitigates), so injection succeeds. *)
+  let* (`OpHash oph) = M.inject [op] client in
+  Log.info "injected refutation %s" oph ;
+  (* Sanity: the operation is a *validated* mempool candidate. This proves the
+     mempool accepts it (it cannot run the game-state check — no context), so
+     if it does not end up in the block, that is an active decision of the
+     baker's block-validation filter, not because the op was lost or refused
+     upstream. *)
+  let* pending =
+    Client.RPC.call client
+    @@ RPC.get_chain_mempool_pending_operations ~validated:true ()
+  in
+  let validated_hashes =
+    List.map
+      (fun op -> JSON.(op |-> "hash" |> as_string))
+      JSON.(pending |-> "validated" |> as_list)
+  in
+  Check.(
+    (List.mem oph validated_hashes = true)
+      bool
+      ~error_msg:
+        "the operation is not a validated mempool candidate; the test cannot \
+         conclude the baker actively filtered it.") ;
+  let* () = Client.bake_for_and_wait client in
+  (* The block validation plugin must refuse the operation: it must NOT
+     be included in the baked block. *)
+  let* head = Client.RPC.call client @@ RPC.get_chain_block () in
+  let manager_ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
+  let included =
+    List.exists
+      (fun op -> String.equal oph JSON.(op |-> "hash" |> as_string))
+      manager_ops
+  in
+  Log.info
+    "validated mempool candidate=%b, included in block=%b"
+    (List.mem oph validated_hashes)
+    included ;
+  Check.(
+    (included = false)
+      bool
+      ~error_msg:
+        "the multi-tick Proof operation should have been refused by the block \
+         validation plugin, but it was included in the block.") ;
+  (* And the game must still be [Dissecting] — the move did not collapse it
+     into an indefensible [Final_move]. *)
+  let* games =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_staker_games
+         ~staker:source.public_key_hash
+         sc_rollup
+         ()
+  in
+  let kinds =
+    List.map
+      (fun g -> JSON.(g |-> "game" |-> "game_state" |-> "kind" |> as_string))
+      (JSON.as_list games)
+  in
+  Log.info "ongoing games for player = [%s]" (String.concat "; " kinds) ;
+  (* The game must still exist (otherwise the [Dissecting] check below would be
+     vacuously true). *)
+  Check.(
+    (List.length kinds = 1)
+      int
+      ~error_msg:"expected exactly one ongoing game for the player, got %L.") ;
+  List.iter
+    (fun kind ->
+      Check.(
+        (kind = "Dissecting")
+          string
+          ~error_msg:
+            "after the move the game state is %L, expected %R (the multi-tick \
+             Proof must not have advanced the game)."))
+    kinds ;
+  unit
+
+(** End-to-end test of the block validation plugin rule allowing at most one
+    refutation operation per game per block
+    ([Sc_rollup_multiple_operations_for_game_in_block] in
+    [src/proto_alpha/lib_plugin/block_validation.ml]).
+
+    The plugin checks refutation moves against the context at the START of the
+    block, which is not updated as operations are applied. Two operations on
+    the same game in one block would therefore let the second one be checked
+    against a stale game state. This test builds that exact bypass: a valid
+    dissection move by the player followed, in the same mempool, by a Proof
+    move from the opponent whose [choice] tick only exists in the refreshed
+    dissection — invisible to the start-of-block guard, yet stored as
+    an indefensible [Final_move] if it were applied. The plugin must include
+    the first operation and filter out the second at block construction. *)
+let test_one_refutation_operation_per_game_per_block =
+  test_forking_scenario
+    ~variant:"at most one refutation operation per game per block"
+  @@
+  fun client
+      _node
+      protocol
+      ~sc_rollup
+      ~operator1
+      ~operator2
+      commits
+      _level0
+      _level1
+    ->
+  let c1, c2, c31, c32, _c311, _c321 = commits in
+  let cement = cement_commitments protocol client sc_rollup in
+  let* constants = get_sc_rollup_constants client in
+  let challenge_window = constants.challenge_window_in_blocks in
+  let commitment_period = constants.commitment_period_in_blocks in
+  let number_of_sections = constants.number_of_sections_in_dissection in
+  let* () =
+    (* Be able to cement both c1 and c2 *)
+    repeat (challenge_window + commitment_period) (fun () ->
+        Client.bake_for_and_wait client)
+  in
+  let* () = cement [c1; c2] in
+  let module M = Operation.Manager in
+  let source = operator2 in
+  let opponent = operator1.public_key_hash in
+  (* Open the game between the conflicting commitments c32 (player) and c31
+     (opponent). It is now in the [Dissecting] phase over the initial wide
+     section. *)
+  let* () =
+    start_refute
+      client
+      ~source
+      ~opponent
+      ~sc_rollup
+      ~player_commitment_hash:c32
+      ~opponent_commitment_hash:c31
+  in
+  (* First operation: the player's valid dissection move — the same dissection
+     as [move_refute_with_unique_state_hash], built inline so it is not baked
+     yet. The doubled fee makes the baker select it first. If this hash needs
+     to be recomputed, run this test with --verbose and grep for
+     'compressed_state' in the produced logs. *)
+  let state_hash = "srs11Z9V76SGd97kGmDQXV8tEF67C48GMy77RuaHdF1kWLk6UTmMfj" in
+  let dissection =
+    List.init number_of_sections (fun i ->
+        if i = number_of_sections - 1 then M.{state_hash = None; tick = i}
+        else M.{state_hash = Some state_hash; tick = i})
+  in
+  let op_dissection =
+    M.make ~source ~fee:24_000
+    @@ M.sc_rollup_refute
+         ~sc_rollup
+         ~opponent
+         ~refutation:
+           (M.Move {choice_tick = 0; refutation_step = Dissection dissection})
+         ()
+  in
+  (* Second operation, same game, other player: a [Proof] move on choice 1 — a
+     tick that exists only in [op_dissection]'s refreshed dissection, not in
+     the start-of-block one. The stale-context multi-tick guard cannot reject
+     it (its choice is not found there), and if it were applied after the
+     dissection move it would be stored as a [Final_move] over a single-tick
+     section. Only the one-operation-per-game rule can filter it. *)
+  let proof = `O [("pvm_step", `String "00")] in
+  let op_proof =
+    M.make ~source:operator1
+    @@ M.sc_rollup_refute
+         ~sc_rollup
+         ~opponent:source.public_key_hash
+         ~refutation:(M.Move {choice_tick = 1; refutation_step = Proof proof})
+         ()
+  in
+  let* (`OpHash oph_dissection) = M.inject [op_dissection] client in
+  let* (`OpHash oph_proof) = M.inject [op_proof] client in
+  Log.info
+    "one-op-per-game: injected dissection %s and proof %s"
+    oph_dissection
+    oph_proof ;
+  (* Sanity: both operations are *validated* mempool candidates (they come
+     from different managers, so the 1M rule does not apply). If the proof
+     operation does not end up in the block, that is an active decision of the
+     block-validation filter. *)
+  let* pending =
+    Client.RPC.call client
+    @@ RPC.get_chain_mempool_pending_operations ~validated:true ()
+  in
+  let validated_hashes =
+    List.map
+      (fun op -> JSON.(op |-> "hash" |> as_string))
+      JSON.(pending |-> "validated" |> as_list)
+  in
+  List.iter
+    (fun oph ->
+      Check.(
+        (List.mem oph validated_hashes = true)
+          bool
+          ~error_msg:
+            "one-op-per-game: both operations should be validated mempool \
+             candidates; the test cannot conclude the baker actively filtered \
+             one of them."))
+    [oph_dissection; oph_proof] ;
+  let* () = Client.bake_for_and_wait client in
+  let* head = Client.RPC.call client @@ RPC.get_chain_block () in
+  let manager_ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
+  let included oph =
+    List.exists
+      (fun op -> String.equal oph JSON.(op |-> "hash" |> as_string))
+      manager_ops
+  in
+  Log.info
+    "one-op-per-game: dissection included=%b, proof included=%b"
+    (included oph_dissection)
+    (included oph_proof) ;
+  (* The first operation on the game must be included... *)
+  Check.(
+    (included oph_dissection = true)
+      bool
+      ~error_msg:
+        "one-op-per-game: the player's dissection move should have been \
+         included in the block.") ;
+  (* ...and the second operation on the same game must be filtered out. *)
+  Check.(
+    (included oph_proof = false)
+      bool
+      ~error_msg:
+        "one-op-per-game: the second operation on the same refutation game \
+         should have been filtered out by the block validation plugin, but it \
+         was included in the block.") ;
+  (* The game advanced by exactly one move: it is still [Dissecting] — the
+     stale-context Proof did not collapse it into an indefensible
+     [Final_move]. *)
+  let* games =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_staker_games
+         ~staker:source.public_key_hash
+         sc_rollup
+         ()
+  in
+  let kinds =
+    List.map
+      (fun g -> JSON.(g |-> "game" |-> "game_state" |-> "kind" |> as_string))
+      (JSON.as_list games)
+  in
+  Log.info
+    "one-op-per-game: ongoing games for player = [%s]"
+    (String.concat "; " kinds) ;
+  Check.(
+    (List.length kinds = 1)
+      int
+      ~error_msg:
+        "one-op-per-game: expected exactly one ongoing game for the player, \
+         got %L.") ;
+  List.iter
+    (fun kind ->
+      Check.(
+        (kind = "Dissecting")
+          string
+          ~error_msg:
+            "one-op-per-game: after baking the game state is %L, expected %R."))
+    kinds ;
+  unit
+
 (* Testing the timeout to record gas consumption in a regression trace and
    detect when the value changes.
    For functional tests on timing-out a dispute, see unit tests in
@@ -9241,6 +9567,12 @@ let register ~protocols =
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
   test_dal_commitment_with_pre_genesis_attested_levels protocols ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
+  test_multitick_proof_rejected_by_plugin
+    ~kind:"arith"
+    (List.filter (fun p -> Protocol.number p >= 024) protocols) ;
+  test_one_refutation_operation_per_game_per_block
+    ~kind:"arith"
+    (List.filter (fun p -> Protocol.number p >= 024) protocols) ;
   test_refutation_reward_and_punishment protocols ~kind:"arith" ;
   test_timeout ~kind:"arith" protocols ;
   test_no_cementation_if_parent_not_lcc_or_if_disputed_commit

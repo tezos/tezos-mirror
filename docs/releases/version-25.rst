@@ -1,5 +1,5 @@
-Version 25.0~beta1
-==================
+Version 25.1
+============
 
 Changes
 -------
@@ -13,6 +13,21 @@ Version 25 introduces the following changes or new features:
 
 An overview of breaking changes and deprecations introduced in Octez
 v25 can be found :ref:`here <v25_breaking_changes>`.
+
+Octez v25.1
+~~~~~~~~~~~
+
+Octez v25.1 fixes three security issues: a bug where the node's in-memory
+protocol cache could be reused across a chain reorganization, a vulnerability
+in the validation of smart rollup refutation game moves, and a vulnerability
+where malformed double-baking evidence was not rejected. Node operators and
+bakers should upgrade at their earliest convenience.
+
+It also contains bug fixes and improvements to the node, the smart rollup node
+and the DAL node. Note two breaking changes: the node's ``/metrics`` endpoint
+is no longer served on the RPC port (use ``--metrics-addr`` instead), and the
+DAL node RPC server now binds to ``127.0.0.1:10732`` by default instead of
+``0.0.0.0:10732``.
 
 .. _protocol_support_v25:
 
@@ -60,16 +75,17 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v25.0-beta1
+  git checkout octez-v25.1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v25.0-beta1`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v25.1`` Docker images of Octez.
 
 Changelog
 ---------
 
+- `Version 25.1 <../CHANGES.html#version-25-1>`_
 - `Version 25.0~beta1 <../CHANGES.html#version-25-0-beta1>`_

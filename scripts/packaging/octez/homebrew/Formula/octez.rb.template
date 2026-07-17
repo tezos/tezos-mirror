@@ -15,7 +15,7 @@ class Octez < Formula
   version "%%VERSION%%"
   license "MIT"
 
-  build_dependencies = %w[pkg-config coreutils autoconf rsync wget opam protobuf cmake rustup gcc]
+  build_dependencies = %w[pkg-config coreutils autoconf rsync wget unzip opam protobuf cmake rustup gcc]
   build_dependencies.each do |dependency|
     depends_on dependency => :build
   end

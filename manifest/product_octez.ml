@@ -6964,6 +6964,11 @@ end = struct
               octez_protocol_environment;
               octez_stdlib_unix;
               main |> open_;
+              (* The unit tests use the block-validation plugin (the
+                 [test_sc_rollup_game] cases) starting from alpha/026;
+                 older protocols have no such test, so the dependency is
+                 scoped by protocol number. *)
+              plugin |> if_some |> if_ N.(number >= 026) |> open_;
               octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
               alcotezt;
@@ -8594,7 +8599,7 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
 
   let _024_PtTALLiN = active (Name.v "PtTALLiN" 024)
 
-  let _025_PsUshuai = active (Name.dev "025_PsUshuai")
+  let _025_PsUshuai = active (Name.v "PsUshuai" 025)
 
   let alpha = active (Name.dev "alpha")
 
