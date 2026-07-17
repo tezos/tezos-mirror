@@ -38,7 +38,7 @@ use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
 use tezosx_interfaces::{AliasInfo, Origin, Registry};
 
-pub struct EtherlinkVMDB<'a, Host: StorageV1, R: Registry> {
+pub struct EtherlinkVMDB<'a, Host, R> {
     pub registry: &'a R,
     /// Runtime host
     pub host: &'a mut Host,
@@ -77,7 +77,7 @@ enum AccountState {
     SelfDestructed,
 }
 
-impl<'a, Host, R: Registry> EtherlinkVMDB<'a, Host, R>
+impl<'a, Host, R> EtherlinkVMDB<'a, Host, R>
 where
     Host: StorageV1,
 {
@@ -316,7 +316,7 @@ where
     }
 }
 
-impl<Host, R: Registry> Database for EtherlinkVMDB<'_, Host, R>
+impl<Host, R> Database for EtherlinkVMDB<'_, Host, R>
 where
     Host: StorageV1,
 {
