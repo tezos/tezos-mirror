@@ -134,3 +134,8 @@ Miscellaneous
   in-flight POSTs. A stalled server now makes individual POSTs time out and be
   reported as failures (the usual failure path) instead of leaving the archiver
   hung indefinitely with leaked connections.
+
+- Teztale archiver: added ``--replay-backups`` (requires ``--backup-dir``). When
+  set, the archiver periodically re-sends the backed-up POSTs and deletes each
+  one once the server accepts it, so the local backup is drained instead of
+  growing without bound after an outage.

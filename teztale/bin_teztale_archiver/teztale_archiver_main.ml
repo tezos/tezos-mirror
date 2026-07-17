@@ -169,7 +169,7 @@ let select_commands _ctxt Client_config.{chain; _} =
       Tezos_clic.command
         ~group
         ~desc:"run the archiver to a teztale_server"
-        (Tezos_clic.args3
+        (Tezos_clic.args4
            (Tezos_clic.arg
               ~doc:"dump failed post data"
               ~long:"backup-dir"
@@ -192,12 +192,27 @@ let select_commands _ctxt Client_config.{chain; _} =
               (Tezos_clic.parameter (fun _ s ->
                    match float_of_string_opt s with
                    | Some f when f > 0. -> return f
-                   | _ -> fail []))))
+                   | _ -> fail [])))
+           (Tezos_clic.switch
+              ~doc:
+                "periodically re-send the POSTs saved in --backup-dir and \
+                 delete each once the server accepts it (requires \
+                 --backup-dir)"
+              ~long:"replay-backups"
+              ()))
         (Tezos_clic.prefixes ["feed"] @@ Tezos_clic.seq_of_param endpoint_param)
-        (fun (backup_path, level, send_timeout) endpoints cctxt ->
+        (fun (backup_path, level, send_timeout, replay_backups)
+             endpoints
+             cctxt
+           ->
           Option.iter (fun level -> Log.verbosity := level) level ;
           Option.iter Server_archiver.set_request_timeout send_timeout ;
           let logger = Log.logger () in
+          let* () =
+            if replay_backups && Option.is_none backup_path then
+              failwith "--replay-backups requires --backup-dir"
+            else return_unit
+          in
           List.iter
             (fun h -> Log.info logger (fun () -> Protocol_hash.to_b58check h))
             !General_archiver.supported_protocols ;
@@ -237,6 +252,11 @@ let select_commands _ctxt Client_config.{chain; _} =
                     backup_path;
               }
           in
+          (match (replay_backups, backup_path) with
+          | true, Some dir ->
+              Lwt.async (fun () ->
+                  Server_archiver.replay_backups_loop state dir)
+          | _ -> ()) ;
           main_server state cctxt);
     ]
 
