@@ -35,4 +35,9 @@ val extract_auth : Uri.t -> endpoint
     handles every chunk kind and never raises. *)
 val backup_post : string -> chunk -> unit Lwt.t
 
+(** [set_request_timeout seconds] sets the maximum time to wait for a single
+    POST to the teztale-server before giving up (default: 30s). On timeout the
+    send is aborted and treated as a failure. *)
+val set_request_timeout : float -> unit
+
 include Archiver.S with type t = ctx

@@ -128,3 +128,9 @@ Miscellaneous
   including ``/rights`` and ``/dal_shards`` which were previously dropped
   silently. Each failed POST is stored verbatim (path + body) as one record, so
   no data is lost when the server is unreachable.
+
+- Teztale archiver: added a ``--send-timeout`` option (default 30s) bounding
+  each POST to the teztale-server, and capped the number of concurrent
+  in-flight POSTs. A stalled server now makes individual POSTs time out and be
+  reported as failures (the usual failure path) instead of leaving the archiver
+  hung indefinitely with leaked connections.

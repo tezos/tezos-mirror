@@ -169,7 +169,7 @@ let select_commands _ctxt Client_config.{chain; _} =
       Tezos_clic.command
         ~group
         ~desc:"run the archiver to a teztale_server"
-        (Tezos_clic.args2
+        (Tezos_clic.args3
            (Tezos_clic.arg
               ~doc:"dump failed post data"
               ~long:"backup-dir"
@@ -182,10 +182,21 @@ let select_commands _ctxt Client_config.{chain; _} =
               (Tezos_clic.parameter (fun _ arg ->
                    match Log.level_of_string arg with
                    | Some level -> return level
-                   | None -> fail []))))
+                   | None -> fail [])))
+           (Tezos_clic.arg
+              ~doc:
+                "timeout in seconds for each POST to the teztale server \
+                 (default: 30)"
+              ~long:"send-timeout"
+              ~placeholder:"SECONDS"
+              (Tezos_clic.parameter (fun _ s ->
+                   match float_of_string_opt s with
+                   | Some f when f > 0. -> return f
+                   | _ -> fail []))))
         (Tezos_clic.prefixes ["feed"] @@ Tezos_clic.seq_of_param endpoint_param)
-        (fun (backup_path, level) endpoints cctxt ->
+        (fun (backup_path, level, send_timeout) endpoints cctxt ->
           Option.iter (fun level -> Log.verbosity := level) level ;
+          Option.iter Server_archiver.set_request_timeout send_timeout ;
           let logger = Log.logger () in
           List.iter
             (fun h -> Log.info logger (fun () -> Protocol_hash.to_b58check h))
