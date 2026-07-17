@@ -2,10 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    error::EvmKernelError,
-    helpers::rlp::{append_option_canonical, append_u16_le, append_u64_le},
-};
+use super::error::InspectorError;
+use crate::helpers::rlp::{append_option_canonical, append_u16_le, append_u64_le};
 
 use revm::{
     context::{ContextTr, JournalTr},
@@ -195,7 +193,7 @@ impl StructLogger {
         output: Option<&Bytes>,
         gas_used: u64,
         transaction_hash: Option<B256>,
-    ) -> Result<(), EvmKernelError>
+    ) -> Result<(), InspectorError>
     where
         Host: StorageV1,
     {

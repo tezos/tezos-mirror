@@ -23,6 +23,7 @@ pub trait HasHost {
 }
 
 pub mod call_tracer;
+pub mod error;
 pub mod storage;
 pub mod struct_logger;
 

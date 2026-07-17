@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::inspectors::error::InspectorError;
 use evm_types::{CustomPrecompileError, IntoWithRemainder};
 use revm::{
     bytecode::BytecodeDecodeError,
@@ -128,5 +129,23 @@ impl From<EvmKernelError> for TezosXRuntimeError {
             EvmKernelError::Runtime(err) => TezosXRuntimeError::Runtime(err),
             other => TezosXRuntimeError::Custom(other.to_string()),
         }
+    }
+}
+
+impl From<InspectorError> for EvmKernelError {
+    fn from(value: InspectorError) -> Self {
+        match value {
+            InspectorError::Runtime(err) => EvmKernelError::Runtime(err),
+            InspectorError::Path(err) => EvmKernelError::Path(err),
+            InspectorError::IndexableStorage(err) => {
+                EvmKernelError::IndexableStorage(err)
+            }
+        }
+    }
+}
+
+impl From<InspectorError> for EvmRunError {
+    fn from(value: InspectorError) -> Self {
+        EvmRunError::Kernel(value.into())
     }
 }
