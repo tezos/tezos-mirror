@@ -46,14 +46,12 @@ use primitive_types::{H160, U256};
 )]
 #[repr(u64)]
 pub enum StorageVersion {
-    // V46 is the lowest storage version any live/tested network holds (the
-    // `farfadet-r3` mainnet kernel exercised by the migration tezt is at 46).
-    // Keep the variant (its migration body is cleared) so `read_storage_version`
-    // can map the on-chain `46` and step to V47; otherwise `FromPrimitive::from_u64`
-    // fails with `InvalidConversion` and migration aborts. Pre-V46 variants are
-    // dropped as no live network is below V46. Don't remove until all are >= V47.
-    V46 = 46,
-    V47,
+    // V47 is the lowest storage version any live network holds. Keep the
+    // variant (its migration body is cleared) so `read_storage_version` can map
+    // the on-chain `47` and step to V48; otherwise `FromPrimitive::from_u64`
+    // fails with `InvalidConversion` and migration aborts. Pre-V47 variants are
+    // dropped as no live network is below V47. Don't remove until all are >= V48.
+    V47 = 47,
     V48,
     V49,
     V50,
