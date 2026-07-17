@@ -3054,6 +3054,24 @@ fn typecheck_instruction_step<'a, 'b>(
     use Micheline::*;
     use Prim::*;
 
+    // A singleton sequence `{ x }` carries no semantic nesting, so it
+    // elaborates exactly as `x` (as in L1's `script_ir_translator`). Peeling
+    // any run of them keeps a deeply nested body `{{{…}}}` from surviving as
+    // an O(depth) nested `Instruction::Seq`.
+    //
+    // L1's singleton arm (`Seq (_, [single]) -> non_terminal_recursion …`)
+    // recurses back into `parse_instr`, which charges `parse_instr_cycle` at
+    // its top for every level. `INSTR_STEP` was consumed once above for the
+    // outermost node; charge it again per peeled level so the collapse stays a
+    // pure structural/runtime optimisation with the same gas as the previous
+    // per-`OpenSeq` recursion — the L1-parity calibration of `INSTR_STEP`
+    // (see `gas::tc_cost`) is preserved rather than silently invalidated.
+    let mut i = i;
+    while let Seq([single]) = i {
+        gas.consume(gas::tc_cost::INSTR_STEP)?;
+        i = single;
+    }
+
     macro_rules! unexpected_micheline {
         () => {
             return Err(TcError::UnexpectedMicheline(format!("{i:?}")))
@@ -9694,21 +9712,51 @@ mod typecheck_tests {
     #[test]
     fn seq() {
         let mut stack = tc_stk![Type::Int, Type::Nat];
+        // Singleton sequences collapse (`{ PAIR }` -> `Pair`, `{{{{{DROP}}}}}`
+        // -> `Drop`); `{}` and `{{{}}}` wrap no single element, so they stay
+        // as `Seq([])`.
         assert_eq!(
             typecheck_instruction(
                 &parse("{ { PAIR }; {{ CAR; }}; {}; {{{}}}; {{{{{DROP}}}}} }").unwrap(),
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Seq(vec![
-                Seq(vec![Pair]),
-                Seq(vec![Seq(vec![Car])]),
-                Seq(vec![]),
-                Seq(vec![Seq(vec![Seq(vec![])])]),
-                Seq(vec![Seq(vec![Seq(vec![Seq(vec![Seq(vec![Drop(None)])])])])])
-            ]))
+            Ok(Seq(vec![Pair, Car, Seq(vec![]), Seq(vec![]), Drop(None)]))
         );
         assert_eq!(stack, tc_stk![]);
+    }
+
+    // L2-1790: the singleton-sequence peel in `typecheck_instruction_step`
+    // collapses a chain of singleton braces to its innermost instruction, so a
+    // `{{{…DROP…}}}` body 100 000 braces deep elaborates to a single `Drop`
+    // rather than an `O(depth)` nested `Instruction::Seq`. Built via the arena
+    // (bypassing the recursive parser) and driven through the real typecheck
+    // path on a worker thread with the kernel's ~1 MiB Rust stack: were the
+    // collapse absent, the surviving nested `Seq` would be `O(depth)` to hold
+    // and its recursive `Drop`/`PartialEq` walk would overflow that stack.
+    #[test]
+    fn deeply_nested_singleton_seq_collapses_to_constant_size() {
+        use std::thread;
+        const DEPTH: usize = 100_000;
+        thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
+                let mut code = Micheline::App(Prim::DROP, &[], NO_ANNS);
+                for _ in 0..DEPTH {
+                    code = Micheline::Seq(arena.alloc_extend([code]));
+                }
+                let mut stack = tc_stk![Type::Unit];
+                assert_eq!(
+                    typecheck_instruction(&code, &mut Gas::new(u32::MAX), &mut stack),
+                    Ok(Drop(None)),
+                    "a {DEPTH}-deep singleton chain must collapse to a single Drop",
+                );
+                assert_eq!(stack, tc_stk![]);
+            })
+            .unwrap()
+            .join()
+            .expect("worker thread completes");
     }
 
     #[test]

@@ -141,6 +141,17 @@
   on EVM frame revert, so the orphaned origination is dropped with the
   reverted state instead of being re-attributed to the next call that
   drains it. (!22393)
+- **Bug fix:** `EXEC` of a lambda with a deeply nested body no longer
+  overflows the native stack, and no longer costs `O(D²)` work for `O(D)` gas.
+  The runtime body is walked borrowed from a keep-alive arena instead of
+  deep-cloning each opened sub-block. (!22444)
+- Elaboration now collapses singleton sequences (`{ x }` elaborates as `x`),
+  mirroring L1's `script_ir_translator`. A body wrapped in a chain of singleton
+  braces `{{{…x…}}}` therefore no longer survives typechecking as an `O(depth)`
+  nested structure, and runtime `EXEC`/`VIEW` walks its collapsed,
+  constant-size form. Multi-element and empty blocks are left intact (as L1
+  does), so only the semantically vacuous singleton wrappers are peeled.
+  (!22452)
 - The typechecker now charges the gas for entrypoint resolution (a flat cost
   for `SELF`, the `CONTRACT` instruction, and contract-value parsing) and the
   `CHECK_PRINTABLE` cost (10·len+15) of string literals and view names, which
