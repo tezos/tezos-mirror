@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::precompiles::provider::EtherlinkPrecompiles;
 use call_tracer::{CallTracer, CallTracerInput};
 use revm::{
     context::ContextTr,
+    handler::EthPrecompiles,
     interpreter::{
         interpreter::ReturnDataImpl, CallInputs, CallOutcome, CreateInputs,
         CreateOutcome, Interpreter, InterpreterTypes, Stack,
@@ -36,7 +36,7 @@ pub enum TracerInput {
 }
 
 impl TracerInput {
-    pub fn tracer(&self, precompiles: EtherlinkPrecompiles, spec_id: SpecId) -> Tracer {
+    pub fn tracer(&self, precompiles: EthPrecompiles, spec_id: SpecId) -> Tracer {
         match self {
             TracerInput::CallTracer(CallTracerInput {
                 config,

@@ -579,17 +579,16 @@ where
     let db = EtherlinkVMDB::new(host, registry, block_constants, classify_native)?;
 
     if let Some(tracer_input) = tracer_input {
-        let mut tracer = tracer_input.tracer(
-            EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled()),
-            spec_id,
-        );
+        let precompiles =
+            EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled());
+        let mut tracer = tracer_input.tracer(precompiles.builtins.clone(), spec_id);
         let mut evm_context = build_evm_inspector_context(
             db,
             journal,
             &block_env,
             &tx,
             gas_data.maximum_gas_per_transaction,
-            EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled()),
+            precompiles,
             block_constants.chain_id.as_u64(),
             spec_id,
             &mut tracer,

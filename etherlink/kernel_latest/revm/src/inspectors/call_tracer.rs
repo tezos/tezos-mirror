@@ -3,16 +3,14 @@
 // SPDX-License-Identifier: MIT
 
 use super::{storage::flush_call_traces, HasHost};
-use crate::{
-    helpers::rlp::{
-        append_address, append_option_address, append_option_canonical,
-        append_option_u64_le, append_u16_le, append_u256_le, append_u64_le,
-    },
-    precompiles::provider::EtherlinkPrecompiles,
+use crate::helpers::rlp::{
+    append_address, append_option_address, append_option_canonical, append_option_u64_le,
+    append_u16_le, append_u256_le, append_u64_le,
 };
 
 use revm::{
     context::{ContextTr, CreateScheme, JournalTr, Transaction},
+    handler::EthPrecompiles,
     interpreter::{
         gas::calculate_initial_tx_gas_for_tx, interpreter::ReturnDataImpl, CallInputs,
         CallOutcome, CallScheme, CreateInputs, CreateOutcome, Gas, InitialAndFloorGas,
@@ -188,7 +186,7 @@ impl CallTrace {
 
 pub struct CallTracer {
     config: CallTracerConfig,
-    precompiles: EtherlinkPrecompiles,
+    precompiles: EthPrecompiles,
     call_trace: HashMap<u16, CallTrace>,
     /// Traces buffered in memory, flushed to storage once at the end of
     /// each transaction (depth == 0).  RLP encoding is deferred to flush
@@ -202,7 +200,7 @@ pub struct CallTracer {
 impl CallTracer {
     pub fn new(
         config: CallTracerConfig,
-        precompiles: EtherlinkPrecompiles,
+        precompiles: EthPrecompiles,
         spec_id: SpecId,
         transaction_hash: Option<B256>,
     ) -> Self {
@@ -317,11 +315,8 @@ where
 
         self.set_call_trace(depth, call_trace);
 
-        if let Some(precompile) = self
-            .precompiles
-            .builtins
-            .precompiles
-            .get(&inputs.bytecode_address)
+        if let Some(precompile) =
+            self.precompiles.precompiles.get(&inputs.bytecode_address)
         {
             // Hack-ish behavior. In case the invoked address is a precompile we need to
             // pre-simulate its result because the `call_end` hook is never called when a
