@@ -30,7 +30,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  octez-rust-deps
+  octez-rollup-node-rust-deps
   src_proto_025_PsUshuai_lib_sc_rollup_node_test_tezt_lib
   tezt)
  (link_flags

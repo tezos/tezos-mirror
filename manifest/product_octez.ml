@@ -8458,6 +8458,7 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
             octez_smart_rollup_node_lib |> open_;
             octez_scoru_wasm;
             octez_scoru_wasm_fast;
+            octez_smart_rollup_node_dual_lib |> if_ N.(number >= 025) |> open_;
             octez_riscv_pvm |> if_ N.(number >= 021);
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
             octez_version_value;

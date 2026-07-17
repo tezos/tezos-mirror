@@ -43,6 +43,7 @@
   octez-smart-rollup-node-lib
   octez-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-fast
+  octez-smart-rollup-node-lib.dual
   octez-riscv-pvm
   octez-libs.crypto-dal
   octez-version.value)
@@ -72,6 +73,7 @@
   -open Octez_crawler
   -open Octez_injector
   -open Octez_smart_rollup_node
+  -open Octez_smart_rollup_node_dual
   -open Tezos_crypto_dal))
 
 (rule
