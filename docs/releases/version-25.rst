@@ -18,13 +18,12 @@ v25 can be found :ref:`here <v25_breaking_changes>`.
 Octez v25.1
 ~~~~~~~~~~~
 
-Octez v25.1 is a security release addressing three vulnerabilities:
-
-- a case where the in-memory protocol cache could be reused across a chain reorganization even though it did not belong to the block's predecessor, risking validation against stale entries;
-- a flaw in smart rollup refutation game validation that could allow an invalid refutation move to bypass block validation;
-- a flaw (protocol PsUshuai) where malformed double-baking evidence was not rejected by block validation, the mempool, or the baker.
-
-All node operators and bakers should upgrade promptly.
+Octez v25.1 hardens the Octez node against three security threats: by
+addressing a bug where the node's in-memory protocol cache could be reused
+across a chain reorganization, by introducing a stricter validation of smart
+rollup refutation game moves to reject malformed inputs, and by introducing a
+stricter validation for illegitimate double-baking evidence. Node operators and
+bakers should upgrade at their earliest convenience.
 
 .. _protocol_support_v25:
 
