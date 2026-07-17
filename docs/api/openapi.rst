@@ -44,7 +44,7 @@ Shell RPCs
 The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi <../_static/rpc-openapi.html>`__ (version 25.0)
+- `rpc-openapi <../_static/rpc-openapi.html>`__ (version 25.1)
 - `rpc-openapi-dev <../_static/rpc-openapi-dev.html>`__ (version master)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
@@ -55,12 +55,12 @@ Ushuaia RPCs
 The OpenAPI specifications for RPCs which are specific to the Ushuaia (``PsUshuai``)
 protocol proposal can be found at:
 
-- `ushuaia-openapi <../_static/ushuaia-openapi.html>`__ (version 25.0)
+- `ushuaia-openapi <../_static/ushuaia-openapi.html>`__ (version 25.1)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Ushuaia protocol proposal can be found at:
 
-- `ushuaia-mempool-openapi <../_static/ushuaia-mempool-openapi.html>`__ (version 25.0)
+- `ushuaia-mempool-openapi <../_static/ushuaia-mempool-openapi.html>`__ (version 25.1)
 
 Alpha RPCs
 ----------
@@ -91,7 +91,7 @@ Ushuaia RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Ushuaia
 (``PsUshuai``) protocol proposal can be found at:
 
-- `ushuaia-smart-rollup-node-openapi <../_static/ushuaia-smart-rollup-node-openapi.html>`__ (version 25.0)
+- `ushuaia-smart-rollup-node-openapi <../_static/ushuaia-smart-rollup-node-openapi.html>`__ (version 25.1)
 
 Alpha RPCs
 ----------
@@ -109,7 +109,7 @@ DAL Node
 The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
-- `dal-node-openapi <../_static/dal-node-openapi.html>`__ (version 25.0)
+- `dal-node-openapi <../_static/dal-node-openapi.html>`__ (version 25.1)
 - `dal-node-openapi-dev <../_static/dal-node-openapi-dev.html>`__ (version master)
 
 .. _openapi_generate:
