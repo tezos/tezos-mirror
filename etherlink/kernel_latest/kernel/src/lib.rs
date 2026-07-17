@@ -63,6 +63,7 @@ mod fallback_upgrade;
 mod fees;
 mod gas_price;
 mod inbox;
+mod journal;
 mod l2block;
 mod linked_list;
 mod migration;
