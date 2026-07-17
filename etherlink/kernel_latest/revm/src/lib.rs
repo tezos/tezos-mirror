@@ -6,9 +6,10 @@
 use crate::{journal::Journal, storage::world_state_handler::StorageAccount};
 use database::EtherlinkVMDB;
 pub use error::{EvmDbError, EvmKernelError, EvmRunError};
+use handler::EtherlinkHandler;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::struct_logger::StructLogger;
-use inspectors::{EtherlinkHandler, EvmInspection, Tracer, TracerInput};
+use inspectors::{EvmInspection, Tracer, TracerInput};
 pub use michelson_types::Withdrawal;
 use precompiles::constants::{
     alias_forwarder_delegation, alias_forwarder_delegation_code_hash,
@@ -38,6 +39,7 @@ use tezosx_journal::TezosXJournal;
 
 pub mod database;
 mod error;
+pub mod handler;
 pub mod helpers;
 pub mod inspectors;
 pub mod journal;
