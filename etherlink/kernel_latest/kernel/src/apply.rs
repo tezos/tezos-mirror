@@ -7,14 +7,12 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
+use evm_inspectors::{get_tracer_configuration, TracerInput};
 use primitive_types::{H160, U256};
 use revm::primitives::alloy_primitives::IntoLogData;
 use revm::primitives::hardfork::SpecId;
-use revm::primitives::{Address, Bytes, B256};
+use revm::primitives::{Address, Bytes};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
-use revm_etherlink::inspectors::call_tracer::CallTracerInput;
-use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
-use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
     RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
@@ -627,35 +625,7 @@ where
         gas_data,
         revm::primitives::U256::from_le_slice(&bytes),
         authorization_list.map(signed_authorization),
-        tracer_input.map(|tracer_input| match tracer_input {
-            TracerInput::CallTracer(CallTracerInput {
-                transaction_hash,
-                config,
-            }) => revm_etherlink::inspectors::TracerInput::CallTracer(
-                revm_etherlink::inspectors::call_tracer::CallTracerInput {
-                    config: revm_etherlink::inspectors::call_tracer::CallTracerConfig {
-                        only_top_call: config.only_top_call,
-                        with_logs: config.with_logs,
-                    },
-                    transaction_hash: transaction_hash.map(|hash| B256::from(hash.0)),
-                },
-            ),
-            TracerInput::StructLogger(StructLoggerInput {
-                transaction_hash,
-                config,
-            }) => revm_etherlink::inspectors::TracerInput::StructLogger(
-                revm_etherlink::inspectors::struct_logger::StructLoggerInput {
-                    config:
-                        revm_etherlink::inspectors::struct_logger::StructLoggerConfig {
-                            enable_memory: config.enable_memory,
-                            enable_return_data: config.enable_return_data,
-                            disable_stack: config.disable_stack,
-                            disable_storage: config.disable_storage,
-                        },
-                    transaction_hash: transaction_hash.map(|hash| B256::from(hash.0)),
-                },
-            ),
-        }),
+        tracer_input,
         is_simulation,
         origin,
     )

@@ -20,13 +20,13 @@ use crate::{
     tick_model::constants::MAXIMUM_GAS_LIMIT,
     transaction::TransactionContent,
 };
+use evm_inspectors::TracerInput;
 use mir::ast::PublicKeyHash;
 use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
-    inspectors::TracerInput,
     storage::{block::BLOCKS_STORED, world_state_handler::StorageAccount},
 };
 use rlp::{Decodable, DecoderError, Encodable};

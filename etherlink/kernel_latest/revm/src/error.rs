@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::inspectors::error::InspectorError;
+use evm_inspectors::error::InspectorError;
 use evm_types::{CustomPrecompileError, IntoWithRemainder};
 use revm::{
     bytecode::BytecodeDecodeError,

@@ -1206,6 +1206,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "evm-inspectors"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "primitive-types",
+ "revm",
+ "rlp",
+ "tezos-evm-logging-latest",
+ "tezos-indexable-storage-latest",
+ "tezos-smart-rollup-host",
+ "tezos_ethereum_latest",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
 name = "evm-types"
 version = "0.1.0"
 dependencies = [
@@ -1233,6 +1249,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "ethbloom",
+ "evm-inspectors",
  "getrandom 0.2.15",
  "hex",
  "http",
@@ -2621,6 +2638,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
  "ethereum",
+ "evm-inspectors",
  "evm-types",
  "hex",
  "http",
