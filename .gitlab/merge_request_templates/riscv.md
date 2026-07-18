@@ -56,16 +56,13 @@ make -C src/riscv all
 ```
 /assign @victor-dumitrescu
 /assign @emturner
-/assign @santnr
-/assign @kurtis.charnock
 /assign @thomas.athorne
+/assign @jobjo
 
 /request_review @victor-dumitrescu
 /request_review @emturner
-/request_review @santnr
-/request_review @jobjo
-/request_review @kurtis.charnock
 /request_review @thomas.athorne
+/request_review @jobjo
 
 /unassign me
 /unassign_reviewer me
