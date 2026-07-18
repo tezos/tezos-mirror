@@ -8,11 +8,11 @@
 use std::fmt::Display;
 
 use alloy_sol_types::SolEvent;
+use evm_inspectors::TracerInput;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
 use revm::primitives::{Address, Log, LogData, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, h160_to_alloy, u256_to_alloy};
-use revm_etherlink::inspectors::TracerInput;
 use revm_etherlink::precompiles::constants::FEED_DEPOSIT_ADDR;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};

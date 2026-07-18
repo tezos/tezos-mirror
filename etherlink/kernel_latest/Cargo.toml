@@ -21,6 +21,7 @@ members = [
   "mir",
   "evm-types",
   "tezosx-journal",
+  "evm_inspectors",
   "revm",
   "revm_evaluation",
   "runtime",
@@ -78,6 +79,7 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 michelson-types = { package = "michelson-types", path = "./michelson-types" }
 evm-types = { package = "evm-types", path = "./evm-types" }
 tezosx-journal = { package = "tezosx-journal", path = "./tezosx-journal" }
+evm-inspectors = { package = "evm-inspectors", path = "./evm_inspectors" }
 revm-etherlink = { package = "revm-etherlink", path = "./revm" }
 tezos_ethereum = { package = "tezos_ethereum_latest", path = "./ethereum" }
 tezos_tezlink = { package = "tezos_tezlink_latest", path = "./tezos" }
