@@ -383,7 +383,10 @@ where
         &mut configuration,
         delayed_hashes,
     )?;
-    upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
+    {
+        let mut base = crate::storage::load_base_keyspace(safe_host.host)?;
+        upgrade::possible_sequencer_key_change(safe_host.host, &mut base, timestamp)?;
+    }
 
     Ok(())
 }

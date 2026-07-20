@@ -399,7 +399,9 @@ fn force_kernel_upgrade<Host>(host: &mut Host) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal + WasmHost + KeySpaceLoader,
 {
-    match upgrade::read_kernel_upgrade(host)? {
+    let kernel_upgrade =
+        upgrade::read_kernel_upgrade(&crate::storage::load_base_keyspace(host)?)?;
+    match kernel_upgrade {
         Some(kernel_upgrade) => {
             let current_timestamp = read_last_info_per_level_timestamp(
                 &crate::storage::load_base_keyspace(host)?,
@@ -410,7 +412,8 @@ where
             if current_timestamp >= (activation_timestamp + 86400i64) {
                 // If the kernel upgrade still exist 1 day after it was supposed
                 // to be activated. It is possible to force its execution.
-                upgrade::upgrade(host, kernel_upgrade.preimage_hash)?
+                let mut base = crate::storage::load_base_keyspace(host)?;
+                upgrade::upgrade(host, &mut base, kernel_upgrade.preimage_hash)?
             };
             Ok(())
         }
@@ -499,9 +502,13 @@ where
 {
     match input {
         Input::ModeSpecific(input) => Mode::handle_input(host, input, inbox_content)?,
-        Input::Upgrade(kernel_upgrade) => store_kernel_upgrade(host, &kernel_upgrade)?,
+        Input::Upgrade(kernel_upgrade) => {
+            let mut base = crate::storage::load_base_keyspace(host)?;
+            store_kernel_upgrade(host, &mut base, &kernel_upgrade)?
+        }
         Input::SequencerUpgrade(sequencer_upgrade) => {
-            store_sequencer_upgrade(host, sequencer_upgrade)?
+            let mut base = crate::storage::load_base_keyspace(host)?;
+            store_sequencer_upgrade(host, &mut base, sequencer_upgrade)?
         }
         Input::RemoveSequencer => remove_sequencer(host)?,
         Input::Info(info) => {
@@ -1022,7 +1029,10 @@ mod tests {
             activation_timestamp,
         });
 
-        let stored_kernel_upgrade = crate::upgrade::read_kernel_upgrade(&host).unwrap();
+        let stored_kernel_upgrade = crate::upgrade::read_kernel_upgrade(
+            &crate::storage::load_base_keyspace(&mut host).unwrap(),
+        )
+        .unwrap();
         assert_eq!(stored_kernel_upgrade, expected_upgrade);
     }
 

@@ -297,7 +297,10 @@ where
         Err(Error::UpgradeError(Fallback)) => {
             // If the migration failed we backup to the previous kernel
             // and force a reboot to reload the kernel.
-            fallback_backup_kernel(host)?;
+            {
+                let mut base = load_base_keyspace(host)?;
+                fallback_backup_kernel(host, &mut base)?;
+            }
             return Ok(SingleRunStatus::Reboot);
         }
         Err(err) => return Err(err.into()),

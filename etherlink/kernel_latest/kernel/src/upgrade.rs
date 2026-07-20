@@ -29,17 +29,15 @@ use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::OwnedPath;
-use tezos_smart_rollup_host::path::Path;
-use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
-use tezos_storage::read_optional_rlp;
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
+use tezos_storage::{keyspace, read_optional_rlp};
 
-const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/base/kernel_upgrade");
-pub const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/base/kernel_root_hash");
+const KERNEL_UPGRADE_KEY: Key = Key::from_static(b"/kernel_upgrade");
+pub const KERNEL_ROOT_HASH_KEY: Key = Key::from_static(b"/kernel_root_hash");
 use revm_etherlink::storage::sequencer_key_change::increment_sequencer_change_counter;
 use revm_etherlink::storage::world_state_handler::GOVERNANCE_SEQUENCER_UPGRADE_PATH;
 use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH;
@@ -87,10 +85,11 @@ impl Encodable for KernelUpgrade {
 
 pub fn store_kernel_upgrade<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     kernel_upgrade: &KernelUpgrade,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + IsEvmNode,
 {
     log!(
         Info,
@@ -98,31 +97,21 @@ where
         hex::encode(kernel_upgrade.preimage_hash),
         kernel_upgrade.activation_timestamp
     );
-    {
-        let mut base = crate::storage::load_base_keyspace(host)?;
-        Event::Upgrade(kernel_upgrade.clone()).store(host, &mut base)?;
-    }
-    let path = OwnedPath::from(KERNEL_UPGRADE);
-    let bytes = &kernel_upgrade.rlp_bytes();
-    host.store_write_all(&path, bytes)
+    Event::Upgrade(kernel_upgrade.clone()).store(host, base)?;
+    keyspace::store_rlp(kernel_upgrade, base, &KERNEL_UPGRADE_KEY)
         .context("Failed to store kernel upgrade")
 }
 
-fn read_kernel_upgrade_at(
-    host: &impl StorageV1,
-    path: &impl Path,
-) -> anyhow::Result<Option<KernelUpgrade>> {
-    read_optional_rlp(host, path).context("Failed to decode kernel upgrade")
-}
-
 pub fn read_kernel_upgrade(
-    host: &impl StorageV1,
+    base: &impl KeySpace,
 ) -> anyhow::Result<Option<KernelUpgrade>> {
-    read_kernel_upgrade_at(host, &KERNEL_UPGRADE)
+    keyspace::read_optional_rlp(base, &KERNEL_UPGRADE_KEY)
+        .context("Failed to decode kernel upgrade")
 }
 
 pub fn upgrade<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     root_hash: [u8; PREIMAGE_HASH_SIZE],
 ) -> anyhow::Result<()>
 where
@@ -130,14 +119,14 @@ where
 {
     log!(Info, "Kernel upgrade initialisation.");
 
-    backup_current_kernel(host)?;
+    backup_current_kernel(host, base)?;
     let config = upgrade_reveal_flow(root_hash);
     config
         .evaluate(host)
         .map_err(UpgradeProcessError::InternalUpgrade)?;
 
-    host.store_write_all(&KERNEL_ROOT_HASH, &root_hash)?;
-    host.store_delete(&KERNEL_UPGRADE)?;
+    base.set(&KERNEL_ROOT_HASH_KEY, root_hash)?;
+    base.delete(&KERNEL_UPGRADE_KEY);
 
     log!(Info, "Kernel is ready to be upgraded.");
     Ok(())
@@ -202,10 +191,11 @@ impl Encodable for SequencerUpgrade {
 
 pub fn store_sequencer_upgrade<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     sequencer_upgrade: SequencerUpgrade,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + IsEvmNode,
 {
     log!(
         Info,
@@ -214,10 +204,7 @@ where
         sequencer_upgrade.activation_timestamp
     );
     let bytes = &sequencer_upgrade.rlp_bytes();
-    {
-        let mut base = crate::storage::load_base_keyspace(host)?;
-        Event::SequencerUpgrade(sequencer_upgrade).store(host, &mut base)?;
-    }
+    Event::SequencerUpgrade(sequencer_upgrade).store(host, base)?;
     let path = OwnedPath::from(GOVERNANCE_SEQUENCER_UPGRADE_PATH);
     host.store_write_all(&path, bytes)
         .context("Failed to store sequencer upgrade")
@@ -260,20 +247,19 @@ where
     Ok(())
 }
 
-pub fn possible_sequencer_upgrade<Host>(host: &mut Host) -> anyhow::Result<()>
+pub fn possible_sequencer_upgrade<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
+) -> anyhow::Result<()>
 where
-    Host: StorageV1 + KeySpaceLoader,
+    Host: StorageV1,
 {
     let upgrade = read_sequencer_upgrade(host)?;
     if let Some(upgrade) = upgrade {
-        let ipl_timestamp = storage::read_last_info_per_level_timestamp(
-            &crate::storage::load_base_keyspace(host)?,
-        )?;
+        let ipl_timestamp = storage::read_last_info_per_level_timestamp(base)?;
         if ipl_timestamp >= upgrade.activation_timestamp {
             sequencer_upgrade(host, upgrade.pool_address, &upgrade.sequencer)?;
-            blueprint_storage::clear_all_blueprints(
-                &mut crate::storage::load_base_keyspace(host)?,
-            )?;
+            blueprint_storage::clear_all_blueprints(base)?;
         }
     }
     Ok(())
@@ -311,18 +297,17 @@ where
 
 pub fn possible_sequencer_key_change<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     evm_timestamp: Timestamp,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + KeySpaceLoader,
+    Host: StorageV1,
 {
     let upgrade = read_sequencer_key_change(host)?;
     if let Some(upgrade) = upgrade {
         if evm_timestamp >= upgrade.activation_timestamp() {
             sequencer_key_change(host, upgrade)?;
-            blueprint_storage::clear_all_blueprints(
-                &mut crate::storage::load_base_keyspace(host)?,
-            )?;
+            blueprint_storage::clear_all_blueprints(base)?;
         }
     }
     Ok(())
@@ -349,11 +334,13 @@ mod tests {
     #[test]
     fn governance_change_increments_counter_once_on_apply() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
 
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
 
         store_sequencer_upgrade(
             &mut host,
+            &mut base,
             SequencerUpgrade {
                 sequencer: test_public_key(),
                 pool_address: H160::zero(),
@@ -366,21 +353,15 @@ mod tests {
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
 
         // Before activation nothing applies, so the counter stays put.
-        storage::store_last_info_per_level_timestamp(
-            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
-            Timestamp::from(50i64),
-        )
-        .unwrap();
-        possible_sequencer_upgrade(&mut host).unwrap();
+        storage::store_last_info_per_level_timestamp(&mut base, Timestamp::from(50i64))
+            .unwrap();
+        possible_sequencer_upgrade(&mut host, &mut base).unwrap();
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
 
         // At/after activation the upgrade applies exactly once: counter is +1.
-        storage::store_last_info_per_level_timestamp(
-            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
-            Timestamp::from(100i64),
-        )
-        .unwrap();
-        possible_sequencer_upgrade(&mut host).unwrap();
+        storage::store_last_info_per_level_timestamp(&mut base, Timestamp::from(100i64))
+            .unwrap();
+        possible_sequencer_upgrade(&mut host, &mut base).unwrap();
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
     }
 
@@ -391,6 +372,7 @@ mod tests {
     #[test]
     fn precompile_change_apply_does_not_increment_counter() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
 
         // Simulate the precompile store-time effects: the pending change is
         // stored and the counter is bumped exactly once.
@@ -403,11 +385,13 @@ mod tests {
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
 
         // Before activation nothing applies.
-        possible_sequencer_key_change(&mut host, Timestamp::from(50i64)).unwrap();
+        possible_sequencer_key_change(&mut host, &mut base, Timestamp::from(50i64))
+            .unwrap();
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
 
         // At/after activation the change applies but the counter is unchanged.
-        possible_sequencer_key_change(&mut host, Timestamp::from(100i64)).unwrap();
+        possible_sequencer_key_change(&mut host, &mut base, Timestamp::from(100i64))
+            .unwrap();
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
     }
 

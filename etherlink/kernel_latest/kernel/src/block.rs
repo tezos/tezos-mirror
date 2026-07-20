@@ -305,7 +305,10 @@ where
         Some(blueprint) => {
             if let Some(kernel_upgrade) = kernel_upgrade {
                 if blueprint.timestamp >= kernel_upgrade.activation_timestamp {
-                    upgrade::upgrade(host, kernel_upgrade.preimage_hash)?;
+                    {
+                        let mut base = crate::storage::load_base_keyspace(host)?;
+                        upgrade::upgrade(host, &mut base, kernel_upgrade.preimage_hash)?;
+                    }
                     // We abort the call, as there is no blueprint to execute,
                     // the kernel will reboot.
                     return Ok(BlueprintParsing::Postponed);
@@ -570,7 +573,8 @@ where
     let http_trace_enabled =
         crate::storage::is_http_trace_enabled(&crate::storage::load_base_keyspace(host)?);
 
-    let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
+    let kernel_upgrade =
+        upgrade::read_kernel_upgrade(&crate::storage::load_base_keyspace(host)?)?;
 
     // If there's a pool address, the coinbase in block constants and miner
     // in blocks is set to the pool address.
@@ -600,7 +604,10 @@ where
             None => {
                 // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
                 // because the sequencer pool address is located outside of `/evm/world_state`.
-                upgrade::possible_sequencer_upgrade(safe_host.host)?;
+                {
+                    let mut base = crate::storage::load_base_keyspace(safe_host.host)?;
+                    upgrade::possible_sequencer_upgrade(safe_host.host, &mut base)?;
+                }
 
                 log!(Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
@@ -697,7 +704,14 @@ where
                     |e| anyhow::anyhow!("seeding address registry failed: {e}"),
                 )?;
             }
-            upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
+            {
+                let mut base = crate::storage::load_base_keyspace(safe_host.host)?;
+                upgrade::possible_sequencer_key_change(
+                    safe_host.host,
+                    &mut base,
+                    timestamp,
+                )?;
+            }
 
             if safe_host.is_evm_node() {
                 Ok(ComputationResult::Finished)
