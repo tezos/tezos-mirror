@@ -489,8 +489,8 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
 
 (* Add a dependency on [job_trigger] in all jobs that are not [Immediate] or [Manual].
    See GRAPH TRANSFORMATIONS above (step 4). *)
-let add_dependency_on_job_trigger (job_trigger : Tezos_ci.tezos_job)
-    (graph : fixed_job_graph) : fixed_job_graph =
+let add_dependency_on_job_trigger (job_trigger : job) (graph : fixed_job_graph)
+    : fixed_job_graph =
   (* The actual [trigger] job is defined deep inside [code_verification.ml]
      (look for [job_start]). CIAO only really cares about the name of the job,
      so we hackishly redefine it here. *)
@@ -498,12 +498,7 @@ let add_dependency_on_job_trigger (job_trigger : Tezos_ci.tezos_job)
   match node.trigger with
   | Immediate | Manual -> node
   | Auto ->
-      let job =
-        {
-          node.job with
-          needs_legacy = (Job, job_trigger) :: node.job.needs_legacy;
-        }
-      in
+      let job = {node.job with needs = (Job, job_trigger) :: node.job.needs} in
       {node with job}
 
 let convert_stage (trigger : trigger) (stage : stage) : Tezos_ci.Stage.t =
@@ -915,38 +910,8 @@ let register_test_release_jobs jobs =
   register_jobs Major_release_tag_test jobs ;
   register_jobs Beta_release_tag_test jobs
 
-(* The purpose of this job is to implement a manual trigger
-   for [before_merging] pipelines, instead of running it on
-   each update to the merge request.
-
-   This job is defined directly with CIAO instead of Cacio on purpose.
-
-   - If it was defined in Cacio we would have to add the [start] stage to
-     the [stage] type, allowing other jobs to use the [start] stage,
-     which is probably not what we want.
-
-   - We don't gain anything by declaring it via Cacio.
-     One could think that it would help add the trigger job automatically
-     to pipelines where a job depends on the trigger job,
-     but what we actually want is for jobs to depend on the trigger job
-     only in [before_merging]. So adding the trigger job as a dependency
-     would be a mistake.
-
-   - This job is not component-specific. *)
-let job_trigger =
-  Tezos_ci.job
-    ~__POS__
-    ~image:Tezos_ci.Images.datadog_ci
-    ~stage:Tezos_ci.Stages.start
-    ~rules:[Gitlab_ci.Util.job_rule ~allow_failure:No ~when_:Manual ()]
-    ~timeout:(Minutes 10)
-    ~name:"trigger"
-    [
-      "echo 'Trigger pipeline!'";
-      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
-       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
-    ]
+(* Defined at the end of this module. *)
+let job_trigger : job option ref = ref None
 
 (* This job is defined directly with CIAO instead of Cacio mostly to avoid
    having to add the [start] stage to the [stage] type.
@@ -967,17 +932,24 @@ let job_datadog_pipeline_trace =
 
 let get_jobs pipeline =
   let jobs = Hashtbl.find_all global_jobs pipeline |> List.rev in
-  [
-    (match pipeline with
-    | Before_merging ->
-        (* [job_trigger] includes what [job_datadog_pipeline_trace] does. *)
-        job_trigger
-    | _ -> job_datadog_pipeline_trace);
-  ]
+  (match pipeline with
+  | Before_merging ->
+      (* [job_trigger] includes what [job_datadog_pipeline_trace] does. *)
+      []
+  | _ -> [job_datadog_pipeline_trace])
   @
   match pipeline with
-  | Before_merging ->
-      convert_jobs ~with_job_trigger:job_trigger ~with_condition:true jobs
+  | Before_merging -> (
+      match !job_trigger with
+      | None ->
+          (* [get_jobs] is not supposed to be called before this module
+               is fully initialized. *)
+          assert false
+      | Some job_trigger ->
+          convert_jobs
+            ~with_job_trigger:job_trigger
+            ~with_condition:true
+            ((Manual, job_trigger) :: jobs))
   | Merge_train -> convert_jobs ~with_condition:true jobs
   | Schedule_extended_test ->
       convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
@@ -1601,6 +1573,28 @@ module Shared = Make (struct
 
   let paths = []
 end)
+
+(* Initialize [job_trigger]. *)
+let () =
+  job_trigger :=
+    Some
+      (Shared.job
+         "trigger"
+         ~__POS__
+         ~description:"Manual job that does nothing but guard other jobs."
+         ~image:Tezos_ci.Images.datadog_ci
+         ~stage:Start
+         ~timeout:(Minutes 10)
+         ~allow_failure:No
+         ~force:true
+         ~script:
+           [
+             "echo 'Trigger pipeline!'";
+             "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+             "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+              pipeline_type:$PIPELINE_TYPE --tags \
+              mr_number:$CI_MERGE_REQUEST_IID";
+           ])
 
 (* Initialize [job_select_tezts]. *)
 let () =
