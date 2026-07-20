@@ -22,10 +22,9 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
 use tezos_storage::keyspace;
 
-use crate::storage::load_base_keyspace;
 use tezos_tezlink::operation::Operation;
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedInboxItem>);
@@ -208,16 +207,6 @@ impl DelayedInbox {
     pub fn from_base(base: &impl KeySpace) -> Result<Self> {
         let linked_list = LinkedList::new(&DELAYED_INBOX_KEY, base)?;
         Ok(Self(linked_list))
-    }
-
-    /// Transient-load constructor for isolated callers that do not already
-    /// hold a `/base` handle.
-    pub fn new<Host>(host: &mut Host) -> Result<Self>
-    where
-        Host: KeySpaceLoader,
-    {
-        let base = load_base_keyspace(host)?;
-        Self::from_base(&base)
     }
 
     pub fn save_transaction(

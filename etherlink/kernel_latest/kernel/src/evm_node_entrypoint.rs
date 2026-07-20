@@ -43,7 +43,9 @@ use tezos_smart_rollup_keyspace::{Key, KeySpace};
 #[cfg(target_arch = "wasm32")]
 use tezos_smart_rollup_core::rollup_host::RollupHost;
 
-const DELAYED_INPUT_PATH: RefPath = RefPath::assert_from(b"/base/__delayed_input");
+// Keys inside the `/base` keyspace. Each resolves to the durable path formed by
+// prefixing `/base` to the relative key below.
+const DELAYED_INPUT_KEY: Key = Key::from_static(b"/__delayed_input");
 
 const TEZOSX_SIMULATION_INPUT_KEY: Key = Key::from_static(b"/__simulation/input");
 const TEZOSX_SIMULATION_RESULT_KEY: Key = Key::from_static(b"/__simulation/result");
@@ -67,10 +69,10 @@ where
         + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
-    let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
-    let mut delayed_inbox = DelayedInbox::new(&mut host).unwrap();
     let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+    let payload = base.get(&DELAYED_INPUT_KEY).unwrap();
+    let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
+    let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
     delayed_inbox
         .save_transaction(&host, &mut base, transaction, 0.into(), 0u32)
         .unwrap();
@@ -90,14 +92,12 @@ where
         + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
+    let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+    let payload = base.get(&DELAYED_INPUT_KEY).unwrap();
     let transaction_hash: TransactionHash = decode_tx_hash(Rlp::new(&payload)).unwrap();
-    let mut delayed_inbox = DelayedInbox::new(&mut host).unwrap();
+    let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
     delayed_inbox
-        .delete(
-            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
-            crate::delayed_inbox::Hash(transaction_hash),
-        )
+        .delete(&mut base, crate::delayed_inbox::Hash(transaction_hash))
         .unwrap();
 }
 #[cfg(target_arch = "wasm32")]
