@@ -86,6 +86,9 @@ type t = {
           access should be granted *)
   media_type : Media_type.Command_line.t;
   max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t;
+  max_request_body_size : int64 option;
+      (** maximum size, in bytes, of an RPC request body read into memory.
+          [None] leaves the value from the configuration file untouched. *)
   metrics_addr : string list;
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;

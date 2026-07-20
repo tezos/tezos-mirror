@@ -68,6 +68,7 @@ type t = {
   allow_all_rpc : P2p_point.Id.addr_port_id list;
   media_type : Media_type.Command_line.t;
   max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t;
+  max_request_body_size : int64 option;
   metrics_addr : string list;
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;
@@ -196,9 +197,9 @@ let wrap data_dir config_file network connections max_download_speed
     external_rpc_listen_addrs rpc_tls cors_origins cors_headers log_output
     log_coloring history_mode synchronisation_threshold latency
     disable_config_validation allow_all_rpc media_type
-    max_active_rpc_connections metrics_addr operation_metadata_size_limit
-    enable_http_cache_headers disable_context_pruning storage_maintenance_delay
-    =
+    max_active_rpc_connections max_request_body_size metrics_addr
+    operation_metadata_size_limit enable_http_cache_headers
+    disable_context_pruning storage_maintenance_delay =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -251,6 +252,7 @@ let wrap data_dir config_file network connections max_download_speed
     allow_all_rpc;
     media_type;
     max_active_rpc_connections;
+    max_request_body_size;
     metrics_addr;
     operation_metadata_size_limit;
     enable_http_cache_headers;
@@ -763,6 +765,26 @@ module Term = struct
           Config_file.default_max_active_rpc_connections
       & info ~docs ~doc ~docv:"NUM" ["max-active-rpc-connections"])
 
+  let max_request_body_size =
+    let doc =
+      "Sets the maximum size, in bytes, of an RPC request body the server will \
+       read into memory. Requests whose body exceeds this size are rejected \
+       with HTTP 413 before routing or ACL checks are performed."
+    in
+    let get_max_request_body_size str =
+      match Int64.of_string_opt str with
+      | Some n when Int64.compare n 0L > 0 -> `Ok n
+      | Some _ | None ->
+          `Error "rpc-max-request-body must be a positive integer"
+    in
+    Arg.(
+      value
+      & opt
+          (some
+             (get_max_request_body_size, fun ppf n -> Format.fprintf ppf "%Ld" n))
+          None
+      & info ~docs ~doc ~docv:"BYTES" ["rpc-max-request-body"])
+
   let enable_http_cache_headers =
     let doc = "Enables HTTP cache headers in the RPC response" in
     Arg.(value & flag & info ~docs ~doc ["enable-http-cache-headers"])
@@ -807,9 +829,9 @@ module Term = struct
     $ external_rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers
     $ log_output $ log_coloring $ history_mode $ synchronisation_threshold
     $ latency $ disable_config_validation $ allow_all_rpc $ media_type
-    $ max_active_rpc_connections $ metrics_addr $ operation_metadata_size_limit
-    $ enable_http_cache_headers $ disable_context_pruning
-    $ storage_maintenance_delay
+    $ max_active_rpc_connections $ max_request_body_size $ metrics_addr
+    $ operation_metadata_size_limit $ enable_http_cache_headers
+    $ disable_context_pruning $ storage_maintenance_delay
 end
 
 let read_config_file args =
@@ -955,6 +977,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     allow_all_rpc;
     media_type;
     max_active_rpc_connections;
+    max_request_body_size;
     metrics_addr;
     operation_metadata_size_limit;
     enable_http_cache_headers;
@@ -1102,6 +1125,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ~allow_all_rpc
     ~media_type
     ~max_active_rpc_connections
+    ?max_request_body_size
     ~metrics_addr
     ?operation_metadata_size_limit
     ~private_mode

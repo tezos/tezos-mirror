@@ -38,6 +38,8 @@ let default_rpc_port = 8732
 let default_max_active_rpc_connections =
   RPC_server.Max_active_rpc_connections.default
 
+let default_max_request_body_size = RPC_middleware.default_max_body_size
+
 let default_metrics_port = 9932
 
 let default_p2p_port = 9732
@@ -430,6 +432,7 @@ and rpc = {
   acl : RPC_server.Acl.policy;
   media_type : Media_type.Command_line.t;
   max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t;
+  max_request_body_size : int64;
   enable_http_cache_headers : bool;
 }
 
@@ -460,6 +463,7 @@ let default_rpc =
     acl = RPC_server.Acl.empty_policy;
     media_type = Media_type.Command_line.Any;
     max_active_rpc_connections = default_max_active_rpc_connections;
+    max_request_body_size = default_max_request_body_size;
     enable_http_cache_headers = false;
   }
 
@@ -635,6 +639,7 @@ let rpc : rpc Data_encoding.t =
            acl;
            media_type;
            max_active_rpc_connections;
+           max_request_body_size;
            enable_http_cache_headers;
          }
        ->
@@ -653,6 +658,7 @@ let rpc : rpc Data_encoding.t =
           acl,
           media_type,
           max_active_rpc_connections,
+          max_request_body_size,
           enable_http_cache_headers ) ))
     (fun ( ( listen_addrs,
              external_listen_addrs,
@@ -664,6 +670,7 @@ let rpc : rpc Data_encoding.t =
              acl,
              media_type,
              max_active_rpc_connections,
+             max_request_body_size,
              enable_http_cache_headers ) )
        ->
       let tls =
@@ -695,6 +702,7 @@ let rpc : rpc Data_encoding.t =
         acl;
         media_type;
         max_active_rpc_connections;
+        max_request_body_size;
         enable_http_cache_headers;
       })
     (merge_objs
@@ -722,7 +730,7 @@ let rpc : rpc Data_encoding.t =
                 https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
              (list string)
              default_rpc.cors_origins))
-       (obj7
+       (obj8
           (dft
              "cors-headers"
              ~description:
@@ -754,6 +762,16 @@ let rpc : rpc Data_encoding.t =
                "The maximum number of active connections per RPC endpoint."
              RPC_server.Max_active_rpc_connections.encoding
              default_rpc.max_active_rpc_connections)
+          (dft
+             "max-request-body-size"
+             ~description:
+               "The maximum size, in bytes, of an RPC request body the server \
+                will read into memory. Requests whose body exceeds this size \
+                are rejected with HTTP 413 before routing or ACL checks are \
+                performed. This bounds request-ingestion memory use regardless \
+                of what the client declares or sends."
+             int64
+             default_rpc.max_request_body_size)
           (dft
              "enable-http-cache-headers"
              ~description:
@@ -973,7 +991,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?(external_rpc_listen_addrs = []) ?(allow_all_rpc = [])
     ?(media_type = Media_type.Command_line.Any)
     ?(max_active_rpc_connections = default_rpc.max_active_rpc_connections)
-    ?(metrics_addr = []) ?operation_metadata_size_limit
+    ?max_request_body_size ?(metrics_addr = []) ?operation_metadata_size_limit
     ?(private_mode = default_p2p.private_mode)
     ?(disable_p2p_maintenance =
       Option.is_none default_p2p.limits.maintenance_idle_time)
@@ -1066,6 +1084,10 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       acl;
       media_type;
       max_active_rpc_connections;
+      max_request_body_size =
+        Option.value
+          ~default:cfg.rpc.max_request_body_size
+          max_request_body_size;
       enable_http_cache_headers =
         Option.value
           ~default:cfg.rpc.enable_http_cache_headers
