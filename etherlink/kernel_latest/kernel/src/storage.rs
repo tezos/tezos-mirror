@@ -123,11 +123,10 @@ pub(crate) const STORAGE_VERSION_KEY: Key = Key::from_static(b"/storage_version"
 // durable path `/base/kernel_version`.
 const KERNEL_VERSION_KEY: Key = Key::from_static(b"/kernel_version");
 
-// `/base/admin` keeps an absolute form next to the relative key: the
-// reveal-storage bootstrap writes it through the raw host while readers go
+// Key to the admin, inside the `/base` keyspace. Resolves to the durable path
+// `/base/admin`. Both the reveal-storage bootstrap writer and the readers go
 // through the `/base` keyspace.
-pub const ADMIN: RefPath = RefPath::assert_from(b"/base/admin");
-const ADMIN_KEY: Key = Key::from_static(b"/admin");
+pub(crate) const ADMIN_KEY: Key = Key::from_static(b"/admin");
 pub const SEQUENCER_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/world_state/sequencer_governance");
 const KERNEL_GOVERNANCE_KEY: Key = Key::from_static(b"/kernel_governance");
