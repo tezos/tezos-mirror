@@ -7,7 +7,7 @@
 
 open Gitlab_ci.Base
 
-type stage = Build | Test | Publish | Test_publication
+type stage = Start | Build | Test | Publish | Test_publication
 
 (* Should actually be equivalent to [Stdlib.compare]
    if stages are defined in the right order.
@@ -18,18 +18,22 @@ type stage = Build | Test | Publish | Test_publication
    and thus this comment. *)
 let compare_stages a b =
   match (a, b) with
+  | Start, Start -> 0
+  | Start, (Build | Test | Publish | Test_publication) -> -1
+  | Build, Start -> 1
   | Build, Build -> 0
   | Build, (Test | Publish | Test_publication) -> -1
-  | Test, Build -> 1
+  | Test, (Start | Build) -> 1
   | Test, Test -> 0
   | Test, (Publish | Test_publication) -> -1
-  | Publish, (Build | Test) -> 1
+  | Publish, (Start | Build | Test) -> 1
   | Publish, Publish -> 0
   | Publish, Test_publication -> -1
-  | Test_publication, (Build | Test | Publish) -> 1
+  | Test_publication, (Start | Build | Test | Publish) -> 1
   | Test_publication, Test_publication -> 0
 
 let show_stage = function
+  | Start -> "start"
   | Build -> "build"
   | Test -> "test"
   | Publish -> "publish"
@@ -504,6 +508,7 @@ let add_dependency_on_job_trigger (job_trigger : Tezos_ci.tezos_job)
 
 let convert_stage (trigger : trigger) (stage : stage) : Tezos_ci.Stage.t =
   match (stage, trigger) with
+  | Start, _ -> Tezos_ci.Stages.start
   | Build, _ -> Tezos_ci.Stages.build
   | Test, Immediate ->
       (* In the future, we plan to remove the sanity stage.
@@ -629,27 +634,33 @@ let convert_graph ?(interruptible_pipeline = true)
               in
               let interruptible, interruptible_runner =
                 match stage with
-                | Build | Test ->
+                | Start | Build | Test ->
                     (* Build and test jobs are canceled if another pipeline starts.
-                         This can be overridden by [interruptible_pipeline].
-                         The runner itself can always be preempted, to reduce costs. *)
+                       This can be overridden by [interruptible_pipeline].
+                       The runner itself can always be preempted, to reduce costs.
+                       Start jobs cannot be non-interruptible if we want build and test
+                       jobs to be interruptible, because a rule of GitLab is that as soon
+                       as a non-interruptible job started, the whole pipeline can no
+                       longer be interrupted
+                       (see https://docs.gitlab.com/ci/yaml/#interruptible).
+                       So we use the same interruptibility for the start stage. *)
                     if interruptible_pipeline then (true, None)
                     else (false, None)
                 | Publish ->
                     (* Publish jobs are not canceled if another pipeline starts.
-                         This is to avoid partial publications.
-                         This can be overridden by [interruptible_publish].
-                         The runner can be preempted only if the job is interruptible,
-                         for the same reason (avoiding partial publications). *)
+                       This is to avoid partial publications.
+                       This can be overridden by [interruptible_publish].
+                       The runner can be preempted only if the job is interruptible,
+                       for the same reason (avoiding partial publications). *)
                     if interruptible_publish then (true, None)
                     else (false, Some false)
                 | Test_publication ->
                     (* Tests that are performed after publish jobs are not canceled
-                         if another pipeline starts, because we do want to check
-                         that published artifacts are working.
-                         However, this is not a strong enough requirement for us
-                         to justify the increased costs,
-                         so the runners can still be preempted. *)
+                       if another pipeline starts, because we do want to check
+                       that published artifacts are working.
+                       However, this is not a strong enough requirement for us
+                       to justify the increased costs,
+                       so the runners can still be preempted. *)
                     if interruptible_publish then (true, None) else (false, None)
               in
               let retry : Gitlab_ci.Types.retry option =
@@ -657,7 +668,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 | Some _ -> retry
                 | None -> (
                     match stage with
-                    | Build | Test | Test_publication -> None
+                    | Start | Build | Test | Test_publication -> None
                     | Publish -> Some Tezos_ci.no_retry)
               in
               let dev_infra =
