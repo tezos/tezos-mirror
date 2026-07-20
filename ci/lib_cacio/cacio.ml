@@ -935,10 +935,12 @@ let get_jobs pipeline =
   | Before_merging ->
       convert_jobs ~with_job_trigger:job_trigger ~with_condition:true jobs
   | Merge_train -> convert_jobs ~with_condition:true jobs
-  | Schedule_extended_test -> convert_jobs ~interruptible_pipeline:false jobs
   | Master -> convert_jobs ~interruptible_publish:true jobs
   | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
-  | Base_images_daily -> convert_jobs ~interruptible_pipeline:false jobs
+  | Schedule_extended_test | Custom_extended_test | Base_images_daily
+  | Homebrew_daily | Scheduled_docker_master_snapshot ->
+      (* Scheduled pipelines. *)
+      convert_jobs ~interruptible_pipeline:false jobs
   | _ -> convert_jobs jobs
 
 let release_tag_rexes = ref String_set.empty

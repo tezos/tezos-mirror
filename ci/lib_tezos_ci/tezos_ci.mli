@@ -383,11 +383,6 @@ val trigger_job :
   Pipeline.child_pipeline ->
   tezos_job
 
-(** Override the [interruptible:] flag of a job.
-
-    Has no effect on {!trigger_job}s. *)
-val with_interruptible : bool -> tezos_job -> tezos_job
-
 module Stages : sig
   val start : Stage.t
 
