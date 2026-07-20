@@ -206,7 +206,6 @@ type job = {
   tag : Tezos_ci.Runner.Tag.t option;
   image : Tezos_ci.Image.t option;
   needs : (need * job) list;
-  needs_legacy : (need * Tezos_ci.tezos_job) list;
   parallel : Gitlab_ci.Types.parallel option;
   only_if : Condition.t;
   variables : Gitlab_ci.Types.variables;
@@ -568,7 +567,6 @@ let convert_graph ?(interruptible_pipeline = true)
                     tag;
                     image;
                     needs;
-                    needs_legacy;
                     parallel;
                     only_if = _;
                     variables;
@@ -593,10 +591,9 @@ let convert_graph ?(interruptible_pipeline = true)
               (* Convert dependencies recursively. *)
               let dependencies =
                 let needs =
-                  needs_legacy
-                  @ List.map
-                      (fun (need, dep) -> (need, convert_uid dep.uid))
-                      needs
+                  List.map
+                    (fun (need, dep) -> (need, convert_uid dep.uid))
+                    needs
                 in
                 Fun.flip List.map needs @@ fun (need, dep) ->
                 match need with
@@ -760,7 +757,6 @@ module type COMPONENT_API = sig
     ?force:bool ->
     ?force_if_label:string list ->
     ?needs:(need * job) list ->
-    ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
     ?environment:Gitlab_ci.Types.environment ->
     ?variables:Gitlab_ci.Types.variables ->
@@ -793,7 +789,6 @@ module type COMPONENT_API = sig
     ?tag:Tezos_ci.Runner.Tag.t ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
-    ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?tezt_exe:string ->
@@ -1027,11 +1022,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ?tag ?image ?only_if_changed ?(force = false)
-      ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
-      ?environment ?(variables = []) ?artifacts ?(cache = [])
-      ?(cargo_cache = false) ?sccache ?(dune_cache = false)
-      ?(disable_datadog = false) ?allow_failure ?retry ?timeout
-      ?(image_dependencies = []) ?services ?id_tokens ?(script = []) name =
+      ?(force_if_label = []) ?(needs = []) ?parallel ?environment
+      ?(variables = []) ?artifacts ?(cache = []) ?(cargo_cache = false) ?sccache
+      ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
+      ?timeout ?(image_dependencies = []) ?services ?id_tokens ?(script = [])
+      name =
     let name = make_name name in
     declared_jobs := String_map.add name source_location !declared_jobs ;
     let before_script = [] in
@@ -1155,7 +1150,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       tag;
       image;
       needs;
-      needs_legacy;
       parallel;
       only_if =
         (if force then Condition.true_
@@ -1208,7 +1202,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let tezt_job ~__POS__:source_location ~pipeline ~description ?provider ?arch
       ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?tag ?only_if_changed
-      ?(needs = []) ?needs_legacy ?disable_datadog ?allow_failure ?tezt_exe
+      ?(needs = []) ?disable_datadog ?allow_failure ?tezt_exe
       ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
       ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
       ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = [])
@@ -1402,7 +1396,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ~image:Tezos_ci.Images.CI.e2etest
       ?only_if_changed
       ~needs
-      ?needs_legacy
       ?parallel:
         (if parallel_jobs > 1 then Some (Vector parallel_jobs) else None)
       ~variables

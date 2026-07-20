@@ -180,12 +180,9 @@ module type COMPONENT_API = sig
       [only_if_changed] can include glob patterns such as [dir/**/*.ml].
       Its default value is the [paths] of the current component.
 
-      The job will not start before all [needs] and [needs_legacy] jobs succeed.
+      The job will not start before all [needs] jobs succeed.
       Additionally, [needs] are automatically added to pipelines in which the job
       is present if they are not already present.
-      [needs_legacy] allows to make an incremental transition to Cacio,
-      but [needs_legacy] jobs are not automatically added to pipelines,
-      contrary to [needs] jobs.
 
       If [cargo_cache] is [true], the resulting job caches some subdirectories
       of [.cargo] using GitLab's cache. It also allows cargo to access the network.
@@ -223,7 +220,6 @@ module type COMPONENT_API = sig
     ?force:bool ->
     ?force_if_label:string list ->
     ?needs:(need * job) list ->
-    ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
     ?environment:Gitlab_ci.Types.environment ->
     ?variables:Gitlab_ci.Types.variables ->
@@ -257,7 +253,7 @@ module type COMPONENT_API = sig
       - [tezt_exe] is the path to the Tezt executable, relative to [_build/default/].
         It defaults to [tezt/tests/main.exe]. This executable is assumed to have been
         built by another job, which you must specify as a dependency with an [Artifacts]
-        [~needs] or [~needs_legacy].
+        [~needs].
       - [before_script] is prepended to the job's script.
 
       Timeouts:
@@ -312,7 +308,6 @@ module type COMPONENT_API = sig
     ?tag:Tezos_ci.Runner.Tag.t ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
-    ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?tezt_exe:string ->
