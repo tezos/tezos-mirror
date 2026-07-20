@@ -109,19 +109,15 @@ pub fn load_base_keyspace<L: KeySpaceLoader>(
 
 pub const PRIVATE_FLAG_KEY: Key = Key::from_static(b"/remove_whitelist");
 
-// Canonical durable path of the storage version. The reader/writer go through
-// the `/base` keyspace via [`STORAGE_VERSION_KEY`]; this absolute form is kept
-// for documentation and tests asserting the resolved path.
-#[allow(dead_code)]
-pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/storage_version");
-// Legacy storage version path, outside the `/base` keyspace. Still read raw as
-// a fallback for state written before the value moved under `/base`.
+// Legacy storage version path, outside the `/base` keyspace. Only read once,
+// by `init_storage_versioning` at stage zero, which promotes the recorded
+// value into `/base` and clears this path.
 pub const LEGACY_STORAGE_VERSION_PATH: RefPath =
     RefPath::assert_from(b"/evm/storage_version");
 
 // Key to the storage version, inside the `/base` keyspace. Resolves to the
 // durable path `/base/storage_version`.
-const STORAGE_VERSION_KEY: Key = Key::from_static(b"/storage_version");
+pub(crate) const STORAGE_VERSION_KEY: Key = Key::from_static(b"/storage_version");
 
 // Key to the kernel version, inside the `/base` keyspace. Resolves to the
 // durable path `/base/kernel_version`.
@@ -863,50 +859,22 @@ pub fn read_or_set_maximum_gas_per_transaction(
 }
 
 pub fn store_storage_version(
-    host: &mut (impl StorageV1 + KeySpaceLoader),
+    base: &mut impl KeySpace,
     storage_version: StorageVersion,
 ) -> Result<(), Error> {
     let storage_version = u64::from(storage_version);
-    {
-        let mut base = load_base_keyspace(host)?;
-        base.set(&STORAGE_VERSION_KEY, storage_version.to_le_bytes())?;
-    }
-    // Clean up the legacy /evm/ path (outside `/base`) so only
-    // /base/storage_version remains.
-    let _ = host.store_delete(&LEGACY_STORAGE_VERSION_PATH);
+    base.set(&STORAGE_VERSION_KEY, storage_version.to_le_bytes())?;
     Ok(())
 }
 
-pub fn read_storage_version<Host>(host: &mut Host) -> Result<StorageVersion, Error>
-where
-    Host: StorageV1 + KeySpaceLoader,
-{
-    // Try the `/base` keyspace first, falling back to the legacy /evm/ path
-    // (outside `/base`) only when the new key does not exist yet.
-    let from_base = {
-        let base = load_base_keyspace(host)?;
-        keyspace::read_u64_le(&base, &STORAGE_VERSION_KEY).ok()
-    };
-    let version_u64 = match from_base {
-        Some(version_u64) => version_u64,
-        None => {
-            let size = std::mem::size_of::<u64>();
-            let bytes = host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, size)?;
-            let slice_of_bytes: [u8; 8] =
-                bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
-            u64::from_le_bytes(slice_of_bytes)
-        }
-    };
+#[cfg(test)]
+pub fn read_storage_version(base: &impl KeySpace) -> Result<StorageVersion, Error> {
+    // The version is reconciled into `/base` by `init_storage_versioning` at
+    // stage zero, so every read here goes through the keyspace alone.
+    let version_u64 = keyspace::read_u64_le(base, &STORAGE_VERSION_KEY)?;
     let version = FromPrimitive::from_u64(version_u64).ok_or(Error::InvalidConversion)?;
     log!(Debug, "Current storage version: {:?}", version);
     Ok(version)
-}
-
-/// Whether the storage version is already set in the `/base` keyspace
-/// (resolving to `/base/storage_version`). Used by stage zero to decide
-/// whether storage versioning needs initialising.
-pub fn is_storage_version_initialised(base: &impl KeySpace) -> bool {
-    base.contains(&STORAGE_VERSION_KEY)
 }
 
 pub fn read_kernel_version(
@@ -1237,6 +1205,11 @@ mod tests {
     use crate::storage::ENABLE_FA_BRIDGE;
     use crate::storage::{load_base_keyspace, ENABLE_DAL_KEY};
 
+    // Canonical durable path of the storage version: the writer/reader go
+    // through the `/base` keyspace via [`super::STORAGE_VERSION_KEY`]; tests
+    // assert against this resolved absolute form.
+    const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/storage_version");
+
     fn tweak_dal_activation(
         host: &mut (impl StorageV1 + KeySpaceLoader),
         activate_dal: bool,
@@ -1520,26 +1493,24 @@ mod tests {
     fn base_keyspace_version_writers_resolve_to_absolute_paths() {
         let mut host = MockKernelHost::default();
 
-        // On a fresh base, versioning is not yet initialised.
         {
-            let base = super::load_base_keyspace(&mut host).unwrap();
-            assert!(!super::is_storage_version_initialised(&base));
-        }
+            let mut base = super::load_base_keyspace(&mut host).unwrap();
 
-        super::store_storage_version(&mut host, super::STORAGE_VERSION).unwrap();
-        assert_eq!(
-            super::read_storage_version(&mut host).unwrap(),
-            super::STORAGE_VERSION
-        );
+            // On a fresh base, versioning is not yet initialised.
+            assert!(!base.contains(&super::STORAGE_VERSION_KEY));
+
+            super::store_storage_version(&mut base, super::STORAGE_VERSION).unwrap();
+            assert_eq!(
+                super::read_storage_version(&base).unwrap(),
+                super::STORAGE_VERSION
+            );
+            assert!(base.contains(&super::STORAGE_VERSION_KEY));
+        }
         // The keyspace writer must land at the historical absolute path.
         assert_eq!(
-            host.store_read_all(&super::STORAGE_VERSION_PATH).unwrap(),
+            host.store_read_all(&STORAGE_VERSION_PATH).unwrap(),
             u64::from(super::STORAGE_VERSION).to_le_bytes()
         );
-        {
-            let base = super::load_base_keyspace(&mut host).unwrap();
-            assert!(super::is_storage_version_initialised(&base));
-        }
 
         super::store_kernel_version(&mut host, "kernel-test").unwrap();
         assert_eq!(
@@ -1585,31 +1556,61 @@ mod tests {
         );
     }
 
-    // `read_storage_version` keeps reading the legacy /evm/ path (outside
-    // `/base`) when the `/base` key is absent, and `store_storage_version`
-    // cleans the legacy path up so only the `/base` value remains.
+    // `init_storage_versioning` is the single place that reconciles the
+    // storage version into the `/base` keyspace: it bootstraps a fresh store
+    // to the current version, leaves an existing `/base` value untouched, and
+    // promotes a legacy /evm/ value verbatim (so the migration framework still
+    // resumes from it) while clearing the legacy path.
     #[test]
-    fn storage_version_legacy_fallback_and_cleanup() {
-        let mut host = MockKernelHost::default();
-        let version_bytes = u64::from(super::STORAGE_VERSION).to_le_bytes();
+    fn init_storage_versioning_reconciles_version_into_base() {
+        // Fresh storage bootstraps to the current version.
+        {
+            let mut host = MockKernelHost::default();
+            let mut base = super::load_base_keyspace(&mut host).unwrap();
+            crate::init_storage_versioning(&mut host, &mut base).unwrap();
+            assert_eq!(
+                super::read_storage_version(&base).unwrap(),
+                super::STORAGE_VERSION
+            );
+        }
 
-        // Only the legacy /evm/ path is set: the reader falls back to it.
-        host.store_write_all(&super::LEGACY_STORAGE_VERSION_PATH, &version_bytes)
+        // A version already under `/base` is left untouched.
+        {
+            let mut host = MockKernelHost::default();
+            let mut base = super::load_base_keyspace(&mut host).unwrap();
+            base.set(&super::STORAGE_VERSION_KEY, 46u64.to_le_bytes())
+                .unwrap();
+            crate::init_storage_versioning(&mut host, &mut base).unwrap();
+            assert_eq!(
+                base.get(&super::STORAGE_VERSION_KEY).unwrap(),
+                46u64.to_le_bytes()
+            );
+        }
+
+        // A version living only at the legacy /evm/ path is promoted verbatim
+        // into `/base` (not bumped to the current version) and the legacy path
+        // is cleared.
+        {
+            let mut host = MockKernelHost::default();
+            let mut base = super::load_base_keyspace(&mut host).unwrap();
+            host.store_write_all(
+                &super::LEGACY_STORAGE_VERSION_PATH,
+                &46u64.to_le_bytes(),
+            )
             .unwrap();
-        assert_eq!(
-            super::read_storage_version(&mut host).unwrap(),
-            super::STORAGE_VERSION
-        );
-
-        // Writing through the keyspace removes the legacy path.
-        super::store_storage_version(&mut host, super::STORAGE_VERSION).unwrap();
-        assert!(host
-            .store_read_all(&super::LEGACY_STORAGE_VERSION_PATH)
-            .is_err());
-        assert_eq!(
-            host.store_read_all(&super::STORAGE_VERSION_PATH).unwrap(),
-            version_bytes
-        );
+            crate::init_storage_versioning(&mut host, &mut base).unwrap();
+            assert_eq!(
+                base.get(&super::STORAGE_VERSION_KEY).unwrap(),
+                46u64.to_le_bytes()
+            );
+            assert_eq!(
+                host.store_read_all(&STORAGE_VERSION_PATH).unwrap(),
+                46u64.to_le_bytes()
+            );
+            assert!(host
+                .store_read_all(&super::LEGACY_STORAGE_VERSION_PATH)
+                .is_err());
+        }
     }
 
     #[test]

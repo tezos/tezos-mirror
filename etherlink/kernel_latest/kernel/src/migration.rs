@@ -9,9 +9,7 @@ use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
-use crate::storage::{
-    read_evm_chain_id, read_storage_version, store_storage_version, StorageVersion,
-};
+use crate::storage::{read_evm_chain_id, StorageVersion};
 use revm_etherlink::storage::block::BLOCKS_STORED;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
@@ -61,9 +59,31 @@ pub fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), Runtime
 
 mod legacy {
     use super::*;
+    use num_traits::FromPrimitive;
 
     pub const TMP_NEXT_BLUEPRINT_PATH: RefPath =
         RefPath::assert_from(b"/__tmp_next_blueprint_path");
+
+    const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/storage_version");
+
+    pub fn migration_read_storage_version(
+        host: &impl StorageV1,
+    ) -> Result<StorageVersion, Error> {
+        let bytes =
+            host.store_read(&STORAGE_VERSION_PATH, 0, std::mem::size_of::<u64>())?;
+        let slice: [u8; 8] =
+            bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
+        FromPrimitive::from_u64(u64::from_le_bytes(slice)).ok_or(Error::InvalidConversion)
+    }
+
+    pub fn migration_store_storage_version(
+        host: &mut impl StorageV1,
+        storage_version: StorageVersion,
+    ) -> Result<(), Error> {
+        let storage_version = u64::from(storage_version);
+        host.store_write_all(&STORAGE_VERSION_PATH, &storage_version.to_le_bytes())?;
+        Ok(())
+    }
 }
 
 fn migrate_to<Host>(
@@ -540,7 +560,7 @@ fn migration<Host>(host: &mut Host) -> anyhow::Result<MigrationStatus>
 where
     Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
-    match read_storage_version(host)?.next() {
+    match legacy::migration_read_storage_version(host)?.next() {
         Some(next_version) => {
             let status = migrate_to(host, next_version)?;
 
@@ -548,7 +568,7 @@ where
             // `None`, we consider it done. A good use case for `None` is for instance for a
             // migration that does not apply to the current network.
             if status != MigrationStatus::InProgress {
-                store_storage_version(host, next_version)?;
+                legacy::migration_store_storage_version(host, next_version)?;
                 // `InProgress` so that we reboot and try apply the next migration, if any.
                 return Ok(MigrationStatus::InProgress);
             }

@@ -109,7 +109,10 @@ where
     Host: StorageV1 + WasmHost + IsEvmNode + KeySpaceLoader,
 {
     log!(Debug, "Entering stage zero.");
-    init_storage_versioning(host)?;
+    {
+        let mut base = load_base_keyspace(host)?;
+        init_storage_versioning(host, &mut base)?;
+    }
     switch_to_public_rollup(host)?;
     storage_migration(host)
 }
@@ -151,23 +154,22 @@ fn set_kernel_version(host: &mut (impl StorageV1 + KeySpaceLoader)) -> Result<()
 }
 
 fn init_storage_versioning(
-    host: &mut (impl StorageV1 + KeySpaceLoader),
+    host: &mut impl StorageV1,
+    base: &mut impl KeySpace,
 ) -> Result<(), Error> {
-    // Check both the `/base` keyspace and the legacy /evm/ path.
-    // If either exists, storage versioning is already initialised and the
-    // migration framework will take it from here.
-    use crate::storage::{is_storage_version_initialised, LEGACY_STORAGE_VERSION_PATH};
-    let initialised = {
-        let base = load_base_keyspace(host)?;
-        is_storage_version_initialised(&base)
-    };
-    if initialised {
+    // Reconcile the storage version into the `/base` keyspace once, at stage
+    // zero: this is the only place that reads the legacy /evm/ path.
+    use crate::storage::{LEGACY_STORAGE_VERSION_PATH, STORAGE_VERSION_KEY};
+    if base.contains(&STORAGE_VERSION_KEY) {
+        Ok(())
+    } else if let Ok(version) = host.store_read_all(&LEGACY_STORAGE_VERSION_PATH) {
+        // Upgrading from the pre-`/base` layout: carry the recorded version
+        // over verbatim so the migration framework still resumes from it.
+        base.set(&STORAGE_VERSION_KEY, version)?;
+        let _ = host.store_delete(&LEGACY_STORAGE_VERSION_PATH);
         Ok(())
     } else {
-        match host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, 0) {
-            Ok(_) => Ok(()),
-            Err(_) => store_storage_version(host, STORAGE_VERSION),
-        }
+        store_storage_version(base, STORAGE_VERSION)
     }
 }
 
