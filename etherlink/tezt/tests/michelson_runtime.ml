@@ -6208,6 +6208,137 @@ code { UNPAIR ;
         "Tezos X receiver storage %L must match L1 %R (pre-update copy)") ;
   unit
 
+(** [test_concat_rejects_oversized_result] registers a Tezt test that, for each
+    of the four CONCAT overloads (bytes and string, list and pair), originates a
+    contract whose CONCAT result exceeds the maximum size allocatable on the
+    kernel's wasm32 target (2^31 - 1 bytes), submits a call to it, and checks the
+    runtime rejects it with a bounded Overflow error. *)
+let test_concat_rejects_oversized_result =
+  register_tezosx_test
+    ~title:"Michelson CONCAT rejects an over-sized result with Overflow"
+    ~tags:["michelson"; "concat"; "overflow"; "oom"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint sequencer in
+  let check_overflow ~alias ~contract =
+    let* c =
+      Client.originate_contract
+        ~endpoint
+        ~amount:Tez.zero
+        ~alias
+        ~src:Constant.bootstrap1.public_key_hash
+        ~init:"Unit"
+        ~prg:contract
+        ~burn_cap:Tez.one
+        client
+    in
+    let*@ _ = Rpc.produce_block sequencer in
+    let process =
+      Client.spawn_transfer
+        ~endpoint
+        ~amount:Tez.zero
+        ~fee:(Tez.of_mutez_int 100_000)
+        ~gas_limit:660_000
+        ~storage_limit:0
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:c
+        ~arg:"Unit"
+        ~burn_cap:Tez.one
+        client
+    in
+    let* err = Process.check_and_read_stderr ~expect_failure:true process in
+    Check.(err =~ rex "Overflow")
+      ~error_msg:"Expected a bounded Overflow error, got %L" ;
+    unit
+  in
+  (* List overload, bytes: 2048 copies of a 2^20 chunk concatenate to 2^31. *)
+  Log.info "Check overflow for CONCAT on bytes list" ;
+  let* () =
+    check_overflow
+      ~alias:"concat_bytes_list"
+      ~contract:
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       # Build a list of 2048 copies of a 2^20-byte value; total = 2048 * 2^20 = 2^31 = isize::MAX + 1.
+       ## Build the 2^20-byte value.
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       ## Build the list of 2048 copies of the value.
+       NIL bytes ; PUSH int 2048 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ;
+       DIP { DROP } ;
+       CONCAT ;   # result is 2^31 > isize::MAX  =>  rejected with Overflow
+       DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+  in
+  (* List overload, string: 2048 copies of a 2^20 chunk concatenate to 2^31. *)
+  Log.info "Check overflow for CONCAT on string list" ;
+  let* () =
+    check_overflow
+      ~alias:"concat_string_list"
+      ~contract:
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       # Build a list of 2048 copies of a 2^20-character value; total = 2048 * 2^20 = 2^31 = isize::MAX + 1.
+       ## Build the 2^20-character value.
+       PUSH string "0" ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       ## Build the list of 2048 copies of the value.
+       NIL string ; PUSH int 2048 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ;
+       DIP { DROP } ;
+       CONCAT ;   # result is 2^31 > isize::MAX  =>  rejected with Overflow
+       DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+  in
+  (* Pair overload, bytes: a 2^30 value concatenated with itself makes 2^31. *)
+  Log.info "Check overflow for CONCAT on bytes pair" ;
+  let* () =
+    check_overflow
+      ~alias:"concat_bytes_pair"
+      ~contract:
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       # Build b1, a 2^30-byte value: 1024 copies of a 2^20-byte chunk, concatenated.
+       ## Build the 2^20-byte chunk.
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       ## Concatenate 1024 copies of the chunk into b1 (2^30 bytes, < isize::MAX).
+       NIL bytes ; PUSH int 1024 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;      # b2 = b1, so |b1| + |b2| = 2^31 = isize::MAX + 1
+       CONCAT ;   # |b1| + |b2| = 2^31 > isize::MAX  =>  rejected with Overflow
+       DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+  in
+  (* Pair overload, string: a 2^30 value concatenated with itself makes 2^31. *)
+  Log.info "Check overflow for CONCAT on string pair" ;
+  let* () =
+    check_overflow
+      ~alias:"concat_string_pair"
+      ~contract:
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       # Build s1, a 2^30-character value: 1024 copies of a 2^20-character chunk, concatenated.
+       ## Build the 2^20-character chunk.
+       PUSH string "0" ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       ## Concatenate 1024 copies of the chunk into s1 (2^30 characters, < isize::MAX).
+       NIL string ; PUSH int 1024 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;      # s2 = s1, so |s1| + |s2| = 2^31 = isize::MAX + 1
+       CONCAT ;   # |s1| + |s2| = 2^31 > isize::MAX  =>  rejected with Overflow
+       DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+  in
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -6304,4 +6435,5 @@ let () =
   test_deep_container_lambda_storage [Alpha] ;
   test_deep_container_lambda_storage_drop [Alpha] ;
   test_recursive_lambda_exhausts_gas [Alpha] ;
-  test_deep_type_in_invalid_arg_error [Alpha]
+  test_deep_type_in_invalid_arg_error [Alpha] ;
+  test_concat_rejects_oversized_result [Alpha]
