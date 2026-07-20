@@ -400,8 +400,13 @@ impl Evaluation {
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
         let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
-        let experimental_features = ExperimentalFeatures::read_from_storage(host);
-        let debug_features = DebugFeatures::read_from_storage(host);
+        let (experimental_features, debug_features) = {
+            let base = crate::storage::load_base_keyspace(host)?;
+            (
+                ExperimentalFeatures::read_from_storage(host, &base),
+                DebugFeatures::read_from_storage(&base),
+            )
+        };
 
         let constants = match block_storage::read_current_etherlink_block(host) {
             Ok(block) => {
@@ -440,7 +445,11 @@ impl Evaluation {
                     .map(|timestamp| U256::from(timestamp.as_u64()))
                     .unwrap_or_else(|| {
                         U256::from(
-                            read_last_info_per_level_timestamp(host)
+                            crate::storage::load_base_keyspace(host)
+                                .map_err(Error::from)
+                                .and_then(|base| {
+                                    read_last_info_per_level_timestamp(&base)
+                                })
                                 .unwrap_or(Timestamp::from(0))
                                 .as_u64(),
                         )
@@ -520,7 +529,9 @@ impl Evaluation {
             &Default::default(),
             &constants,
             spec_id,
-            crate::storage::is_http_trace_enabled(host),
+            crate::storage::is_http_trace_enabled(
+                &crate::storage::load_base_keyspace(host)?,
+            ),
             &debug_features,
             0,
             tracer_input,
@@ -708,8 +719,8 @@ where
     let simulation = parse_inbox(host)?;
     match simulation {
         Message::Evaluation(simulation) => {
-            let tracer_input = read_tracer_input(host)?;
-
+            let tracer_input =
+                read_tracer_input(&crate::storage::load_base_keyspace(host)?)?;
             let (outcome, traces) =
                 simulation.run(host, registry, tracer_input, spec_id)?;
             storage::store_simulation_http_traces(host, &traces)?;
@@ -807,8 +818,10 @@ mod tests {
     where
         Host: StorageV1 + KeySpaceLoader,
     {
-        let timestamp =
-            read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
+        let timestamp = read_last_info_per_level_timestamp(
+            &crate::storage::load_base_keyspace(host).unwrap(),
+        )
+        .unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
         let evm_chain_id = fetch_evm_chain_id(host);
         let block_fees = retrieve_block_fees(host);

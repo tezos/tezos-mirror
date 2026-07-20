@@ -373,19 +373,14 @@ impl DelayedInbox {
     }
 
     /// Returns whether the oldest tx in the delayed inbox has timed out.
-    pub fn first_has_timed_out<Host>(&mut self, host: &mut Host) -> Result<bool>
-    where
-        Host: StorageV1 + KeySpaceLoader,
-    {
-        // The scalar reads load and drop their own `/base` handle (or read a
-        // raw path), so none is alive when we load `/base` for the list below.
-        let now = read_last_info_per_level_timestamp(host)?;
-        let timeout = storage::delayed_inbox_timeout(host)?;
-        let current_level = storage::read_l1_level(host)?;
-        let min_levels = storage::delayed_inbox_min_levels(host)?;
-        let base = load_base_keyspace(host)?;
+    pub fn first_has_timed_out(&mut self, base: &impl KeySpace) -> Result<bool> {
+        // Every read below resolves against the threaded `/base` handle.
+        let now = read_last_info_per_level_timestamp(base)?;
+        let timeout = storage::delayed_inbox_timeout(base)?;
+        let current_level = storage::read_l1_level(base)?;
+        let min_levels = storage::delayed_inbox_min_levels(base)?;
         let popped =
-            self.first_if_timed_out(&base, now, timeout, current_level, min_levels)?;
+            self.first_if_timed_out(base, now, timeout, current_level, min_levels)?;
         Ok(popped.is_some())
     }
 
@@ -503,14 +498,14 @@ mod tests {
     #[test]
     fn test_delayed_inbox_roundtrip() {
         let mut host = MockKernelHost::default();
-        let timestamp: Timestamp =
-            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut delayed_inbox =
             DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
 
         let tx: Transaction = dummy_transaction(0);
 
+        let timestamp: Timestamp =
+            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(&host, &mut base, tx.clone().into(), timestamp, 0)
             .expect("Tx should be saved in the delayed inbox");
@@ -528,8 +523,6 @@ mod tests {
     #[test]
     fn test_delayed_inbox_tezos_roundtrip() {
         let mut host = MockKernelHost::default();
-        let timestamp =
-            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut delayed_inbox =
             DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
@@ -547,6 +540,8 @@ mod tests {
             content: TezosDelayed(op),
         };
 
+        let timestamp =
+            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(&host, &mut base, tx.clone().into(), timestamp, 0)
             .expect("Tezos operation should be saved in the delayed inbox");
@@ -565,8 +560,6 @@ mod tests {
     #[test]
     fn test_delayed_inbox_tezos_dropped_on_stale_branch() {
         let mut host = MockKernelHost::default();
-        let timestamp =
-            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut delayed_inbox =
             DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
@@ -579,6 +572,8 @@ mod tests {
             content: TezosDelayed(op),
         };
 
+        let timestamp =
+            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         // Dropping is not an error: the call succeeds but nothing is stored.
         delayed_inbox
             .save_transaction(&host, &mut base, tx.clone().into(), timestamp, 0)
@@ -598,8 +593,6 @@ mod tests {
     #[test]
     fn test_delayed_inbox_roundtrip_error_non_delayed() {
         let mut host = MockKernelHost::default();
-        let timestamp: Timestamp =
-            read_last_info_per_level_timestamp(&mut host).unwrap_or(Timestamp::from(0));
         let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut delayed_inbox =
             DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
@@ -609,6 +602,8 @@ mod tests {
             content: Ethereum(tx_(12)),
         };
 
+        let timestamp: Timestamp =
+            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         let res =
             delayed_inbox.save_transaction(&host, &mut base, tx.into(), timestamp, 0);
 

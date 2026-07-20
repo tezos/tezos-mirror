@@ -50,7 +50,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
@@ -139,11 +139,8 @@ pub struct DebugFeatures {
 }
 
 impl DebugFeatures {
-    pub fn read_from_storage<Host>(host: &mut Host) -> Self
-    where
-        Host: StorageV1,
-    {
-        let enable_debug_precompiles = crate::storage::enable_debug_precompiles(host);
+    pub fn read_from_storage(base: &impl KeySpace) -> Self {
+        let enable_debug_precompiles = crate::storage::enable_debug_precompiles(base);
 
         DebugFeatures {
             enable_debug_precompiles,
@@ -160,16 +157,11 @@ pub struct ExperimentalFeatures {
 }
 
 impl ExperimentalFeatures {
-    pub fn read_from_storage(host: &mut (impl StorageV1 + KeySpaceLoader)) -> Self {
-        let (enable_michelson_gas_refund, tezos_runtime_enabled) = {
-            let base = crate::storage::load_base_keyspace(host).expect(
-                "no other `/base` keyspace handle may be live when reading experimental features",
-            );
-            (
-                crate::storage::enable_michelson_gas_refund(&base),
-                crate::storage::enable_tezos_runtime(&base),
-            )
-        };
+    pub fn read_from_storage(host: &impl StorageV1, base: &impl KeySpace) -> Self {
+        let (enable_michelson_gas_refund, tezos_runtime_enabled) = (
+            crate::storage::enable_michelson_gas_refund(base),
+            crate::storage::enable_tezos_runtime(base),
+        );
 
         let enabled_michelson_target_sunrise_level = if tezos_runtime_enabled {
             // The target sunrise level defaults to 0 if not set. This allows

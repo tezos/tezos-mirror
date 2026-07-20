@@ -429,7 +429,7 @@ where
     if host.last_run_aborted()? {
         log!(Error, "Something went wrong during previous kernel_run");
 
-        if !inside_stage_one(host) {
+        if !inside_stage_one(&crate::storage::load_base_keyspace(host)?) {
             // Something went wrong outside stage one, leading us to assume this is most certainly
             // related to stage 2. We clean-up potential leftovers of the interrupted execution.
 
@@ -567,7 +567,8 @@ where
     // the [SafeStorage]-mirrored world state subtree, and the common
     // (unset) case costs a single [store_has] per block instead of one
     // per transaction.
-    let http_trace_enabled = crate::storage::is_http_trace_enabled(host);
+    let http_trace_enabled =
+        crate::storage::is_http_trace_enabled(&crate::storage::load_base_keyspace(host)?);
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
 
@@ -1244,8 +1245,13 @@ mod tests {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
         init_safe_storage_roots(host);
-        let experimental_features = ExperimentalFeatures::read_from_storage(host);
-        let debug_features = DebugFeatures::read_from_storage(host);
+        let (experimental_features, debug_features) = {
+            let base = crate::storage::load_base_keyspace(host).unwrap();
+            (
+                ExperimentalFeatures::read_from_storage(host, &base),
+                DebugFeatures::read_from_storage(&base),
+            )
+        };
         TezosXChainConfig::create_config(
             DUMMY_CHAIN_ID,
             EvmLimits::default(),
@@ -2402,8 +2408,10 @@ mod tests {
     where
         MockHost: StorageV1 + KeySpaceLoader,
     {
-        let timestamp =
-            read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
+        let timestamp = read_last_info_per_level_timestamp(
+            &crate::storage::load_base_keyspace(host).unwrap(),
+        )
+        .unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
         let evm_chain_id = fetch_evm_chain_id(host);
         let block_fees = retrieve_block_fees(host);

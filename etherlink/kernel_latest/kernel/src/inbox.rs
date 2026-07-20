@@ -212,10 +212,10 @@ impl InputHandler for SequencerInput {
         log!(Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
             Self::DelayedInput(tx) => {
-                let previous_timestamp = read_last_info_per_level_timestamp(host)?;
-                let level = read_l1_level(host)?;
-                log!(Benchmarking, "Handling a delayed input");
                 let mut base = crate::storage::load_base_keyspace(host)?;
+                let previous_timestamp = read_last_info_per_level_timestamp(&base)?;
+                let level = read_l1_level(&base)?;
+                log!(Benchmarking, "Handling a delayed input");
                 delayed_inbox.save_transaction(
                     host,
                     &mut base,
@@ -290,10 +290,10 @@ impl InputHandler for SequencerInput {
     where
         Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader,
     {
-        let previous_timestamp = read_last_info_per_level_timestamp(host)?;
-        let level = read_l1_level(host)?;
-        let tx = handle_deposit(host, deposit)?;
         let mut base = crate::storage::load_base_keyspace(host)?;
+        let previous_timestamp = read_last_info_per_level_timestamp(&base)?;
+        let level = read_l1_level(&base)?;
+        let tx = handle_deposit(host, deposit)?;
         delayed_inbox.save_transaction(host, &mut base, tx, previous_timestamp, level)
     }
 
@@ -307,10 +307,10 @@ impl InputHandler for SequencerInput {
     where
         Host: StorageV1 + HostReveal + IsEvmNode + KeySpaceLoader,
     {
-        let previous_timestamp = read_last_info_per_level_timestamp(host)?;
-        let level = read_l1_level(host)?;
-        let tx = handle_fa_deposit(host, fa_deposit)?;
         let mut base = crate::storage::load_base_keyspace(host)?;
+        let previous_timestamp = read_last_info_per_level_timestamp(&base)?;
+        let level = read_l1_level(&base)?;
+        let tx = handle_fa_deposit(host, fa_deposit)?;
         delayed_inbox.save_transaction(host, &mut base, tx, previous_timestamp, level)
     }
 }
@@ -401,7 +401,10 @@ where
 {
     match upgrade::read_kernel_upgrade(host)? {
         Some(kernel_upgrade) => {
-            let current_timestamp = read_last_info_per_level_timestamp(host)?.i64();
+            let current_timestamp = read_last_info_per_level_timestamp(
+                &crate::storage::load_base_keyspace(host)?,
+            )?
+            .i64();
             let activation_timestamp = kernel_upgrade.activation_timestamp.i64();
 
             if current_timestamp >= (activation_timestamp + 86400i64) {
@@ -503,9 +506,13 @@ where
         Input::RemoveSequencer => remove_sequencer(host)?,
         Input::Info(info) => {
             // New inbox level detected, remove all previous events.
-            clear_events(host)?;
-            store_last_info_per_level_timestamp(host, info.info.predecessor_timestamp)?;
-            store_l1_level(host, info.level)?
+            let mut base = crate::storage::load_base_keyspace(host)?;
+            clear_events(&mut base)?;
+            store_last_info_per_level_timestamp(
+                &mut base,
+                info.info.predecessor_timestamp,
+            )?;
+            store_l1_level(&mut base, info.level)?
         }
         Input::Deposit((deposit, chain_id)) => {
             Mode::handle_deposit(host, deposit, chain_id, inbox_content)?
@@ -684,7 +691,10 @@ where
         crate::blueprint_storage::read_next_blueprint_number(
             &crate::storage::load_base_keyspace(host)?,
         )?;
-    let experimental_features = ExperimentalFeatures::read_from_storage(host);
+    let experimental_features = {
+        let base = crate::storage::load_base_keyspace(host)?;
+        ExperimentalFeatures::read_from_storage(host, &base)
+    };
     let (legacy_dal_signals_disabled, dal_publishers_whitelist) = {
         let base = crate::storage::load_base_keyspace(host)
             .map_err(|e| anyhow::anyhow!("failed to load the `/base` keyspace: {e}"))?;

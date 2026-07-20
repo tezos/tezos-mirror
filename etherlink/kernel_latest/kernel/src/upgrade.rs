@@ -266,7 +266,9 @@ where
 {
     let upgrade = read_sequencer_upgrade(host)?;
     if let Some(upgrade) = upgrade {
-        let ipl_timestamp = storage::read_last_info_per_level_timestamp(host)?;
+        let ipl_timestamp = storage::read_last_info_per_level_timestamp(
+            &crate::storage::load_base_keyspace(host)?,
+        )?;
         if ipl_timestamp >= upgrade.activation_timestamp {
             sequencer_upgrade(host, upgrade.pool_address, &upgrade.sequencer)?;
             blueprint_storage::clear_all_blueprints(
@@ -364,14 +366,20 @@ mod tests {
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
 
         // Before activation nothing applies, so the counter stays put.
-        storage::store_last_info_per_level_timestamp(&mut host, Timestamp::from(50i64))
-            .unwrap();
+        storage::store_last_info_per_level_timestamp(
+            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
+            Timestamp::from(50i64),
+        )
+        .unwrap();
         possible_sequencer_upgrade(&mut host).unwrap();
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
 
         // At/after activation the upgrade applies exactly once: counter is +1.
-        storage::store_last_info_per_level_timestamp(&mut host, Timestamp::from(100i64))
-            .unwrap();
+        storage::store_last_info_per_level_timestamp(
+            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
+            Timestamp::from(100i64),
+        )
+        .unwrap();
         possible_sequencer_upgrade(&mut host).unwrap();
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
     }

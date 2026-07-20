@@ -354,7 +354,11 @@ where
     // simulate used by `eth_call` / `eth_estimateGas`, which leave the flag
     // unset and pay no trace clone. Read on the base host, before any
     // `SafeStorage` wrapping, exactly as the applied path does.
-    trace_journal.set_http_trace_enabled(crate::storage::is_http_trace_enabled(&host));
+    trace_journal.set_http_trace_enabled(
+        crate::storage::load_base_keyspace(&mut host)
+            .map(|base| crate::storage::is_http_trace_enabled(&base))
+            .unwrap_or(false),
+    );
     let execution_result = match transaction {
         chains::TezosXTransaction::Tezos(operation) => {
             let enable_gas_refund = chain_config

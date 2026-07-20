@@ -225,7 +225,8 @@ where
 
     // Read the HTTP-trace replay flag before wrapping the host in
     // [SafeStorage] — see [block::produce] for the rationale.
-    let http_trace_enabled = crate::storage::is_http_trace_enabled(host);
+    let http_trace_enabled =
+        crate::storage::is_http_trace_enabled(&crate::storage::load_base_keyspace(host)?);
 
     let mut safe_host = SafeStorage {
         host,

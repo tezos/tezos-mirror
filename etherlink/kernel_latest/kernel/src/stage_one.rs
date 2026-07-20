@@ -48,8 +48,10 @@ where
         enable_fa_bridge,
         chain_configuration,
     )? {
-        let timestamp =
-            read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
+        let timestamp = read_last_info_per_level_timestamp(
+            &crate::storage::load_base_keyspace(host)?,
+        )
+        .unwrap_or(Timestamp::from(0));
         let blueprint = Blueprint {
             transactions,
             timestamp,
@@ -69,8 +71,8 @@ fn fetch_delayed_transactions<Host>(
 where
     Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
-    let timestamp = read_last_info_per_level_timestamp(host)?;
     let mut base_ks = crate::storage::load_base_keyspace(host)?;
+    let timestamp = read_last_info_per_level_timestamp(&base_ks)?;
     // Number and minimal timestamp for the first forced blueprint
     let (base, minimal_timestamp) = match read_current_blueprint_header(&base_ks) {
         Result::Ok(blueprint_header) => {
@@ -152,7 +154,8 @@ where
         StageOneStatus::Done => {
             log!(Debug, "Stage one done, rebooting");
             // Check if there are timed-out transactions in the delayed inbox
-            let timed_out = delayed_inbox.first_has_timed_out(host)?;
+            let timed_out = delayed_inbox
+                .first_has_timed_out(&crate::storage::load_base_keyspace(host)?)?;
             if timed_out {
                 fetch_delayed_transactions(host, delayed_inbox)?
             };
@@ -1154,8 +1157,10 @@ mod tests {
 
         // Read back the timestamp that fetch_blueprints stored from
         // the info-per-level message.
-        let stored_ts = read_last_info_per_level_timestamp(&mut host)
-            .expect("timestamp should be readable after fetch");
+        let stored_ts = read_last_info_per_level_timestamp(
+            &crate::storage::load_base_keyspace(&mut host).unwrap(),
+        )
+        .expect("timestamp should be readable after fetch");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")

@@ -135,21 +135,21 @@ where
     log!(Debug, "Chain Configuration: {chain_config:?}");
     log!(Debug, "Configuration: {}", configuration);
 
-    enter_stage_one(host)?;
+    enter_stage_one(&mut load_base_keyspace(host)?)?;
     let res = fetch_blueprints(host, smart_rollup_address, chain_config, configuration);
-    leave_stage_one(host)?;
+    leave_stage_one(&mut load_base_keyspace(host)?)?;
     res
 }
 
-fn set_kernel_version(host: &mut (impl StorageV1 + KeySpaceLoader)) -> Result<(), Error> {
-    match read_kernel_version(host) {
+fn set_kernel_version(base: &mut impl KeySpace) -> Result<(), Error> {
+    match read_kernel_version(base) {
         Ok(kernel_version) => {
             if kernel_version != KERNEL_VERSION {
-                store_kernel_version(host, KERNEL_VERSION)?
+                store_kernel_version(base, KERNEL_VERSION)?
             };
             Ok(())
         }
-        Err(_) => store_kernel_version(host, KERNEL_VERSION),
+        Err(_) => store_kernel_version(base, KERNEL_VERSION),
     }
 }
 
@@ -279,7 +279,7 @@ where
             // at every kernel run.
             // The alternative is to enforce every new kernels use the
             // installer configuration to initialize this value.
-            set_kernel_version(host)?;
+            set_kernel_version(&mut load_base_keyspace(host)?)?;
         }
         // If the migration is still in progress or was finished, we abort the
         // current kernel run.
@@ -289,7 +289,7 @@ where
         Ok(MigrationStatus::Done) => {
             // If a migration was finished, we update the kernel version
             // in the storage.
-            set_kernel_version(host)?;
+            set_kernel_version(&mut load_base_keyspace(host)?)?;
             let configuration = fetch_configuration(host);
             log!(Info, "Configuration after migration: {}", configuration);
             return Ok(SingleRunStatus::Reboot);
@@ -349,7 +349,7 @@ where
         return Ok(SingleRunStatus::Reboot);
     };
 
-    let trace_input = read_tracer_input(host)?;
+    let trace_input = read_tracer_input(&load_base_keyspace(host)?)?;
 
     // Start processing blueprints
     #[cfg(not(feature = "benchmark-bypass-stage2"))]

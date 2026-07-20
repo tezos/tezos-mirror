@@ -268,8 +268,15 @@ where
     let evm_chain_id = fetch_evm_chain_id(host);
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
-    let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    let debug_features = DebugFeatures::read_from_storage(host);
+    let (experimental_features, debug_features) = {
+        let base = load_base_keyspace(host).expect(
+            "no other `/base` keyspace handle may be live when reading the features",
+        );
+        (
+            ExperimentalFeatures::read_from_storage(host, &base),
+            DebugFeatures::read_from_storage(&base),
+        )
+    };
     let michelson_chain_id = fetch_michelson_runtime_chain_id(host, evm_chain_id);
     TezosXChainConfig::create_config(
         evm_chain_id,

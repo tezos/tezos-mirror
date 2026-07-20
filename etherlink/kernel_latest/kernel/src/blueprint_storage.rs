@@ -569,7 +569,10 @@ where
 {
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
-    let experimental_features = ExperimentalFeatures::read_from_storage(host);
+    let experimental_features = {
+        let base = crate::storage::load_base_keyspace(host)?;
+        ExperimentalFeatures::read_from_storage(host, &base)
+    };
     for tx_hash in delayed_hashes {
         let tx = delayed_inbox
             .find_transaction(&crate::storage::load_base_keyspace(host)?, tx_hash)?;
@@ -739,7 +742,9 @@ where
             // timestamps.
             #[cfg(not(feature = "benchmark"))]
             {
-                let last_seen_l1_timestamp = read_last_info_per_level_timestamp(host)?;
+                let last_seen_l1_timestamp = read_last_info_per_level_timestamp(
+                    &crate::storage::load_base_keyspace(host)?,
+                )?;
                 let accepted_bound = Timestamp::from(
                     last_seen_l1_timestamp
                         .i64()
@@ -1070,7 +1075,11 @@ mod tests {
             chain_id: None,
         };
 
-        store_last_info_per_level_timestamp(&mut host, Timestamp::from(40)).unwrap();
+        store_last_info_per_level_timestamp(
+            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
+            Timestamp::from(40),
+        )
+        .unwrap();
 
         let delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
