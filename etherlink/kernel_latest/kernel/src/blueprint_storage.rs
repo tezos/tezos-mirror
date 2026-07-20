@@ -571,7 +571,8 @@ where
     let mut total_size = current_blueprint_size;
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
     for tx_hash in delayed_hashes {
-        let tx = delayed_inbox.find_transaction(host, tx_hash)?;
+        let tx = delayed_inbox
+            .find_transaction(&crate::storage::load_base_keyspace(host)?, tx_hash)?;
         match tx {
             Some(tx) => {
                 if let TransactionContent::TezosDelayed(_) = &tx.0.content {

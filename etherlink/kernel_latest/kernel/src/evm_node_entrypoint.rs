@@ -71,8 +71,9 @@ where
     let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
     let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
     let mut delayed_inbox = DelayedInbox::new(&mut host).unwrap();
+    let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
     delayed_inbox
-        .save_transaction(&mut host, transaction, 0.into(), 0u32)
+        .save_transaction(&host, &mut base, transaction, 0.into(), 0u32)
         .unwrap();
 }
 
@@ -94,7 +95,10 @@ where
     let transaction_hash: TransactionHash = decode_tx_hash(Rlp::new(&payload)).unwrap();
     let mut delayed_inbox = DelayedInbox::new(&mut host).unwrap();
     delayed_inbox
-        .delete(&mut host, crate::delayed_inbox::Hash(transaction_hash))
+        .delete(
+            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
+            crate::delayed_inbox::Hash(transaction_hash),
+        )
         .unwrap();
 }
 #[cfg(target_arch = "wasm32")]

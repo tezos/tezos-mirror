@@ -472,8 +472,10 @@ where
                             .collect();
 
                         for hash in potential_culprits {
-                            delayed_inbox.delete(host, Hash(hash))?;
-                            Event::DroppedDelayedTransaction(hash).store(host)?;
+                            let mut base = crate::storage::load_base_keyspace(host)?;
+                            delayed_inbox.delete(&mut base, Hash(hash))?;
+                            Event::DroppedDelayedTransaction(hash)
+                                .store(host, &mut base)?;
                         }
                     }
                 }
@@ -498,7 +500,8 @@ where
     Host: StorageV1 + KeySpaceLoader,
 {
     for hash in delayed_txs {
-        delayed_inbox.delete(host, hash.into())?;
+        delayed_inbox
+            .delete(&mut crate::storage::load_base_keyspace(host)?, hash.into())?;
     }
     Ok(())
 }
@@ -528,7 +531,10 @@ where
 
     let event = Event::blueprint_applied(block_header);
 
-    event.store(safe_host.host)?;
+    {
+        let mut base = crate::storage::load_base_keyspace(safe_host.host)?;
+        event.store(safe_host.host, &mut base)?;
+    }
 
     let written = outbox_queue.flush_queue(safe_host.host);
     // Log to Info only if we flushed messages.

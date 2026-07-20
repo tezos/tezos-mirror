@@ -98,7 +98,10 @@ where
         hex::encode(kernel_upgrade.preimage_hash),
         kernel_upgrade.activation_timestamp
     );
-    Event::Upgrade(kernel_upgrade.clone()).store(host)?;
+    {
+        let mut base = crate::storage::load_base_keyspace(host)?;
+        Event::Upgrade(kernel_upgrade.clone()).store(host, &mut base)?;
+    }
     let path = OwnedPath::from(KERNEL_UPGRADE);
     let bytes = &kernel_upgrade.rlp_bytes();
     host.store_write_all(&path, bytes)
@@ -211,7 +214,10 @@ where
         sequencer_upgrade.activation_timestamp
     );
     let bytes = &sequencer_upgrade.rlp_bytes();
-    Event::SequencerUpgrade(sequencer_upgrade).store(host)?;
+    {
+        let mut base = crate::storage::load_base_keyspace(host)?;
+        Event::SequencerUpgrade(sequencer_upgrade).store(host, &mut base)?;
+    }
     let path = OwnedPath::from(GOVERNANCE_SEQUENCER_UPGRADE_PATH);
     host.store_write_all(&path, bytes)
         .context("Failed to store sequencer upgrade")

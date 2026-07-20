@@ -70,10 +70,9 @@ where
     Host: StorageV1 + IsEvmNode + KeySpaceLoader,
 {
     let timestamp = read_last_info_per_level_timestamp(host)?;
+    let mut base_ks = crate::storage::load_base_keyspace(host)?;
     // Number and minimal timestamp for the first forced blueprint
-    let current_blueprint_header =
-        read_current_blueprint_header(&crate::storage::load_base_keyspace(host)?);
-    let (base, minimal_timestamp) = match current_blueprint_header {
+    let (base, minimal_timestamp) = match read_current_blueprint_header(&base_ks) {
         Result::Ok(blueprint_header) => {
             (blueprint_header.number + 1, blueprint_header.timestamp)
         }
@@ -82,7 +81,9 @@ where
     // Accumulator of how many blueprints we fetched
     let mut offset: u32 = 0;
 
-    while let Some(timed_out) = delayed_inbox.next_delayed_inbox_blueprint(host)? {
+    while let Some(timed_out) =
+        delayed_inbox.next_delayed_inbox_blueprint(&mut base_ks)?
+    {
         log!(
             Info,
             "Creating blueprint from timed out delayed transactions of length {}",
@@ -99,12 +100,12 @@ where
             timestamp,
             level,
         }
-        .store(host)?;
+        .store(host, &mut base_ks)?;
 
         // Clean existing blueprints
         if offset == 0 {
             log!(Info, "Deleting all blueprints following flush at {}", level);
-            clear_all_blueprints(&mut crate::storage::load_base_keyspace(host)?)?;
+            clear_all_blueprints(&mut base_ks)?;
         }
 
         // Create a new blueprint with the timed out transactions
@@ -113,11 +114,7 @@ where
             timestamp,
         };
         // Store the blueprint.
-        store_forced_blueprint(
-            &mut crate::storage::load_base_keyspace(host)?,
-            blueprint,
-            level,
-        )?;
+        store_forced_blueprint(&mut base_ks, blueprint, level)?;
         offset += 1;
     }
 
@@ -236,7 +233,7 @@ mod tests {
         types::PublicKeyHash,
     };
     use tezos_smart_rollup_host::reveal::HostReveal;
-    use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_smart_rollup_keyspace::KeySpace;
     use tezos_smart_rollup_mock::TransferMetadata;
 
     use crate::{
@@ -395,16 +392,11 @@ mod tests {
         }
     }
 
-    fn delayed_inbox_is_empty<
-        Host: StorageV1 + tezos_smart_rollup_keyspace::KeySpaceLoader,
-    >(
-        conf: &Configuration,
-        host: &mut Host,
-    ) -> bool {
+    fn delayed_inbox_is_empty(conf: &Configuration, base: &impl KeySpace) -> bool {
         match &conf.mode {
             ConfigurationMode::Proxy => panic!("No delayed inbox in proxy mode"),
             ConfigurationMode::Sequencer { delayed_inbox, .. } => {
-                delayed_inbox.is_empty(host).unwrap()
+                delayed_inbox.is_empty(base).unwrap()
             }
         }
     }
@@ -677,7 +669,10 @@ mod tests {
             panic!("There shouldn't be a blueprint, the transaction comes from the delayed bridge")
         }
 
-        if delayed_inbox_is_empty(&conf, &mut host) {
+        if delayed_inbox_is_empty(
+            &conf,
+            &crate::storage::load_base_keyspace(&mut host).unwrap(),
+        ) {
             panic!("The delayed inbox shouldn't be empty")
         }
     }
@@ -718,7 +713,10 @@ mod tests {
             panic!("There shouldn't be a blueprint, the transaction comes from the delayed bridge")
         }
 
-        if !delayed_inbox_is_empty(&conf, &mut host) {
+        if !delayed_inbox_is_empty(
+            &conf,
+            &crate::storage::load_base_keyspace(&mut host).unwrap(),
+        ) {
             panic!("The delayed inbox should be empty, as it comes from the wrong delayed bridge")
         }
     }
@@ -857,7 +855,10 @@ mod tests {
             panic!("There shouldn't be a blueprint, the transaction comes from the delayed bridge")
         }
 
-        if delayed_inbox_is_empty(&conf, &mut host) {
+        if delayed_inbox_is_empty(
+            &conf,
+            &crate::storage::load_base_keyspace(&mut host).unwrap(),
+        ) {
             panic!("The delayed inbox shouldn't be empty")
         }
     }

@@ -215,8 +215,10 @@ impl InputHandler for SequencerInput {
                 let previous_timestamp = read_last_info_per_level_timestamp(host)?;
                 let level = read_l1_level(host)?;
                 log!(Benchmarking, "Handling a delayed input");
+                let mut base = crate::storage::load_base_keyspace(host)?;
                 delayed_inbox.save_transaction(
                     host,
+                    &mut base,
                     TezosXTransaction::Ethereum(tx),
                     previous_timestamp,
                     level,
@@ -291,7 +293,8 @@ impl InputHandler for SequencerInput {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
         let tx = handle_deposit(host, deposit)?;
-        delayed_inbox.save_transaction(host, tx, previous_timestamp, level)
+        let mut base = crate::storage::load_base_keyspace(host)?;
+        delayed_inbox.save_transaction(host, &mut base, tx, previous_timestamp, level)
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
@@ -307,7 +310,8 @@ impl InputHandler for SequencerInput {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
         let tx = handle_fa_deposit(host, fa_deposit)?;
-        delayed_inbox.save_transaction(host, tx, previous_timestamp, level)
+        let mut base = crate::storage::load_base_keyspace(host)?;
+        delayed_inbox.save_transaction(host, &mut base, tx, previous_timestamp, level)
     }
 }
 

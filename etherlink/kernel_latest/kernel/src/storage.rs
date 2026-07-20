@@ -1081,14 +1081,10 @@ where
     }
 }
 
-pub fn store_event(
-    host: &mut (impl StorageV1 + KeySpaceLoader),
-    event: &Event,
-) -> anyhow::Result<()> {
-    let mut base = load_base_keyspace(host)?;
+pub fn store_event(base: &mut impl KeySpace, event: &Event) -> anyhow::Result<()> {
     let index = KeyspaceIndexableStorage::new(EVENTS_KEY);
     index
-        .push_value(&mut base, &event.rlp_bytes())
+        .push_value(base, &event.rlp_bytes())
         .map_err(Into::into)
 }
 
