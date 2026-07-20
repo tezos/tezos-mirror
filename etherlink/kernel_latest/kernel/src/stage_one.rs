@@ -238,7 +238,6 @@ mod tests {
         types::PublicKeyHash,
     };
     use tezos_smart_rollup_host::reveal::HostReveal;
-    use tezos_smart_rollup_keyspace::KeySpace;
     use tezos_smart_rollup_mock::TransferMetadata;
 
     use crate::{
@@ -410,22 +409,20 @@ mod tests {
     #[test]
     fn test_parsing_proxy_transaction() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        match read_next_blueprint(&mut host, &mut conf)
+        match read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -439,6 +436,7 @@ mod tests {
     #[test]
     fn test_parsing_proxy_chunked_transaction() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_NEW_CHUNKED_TX).unwrap()));
         host.host
@@ -446,19 +444,16 @@ mod tests {
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        match read_next_blueprint(&mut host, &mut conf)
+        match read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -471,22 +466,20 @@ mod tests {
 
     fn test_sequencer_reject_proxy_transactions(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -507,6 +500,7 @@ mod tests {
 
     fn test_sequencer_reject_proxy_chunked_transactions(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_NEW_CHUNKED_TX).unwrap()));
         host.host
@@ -514,19 +508,16 @@ mod tests {
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -547,25 +538,24 @@ mod tests {
 
     fn test_parsing_valid_sequencer_chunk(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
         if read_blueprint(
             &mut host,
+            &mut base,
             &conf,
             U256::from(10),
             Timestamp::from(0),
@@ -591,23 +581,21 @@ mod tests {
 
     fn test_parsing_invalid_sequencer_chunk(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_UNPARSABLE).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -628,37 +616,35 @@ mod tests {
 
     fn test_proxy_rejects_sequencer_chunk(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
         let chain_config = test_tezosx_chain_config();
 
+        match read_proxy_inbox(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &conf.tezos_contracts,
+            false,
+            &chain_config,
+        )
+        .unwrap()
         {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            match read_proxy_inbox(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &conf.tezos_contracts,
-                false,
-                &chain_config,
-            )
-            .unwrap()
-            {
-                None => panic!("There should be an InboxContent"),
-                Some(ProxyInboxContent { transactions, .. }) => assert_eq!(
-                    transactions,
-                    vec![],
-                    "The proxy shouldn't have read any transaction"
-                ),
-            };
-        }
+            None => panic!("There should be an InboxContent"),
+            Some(ProxyInboxContent { transactions, .. }) => assert_eq!(
+                transactions,
+                vec![],
+                "The proxy shouldn't have read any transaction"
+            ),
+        };
 
         // The dummy chunk in the inbox is registered at block 10
         store_current_number(&mut host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH, U256::from(9))
             .unwrap();
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -679,6 +665,7 @@ mod tests {
 
     fn test_parsing_delayed_inbox(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_sequencer_config(enable_dal, None);
         let metadata = TransferMetadata::new(
             delayed_bridge(&conf),
@@ -687,19 +674,16 @@ mod tests {
         for message in dummy_delayed_transaction() {
             host.host.add_transfer(message, &metadata);
         }
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -707,10 +691,7 @@ mod tests {
             panic!("There shouldn't be a blueprint, the transaction comes from the delayed bridge")
         }
 
-        if delayed_inbox_is_empty(
-            &conf,
-            &crate::storage::load_base_keyspace(&mut host).unwrap(),
-        ) {
+        if delayed_inbox_is_empty(&conf, &base) {
             panic!("The delayed inbox shouldn't be empty")
         }
     }
@@ -727,6 +708,7 @@ mod tests {
 
     fn test_parsing_l1_contract_inbox(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_sequencer_config(enable_dal, None);
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
@@ -735,19 +717,16 @@ mod tests {
         for message in dummy_delayed_transaction() {
             host.host.add_transfer(message, &metadata);
         }
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -755,10 +734,7 @@ mod tests {
             panic!("There shouldn't be a blueprint, the transaction comes from the delayed bridge")
         }
 
-        if !delayed_inbox_is_empty(
-            &conf,
-            &crate::storage::load_base_keyspace(&mut host).unwrap(),
-        ) {
+        if !delayed_inbox_is_empty(&conf, &base) {
             panic!("The delayed inbox should be empty, as it comes from the wrong delayed bridge")
         }
     }
@@ -776,6 +752,7 @@ mod tests {
     #[test]
     fn test_parsing_delayed_inbox_rejected_in_proxy() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
@@ -784,19 +761,16 @@ mod tests {
         for message in dummy_delayed_transaction() {
             host.host.add_transfer(message, &metadata)
         }
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        match read_next_blueprint(&mut host, &mut conf)
+        match read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail").0
         {
             None => panic!("There should be a blueprint"),
@@ -809,6 +783,7 @@ mod tests {
     #[test]
     fn test_deposit_in_proxy_mode() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
             conf.tezos_contracts.ticketer.clone().unwrap(),
@@ -818,19 +793,16 @@ mod tests {
             dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        match read_next_blueprint(&mut host, &mut conf)
+        match read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -846,6 +818,7 @@ mod tests {
     #[test]
     fn test_deposit_with_invalid_ticketer() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
@@ -857,19 +830,16 @@ mod tests {
             ),
             &metadata,
         );
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        match read_next_blueprint(&mut host, &mut conf)
+        match read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -884,6 +854,7 @@ mod tests {
 
     fn test_deposit_in_sequencer_mode(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_sequencer_config(enable_dal, None);
         let metadata = TransferMetadata::new(
             conf.tezos_contracts.ticketer.clone().unwrap(),
@@ -893,19 +864,16 @@ mod tests {
             dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -913,10 +881,7 @@ mod tests {
             panic!("There shouldn't be a blueprint, the transaction comes from the delayed bridge")
         }
 
-        if delayed_inbox_is_empty(
-            &conf,
-            &crate::storage::load_base_keyspace(&mut host).unwrap(),
-        ) {
+        if delayed_inbox_is_empty(&conf, &base) {
             panic!("The delayed inbox shouldn't be empty")
         }
     }
@@ -996,14 +961,12 @@ mod tests {
     #[test]
     fn test_dal_signal() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_sequencer_config(true, None);
 
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            setup_dal_signal(&mut host, &mut base, &mut conf, None, None);
-        }
+        setup_dal_signal(&mut host, &mut base, &mut conf, None, None);
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_none()
@@ -1015,20 +978,18 @@ mod tests {
     #[test]
     fn test_dal_signal_empty_slot() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_sequencer_config(false, Some(vec![8]));
 
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            setup_dal_signal(
-                &mut host,
-                &mut base,
-                &mut conf,
-                Some(vec![21]),
-                Some(vec![]),
-            );
-        }
+        setup_dal_signal(
+            &mut host,
+            &mut base,
+            &mut conf,
+            Some(vec![21]),
+            Some(vec![]),
+        );
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -1040,14 +1001,12 @@ mod tests {
     #[test]
     fn test_dal_signal_with_multiple_slots_filled() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_sequencer_config(true, Some(vec![6, 8]));
 
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            setup_dal_signal(&mut host, &mut base, &mut conf, None, None);
-        }
+        setup_dal_signal(&mut host, &mut base, &mut conf, None, None);
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_none()
@@ -1059,14 +1018,12 @@ mod tests {
     #[test]
     fn test_parsable_dal_signal_without_dal() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_sequencer_config(false, None);
 
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            setup_dal_signal(&mut host, &mut base, &mut conf, Some(vec![6]), None);
-        }
+        setup_dal_signal(&mut host, &mut base, &mut conf, Some(vec![6]), None);
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -1078,14 +1035,12 @@ mod tests {
     #[test]
     fn test_invalid_dal_signal() {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_sequencer_config(true, Some(vec![8]));
 
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            setup_dal_signal(&mut host, &mut base, &mut conf, Some(vec![21]), None);
-        }
+        setup_dal_signal(&mut host, &mut base, &mut conf, Some(vec![21]), None);
 
-        if read_next_blueprint(&mut host, &mut conf)
+        if read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -1100,25 +1055,23 @@ mod tests {
         // the proxy reads an inbox with zero user transactions and produces
         // a blueprint with an empty transaction list.
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let mut conf = dummy_proxy_configuration();
-        let status = {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed")
-        };
+        let status = fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
         assert!(
             matches!(status, StageOneStatus::Reboot),
             "Even with no user transactions the proxy reads the inbox and requests a reboot"
         );
 
-        match read_next_blueprint(&mut host, &mut conf)
+        match read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -1138,6 +1091,7 @@ mod tests {
         // All transactions received during a single L1 level must be
         // collected into a single proxy blueprint.
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         // Add the same transaction three times (they are independent
         // external messages).
         for _ in 0..3 {
@@ -1145,24 +1099,21 @@ mod tests {
                 .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         }
         let mut conf = dummy_proxy_configuration();
-        let status = {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed")
-        };
+        let status = fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
         assert!(
             matches!(status, StageOneStatus::Reboot),
             "Non-empty proxy inbox should request a reboot"
         );
 
-        match read_next_blueprint(&mut host, &mut conf)
+        match read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -1182,6 +1133,7 @@ mod tests {
         // A blueprint produced in proxy mode should contain both plain
         // transactions and deposits received during the same L1 level.
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
 
         // One simple transaction
         host.host
@@ -1198,24 +1150,21 @@ mod tests {
             &metadata,
         );
 
-        let status = {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed")
-        };
+        let status = fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
         assert!(
             matches!(status, StageOneStatus::Reboot),
             "Mixed tx+deposit inbox should request a reboot"
         );
 
-        match read_next_blueprint(&mut host, &mut conf)
+        match read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -1237,31 +1186,27 @@ mod tests {
         // fetch_blueprints the resulting blueprint has a non-zero
         // timestamp that matches the value read back from storage.
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
 
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
 
         let mut conf = dummy_proxy_configuration();
-        {
-            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            fetch_blueprints(
-                &mut host,
-                &mut base,
-                DEFAULT_SR_ADDRESS,
-                &test_tezosx_chain_config(),
-                &mut conf,
-            )
-            .expect("fetch failed");
-        }
+        fetch_blueprints(
+            &mut host,
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
 
         // Read back the timestamp that fetch_blueprints stored from
         // the info-per-level message.
-        let stored_ts = read_last_info_per_level_timestamp(
-            &crate::storage::load_base_keyspace(&mut host).unwrap(),
-        )
-        .expect("timestamp should be readable after fetch");
+        let stored_ts = read_last_info_per_level_timestamp(&base)
+            .expect("timestamp should be readable after fetch");
 
-        match read_next_blueprint(&mut host, &mut conf)
+        match read_next_blueprint(&mut host, &mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {

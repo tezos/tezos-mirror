@@ -344,7 +344,8 @@ where
     // Performing health check to recover from a potentially corrupted durable storage. We do it
     // before the stage one because stage one reboots and would clear the flag.
     if !host.is_evm_node() {
-        health_check::<Host>(host, &mut configuration)?;
+        let mut base = load_base_keyspace(host)?;
+        health_check::<Host>(host, &mut base, &mut configuration)?;
     }
 
     // Initialize custom precompile
@@ -378,8 +379,10 @@ where
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
         log!(Debug, "Entering stage two.");
+        let mut base = load_base_keyspace(host)?;
         if let block::ComputationResult::Finished = block::produce(
             host,
+            &mut base,
             &chain_configuration,
             &mut configuration,
             sequencer_pool_address,

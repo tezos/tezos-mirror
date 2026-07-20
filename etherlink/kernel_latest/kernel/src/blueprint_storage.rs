@@ -30,7 +30,7 @@ use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
 use tezos_storage::{keyspace, read_rlp, store_rlp};
 use tezos_tezlink::block::TezBlock;
 use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
@@ -867,51 +867,38 @@ fn read_all_chunks_and_validate(
 
 pub fn read_blueprint<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     config: &Configuration,
     number: U256,
     previous_timestamp: Timestamp,
     previous_chain_header: &EVMBlockHeader,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
-    Host: StorageV1 + KeySpaceLoader,
+    Host: StorageV1,
 {
-    let exists = blueprint_exists(&crate::storage::load_base_keyspace(host)?, number)?;
+    let exists = blueprint_exists(base, number)?;
     if exists {
-        let nb_chunks =
-            read_blueprint_nb_chunks(&crate::storage::load_base_keyspace(host)?, number)?;
-        let current_generation = read_current_generation_or_default(
-            &crate::storage::load_base_keyspace(host)?,
-            U256::zero(),
-        )?;
-        let blueprint_generation = read_blueprint_generation_or_default(
-            &crate::storage::load_base_keyspace(host)?,
-            number,
-            U256::zero(),
-        )?;
+        let nb_chunks = read_blueprint_nb_chunks(base, number)?;
+        let current_generation = read_current_generation_or_default(base, U256::zero())?;
+        let blueprint_generation =
+            read_blueprint_generation_or_default(base, number, U256::zero())?;
         // If the generation is not the current one, the blueprint is stale
         if blueprint_generation < current_generation {
-            invalidate_blueprint(
-                &mut crate::storage::load_base_keyspace(host)?,
-                number,
-                &BlueprintValidity::StaleBlueprint,
-            )?;
+            invalidate_blueprint(base, number, &BlueprintValidity::StaleBlueprint)?;
             return Ok((None, 0));
         }
         log!(Benchmarking, "Number of chunks in blueprint: {}", nb_chunks);
         // All chunks are available
-        let (blueprint, size) = {
-            let mut base = crate::storage::load_base_keyspace(host)?;
-            read_all_chunks_and_validate(
-                host,
-                &mut base,
-                number,
-                nb_chunks,
-                config,
-                previous_chain_header,
-                previous_timestamp,
-                number,
-            )?
-        };
+        let (blueprint, size) = read_all_chunks_and_validate(
+            host,
+            base,
+            number,
+            nb_chunks,
+            config,
+            previous_chain_header,
+            previous_timestamp,
+            number,
+        )?;
         Ok((blueprint, size))
     } else {
         log!(Benchmarking, "Number of chunks in blueprint: {}", 0);
@@ -923,30 +910,36 @@ where
 #[cfg(test)]
 pub fn read_next_blueprint<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     config: &mut Configuration,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
-    Host: StorageV1 + KeySpaceLoader,
+    Host: StorageV1,
 {
-    let current_block_header = read_current_block_header::<EVMBlockHeader>(
-        &crate::storage::load_base_keyspace(host)?,
-    );
-    let (number, previous_timestamp, block_header) = match current_block_header {
-        Ok(BlockHeader {
-            blueprint_header,
-            chain_header,
-        }) => (
-            blueprint_header.number + 1,
-            blueprint_header.timestamp,
-            chain_header,
-        ),
-        Err(_) => (
-            U256::zero(),
-            Timestamp::from(0),
-            EVMBlockHeader::genesis_header(),
-        ),
-    };
-    read_blueprint(host, config, number, previous_timestamp, &block_header)
+    let (number, previous_timestamp, block_header) =
+        match read_current_block_header::<EVMBlockHeader>(base) {
+            Ok(BlockHeader {
+                blueprint_header,
+                chain_header,
+            }) => (
+                blueprint_header.number + 1,
+                blueprint_header.timestamp,
+                chain_header,
+            ),
+            Err(_) => (
+                U256::zero(),
+                Timestamp::from(0),
+                EVMBlockHeader::genesis_header(),
+            ),
+        };
+    read_blueprint(
+        host,
+        base,
+        config,
+        number,
+        previous_timestamp,
+        &block_header,
+    )
 }
 
 pub fn drop_blueprint(base: &mut impl KeySpace, number: U256) -> Result<(), Error> {
@@ -1002,8 +995,9 @@ mod tests {
 
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let delayed_inbox =
-            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
         let delayed_bridge: ContractKt1Hash =
             ContractKt1Hash::from_base58_check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
                 .unwrap();
@@ -1059,74 +1053,54 @@ mod tests {
             chain_id: None,
         };
 
-        store_last_info_per_level_timestamp(
-            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
-            Timestamp::from(40),
-        )
-        .unwrap();
+        store_last_info_per_level_timestamp(&mut base, Timestamp::from(40)).unwrap();
 
         let delayed_inbox =
-            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
-        let validity = {
-            let base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            parse_and_validate_blueprint(
-                &host,
-                &base,
-                blueprint_with_hashes_bytes.as_ref(),
-                &delayed_inbox,
-                0,
-                false,
-                500,
-                &EVMBlockHeader {
-                    hash: GENESIS_PARENT_HASH,
-                    receipts_root: vec![0; 32],
-                    transactions_root: vec![0; 32],
-                },
-                Timestamp::from(0),
-                U256::zero(),
-            )
-            .expect("Should be able to parse blueprint")
-        };
+        let validity = parse_and_validate_blueprint(
+            &host,
+            &base,
+            blueprint_with_hashes_bytes.as_ref(),
+            &delayed_inbox,
+            0,
+            false,
+            500,
+            &EVMBlockHeader {
+                hash: GENESIS_PARENT_HASH,
+                receipts_root: vec![0; 32],
+                transactions_root: vec![0; 32],
+            },
+            Timestamp::from(0),
+            U256::zero(),
+        )
+        .expect("Should be able to parse blueprint");
         assert_eq!(
             validity.0,
             BlueprintValidity::DelayedHashMissing(dummy_tx_hash)
         );
 
         // Store blueprint
-        store_sequencer_blueprint(
-            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
-            seq_blueprint,
-        )
-        .expect("Should be able to store sequencer blueprint");
+        store_sequencer_blueprint(&mut base, seq_blueprint)
+            .expect("Should be able to store sequencer blueprint");
 
         // Blueprint 0 should be stored
-        let exists = blueprint_exists(
-            &crate::storage::load_base_keyspace(&mut host).unwrap(),
-            U256::zero(),
-        )
-        .unwrap();
+        let exists = blueprint_exists(&base, U256::zero()).unwrap();
         assert!(exists);
 
         // Reading the next blueprint should be None, as the delayed hash
         // isn't in the delayed inbox
-        let blueprint = read_next_blueprint(&mut host, &mut config)
+        let blueprint = read_next_blueprint(&mut host, &mut base, &mut config)
             .expect("Reading next blueprint should work");
         assert!(blueprint.0.is_none());
 
         // Next number should be 0, as we didn't read one
-        let number = read_next_blueprint_number(
-            &crate::storage::load_base_keyspace(&mut host).unwrap(),
-        )
-        .expect("Should be able to read next blueprint number");
+        let number = read_next_blueprint_number(&base)
+            .expect("Should be able to read next blueprint number");
         assert!(number.is_zero());
 
         // The blueprint 0 should have been removed
-        let exists = blueprint_exists(
-            &crate::storage::load_base_keyspace(&mut host).unwrap(),
-            U256::zero(),
-        )
-        .unwrap();
+        let exists = blueprint_exists(&base, U256::zero()).unwrap();
         assert!(!exists);
 
         // Test with invalid parent hash
@@ -1150,56 +1124,42 @@ mod tests {
         };
 
         let delayed_inbox =
-            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
-        let validity = {
-            let base = crate::storage::load_base_keyspace(&mut host).unwrap();
-            parse_and_validate_blueprint(
-                &host,
-                &base,
-                blueprint_with_hashes_bytes.as_ref(),
-                &delayed_inbox,
-                0,
-                false,
-                500,
-                &EVMBlockHeader {
-                    hash: GENESIS_PARENT_HASH,
-                    receipts_root: vec![0; 32],
-                    transactions_root: vec![0; 32],
-                },
-                Timestamp::from(0),
-                U256::zero(),
-            )
-            .expect("Should be able to parse blueprint")
-        };
+        let validity = parse_and_validate_blueprint(
+            &host,
+            &base,
+            blueprint_with_hashes_bytes.as_ref(),
+            &delayed_inbox,
+            0,
+            false,
+            500,
+            &EVMBlockHeader {
+                hash: GENESIS_PARENT_HASH,
+                receipts_root: vec![0; 32],
+                transactions_root: vec![0; 32],
+            },
+            Timestamp::from(0),
+            U256::zero(),
+        )
+        .expect("Should be able to parse blueprint");
         assert_eq!(validity.0, BlueprintValidity::InvalidParentHash);
 
         // Store blueprint
-        store_sequencer_blueprint(
-            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
-            seq_blueprint,
-        )
-        .expect("Should be able to store sequencer blueprint");
+        store_sequencer_blueprint(&mut base, seq_blueprint)
+            .expect("Should be able to store sequencer blueprint");
         // Blueprint 0 should be stored
-        let exists = blueprint_exists(
-            &crate::storage::load_base_keyspace(&mut host).unwrap(),
-            U256::zero(),
-        )
-        .unwrap();
+        let exists = blueprint_exists(&base, U256::zero()).unwrap();
         assert!(exists);
 
         // Reading the next blueprint should be None, as the parent hash
         // is invalid
-        let blueprint = read_next_blueprint(&mut host, &mut config)
+        let blueprint = read_next_blueprint(&mut host, &mut base, &mut config)
             .expect("Reading next blueprint should work");
         assert!(blueprint.0.is_none());
 
         // The blueprint 0 should have been removed
-        let exists = blueprint_exists(
-            &crate::storage::load_base_keyspace(&mut host).unwrap(),
-            U256::zero(),
-        )
-        .unwrap();
+        let exists = blueprint_exists(&base, U256::zero()).unwrap();
         assert!(!exists)
     }
 

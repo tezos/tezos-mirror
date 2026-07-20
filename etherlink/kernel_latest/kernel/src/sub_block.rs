@@ -384,14 +384,18 @@ where
     )?;
 
     let timestamp = block.timestamp();
-    promote_block(
-        &mut safe_host,
-        &outbox_queue,
-        &BlockInProgressProvenance::Storage,
-        block.header(),
-        &mut configuration,
-        delayed_hashes,
-    )?;
+    {
+        let mut base = crate::storage::load_base_keyspace(safe_host.host)?;
+        promote_block(
+            &mut safe_host,
+            &mut base,
+            &outbox_queue,
+            &BlockInProgressProvenance::Storage,
+            block.header(),
+            &mut configuration,
+            delayed_hashes,
+        )?;
+    }
     {
         let mut base = crate::storage::load_base_keyspace(safe_host.host)?;
         upgrade::possible_sequencer_key_change(safe_host.host, &mut base, timestamp)?;
