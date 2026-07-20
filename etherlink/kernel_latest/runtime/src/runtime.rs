@@ -7,11 +7,7 @@
 
 use std::{
     borrow::{Borrow, BorrowMut},
-    cell::Cell,
-    collections::BTreeMap,
     marker::PhantomData,
-    ops::Bound,
-    rc::Rc,
 };
 
 use crate::extensions::WithGas;
@@ -28,7 +24,9 @@ use tezos_smart_rollup_host::{
     storage::{CoreStorage, StorageV1},
     wasm::WasmHost,
 };
-use tezos_smart_rollup_keyspace::irmin_ds::StorageV1KeySpaceCompat;
+use tezos_smart_rollup_keyspace::irmin_ds::{
+    IrminKeySpaceRegistry, StorageV1KeySpaceCompat,
+};
 use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
 use tezos_smart_rollup_mock::MockHost;
 
@@ -60,7 +58,7 @@ pub struct KernelHost<R, Host: BorrowMut<R> + Borrow<R>> {
     pub execution_gas_used: u64,
     pub is_evm_node: bool,
     pub _pd: PhantomData<R>,
-    loaded_keyspaces: BTreeMap<Name, Rc<Cell<bool>>>,
+    registry: IrminKeySpaceRegistry,
 }
 
 impl<R: HostReveal, Host: BorrowMut<R> + Borrow<R>> HostReveal for KernelHost<R, Host> {
@@ -329,7 +327,7 @@ impl<R: StorageV1, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host> {
             execution_gas_used: 0,
             is_evm_node,
             _pd: PhantomData,
-            loaded_keyspaces: BTreeMap::new(),
+            registry: IrminKeySpaceRegistry::new(),
         }
     }
 }
@@ -342,7 +340,7 @@ impl Default for MockKernelHost {
             execution_gas_used: 0,
             is_evm_node: false,
             _pd: PhantomData,
-            loaded_keyspaces: BTreeMap::new(),
+            registry: IrminKeySpaceRegistry::new(),
         }
     }
 }
@@ -355,12 +353,20 @@ impl MockKernelHost {
             execution_gas_used: 0,
             is_evm_node: false,
             _pd: PhantomData,
-            loaded_keyspaces: BTreeMap::new(),
+            registry: IrminKeySpaceRegistry::new(),
         }
     }
 }
 
-impl<R: StorageV1 + CoreStorage, Host: BorrowMut<R> + Borrow<R>> KeySpaceLoader
+impl<R: CoreStorage, Host: BorrowMut<R> + Borrow<R>> CoreStorage for KernelHost<R, Host> {
+    type Storage = R::Storage;
+
+    unsafe fn new_storage(&mut self) -> Self::Storage {
+        self.host.borrow_mut().new_storage()
+    }
+}
+
+impl<R: CoreStorage, Host: BorrowMut<R> + Borrow<R>> KeySpaceLoader
     for KernelHost<R, Host>
 {
     type KeySpace = StorageV1KeySpaceCompat<R::Storage>;
@@ -369,70 +375,10 @@ impl<R: StorageV1 + CoreStorage, Host: BorrowMut<R> + Borrow<R>> KeySpaceLoader
         &mut self,
         name: Name,
     ) -> Result<Self::KeySpace, KeySpaceLoaderError> {
-        // Check for exact duplicate or re-load a dropped keyspace.
-        if let Some(guard) = self.loaded_keyspaces.get(&name) {
-            if guard.get() {
-                return Err(KeySpaceLoaderError::AlreadyLoaded);
-            }
-            // Keyspace was previously loaded and dropped — re-load
-            // immediately. Overlap checks are unnecessary: the name was
-            // already validated, and overlapping names are permanently
-            // rejected.
-            guard.set(true);
-            let guard = Rc::clone(guard);
-            return Ok(StorageV1KeySpaceCompat::new(
-                // SAFETY: same as below — non-overlapping prefix.
-                unsafe { self.host.borrow_mut().new_storage() },
-                name,
-                guard,
-            ));
-        }
-
-        let name_str: &str = name.as_ref();
-
-        // Check for overlapping descendants using BTreeMap::range.
-        // In the sorted map, any name starting with `name/` sorts right
-        // after `name` (only '-' and '.' are valid path chars below '/').
-        for (existing, _) in self
-            .loaded_keyspaces
-            .range::<Name, _>((Bound::Excluded(&name), Bound::Unbounded))
-        {
-            let existing_str: &str = existing.as_ref();
-            if !existing_str.starts_with(name_str) {
-                break;
-            }
-            if existing_str.as_bytes()[name_str.len()] == b'/' {
-                return Err(KeySpaceLoaderError::Overlapping);
-            }
-        }
-
-        // Check for overlapping ancestors via point lookups at each '/'
-        // boundary. The number of lookups is bounded by the path depth.
-        for (i, &b) in name_str.as_bytes().iter().enumerate().skip(1) {
-            if b == b'/' {
-                if let Ok(ancestor) = name_str[..i].parse::<Name>() {
-                    if self.loaded_keyspaces.contains_key(&ancestor) {
-                        return Err(KeySpaceLoaderError::Overlapping);
-                    }
-                }
-            }
-        }
-
-        let guard = self
-            .loaded_keyspaces
-            .entry(name.clone())
-            .or_insert_with(|| Rc::new(Cell::new(false)));
-        guard.set(true);
-        let guard = Rc::clone(guard);
-
-        Ok(StorageV1KeySpaceCompat::new(
-            // SAFETY: each keyspace gets its own storage handle, scoped
-            // to a unique Name prefix. Handles access non-overlapping
-            // parts of the same underlying storage.
-            unsafe { self.host.borrow_mut().new_storage() },
-            name,
-            guard,
-        ))
+        // SAFETY: `KernelHost` owns exactly one registry, which therefore
+        // governs every keyspace minted from `self.host`, so `register`'s
+        // overlap checks cannot be bypassed.
+        unsafe { self.registry.load_or_create(self.host.borrow_mut(), name) }
     }
 }
 
