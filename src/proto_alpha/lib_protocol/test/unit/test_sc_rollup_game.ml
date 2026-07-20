@@ -877,10 +877,16 @@ let test_at_most_one_operation_per_game_per_block () =
         predecessor, an HONEST defender commitment of exactly one tick whose
         state is the honest result of consuming the victim level's next message
         [(victim_level, 3)], plus a differing refuter commitment;
-     4. open the game and play a [Proof] whose PVM step genuinely consumes the
-        ATTACKER level's message [(attacker_level, 3)] wrapped as an
-        [Inbox_proof] claiming [victim_level];
-     5. assert [R.game_move] returns [Some (G.Loser {loser = defender; _})]. *)
+     4. open the game and build that [Proof] — a genuine inclusion proof of
+        the ATTACKER level's message [(attacker_level, 3)] wrapped in an
+        [Inbox_proof] CLAIMING [victim_level];
+     5. assert the protocol consensus is STILL unsound: fed this proof
+        directly, [R.game_move] accepts it and declares the honest defender
+        [Loser] — the expected, unfixed protocol behaviour;
+     6. assert the block-validation plugin REJECTS the same operation with
+        [Sc_rollup_inbox_proof_claimed_level_mismatch] carrying
+        [claimed_level = victim_level] and [proven_level = attacker_level],
+        showing the filter blocks the attack consensus alone lets win. *)
 let test_inbox_proof_level_confusion () =
   let open Lwt_result_wrap_syntax in
   let open Alpha_context in
@@ -1110,6 +1116,11 @@ let test_inbox_proof_level_confusion () =
     Data_encoding.Binary.of_bytes_exn Sc_rollup_proof_repr.encoding
     @@ Data_encoding.Binary.to_bytes_exn Sc_rollup.Proof.encoding alpha_proof
   in
+  (* Consensus is still unsound: fed this proof directly, [R.game_move]
+     accepts it and the honest defender LOSES the game. This is the expected
+     (unfixed) protocol behaviour the plugin filter below shields against. We
+     run it on [ctxt] and discard the resulting context so the plugin check
+     replays the same pre-move state. *)
   let*@ game_result, _ctxt =
     R.game_move
       ctxt
@@ -1119,19 +1130,54 @@ let test_inbox_proof_level_confusion () =
       ~choice:Sc_rollup_tick_repr.initial
       ~step:(G.Proof proof)
   in
-  match game_result with
-  | Some (G.Loser {loser; _}) ->
-      Assert.equal_bool
-        ~loc:__LOC__
-        (Sc_rollup_repr.Staker.equal loser defender)
-        true
-  | Some G.Draw ->
+  let* () =
+    match game_result with
+    | Some (G.Loser {loser; _}) ->
+        Assert.equal_bool
+          ~loc:__LOC__
+          (Sc_rollup_repr.Staker.equal loser defender)
+          true
+    | Some G.Draw ->
+        Test.fail
+          "level-confusion: the attack resolved to a Draw instead of a win"
+    | None ->
+        Test.fail
+          "level-confusion: the wrong-level proof did not win the game \
+           (game_move returned None instead of Loser defender)"
+  in
+  (* The plugin must reject the operation: the proof proves level 3
+     but claims level 2. *)
+  let*! plugin_res =
+    run_block_validation_plugin
+      ~ctxt_before:ctxt
+      ~source:refuter
+      ~opponent:defender
+      ~rollup
+      ~choice:Sc_rollup_tick_repr.initial
+      ~proof
+  in
+  match plugin_res with
+  | Ok _ ->
       Test.fail
-        "level-confusion: the attack resolved to a Draw instead of a win"
-  | None ->
-      Test.fail
-        "level-confusion: the wrong-level proof did not win the game \
-         (game_move returned None instead of Loser defender)"
+        "level-confusion: the plugin accepted an inbox proof whose proven \
+         level (3) does not match the claimed level (2)"
+  | Error trace ->
+      if
+        List.exists
+          (function
+            | Environment.Ecoproto_error
+                (Block_validation.Sc_rollup_inbox_proof_claimed_level_mismatch
+                   {claimed_level; proven_level}) ->
+                Raw_level.equal claimed_level victim_level
+                && Raw_level.equal proven_level attacker_level
+            | _ -> false)
+          trace
+      then return_unit
+      else
+        Test.fail
+          "level-confusion: the plugin rejected the operation but not with \
+           Sc_rollup_inbox_proof_claimed_level_mismatch {claimed = 2; proven = \
+           3}"
 
 let tests =
   [
