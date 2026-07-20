@@ -64,6 +64,10 @@
   operation's copy of a big_map observes the source as it was before the storage
   update (previously it observed the post-update value, diverging from L1 and
   reaching the called contract's final state). (!22357)
+- The Michelson runtime rejects `key` literals whose bytes are not a valid
+  curve point, for all curves. This includes Ed25519, which is intentionally
+  stricter than L1 (L1 accepts length-valid Ed25519 keys); tz4 (BLS) keys are
+  rejected as well, as BLS is unsupported. (!22501)
 
 ## Version 6 (Farfadet)
 

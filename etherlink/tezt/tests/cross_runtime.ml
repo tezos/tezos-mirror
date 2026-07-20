@@ -15855,6 +15855,118 @@ let test_crac_deep_failure_backtracks_alias_target () =
   check_crac_brackets ~prefix internals ;
   unit
 
+(** The Michelson runtime rejects [key] literals whose bytes are not a valid
+ *  point on the selected curve, for all curves including Ed25519 (stricter
+ *  than the Tezos L1 typechecker, which accepts length-valid Ed25519 keys). *)
+let test_michelson_runtime_rejects_invalid_key () =
+  let with_runtimes = Tezosx_runtime.[Tezos] in
+  let tags =
+    ["tezosx"]
+    @ List.map Tezosx_runtime.tag with_runtimes
+    @ ["tezlink"; "michelson"; "key"; "validation"]
+  in
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~uses_client:true
+    ~kernel:Latest
+    ~title:"Michelson runtime rejects invalid public key literals"
+    ~tags
+    ~with_runtimes
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sequencer ->
+  let source = Constant.bootstrap5 in
+  (* Conversions and forging need a protocol-aware client but no chain:
+     use a mockup client.  Injection goes through the tezlink RPC. *)
+  let* client =
+    Client.init_mockup ~protocol:Michelson_contracts.tezlink_protocol ()
+  in
+  let* client_tezlink = tezlink_client_from_evm_node sequencer in
+  let prg = "parameter unit; storage key; code { CDR; NIL operation; PAIR }" in
+  let* code = Client.convert_script_to_json ~script:prg client in
+  let counter = ref 0 in
+  (* Originates the [key]-storing contract with [data] as its initial
+     storage and returns the application status of the origination. *)
+  let originate_with_storage ~data =
+    incr counter ;
+    let counter = !counter in
+    let* init_storage = Client.convert_data_to_json ~data client in
+    let* branch = tez_branch client_tezlink in
+    let* op =
+      Operation.Manager.(
+        operation
+          ~branch
+          [
+            make
+              ~fee:10_000
+              ~counter
+              ~gas_limit:100_000
+              ~storage_limit:60_000
+              ~source
+              (origination ~code ~init_storage ~init_balance:0 ());
+          ])
+        client
+    in
+    let* op_json =
+      TezContract.inject_op_and_produce_block ~client_tezlink ~sequencer op
+    in
+    return
+      JSON.(
+        op_json |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+        |-> "status" |> as_string)
+  in
+  (* A valid secp256k1 key is a valid point and is accepted. *)
+  let* status =
+    originate_with_storage
+      ~data:"\"sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD\""
+  in
+  Check.(
+    (status = "applied")
+      string
+      ~error_msg:"Valid secp256k1 key: expected status %R, got %L") ;
+  (* A secp256k1 key with a valid tag and length but an invalid point is
+     rejected. *)
+  let* status =
+    originate_with_storage
+      ~data:
+        "0x0102ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  in
+  Check.(
+    (status = "failed")
+      string
+      ~error_msg:"Invalid secp256k1 key: expected status %R, got %L") ;
+  (* An Ed25519 key with a valid tag and length but an invalid point is
+     rejected (stricter than L1, which accepts length-valid Ed25519 keys). *)
+  let* status =
+    originate_with_storage
+      ~data:
+        "0x000202020202020202020202020202020202020202020202020202020202020202"
+  in
+  Check.(
+    (status = "failed")
+      string
+      ~error_msg:"Invalid Ed25519 key: expected status %R, got %L") ;
+  (* A P256 key with a valid tag and length but an invalid point is
+     rejected. *)
+  let* status =
+    originate_with_storage
+      ~data:
+        "0x0202ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  in
+  Check.(
+    (status = "failed")
+      string
+      ~error_msg:"Invalid P256 key: expected status %R, got %L") ;
+  (* tz4 (BLS) keys are forbidden in tezlink, so even a valid one is rejected
+     by the Michelson runtime (the kernel is built without bls). *)
+  let* status =
+    originate_with_storage
+      ~data:
+        "\"BLpk1yE462s3cPX5t2HhvGPg3HSEUgqLi9q9Knwx7mbN4VuhEsvBYFvEz5Eu9shR7vZRY1k5PCtV\""
+  in
+  Check.(
+    (status = "failed") string ~error_msg:"tz4 key: expected status %R, got %L") ;
+  unit
+
 let () =
   test_crac_evm_to_tez () ;
   test_crac_evm_multiple_independent_crossings () ;
@@ -15998,4 +16110,5 @@ let () =
   test_crac_address_identity_path_independence () ;
   test_crac_legacy_fallback_blind_derivation () ;
   test_crac_origin_repair_none_to_alias () ;
-  test_crac_journal_revert_drops_origin ()
+  test_crac_journal_revert_drops_origin () ;
+  test_michelson_runtime_rejects_invalid_key ()
