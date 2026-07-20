@@ -1090,7 +1090,7 @@ pub fn store_sequencer(
 ) -> anyhow::Result<()> {
     let pk_b58 = PublicKey::to_b58check(public_key);
     let bytes = String::as_bytes(&pk_b58);
-    host.store_write(&SEQUENCER_KEY_PATH, bytes, 0)
+    host.store_write_all(&SEQUENCER_KEY_PATH, bytes)
         .map_err(Into::into)
 }
 
