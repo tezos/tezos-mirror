@@ -7,8 +7,6 @@
   octez-libs.micheline
   octez-libs.base
   octez-shell-libs.store
-  tezos-protocol-024-PtTALLiN.protocol
-  octez-protocol-024-PtTALLiN-libs.client
   tezos-protocol-025-PsUshuai.protocol
   octez-protocol-025-PsUshuai-libs.client
   tezos-protocol-alpha.protocol
