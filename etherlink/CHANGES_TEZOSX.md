@@ -11,6 +11,9 @@
   advances by exactly one per change — at scheduling time for a precompile
   change, at activation time for a governance change — and is exposed to the
   next signer. (!22504)
+- The `change_sequencer_key` precompile no longer treats a signature check
+  returning `Ok(false)` as success, so a syntactically valid but incorrect
+  signature can no longer authorize a key rotation. (!22510)
 - The `verify_tezos_signature` precompile (reached through an alias
   forwarder's EIP-1271 `isValidSignature`) now rejects non-canonical
   high-S P-256 (tz3) signatures. ECDSA is malleable: for any valid

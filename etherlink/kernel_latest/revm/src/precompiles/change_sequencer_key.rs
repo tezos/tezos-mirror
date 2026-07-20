@@ -171,9 +171,9 @@ where
             signed_payload
                 .extend_from_slice(&change_counter.to_be_bytes::<{ U256::BYTES }>());
 
-            if sequencer_key
+            if !sequencer_key
                 .verify_signature(&signature, &signed_payload)
-                .is_err()
+                .unwrap_or(false)
             {
                 return Err(CustomPrecompileError::Revert(
                     String::from("invalid signature"),
