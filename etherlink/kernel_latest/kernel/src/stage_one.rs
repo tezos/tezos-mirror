@@ -29,35 +29,35 @@ use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 pub fn fetch_proxy_blueprints<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
     chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
+        base,
         smart_rollup_address,
         tezos_contracts,
         enable_fa_bridge,
         chain_configuration,
     )? {
-        let timestamp = read_last_info_per_level_timestamp(
-            &crate::storage::load_base_keyspace(host)?,
-        )
-        .unwrap_or(Timestamp::from(0));
+        let timestamp =
+            read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let blueprint = Blueprint {
             transactions,
             timestamp,
         };
         // Store the blueprint.
-        store_inbox_blueprint(&mut crate::storage::load_base_keyspace(host)?, blueprint)?;
+        store_inbox_blueprint(base, blueprint)?;
         Ok(StageOneStatus::Reboot)
     } else {
         Ok(StageOneStatus::Done)
@@ -66,15 +66,15 @@ where
 
 fn fetch_delayed_transactions<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     delayed_inbox: &mut DelayedInbox,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + IsEvmNode,
 {
-    let mut base_ks = crate::storage::load_base_keyspace(host)?;
-    let timestamp = read_last_info_per_level_timestamp(&base_ks)?;
+    let timestamp = read_last_info_per_level_timestamp(base)?;
     // Number and minimal timestamp for the first forced blueprint
-    let (base, minimal_timestamp) = match read_current_blueprint_header(&base_ks) {
+    let (base_number, minimal_timestamp) = match read_current_blueprint_header(base) {
         Result::Ok(blueprint_header) => {
             (blueprint_header.number + 1, blueprint_header.timestamp)
         }
@@ -83,9 +83,7 @@ where
     // Accumulator of how many blueprints we fetched
     let mut offset: u32 = 0;
 
-    while let Some(timed_out) =
-        delayed_inbox.next_delayed_inbox_blueprint(&mut base_ks)?
-    {
+    while let Some(timed_out) = delayed_inbox.next_delayed_inbox_blueprint(base)? {
         log!(
             Info,
             "Creating blueprint from timed out delayed transactions of length {}",
@@ -96,18 +94,18 @@ where
         // If it's not the case, we fallback and take the previous block timestamp.
         let timestamp = std::cmp::max(timestamp, minimal_timestamp);
 
-        let level = base.add(offset);
+        let level = base_number.add(offset);
         Event::FlushDelayedInbox {
             transactions: &timed_out,
             timestamp,
             level,
         }
-        .store(host, &mut base_ks)?;
+        .store(host, base)?;
 
         // Clean existing blueprints
         if offset == 0 {
             log!(Info, "Deleting all blueprints following flush at {}", level);
-            clear_all_blueprints(&mut base_ks)?;
+            clear_all_blueprints(base)?;
         }
 
         // Create a new blueprint with the timed out transactions
@@ -116,7 +114,7 @@ where
             timestamp,
         };
         // Store the blueprint.
-        store_forced_blueprint(&mut base_ks, blueprint, level)?;
+        store_forced_blueprint(base, blueprint, level)?;
         offset += 1;
     }
 
@@ -126,6 +124,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn fetch_sequencer_blueprints<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
     delayed_bridge: ContractKt1Hash,
@@ -137,10 +136,11 @@ fn fetch_sequencer_blueprints<Host>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     match read_sequencer_inbox(
         host,
+        base,
         smart_rollup_address,
         tezos_contracts,
         delayed_bridge,
@@ -154,10 +154,9 @@ where
         StageOneStatus::Done => {
             log!(Debug, "Stage one done, rebooting");
             // Check if there are timed-out transactions in the delayed inbox
-            let timed_out = delayed_inbox
-                .first_has_timed_out(&crate::storage::load_base_keyspace(host)?)?;
+            let timed_out = delayed_inbox.first_has_timed_out(base)?;
             if timed_out {
-                fetch_delayed_transactions(host, delayed_inbox)?
+                fetch_delayed_transactions(host, base, delayed_inbox)?
             };
             // Force the kernel to reboot, so that the first blueprint will have
             // the maximum tick capacity
@@ -173,12 +172,13 @@ where
 #[cfg_attr(feature = "benchmark", inline(never))]
 pub fn fetch_blueprints<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     chain_config: &crate::chains::TezosXChainConfig,
     config: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     match &mut config.mode {
         ConfigurationMode::Sequencer {
@@ -190,6 +190,7 @@ where
             max_blueprint_lookahead_in_seconds: _,
         } => fetch_sequencer_blueprints(
             host,
+            base,
             smart_rollup_address,
             &config.tezos_contracts,
             delayed_bridge.clone(),
@@ -202,6 +203,7 @@ where
         ),
         ConfigurationMode::Proxy => fetch_proxy_blueprints(
             host,
+            base,
             smart_rollup_address,
             &config.tezos_contracts,
             config.enable_fa_bridge,
@@ -257,8 +259,9 @@ mod tests {
         kernel_slots: Option<Vec<u8>>,
     ) -> Configuration {
         let mut host = MockKernelHost::default();
+        let base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let delayed_inbox =
-            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
         let delayed_bridge: ContractKt1Hash =
             ContractKt1Hash::from_base58_check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
                 .unwrap();
@@ -410,13 +413,17 @@ mod tests {
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -439,13 +446,17 @@ mod tests {
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -463,13 +474,17 @@ mod tests {
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -499,13 +514,17 @@ mod tests {
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -532,13 +551,17 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         // The dummy chunk in the inbox is registered at block 10
         if read_blueprint(
@@ -572,13 +595,17 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_UNPARSABLE).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -607,22 +634,26 @@ mod tests {
         let mut conf = dummy_sequencer_config(enable_dal, None);
         let chain_config = test_tezosx_chain_config();
 
-        match read_proxy_inbox(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &conf.tezos_contracts,
-            false,
-            &chain_config,
-        )
-        .unwrap()
         {
-            None => panic!("There should be an InboxContent"),
-            Some(ProxyInboxContent { transactions, .. }) => assert_eq!(
-                transactions,
-                vec![],
-                "The proxy shouldn't have read any transaction"
-            ),
-        };
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            match read_proxy_inbox(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &conf.tezos_contracts,
+                false,
+                &chain_config,
+            )
+            .unwrap()
+            {
+                None => panic!("There should be an InboxContent"),
+                Some(ProxyInboxContent { transactions, .. }) => assert_eq!(
+                    transactions,
+                    vec![],
+                    "The proxy shouldn't have read any transaction"
+                ),
+            };
+        }
 
         // The dummy chunk in the inbox is registered at block 10
         store_current_number(&mut host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH, U256::from(9))
@@ -656,13 +687,17 @@ mod tests {
         for message in dummy_delayed_transaction() {
             host.host.add_transfer(message, &metadata);
         }
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -700,13 +735,17 @@ mod tests {
         for message in dummy_delayed_transaction() {
             host.host.add_transfer(message, &metadata);
         }
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -745,13 +784,17 @@ mod tests {
         for message in dummy_delayed_transaction() {
             host.host.add_transfer(message, &metadata)
         }
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail").0
@@ -775,13 +818,17 @@ mod tests {
             dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -810,13 +857,17 @@ mod tests {
             ),
             &metadata,
         );
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -842,13 +893,17 @@ mod tests {
             dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -909,6 +964,7 @@ mod tests {
 
     fn setup_dal_signal(
         host: &mut MockKernelHost,
+        base: &mut impl KeySpace,
         conf: &mut Configuration,
         signal_slots: Option<Vec<u8>>,
         filled_slots: Option<Vec<u8>>,
@@ -927,8 +983,14 @@ mod tests {
         let filled_slots = filled_slots.unwrap_or(dal_slots);
         fill_slots(host, filled_slots);
 
-        fetch_blueprints(host, DEFAULT_SR_ADDRESS, &test_tezosx_chain_config(), conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            host,
+            base,
+            DEFAULT_SR_ADDRESS,
+            &test_tezosx_chain_config(),
+            conf,
+        )
+        .expect("fetch failed");
     }
 
     #[test]
@@ -936,7 +998,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut conf = dummy_sequencer_config(true, None);
 
-        setup_dal_signal(&mut host, &mut conf, None, None);
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            setup_dal_signal(&mut host, &mut base, &mut conf, None, None);
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -952,7 +1017,16 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut conf = dummy_sequencer_config(false, Some(vec![8]));
 
-        setup_dal_signal(&mut host, &mut conf, Some(vec![21]), Some(vec![]));
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            setup_dal_signal(
+                &mut host,
+                &mut base,
+                &mut conf,
+                Some(vec![21]),
+                Some(vec![]),
+            );
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -968,7 +1042,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut conf = dummy_sequencer_config(true, Some(vec![6, 8]));
 
-        setup_dal_signal(&mut host, &mut conf, None, None);
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            setup_dal_signal(&mut host, &mut base, &mut conf, None, None);
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -984,7 +1061,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut conf = dummy_sequencer_config(false, None);
 
-        setup_dal_signal(&mut host, &mut conf, Some(vec![6]), None);
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            setup_dal_signal(&mut host, &mut base, &mut conf, Some(vec![6]), None);
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -1000,7 +1080,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut conf = dummy_sequencer_config(true, Some(vec![8]));
 
-        setup_dal_signal(&mut host, &mut conf, Some(vec![21]), None);
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            setup_dal_signal(&mut host, &mut base, &mut conf, Some(vec![21]), None);
+        }
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -1018,13 +1101,17 @@ mod tests {
         // a blueprint with an empty transaction list.
         let mut host = MockKernelHost::default();
         let mut conf = dummy_proxy_configuration();
-        let status = fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        let status = {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed")
+        };
 
         assert!(
             matches!(status, StageOneStatus::Reboot),
@@ -1058,13 +1145,17 @@ mod tests {
                 .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         }
         let mut conf = dummy_proxy_configuration();
-        let status = fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        let status = {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed")
+        };
 
         assert!(
             matches!(status, StageOneStatus::Reboot),
@@ -1107,13 +1198,17 @@ mod tests {
             &metadata,
         );
 
-        let status = fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        let status = {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed")
+        };
 
         assert!(
             matches!(status, StageOneStatus::Reboot),
@@ -1147,13 +1242,17 @@ mod tests {
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
 
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(
-            &mut host,
-            DEFAULT_SR_ADDRESS,
-            &test_tezosx_chain_config(),
-            &mut conf,
-        )
-        .expect("fetch failed");
+        {
+            let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+            fetch_blueprints(
+                &mut host,
+                &mut base,
+                DEFAULT_SR_ADDRESS,
+                &test_tezosx_chain_config(),
+                &mut conf,
+            )
+            .expect("fetch failed");
+        }
 
         // Read back the timestamp that fetch_blueprints stored from
         // the info-per-level message.

@@ -50,7 +50,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
@@ -560,18 +560,18 @@ impl TezosXChainConfig {
         }
     }
 
-    pub fn fetch_hashes_from_delayed_inbox<Host>(
-        host: &mut Host,
+    pub fn fetch_hashes_from_delayed_inbox(
+        host: &impl StorageV1,
+        base: &impl KeySpace,
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &DelayedInbox,
         current_blueprint_size: usize,
         block_number: U256,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
-    where
-        Host: StorageV1 + KeySpaceLoader,
     {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
             host,
+            base,
             delayed_hashes,
             delayed_inbox,
             current_blueprint_size,
@@ -717,12 +717,13 @@ impl TezosXChainConfig {
     pub fn start_simulation_mode<Host>(
         &self,
         host: &mut Host,
+        base: &mut impl KeySpace,
         registry: &impl Registry,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + WasmHost + KeySpaceLoader,
+        Host: StorageV1 + WasmHost,
     {
-        start_simulation_mode(host, registry, &self.spec_id)
+        start_simulation_mode(host, base, registry, &self.spec_id)
     }
 
     pub fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath> {

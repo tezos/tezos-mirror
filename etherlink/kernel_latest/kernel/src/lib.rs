@@ -124,20 +124,27 @@ where
 #[cfg_attr(feature = "benchmark", inline(never))]
 pub fn stage_one<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
     chain_config: &chains::TezosXChainConfig,
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     log!(Debug, "Entering stage one.");
     log!(Debug, "Chain Configuration: {chain_config:?}");
     log!(Debug, "Configuration: {}", configuration);
 
-    enter_stage_one(&mut load_base_keyspace(host)?)?;
-    let res = fetch_blueprints(host, smart_rollup_address, chain_config, configuration);
-    leave_stage_one(&mut load_base_keyspace(host)?)?;
+    enter_stage_one(base)?;
+    let res = fetch_blueprints(
+        host,
+        base,
+        smart_rollup_address,
+        chain_config,
+        configuration,
+    );
+    leave_stage_one(base)?;
     res
 }
 
@@ -349,14 +356,18 @@ where
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    if let StageOneStatus::Reboot = stage_one(
-        host,
-        smart_rollup_address,
-        &chain_configuration,
-        &mut configuration,
-    )
-    .context("Failed during stage 1")?
-    {
+    let stage_one_status = {
+        let mut base = load_base_keyspace(host)?;
+        stage_one(
+            host,
+            &mut base,
+            smart_rollup_address,
+            &chain_configuration,
+            &mut configuration,
+        )
+        .context("Failed during stage 1")?
+    };
+    if let StageOneStatus::Reboot = stage_one_status {
         #[cfg(not(target_arch = "riscv64"))]
         return Ok(SingleRunStatus::Reboot);
     };

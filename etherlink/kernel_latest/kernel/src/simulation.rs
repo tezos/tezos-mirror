@@ -42,7 +42,7 @@ use evm_inspectors::TracerInput;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::CracId;
 
@@ -383,6 +383,7 @@ impl Evaluation {
     pub fn run<Host>(
         &self,
         host: &mut Host,
+        base: &impl KeySpace,
         registry: &impl Registry,
         tracer_input: Option<TracerInput>,
         spec_id: &SpecId,
@@ -394,19 +395,14 @@ impl Evaluation {
         Error,
     >
     where
-        Host: StorageV1 + KeySpaceLoader,
+        Host: StorageV1,
     {
         let evm_chain_id = fetch_evm_chain_id(host);
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
         let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
-        let (experimental_features, debug_features) = {
-            let base = crate::storage::load_base_keyspace(host)?;
-            (
-                ExperimentalFeatures::read_from_storage(host, &base),
-                DebugFeatures::read_from_storage(&base),
-            )
-        };
+        let experimental_features = ExperimentalFeatures::read_from_storage(host, base);
+        let debug_features = DebugFeatures::read_from_storage(base);
 
         let constants = match block_storage::read_current_etherlink_block(host) {
             Ok(block) => {
@@ -445,11 +441,7 @@ impl Evaluation {
                     .map(|timestamp| U256::from(timestamp.as_u64()))
                     .unwrap_or_else(|| {
                         U256::from(
-                            crate::storage::load_base_keyspace(host)
-                                .map_err(Error::from)
-                                .and_then(|base| {
-                                    read_last_info_per_level_timestamp(&base)
-                                })
+                            read_last_info_per_level_timestamp(base)
                                 .unwrap_or(Timestamp::from(0))
                                 .as_u64(),
                         )
@@ -529,9 +521,7 @@ impl Evaluation {
             &Default::default(),
             &constants,
             spec_id,
-            crate::storage::is_http_trace_enabled(
-                &crate::storage::load_base_keyspace(host)?,
-            ),
+            crate::storage::is_http_trace_enabled(base),
             &debug_features,
             0,
             tracer_input,
@@ -709,22 +699,22 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
 
 pub fn start_simulation_mode<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     registry: &impl Registry,
     spec_id: &SpecId,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost + KeySpaceLoader,
+    Host: StorageV1 + WasmHost,
 {
     log!(Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     match simulation {
         Message::Evaluation(simulation) => {
-            let tracer_input =
-                read_tracer_input(&crate::storage::load_base_keyspace(host)?)?;
+            let tracer_input = read_tracer_input(base)?;
             let (outcome, traces) =
-                simulation.run(host, registry, tracer_input, spec_id)?;
-            storage::store_simulation_http_traces(host, &traces)?;
-            storage::store_simulation_result(host, outcome)
+                simulation.run(host, base, registry, tracer_input, spec_id)?;
+            storage::store_simulation_http_traces(base, &traces)?;
+            storage::store_simulation_result(base, outcome)
         }
     }
 }
@@ -814,14 +804,12 @@ mod tests {
     // call: get (public view)
     const STORAGE_CONTRACT_CALL_GET: &str = "6d4ce63c";
 
-    fn create_contract<Host>(host: &mut Host) -> H160
+    fn create_contract<Host>(host: &mut Host, base: &impl KeySpace) -> H160
     where
-        Host: StorageV1 + KeySpaceLoader,
+        Host: StorageV1,
     {
-        let timestamp = read_last_info_per_level_timestamp(
-            &crate::storage::load_base_keyspace(host).unwrap(),
-        )
-        .unwrap_or(Timestamp::from(0));
+        let timestamp =
+            read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
         let evm_chain_id = fetch_evm_chain_id(host);
         let block_fees = retrieve_block_fees(host);
@@ -885,8 +873,9 @@ mod tests {
     fn simulation_result() {
         // setup
         let mut host = MockKernelHost::default();
+        let base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let registry = RegistryImpl::default();
-        let new_address = create_contract(&mut host);
+        let new_address = create_contract(&mut host, &base);
 
         // run evaluation num
         let evaluation = Evaluation {
@@ -899,7 +888,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
+        let outcome =
+            evaluation.run(&mut host, &base, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let (outcome, _traces) = outcome.unwrap();
@@ -925,7 +915,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
+        let outcome =
+            evaluation.run(&mut host, &base, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let (outcome, _traces) = outcome.unwrap();
@@ -944,8 +935,9 @@ mod tests {
     fn evaluation_result_no_gas() {
         // setup
         let mut host = MockKernelHost::default();
+        let base = crate::storage::load_base_keyspace(&mut host).unwrap();
         let registry = RegistryImpl::default();
-        let new_address = create_contract(&mut host);
+        let new_address = create_contract(&mut host, &base);
 
         // run evaluation num
         let evaluation = Evaluation {
@@ -958,7 +950,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
+        let outcome =
+            evaluation.run(&mut host, &base, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let (outcome, _traces) = outcome.unwrap();
@@ -1013,7 +1006,8 @@ mod tests {
     fn parse_simulation2() {
         // setup
         let mut host = MockKernelHost::default();
-        let new_address = create_contract(&mut host);
+        let base = crate::storage::load_base_keyspace(&mut host).unwrap();
+        let new_address = create_contract(&mut host, &base);
 
         let to = Some(new_address);
         let data = hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap();

@@ -433,7 +433,12 @@ where
 
     // Store captured HTTP traces.
     let traces = trace_journal.into_http_traces();
-    if let Err(err) = crate::storage::store_simulation_http_traces(&mut host, &traces) {
+    if let Err(err) = crate::storage::load_base_keyspace(&mut host)
+        .map_err(anyhow::Error::from)
+        .and_then(|mut base| {
+            crate::storage::store_simulation_http_traces(&mut base, &traces)
+        })
+    {
         log!(
             Error,
             "Tezos X simulation: failed to store HTTP traces: {:?}",
