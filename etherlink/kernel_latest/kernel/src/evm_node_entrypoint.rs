@@ -114,7 +114,14 @@ where
         + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let tx_input = match sub_block::read_single_tx_execution_input(&mut host) {
+    let mut base = match crate::storage::load_base_keyspace(&mut host) {
+        Ok(base) => base,
+        Err(err) => {
+            log!(Error, "Error loading the `/base` keyspace: {:?}", err);
+            return;
+        }
+    };
+    let tx_input = match sub_block::read_single_tx_execution_input(&mut base) {
         Ok(Some(input)) => input,
         Ok(None) => {
             log!(
@@ -132,7 +139,7 @@ where
             return;
         }
     };
-    match sub_block::handle_run_transaction(&mut host, tx_input) {
+    match sub_block::handle_run_transaction(&mut host, &base, tx_input) {
         Ok(()) => (),
         Err(err) => {
             log!(
@@ -158,7 +165,14 @@ where
         + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let assemble_block_input = match sub_block::read_assemble_block_input(&mut host) {
+    let mut base = match crate::storage::load_base_keyspace(&mut host) {
+        Ok(base) => base,
+        Err(err) => {
+            log!(Error, "Error loading the `/base` keyspace: {:?}", err);
+            return;
+        }
+    };
+    let assemble_block_input = match sub_block::read_assemble_block_input(&mut base) {
         Ok(Some(input)) => input,
         Ok(None) => {
             log!(Error, "No assemble block input found in storage");
@@ -169,7 +183,7 @@ where
             return;
         }
     };
-    match sub_block::assemble_block(&mut host, assemble_block_input) {
+    match sub_block::assemble_block(&mut host, &mut base, assemble_block_input) {
         Ok(()) => (),
         Err(err) => {
             log!(Error, "Error while assembling block: {:?}", err);
