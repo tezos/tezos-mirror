@@ -477,6 +477,13 @@ let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
     | Some middleware -> middleware callback
     | None -> callback
   in
+  (* Outermost layer: caps the request body size before anything else runs
+     (events, metrics, forwarding, routing, ACL). *)
+  let callback =
+    RPC_middleware.limit_body_size
+      ~max_body_size:rpc_config.max_request_body_size
+      callback
+  in
   let mode = extract_mode rpc_server_kind in
   Lwt.catch
     (fun () ->
