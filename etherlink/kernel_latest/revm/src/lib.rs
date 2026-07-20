@@ -1950,6 +1950,82 @@ mod test {
     }
 
     #[test]
+    fn test_call_update_sequencer_key_invalid_point() {
+        let mut host = MockKernelHost::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+
+        init_precompile_bytecodes(&mut host, true).unwrap();
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            origin: AccountOrigin::Unclassified,
+            code: None,
+        };
+        let mut storage_account = StorageAccount::from_address(&caller).unwrap();
+        storage_account.set_info(&mut host, caller_info).unwrap();
+
+        // Current sequencer key.
+        let private_key = SecretKeyEd25519::from_b58check(
+            "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6",
+        )
+        .unwrap();
+        let public_key = PublicKey::from_b58check(
+            "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
+        )
+        .unwrap();
+        let pk_b58 = PublicKey::to_b58check(&public_key);
+        host.store_write_all(&SEQUENCER_KEY_PATH, String::as_bytes(&pk_b58))
+            .unwrap();
+
+        // Replacement key: secp256k1 tag (0x01), compression byte 0x02, then 32
+        // bytes that are not a point on the curve. It parses (length-only) but
+        // must be rejected by the curve check.
+        let mut invalid_pk_bytes = vec![0x01u8, 0x02];
+        invalid_pk_bytes.extend_from_slice(&[0xff; 32]);
+        // Signed by the current sequencer, so the only reason to revert is the
+        // invalid point.
+        let signature = private_key.sign(invalid_pk_bytes.clone()).unwrap();
+        let signature_bytes = signature.to_bytes().unwrap();
+        let calldata =
+            ChangeSequencerKeyCalls::change_sequencer_key(change_sequencer_keyCall {
+                publicKey: Bytes::copy_from_slice(&invalid_pk_bytes),
+                signature: Bytes::copy_from_slice(&signature_bytes),
+            })
+            .abi_encode();
+
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let ExecutionOutcome { result, .. } = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            caller,
+            Some(CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS),
+            Bytes::copy_from_slice(&calldata),
+            GasData::new(10_000_000, 0, GAS_LIMIT),
+            U256::MAX,
+            None,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .unwrap();
+
+        // The precompile reverts: no event is emitted and no pending key change
+        // is stored.
+        assert!(result.logs().is_empty());
+        assert!(host.store_read_all(&SEQUENCER_KEY_CHANGE_PATH).is_err());
+    }
+
+    #[test]
     fn test_call_mint_erc20() {
         let mut host = MockKernelHost::default();
         let block_constants = BlockConstants::test_block_with_fees();

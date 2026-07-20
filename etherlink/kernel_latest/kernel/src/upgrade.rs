@@ -172,6 +172,11 @@ impl Decodable for SequencerUpgrade {
 
         let mut it = decoder.iter();
         let sequencer = decode_public_key(&next(&mut it)?)?;
+        // Reject keys that are not valid points on their curve, so an unusable
+        // key cannot become the sequencer key.
+        sequencer
+            .check_validity()
+            .map_err(|_| DecoderError::Custom("invalid sequencer public key"))?;
         let pool_address: H160 = decode_field(&next(&mut it)?, "sequencer_pool_address")?;
         let activation_timestamp = decode_timestamp(&next(&mut it)?)?;
 
@@ -386,5 +391,48 @@ mod tests {
         // At/after activation the change applies but the counter is unchanged.
         possible_sequencer_key_change(&mut host, Timestamp::from(100i64)).unwrap();
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+    }
+
+    fn upgrade_with(sequencer: PublicKey) -> SequencerUpgrade {
+        SequencerUpgrade {
+            sequencer,
+            pool_address: H160::zero(),
+            activation_timestamp: Timestamp::from(0i64),
+        }
+    }
+
+    #[test]
+    fn sequencer_upgrade_decode_rejects_off_curve_key() {
+        // A secp256k1 key that decodes (length-only) but is not a point on the
+        // curve must be rejected so it cannot become the sequencer key.
+        let invalid = PublicKey::from_b58check(
+            "sppk7bFP2oW86SDDFzqiDCMtbm8j4obhJ9AVYkG1XFzwz4ik6kGmM5V",
+        )
+        .unwrap();
+        let encoded = rlp::encode(&upgrade_with(invalid));
+        assert!(rlp::decode::<SequencerUpgrade>(&encoded).is_err());
+    }
+
+    #[test]
+    fn sequencer_upgrade_decode_accepts_valid_key() {
+        let valid = PublicKey::from_b58check(
+            "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
+        )
+        .unwrap();
+        let encoded = rlp::encode(&upgrade_with(valid));
+        assert!(rlp::decode::<SequencerUpgrade>(&encoded).is_ok());
+    }
+
+    #[test]
+    fn sequencer_upgrade_decode_rejects_invalid_ed25519() {
+        // Unlike Michelson `key` literals, the sequencer key is fully
+        // validated: an Ed25519 key that decodes (length-only) but is not a
+        // valid point is rejected.
+        let invalid = PublicKey::from_b58check(
+            "edpktf7DydMTKVxjkGzpoCefNuUuSdTa7YVquqoVs2uTjNJ5iCqxLn",
+        )
+        .unwrap();
+        let encoded = rlp::encode(&upgrade_with(invalid));
+        assert!(rlp::decode::<SequencerUpgrade>(&encoded).is_err());
     }
 }
