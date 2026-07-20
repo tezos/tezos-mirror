@@ -1459,7 +1459,7 @@ test_sdk_rust:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.compile_sources_doc_deps_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1480,7 +1480,7 @@ oc.compile_sources_doc_deps_debian:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_deps_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-73a6a3d6
   stage: test
   tags:
   - gcp_very_high_cpu
