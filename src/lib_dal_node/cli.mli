@@ -89,6 +89,9 @@ module Term : sig
   (** Metrics server endpoint. *)
   val metrics_addr_arg : P2p_point.Id.t arg
 
+  (** Maximum size, in bytes, of an RPC request body read into memory. *)
+  val rpc_max_request_body_size_arg : int64 arg
+
   val history_mode_arg : Configuration_file.history_mode arg
 
   (** Name of the service provided by this node. *)
@@ -158,6 +161,7 @@ module Action : sig
     ?batching_configuration:Configuration_file.batching_configuration ->
     ?publish_slots_regularly:Configuration_file.publish_slots_regularly ->
     ?ignore_l1_history_check:bool ->
+    ?rpc_max_request_body_size:int64 ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t
 
@@ -186,6 +190,7 @@ module Action : sig
     ?disable_amplification:bool ->
     ?banned_addrs:P2p_addr.t list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
+    ?rpc_max_request_body_size:int64 ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t
 
@@ -214,6 +219,7 @@ module Action : sig
     ?disable_amplification:bool ->
     ?banned_addrs:P2p_addr.t list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
+    ?rpc_max_request_body_size:int64 ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t
 
@@ -242,6 +248,7 @@ module Action : sig
     ?disable_amplification:bool ->
     ?banned_addrs:P2p_addr.t list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
+    ?rpc_max_request_body_size:int64 ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t
 

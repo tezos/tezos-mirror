@@ -883,7 +883,10 @@ let register_plugin node_ctxt =
 
 let start configuration ctxt =
   let open Lwt_syntax in
-  let Configuration_file.{rpc_addr; rpc_acl_policy; _} = configuration in
+  let Configuration_file.
+        {rpc_addr; rpc_acl_policy; rpc_max_request_body_size; _} =
+    configuration
+  in
   let dir = register ctxt (register_plugin ctxt) in
   let dir =
     Tezos_rpc.Directory.register_describe_directory_service
@@ -914,7 +917,10 @@ let start configuration ctxt =
         RPC_server.launch
           ~host
           server
-          ~callback:(RPC_server.resto_callback server)
+          ~callback:
+            (RPC_middleware.limit_body_size
+               ~max_body_size:rpc_max_request_body_size
+               (RPC_server.resto_callback server))
           node
       in
       return_ok server)

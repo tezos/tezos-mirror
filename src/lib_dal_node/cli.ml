@@ -66,7 +66,8 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
     ?service_namespace ?telemetry_env ?experimental_features
     ?fetch_trusted_setup ?(verbose = false) ?(ignore_l1_config_peers = false)
     ?(disable_amplification = false) ?(banned_addrs = [])
-    ?batching_configuration ?publish_slots_regularly configuration =
+    ?batching_configuration ?publish_slots_regularly ?rpc_max_request_body_size
+    configuration =
   let profile =
     match profile with
     | None -> configuration.Configuration_file.profile
@@ -124,6 +125,10 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
         ~none:configuration.publish_slots_regularly
         ~some:Option.some
         publish_slots_regularly;
+    rpc_max_request_body_size =
+      Option.value
+        ~default:configuration.rpc_max_request_body_size
+        rpc_max_request_body_size;
   }
 
 let profile ?attesters ?operators ?observers ?(bootstrap = false) () =
@@ -538,6 +543,28 @@ module Term = struct
 
   let metrics_addr = arg_to_cmdliner metrics_addr_arg
 
+  let rpc_max_request_body_size_arg =
+    let parse str =
+      match Int64.of_string_opt str with
+      | Some n when Int64.compare n 0L > 0 -> Ok n
+      | Some _ | None -> Error "rpc-max-request-body must be a positive integer"
+    in
+    let pp ppf n = Format.fprintf ppf "%Ld" n in
+    make_arg
+      ~doc:
+        (Format.asprintf
+           "The maximum size, in bytes, of an RPC request body the server will \
+            read into memory. Requests whose body exceeds this size are \
+            rejected with HTTP 413 before routing or ACL checks are performed. \
+            The default is %Ld."
+           Configuration_file.default_rpc_max_request_body_size)
+      ~placeholder:"BYTES"
+      ~pp
+      ~parse
+      "rpc-max-request-body"
+
+  let rpc_max_request_body_size = arg_to_cmdliner rpc_max_request_body_size_arg
+
   let history_mode_arg =
     let open Result_syntax in
     let doc =
@@ -816,7 +843,8 @@ module Run = struct
        ignore_topics
        batching_configuration
        publish_slots_regularly
-       ignore_l1_history_check ->
+       ignore_l1_history_check
+       rpc_max_request_body_size ->
     let open Lwt_result_syntax in
     let data_dir =
       Option.value ~default:Configuration_file.default.data_dir data_dir
@@ -852,6 +880,7 @@ module Run = struct
         ?banned_addrs
         ?batching_configuration
         ?publish_slots_regularly
+        ?rpc_max_request_body_size
     in
     let* () =
       if env_disable_shard_validation && not disable_shard_validation then
@@ -927,7 +956,7 @@ module Run = struct
        $ fetch_trusted_setup $ disable_shard_validation $ verbose
        $ ignore_l1_config_peers $ disable_amplification $ banned_addrs
        $ ignore_topics $ batching_configuration $ publish_slots_regularly
-       $ ignore_l1_history_check))
+       $ ignore_l1_history_check $ rpc_max_request_body_size))
 
   let cmd = Cmdliner.Cmd.v info term
 end
@@ -967,7 +996,8 @@ module Config = struct
        ignore_l1_config_peers
        disable_amplification
        banned_addrs
-       batching_configuration ->
+       batching_configuration
+       rpc_max_request_body_size ->
     let open Lwt_result_syntax in
     let data_dir =
       Option.value ~default:Configuration_file.default.data_dir data_dir
@@ -1000,6 +1030,7 @@ module Config = struct
         ~disable_amplification
         ?banned_addrs
         ?batching_configuration
+        ?rpc_max_request_body_size
     in
     action ~config_file ~configuration_override
 
@@ -1014,7 +1045,7 @@ module Config = struct
        $ operator_profile $ observer_profile $ bootstrap_profile $ peers
        $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
        $ verbose $ ignore_l1_config_peers $ disable_amplification $ banned_addrs
-       $ batching_configuration))
+       $ batching_configuration $ rpc_max_request_body_size))
 
   let print_trace ~error_trace =
     Format.eprintf "Failure: %a" Error_monad.pp_print_trace error_trace ;
@@ -1396,7 +1427,8 @@ module Action = struct
       ?(disable_shard_validation = false) ?(verbose = false)
       ?(ignore_l1_config_peers = false) ?(disable_amplification = false)
       ?banned_addrs ?ignore_topics ?batching_configuration
-      ?publish_slots_regularly ?(ignore_l1_history_check = false) () =
+      ?publish_slots_regularly ?(ignore_l1_history_check = false)
+      ?rpc_max_request_body_size () =
     Run.action
       data_dir
       config_file
@@ -1427,6 +1459,7 @@ module Action = struct
       batching_configuration
       publish_slots_regularly
       ignore_l1_history_check
+      rpc_max_request_body_size
 
   let mk_config_action action =
    fun ?data_dir
@@ -1453,6 +1486,7 @@ module Action = struct
        ?(disable_amplification = false)
        ?banned_addrs
        ?batching_configuration
+       ?rpc_max_request_body_size
        () ->
     action
       data_dir
@@ -1479,6 +1513,7 @@ module Action = struct
       disable_amplification
       banned_addrs
       batching_configuration
+      rpc_max_request_body_size
 
   let config_init = mk_config_action Config.Init.action
 
