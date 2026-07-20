@@ -37,7 +37,6 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_smart_rollup::outbox::OutboxQueue;
-use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
 #[cfg(target_arch = "wasm32")]
@@ -50,10 +49,10 @@ const DELAYED_INPUT_KEY: Key = Key::from_static(b"/__delayed_input");
 const TEZOSX_SIMULATION_INPUT_KEY: Key = Key::from_static(b"/__simulation/input");
 const TEZOSX_SIMULATION_RESULT_KEY: Key = Key::from_static(b"/__simulation/result");
 
-pub(crate) const TEZOSX_ENTRYPOINTS_INPUT: RefPath =
-    RefPath::assert_from(b"/base/tezosx_entrypoints/input");
-pub(crate) const TEZOSX_ENTRYPOINTS_RESULT: RefPath =
-    RefPath::assert_from(b"/base/tezosx_entrypoints/result");
+pub(crate) const TEZOSX_ENTRYPOINTS_INPUT_KEY: Key =
+    Key::from_static(b"/tezosx_entrypoints/input");
+pub(crate) const TEZOSX_ENTRYPOINTS_RESULT_KEY: Key =
+    Key::from_static(b"/tezosx_entrypoints/result");
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
@@ -498,21 +497,34 @@ pub extern "C" fn tezosx_michelson_entrypoints() {
 #[allow(dead_code)]
 pub fn tezosx_michelson_entrypoints_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let input = match host.store_read_all(&TEZOSX_ENTRYPOINTS_INPUT) {
-        Ok(bytes) => bytes,
+    let mut base = match crate::storage::load_base_keyspace(&mut host) {
+        Ok(base) => base,
         Err(err) => {
-            log!(Error, "Error reading tezosx entrypoints input: {:?}", err);
+            log!(Error, "Error loading the `/base` keyspace: {:?}", err);
             return;
         }
     };
-    handle_query_entrypoints_to(&mut host, &input, &TEZOSX_ENTRYPOINTS_RESULT);
+    let input = match base.get(&TEZOSX_ENTRYPOINTS_INPUT_KEY) {
+        Some(bytes) => bytes,
+        None => {
+            log!(Error, "Tezos X entrypoints input not found");
+            return;
+        }
+    };
+    handle_query_entrypoints_to(
+        &mut host,
+        &mut base,
+        &input,
+        &TEZOSX_ENTRYPOINTS_RESULT_KEY,
+    );
 }
 
 /// Query the entrypoints and synthetic views of a contract and write
-/// the result to `result_path`.
+/// the result through the `/base` keyspace at `result_key`.
 ///
 /// This works for both originated and enshrined smart contracts of
 /// the Michelson runtime but is currently only used for enshrined
@@ -524,8 +536,9 @@ where
 /// Input: binary-encoded contract AddressHash (22 bytes).
 fn handle_query_entrypoints_to<Host, R>(
     host: &mut KernelHost<R, Host>,
+    base: &mut impl KeySpace,
     payload: &[u8],
-    result_path: &RefPath,
+    result_key: &Key,
 ) where
     R: tezos_smart_rollup_host::runtime::Runtime,
     Host: std::borrow::BorrowMut<R> + std::borrow::Borrow<R>,
@@ -563,7 +576,7 @@ fn handle_query_entrypoints_to<Host, R>(
             return;
         }
     };
-    if let Err(err) = host.store_write_all(result_path, &result) {
+    if let Err(err) = base.set(result_key, result) {
         log!(Error, "Error writing tezos entrypoints result: {:?}", err);
     }
 }
@@ -669,15 +682,15 @@ mod tests {
     use mir::gas::Gas;
     use mir::parser::Parser;
     use std::collections::HashMap;
-    use tezos_smart_rollup_host::storage::StorageV1;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_keyspace::KeySpace;
 
-    use crate::evm_node_entrypoint::{
-        tezosx_michelson_entrypoints_fn, TEZOSX_ENTRYPOINTS_INPUT,
-        TEZOSX_ENTRYPOINTS_RESULT,
+    use crate::evm_node_entrypoint::tezosx_michelson_entrypoints_fn;
+
+    use super::{
+        encode_entrypoints_result, TEZOSX_ENTRYPOINTS_INPUT_KEY,
+        TEZOSX_ENTRYPOINTS_RESULT_KEY,
     };
-
-    use super::encode_entrypoints_result;
     use tezos_execution::enshrined_contracts::EnshrinedContracts;
 
     /// Decodes the output of `encode_entrypoints_result` back into a
@@ -929,17 +942,24 @@ mod tests {
         assert_eq!(*return_ty, Type::Bytes);
     }
 
-    fn run_entrypoints_query(host: &mut MockHost, addr_hash: &[u8]) -> Vec<u8> {
-        host.store_write_all(&TEZOSX_ENTRYPOINTS_INPUT, addr_hash)
-            .expect("write input");
-        tezosx_michelson_entrypoints_fn(host);
-        host.store_read_all(&TEZOSX_ENTRYPOINTS_RESULT)
+    fn run_entrypoints_query(host: &mut MockKernelHost, addr_hash: &[u8]) -> Vec<u8> {
+        // The node seeds the input and reads the result through the `/base`
+        // keyspace, and `tezosx_michelson_entrypoints_fn` consumes/produces
+        // them the same way.
+        {
+            let mut base = crate::storage::load_base_keyspace(host).unwrap();
+            base.set(&TEZOSX_ENTRYPOINTS_INPUT_KEY, addr_hash)
+                .expect("write input");
+        }
+        tezosx_michelson_entrypoints_fn(&mut host.host);
+        let base = crate::storage::load_base_keyspace(host).unwrap();
+        base.get(&TEZOSX_ENTRYPOINTS_RESULT_KEY)
             .expect("entrypoints result should have been written")
     }
 
     #[test]
     fn test_entrypoints_query_gateway() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let result = run_entrypoints_query(
             &mut host,
             &EnshrinedContracts::TezosXGateway.address_hash_bytes(),
@@ -990,7 +1010,7 @@ mod tests {
 
     #[test]
     fn test_entrypoints_query_erc20() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let result = run_entrypoints_query(
             &mut host,
             &EnshrinedContracts::ERC20Wrapper.address_hash_bytes(),
@@ -1006,7 +1026,7 @@ mod tests {
 
     #[test]
     fn test_entrypoints_query_unknown_contract_returns_none() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let unknown_kt1: [u8; 22] =
             hex::decode("01AABBCC000000000000000000000000000000000100")
                 .unwrap()
