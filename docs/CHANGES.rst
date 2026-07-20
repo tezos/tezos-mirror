@@ -19,21 +19,16 @@ General
   NAT or load balancer that drops idle flows) are eventually closed and
   their resources released, instead of being retained until restart.
 
-- **Security** Fixed a bug where the in-memory protocol cache could be
-  reused across a chain reorganization even though it did not belong to
-  the block's predecessor, risking validation against stale entries. The
-  cache is now rebuilt from the committed context whenever this is
-  detected. Node operators should upgrade promptly. (MR :gl:`!22462`)
+- **Security** Ensured the cache is rebuilt from the committed context whenever
+  the in-memory protocol cache contains stale data computed before a chain
+  reorganization. (MR :gl:`!22462`)
 
-- **Security** Fixed a vulnerability in smart rollup refutation game
-  validation (protocols PtTALLiN, PsUshuai, Alpha) that could allow an
-  invalid refutation move to bypass block validation. Node operators
-  and bakers should upgrade promptly. (MR :gl:`!22476`)
+- **Security** Hardened the validation of the smart rollup operation used to
+  advance an ongoing refutation game to reject malformed inputs at the shell
+  level. (MR :gl:`!22476`)
 
-- **Security** Fixed a vulnerability (protocol PsUshuai) where malformed
-  double-baking evidence was not rejected by block validation, the
-  mempool, or the baker. Node operators and bakers should upgrade
-  promptly. (MR :gl:`!22484`)
+- **Security** Hardened the validation of the double-baking evidence at the
+  shell level against adversarial inputs. (MR :gl:`!22484`)
 
 Node
 ----
