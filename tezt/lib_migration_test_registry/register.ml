@@ -14,7 +14,6 @@ type state = {
     | `Nextnet of string
     | `Sandbox
     | `Shadownet
-    | `Tallinnnet
     | `Ushuaianet
     | `Weeklynet of string ];
   next_protocol : Tezt_tezos.Protocol.t;
