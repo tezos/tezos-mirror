@@ -639,14 +639,18 @@ where
             }
         }
 
-        if let Some(transaction_hash) = struct_logger_tx_hash {
-            StructLogger::store_outcome(
-                evm_context.ctx.db_mut().host,
-                result.is_success(),
-                result.output(),
-                result.gas_used(),
-                transaction_hash,
-            )?
+        // Cross-runtime legs inherit the outer transaction's tracer; only
+        // the outer run's outcome belongs in storage.
+        if !is_cross_runtime {
+            if let Some(transaction_hash) = struct_logger_tx_hash {
+                StructLogger::store_outcome(
+                    evm_context.ctx.db_mut().host,
+                    result.is_success(),
+                    result.output(),
+                    result.gas_used(),
+                    transaction_hash,
+                )?
+            }
         }
 
         let withdrawals = if matches!(origin, TransactionOrigin::UserInput { .. }) {
