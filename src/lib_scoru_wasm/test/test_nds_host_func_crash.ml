@@ -103,6 +103,60 @@ let test_nds_host_func_crashes_process ~version () =
   assert raised ;
   Lwt_result_syntax.return_unit
 
+(** A kernel that imports and calls the real [nds_registry_resize]
+    host function (available from V6). Unlike {!kernel}, nothing is
+    hijacked in the registry: this exercises the genuine flag-off NDS
+    implementation as dispatched by a single-state PVM. *)
+let nds_flag_off_kernel =
+  {|
+(module
+ (import "smart_rollup_core" "nds_registry_resize"
+         (func $nds_registry_resize (param i64) (result i32)))
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_run")
+       (drop (call $nds_registry_resize (i64.const 2)))
+       (nop))
+ )
+|}
+
+(** Regression test for making the flag-off NDS path a plain
+    [Host_func].  The default PVM runs with single-state
+    ([Durable_only]) storage and the [Nds_host_functions] feature flag
+    off.  Prior to the fix a disabled NDS host function was still
+    registered as an [Nds_host_func], so calling it hit the
+    [Durable_only] branch in [eval.ml] and raised
+    [Eval.Nds_host_func_without_nds_storage] — which [next_tick_state]
+    re-raises, crashing the PVM.  With the flag off the call must now
+    degrade to a no-op (returning the disabled code) and leave the PVM
+    running normally. *)
+let test_nds_flag_off_does_not_crash_on_single_state ~version () =
+  let open Lwt_syntax in
+  let* tree = initial_state ~version nds_flag_off_kernel in
+  let* tree = eval_until_input_requested tree in
+  let* tree = set_empty_inbox_step 0l tree in
+  let* crashed, final_tree =
+    Lwt.catch
+      (fun () ->
+        let* tree = eval_until_input_or_reveal_requested tree in
+        Lwt.return (false, Some tree))
+      (function
+        | Tezos_webassembly_interpreter.Eval.Nds_host_func_without_nds_storage
+          ->
+            Lwt.return (true, None)
+        | exn -> Lwt.reraise exn)
+  in
+  assert (not crashed) ;
+  (* The flag-off call degraded to a no-op, so the PVM must keep running
+     normally rather than having been marked stuck. *)
+  let* stuck_flag =
+    match final_tree with
+    | Some tree -> has_stuck_flag tree
+    | None -> Lwt.return_true
+  in
+  assert (not stuck_flag) ;
+  Lwt_result_syntax.return_unit
+
 let tests =
   tztests_with_all_pvms
     [
@@ -111,9 +165,21 @@ let tests =
         test_nds_host_func_crashes_process );
     ]
 
+(* NDS host functions only exist from V6 onwards; on earlier versions
+   the import would fail to link, so the flag-off regression is gated
+   to V6+. *)
+let v6_tests =
+  tztests_with_pvm
+    ~versions:Wasm_pvm_state.[V6; VExperimental]
+    [
+      ( "flag-off NDS host function does not crash single-state PVM",
+        `Quick,
+        test_nds_flag_off_does_not_crash_on_single_state );
+    ]
+
 let () =
   Alcotest_lwt.run
     ~__FILE__
     "test lib scoru wasm"
-    [("NDS host function dispatch", tests)]
+    [("NDS host function dispatch", tests @ v6_tests)]
   |> Lwt_main.run
