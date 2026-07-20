@@ -37,6 +37,7 @@ tezos_crypto_rs.workspace = true
 tezos_crypto_rs.workspace = true
 tezos-evm-logging.workspace = true
 tezos-smart-rollup-mock.workspace = true
+tezos-smart-rollup-encoding.workspace = true
 tezos_data_encoding.workspace = true
 tezos-protocol.workspace = true
 mir.workspace = true

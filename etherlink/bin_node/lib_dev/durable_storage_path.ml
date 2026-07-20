@@ -261,6 +261,11 @@ let sequencer_key ~storage_version =
   then sequencer_key_world_state
   else sequencer_key_legacy
 
+(* Counter incremented by the kernel on every sequencer key change. It only
+   ever lives in the world state (introduced after the world-state migration),
+   so there is no legacy path. *)
+let sequencer_change_counter = EVM.World_state.make "/sequencer_change_counter"
+
 let maximum_gas_per_transaction ~storage_version =
   if Storage_version.evm_config_moved_to_world_state ~storage_version then
     EVM.World_state.make "/maximum_gas_per_transaction"

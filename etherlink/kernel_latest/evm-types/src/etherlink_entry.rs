@@ -27,6 +27,7 @@ pub enum EtherlinkEntry {
     IncrementGlobalCounter,
     StoreSequencerKeyChange {
         old_sequencer_key_change: Option<SequencerKeyChange>,
+        old_sequencer_change_counter: Option<U256>,
     },
     CreateAlias {
         address: Address,

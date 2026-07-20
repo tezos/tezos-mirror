@@ -589,11 +589,26 @@ impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
         Ok(self.database.deposit_in_queue(deposit_id)?)
     }
 
-    pub fn store_sequencer_key_change(&mut self, upgrade: SequencerKeyChange) {
+    /// Counter the next sequencer key change must be signed against, read
+    /// through the layered state so a second inner precompile call in the same
+    /// transaction sees the in-memory value (see
+    /// `LayeredState::sequencer_change_counter`).
+    pub fn sequencer_change_counter(&self) -> Result<U256, LayeredStateError> {
         self.journal
             .evm
             .layered_state
-            .store_sequencer_key_change(upgrade)
+            .sequencer_change_counter(&self.database)
+    }
+
+    pub fn store_sequencer_key_change(
+        &mut self,
+        upgrade: SequencerKeyChange,
+        base_counter: U256,
+    ) -> Result<(), LayeredStateError> {
+        self.journal
+            .evm
+            .layered_state
+            .store_sequencer_key_change(upgrade, base_counter)
     }
 
     pub fn log(&mut self, log: Log) {

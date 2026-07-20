@@ -157,6 +157,8 @@ val sequencer_key_world_state : path
 
 val sequencer_key : storage_version:int -> path
 
+val sequencer_change_counter : path
+
 val maximum_gas_per_transaction : storage_version:int -> path
 
 val michelson_runtime_sunrise_level : storage_version:int -> path
