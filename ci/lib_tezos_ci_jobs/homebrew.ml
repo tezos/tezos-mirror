@@ -5,9 +5,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let only_if_changed =
+  [
+    "scripts/packaging/test_homebrew_install.sh";
+    "scripts/packaging/homebrew_release.sh";
+    "images/scripts/install-gcloud.sh";
+    "scripts/packaging/homebrew_install.sh";
+    "scripts/packaging/octez/homebrew/Formula/*";
+    "scripts/version.sh";
+    "manifest/**/*.ml*";
+  ]
+
 open Tezos_ci
 module CI = Cacio.Shared
-open Changesets
 
 let image = Images.Base_images.debian_homebrew_trixie
 
@@ -25,7 +35,7 @@ let job_create_homebrew_formula =
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Days 1))
          ["public/homebrew/*"])
-    ~only_if_changed:(Tezos_ci.Changeset.encode changeset_homebrew)
+    ~only_if_changed
     ~script:["./scripts/packaging/homebrew_release.sh"]
 
 let job_build_homebrew_formula =
@@ -41,7 +51,7 @@ let job_build_homebrew_formula =
     ~allow_failure:No
     ~image
     ~needs:[(Job, job_create_homebrew_formula)]
-    ~only_if_changed:(Tezos_ci.Changeset.encode changeset_homebrew)
+    ~only_if_changed
     ~variables:
       [
         ("DUNE_BUILD_JOBS", "-j 12");
@@ -64,7 +74,7 @@ let job_build_homebrew_formula_macosx =
     ~image:(Image.mk_external ~image_path:"$MACOS_IMAGE")
     ~allow_failure:Yes
     ~needs:[(Job, job_create_homebrew_formula)]
-    ~only_if_changed:(Tezos_ci.Changeset.encode changeset_homebrew)
+    ~only_if_changed
     ~parallel:
       (Matrix [[("MACOS_IMAGE", ["macos-15-xcode-16"; "macos-26-xcode-26"])]])
     ~tag:Dynamic
