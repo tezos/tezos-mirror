@@ -28,6 +28,8 @@ pub enum LayeredStateError {
     },
     #[error("Global counter overflow")]
     GlobalCounterOverflow,
+    #[error("Sequencer change counter overflow")]
+    SequencerChangeCounterOverflow,
     #[error("Deposit already removed")]
     DepositAlreadyRemoved,
 }

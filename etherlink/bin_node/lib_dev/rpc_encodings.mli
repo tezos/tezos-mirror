@@ -138,6 +138,11 @@ module Sequencer :
     with type input = Ethereum_types.Block_parameter.extended
      and type output = Signature.Public_key.t
 
+module Sequencer_key_change_counter :
+  METHOD
+    with type input = Ethereum_types.Block_parameter.extended
+     and type output = Ethereum_types.quantity
+
 module Kernel_version :
   METHOD
     with type input = Ethereum_types.Block_parameter.extended
