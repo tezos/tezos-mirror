@@ -9,17 +9,19 @@
 //! concatenating the prefix with the key to form a full irmin path.
 
 use std::cell::Cell;
+use std::collections::BTreeMap;
+use std::ops::Bound;
 use std::rc::Rc;
 
 use hex_literal::hex;
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath},
     runtime::{RuntimeError, ValueType},
-    storage::StorageV1,
+    storage::{CoreStorage, StorageV1},
     Error as HostError,
 };
 
-use crate::{Key, KeySpace, KeySpaceWriteError, Name};
+use crate::{Key, KeySpace, KeySpaceLoaderError, KeySpaceWriteError, Name};
 
 /// Blake2B hash of an empty irmin tree (`Context.Tree.empty` in OCaml).
 const EMPTY_TREE_HASH: [u8; 32] =
@@ -149,19 +151,19 @@ fn classify_write_error(e: RuntimeError) -> KeySpaceWriteError {
 /// Each instance operates under a fixed [`Name`] prefix: all keys are
 /// resolved to `{prefix}{key}` in the durable tree.
 ///
-/// When created via [`KeySpaceLoader`], the handle carries a guard
+/// When created via [`IrminKeySpaceRegistry::load_or_create`], the handle carries a guard
 /// that releases the name on [`Drop`], allowing it to be loaded again.
-pub struct StorageV1KeySpaceCompat<Host> {
-    host: Host,
+pub struct StorageV1KeySpaceCompat<Storage> {
+    storage: Storage,
     prefix: Name,
     guard: Rc<Cell<bool>>,
 }
 
-impl<Host> StorageV1KeySpaceCompat<Host> {
+impl<Storage> StorageV1KeySpaceCompat<Storage> {
     /// Create a new `StorageV1KeySpaceCompat` operating under the given name prefix.
-    pub fn new(host: Host, name: Name, guard: Rc<Cell<bool>>) -> Self {
+    pub fn new(storage: Storage, name: Name, guard: Rc<Cell<bool>>) -> Self {
         Self {
-            host,
+            storage,
             prefix: name,
             guard,
         }
@@ -175,14 +177,14 @@ impl<Host> StorageV1KeySpaceCompat<Host> {
     }
 }
 
-impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
+impl<Storage: StorageV1> KeySpace for StorageV1KeySpaceCompat<Storage> {
     fn name(&self) -> &Name {
         &self.prefix
     }
 
     fn get(&self, key: &Key) -> Option<Vec<u8>> {
         let path = self.full_path(key);
-        self.host
+        self.storage
             .store_read_all(&path)
             .map_err(StorageV1ReadError::from)
             .ok()
@@ -190,7 +192,7 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
 
     fn read(&self, key: &Key, offset: usize, buffer: &mut [u8]) -> Option<usize> {
         let path = self.full_path(key);
-        self.host
+        self.storage
             .store_read_slice(&path, offset, buffer)
             .map_err(StorageV1ReadError::from)
             .ok()
@@ -202,7 +204,7 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
         value: impl AsRef<[u8]>,
     ) -> Result<(), KeySpaceWriteError> {
         let path = self.full_path(key);
-        self.host
+        self.storage
             .store_write_all(&path, value.as_ref())
             .map_err(classify_write_error)
     }
@@ -214,7 +216,7 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
         data: impl AsRef<[u8]>,
     ) -> Result<usize, KeySpaceWriteError> {
         let path = self.full_path(key);
-        self.host
+        self.storage
             .store_write(&path, data.as_ref(), offset)
             .map_err(classify_write_error)
             .map(|()| data.as_ref().len())
@@ -222,7 +224,7 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
 
     fn value_length(&self, key: &Key) -> Option<usize> {
         let path = self.full_path(key);
-        self.host
+        self.storage
             .store_value_size(&path)
             .map_err(StorageV1ReadError::from)
             .ok()
@@ -230,7 +232,7 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
 
     fn contains(&self, key: &Key) -> bool {
         let res = self
-            .host
+            .storage
             .store_has(&self.full_path(key))
             .map_err(StorageV1ReadError::from);
         match res {
@@ -242,10 +244,13 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
 
     fn delete(&mut self, key: &Key) -> bool {
         let path = self.full_path(key);
-        let has_value = self.host.store_has(&path).map_err(StorageV1ReadError::from);
+        let has_value = self
+            .storage
+            .store_has(&path)
+            .map_err(StorageV1ReadError::from);
         match has_value {
             Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => {
-                let _ = self.host.store_delete_value(&path);
+                let _ = self.storage.store_delete_value(&path);
                 true
             }
             _ => false,
@@ -254,14 +259,14 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
 
     fn clear(&mut self) {
         let _ = self
-            .host
+            .storage
             .store_delete(&self.prefix)
             .map_err(StorageV1ReadError::from);
     }
 
     fn copy_from(&mut self, other: &Self) {
         let res = self
-            .host
+            .storage
             .store_copy(&other.prefix, &self.prefix)
             .map_err(StorageV1ReadError::from);
         match res {
@@ -277,7 +282,7 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
 
     fn move_from(&mut self, other: &mut Self) {
         let res = self
-            .host
+            .storage
             .store_move(&other.prefix, &self.prefix)
             .map_err(StorageV1ReadError::from);
         match res {
@@ -293,7 +298,7 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
 
     fn hash(&self) -> Vec<u8> {
         let res = self
-            .host
+            .storage
             .store_get_hash(&self.prefix)
             .map_err(StorageV1ReadError::from);
         match res {
@@ -310,9 +315,106 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
     }
 }
 
-impl<Host> Drop for StorageV1KeySpaceCompat<Host> {
+impl<Storage> Drop for StorageV1KeySpaceCompat<Storage> {
     fn drop(&mut self) {
         self.guard.set(false);
+    }
+}
+
+/// The registry of currently-loaded keyspace names backing a [`StorageV1`]
+/// [`KeySpaceLoader`](crate::KeySpaceLoader).
+///
+/// It mints one handle per keyspace via [`CoreStorage::new_storage`] and
+/// rejects overlapping names. The set of loaded names is fully encapsulated:
+/// callers receive a per-handle drop-guard, never access to the registry
+/// itself.
+#[derive(Debug, Default)]
+pub struct IrminKeySpaceRegistry {
+    /// The set of loaded names. Each name is guarded by a flag cleared when
+    /// its keyspace handle is dropped, allowing the name to be reloaded.
+    loaded: BTreeMap<Name, Rc<Cell<bool>>>,
+}
+
+impl IrminKeySpaceRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Load or create a key space with the given `name`, minting its storage
+    /// handle from `host`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure `self` is the only registry minting keyspaces
+    /// from `host`; otherwise the overlap checks can be bypassed and two live
+    /// keyspaces may address overlapping paths.
+    pub unsafe fn load_or_create<Host: CoreStorage>(
+        &mut self,
+        host: &mut Host,
+        name: Name,
+    ) -> Result<StorageV1KeySpaceCompat<Host::Storage>, KeySpaceLoaderError> {
+        // Resolve the name against the registry first, taking an owned guard,
+        // so the registry borrow is released before minting the handle.
+        let guard = self.register(&name)?;
+        // SAFETY: the handle is scoped to `name`, a unique, non-overlapping
+        // prefix (enforced by `register`), so no two live keyspaces address
+        // overlapping paths.
+        let storage = unsafe { host.new_storage() };
+        Ok(StorageV1KeySpaceCompat::new(storage, name, guard))
+    }
+
+    /// Register `name` in the loaded set and return its guard, or an error if
+    /// it is already loaded or overlaps a currently-loaded name.
+    fn register(&mut self, name: &Name) -> Result<Rc<Cell<bool>>, KeySpaceLoaderError> {
+        let loaded = &mut self.loaded;
+
+        // Check for exact duplicate or re-load a dropped keyspace.
+        if let Some(guard) = loaded.get(name) {
+            if guard.get() {
+                return Err(KeySpaceLoaderError::AlreadyLoaded);
+            }
+            // Previously loaded and dropped — re-load immediately. Overlap
+            // checks are unnecessary: the name was already validated, and
+            // overlapping names are permanently rejected.
+            guard.set(true);
+            return Ok(Rc::clone(guard));
+        }
+
+        let name_str: &str = name.as_ref();
+
+        // Overlapping descendants: in the sorted map any name starting with
+        // `name/` sorts right after `name` (only '-' and '.' are valid path
+        // chars below '/').
+        for (existing, _) in
+            loaded.range::<Name, _>((Bound::Excluded(name), Bound::Unbounded))
+        {
+            let existing_str: &str = existing.as_ref();
+            if !existing_str.starts_with(name_str) {
+                break;
+            }
+            if existing_str.as_bytes()[name_str.len()] == b'/' {
+                return Err(KeySpaceLoaderError::Overlapping);
+            }
+        }
+
+        // Overlapping ancestors: point lookups at each '/' boundary, bounded by
+        // the path depth.
+        for (i, &b) in name_str.as_bytes().iter().enumerate().skip(1) {
+            if b == b'/' {
+                if let Ok(ancestor) = name_str[..i].parse::<Name>() {
+                    if loaded.contains_key(&ancestor) {
+                        return Err(KeySpaceLoaderError::Overlapping);
+                    }
+                }
+            }
+        }
+
+        let guard = loaded
+            .entry(name.clone())
+            .or_insert_with(|| Rc::new(Cell::new(false)));
+        guard.set(true);
+        Ok(Rc::clone(guard))
     }
 }
 
