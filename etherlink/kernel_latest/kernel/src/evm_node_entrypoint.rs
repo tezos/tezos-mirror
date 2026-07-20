@@ -38,16 +38,15 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
 #[cfg(target_arch = "wasm32")]
 use tezos_smart_rollup_core::rollup_host::RollupHost;
 
 const DELAYED_INPUT_PATH: RefPath = RefPath::assert_from(b"/base/__delayed_input");
 
-const TEZOSX_SIMULATION_INPUT: RefPath =
-    RefPath::assert_from(b"/base/__simulation/input");
-const TEZOSX_SIMULATION_RESULT: RefPath =
-    RefPath::assert_from(b"/base/__simulation/result");
+const TEZOSX_SIMULATION_INPUT_KEY: Key = Key::from_static(b"/__simulation/input");
+const TEZOSX_SIMULATION_RESULT_KEY: Key = Key::from_static(b"/__simulation/result");
 
 pub(crate) const TEZOSX_ENTRYPOINTS_INPUT: RefPath =
     RefPath::assert_from(b"/base/tezosx_entrypoints/input");
@@ -192,10 +191,17 @@ where
         + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let input = match host.store_read_all(&TEZOSX_SIMULATION_INPUT) {
-        Ok(bytes) => bytes,
+    let mut base = match crate::storage::load_base_keyspace(&mut host) {
+        Ok(base) => base,
         Err(err) => {
-            log!(Error, "Error reading Tezos X simulation input: {:?}", err);
+            log!(Error, "Error loading the `/base` keyspace: {:?}", err);
+            return;
+        }
+    };
+    let input = match base.get(&TEZOSX_SIMULATION_INPUT_KEY) {
+        Some(bytes) => bytes,
+        None => {
+            log!(Error, "Tezos X simulation input not found");
             return;
         }
     };
@@ -242,20 +248,8 @@ where
         transaction_bytes.len()
     );
 
-    let chain_config = {
-        let base = match crate::storage::load_base_keyspace(&mut host) {
-            Ok(base) => base,
-            Err(err) => {
-                log!(Error, "Error loading the `/base` keyspace: {:?}", err);
-                return;
-            }
-        };
-        fetch_tezosx_configuration(&mut host, &base)
-    };
-    let blueprint_header = match crate::storage::load_base_keyspace(&mut host)
-        .map_err(crate::error::Error::from)
-        .and_then(|base| read_current_blueprint_header(&base))
-    {
+    let chain_config = fetch_tezosx_configuration(&mut host, &base);
+    let blueprint_header = match read_current_blueprint_header(&base) {
         Ok(h) => h,
         Err(err) => {
             log!(
@@ -363,11 +357,7 @@ where
     // simulate used by `eth_call` / `eth_estimateGas`, which leave the flag
     // unset and pay no trace clone. Read on the base host, before any
     // `SafeStorage` wrapping, exactly as the applied path does.
-    trace_journal.set_http_trace_enabled(
-        crate::storage::load_base_keyspace(&mut host)
-            .map(|base| crate::storage::is_http_trace_enabled(&base))
-            .unwrap_or(false),
-    );
+    trace_journal.set_http_trace_enabled(crate::storage::is_http_trace_enabled(&base));
     let execution_result = match transaction {
         chains::TezosXTransaction::Tezos(operation) => {
             let enable_gas_refund = chain_config
@@ -433,12 +423,7 @@ where
 
     // Store captured HTTP traces.
     let traces = trace_journal.into_http_traces();
-    if let Err(err) = crate::storage::load_base_keyspace(&mut host)
-        .map_err(anyhow::Error::from)
-        .and_then(|mut base| {
-            crate::storage::store_simulation_http_traces(&mut base, &traces)
-        })
-    {
+    if let Err(err) = crate::storage::store_simulation_http_traces(&mut base, &traces) {
         log!(
             Error,
             "Tezos X simulation: failed to store HTTP traces: {:?}",
@@ -484,7 +469,7 @@ where
     // Result is RLP-encoded as a value containing the serialized operation.
     let mut stream = RlpStream::new();
     stream.append(&op_bytes);
-    if let Err(err) = host.store_write_all(&TEZOSX_SIMULATION_RESULT, &stream.out()) {
+    if let Err(err) = base.set(&TEZOSX_SIMULATION_RESULT_KEY, stream.out()) {
         log!(Error, "Error writing Tezos X simulation result: {:?}", err);
     }
 }
