@@ -58,6 +58,10 @@ General
 Node
 ----
 
+- The RPC server now rejects with HTTP 413 requests whose body exceeds the cap
+  set by the new ``--rpc-max-request-body`` option (in bytes, 16 MiB by
+  default).
+
 - **Breaking change** The node ``/metrics`` endpoint is no longer served
   on the ``--rpc-addr`` (or ``--external-rpc-addr``) listener; querying
   ``/metrics`` on the RPC port now returns ``404``. Metrics are served
@@ -208,6 +212,10 @@ Smart Rollup node
   not available in the node's storage (e.g. after a snapshot import in
   full mode). (MR :gl:`!22415`)
 
+- The RPC server now rejects with HTTP 413 requests whose body exceeds the cap
+  set by the new ``--rpc-max-request-body`` option (in bytes, 32 MiB by
+  default).
+
 Smart Rollup WASM Debugger
 --------------------------
 
@@ -230,6 +238,10 @@ DAL node
   messages now enforce upper bounds on the lengths of their list fields
   (``message_ids`` for IHave/IWant, ``px`` for Prune), consistent with
   the limits already applied on the send side. (MR :gl:`!22537`)
+
+- The RPC server now rejects with HTTP 413 requests whose body exceeds the cap
+  set by the new ``--rpc-max-request-body`` option (in bytes, 16 MiB by
+  default).
 
 - Decoupled the storage lifetimes of slot payloads and shards. Shards are now
   always retained for a single, profile-independent period (about 150 levels);
