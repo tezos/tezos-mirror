@@ -15,9 +15,8 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_host::path::{concat, OwnedPath};
-use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 #[derive(Eq, PartialEq)]
 pub enum MigrationStatus {
@@ -66,6 +65,9 @@ mod legacy {
 
     const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/storage_version");
 
+    const ENABLE_TEZOS_RUNTIME_PATH: RefPath =
+        RefPath::assert_from(b"/base/feature_flags/enable_tezos_runtime");
+
     pub fn migration_read_storage_version(
         host: &impl StorageV1,
     ) -> Result<StorageVersion, Error> {
@@ -84,6 +86,13 @@ mod legacy {
         host.store_write_all(&STORAGE_VERSION_PATH, &storage_version.to_le_bytes())?;
         Ok(())
     }
+
+    pub fn migration_enable_tezos_runtime(host: &impl StorageV1) -> bool {
+        matches!(
+            host.store_has(&ENABLE_TEZOS_RUNTIME_PATH),
+            Ok(Some(ValueType::Value | ValueType::ValueWithSubtree))
+        )
+    }
 }
 
 fn migrate_to<Host>(
@@ -91,7 +100,7 @@ fn migrate_to<Host>(
     version: StorageVersion,
 ) -> anyhow::Result<MigrationStatus>
 where
-    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + IsEvmNode,
 {
     log!(Info, "Migrating to {:?}", version);
     match version {
@@ -318,10 +327,7 @@ where
             // TEZOSX_CALLER_ADDRESS is only ever written to by
             // `init_tezosx_alias`, which is unreachable when
             // `enable_tezos_runtime` is unset.
-            let tezos_runtime_enabled = {
-                let base = crate::storage::load_base_keyspace(host)?;
-                crate::storage::enable_tezos_runtime(&base)
-            };
+            let tezos_runtime_enabled = legacy::migration_enable_tezos_runtime(host);
             if tezos_runtime_enabled {
                 use revm_etherlink::precompiles::constants::TEZOSX_CALLER_ADDRESS;
                 use revm_etherlink::storage::world_state_handler::StorageAccount;
@@ -360,10 +366,7 @@ where
             // sunrise_level is written by the kernel at the sunrise
             // block. Mainnet has neither path. Gate on
             // [enable_tezos_runtime] so we skip cleanly there.
-            let tezos_runtime_enabled = {
-                let base = crate::storage::load_base_keyspace(host)?;
-                crate::storage::enable_tezos_runtime(&base)
-            };
+            let tezos_runtime_enabled = legacy::migration_enable_tezos_runtime(host);
             if tezos_runtime_enabled {
                 let moves: &[(&[u8], &[u8])] = &[
                     (
@@ -489,10 +492,7 @@ where
                 b"/tez/tez_accounts/tezosx/__system__/alias_implementation",
             );
             const FORWARDER_CODE_HEX_V61: &str = "02000000740500036c0501036805020200000065031703210743036e01000000244b5431386f444a4a4b584d4b68664531625375415047703932705963775644697173507705550368072f02000000120743036801000000076761746577617903270200000000031505700002034d053d036d034c031b0342";
-            let tezos_runtime_enabled = {
-                let base = crate::storage::load_base_keyspace(host)?;
-                crate::storage::enable_tezos_runtime(&base)
-            };
+            let tezos_runtime_enabled = legacy::migration_enable_tezos_runtime(host);
             if tezos_runtime_enabled {
                 if host.store_has(&ALIAS_IMPLEMENTATION_PATH)?.is_none() {
                     let code = hex::decode(FORWARDER_CODE_HEX_V61)?;
@@ -558,7 +558,7 @@ where
 //
 fn migration<Host>(host: &mut Host) -> anyhow::Result<MigrationStatus>
 where
-    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + IsEvmNode,
 {
     match legacy::migration_read_storage_version(host)?.next() {
         Some(next_version) => {
@@ -581,7 +581,7 @@ where
 
 pub fn storage_migration<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
 where
-    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + IsEvmNode,
 {
     let migration_result = migration(host);
     migration_result.map_err(|_| Error::UpgradeError(UpgradeProcessError::Fallback))
