@@ -27,7 +27,7 @@
 (* Declaration order must respect the version order. *)
 type t = U025 | T024 | S023 | Alpha
 
-let all = [U025; T024; Alpha]
+let all = [U025; Alpha]
 
 let encoding =
   Data_encoding.string_enum
@@ -323,7 +323,7 @@ let parameters_with_custom_consensus_rights_delay ~protocol
 
 let previous_protocol = function
   | Alpha -> Some U025
-  | U025 -> Some T024
+  | U025 -> None
   | T024 -> None
   | S023 -> None
 
