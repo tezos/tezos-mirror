@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -60,7 +60,7 @@ docker:merge_manifests:
   retry: 0
 
 oc.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -79,7 +79,7 @@ oc.docker:amd64:
   - ./scripts/ci/docker_initialize.sh --image-names
   - ./scripts/ci/docker_release.sh --runtime-image ${ci_image_name}/runtime:${ci_image_tag}
     --build-deps-image ${ci_image_name}/build:${ci_image_tag} --rust-toolchain-image
-    ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+    ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -101,7 +101,7 @@ oc.docker:amd64:
     - runner_system_failure
 
 oc.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
@@ -141,7 +141,7 @@ oc.docker:arm64:
     - runner_system_failure
 
 oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: images
   tags:
   - gcp
@@ -174,7 +174,7 @@ oc.docker:ci:amd64:
     - runner_system_failure
 
 oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: images
   tags:
   - gcp_arm64

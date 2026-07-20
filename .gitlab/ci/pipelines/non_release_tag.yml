@@ -8,7 +8,7 @@ stages:
 - publish
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -43,7 +43,7 @@ apt_repo_debian:
   retry: 0
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -99,7 +99,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -130,7 +130,7 @@ docker:merge_manifests:
   retry: 0
 
 gitlab:publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -159,7 +159,7 @@ gitlab:publish:
   retry: 0
 
 grafazos.build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -186,7 +186,7 @@ grafazos.build:
     when: on_success
 
 oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-73a6a3d6
   stage: build
   tags:
   - $TAGS
@@ -213,7 +213,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 oc.build-debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-73a6a3d6
   stage: build
   tags:
   - $TAGS
@@ -255,7 +255,7 @@ oc.build-debian:
       - gcp_arm64
 
 oc.build-keyring_package:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-73a6a3d6
   stage: build
   tags:
   - $TAGS
@@ -285,7 +285,7 @@ oc.build-keyring_package:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
 
 oc.build-ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-73a6a3d6
   stage: build
   tags:
   - $TAGS
@@ -424,7 +424,7 @@ oc.build:static-x86_64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -447,7 +447,7 @@ oc.create-homebrew-formula:
     - public/homebrew/*
 
 oc.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -487,7 +487,7 @@ oc.docker:amd64:
     - runner_system_failure
 
 oc.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
@@ -527,7 +527,7 @@ oc.docker:arm64:
     - runner_system_failure
 
 oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: images
   tags:
   - gcp
@@ -560,7 +560,7 @@ oc.docker:ci:amd64:
     - runner_system_failure
 
 oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: images
   tags:
   - gcp_arm64
@@ -687,7 +687,7 @@ octez-smart-rollup-node.build:static-x86_64-binaries:
     - octez-binaries/$ARCH/*
 
 octez-smart-rollup-node.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -721,7 +721,7 @@ octez-smart-rollup-node.docker:amd64:
     action: access
 
 octez-smart-rollup-node.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
@@ -755,7 +755,7 @@ octez-smart-rollup-node.docker:arm64:
     action: access
 
 octez-smart-rollup-node.docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible

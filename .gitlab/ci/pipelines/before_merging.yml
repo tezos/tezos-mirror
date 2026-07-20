@@ -11,7 +11,7 @@ stages:
 - publishing_tests
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -63,7 +63,7 @@ apt_repo_debian:
   retry: 0
 
 audit_riscv_deps:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: sanity
   tags:
   - gcp
@@ -253,7 +253,7 @@ build_octez_source:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 cargo_audit:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: sanity
   tags:
   - gcp
@@ -280,7 +280,7 @@ cargo_audit:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_jsonnet:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-73a6a3d6
   stage: sanity
   tags:
   - gcp
@@ -307,7 +307,7 @@ check_jsonnet:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_riscv_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -356,7 +356,7 @@ check_riscv_kernels:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 check_rust_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: sanity
   tags:
   - gcp
@@ -603,7 +603,7 @@ documentation.docgen:
     - docs/shell/p2p_api.rst
 
 documentation.install_python_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -1100,7 +1100,7 @@ etherlink.lint_wasm_runtime:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.mir_no_tickets:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -1189,7 +1189,7 @@ etherlink.mir_tzt:
     CARGO_NET_OFFLINE: "false"
 
 etherlink.test_evm_compatibility:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -1239,7 +1239,7 @@ etherlink.test_evm_compatibility:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.test_kernel:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -1291,7 +1291,7 @@ etherlink.test_kernel:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.test_revm_compatibility:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -1777,7 +1777,7 @@ etherlink.unit_tests:
   retry: 2
 
 grafazos.build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -1809,7 +1809,7 @@ grafazos.build:
     when: on_success
 
 images.alpine-ci-all.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -1872,7 +1872,7 @@ images.alpine-ci-all.merge:
     - runner_system_failure
 
 images.alpine-ci-all:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -1921,7 +1921,7 @@ images.alpine-ci-all:amd64:
     - runner_system_failure
 
 images.alpine-ci-all:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
@@ -2019,7 +2019,7 @@ images.alpine-docker-ci:
     - runner_system_failure
 
 images.ci-release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2067,7 +2067,7 @@ images.ci-release:
       - trixie
 
 images.debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2138,7 +2138,7 @@ images.debian:
       - trixie
 
 images.debian-build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - $TAGS
@@ -2200,7 +2200,7 @@ images.debian-build:
       - gcp_arm64
 
 images.debian-build.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -2257,7 +2257,7 @@ images.debian-build.merge:
       - trixie
 
 images.debian-homebrew:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2305,7 +2305,7 @@ images.debian-homebrew:
       - trixie
 
 images.debian-jsonnet:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2352,7 +2352,7 @@ images.debian-jsonnet:
       - trixie
 
 images.debian-rust:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - $TAGS
@@ -2404,7 +2404,7 @@ images.debian-rust:
       - gcp_arm64
 
 images.debian-rust-sdk-bindings:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2452,7 +2452,7 @@ images.debian-rust-sdk-bindings:
       - trixie
 
 images.debian-rust.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -2496,7 +2496,7 @@ images.debian-rust.merge:
     - runner_system_failure
 
 images.debian-systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2549,7 +2549,7 @@ images.debian-systemd:
       - trixie
 
 images.ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2614,7 +2614,7 @@ images.ubuntu:
       - "26.04"
 
 images.ubuntu-build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - $TAGS
@@ -2677,7 +2677,7 @@ images.ubuntu-build:
       - gcp_arm64
 
 images.ubuntu-build.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -2735,7 +2735,7 @@ images.ubuntu-build.merge:
       - "26.04"
 
 images.ubuntu-systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2852,7 +2852,7 @@ npm_audit:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-73a6a3d6
   stage: build
   tags:
   - $TAGS
@@ -2896,7 +2896,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 oc.build-debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-73a6a3d6
   stage: build
   tags:
   - $TAGS
@@ -2953,7 +2953,7 @@ oc.build-debian:
       - gcp_very_high_cpu_ramfs
 
 oc.build-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -3032,7 +3032,7 @@ oc.build-homebrew-formula-macosx:
       - macos-26-xcode-26
 
 oc.build-keyring_package:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-73a6a3d6
   stage: build
   tags:
   - $TAGS
@@ -3613,7 +3613,7 @@ oc.build_arm64-released:
     when: on_success
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -4021,7 +4021,7 @@ oc.check_lift_limits_patch:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.compile_sources_doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs
@@ -4057,7 +4057,7 @@ oc.compile_sources_doc:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -4091,7 +4091,7 @@ oc.create-homebrew-formula:
     - public/homebrew/*
 
 oc.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -4130,7 +4130,7 @@ oc.docker:amd64:
   - ./scripts/ci/docker_initialize.sh --image-names
   - ./scripts/ci/docker_release.sh --runtime-image ${ci_image_name}/runtime:${ci_image_tag}
     --build-deps-image ${ci_image_name}/build:${ci_image_tag} --rust-toolchain-image
-    ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+    ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -4149,7 +4149,7 @@ oc.docker:amd64:
     - runner_system_failure
 
 oc.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
@@ -4206,7 +4206,7 @@ oc.docker:arm64:
     - runner_system_failure
 
 oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: images
   tags:
   - gcp
@@ -4239,7 +4239,7 @@ oc.docker:ci:amd64:
     - runner_system_failure
 
 oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: images
   tags:
   - gcp_arm64
@@ -4272,7 +4272,7 @@ oc.docker:ci:arm64:
     - runner_system_failure
 
 oc.install_bin_debian_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
   stage: publishing_tests
   tags:
   - gcp
@@ -4311,7 +4311,7 @@ oc.install_bin_debian_trixie:
     PREFIX: ""
 
 oc.install_bin_debian_trixie_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publishing_tests
   tags:
   - gcp
@@ -4351,7 +4351,7 @@ oc.install_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-25648bf0
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-73a6a3d6
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -4428,7 +4428,7 @@ oc.integration:compiler-rejections:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
   stage: publishing_tests
   tags:
   - gcp
@@ -4579,7 +4579,7 @@ oc.python_check:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.script.docker_verify_image_amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -4630,7 +4630,7 @@ oc.script.docker_verify_image_amd64:
     - runner_system_failure
 
 oc.script.docker_verify_image_arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -4912,7 +4912,7 @@ oc.test-liquidity-baking-scripts:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.test_keyring_debian_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publishing_tests
   tags:
   - gcp
@@ -4952,7 +4952,7 @@ oc.test_keyring_debian_trixie:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-25648bf0
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-73a6a3d6
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -5419,7 +5419,7 @@ oc.unit:webassembly-x86_64:
     CARGO_NET_OFFLINE: "false"
 
 oc.upgrade_bin_debian_trixie_systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publishing_tests
   tags:
   - gcp
@@ -5459,7 +5459,7 @@ oc.upgrade_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-25648bf0
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-73a6a3d6
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
@@ -5771,7 +5771,7 @@ sanity_ci:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 sdk_bindings.test:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -5872,7 +5872,7 @@ select_tezts:
     when: always
 
 test_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -5921,7 +5921,7 @@ test_kernels:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 test_sdk_rust:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
   stage: test
   tags:
   - gcp

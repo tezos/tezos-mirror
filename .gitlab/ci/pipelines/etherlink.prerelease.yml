@@ -129,7 +129,7 @@ etherlink.build_evm_node_static_x86_64:
     when: on_success
 
 etherlink.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -168,7 +168,7 @@ etherlink.docker:amd64:
     - runner_system_failure
 
 etherlink.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
@@ -207,7 +207,7 @@ etherlink.docker:arm64:
     - runner_system_failure
 
 etherlink.docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -238,7 +238,7 @@ etherlink.docker:merge_manifests:
   retry: 0
 
 etherlink.gitlab:octez-evm-node-release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -262,7 +262,7 @@ etherlink.gitlab:octez-evm-node-release:
   retry: 0
 
 oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: images
   tags:
   - gcp
@@ -295,7 +295,7 @@ oc.docker:ci:amd64:
     - runner_system_failure
 
 oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: images
   tags:
   - gcp_arm64
