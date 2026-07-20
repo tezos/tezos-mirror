@@ -301,6 +301,11 @@ oc.docker:ci:amd64:
   artifacts:
     reports:
       dotenv: ci_image_tag.env
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}

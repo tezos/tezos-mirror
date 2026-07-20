@@ -285,7 +285,7 @@ let job_oc_unit_non_proto_x86_64 =
     ~description:
       "Run unit tests for the non-protocol parts of Octez (on amd64)."
     ~stage:Test
-    ~retry:Gitlab_ci.Types.{max = 2; when_ = []}
+    ~retry:Tezos_ci.retry_twice
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~image:Tezos_ci.Images.CI.test
       (* use the test image because [lib_benchmark] require Python *)
@@ -311,7 +311,7 @@ let job_oc_unit_non_proto_arm64 =
     ~description:
       "Run unit tests for the non-protocol parts of Octez (on arm64)."
     ~stage:Test
-    ~retry:Gitlab_ci.Types.{max = 2; when_ = []}
+    ~retry:Tezos_ci.retry_twice
     ~parallel:(Vector 2)
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~image:Tezos_ci.Images.CI.test
@@ -351,7 +351,7 @@ let job_oc_unit_proto_x86_64 =
     ~__POS__
     ~description:"Run unit tests for the protocol parts of Octez."
     ~stage:Test
-    ~retry:Gitlab_ci.Types.{max = 2; when_ = []}
+    ~retry:Tezos_ci.retry_twice
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~image:Tezos_ci.Images.CI.build
     ~arch:Amd64
@@ -371,7 +371,7 @@ let job_oc_unit_other_x86_64 =
     ~__POS__
     ~description:"Run unit tests for some non-Octez parts of the repository."
     ~stage:Test
-    ~retry:Gitlab_ci.Types.{max = 2; when_ = []}
+    ~retry:Tezos_ci.retry_twice
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~image:Tezos_ci.Images.CI.build
     ~arch:Amd64

@@ -50,14 +50,7 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
         "scripts/create_docker_image.sh";
       ]
     ~allow_failure:No
-    ~retry:
-      {
-        (* Set retry to 1 because the job is a bit flaky.
-           The runner sometimes dies, causing the job to fail with EOF.
-           Perhaps surprisingly, this surfaces as a [Script_failure]. *)
-        Gitlab_ci.Types.max = 1;
-        when_ = [Script_failure; Runner_system_failure];
-      }
+    ~retry:Tezos_ci.dind_retry
     ~arch
     ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
       (* The L2 builder image (used for with-EVM builds) is the
@@ -138,7 +131,7 @@ let make_job_docker_merge_manifests ~__POS__ ~name ~description ~needs ~scripts
     ~__POS__
     ~description
     ~stage:Publish
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:Tezos_ci.no_retry
     ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
     ~needs
     ~services:[{name = Tezos_ci.Images.Base_images.dind_service}]
@@ -219,7 +212,7 @@ let job_docker_promote_weekly =
     ~description:
       "Promote the master snapshot Docker image to the rolling [weekly] tag."
     ~stage:Publish
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:Tezos_ci.no_retry
     ~needs:[(Job, job_docker_merge_manifests_snapshot `experimental_with_evm)]
     ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
@@ -280,6 +273,7 @@ let job_script_docker_verify_image =
             arch );
       ]
     ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
+    ~retry:Tezos_ci.dind_retry
     ~variables:
       [("DOCKER_VERSION", version); ("IMAGE_ARCH_PREFIX", arch_string ^ "_")]
     ~services:[{name = Tezos_ci.Images.Base_images.dind_service}]

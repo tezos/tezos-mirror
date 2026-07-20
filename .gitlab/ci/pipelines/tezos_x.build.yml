@@ -107,6 +107,11 @@ oc.docker:ci:amd64:
   artifacts:
     reports:
       dotenv: ci_image_tag.env
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 tezos_x.build_released:
   image: ${ci_image_name}/build:${ci_image_tag}

@@ -116,7 +116,7 @@ let job_docker_merge_manifests =
       | `real ->
           Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
       | `test -> None)
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:no_retry
     ~services:[{name = Images.Base_images.dind_service}]
     ~description:"Merge manifest for arm64 and arm64 docker images."
     ~script:
@@ -165,7 +165,7 @@ let job_deploy_release_page_assets =
         "eval $(opam env)";
         "./scripts/rollup_node/releases/deploy_release_page_assets.sh";
       ]
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:no_retry
 
 let job_release_page =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -196,7 +196,7 @@ let job_release_page =
         "eval $(opam env)";
         "./scripts/rollup_node/releases/publish_release_page.sh";
       ]
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:no_retry
 
 let job_gitlab_release =
   CI.job
@@ -209,7 +209,7 @@ let job_gitlab_release =
         (Artifacts, job_build_static_binaries Amd64);
         (Artifacts, job_build_static_binaries Arm64);
       ]
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:no_retry
     ~description:"Create the gitlab release for the Octez Smart Rollup."
     ~script:["./scripts/rollup_node/releases/create_gitlab_release.sh"]
 

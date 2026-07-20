@@ -55,6 +55,11 @@ oc.docker:ci:amd64:
   artifacts:
     reports:
       dotenv: ci_image_tag.env
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.docker:ci:arm64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -84,8 +89,9 @@ oc.docker:ci:arm64:
     reports:
       dotenv: ci_image_tag.env
   retry:
-    max: 1
+    max: 2
     when:
+    - script_failure
     - runner_system_failure
 
 teztale.build-arm64:

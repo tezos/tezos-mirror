@@ -291,6 +291,11 @@ oc.install_bin_debian_bookworm_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: bookworm
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.install_bin_debian_trixie:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
@@ -343,6 +348,11 @@ oc.install_bin_debian_trixie_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: trixie
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.install_bin_ubuntu_22_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-25648bf0
@@ -395,6 +405,11 @@ oc.install_bin_ubuntu_22_04_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "22.04"
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.install_bin_ubuntu_24_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-25648bf0
@@ -447,6 +462,11 @@ oc.install_bin_ubuntu_24_04_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "24.04"
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.install_bin_ubuntu_26_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:26.04-master-25648bf0
@@ -499,6 +519,11 @@ oc.install_bin_ubuntu_26_04_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "26.04"
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.lintian_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-25648bf0
@@ -621,6 +646,11 @@ oc.test_keyring_debian_bookworm:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: bookworm
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.test_keyring_debian_trixie:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -651,6 +681,11 @@ oc.test_keyring_debian_trixie:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: trixie
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.test_keyring_ubuntu_22_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -681,6 +716,11 @@ oc.test_keyring_ubuntu_22_04:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "22.04"
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.test_keyring_ubuntu_24_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -711,6 +751,11 @@ oc.test_keyring_ubuntu_24_04:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "24.04"
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.test_keyring_ubuntu_26_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -741,6 +786,11 @@ oc.test_keyring_ubuntu_26_04:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "26.04"
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.upgrade_bin_debian_bookworm_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -771,6 +821,11 @@ oc.upgrade_bin_debian_bookworm_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: bookworm
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.upgrade_bin_debian_trixie_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -801,6 +856,11 @@ oc.upgrade_bin_debian_trixie_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: trixie
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.upgrade_bin_ubuntu_22_04_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -831,6 +891,11 @@ oc.upgrade_bin_ubuntu_22_04_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "22.04"
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.upgrade_bin_ubuntu_24_04_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -861,6 +926,11 @@ oc.upgrade_bin_ubuntu_24_04_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "24.04"
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.upgrade_bin_ubuntu_26_04_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-25648bf0
@@ -891,3 +961,8 @@ oc.upgrade_bin_ubuntu_26_04_systemd:
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
     RELEASE: "26.04"
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
