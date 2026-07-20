@@ -55,7 +55,7 @@ where
             timestamp,
         };
         // Store the blueprint.
-        store_inbox_blueprint(host, blueprint)?;
+        store_inbox_blueprint(&mut crate::storage::load_base_keyspace(host)?, blueprint)?;
         Ok(StageOneStatus::Reboot)
     } else {
         Ok(StageOneStatus::Done)
@@ -71,7 +71,9 @@ where
 {
     let timestamp = read_last_info_per_level_timestamp(host)?;
     // Number and minimal timestamp for the first forced blueprint
-    let (base, minimal_timestamp) = match read_current_blueprint_header(host) {
+    let current_blueprint_header =
+        read_current_blueprint_header(&crate::storage::load_base_keyspace(host)?);
+    let (base, minimal_timestamp) = match current_blueprint_header {
         Result::Ok(blueprint_header) => {
             (blueprint_header.number + 1, blueprint_header.timestamp)
         }
@@ -102,7 +104,7 @@ where
         // Clean existing blueprints
         if offset == 0 {
             log!(Info, "Deleting all blueprints following flush at {}", level);
-            clear_all_blueprints(host)?;
+            clear_all_blueprints(&mut crate::storage::load_base_keyspace(host)?)?;
         }
 
         // Create a new blueprint with the timed out transactions
@@ -111,7 +113,11 @@ where
             timestamp,
         };
         // Store the blueprint.
-        store_forced_blueprint(host, blueprint, level)?;
+        store_forced_blueprint(
+            &mut crate::storage::load_base_keyspace(host)?,
+            blueprint,
+            level,
+        )?;
         offset += 1;
     }
 

@@ -264,7 +264,10 @@ fn get_next_bip_info<Host>(host: &mut Host) -> (U256, Timestamp, EVMBlockHeader)
 where
     Host: StorageV1 + KeySpaceLoader,
 {
-    match read_current_block_header(host) {
+    let current_block_header = crate::storage::load_base_keyspace(host)
+        .map_err(crate::error::Error::from)
+        .and_then(|base| read_current_block_header(&base));
+    match current_block_header {
         Err(_) => (
             U256::zero(),
             Timestamp::from(0),
@@ -409,7 +412,10 @@ where
         error
     );
     safe_host.revert()?;
-    drop_blueprint(safe_host.host, number)?;
+    drop_blueprint(
+        &mut crate::storage::load_base_keyspace(safe_host.host)?,
+        number,
+    )?;
     Ok(())
 }
 
@@ -474,7 +480,7 @@ where
                 _ => (),
             }
 
-            drop_blueprint(host, number)?;
+            drop_blueprint(&mut crate::storage::load_base_keyspace(host)?, number)?;
         }
 
         return Ok(());
@@ -514,8 +520,11 @@ where
     safe_host.promote()?;
     safe_host.promote_trace()?;
     safe_host.promote_http_trace()?;
-    drop_blueprint(safe_host.host, block_header.blueprint_header.number)?;
-    store_current_block_header(safe_host.host, &block_header)?;
+    {
+        let mut base = crate::storage::load_base_keyspace(safe_host.host)?;
+        drop_blueprint(&mut base, block_header.blueprint_header.number)?;
+        store_current_block_header(&mut base, &block_header)?;
+    }
 
     let event = Event::blueprint_applied(block_header);
 
@@ -774,7 +783,10 @@ mod tests {
     where
         Host: StorageV1 + KeySpaceLoader,
     {
-        Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
+        Ok(crate::blueprint_storage::read_current_blueprint_header(
+            &crate::storage::load_base_keyspace(host)?,
+        )?
+        .number)
     }
 
     use tezos_smart_rollup_host::storage::StorageV1;
@@ -1150,7 +1162,7 @@ mod tests {
     {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
             store_inbox_blueprint_by_number(
-                host,
+                &mut crate::storage::load_base_keyspace(host).unwrap(),
                 blueprint,
                 start_number + U256::from(i),
             )
@@ -1371,7 +1383,7 @@ mod tests {
         };
 
         store_inbox_blueprint_by_number(
-            &mut host,
+            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
             blueprint(vec![tezos_tx]),
             U256::from(1),
         )
@@ -2709,7 +2721,11 @@ mod tests {
         let chain_config = dummy_tezosx_config(SpecId::default());
         // first block should be 0
         let blueprint = almost_empty_blueprint();
-        store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
+        store_inbox_blueprint(
+            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
+            blueprint,
+        )
+        .expect("Should store a blueprint");
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
@@ -2723,7 +2739,11 @@ mod tests {
 
         // second block
         let blueprint = almost_empty_blueprint();
-        store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
+        store_inbox_blueprint(
+            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
+            blueprint,
+        )
+        .expect("Should store a blueprint");
         produce(
             &mut host,
             &chain_config,
@@ -2736,7 +2756,11 @@ mod tests {
 
         // third block
         let blueprint = almost_empty_blueprint();
-        store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
+        store_inbox_blueprint(
+            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
+            blueprint,
+        )
+        .expect("Should store a blueprint");
         produce(
             &mut host,
             &chain_config,
@@ -3236,8 +3260,12 @@ mod tests {
         assert_eq!(next_protocol, current_protocol);
 
         // Second block: both protocol and next_protocol should be current
-        store_inbox_blueprint_by_number(&mut host, blueprint(vec![]), U256::from(1))
-            .expect("Should have stored blueprint");
+        store_inbox_blueprint_by_number(
+            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
+            blueprint(vec![]),
+            U256::from(1),
+        )
+        .expect("Should have stored blueprint");
 
         produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");

@@ -263,7 +263,9 @@ where
         let ipl_timestamp = storage::read_last_info_per_level_timestamp(host)?;
         if ipl_timestamp >= upgrade.activation_timestamp {
             sequencer_upgrade(host, upgrade.pool_address, &upgrade.sequencer)?;
-            blueprint_storage::clear_all_blueprints(host)?;
+            blueprint_storage::clear_all_blueprints(
+                &mut crate::storage::load_base_keyspace(host)?,
+            )?;
         }
     }
     Ok(())
@@ -310,7 +312,9 @@ where
     if let Some(upgrade) = upgrade {
         if evm_timestamp >= upgrade.activation_timestamp() {
             sequencer_key_change(host, upgrade)?;
-            blueprint_storage::clear_all_blueprints(host)?;
+            blueprint_storage::clear_all_blueprints(
+                &mut crate::storage::load_base_keyspace(host)?,
+            )?;
         }
     }
     Ok(())

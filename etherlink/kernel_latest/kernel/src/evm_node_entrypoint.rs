@@ -239,7 +239,10 @@ where
     );
 
     let chain_config = fetch_tezosx_configuration(&mut host);
-    let blueprint_header = match read_current_blueprint_header(&mut host) {
+    let blueprint_header = match crate::storage::load_base_keyspace(&mut host)
+        .map_err(crate::error::Error::from)
+        .and_then(|base| read_current_blueprint_header(&base))
+    {
         Ok(h) => h,
         Err(err) => {
             log!(

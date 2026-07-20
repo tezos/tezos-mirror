@@ -191,7 +191,8 @@ where
         blueprint.chunk_index,
         blueprint.number
     );
-    store_sequencer_blueprint(host, blueprint).map_err(Error::into)
+    store_sequencer_blueprint(&mut crate::storage::load_base_keyspace(host)?, blueprint)
+        .map_err(Error::into)
 }
 
 impl InputHandler for SequencerInput {
@@ -239,7 +240,9 @@ impl InputHandler for SequencerInput {
                 let slot_size = params.slot_size;
                 let page_size = params.page_size;
                 let next_blueprint_number: U256 =
-                    crate::blueprint_storage::read_next_blueprint_number(host)?;
+                    crate::blueprint_storage::read_next_blueprint_number(
+                        &crate::storage::load_base_keyspace(host)?,
+                    )?;
                 for signal in signals.0.iter() {
                     let published_level = signal.published_level;
                     let slot_indices = &signal.slot_indices;
@@ -426,7 +429,9 @@ where
     }
 
     let next_blueprint_number: U256 =
-        crate::blueprint_storage::read_next_blueprint_number(host)?;
+        crate::blueprint_storage::read_next_blueprint_number(
+            &crate::storage::load_base_keyspace(host)?,
+        )?;
 
     log!(
         Debug,
@@ -672,7 +677,9 @@ where
     // during this kernel run.
     let mut inbox_is_empty = true;
     let next_blueprint_number: U256 =
-        crate::blueprint_storage::read_next_blueprint_number(host)?;
+        crate::blueprint_storage::read_next_blueprint_number(
+            &crate::storage::load_base_keyspace(host)?,
+        )?;
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
     let (legacy_dal_signals_disabled, dal_publishers_whitelist) = {
         let base = crate::storage::load_base_keyspace(host)
@@ -1373,7 +1380,7 @@ mod tests {
             transactions_root: vec![],
         };
         store_current_block_header(
-            &mut host,
+            &mut crate::storage::load_base_keyspace(&mut host).unwrap(),
             &BlockHeader {
                 blueprint_header: BlueprintHeader {
                     number: head_level,
