@@ -17,6 +17,11 @@
 - Fixed sequencer key storage corruption: writing a shorter sequencer key left
   trailing bytes of the previous, longer key in storage. The stored key is now
   fully overwritten and truncated to its exact length. (!22510)
+- Fixed a blueprint chunk DoS: a blueprint chunk whose RLP `number` field was
+  longer than 32 bytes panicked the kernel during RLP decode, before the
+  signature was checked. Any L1 account could send such a chunk with no
+  sequencer key and no valid signature, trapping the rollup node. Oversized
+  U256 fields are now rejected with a clean decode error. (!22510)
 - The `verify_tezos_signature` precompile (reached through an alias
   forwarder's EIP-1271 `isValidSignature`) now rejects non-canonical
   high-S P-256 (tz3) signatures. ECDSA is malleable: for any valid
