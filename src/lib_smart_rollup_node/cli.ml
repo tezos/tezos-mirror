@@ -425,6 +425,26 @@ let positive_int32_parameter =
       | None | Some _ ->
           cctxt#error "Expected a valid positive integer, provided %s instead" p)
 
+let positive_int64_parameter =
+  Tezos_clic.parameter (fun (cctxt : Client_context.full) p ->
+      match Int64.of_string_opt p with
+      | Some i when Compare.Int64.(i > 0L) -> Lwt_result.return i
+      | None | Some _ ->
+          cctxt#error "Expected a valid positive integer, provided %s instead" p)
+
+let rpc_max_request_body_arg =
+  Tezos_clic.arg
+    ~long:"rpc-max-request-body"
+    ~placeholder:"bytes"
+    ~doc:
+      (Format.asprintf
+         "The maximum size, in bytes, of an RPC request body the server will \
+          read into memory. Requests whose body exceeds this size are rejected \
+          with HTTP 413 before routing or ACL checks are performed. Default \
+          value is %Ld"
+         Configuration.default_rpc_max_request_body_size)
+    positive_int64_parameter
+
 let index_buffer_size_arg =
   Tezos_clic.arg
     ~long:"index-buffer-size"

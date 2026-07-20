@@ -41,6 +41,7 @@ val start :
   rpc_addr:string ->
   rpc_port:int ->
   acl:Tezos_rpc_http_server.RPC_server.Acl.policy ->
+  rpc_max_request_body_size:int64 ->
   cors:Resto_cohttp.Cors.t ->
   unit Tezos_rpc.Directory.t ->
   t tzresult Lwt.t

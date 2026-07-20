@@ -62,7 +62,7 @@ module Acl = struct
     if V6.scope address = Interface then allow_all else secure
 end
 
-let start ~rpc_addr ~rpc_port ~acl ~cors dir =
+let start ~rpc_addr ~rpc_port ~acl ~rpc_max_request_body_size ~cors dir =
   let open Lwt_result_syntax in
   let rpc_addr = P2p_addr.of_string_exn rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
@@ -85,7 +85,9 @@ let start ~rpc_addr ~rpc_port ~acl ~cors dir =
       ~host
       server
       ~callback:
-        (Octez_telemetry.HTTP_server.resto_callback ~port:rpc_port server)
+        (RPC_middleware.limit_body_size
+           ~max_body_size:rpc_max_request_body_size
+           (Octez_telemetry.HTTP_server.resto_callback ~port:rpc_port server))
       node
   in
   return {server; host; node; acl}
