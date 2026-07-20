@@ -243,9 +243,13 @@ let errors_contains_context_error errors =
        - "unknown inode key": to catch the so called inode error *)
     Re.compile (Re.Perl.re "[Ii]rmin|[Bb]rassaia|unknown inode key")
   in
-  let is_context_error error =
-    let error_s = Format.asprintf "%a" Error_monad.pp error in
-    match Re.exec rex error_s with exception Not_found -> false | _ -> true
+  let is_context_error = function
+    | Exn _ as error -> (
+        let error_s = Format.asprintf "%a" Error_monad.pp error in
+        match Re.exec rex error_s with
+        | exception Not_found -> false
+        | _ -> true)
+    | _ -> false
   in
   List.exists is_context_error errors
 
