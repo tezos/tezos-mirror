@@ -14,6 +14,9 @@
 - The `change_sequencer_key` precompile no longer treats a signature check
   returning `Ok(false)` as success, so a syntactically valid but incorrect
   signature can no longer authorize a key rotation. (!22510)
+- Fixed sequencer key storage corruption: writing a shorter sequencer key left
+  trailing bytes of the previous, longer key in storage. The stored key is now
+  fully overwritten and truncated to its exact length. (!22510)
 - The `verify_tezos_signature` precompile (reached through an alias
   forwarder's EIP-1271 `isValidSignature`) now rejects non-canonical
   high-S P-256 (tz3) signatures. ECDSA is malleable: for any valid
