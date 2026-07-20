@@ -11,8 +11,8 @@ use revm::{
     },
     inspector::InspectorHandler,
     interpreter::{
-        interpreter::EthInterpreter, interpreter_action::FrameInit, FrameInput,
-        SharedMemory,
+        interpreter::EthInterpreter, interpreter_action::FrameInit, CallScheme,
+        FrameInput, SharedMemory,
     },
     state::{Bytecode, EvmState},
     Inspector,
@@ -100,6 +100,11 @@ where
             // the `Call` shape carries the flag.
             if let FrameInput::Call(ref mut call_inputs) = frame_input {
                 call_inputs.is_static = true;
+                // Rewrite the scheme so inspectors render the frame as
+                // STATICCALL, like an outgoing view crossing. revm never
+                // consults a Call-shaped input's scheme after frame
+                // creation; `is_static` above carries the semantics.
+                call_inputs.scheme = CallScheme::StaticCall;
             }
         }
 
