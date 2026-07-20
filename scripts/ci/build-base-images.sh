@@ -3,7 +3,9 @@ set -eu
 
 DOCKERFILE=${1:?"Dockerfile missing"}
 
-BINFMT_VERSION=9.2.2-52
+# Must be >= qemu-v10.1.3: fixes openat2()-based tar extraction on emulated
+# aarch64 (tonistiigi/binfmt#285), which breaks with Ubuntu 26.04's newer tar.
+BINFMT_VERSION=10.2.3-68
 
 LATEST_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 LATEST_TAG_GENERIC="${CI_COMMIT_REF_SLUG}"
