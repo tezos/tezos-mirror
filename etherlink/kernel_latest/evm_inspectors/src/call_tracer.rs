@@ -13,17 +13,15 @@ use super::{
 
 use revm::{
     context::{ContextTr, CreateScheme, JournalTr, Transaction},
-    handler::EthPrecompiles,
     interpreter::{
         gas::calculate_initial_tx_gas_for_tx, interpreter::ReturnDataImpl, CallInputs,
-        CallOutcome, CallScheme, CreateInputs, CreateOutcome, Gas, InitialAndFloorGas,
-        InstructionResult, InterpreterResult, InterpreterTypes,
+        CallOutcome, CallScheme, CreateInputs, CreateOutcome, InitialAndFloorGas,
+        InstructionResult, InterpreterTypes,
     },
     primitives::{hardfork::SpecId, hash_map::HashMap, Address, Bytes, Log, B256, U256},
     Inspector,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
-use std::ops::Range;
 use tezos_ethereum::{
     rlp_helpers::{check_list, decode_field, decode_option, next},
     Log as RlpLog,
@@ -189,7 +187,6 @@ impl CallTrace {
 
 pub struct CallTracer {
     config: CallTracerConfig,
-    precompiles: EthPrecompiles,
     call_trace: HashMap<u16, CallTrace>,
     /// Traces buffered in memory, flushed to storage once at the end of
     /// each transaction (depth == 0).  RLP encoding is deferred to flush
@@ -203,13 +200,11 @@ pub struct CallTracer {
 impl CallTracer {
     pub fn new(
         config: CallTracerConfig,
-        precompiles: EthPrecompiles,
         spec_id: SpecId,
         transaction_hash: Option<B256>,
     ) -> Self {
         Self {
             config,
-            precompiles,
             call_trace: HashMap::with_capacity(1),
             pending_traces: Vec::new(),
             transaction_hash,
@@ -314,48 +309,6 @@ where
         call_trace.add_gas(Some(inputs.gas_limit + self.initial_gas));
 
         self.set_call_trace(depth, call_trace);
-
-        if let Some(precompile) =
-            self.precompiles.precompiles.get(&inputs.bytecode_address)
-        {
-            // Hack-ish behavior. In case the invoked address is a precompile we need to
-            // pre-simulate its result because the `call_end` hook is never called when a
-            // precompile contract is called.
-
-            let memory_offset = Range { start: 0, end: 0 }; // Ignored.
-            let mut outcome = match precompile.execute(&call_data, inputs.gas_limit) {
-                Ok(result) => CallOutcome {
-                    result: InterpreterResult {
-                        result: InstructionResult::Return,
-                        output: result.bytes,
-                        gas: Gas::new_spent(result.gas_used),
-                    },
-                    memory_offset,
-                    was_precompile_called: true,
-                    precompile_call_logs: vec![],
-                },
-                Err(_) => CallOutcome {
-                    result: InterpreterResult {
-                        result: InstructionResult::PrecompileError,
-                        // No return data, indicates a precompile contract error.
-                        output: Bytes::new(),
-                        gas: Gas::new_spent(inputs.gas_limit),
-                    },
-                    memory_offset,
-                    was_precompile_called: true,
-                    precompile_call_logs: vec![],
-                },
-            };
-
-            <CallTracer as Inspector<CTX, INTR>>::call_end(
-                self,
-                context,
-                inputs,
-                &mut outcome,
-            );
-
-            return None;
-        }
 
         // NB: Always return [None] or else the result of the call will be overriden.
         None

@@ -4,7 +4,6 @@
 
 use evm_inspectors::{Tracer, TracerInput};
 use revm::primitives::hardfork::SpecId;
-use revm_etherlink::precompiles::provider::EtherlinkPrecompiles;
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_ethereum::block::BlockConstants;
 use tezosx_journal::{CracId, TezosXJournal};
@@ -33,13 +32,7 @@ pub fn prepare_tezosx_journal(
         journal.enable_debug_precompiles();
     }
 
-    let tracer = tracer_input.map(|input| {
-        input.tracer(
-            EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled())
-                .builtins,
-            *spec_id,
-        )
-    });
+    let tracer = tracer_input.map(|input| input.tracer(*spec_id));
 
     (journal, tracer)
 }
