@@ -1183,7 +1183,8 @@ mod tests {
         use crate::configuration::fetch_configuration;
 
         let mut host = MockKernelHost::default();
-        let conf = fetch_configuration(&mut host);
+        let base = crate::storage::load_base_keyspace(&mut host).unwrap();
+        let conf = fetch_configuration(&mut host, &base);
         assert!(
             matches!(conf.mode, ConfigurationMode::Proxy),
             "fetch_configuration should return Proxy when no sequencer key is stored"

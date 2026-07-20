@@ -290,7 +290,10 @@ where
             // If a migration was finished, we update the kernel version
             // in the storage.
             set_kernel_version(&mut load_base_keyspace(host)?)?;
-            let configuration = fetch_configuration(host);
+            let configuration = {
+                let base = load_base_keyspace(host)?;
+                fetch_configuration(host, &base)
+            };
             log!(Info, "Configuration after migration: {}", configuration);
             return Ok(SingleRunStatus::Reboot);
         }
@@ -321,8 +324,14 @@ where
     let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let chain_configuration = fetch_tezosx_configuration(host);
-    let mut configuration = fetch_configuration(host);
+    let chain_configuration = {
+        let base = load_base_keyspace(host)?;
+        fetch_tezosx_configuration(host, &base)
+    };
+    let mut configuration = {
+        let base = load_base_keyspace(host)?;
+        fetch_configuration(host, &base)
+    };
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it

@@ -242,7 +242,16 @@ where
         transaction_bytes.len()
     );
 
-    let chain_config = fetch_tezosx_configuration(&mut host);
+    let chain_config = {
+        let base = match crate::storage::load_base_keyspace(&mut host) {
+            Ok(base) => base,
+            Err(err) => {
+                log!(Error, "Error loading the `/base` keyspace: {:?}", err);
+                return;
+            }
+        };
+        fetch_tezosx_configuration(&mut host, &base)
+    };
     let blueprint_header = match crate::storage::load_base_keyspace(&mut host)
         .map_err(crate::error::Error::from)
         .and_then(|base| read_current_blueprint_header(&base))

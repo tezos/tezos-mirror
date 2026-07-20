@@ -216,7 +216,10 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host);
+    let config = {
+        let base = crate::storage::load_base_keyspace(host)?;
+        fetch_tezosx_configuration(host, &base)
+    };
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
     let sequencer_pool_address = (block_constants.evm_runtime_block_constants.coinbase
@@ -344,11 +347,17 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host);
+    let config = {
+        let base = crate::storage::load_base_keyspace(host)?;
+        fetch_tezosx_configuration(host, &base)
+    };
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
 
-    let mut configuration = fetch_configuration(host);
+    let mut configuration = {
+        let base = crate::storage::load_base_keyspace(host)?;
+        fetch_configuration(host, &base)
+    };
     let mut safe_host = SafeStorage {
         host,
         world_states: config

@@ -110,8 +110,18 @@ pub fn reveal_storage<Host>(
 
     log!(Info, "Done revealing");
 
-    let chain_config = fetch_tezosx_configuration(host);
-    let configuration = fetch_configuration(host);
+    let chain_config = {
+        let base = crate::storage::load_base_keyspace(host).expect(
+            "no other `/base` keyspace handle may be live during the configuration fetch",
+        );
+        fetch_tezosx_configuration(host, &base)
+    };
+    let configuration = {
+        let base = crate::storage::load_base_keyspace(host).expect(
+            "no other `/base` keyspace handle may be live during the configuration fetch",
+        );
+        fetch_configuration(host, &base)
+    };
     log!(Info, "Chain Configuration {chain_config:?}");
     log!(Info, "Configuration {}", configuration);
 }
