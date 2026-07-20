@@ -30,11 +30,11 @@ Access the documentation:
 Run commands:
 
   run sandbox [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
-      [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
-      [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
-      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--rpc-max-request-body <BYTES>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]]
+      [--max-number-blocks <100>] [--max-number-logs <1000>] [--chunk-size <10>]
+      [-K --keep-alive] [--rpc-timeout <sec>] [--rollup-node-endpoint <url>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose] [--restricted-rpcs <regexp>]
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
@@ -58,6 +58,9 @@ Run commands:
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
       batch. Can either be `unlimited` or a positive integer.
+    --rpc-max-request-body <BYTES>: The maximum size, in bytes, of an RPC request body the
+      server will read into memory. Requests whose body exceeds this size are rejected with
+      HTTP 413. Defaults to 33554432.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.
@@ -139,11 +142,11 @@ Run commands:
       can be provided with the syntax RUNTIME:TARGET_SUNRISE_LEVEL.
   
   run sequencer [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
-      [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
-      [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
-      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--rpc-max-request-body <BYTES>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]]
+      [--max-number-blocks <100>] [--max-number-logs <1000>] [--chunk-size <10>]
+      [-K --keep-alive] [--rpc-timeout <sec>] [--rollup-node-endpoint <url>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose] [--restricted-rpcs <regexp>]
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
@@ -165,6 +168,9 @@ Run commands:
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
       batch. Can either be `unlimited` or a positive integer.
+    --rpc-max-request-body <BYTES>: The maximum size, in bytes, of an RPC request body the
+      server will read into memory. Requests whose body exceeds this size are rejected with
+      HTTP 413. Defaults to 33554432.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.
@@ -236,11 +242,11 @@ Run commands:
       modes. When unset, the garbage collection drifts relative to the previous one.
   
   run observer [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
-      [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
-      [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
-      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--rpc-max-request-body <BYTES>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]]
+      [--max-number-blocks <100>] [--max-number-logs <1000>] [--chunk-size <10>]
+      [-K --keep-alive] [--rpc-timeout <sec>] [--rollup-node-endpoint <url>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose] [--restricted-rpcs <regexp>]
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--profiling [BOOL]] [--private-rpc-port <PORT>] [--evm-node-endpoint <url>]
@@ -261,6 +267,9 @@ Run commands:
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
       batch. Can either be `unlimited` or a positive integer.
+    --rpc-max-request-body <BYTES>: The maximum size, in bytes, of an RPC request body the
+      server will read into memory. Requests whose body exceeds this size are rejected with
+      HTTP 413. Defaults to 33554432.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.
@@ -334,11 +343,11 @@ Run commands:
       and patch its local state accordingly.
   
   experimental run rpc [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
-      [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
-      [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
-      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--rpc-max-request-body <BYTES>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]]
+      [--max-number-blocks <100>] [--max-number-logs <1000>] [--chunk-size <10>]
+      [-K --keep-alive] [--rpc-timeout <sec>] [--rollup-node-endpoint <url>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose] [--restricted-rpcs <regexp>]
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--profiling [BOOL]] [--evm-node-endpoint <url>] [--evm-node-private-endpoint <url>]
@@ -355,6 +364,9 @@ Run commands:
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
       batch. Can either be `unlimited` or a positive integer.
+    --rpc-max-request-body <BYTES>: The maximum size, in bytes, of an RPC request body the
+      server will read into memory. Requests whose body exceeds this size are rejected with
+      HTTP 413. Defaults to 33554432.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.
@@ -414,11 +426,11 @@ Run commands:
 Configuration commands:
 
   init config [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
-      [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
-      [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
-      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--rpc-max-request-body <BYTES>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]]
+      [--max-number-blocks <100>] [--max-number-logs <1000>] [--chunk-size <10>]
+      [-K --keep-alive] [--rpc-timeout <sec>] [--rollup-node-endpoint <url>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose] [--restricted-rpcs <regexp>]
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
@@ -443,6 +455,9 @@ Configuration commands:
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
       batch. Can either be `unlimited` or a positive integer.
+    --rpc-max-request-body <BYTES>: The maximum size, in bytes, of an RPC request body the
+      server will read into memory. Requests whose body exceeds this size are rejected with
+      HTTP 413. Defaults to 33554432.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.

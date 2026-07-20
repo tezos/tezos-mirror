@@ -506,6 +506,26 @@ let rpc_batch_limit_arg =
                     `unlimited` or an integer"
                    r)))
 
+let rpc_max_request_body_arg =
+  Tezos_clic.arg
+    ~long:"rpc-max-request-body"
+    ~placeholder:"BYTES"
+    ~doc:
+      (Format.asprintf
+         "The maximum size, in bytes, of an RPC request body the server will \
+          read into memory. Requests whose body exceeds this size are rejected \
+          with HTTP 413. Defaults to %Ld."
+         Configuration.default_max_request_body_size)
+    (Tezos_clic.parameter (fun _ctxt r ->
+         let open Lwt_result_syntax in
+         match Int64.of_string_opt r with
+         | Some size when Compare.Int64.(size > 0L) -> return size
+         | Some _ | None ->
+             failwith
+               "Invalid argument for --rpc-max-request-body: %s. Should be a \
+                positive integer"
+               r))
+
 let private_rpc_port_arg =
   Tezos_clic.arg
     ~long:"private-rpc-port"
@@ -1218,12 +1238,13 @@ let blueprint_version_arg =
        | s -> failwith "Invalid blueprint version %S" s)
 
 let common_config_args =
-  Tezos_clic.args24
+  Tezos_clic.args25
     data_dir_arg
     config_path_arg
     rpc_addr_arg
     rpc_port_arg
     rpc_batch_limit_arg
+    rpc_max_request_body_arg
     cors_allowed_origins_arg
     cors_allowed_headers_arg
     ws_arg
@@ -1502,15 +1523,16 @@ let kernel_from_args network kernel =
     mode, initialise the logger and GC parameters, then hand control over
     to {!Evm_node_lib_dev.Sequencer.main}. *)
 let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_keys ?rpc_addr ?rpc_port
-    ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
-    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
-    ~keep_alive ?rpc_timeout ?rollup_node_endpoint ~verbose ?profiling
-    ?preimages ?preimages_endpoint ?native_execution_policy ?time_between_blocks
-    ?max_number_of_chunks ?private_rpc_port ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-    ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-    ?genesis_timestamp ?restricted_rpcs ?kernel ?dal_slots ?sandbox_config
-    ~finalized_view ?sunset_sec ?gc_time_of_day config_file =
+    ?rpc_batch_limit ?rpc_max_request_body_size ?cors_origins ?cors_headers
+    ?enable_websocket ?tx_queue_max_lifespan ?tx_queue_max_size
+    ?tx_queue_tx_per_addr_limit ~keep_alive ?rpc_timeout ?rollup_node_endpoint
+    ~verbose ?profiling ?preimages ?preimages_endpoint ?native_execution_policy
+    ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
+    ?log_filter_chunk_size ?genesis_timestamp ?restricted_rpcs ?kernel
+    ?dal_slots ?sandbox_config ~finalized_view ?sunset_sec ?gc_time_of_day
+    config_file =
   let open Lwt_result_syntax in
   let* configuration =
     Cli.create_or_read_config
@@ -1518,6 +1540,7 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_keys ?rpc_addr ?rpc_port
       ?rpc_addr
       ?rpc_port
       ?rpc_batch_limit
+      ?rpc_max_request_body_size
       ?cors_origins
       ?cors_headers
       ?enable_websocket
@@ -1591,6 +1614,7 @@ let rpc_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
+             rpc_max_request_body_size,
              cors_origins,
              cors_headers,
              enable_websocket,
@@ -1683,6 +1707,7 @@ let rpc_command =
           ?cors_origins
           ?cors_headers
           ?rpc_batch_limit
+          ?rpc_max_request_body_size
           ?enable_websocket
           ~verbose
           ?profiling
@@ -1714,14 +1739,14 @@ let rpc_command =
 (** Read or create the configuration, initialise the logger and GC
     parameters, then hand control over to {!Evm_node_lib_dev.Observer.main}. *)
 let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
-    ?rpc_batch_limit ?private_rpc_port ?cors_origins ?cors_headers
-    ?enable_websocket ~verbose ?profiling ?preimages ?preimages_endpoint
-    ?native_execution_policy ?rollup_node_endpoint ~dont_track_rollup_node
-    ?evm_node_endpoint ?tx_queue_max_lifespan ?tx_queue_max_size
-    ?tx_queue_tx_per_addr_limit ?log_filter_chunk_size ?log_filter_max_nb_logs
-    ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel ~no_sync
-    ~init_from_snapshot ?history_mode ?gc_time_of_day ~finalized_view ?network
-    ~sandbox config_file =
+    ?rpc_batch_limit ?rpc_max_request_body_size ?private_rpc_port ?cors_origins
+    ?cors_headers ?enable_websocket ~verbose ?profiling ?preimages
+    ?preimages_endpoint ?native_execution_policy ?rollup_node_endpoint
+    ~dont_track_rollup_node ?evm_node_endpoint ?tx_queue_max_lifespan
+    ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ?log_filter_chunk_size
+    ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
+    ~no_sync ~init_from_snapshot ?history_mode ?gc_time_of_day ~finalized_view
+    ?network ~sandbox config_file =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1732,6 +1757,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
       ?rpc_port
       ?private_rpc_port
       ?rpc_batch_limit
+      ?rpc_max_request_body_size
       ?cors_origins
       ?cors_headers
       ?enable_websocket
@@ -2644,6 +2670,7 @@ let init_config_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
+             rpc_max_request_body_size,
              cors_origins,
              cors_headers,
              enable_websocket,
@@ -2707,6 +2734,7 @@ let init_config_command =
           ?rpc_addr
           ?rpc_port
           ?rpc_batch_limit
+          ?rpc_max_request_body_size
           ?cors_origins
           ?cors_headers
           ?enable_websocket
@@ -3229,6 +3257,7 @@ let sequencer_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
+             rpc_max_request_body_size,
              cors_origins,
              cors_headers,
              enable_websocket,
@@ -3288,6 +3317,7 @@ let sequencer_command =
         ?rpc_addr
         ?rpc_port
         ?rpc_batch_limit
+        ?rpc_max_request_body_size
         ?cors_origins
         ?cors_headers
         ?enable_websocket
@@ -3337,6 +3367,7 @@ let sandbox_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
+             rpc_max_request_body_size,
              cors_origins,
              cors_headers,
              enable_websocket,
@@ -3424,6 +3455,7 @@ let sandbox_command =
         ?rpc_addr
         ?rpc_port
         ?rpc_batch_limit
+        ?rpc_max_request_body_size
         ?cors_origins
         ?cors_headers
         ?enable_websocket
@@ -3486,6 +3518,7 @@ let observer_command =
              rpc_addr,
              rpc_port,
              rpc_batch_limit,
+             rpc_max_request_body_size,
              cors_origins,
              cors_headers,
              enable_websocket,
@@ -3535,6 +3568,7 @@ let observer_command =
         ?rpc_addr
         ?rpc_port
         ?rpc_batch_limit
+        ?rpc_max_request_body_size
         ?cors_origins
         ?cors_headers
         ?enable_websocket

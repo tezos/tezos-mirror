@@ -43,7 +43,15 @@ module Resto = struct
     let open Lwt_result_syntax in
     let open Tezos_rpc_http_server in
     let Configuration.
-          {port; addr; cors_origins; cors_headers; max_active_connections; _} =
+          {
+            port;
+            addr;
+            cors_origins;
+            cors_headers;
+            max_active_connections;
+            max_request_body_size;
+            _;
+          } =
       rpc
     in
 
@@ -84,7 +92,10 @@ module Resto = struct
         ~max_active_connections
         ~host
         server
-        ~callback:(callback ~port server directory)
+        ~callback:
+          (RPC_middleware.limit_body_size
+             ~max_body_size:max_request_body_size
+             (callback ~port server directory))
         ~conn_closed
         node
     in

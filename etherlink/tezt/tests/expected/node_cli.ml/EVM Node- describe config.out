@@ -267,7 +267,12 @@
         || { /* blacklist
                 The list of JSON RPC API methods disallowed for this server. */
              "blacklist": [ $unistring ... ] },
-      "max_active_connections"?: $max_active_rpc_connections },
+      "max_active_connections"?: $max_active_rpc_connections,
+      "max_request_body_size"?:
+        $int64
+        /* The maximum size, in bytes, of an RPC request body the server will read into
+           memory. Requests whose body exceeds this size are rejected with HTTP 413 before
+           routing is performed. */ },
   "private_rpc"?:
     { "port"?:
         integer ∈ [1, 2^16-1]
@@ -296,7 +301,12 @@
         || { /* blacklist
                 The list of JSON RPC API methods disallowed for this server. */
              "blacklist": [ $unistring ... ] },
-      "max_active_connections"?: $max_active_rpc_connections },
+      "max_active_connections"?: $max_active_rpc_connections,
+      "max_request_body_size"?:
+        $int64
+        /* The maximum size, in bytes, of an RPC request body the server will read into
+           memory. Requests whose body exceeds this size are rejected with HTTP 413 before
+           routing is performed. */ },
   "websockets"?:
     { "max_message_length"?:
         integer ∈ [-2^30, 2^30]

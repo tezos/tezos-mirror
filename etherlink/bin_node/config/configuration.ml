@@ -241,6 +241,7 @@ type rpc = {
   cors_headers : string list;
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
+  max_request_body_size : int64;
   batch_limit : limit;
   restricted_rpcs : restricted_rpcs;
 }
@@ -421,13 +422,18 @@ let default_cors_origins = []
 
 let default_cors_headers = []
 
+(* Larger than the shared default (16 MiB): a JSON-RPC batch is a single request
+   carrying many calls, and [--rpc-batch-limit] bounds their number, not their
+   total size. *)
+let default_max_request_body_size = 33_554_432L (* 32 MiB *)
+
 let default_rpc ?(rpc_port = default_rpc_port) ?(rpc_addr = default_rpc_addr)
     ?(cors_origins = default_cors_origins)
     ?(cors_headers = default_cors_headers) ?(batch_limit = Unlimited)
     ?(restricted_rpcs = Unrestricted)
     ?(max_active_connections =
-      Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.Unlimited) ()
-    =
+      Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.Unlimited)
+    ?(max_request_body_size = default_max_request_body_size) () =
   {
     port = rpc_port;
     addr = rpc_addr;
@@ -436,6 +442,7 @@ let default_rpc ?(rpc_port = default_rpc_port) ?(rpc_addr = default_rpc_addr)
     batch_limit;
     restricted_rpcs;
     max_active_connections;
+    max_request_body_size;
   }
 
 let default_db = {pool_size = 8; max_conn_reuse_count = None}
@@ -1633,6 +1640,7 @@ let rpc_encoding =
              batch_limit;
              restricted_rpcs;
              max_active_connections;
+             max_request_body_size;
            }
          ->
         ( port,
@@ -1641,14 +1649,16 @@ let rpc_encoding =
           cors_headers,
           batch_limit,
           restricted_rpcs,
-          max_active_connections ))
+          max_active_connections,
+          max_request_body_size ))
       (fun ( port,
              addr,
              cors_origins,
              cors_headers,
              batch_limit,
              restricted_rpcs,
-             max_active_connections )
+             max_active_connections,
+             max_request_body_size )
          ->
         {
           port;
@@ -1658,8 +1668,9 @@ let rpc_encoding =
           batch_limit;
           restricted_rpcs;
           max_active_connections;
+          max_request_body_size;
         })
-      (obj7
+      (obj8
          (dft
             ~description:"The port used to bind the socket of the RPC server."
             "port"
@@ -1690,7 +1701,15 @@ let rpc_encoding =
          (dft
             "max_active_connections"
             Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.encoding
-            default_max_active_connections)))
+            default_max_active_connections)
+         (dft
+            ~description:
+              "The maximum size, in bytes, of an RPC request body the server \
+               will read into memory. Requests whose body exceeds this size \
+               are rejected with HTTP 413 before routing is performed."
+            "max_request_body_size"
+            int64
+            default_max_request_body_size)))
 
 let websockets_config_encoding =
   let open Data_encoding in
@@ -2254,7 +2273,7 @@ module Cli = struct
     }
 
   let patch_rpc ?rpc_addr ?rpc_port ?cors_origins ?cors_headers ?batch_limit
-      ?restricted_rpcs ?max_active_connections rpc =
+      ?restricted_rpcs ?max_active_connections ?max_request_body_size rpc =
     {
       port = Option.value ~default:rpc.port rpc_port;
       addr = Option.value ~default:rpc.addr rpc_addr;
@@ -2265,19 +2284,22 @@ module Cli = struct
         Option.value ~default:rpc.restricted_rpcs restricted_rpcs;
       max_active_connections =
         Option.value ~default:rpc.max_active_connections max_active_connections;
+      max_request_body_size =
+        Option.value ~default:rpc.max_request_body_size max_request_body_size;
     }
 
   let patch_configuration_from_args ~data_dir ?rpc_addr ?rpc_port
-      ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
-      ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
-      ?keep_alive ?rollup_node_endpoint ?dont_track_rollup_node ?verbose
-      ?profiling ?preimages ?preimages_endpoint ?native_execution_policy
-      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_keys ?evm_node_endpoint ?log_filter_max_nb_blocks
-      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
-      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?restricted_rpcs ?finalized_view ?history_mode ?gc_time_of_day ?dal_slots
-      ?sunset_sec ?rpc_timeout ?fail_on_divergence configuration =
+      ?rpc_batch_limit ?rpc_max_request_body_size ?cors_origins ?cors_headers
+      ?enable_websocket ?tx_queue_max_lifespan ?tx_queue_max_size
+      ?tx_queue_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
+      ?dont_track_rollup_node ?verbose ?profiling ?preimages ?preimages_endpoint
+      ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
+      ?private_rpc_port ?sequencer_keys ?evm_node_endpoint
+      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+      ?catchup_cooldown ?restricted_rpcs ?finalized_view ?history_mode
+      ?gc_time_of_day ?dal_slots ?sunset_sec ?rpc_timeout ?fail_on_divergence
+      configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -2285,14 +2307,26 @@ module Cli = struct
         ?cors_headers
         ?cors_origins
         ?batch_limit:rpc_batch_limit
+        ?max_request_body_size:rpc_max_request_body_size
         ?restricted_rpcs
         configuration.public_rpc
     in
     let private_rpc =
       match configuration.private_rpc with
       | None ->
-          Option.map (fun rpc_port -> default_rpc ~rpc_port ()) private_rpc_port
-      | Some rpc -> Some (patch_rpc ?rpc_port:private_rpc_port rpc)
+          Option.map
+            (fun rpc_port ->
+              default_rpc
+                ~rpc_port
+                ?max_request_body_size:rpc_max_request_body_size
+                ())
+            private_rpc_port
+      | Some rpc ->
+          Some
+            (patch_rpc
+               ?rpc_port:private_rpc_port
+               ?max_request_body_size:rpc_max_request_body_size
+               rpc)
     in
     let keep_alive =
       Option.value keep_alive ~default:configuration.keep_alive
@@ -2472,23 +2506,24 @@ module Cli = struct
       performance_profile = configuration.performance_profile;
     }
 
-  let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
-      ?cors_headers ?enable_websocket ?tx_queue_max_lifespan ?tx_queue_max_size
-      ?tx_queue_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
-      ?dont_track_rollup_node ?verbose ?profiling ?preimages ?preimages_endpoint
-      ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_keys ?evm_node_endpoint
-      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?restricted_rpcs ?finalized_view ?dal_slots ?network
-      ?history_mode ?gc_time_of_day ?sunset_sec ?rpc_timeout ?fail_on_divergence
-      () =
+  let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
+      ?rpc_max_request_body_size ?cors_origins ?cors_headers ?enable_websocket
+      ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
+      ?keep_alive ?rollup_node_endpoint ?dont_track_rollup_node ?verbose
+      ?profiling ?preimages ?preimages_endpoint ?native_execution_policy
+      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
+      ?sequencer_keys ?evm_node_endpoint ?log_filter_max_nb_blocks
+      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+      ?restricted_rpcs ?finalized_view ?dal_slots ?network ?history_mode
+      ?gc_time_of_day ?sunset_sec ?rpc_timeout ?fail_on_divergence () =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
          ~data_dir
          ?rpc_addr
          ?rpc_port
          ?rpc_batch_limit
+         ?rpc_max_request_body_size
          ?cors_origins
          ?cors_headers
          ?enable_websocket
@@ -2525,10 +2560,10 @@ module Cli = struct
          ?fail_on_divergence
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
-      ?cors_origins ?cors_headers ?enable_websocket ?tx_queue_max_lifespan
-      ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ?keep_alive
-      ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
-      ?preimages ?preimages_endpoint ?native_execution_policy
+      ?rpc_max_request_body_size ?cors_origins ?cors_headers ?enable_websocket
+      ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
+      ?keep_alive ?rollup_node_endpoint ?dont_track_rollup_node ?verbose
+      ?profiling ?preimages ?preimages_endpoint ?native_execution_policy
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
       ?sequencer_keys ?evm_node_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
@@ -2562,6 +2597,7 @@ module Cli = struct
           ?rpc_addr
           ?rpc_port
           ?rpc_batch_limit
+          ?rpc_max_request_body_size
           ?cors_origins
           ?cors_headers
           ?enable_websocket
@@ -2606,6 +2642,7 @@ module Cli = struct
           ?rpc_addr
           ?rpc_port
           ?rpc_batch_limit
+          ?rpc_max_request_body_size
           ?cors_origins
           ?cors_headers
           ?enable_websocket

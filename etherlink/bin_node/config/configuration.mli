@@ -215,6 +215,10 @@ type rpc = {
   cors_headers : string list;
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
+  max_request_body_size : int64;
+      (** Maximum size, in bytes, of an RPC request body the server reads into
+          memory. Requests whose body exceeds this size are rejected with HTTP
+          413. *)
   batch_limit : limit;
   restricted_rpcs : restricted_rpcs;
 }
@@ -358,6 +362,9 @@ val default_history_mode : history_mode
 
 val default_data_dir : string
 
+(** Default value for the [max_request_body_size] field of {!rpc}. *)
+val default_max_request_body_size : int64
+
 val get_data_dir : data_dir:string option -> string
 
 val config_filename :
@@ -371,6 +378,7 @@ module Cli : sig
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?rpc_batch_limit:limit ->
+    ?rpc_max_request_body_size:int64 ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
     ?enable_websocket:bool ->
@@ -414,6 +422,7 @@ module Cli : sig
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?rpc_batch_limit:limit ->
+    ?rpc_max_request_body_size:int64 ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?enable_websocket:bool ->
@@ -456,6 +465,7 @@ module Cli : sig
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?rpc_batch_limit:limit ->
+    ?rpc_max_request_body_size:int64 ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
     ?enable_websocket:bool ->
