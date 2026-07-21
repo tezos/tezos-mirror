@@ -370,6 +370,12 @@ let simple_logger =
     ~label:"simple_logger"
     ~contract:"SimpleLogger"
 
+let logger_nested =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/logger_nested.sol")
+    ~label:"logger_nested"
+    ~contract:"LoggerA"
+
 let call_tracer_depth =
   compile_contract
     ~source:(solidity_contracts_path ^ "/call_tracer_depth.sol")
