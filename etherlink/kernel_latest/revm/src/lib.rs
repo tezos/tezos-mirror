@@ -4304,6 +4304,233 @@ mod test {
         }
     }
 
+    mod call_tracer_precompile {
+        use alloy_sol_types::{sol, SolCall};
+        use evm_inspectors::{
+            call_tracer::{CallTracer, CallTracerConfig},
+            storage::trace_tx_path,
+            Tracer,
+        };
+        use revm::{
+            context::{
+                result::{ExecutionResult, Output},
+                transaction::AccessList,
+            },
+            primitives::{hex::FromHex, Address, Bytes, B256, U256},
+        };
+        use rlp::Rlp;
+        use tezos_ethereum::block::BlockConstants;
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_indexable_storage::IndexableStorage;
+        use tezos_smart_rollup_host::path::RefPath;
+        use tezosx_interfaces::RuntimeId;
+        use tezosx_journal::TezosXJournal;
+
+        use crate::{
+            run_transaction,
+            test::{
+                utilities::{fund, Registry, DEFAULT_SPEC_ID, STATIC_CALLER_BYTECODE},
+                GAS_LIMIT,
+            },
+            ExecutionOutcome, GasData, TransactionOrigin,
+        };
+
+        sol!("contracts/tests/static_caller.sol");
+        use self::StaticCaller::makeStaticCallCall;
+
+        fn identity_precompile() -> Address {
+            Address::from_hex("0000000000000000000000000000000000000004").unwrap()
+        }
+
+        // Shared driver for both the deploy and the traced-call paths;
+        // they differ only in the destination (`None` creates a contract)
+        // and whether a tracer is attached.
+        fn run(
+            host: &mut MockKernelHost,
+            caller: Address,
+            to: Option<Address>,
+            calldata: Bytes,
+            tracer: Option<&mut Tracer>,
+        ) -> ExecutionOutcome {
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+            run_transaction(
+                host,
+                &registry,
+                &mut journal,
+                DEFAULT_SPEC_ID,
+                &BlockConstants::test_block_with_no_fees(),
+                None,
+                caller,
+                to,
+                calldata,
+                GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
+                U256::ZERO,
+                None,
+                tracer,
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
+            )
+            .unwrap()
+        }
+
+        fn deploy(host: &mut MockKernelHost, caller: Address) -> Address {
+            let outcome = run(
+                host,
+                caller,
+                None,
+                Bytes::from_hex(STATIC_CALLER_BYTECODE).unwrap(),
+                None,
+            );
+            match outcome.result {
+                ExecutionResult::Success {
+                    output: Output::Create(_, Some(addr)),
+                    ..
+                } => addr,
+                other => panic!("StaticCaller deploy failed: {other:?}"),
+            }
+        }
+
+        fn run_traced(
+            host: &mut MockKernelHost,
+            caller: Address,
+            destination: Address,
+            calldata: Bytes,
+            tracer: &mut Tracer,
+        ) -> ExecutionOutcome {
+            run(host, caller, Some(destination), calldata, Some(tracer))
+        }
+
+        fn call_tracer(tx_hash: B256) -> Tracer {
+            Tracer::CallTracer(CallTracer::new(
+                CallTracerConfig {
+                    only_top_call: false,
+                    with_logs: false,
+                },
+                DEFAULT_SPEC_ID,
+                Some(tx_hash),
+            ))
+        }
+
+        // The `CallTracer` flushes its buffered traces, RLP-encoded, into
+        // an `IndexableStorage` keyed on the transaction hash. There is no
+        // Rust decoder for `CallTrace` (the node side decodes the RLP), so
+        // we read the raw encodings back and inspect them positionally.
+        fn read_traces(host: &MockKernelHost, tx_hash: B256) -> Vec<Vec<u8>> {
+            let path =
+                trace_tx_path(&Some(tx_hash), &RefPath::assert_from(b"/call_trace"))
+                    .unwrap();
+            let storage = IndexableStorage::new_owned_path(path);
+            let length = storage.length(host).unwrap();
+            (0..length)
+                .map(|index| storage.get_value(host, index).unwrap())
+                .collect()
+        }
+
+        // Positional accessors over `CallTrace::rlp_append` (a list of 11
+        // fields: type, from, to, value, gas, gas_used, input, output,
+        // error, logs, depth).
+        fn trace_type(trace: &Rlp) -> Vec<u8> {
+            trace.val_at(0).unwrap()
+        }
+
+        fn trace_to(trace: &Rlp) -> Option<Address> {
+            trace
+                .val_at::<Option<Vec<u8>>>(2)
+                .unwrap()
+                .map(|bytes| Address::from_slice(&bytes))
+        }
+
+        fn trace_output(trace: &Rlp) -> Option<Vec<u8>> {
+            trace.val_at(7).unwrap()
+        }
+
+        fn trace_depth(trace: &Rlp) -> u16 {
+            let bytes: Vec<u8> = trace.val_at(10).unwrap();
+            let mut buffer = [0u8; 2];
+            buffer[..bytes.len()].copy_from_slice(&bytes);
+            u16::from_le_bytes(buffer)
+        }
+
+        /// A precompile invoked as a nested `STATICCALL` must be recorded
+        /// as its own child frame carrying the precompile's real output.
+        #[test]
+        fn nested_precompile_call_records_real_outcome() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([0x11; 20]);
+            fund(&mut host, caller);
+            let static_caller = deploy(&mut host, caller);
+
+            let identity = identity_precompile();
+            let payload = Bytes::from(vec![0xAB; 64]);
+            let calldata: Bytes = makeStaticCallCall::new((identity, payload.clone()))
+                .abi_encode()
+                .into();
+
+            let tx_hash = B256::from([0xC1; 32]);
+            let mut tracer = call_tracer(tx_hash);
+            let outcome =
+                run_traced(&mut host, caller, static_caller, calldata, &mut tracer);
+            assert!(
+                outcome.result.is_success(),
+                "static call to the identity precompile should succeed"
+            );
+
+            let traces = read_traces(&host, tx_hash);
+            assert_eq!(
+                traces.len(),
+                2,
+                "expected the outer CALL and the nested precompile frame"
+            );
+
+            let precompile_frame = traces
+                .iter()
+                .map(|bytes| Rlp::new(bytes))
+                .find(|trace| trace_depth(trace) == 1)
+                .expect("nested precompile frame should be recorded");
+
+            assert_eq!(trace_type(&precompile_frame), b"STATICCALL".to_vec());
+            assert_eq!(trace_to(&precompile_frame), Some(identity));
+            // The identity precompile echoes its input; recording the real
+            // `call_end` outcome means the frame's output is the echoed
+            // payload rather than empty (the frame being dropped) or a
+            // duplicated pre-simulation.
+            assert_eq!(trace_output(&precompile_frame), Some(payload.to_vec()));
+        }
+
+        /// A transaction sent directly to a builtin precompile must record
+        /// a single top-level frame carrying the precompile's real output.
+        #[test]
+        fn top_level_precompile_call_records_real_outcome() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([0x11; 20]);
+            fund(&mut host, caller);
+
+            let identity = identity_precompile();
+            let input = Bytes::from(vec![0x42; 96]);
+
+            let tx_hash = B256::from([0xD2; 32]);
+            let mut tracer = call_tracer(tx_hash);
+            let outcome =
+                run_traced(&mut host, caller, identity, input.clone(), &mut tracer);
+            assert!(
+                outcome.result.is_success(),
+                "call to the identity precompile should succeed"
+            );
+
+            let traces = read_traces(&host, tx_hash);
+            assert_eq!(traces.len(), 1, "expected a single top-level frame");
+
+            let frame = Rlp::new(&traces[0]);
+            assert_eq!(trace_depth(&frame), 0);
+            assert_eq!(trace_type(&frame), b"CALL".to_vec());
+            assert_eq!(trace_to(&frame), Some(identity));
+            assert_eq!(trace_output(&frame), Some(input.to_vec()));
+        }
+    }
+
     #[test]
     fn test_osaka_clz_is_enabled() {
         let mut host = MockKernelHost::default();
