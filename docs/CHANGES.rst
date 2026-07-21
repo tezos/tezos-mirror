@@ -3,16 +3,29 @@
 Changelog
 '''''''''
 
-Version 25.0
+Version 25.1
 ============
 
 General
 -------
 
-- Improved the handling of the in-memory protocol cache across chain
-  reorganizations: it is now reused only when it corresponds to the block's
-  predecessor, and is otherwise rebuilt from the committed context. (MR
-  :gl:`!22462`)
+- **Security** Ensured the cache is rebuilt from the committed context whenever
+  the in-memory protocol cache contains stale data computed before a chain
+  reorganization. (MR :gl:`!22462`)
+
+- **Security** Hardened the validation of the smart rollup operation used to
+  advance an ongoing refutation game to reject malformed inputs at the shell
+  level. (MR :gl:`!22476`)
+
+- **Security** Hardened the validation of the double-baking evidence at the
+  shell level against adversarial inputs. (MR :gl:`!22484`)
+
+
+Version 25.0
+============
+
+General
+-------
 
 - Fixed a file descriptor leak in the RPC client: the connection of each
   followed HTTP redirect was never released. This affected every Octez

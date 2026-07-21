@@ -1,4 +1,4 @@
-Version 25.0
+Version 25.1
 ============
 
 Changes
@@ -14,6 +14,16 @@ Version 25 introduces the following changes or new features:
 
 An overview of breaking changes and deprecations introduced in Octez
 v25 can be found :ref:`here <v25_breaking_changes>`.
+
+Octez v25.1
+~~~~~~~~~~~
+
+Octez v25.1 hardens the Octez node against three security threats: by
+addressing a bug where the node's in-memory protocol cache could be reused
+across a chain reorganization, by introducing a stricter validation of smart
+rollup refutation game moves to reject malformed inputs, and by introducing a
+stricter validation for illegitimate double-baking evidence. Node operators and
+bakers should upgrade at their earliest convenience.
 
 .. _protocol_support_v25:
 
@@ -121,18 +131,19 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v25.0
+  git checkout octez-v25.1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v25.0`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v25.1`` Docker images of Octez.
 
 Changelog
 ---------
 
+- `Version 25.1 <../CHANGES.html#version-25-1>`_
 - `Version 25.0 <../CHANGES.html#version-25-0>`_
 - `Version 25.0~rc1 <../CHANGES.html#version-25-0-rc1>`_
 - `Version 25.0~beta1 <../CHANGES.html#version-25-0-beta1>`_
