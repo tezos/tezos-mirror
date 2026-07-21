@@ -7,7 +7,7 @@ use crate::{journal::Journal, storage::world_state_handler::StorageAccount};
 use database::EtherlinkVMDB;
 pub use error::{EvmDbError, EvmKernelError, EvmRunError};
 use evm_inspectors::struct_logger::StructLogger;
-use evm_inspectors::{Tracer, TracerInput};
+use evm_inspectors::Tracer;
 use handler::EtherlinkHandler;
 use helpers::storage::u256_to_le_bytes;
 pub use michelson_types::Withdrawal;
@@ -540,7 +540,7 @@ pub fn run_transaction<'a, Host, R: Registry>(
     gas_data: GasData,
     value: U256,
     authorization_list: Option<Vec<SignedAuthorization>>,
-    tracer_input: Option<TracerInput>,
+    tracer: Option<&'a mut Tracer>,
     is_simulation: bool,
     mut origin: TransactionOrigin,
 ) -> Result<ExecutionOutcome, EvmRunError>
@@ -577,10 +577,9 @@ where
     let classify_native = (!is_cross_runtime).then_some(caller);
     let db = EtherlinkVMDB::new(host, registry, block_constants, classify_native)?;
 
-    if let Some(tracer_input) = tracer_input {
+    if let Some(tracer) = tracer {
         let precompiles =
             EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled());
-        let mut tracer = tracer_input.tracer(precompiles.builtins.clone(), spec_id);
         let mut evm_context = build_evm_inspector_context(
             db,
             journal,
@@ -590,7 +589,7 @@ where
             precompiles,
             block_constants.chain_id.as_u64(),
             spec_id,
-            &mut tracer,
+            tracer,
             is_simulation,
             is_cross_runtime,
             alias_delegation,

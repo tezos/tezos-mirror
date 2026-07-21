@@ -9,7 +9,6 @@
 // when the proxy node simulates directly
 
 use crate::apply::revm_run_transaction;
-use crate::block_storage;
 use crate::chains::{DebugFeatures, ExperimentalFeatures};
 use crate::configuration::fetch_evm_chain_id;
 use crate::fees::simulation_add_gas_for_fees;
@@ -18,6 +17,7 @@ use crate::storage::{
     read_sequencer_pool_address, read_tracer_input,
 };
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
+use crate::{block_storage, journal};
 use crate::{error::Error, storage};
 
 use crate::{parsable, parsing};
@@ -44,7 +44,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_interfaces::{Registry, RuntimeId};
-use tezosx_journal::{CracId, TezosXJournal};
+use tezosx_journal::CracId;
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;
@@ -515,19 +515,17 @@ impl Evaluation {
         // EVM-entered applied path so a gateway crossing captures the EVM
         // caller as Ethereum-native. The operation-hash seed is left zero
         // (simulated KT1s are non-authoritative, see above).
-        let mut journal = TezosXJournal::new(
+        let (mut journal, mut tracer) = journal::prepare_tezosx_journal(
             CracId::mock(RuntimeId::Ethereum),
-            Default::default(),
-            constants.clone(),
+            &Default::default(),
+            &constants,
+            spec_id,
+            crate::storage::is_http_trace_enabled(host),
+            &debug_features,
+            0,
+            tracer_input,
         );
-        // Capture HTTP traces only when the node requested them (it writes
-        // the flag before an `http_traceCall`). Plain `eth_call` /
-        // `eth_estimateGas` — which share this path and are called a lot —
-        // leave the flag unset and pay no trace clone.
-        journal.set_http_trace_enabled(crate::storage::is_http_trace_enabled(host));
-        if debug_features.enable_debug_precompiles {
-            journal.enable_debug_precompiles();
-        }
+
         let sim_result = match revm_run_transaction(
             host,
             registry,
@@ -543,7 +541,7 @@ impl Evaluation {
             max_gas_limit,
             None,
             spec_id,
-            tracer_input,
+            tracer.as_mut(),
             true,
             // TODO: Replace this by the decoded access lists if any.
             TransactionOrigin::UserInput {
@@ -711,6 +709,7 @@ where
     match simulation {
         Message::Evaluation(simulation) => {
             let tracer_input = read_tracer_input(host)?;
+
             let (outcome, traces) =
                 simulation.run(host, registry, tracer_input, spec_id)?;
             storage::store_simulation_http_traces(host, &traces)?;
@@ -729,6 +728,7 @@ mod tests {
     };
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_journal::TezosXJournal;
 
     use crate::registry_impl::RegistryImpl;
     use crate::retrieve_block_fees;

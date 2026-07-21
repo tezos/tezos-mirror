@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
-use evm_inspectors::{get_tracer_configuration, TracerInput};
+use evm_inspectors::{get_tracer_configuration, Tracer, TracerInput};
 use primitive_types::{H160, U256};
 use revm::primitives::alloy_primitives::IntoLogData;
 use revm::primitives::hardfork::SpecId;
@@ -49,6 +49,7 @@ use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
 use crate::chains::{DebugFeatures, EvmLimits};
 use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
+use crate::journal;
 use crate::transaction::{Transaction, TransactionContent};
 
 sol! {
@@ -580,7 +581,7 @@ pub fn revm_run_transaction<Host>(
     maximum_gas_per_transaction: u64,
     authorization_list: Option<AuthorizationList>,
     spec_id: &SpecId,
-    tracer_input: Option<TracerInput>,
+    tracer: Option<&mut Tracer>,
     is_simulation: bool,
     origin: revm_etherlink::TransactionOrigin,
 ) -> Result<ExecutionOutcome, Error>
@@ -625,7 +626,7 @@ where
         gas_data,
         revm::primitives::U256::from_le_slice(&bytes),
         authorization_list.map(signed_authorization),
-        tracer_input,
+        tracer,
         is_simulation,
         origin,
     )
@@ -716,16 +717,16 @@ where
         block_constants.number.low_u64(),
     );
 
-    let mut journal =
-        TezosXJournal::new(crac_id, operation_hash, block_constants.clone());
-    // Fold the block's prior internal ops into this op's cap (anti-DoS).
-    journal
-        .michelson
-        .set_internal_operation_counter(internal_operations_base);
-    journal.set_http_trace_enabled(http_trace_enabled);
-    if debug_features.enable_debug_precompiles {
-        journal.enable_debug_precompiles();
-    }
+    let (mut journal, mut tracer) = journal::prepare_tezosx_journal(
+        crac_id,
+        &operation_hash,
+        block_constants,
+        spec_id,
+        http_trace_enabled,
+        debug_features,
+        internal_operations_base,
+        tracer_input,
+    );
 
     let run_result = revm_run_transaction(
         host,
@@ -742,7 +743,7 @@ where
         limits.maximum_gas_limit,
         transaction.authorization_list.clone(),
         spec_id,
-        tracer_input,
+        tracer.as_mut(),
         false,
         TransactionOrigin::UserInput {
             access_list: revm_etherlink::helpers::legacy::access_list_to_revm(
@@ -842,11 +843,17 @@ where
     // Seed the journal with the deposit's own transaction hash so any
     // origination nonce stays deterministic and unique even though the
     // kernel-managed XTZ bridge does not NAC into Michelson today.
-    let mut journal = TezosXJournal::new(
+    let (mut journal, mut tracer) = journal::prepare_tezosx_journal(
         CracId::mock(RuntimeId::Ethereum),
-        tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
-        block_constants.clone(),
+        &tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+        &block_constants,
+        spec_id,
+        false, // http_trace_enabled,
+        &DebugFeatures::default(),
+        0,
+        tracer_input,
     );
+
     match revm_run_transaction(
         host,
         registry,
@@ -862,7 +869,7 @@ where
         maximum_gas_limit,
         None,
         spec_id,
-        tracer_input,
+        tracer.as_mut(),
         false,
         TransactionOrigin::UserInput {
             access_list: revm::context::transaction::AccessList::default(),
@@ -980,11 +987,17 @@ where
     // Seed the journal with the deposit's own transaction hash so any
     // origination nonce stays deterministic and unique even though the
     // kernel-managed FA bridge does not NAC into Michelson today.
-    let mut journal = TezosXJournal::new(
+    let (mut journal, mut tracer) = journal::prepare_tezosx_journal(
         CracId::mock(RuntimeId::Ethereum),
-        tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
-        block_constants.clone(),
+        &tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+        &block_constants,
+        spec_id,
+        false, // http_trace_enabled,
+        &DebugFeatures::default(),
+        0,
+        tracer_input,
     );
+
     revm_run_transaction(
         host,
         registry,
@@ -1000,7 +1013,7 @@ where
         maximum_gas_limit,
         None,
         spec_id,
-        tracer_input,
+        tracer.as_mut(),
         false,
         TransactionOrigin::UserInput {
             access_list: revm::context::transaction::AccessList::default(),
