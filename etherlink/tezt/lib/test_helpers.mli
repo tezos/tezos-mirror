@@ -425,3 +425,12 @@ val register_sandbox_with_observer :
   ?with_runtimes:Tezosx_runtime.t list ->
   (sandbox_test -> unit Lwt.t) ->
   unit
+
+(** Foreign endpoint of the tezlink RPC served by [evm_node]. *)
+val tezlink_foreign_endpoint : Evm_node.t -> Endpoint.t
+
+(** Endpoint of the tezlink RPC served by [evm_node], as a [Client.endpoint]. *)
+val tezlink_endpoint : Evm_node.t -> Client.endpoint
+
+(** Client initialised against the tezlink RPC served by [evm_node]. *)
+val tezlink_client : Evm_node.t -> Client.t Lwt.t

@@ -882,3 +882,13 @@ let register_sandbox_with_observer ~__FILE__ ?(uses_client = false) ?kernel
       sandbox
   in
   body {sandbox; observer}
+
+let tezlink_foreign_endpoint evm_node =
+  let evm_node_endpoint = Evm_node.rpc_endpoint_record evm_node in
+  {evm_node_endpoint with path = "/tezlink"}
+
+let tezlink_endpoint evm_node =
+  Client.Foreign_endpoint (tezlink_foreign_endpoint evm_node)
+
+let tezlink_client evm_node =
+  Client.init ~endpoint:(tezlink_endpoint evm_node) ()
