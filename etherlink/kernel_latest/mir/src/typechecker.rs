@@ -5835,20 +5835,22 @@ fn visit_value<'a, 'b>(
         (T::Bytes, V::Bytes(bs)) => results.push(TV::Bytes(bs.clone())),
         (T::Key, V::String(str)) => {
             ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
-            results.push(TV::Key(
-                PublicKey::from_b58check(str)
-                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
-            ));
+            let key = PublicKey::from_b58check(str)
+                .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?;
+            key.check_validity()
+                .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?;
+            results.push(TV::Key(key));
         }
         (T::Key, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            results.push(TV::Key(
-                PublicKey::nom_read_exact(bs)
-                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
-            ));
+            let key = PublicKey::nom_read_exact(bs)
+                .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?;
+            key.check_validity()
+                .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?;
+            results.push(TV::Key(key));
         }
         (T::Signature, V::String(str)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::SIGNATURE_READABLE)?;
             let sig = Signature::from_base58_check(str)
                 .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?;
             sig.check_validity()
@@ -5856,7 +5858,7 @@ fn visit_value<'a, 'b>(
             results.push(TV::Signature(sig));
         }
         (T::Signature, V::Bytes(bs)) => {
-            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::SIGNATURE_OPTIMIZED)?;
             let sig = Signature::try_from(bs.clone())
                 .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?;
             sig.check_validity()
@@ -6492,6 +6494,67 @@ mod typecheck_tests {
             .encode_for_pack()
             .expect("gas suffices")
             .expect("pack succeeds");
+    }
+
+    // Exact-gas oracles for `key`/`signature` literal decoding. Each
+    // typechecks one valid literal and asserts the precise milligas consumed:
+    // `VALUE_STEP` (100, charged once per value node in `visit_value`) plus the
+    // decode constant. Hardcoded totals so reverting a `gas::tc_cost` constant
+    // fails the test. Costs were benchmarked with `examples/decode_gas.rs`.
+    fn value_typecheck_gas(v: &Micheline, t: &Type) -> u32 {
+        let mut ctx = Ctx::default();
+        let start = ctx.gas.milligas().unwrap();
+        typecheck_value(v, &mut ctx, t, AllowForgedLazyStorageId::No)
+            .expect("valid literal typechecks");
+        start - ctx.gas.milligas().unwrap()
+    }
+
+    #[test]
+    fn key_readable_literal_gas() {
+        let v = Micheline::String(
+            "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK".to_string(),
+        );
+        // VALUE_STEP (100) + KEY_READABLE (36500)
+        assert_eq!(value_typecheck_gas(&v, &Type::Key), 36600);
+    }
+
+    #[test]
+    fn key_optimized_literal_gas() {
+        use tezos_crypto_rs::public_key::PublicKey;
+        use tezos_data_encoding::enc::BinWriter;
+        let mut bytes = Vec::new();
+        PublicKey::from_b58check(
+            "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK",
+        )
+        .unwrap()
+        .bin_write(&mut bytes)
+        .unwrap();
+        let v = Micheline::Bytes(bytes);
+        // VALUE_STEP (100) + KEY_OPTIMIZED (34000)
+        assert_eq!(value_typecheck_gas(&v, &Type::Key), 34100);
+    }
+
+    #[test]
+    fn signature_readable_literal_gas() {
+        let v = Micheline::String(
+            "edsigtoeXp3xFtGugwCTDSDuifQ9Ka81X4gXFoxRQ6Xao2Ryc3yioptrKMfNy5c9pHhbA9Xn3sYZdx2SPiCGTFXjjXx9xKCPDoq"
+                .to_string(),
+        );
+        // VALUE_STEP (100) + SIGNATURE_READABLE (2700)
+        assert_eq!(value_typecheck_gas(&v, &Type::Signature), 2800);
+    }
+
+    #[test]
+    fn signature_optimized_literal_gas() {
+        use tezos_crypto_rs::signature::Signature;
+        let bytes: Vec<u8> = Signature::from_base58_check(
+            "edsigtoeXp3xFtGugwCTDSDuifQ9Ka81X4gXFoxRQ6Xao2Ryc3yioptrKMfNy5c9pHhbA9Xn3sYZdx2SPiCGTFXjjXx9xKCPDoq",
+        )
+        .unwrap()
+        .into();
+        let v = Micheline::Bytes(bytes);
+        // VALUE_STEP (100) + SIGNATURE_OPTIMIZED (42)
+        assert_eq!(value_typecheck_gas(&v, &Type::Signature), 142);
     }
 
     /// hack to simplify syntax in tests
@@ -11761,6 +11824,86 @@ mod typecheck_tests {
                     .unwrap()
             ))))
         );
+    }
+
+    #[test]
+    fn push_key_invalid() {
+        // secp256k1, P256 and BLS literals whose tag and length are well-formed
+        // but whose bytes are not a point on the selected curve are rejected.
+        assert!(matches!(
+            parse(
+                "PUSH key 0x0102ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            )
+            .unwrap()
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        assert!(matches!(
+            parse(
+                "PUSH key 0x0202ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            )
+            .unwrap()
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        assert!(matches!(
+            parse(
+                "PUSH key 0x03ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            )
+            .unwrap()
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        // The same off-curve keys in the readable (base58) form are rejected too.
+        assert!(matches!(
+            parse("PUSH key \"sppk7bFP2oW86SDDFzqiDCMtbm8j4obhJ9AVYkG1XFzwz4ik6kGmM5V\"")
+                .unwrap()
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        assert!(matches!(
+            parse("PUSH key \"p2pk66WuZc7RC3dPJPEDJVKjhZb2M2MxpY7PwFghDxH48Zz8nivSqHC\"")
+                .unwrap()
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        assert!(matches!(
+            parse(
+                "PUSH key \"BLpk2HNLySEaiwT71MzNBuZneM4p3KEjyLJ9FS2Erp8AMJAkVPEstTddjquuAdrmPwumL1xRcttD\""
+            )
+            .unwrap()
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
+        // Ed25519 keys are validated too: an off-curve Ed25519 literal is
+        // rejected (stricter than L1, which accepts length-valid Ed25519).
+        assert!(matches!(
+            parse("PUSH key 0x000202020202020202020202020202020202020202020202020202020202020202")
+                .unwrap()
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
+            Err(TcError::ByteReprError(
+                Type::Key,
+                ByteReprError::WrongFormat(_)
+            ))
+        ));
     }
 
     #[test]

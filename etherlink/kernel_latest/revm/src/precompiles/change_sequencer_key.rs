@@ -101,6 +101,12 @@ where
                 ));
             };
 
+            // Reject keys that are not valid points on their curve, so an
+            // unusable key cannot become the sequencer key.
+            public_key.check_validity().map_err(|_| {
+                CustomPrecompileError::Revert(String::from("invalid public key"), gas)
+            })?;
+
             // Nom read exact isn't compliant with the enconding on OCAML.
             let signature_bytes: &[u8] = &call.signature;
             let Ok(signature) = Signature::try_from(signature_bytes) else {
