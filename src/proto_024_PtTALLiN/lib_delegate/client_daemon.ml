@@ -130,14 +130,16 @@ module Baker = struct
           ()
       in
       let* () =
-        if Option.is_some data_dir && not (List.is_empty extra_nodes) then
-          (* Multiple nodes work only when all the nodes are remote for now. *)
-          failwith
-            "Incompatible configuration: `--extra-node` cannot be used with \
-             local node."
-        else
-          let*! () = Events.(emit extra_node_warning ()) in
-          return_unit
+        match (data_dir, extra_nodes) with
+        | _, [] -> return_unit
+        | Some _, _ :: _ ->
+            (* Multiple nodes work only when all the nodes are remote for now. *)
+            failwith
+              "Incompatible configuration: `--extra-node` cannot be used with \
+               local node."
+        | None, _ :: _ ->
+            let*! () = Events.(emit extra_node_warning ()) in
+            return_unit
       in
       let*! () =
         cctxt#message
