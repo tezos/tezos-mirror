@@ -25,6 +25,7 @@ members = [
 	"installer-kernel",
 	"installer-client",
 	"installer-config",
+        "instrument",
 ]
 
 [workspace.dependencies.tezos_crypto_rs]

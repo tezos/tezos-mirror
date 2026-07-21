@@ -17,9 +17,16 @@
 open Test_helpers
 open Rpc.Syntax
 
-(** [craft_panic_tx ~sequencer ~nonce] builds a signed transaction from the
-    first bootstrap account that calls [panic()] on the debug precompile. *)
-let craft_panic_tx ~sequencer ~nonce =
+type fault = Panic | Stack_overflow
+
+let string_of_fault = function
+  | Panic -> "panic"
+  | Stack_overflow -> "stack_overflow"
+
+(** [craft_tx ~fault ~sequencer ~nonce] builds a signed transaction from the
+    first bootstrap account that calls the [fault] method of the debug
+    precompile. *)
+let craft_tx ~fault ~sequencer ~nonce =
   let*@ chain_id = Rpc.get_chain_id sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   Cast.craft_tx
@@ -30,7 +37,7 @@ let craft_panic_tx ~sequencer ~nonce =
     ~gas:1_000_000
     ~gas_price:1_000_000_000
     ~address:Solidity_contracts.Precompile.panic
-    ~signature:"panic()"
+    ~signature:(sf "%s()" (string_of_fault fault))
     ()
 
 module Self_tests = struct
@@ -44,7 +51,7 @@ module Self_tests = struct
       ~tags:["evm"; "precompile"; "panic"; "fault"; "debug"]
       ~title:"Panic debug precompile is inert when the flag is unset"
     @@ fun sequencer ->
-    let* raw_tx = craft_panic_tx ~sequencer ~nonce:0 in
+    let* raw_tx = craft_tx ~sequencer ~nonce:0 ~fault:Panic in
     let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
     let*@ _ = Rpc.produce_block sequencer in
     let* receipt =
@@ -76,7 +83,7 @@ module Self_tests = struct
       ~tags:["evm"; "precompile"; "panic"; "fault"; "debug"]
       ~title:"Panic debug precompile crashes the sequencer at block production"
     @@ fun sequencer ->
-    let* raw_tx = craft_panic_tx ~sequencer ~nonce:0 in
+    let* raw_tx = craft_tx ~sequencer ~nonce:0 ~fault:Panic in
     (* Wait for the transaction to reach the queue before producing the block,
      so the block that triggers the crash actually contains it. *)
     let added =
@@ -115,13 +122,20 @@ let send_raw_tx_to_delayed_inbox ~sc_rollup_node ~client ~l1_contracts
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
-(* A panic() transaction reaching the block producer through the delayed inbox
+(* A faulty transaction reaching the block producer through the delayed inbox
    takes the sequencer down, exactly like one submitted directly. This
    exercises the operator's recovery path: manually flushing the delayed inbox
    with [--force] publishes a blueprint the kernel drops on the trap,
    unblocking the rollup node so the sequencer can be restarted and able to
-   produce blocks again.  *)
-let test_recover_crashing_delayed_transaction =
+   produce blocks again.
+
+   The [Stack_overflow] variant additionally pins the call-depth guard injected
+   by [smart-rollup-instrument]: its recursion spills only a scalar per frame,
+   so the host stack — not the kernel's 1 MiB shadow stack — is what runs out
+   first. Without the guard that is not a WASM trap, the PVM has nothing to
+   absorb, and it goes Stuck: the flush never drains the delayed inbox and this
+   test times out. See [stack_overflow] in the debug precompile. *)
+let test_recover_crashing_delayed_transaction fault =
   Setup.register_test
     ~__FILE__
     ~time_between_blocks:Nothing
@@ -129,14 +143,25 @@ let test_recover_crashing_delayed_transaction =
     ~enable_dal:false
     ~enable_debug_precompiles:true
     ~da_fee:Wei.zero
-    ~tags:["evm"; "precompile"; "panic"; "fault"; "debug"; "delayed_inbox"]
-    ~title:"Recover from a delayed panic() transaction with a forced flush"
+    ~tags:
+      [
+        "evm";
+        "precompile";
+        string_of_fault fault;
+        "fault";
+        "debug";
+        "delayed_inbox";
+      ]
+    ~title:
+      (sf
+         "Recover from a delayed %s() transaction with a forced flush"
+         (string_of_fault fault))
   @@
   fun {sequencer; sc_rollup_node; client; l1_contracts; sc_rollup_address; _}
       _protocol
     ->
-  (* Submit a panic() transaction through the delayed inbox. *)
-  let* raw_tx = craft_panic_tx ~sequencer ~nonce:0 in
+  (* Submit the faulty transaction through the delayed inbox. *)
+  let* raw_tx = craft_tx ~fault ~sequencer ~nonce:0 in
   let* () =
     send_raw_tx_to_delayed_inbox
       ~sc_rollup_node
@@ -198,4 +223,6 @@ let test_recover_crashing_delayed_transaction =
 
 let () =
   Self_tests.register () ;
-  test_recover_crashing_delayed_transaction [Alpha]
+  List.iter
+    (fun fault -> test_recover_crashing_delayed_transaction fault [Alpha])
+    [Panic; Stack_overflow]
