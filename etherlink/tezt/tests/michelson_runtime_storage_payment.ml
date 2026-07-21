@@ -17,6 +17,7 @@
 *)
 
 open Rpc.Syntax
+open Test_helpers
 
 (** Tezlink's per-operation hard gas limit (Michelson gas units). Mirrors
     [hard_gas_limit_per_operation] in
@@ -39,18 +40,6 @@ module Setup = struct
       ~tags:(["tezosx"; "storage_payment"] @ runtime_tags with_runtimes @ tags)
       ~with_runtimes
 end
-
-let tezlink_foreign_endpoint_from_evm_node evm_node =
-  let evm_node_endpoint = Evm_node.rpc_endpoint_record evm_node in
-  {evm_node_endpoint with path = "/tezlink"}
-
-let tezlink_endpoint_from_evm_node evm_node =
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  Client.Foreign_endpoint tezlink_endpoint
-
-let tezlink_client_from_evm_node evm_node =
-  let endpoint = tezlink_endpoint_from_evm_node evm_node in
-  Client.init ~endpoint
 
 module Contract = struct
   let contract_prg path =
@@ -312,8 +301,8 @@ let test_origination_receipt_exposes_storage_fields () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let initial_storage = "hello" in
   let* _kt1 =
@@ -382,8 +371,8 @@ let test_transfer_with_growth_exposes_delta () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let initial_storage = "x" in
   let new_storage = "hello" in
@@ -458,8 +447,8 @@ let test_transfer_with_shrink_exposes_zero_diff () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let initial_storage = "hello" in
   let new_storage = "x" in
@@ -522,8 +511,8 @@ let test_transfer_to_fresh_implicit_burns_slot () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let* () =
     Client.transfer
@@ -576,8 +565,8 @@ let test_two_internal_transfers_burn_each () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let initial_storage = "" in
   let* kt1 =
@@ -703,8 +692,8 @@ let test_partial_internal_burn_failure_backtracks_all () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let initial_storage = "" in
   let* kt1 =
@@ -880,8 +869,8 @@ let test_partial_internal_storage_limit_overshoot_backtracks_all () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let initial_storage = "" in
   let* kt1 =
@@ -1037,8 +1026,8 @@ let test_big_map_update_insert_overwrite_delete () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let initial_storage = {|Pair { Elt "d" "x" ; Elt "k" "old" } Unit|} in
   let* kt1 =
@@ -1108,8 +1097,8 @@ let test_temp_big_map_dropped_no_charge () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let* kt1 =
     Contract.Big_map_write.originate
@@ -1170,8 +1159,8 @@ let test_big_map_replacement_symmetric () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let* kt1 =
     Contract.Big_map_store.originate
@@ -1241,8 +1230,8 @@ let test_big_map_nonempty_promotion_burns_content () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let* kt1 =
     Contract.Receiver_store.originate
@@ -1310,8 +1299,8 @@ let test_big_map_replacement_nonempty_burns_content () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   let* _kt1_empty =
     Contract.Big_map_store.originate
@@ -1429,8 +1418,8 @@ let test_evm_to_michelson_no_storage_growth_no_payment () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
   let initial_storage = "hello" in
   let* kt1 =
     Contract.Store_input.originate
@@ -1531,8 +1520,8 @@ let test_evm_to_michelson_storage_growth_evm_pays () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
   let initial_storage = "hello" in
   let new_storage = "hello world, this storage is now substantially longer" in
   let* kt1 =
@@ -1651,8 +1640,8 @@ let test_evm_to_michelson_storage_growth_evm_oog_at_g2 () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
   let initial_storage = "hello" in
   let new_storage = "hello world, this storage is now substantially longer" in
   let* kt1 =
@@ -1762,8 +1751,8 @@ let test_evm_to_michelson_storage_growth_evm_reverts_after_g2 () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
   let initial_storage = "hello" in
   let new_storage = "hello world, this storage is now substantially longer" in
   let* kt1 =
@@ -1920,8 +1909,8 @@ let test_evm_to_michelson_alias_origination_evm_pays () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
   let initial_storage = "hello" in
   let* kt1 =
     Contract.Store_input.originate
@@ -2026,7 +2015,7 @@ let test_evm_to_michelson_alias_origination_evm_oog () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun evm_node ->
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let* tez_client = tezlink_client evm_node in
   let initial_storage = "hello" in
   let* kt1 =
     Contract.Store_input.originate
@@ -2142,8 +2131,8 @@ let test_michelson_to_michelson_storage_growth_michelson_pays () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
   let initial_storage = "x" in
   let new_storage = "hello world this is now substantially larger" in
   let* kt1 =
@@ -2243,8 +2232,8 @@ let test_michelson_to_michelson_storage_growth_michelson_failwith_backtracks ()
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
   let initial_storage = "x" in
   let new_storage = "hello world this is now substantially larger" in
   (* Originate (2) — the CRAC target whose storage grows. *)
@@ -2371,8 +2360,8 @@ let test_michelson_to_evm_to_michelson_storage_growth_evm_pays () =
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  let* tez_client = tezlink_client_from_evm_node evm_node () in
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
 
   (* Deploy and initialize the EVM intermediary with the Michelson
      destination + the Michelson-packed parameter. *)
