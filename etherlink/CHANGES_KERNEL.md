@@ -8,15 +8,9 @@
   is the read-only lookup, returning `None` for unregistered addresses.
   `INDEX_ADDRESS` writes to storage and is therefore rejected at typechecking
   in views, following the `TRANSFER_TOKENS` / `SET_DELEGATE` pattern. New
-  registrations are reported in the operation receipt's `address_registry_diff` 
+  registrations are reported in the operation receipt's `address_registry_diff`
   field.
   (!22424 !22425)
-- Changing the sequencer key, via the `change_sequencer_key` precompile or a
-  governance sequencer upgrade, rejects public keys that are not valid curve
-  points. (!22502)
-- The Michelson runtime charges substantially more gas to typecheck `key` and
-  `signature` literals, reflecting the actual decode and curve point-validation
-  cost (benchmarked on the MIR interpreter). (!22503)
 - The account info record (`/info`) may now carry a fourth RLP field,
   the origin classification (alias payload included). Legacy 3-field
   records remain valid and are migrated lazily as accounts are touched;
@@ -70,10 +64,6 @@
   operation's copy of a big_map observes the source as it was before the storage
   update (previously it observed the post-update value, diverging from L1 and
   reaching the called contract's final state). (!22357)
-- The Michelson runtime rejects `key` literals whose bytes are not a valid
-  curve point, for all curves. This includes Ed25519, which is intentionally
-  stricter than L1 (L1 accepts length-valid Ed25519 keys); tz4 (BLS) keys are
-  rejected as well, as BLS is unsupported. (!22501)
 
 ## Version 6 (Farfadet)
 

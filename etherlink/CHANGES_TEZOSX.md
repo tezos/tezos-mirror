@@ -17,11 +17,49 @@
 - Fixed sequencer key storage corruption: writing a shorter sequencer key left
   trailing bytes of the previous, longer key in storage. The stored key is now
   fully overwritten and truncated to its exact length. (!22510)
+- Changing the sequencer key, via the `change_sequencer_key` precompile or a
+  governance sequencer upgrade, rejects public keys that are not valid curve
+  points. (!22502)
 - Fixed a blueprint chunk DoS: a blueprint chunk whose RLP `number` field was
   longer than 32 bytes panicked the kernel during RLP decode, before the
   signature was checked. Any L1 account could send such a chunk with no
   sequencer key and no valid signature, trapping the rollup node. Oversized
   U256 fields are now rejected with a clean decode error. (!22510)
+
+### Michelson Runtime
+
+- **Bug fix:** `EXEC` of a lambda with a deeply nested body no longer
+  overflows the native stack, and no longer costs `O(D²)` work for `O(D)` gas.
+  The runtime body is walked borrowed from a keep-alive arena instead of
+  deep-cloning each opened sub-block. (!22444)
+- Elaboration now collapses singleton sequences (`{ x }` elaborates as `x`),
+  mirroring L1's `script_ir_translator`. A body wrapped in a chain of singleton
+  braces `{{{…x…}}}` therefore no longer survives typechecking as an `O(depth)`
+  nested structure, and runtime `EXEC`/`VIEW` walks its collapsed,
+  constant-size form. Multi-element and empty blocks are left intact (as L1
+  does), so only the semantically vacuous singleton wrappers are peeled.
+  (!22452)
+- The Michelson runtime rejects `key` literals whose bytes are not a valid
+  curve point, for all curves. This includes Ed25519, which is intentionally
+  stricter than L1 (L1 accepts length-valid Ed25519 keys); tz4 (BLS) keys are
+  rejected as well, as BLS is unsupported. (!22501)
+- The Michelson runtime charges substantially more gas to typecheck `key` and
+  `signature` literals, reflecting the actual decode and curve point-validation
+  cost (benchmarked on the MIR interpreter). (!22503)
+
+### Native Atomic Composability
+
+### Storage versions
+
+### Internals
+
+- The kernel is now instrumented to panic when reaching a call stack depth of
+  2,000. (!22447)
+
+## Version 0.7 (22592cfa94eb19a2c8b114190533828791956ae5)
+
+### EVM Runtime
+
 - The `verify_tezos_signature` precompile (reached through an alias
   forwarder's EIP-1271 `isValidSignature`) now rejects non-canonical
   high-S P-256 (tz3) signatures. ECDSA is malleable: for any valid
@@ -159,17 +197,6 @@
   on EVM frame revert, so the orphaned origination is dropped with the
   reverted state instead of being re-attributed to the next call that
   drains it. (!22393)
-- **Bug fix:** `EXEC` of a lambda with a deeply nested body no longer
-  overflows the native stack, and no longer costs `O(D²)` work for `O(D)` gas.
-  The runtime body is walked borrowed from a keep-alive arena instead of
-  deep-cloning each opened sub-block. (!22444)
-- Elaboration now collapses singleton sequences (`{ x }` elaborates as `x`),
-  mirroring L1's `script_ir_translator`. A body wrapped in a chain of singleton
-  braces `{{{…x…}}}` therefore no longer survives typechecking as an `O(depth)`
-  nested structure, and runtime `EXEC`/`VIEW` walks its collapsed,
-  constant-size form. Multi-element and empty blocks are left intact (as L1
-  does), so only the semantically vacuous singleton wrappers are peeled.
-  (!22452)
 - The typechecker now charges the gas for entrypoint resolution (a flat cost
   for `SELF`, the `CONTRACT` instruction, and contract-value parsing) and the
   `CHECK_PRINTABLE` cost (10·len+15) of string literals and view names, which
