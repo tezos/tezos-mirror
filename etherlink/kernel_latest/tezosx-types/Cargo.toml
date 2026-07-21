@@ -12,8 +12,6 @@ license = "MIT"
 primitive-types.workspace = true
 tezos_data_encoding.workspace = true
 tezos-smart-rollup-host.workspace = true
-# TODO: Remove this crate (L2-809)
-tezos-storage.workspace = true
 tezosx-constants.workspace = true
 http.workspace = true
 nom.workspace = true
