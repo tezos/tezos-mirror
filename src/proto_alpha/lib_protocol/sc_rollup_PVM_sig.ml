@@ -343,22 +343,22 @@ let is_reveal_enabled_predicate
     (t : Constants_parametric_repr.sc_rollup_reveal_activation_level) :
     is_reveal_enabled =
  fun ~current_block_level reveal ->
-  let activation_level =
-    match reveal with
-    | Reveal_raw_data h -> (
-        match Sc_rollup_reveal_hash.scheme_of_hash h with
-        | Blake2B -> t.raw_data.blake2B)
-    | Reveal_metadata -> t.metadata
-    | Request_dal_page _ -> t.dal_page
-    | Request_adal_page _ ->
-        (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
-
-           Handle this case for adaptive DAL. We should probably add activation
-           level in the parameters. *)
-        assert false
-    | Reveal_dal_parameters -> t.dal_parameters
+  let check activation_level =
+    Raw_level_repr.(current_block_level >= activation_level)
   in
-  Raw_level_repr.(current_block_level >= activation_level)
+  match reveal with
+  | Reveal_raw_data h -> (
+      match Sc_rollup_reveal_hash.scheme_of_hash h with
+      | Blake2B -> check t.raw_data.blake2B)
+  | Reveal_metadata -> check t.metadata
+  | Request_dal_page _ -> check t.dal_page
+  | Request_adal_page _ ->
+      (* ADAL is not yet activated: no activation level exists in the
+         constants. Returning [false] causes [try_return_reveal] to fall back
+         to the well-known-hash sentinel, so proof verification rejects the
+         move gracefully without raising [Assert_failure]. *)
+      false
+  | Reveal_dal_parameters -> check t.dal_parameters
 
 (** The PVM's current input expectations:
     - [No_input_required] if the machine is busy and has no need for new input.
