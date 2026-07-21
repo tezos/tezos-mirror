@@ -532,8 +532,8 @@ type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
    If it is [false], its conditions are ignored.
    Conditions are typically only used in merge request pipelines such as [before_merging]. *)
 let convert_graph ?(interruptible_pipeline = true)
-    ?(interruptible_publish = false) ~with_condition (graph : fixed_job_graph) :
-    tezos_job_graph =
+    ?(interruptible_publish = false) ?(with_condition = false)
+    (graph : fixed_job_graph) : tezos_job_graph =
   (* To build the graph, we take all jobs from [graph], convert them,
      and add them to [result].
      But before we convert a job, we need the converted version of its dependencies.
@@ -717,7 +717,7 @@ let convert_graph ?(interruptible_pipeline = true)
 (* Convert user-specified jobs into [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS. *)
 let convert_jobs ?interruptible_pipeline ?interruptible_publish
-    ?with_job_trigger ~with_condition (jobs : (trigger * job) list) :
+    ?with_job_trigger ?with_condition (jobs : (trigger * job) list) :
     Tezos_ci.tezos_job list =
   jobs |> make_graph |> fix_graph
   |> (match with_job_trigger with
@@ -726,7 +726,7 @@ let convert_jobs ?interruptible_pipeline ?interruptible_publish
   |> convert_graph
        ?interruptible_pipeline
        ?interruptible_publish
-       ~with_condition
+       ?with_condition
   |> UID_map.bindings |> List.map snd
 
 let parameterize make =
@@ -951,15 +951,11 @@ let get_jobs pipeline =
             ~with_condition:true
             ((Manual, job_trigger) :: jobs))
   | Merge_train -> convert_jobs ~with_condition:true jobs
-  | Schedule_extended_test ->
-      convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
-  | Master ->
-      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
-  | Packaging_revision_test ->
-      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
-  | Base_images_daily ->
-      convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
-  | _ -> convert_jobs ~with_condition:false jobs
+  | Schedule_extended_test -> convert_jobs ~interruptible_pipeline:false jobs
+  | Master -> convert_jobs ~interruptible_publish:true jobs
+  | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
+  | Base_images_daily -> convert_jobs ~interruptible_pipeline:false jobs
+  | _ -> convert_jobs jobs
 
 let release_tag_rexes = ref String_set.empty
 
@@ -1474,10 +1470,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       name
       ~description
-      ~jobs:
-        (legacy_jobs
-        @ convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
-        )
+      ~jobs:(legacy_jobs @ convert_jobs ~interruptible_pipeline:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           scheduled && var "TZ_SCHEDULE_KIND" == str (make_name name)))
@@ -1522,7 +1515,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "release"
       ~description:(sf "Release %s." component_name)
-      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      ~jobs:(legacy_jobs @ convert_jobs jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
@@ -1535,7 +1528,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "test_release"
       ~description:(sf "Release %s (test)." component_name)
-      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      ~jobs:(legacy_jobs @ convert_jobs jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
@@ -1548,7 +1541,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "prerelease"
       ~description:(sf "Prerelease %s." component_name)
-      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      ~jobs:(legacy_jobs @ convert_jobs jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
@@ -1561,7 +1554,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "test_prerelease"
       ~description:(sf "Prerelease %s (test)." component_name)
-      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      ~jobs:(legacy_jobs @ convert_jobs jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
