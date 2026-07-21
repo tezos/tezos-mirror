@@ -2,6 +2,9 @@
 
 # Install dependencies to use gsutils
 
+# Fail on any error/unset var so a broken install can't leave a dangling symlink.
+set -eu
+
 GCLOUD_VERSION="566.0.0"
 GCLOUD_SHA256_X86_64="22513f71d7bf3af39ddf046d8b136ab82595859ecfcc6a4a9e7a37d70a183300"
 GCLOUD_SHA256_ARM="9dd8ccf1f0243585c995b53bc2059c26e048841963804935c584b6e6f8d8f298"
@@ -38,6 +41,12 @@ fi
 tar -xzC /usr/local/ -f "/tmp/${TARBALL}"
 rm "/tmp/${TARBALL}"
 
-/usr/local/google-cloud-sdk/install.sh --quiet --path-update false
+# Skip install.sh: it needs python, which is unrunnable on the emulated arm64
+# base build (bundled python is arm64, no system python). gcloud is only staged
+# here; it runs in the derived build images (native arm64).
 ln -sf /usr/local/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud
 ln -sf /usr/local/google-cloud-sdk/bin/gsutil /usr/local/bin/gsutil
+
+# gcloud isn't runnable here, so just check the files were staged.
+test -x /usr/local/google-cloud-sdk/bin/gcloud
+test -x /usr/local/google-cloud-sdk/bin/gsutil

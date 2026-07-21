@@ -16,3 +16,7 @@ rm "google-cloud-sdk-${GCLOUD_VERSION}-linux-x86_64.tar.gz"
 /google-cloud-sdk/install.sh --quiet
 export PATH="$PATH:/google-cloud-sdk/bin"
 gcloud components install --quiet core gsutil kubectl docker-credential-gcr
+
+# Verify the installation produced a working binary rather than a half-baked
+# image (the build must fail here if gcloud is not actually runnable).
+gcloud --version
