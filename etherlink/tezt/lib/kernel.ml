@@ -34,7 +34,7 @@ let commit_of = function
 let name_of = function
   | Latest -> None
   | Previewnet -> Some "previewnet-0.5"
-  | Mainnet -> Some "farfadet-r5"
+  | Mainnet -> Some "farfadet-r6"
 
 let upgrade_to = function
   | Latest -> Latest
