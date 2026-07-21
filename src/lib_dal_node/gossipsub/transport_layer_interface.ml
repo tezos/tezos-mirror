@@ -46,9 +46,6 @@ module P2p_message_V1 = struct
   let ping_topic =
     Types.Topic.{slot_index = 0; pkh = Signature.Public_key_hash.zero}
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5564
-
-     DAL/GS: bound the lists/seqs in exchanged p2p messages. *)
   let p2p_message_app_encoding =
     let open Data_encoding in
     let open Gs_interface.Worker_instance in
@@ -70,7 +67,13 @@ module P2p_message_V1 = struct
         (obj4
            (req "kind" (constant "prune"))
            (req "topic" Types.Topic.encoding)
-           (req "px" (list px_peer_encoding))
+           (* Bounded to prevent O(N) allocation by a malicious peer; see
+              [Gs_default_parameters.Limits.peers_to_px]. *)
+           (req
+              "px"
+              (list
+                 ~max_length:Gs_default_parameters.Limits.peers_to_px
+                 px_peer_encoding))
            (req "backoff" Types.Span.encoding))
         (function
           | Prune {topic; px; backoff} ->
@@ -84,7 +87,14 @@ module P2p_message_V1 = struct
         (obj3
            (req "kind" (constant "ihave"))
            (req "topic" Types.Topic.encoding)
-           (req "message_ids" (list Types.Message_id.encoding)))
+           (* Bounded to prevent O(N) filter work in the gossipsub event loop;
+              see [Gs_default_parameters.Limits.max_sent_iwant_per_heartbeat]. *)
+           (req
+              "message_ids"
+              (list
+                 ~max_length:
+                   Gs_default_parameters.Limits.max_sent_iwant_per_heartbeat
+                 Types.Message_id.encoding)))
         (function
           | IHave {topic; message_ids} -> Some ((), topic, message_ids)
           | _ -> None)
@@ -94,7 +104,14 @@ module P2p_message_V1 = struct
         ~title:"IWant"
         (obj2
            (req "kind" (constant "iwant"))
-           (req "message_ids" (list Types.Message_id.encoding)))
+           (* Bounded to prevent O(N) fold work in the gossipsub event loop;
+              see [Gs_default_parameters.Limits.max_sent_iwant_per_heartbeat]. *)
+           (req
+              "message_ids"
+              (list
+                 ~max_length:
+                   Gs_default_parameters.Limits.max_sent_iwant_per_heartbeat
+                 Types.Message_id.encoding)))
         (function IWant {message_ids} -> Some ((), message_ids) | _ -> None)
         (fun ((), message_ids) -> IWant {message_ids});
       (* In the following encoding we introduce a special case such that the [Ping] is
