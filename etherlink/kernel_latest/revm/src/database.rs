@@ -5,7 +5,6 @@
 
 use crate::error::EvmDbError;
 use crate::helpers::storage::read_u256_le_default;
-use crate::inspectors::HasHost;
 use crate::storage::{
     block::{get_block_hash, BLOCKS_STORED},
     code::CodeStorage,
@@ -16,6 +15,7 @@ use crate::storage::{
         SEQUENCER_KEY_PATH,
     },
 };
+use evm_inspectors::HasHost;
 use evm_types::{
     DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges,
     FaDepositWithProxy, PrecompileStateChanges, PrecompileStateError,

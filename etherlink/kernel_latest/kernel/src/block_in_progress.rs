@@ -25,13 +25,13 @@ use crate::tick_model;
 use alloy_consensus::proofs::ordered_trie_root_with_encoder;
 use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
-use primitive_types::{H160, H256, U256};
-use revm_etherlink::helpers::legacy::alloy_to_log;
-use revm_etherlink::inspectors::call_tracer::CallTrace;
-use revm_etherlink::inspectors::storage::{
+use evm_inspectors::call_tracer::CallTrace;
+use evm_inspectors::storage::{
     flush_call_traces, store_return_value, store_trace_failed, store_trace_gas,
 };
-use revm_etherlink::inspectors::TracerInput;
+use evm_inspectors::TracerInput;
+use primitive_types::{H160, H256, U256};
+use revm_etherlink::helpers::legacy::alloy_to_log;
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
 use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};

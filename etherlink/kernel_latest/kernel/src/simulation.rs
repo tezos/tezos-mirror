@@ -26,8 +26,8 @@ use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
 use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
 use revm_etherlink::{
-    helpers::legacy::u256_to_alloy, inspectors::TracerInput, EvmKernelError as RevmError,
-    ExecutionOutcome, TransactionOrigin,
+    helpers::legacy::u256_to_alloy, EvmKernelError as RevmError, ExecutionOutcome,
+    TransactionOrigin,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -38,6 +38,7 @@ use tezos_ethereum::rlp_helpers::{
 use tezos_ethereum::transaction::TransactionObject;
 use tezos_evm_logging::{log, Level::*};
 
+use evm_inspectors::TracerInput;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
