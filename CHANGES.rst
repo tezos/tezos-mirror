@@ -97,6 +97,11 @@ DAL node
   delays shard ingestion from other peers.
   (MR :gl:`!22542`)
 
+- The wire encodings for the Gossipsub IHave, IWant, and Prune control
+  messages now enforce upper bounds on the lengths of their list fields
+  (``message_ids`` for IHave/IWant, ``px`` for Prune), consistent with
+  the limits already applied on the send side. (MR :gl:`!22537`)
+
 - The ``/profiles/<pkh>/monitor/attestable_slots`` streaming RPC now emits a
   periodic heartbeat event (one per level), letting consumers detect a stalled
   connection during periods with no attestable-slot activity. (MR :gl:`!22471`)
