@@ -14,6 +14,7 @@ default = ["irmin-compat"]
 irmin-compat = []
 
 [dependencies]
+hex-literal.workspace = true
 thiserror.workspace = true
 
 [dependencies.tezos-smart-rollup-constants]
@@ -30,3 +31,6 @@ default-features = false
 
 [build-dependencies.tezos-smart-rollup-build-utils]
 path = "../build-utils"
+
+[dev-dependencies.tezos-smart-rollup-mock]
+path = "../mock"

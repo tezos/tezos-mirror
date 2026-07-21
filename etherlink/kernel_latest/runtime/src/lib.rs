@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 pub mod extensions;
-pub mod keyspace;
 pub mod runtime;
 pub mod safe_storage;
 // TODO: This will be soon removed whenever the first transition will be made for
