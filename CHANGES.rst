@@ -89,6 +89,12 @@ Packaging
 Smart Rollup node
 -----------------
 
+- The injector now splits batches when individual operations fail simulation
+  with gas exhaustion (instead of repeatedly dropping them), and re-queues the
+  operations set aside by a batch split so they are reconsidered in a later
+  injection round. This fixes a permanent stall with large backlogs of
+  same-tag operations (e.g. cementation). (MR :gl:`!22417`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

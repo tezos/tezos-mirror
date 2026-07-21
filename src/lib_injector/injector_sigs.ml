@@ -226,7 +226,13 @@ module type PROTOCOL_CLIENT = sig
       result for each of these operations (with its associated index in the
       batch, in case there is a revelation operation added) together with a
       Tezos raw unsigned operation that can be directly injected on a node if
-      one wishes to. *)
+      one wishes to.
+
+      Implementations must return [`Exceeds_quotas] when the simulation of the
+      batch fails with a gas exhaustion error, but also when, in [force] mode
+      with several operations, the simulation succeeds globally while some
+      individual operation fails with gas exhaustion. This allows the caller to
+      split the batch instead of discarding such operations. *)
   val simulate_operations :
     #Client_context.full ->
     force:bool ->

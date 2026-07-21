@@ -590,11 +590,13 @@ module Make (Parameters : PARAMETERS) = struct
             state
             (Op_heap.length state.heap)
         in
-        (* We perform a dichotomy by injecting the first half of the
-           operations (we are not looking to maximize the number of operations
-           injected because of the cost of simulation). Only the operations
-           which are actually injected will be removed from the heap so the
-           other half will be reconsidered later. *)
+        (* We perform a dichotomy by simulating (and ultimately injecting)
+           only the first half of the operations (we are not looking to
+           maximize the number of operations injected because of the cost of
+           simulation). The operations have already been removed from the heap
+           by [get_n_ops_batch_from_queue], so the dropped second half is
+           re-queued here to be reconsidered in a subsequent injection round
+           instead of being lost. *)
         match keep_half operations with
         | None ->
             fail
@@ -602,11 +604,29 @@ module Make (Parameters : PARAMETERS) = struct
                  (Exn (Failure "Quotas exceeded when simulating one operation"))
                  trace
         | Some new_operations ->
+            let dropped_operations =
+              let kept = List.length new_operations in
+              List.filteri (fun i _ -> i >= kept) operations
+            in
             let*! () =
               Event.(emit2 batch_too_large_splitting)
                 state
                 (List.length operations)
                 (List.length new_operations)
+            in
+            (* Re-queue best-effort: if the heap is full the dropped
+               operations are simply not re-queued this round (they are
+               reconsidered once the queue drains), which must not turn into
+               a failed injection. *)
+            let*! () =
+              List.iter_s
+                (fun op ->
+                  let open Lwt_syntax in
+                  let* (_ : unit tzresult) =
+                    add_pending_operation ~retry:true state op
+                  in
+                  return_unit)
+                dropped_operations
             in
             simulate_operations state signer new_operations)
     | Ok {operations_statuses; unsigned_operation} ->
@@ -651,6 +671,13 @@ module Make (Parameters : PARAMETERS) = struct
       in
       return_unit
 
+  (* An operation that is back in the pending heap has been set aside by a
+     batch split and re-queued for a later injection round. It must not be
+     penalized or dropped because of the failure of another operation in the
+     same batch. *)
+  let is_requeued state (op : Inj_operation.t) =
+    Op_heap.find_opt state.heap op.id <> None
+
   let inject_on_node state ~nb signer (module Unsigned_op : Proto_unsigned_op) =
     let open Lwt_result_syntax in
     let* signed_op_bytes =
@@ -685,7 +712,9 @@ module Make (Parameters : PARAMETERS) = struct
       | Ok _ -> return_unit
       | Error error ->
           List.iter_es
-            (fun op -> register_error state ~signers:[signer] op error)
+            (fun op ->
+              if is_requeued state op then return_unit
+              else register_error state ~signers:[signer] op error)
             operations
     in
     let*? operations_results, raw_op = simulation_result in
@@ -794,16 +823,18 @@ module Make (Parameters : PARAMETERS) = struct
         let+ operations_to_drop =
           List.fold_left_es
             (fun to_drop op ->
-              let*! retry =
-                Parameters.retry_unsuccessful_operation
-                  state.state
-                  op.Inj_operation.operation
-                  (Failed err)
-              in
-              match retry with
-              | Abort err -> fail err
-              | Retry -> return to_drop
-              | Forget -> return (op :: to_drop))
+              if is_requeued state op then return to_drop
+              else
+                let*! retry =
+                  Parameters.retry_unsuccessful_operation
+                    state.state
+                    op.Inj_operation.operation
+                    (Failed err)
+                in
+                match retry with
+                | Abort err -> fail err
+                | Retry -> return to_drop
+                | Forget -> return (op :: to_drop))
             []
             operations
         in
