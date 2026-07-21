@@ -235,7 +235,7 @@ module WASM = struct
       ~path:"etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wasm"
       ()
 
-  let mainnet_commit = "373884218b198a0357549b147840b59883237ea9"
+  let mainnet_commit = "a6d2d723241e1664b6d7046291427896601516f4"
 
   let previewnet_kernel =
     Uses.make
