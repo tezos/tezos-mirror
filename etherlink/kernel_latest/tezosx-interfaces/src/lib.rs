@@ -21,7 +21,6 @@ pub use tezosx_types::{
 #[cfg(feature = "testing")]
 use primitive_types::U256;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_journal::TezosXJournal;
 
 /// Result of an alias-resolution call.
 ///
@@ -59,6 +58,8 @@ impl AliasResolution {
 }
 
 pub trait Registry {
+    type Journal;
+
     /// Idempotently ensure that the alias of `alias_info` exists in
     /// `target_runtime`, materializing the forwarder and recording the
     /// classification record if needed.
@@ -83,7 +84,7 @@ pub trait Registry {
     fn ensure_alias<Host>(
         &self,
         host: &mut Host,
-        journal: &mut TezosXJournal,
+        journal: &mut Self::Journal,
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
         target_runtime: RuntimeId,
@@ -128,7 +129,7 @@ pub trait Registry {
     fn serve<Host>(
         &self,
         host: &mut Host,
-        journal: &mut TezosXJournal,
+        journal: &mut Self::Journal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
@@ -136,6 +137,8 @@ pub trait Registry {
 }
 
 pub trait RuntimeInterface {
+    type Journal;
+
     /// Idempotently ensure that the alias of `alias_info` exists in
     /// this runtime. `alias_info.runtime` is the source runtime where
     /// the underlying native account lives, and `alias_info.native_address`
@@ -159,9 +162,9 @@ pub trait RuntimeInterface {
     #[allow(clippy::too_many_arguments)]
     fn ensure_alias<Host>(
         &self,
-        registry: &impl Registry,
+        registry: &impl Registry<Journal = Self::Journal>,
         host: &mut Host,
-        journal: &mut TezosXJournal,
+        journal: &mut Self::Journal,
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
         context: CrossRuntimeContext,
@@ -184,9 +187,9 @@ pub trait RuntimeInterface {
     /// failure (4xx/5xx), along with runtime-specific response headers and body.
     fn serve<Host>(
         &self,
-        registry: &impl Registry,
+        registry: &impl Registry<Journal = Self::Journal>,
         host: &mut Host,
-        journal: &mut TezosXJournal,
+        journal: &mut Self::Journal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where

@@ -27,6 +27,8 @@ use tezosx_journal::TezosXJournal;
 use tezosx_tezos_runtime::TezosRuntime;
 
 impl Registry for RegistryImpl {
+    type Journal = TezosXJournal;
+
     fn ensure_alias<Host>(
         &self,
         host: &mut Host,

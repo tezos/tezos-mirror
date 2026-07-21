@@ -249,7 +249,7 @@ fn etherlink_origin<'a, Host, R>(
     >,
 ) where
     Host: StorageV1,
-    R: Registry,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     use crate::journal::CrossRuntimeCall;
     use revm::interpreter::Host as InterpHost;
@@ -272,7 +272,7 @@ fn etherlink_origin<'a, Host, R>(
 fn install_etherlink_origin<'a, Host, R, INSP>(evm: &mut EvmInspection<'a, Host, INSP, R>)
 where
     Host: StorageV1,
-    R: Registry,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     evm.instruction.insert_instruction(
         ORIGIN_OPCODE,
@@ -312,7 +312,7 @@ fn etherlink_gasprice<'a, Host, R>(
     >,
 ) where
     Host: StorageV1,
-    R: Registry,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     use revm::interpreter::Host as InterpHost;
     let value = InterpHost::basefee(context.host);
@@ -329,7 +329,7 @@ fn install_etherlink_gasprice<'a, Host, R, INSP>(
     evm: &mut EvmInspection<'a, Host, INSP, R>,
 ) where
     Host: StorageV1,
-    R: Registry,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     evm.instruction.insert_instruction(
         GASPRICE_OPCODE,
@@ -357,7 +357,7 @@ fn build_evm_inspector_context<'a, Host, R>(
 ) -> Result<EvmInspection<'a, Host, TracerInspector, R>, EvmRunError>
 where
     Host: StorageV1,
-    R: Registry,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
@@ -403,7 +403,7 @@ where
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn build_evm_context<'a, Host, R: Registry>(
+fn build_evm_context<'a, Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>(
     db: EtherlinkVMDB<'a, Host, R>,
     journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
@@ -459,7 +459,7 @@ where
 /// override actually fires when `is_static_top_frame` is set, and so
 /// the starting REVM call depth can be seeded from the cross-runtime
 /// chain depth carried on `TezosXJournal`.
-fn execute_transaction<'a, Host, R: Registry>(
+fn execute_transaction<'a, Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>(
     evm_context: &mut EvmContext<'a, Host, R>,
     tx: &'a TxEnv,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
@@ -502,7 +502,10 @@ where
 /// Install the alias delegation designator in the journaled state so the
 /// alias-init sub-call resolves it. The write commits with the
 /// transaction and reverts with the frame.
-fn install_alias_delegation<Host: StorageV1, R: Registry>(
+fn install_alias_delegation<
+    Host: StorageV1,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+>(
     journaled_state: &mut Journal<'_, Host, R>,
     alias: Option<Address>,
 ) -> Result<(), EvmRunError> {
@@ -521,7 +524,7 @@ fn install_alias_delegation<Host: StorageV1, R: Registry>(
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn run_transaction<'a, Host, R: Registry>(
+pub fn run_transaction<'a, Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>(
     host: &'a mut Host,
     registry: &'a R,
     journal: &'a mut TezosXJournal,
@@ -857,6 +860,8 @@ mod test {
         }
 
         impl RegistryTrait for Registry {
+            type Journal = TezosXJournal;
+
             fn ensure_alias<Host>(
                 &self,
                 host: &mut Host,
@@ -1003,9 +1008,11 @@ mod test {
         pub(crate) struct MockTezosRuntime;
 
         impl RuntimeInterface for MockTezosRuntime {
+            type Journal = TezosXJournal;
+
             fn ensure_alias<Host>(
                 &self,
-                _registry: &impl RegistryTrait,
+                _registry: &impl RegistryTrait<Journal = TezosXJournal>,
                 _host: &mut Host,
                 _journal: &mut TezosXJournal,
                 alias_info: AliasInfo,
@@ -1039,7 +1046,7 @@ mod test {
 
             fn serve<Host>(
                 &self,
-                _registry: &impl RegistryTrait,
+                _registry: &impl RegistryTrait<Journal = TezosXJournal>,
                 host: &mut Host,
                 _journal: &mut TezosXJournal,
                 request: http::Request<Vec<u8>>,

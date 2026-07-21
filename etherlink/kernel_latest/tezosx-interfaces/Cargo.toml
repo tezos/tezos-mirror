@@ -12,11 +12,11 @@ license = "MIT"
 primitive-types.workspace = true
 tezos-smart-rollup-host.workspace = true
 http.workspace = true
-tezosx-journal.workspace = true
+tezosx-journal = { workspace = true, optional = true }
 tezosx-types.workspace = true
 
 [dev-dependencies]
 
 
 [features]
-testing = []
+testing = ["dep:tezosx-journal"]

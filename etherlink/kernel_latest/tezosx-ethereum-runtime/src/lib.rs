@@ -79,7 +79,7 @@ impl EthereumRuntime {
     #[allow(clippy::too_many_arguments)]
     fn materialize_alias<Host>(
         &self,
-        registry: &impl Registry,
+        registry: &impl Registry<Journal = TezosXJournal>,
         host: &mut Host,
         journal: &mut TezosXJournal,
         alias: Address,
@@ -306,7 +306,7 @@ sol! {
 /// `serve` then only handles the result-to-HTTP-status mapping.
 fn execute_request<Host>(
     runtime: &EthereumRuntime,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = TezosXJournal>,
     host: &mut Host,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
@@ -377,7 +377,7 @@ fn classify_evm_run_error(context: &str, e: EvmRunError) -> TezosXRuntimeError {
 /// that for the whole CRAC).
 fn execute_call<Host>(
     runtime: &EthereumRuntime,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = TezosXJournal>,
     host: &mut Host,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
@@ -516,7 +516,7 @@ where
 ///   `400`).
 fn execute_static_call<Host>(
     runtime: &EthereumRuntime,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = TezosXJournal>,
     host: &mut Host,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
@@ -605,9 +605,11 @@ where
 }
 
 impl RuntimeInterface for EthereumRuntime {
+    type Journal = TezosXJournal;
+
     fn ensure_alias<Host>(
         &self,
-        registry: &impl Registry,
+        registry: &impl Registry<Journal = TezosXJournal>,
         host: &mut Host,
         journal: &mut TezosXJournal,
         alias_info: AliasInfo,
@@ -710,7 +712,7 @@ impl RuntimeInterface for EthereumRuntime {
 
     fn serve<Host>(
         &self,
-        registry: &impl Registry,
+        registry: &impl Registry<Journal = TezosXJournal>,
         host: &mut Host,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,

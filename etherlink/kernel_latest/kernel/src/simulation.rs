@@ -389,7 +389,7 @@ impl Evaluation {
         &self,
         host: &mut Host,
         base: &impl KeySpace,
-        registry: &impl Registry,
+        registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
         tracer_input: Option<TracerInput>,
         spec_id: &SpecId,
     ) -> Result<
@@ -725,7 +725,7 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
 pub fn start_simulation_mode<Host>(
     host: &mut Host,
     base: &mut impl KeySpace,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     spec_id: &SpecId,
 ) -> Result<(), anyhow::Error>
 where

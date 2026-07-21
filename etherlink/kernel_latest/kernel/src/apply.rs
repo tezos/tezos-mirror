@@ -547,7 +547,7 @@ fn log_transaction_type(to: Option<H160>, data: &[u8]) {
 #[instrument(skip_all)]
 pub fn revm_run_transaction<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     block_constants: &BlockConstants,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
@@ -612,7 +612,7 @@ where
 #[instrument(skip_all)]
 fn apply_ethereum_transaction_common<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &BlockConstants,
     transaction: &EthereumTransactionCommon,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
@@ -788,7 +788,7 @@ impl From<&Deposit> for SolXTZDeposit {
 #[allow(clippy::too_many_arguments)]
 pub fn pure_xtz_deposit<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     deposit: &Deposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
@@ -936,7 +936,7 @@ impl From<&FaDeposit> for SolFaDepositWithoutProxy {
 #[trace_kernel]
 pub fn pure_fa_deposit<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
@@ -1024,7 +1024,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn apply_fa_deposit<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
@@ -1273,7 +1273,7 @@ where
 #[instrument(skip_all)]
 pub fn apply_transaction<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     transaction: Transaction,

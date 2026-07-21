@@ -828,7 +828,7 @@ fn settle_parent_transfer(
 fn execute_internal_operations<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     internal_operations: Vec<OperationInfo<'a>>,
     sender_account: &crate::account_storage::TezosOriginatedAccount,
@@ -908,7 +908,7 @@ where
 fn execute_pending_operations<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     // The batch to execute: supplies each operation's `sender` and carries the
     // `failed` short-circuit shared by its siblings.
@@ -1307,7 +1307,7 @@ struct TransferOutcome {
 fn transfer<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     sender_account: &impl TezosAccount,
     amount: &Narith,
@@ -1391,7 +1391,7 @@ where
 fn transfer_step<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     sender_account: &impl TezosAccount,
     amount: &Narith,
@@ -1843,7 +1843,7 @@ pub fn get_enshrined_contract_views(
 fn transfer_external<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     amount: &Narith,
     dest: &Contract,
@@ -1953,7 +1953,7 @@ impl From<TransferError> for CracTransferError {
 pub fn cross_runtime_transfer<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     sender: &impl TezosAccount,
     amount: &Narith,
@@ -2485,7 +2485,7 @@ pub fn get_required_da_fees(
 #[allow(clippy::too_many_arguments)]
 pub fn validate_and_apply_operation<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     operation: Operation,
     block_ctx: &BlockCtx,
@@ -2677,7 +2677,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn apply_batch<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     validation_info: validate::ValidatedBatch,
     block_ctx: &BlockCtx,
@@ -2772,7 +2772,7 @@ fn log_on_operation_failure<T, E: std::fmt::Debug>(
 #[allow(clippy::too_many_arguments)]
 fn apply_operation<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     source_account: &TezosImplicitAccount,
     source_public_key: &[u8],

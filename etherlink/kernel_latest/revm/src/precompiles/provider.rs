@@ -87,7 +87,7 @@ impl EtherlinkPrecompiles {
     ) -> Result<Option<InterpreterResult>, CustomPrecompileAbort>
     where
         Host: StorageV1 + 'j,
-        R: Registry + 'j,
+        R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
         CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
     {
         // NIT: can probably do this more efficiently by keeping an immutable
@@ -155,7 +155,7 @@ impl EtherlinkPrecompiles {
 impl<'j, CTX, Host, R> PrecompileProvider<CTX> for EtherlinkPrecompiles
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     type Output = InterpreterResult;

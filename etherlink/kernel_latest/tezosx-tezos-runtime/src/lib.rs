@@ -627,7 +627,7 @@ where
 /// a failure before metering carries no value and reports as unset.
 fn execute_request<Host>(
     chain_id: &ChainId,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = TezosXJournal>,
     host: &mut Host,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
@@ -664,7 +664,7 @@ where
 /// standalone cost of this frame's own internal operations.
 fn execute_entrypoint_call<Host>(
     chain_id: &ChainId,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = TezosXJournal>,
     host: &mut Host,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
@@ -1135,9 +1135,11 @@ fn assert_receipt_markers_balanced(receipt: &tezos_tezlink::block::AppliedOperat
 const STORAGE_WRITE_BASE_MILLIGAS: u64 = 2_000;
 
 impl RuntimeInterface for TezosRuntime {
+    type Journal = TezosXJournal;
+
     fn ensure_alias<Host>(
         &self,
-        _registry: &impl Registry,
+        _registry: &impl Registry<Journal = TezosXJournal>,
         host: &mut Host,
         journal: &mut TezosXJournal,
         alias_info: AliasInfo,
@@ -1373,7 +1375,7 @@ impl RuntimeInterface for TezosRuntime {
     /// and internal operations.
     fn serve<Host>(
         &self,
-        registry: &impl Registry,
+        registry: &impl Registry<Journal = TezosXJournal>,
         host: &mut Host,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,

@@ -330,7 +330,10 @@ fn charge_delegated_storage_cost(
 /// of the return tuple.  Does **not** handle the non-payable check, the
 /// DELEGATECALL/CALLCODE guard, or the initial `ORIGIN_OF_BASE_COST`
 /// charge — those stay in the outer dispatch arm.
-fn dispatch_origin_of<Host: StorageV1, R: Registry>(
+fn dispatch_origin_of<
+    Host: StorageV1,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+>(
     host: &Host,
     registry: &R,
     addr_str: String,
@@ -394,7 +397,10 @@ fn dispatch_origin_of<Host: StorageV1, R: Registry>(
 /// back-stop internally), derivation via `compute_alias`, destination check, and
 /// ABI-encoding.  Does **not** handle the non-payable check, DELEGATECALL/CALLCODE
 /// guard, or the initial `RESOLVE_ADDRESS_BASE_COST` charge.
-fn dispatch_resolve_address<Host: StorageV1, R: Registry>(
+fn dispatch_resolve_address<
+    Host: StorageV1,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+>(
     host: &Host,
     registry: &R,
     addr_str: String,
@@ -527,7 +533,7 @@ fn burn_gateway_residual<'j, CTX, Host, R>(
 ) -> Result<(), CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     let snapshot = *gas;
@@ -575,7 +581,7 @@ fn emit_crac_sent<'j, CTX, Host, R>(
     amount: U256,
 ) where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     let crac_log = Log {
@@ -613,7 +619,7 @@ fn build_original_source<'j, CTX, Host, R>(
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     let runtime = context.journal().crac_origin_runtime();
@@ -635,7 +641,7 @@ where
 /// (identity when the originator is Ethereum-native, a pure
 /// `compute_alias` otherwise) and parses the result, which only fails on
 /// internal corruption.
-fn original_source_evm_address<R: Registry>(
+fn original_source_evm_address<R: Registry<Journal = tezosx_journal::TezosXJournal>>(
     source: &OriginalSource,
     registry: &R,
     gas: Gas,
@@ -676,7 +682,7 @@ fn capture_original_source<'j, CTX, Host, R>(
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     let source_addr = context
@@ -699,7 +705,7 @@ fn resolve_original_source<'j, CTX, Host, R>(
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     if let Some(src) = context.journal().original_source() {
@@ -727,7 +733,7 @@ fn resolve_aliases<'j, CTX, Host, R>(
 ) -> Result<(String, String), CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     // --- sender alias ---
@@ -838,7 +844,7 @@ fn inject_tezos_headers_from_context<'j, CTX, Host, R>(
 ) -> Result<(), CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     let timestamp = context.block().timestamp();
@@ -867,7 +873,7 @@ pub(crate) fn runtime_gateway_precompile<'j, CTX, Host, R>(
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     // Reject DELEGATECALL and CALLCODE gateway-wide. Under those
