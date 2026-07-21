@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased
+## Version 0.63 (2026-07-22)
 
-### Breaking changes
+This release provides support for Etherlink 6.6 (`farfadet-r6`),
+including native execution. Etherlink 6.6 was activated in block
+48,571,992 on Etherlink Mainnet. It also brings support for the
+previewnet reset (2026-07-21).
+
+This release will not apply any migration to the node’s store (version
+24), meaning it is possible to downgrade to previous versions.
 
 ### Configuration changes
 
@@ -36,11 +42,16 @@
   and `run observer` commands to pin the daily history garbage collection to a
   fixed time of day. (!22437)
 
+- Add support for downloading Etherlink 6.6 (`farfadet-r6`) kernel by name
+  using `download kernel farfadet-r6`. (!22541)
+
 ### Execution changes
 
 - Speed-up the blueprints follower catch-up mechanism: the next batch of
   blueprints is now downloaded from the remote EVM node while the current
   batch is being applied. (!22372)
+
+- Add support for executing Etherlink 6.6 (`farfadet-r6`) natively. (!22541)
 
 ### Storage changes
 
