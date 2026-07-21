@@ -803,7 +803,7 @@ mod test {
     mod utilities {
         use alloy_sol_types::sol;
         use primitive_types::U256 as PU256;
-        use revm::primitives::hardfork::SpecId;
+        use revm::primitives::{hardfork::SpecId, Address, U256};
         use tezos_smart_rollup_host::{
             path::{concat, OwnedPath, RefPath},
             storage::StorageV1,
@@ -815,11 +815,34 @@ mod test {
         };
         use tezosx_journal::TezosXJournal;
 
-        use crate::test::GAS_LIMIT;
+        use crate::{
+            storage::world_state_handler::{AccountInfo, StorageAccount},
+            test::GAS_LIMIT,
+        };
 
         /// Milligas consumed by the mock Tezos runtime for every CRAC call.
         /// 10_000 milligas = 1_000 EVM gas (Tezos milligas / 10).
         pub(crate) const MOCK_TEZOS_GAS_CONSUMED: u64 = 10_000;
+
+        /// Compiled deploy bytecode for `contracts/tests/static_caller.sol`,
+        /// shared across the test submodules that probe precompile
+        /// dispatch through a Solidity `StaticCaller` helper.
+        pub(crate) const STATIC_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033";
+
+        /// Give `address` an effectively unlimited balance so it can act
+        /// as the caller/originator of a test transaction.
+        pub(crate) fn fund(host: &mut impl StorageV1, address: Address) {
+            let mut account = StorageAccount::from_address(&address).unwrap();
+            account
+                .set_info(
+                    host,
+                    AccountInfo {
+                        balance: U256::MAX,
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+        }
 
         // Test-only Registry struct that implements the Registry trait from tezosx-interfaces.
         // It contains a MockTezosRuntime for testing cross-runtime functionality,
@@ -2793,9 +2816,10 @@ mod test {
                     MockFaBridgeWrapper::{Burn, Mint},
                 },
                 utilities::{
+                    fund,
                     FABridge::{claimCall, queueCall, withdrawCall, Deposit, Withdrawal},
                     ITable::FaDepositWithProxy,
-                    Registry, DEFAULT_SPEC_ID,
+                    Registry, DEFAULT_SPEC_ID, STATIC_CALLER_BYTECODE,
                 },
                 GAS_LIMIT,
             },
@@ -2998,16 +3022,7 @@ mod test {
             caller: Address,
             calldata: Bytes,
         ) -> Address {
-            let mut caller_account = StorageAccount::from_address(&caller).unwrap();
-            caller_account
-                .set_info(
-                    host,
-                    AccountInfo {
-                        balance: U256::MAX,
-                        ..Default::default()
-                    },
-                )
-                .unwrap();
+            fund(host, caller);
             let registry = Registry::new();
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let result_create = run_transaction(
@@ -3095,7 +3110,7 @@ mod test {
             init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
-            let static_call_bytecode = Bytes::from_hex("6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033").unwrap();
+            let static_call_bytecode = Bytes::from_hex(STATIC_CALLER_BYTECODE).unwrap();
             let static_caller = deploy_contract(&mut host, caller, static_call_bytecode);
 
             let ticket_owner = Address::from([1; 20]);
@@ -3690,10 +3705,10 @@ mod test {
                 },
             },
             run_transaction,
-            storage::world_state_handler::{AccountInfo, StorageAccount},
             test::{
                 utilities::{
-                    last_recorded_sender, last_recorded_source, Registry, DEFAULT_SPEC_ID,
+                    fund, last_recorded_sender, last_recorded_source, Registry,
+                    DEFAULT_SPEC_ID, STATIC_CALLER_BYTECODE,
                 },
                 GAS_LIMIT,
             },
@@ -3707,11 +3722,6 @@ mod test {
         use self::DelegateCaller::makeDelegateCallCall;
         use self::StaticCaller::makeStaticCallCall;
 
-        // Compiled deploy bytecode for `contracts/tests/static_caller.sol`.
-        // Mirrors the inline literal used by `mod fa_bridge` —
-        // duplicated here to keep the module self-contained.
-        const STATIC_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033";
-
         // Compiled deploy bytecode for `contracts/tests/delegate_caller.sol`.
         const DELEGATE_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80638771074f1461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855af49150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220065aceddd10343ed6e9faf40c53bcf49432de8e786641789238cf6d0eaf59c7364736f6c634300081e0033";
 
@@ -3719,18 +3729,6 @@ mod test {
             let mut bc = BlockConstants::test_block_with_no_fees();
             bc.tezos_experimental_features = true;
             bc
-        }
-
-        fn fund_caller(host: &mut MockKernelHost, caller: Address) {
-            let mut acct = StorageAccount::from_address(&caller).unwrap();
-            acct.set_info(
-                host,
-                AccountInfo {
-                    balance: U256::MAX,
-                    ..Default::default()
-                },
-            )
-            .unwrap();
         }
 
         fn deploy(
@@ -3842,7 +3840,7 @@ mod test {
         fn runtime_gateway_rejects_delegate_call_on_call_michelson() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let delegate_caller = deploy(&mut host, caller, DELEGATE_CALLER_BYTECODE);
 
             let outer = makeDelegateCallCall::new((
@@ -3867,7 +3865,7 @@ mod test {
         fn runtime_gateway_rejects_delegate_call_on_call_michelson_view() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let delegate_caller = deploy(&mut host, caller, DELEGATE_CALLER_BYTECODE);
 
             let outer = makeDelegateCallCall::new((
@@ -3896,7 +3894,7 @@ mod test {
         fn runtime_gateway_rejects_static_call_on_call_michelson() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -3924,7 +3922,7 @@ mod test {
         fn runtime_gateway_rejects_static_call_on_call_post() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -3955,7 +3953,7 @@ mod test {
         fn runtime_gateway_allows_static_call_on_call_michelson_view() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -3980,7 +3978,7 @@ mod test {
         fn runtime_gateway_allows_static_call_on_call_get() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -4059,7 +4057,7 @@ mod test {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]); // immediate sender
             let originator = Address::from([2u8; 20]); // transitive source
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
 
             let res = call_gateway_with_originator(
                 &mut host,
@@ -4099,7 +4097,7 @@ mod test {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
             let originator = Address::from([2u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
 
             let res = call_gateway_with_originator(
                 &mut host,
@@ -4150,7 +4148,7 @@ mod test {
             fn view_gas(input_len: usize) -> u64 {
                 let mut host = MockKernelHost::default();
                 let caller = Address::from([1u8; 20]);
-                fund_caller(&mut host, caller);
+                fund(&mut host, caller);
                 let payload =
                     RuntimeGatewayCalls::callMichelsonView(callMichelsonViewCall {
                         destination: "KT1abc".to_string(),
@@ -4176,7 +4174,7 @@ mod test {
             fn get_gas(body_len: usize) -> u64 {
                 let mut host = MockKernelHost::default();
                 let caller = Address::from([1u8; 20]);
-                fund_caller(&mut host, caller);
+                fund(&mut host, caller);
                 let payload = RuntimeGatewayCalls::call(callCall {
                     url: "http://tezos/KT1abc/balanceOf".to_string(),
                     headers: vec![],
@@ -4248,7 +4246,7 @@ mod test {
             // Typed surface: callMichelson(destination, entrypoint, params).
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let typed = call_into(
                 &mut host,
                 caller,
@@ -4270,7 +4268,7 @@ mod test {
 
             // Generic surface: call(POST) to the same contract+entrypoint.
             let mut host = MockKernelHost::default();
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let generic = call_into(
                 &mut host,
                 caller,
