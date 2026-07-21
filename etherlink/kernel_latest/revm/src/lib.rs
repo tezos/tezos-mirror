@@ -9,7 +9,7 @@ pub use error::{EvmDbError, EvmKernelError, EvmRunError};
 use handler::EtherlinkHandler;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::struct_logger::StructLogger;
-use inspectors::{EvmInspection, Tracer, TracerInput};
+use inspectors::{Tracer, TracerInput};
 pub use michelson_types::Withdrawal;
 use precompiles::constants::{
     alias_forwarder_delegation, alias_forwarder_delegation_code_hash,
@@ -57,6 +57,14 @@ type EVMInnerContext<'a, Host, R> = Context<
 type EvmContext<'a, Host, R> = Evm<
     EVMInnerContext<'a, Host, R>,
     (),
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, R>>,
+    EtherlinkPrecompiles,
+    EthFrame<EthInterpreter>,
+>;
+
+pub type EvmInspection<'a, Host, INSP, R> = Evm<
+    EVMInnerContext<'a, Host, R>,
+    INSP,
     EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, R>>,
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
