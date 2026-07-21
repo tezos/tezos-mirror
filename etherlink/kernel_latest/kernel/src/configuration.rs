@@ -9,9 +9,9 @@ use crate::{
     delayed_inbox::DelayedInbox,
     retrieve_minimum_base_fee_per_gas,
     storage::{
-        dal_slots, enable_dal, is_enable_fa_bridge, load_base_keyspace,
-        max_blueprint_lookahead_in_seconds, read_admin, read_delayed_transaction_bridge,
-        read_evm_chain_id, read_kernel_governance, read_kernel_security_governance,
+        dal_slots, enable_dal, is_enable_fa_bridge, max_blueprint_lookahead_in_seconds,
+        read_admin, read_delayed_transaction_bridge, read_evm_chain_id,
+        read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_michelson_runtime_chain_id,
         read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
         store_evm_chain_id, store_michelson_runtime_chain_id,
@@ -28,7 +28,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpace;
 
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
@@ -258,9 +258,12 @@ fn fetch_michelson_runtime_chain_id(
     }
 }
 
-pub fn fetch_tezosx_configuration<Host>(host: &mut Host) -> TezosXChainConfig
+pub fn fetch_tezosx_configuration<Host>(
+    host: &mut Host,
+    base: &impl KeySpace,
+) -> TezosXChainConfig
 where
-    Host: StorageV1 + KeySpaceLoader,
+    Host: StorageV1,
 {
     // Read both runtime chain ids from storage. The EVM chain id falls back to
     // the default and is persisted on first use; the Michelson runtime chain id
@@ -268,8 +271,8 @@ where
     let evm_chain_id = fetch_evm_chain_id(host);
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
-    let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    let debug_features = DebugFeatures::read_from_storage(host);
+    let experimental_features = ExperimentalFeatures::read_from_storage(host, base);
+    let debug_features = DebugFeatures::read_from_storage(base);
     let michelson_chain_id = fetch_michelson_runtime_chain_id(host, evm_chain_id);
     TezosXChainConfig::create_config(
         evm_chain_id,
@@ -281,24 +284,20 @@ where
     )
 }
 
-pub fn fetch_configuration<Host>(host: &mut Host) -> Configuration
+pub fn fetch_configuration<Host>(host: &mut Host, base: &impl KeySpace) -> Configuration
 where
-    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + IsEvmNode,
 {
-    // Loaded once for the whole configuration fetch and threaded down.
-    let base = load_base_keyspace(host).expect(
-        "no other `/base` keyspace handle may be live during the configuration fetch",
-    );
-    let tezos_contracts = fetch_tezos_contracts(host, &base);
+    let tezos_contracts = fetch_tezos_contracts(host, base);
     let maximum_allowed_ticks =
-        read_maximum_allowed_ticks(&base).unwrap_or(MAX_ALLOWED_TICKS);
+        read_maximum_allowed_ticks(base).unwrap_or(MAX_ALLOWED_TICKS);
     let sequencer = sequencer(host).unwrap_or_default();
-    let enable_fa_bridge = is_enable_fa_bridge(&base);
+    let enable_fa_bridge = is_enable_fa_bridge(base);
     let evm_node_flag = host.is_evm_node();
-    let dal: Option<DalConfiguration> = fetch_dal_configuration(&base, evm_node_flag);
+    let dal: Option<DalConfiguration> = fetch_dal_configuration(base, evm_node_flag);
     match sequencer {
         Some(sequencer) => {
-            let delayed_bridge = read_delayed_transaction_bridge(&base)
+            let delayed_bridge = read_delayed_transaction_bridge(base)
                 // The sequencer must declare a delayed transaction bridge. This
                 // default value is only to facilitate the testing.
                 .unwrap_or_else(|| {
@@ -309,11 +308,9 @@ where
                 });
             // Default to 5 minutes.
             let max_blueprint_lookahead_in_seconds =
-                max_blueprint_lookahead_in_seconds(&base)
+                max_blueprint_lookahead_in_seconds(base)
                     .unwrap_or(DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS);
-            // Reuse the live `/base` handle; re-loading would fail with
-            // `AlreadyLoaded`.
-            match DelayedInbox::from_base(&base) {
+            match DelayedInbox::from_base(base) {
                 Ok(delayed_inbox) => Configuration {
                     tezos_contracts,
                     mode: ConfigurationMode::Sequencer {

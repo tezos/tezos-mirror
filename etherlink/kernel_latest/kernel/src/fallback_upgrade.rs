@@ -5,17 +5,19 @@
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError, KERNEL_BOOT_PATH};
+use tezos_smart_rollup_host::{runtime::RuntimeError, KERNEL_BOOT_PATH};
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
-use crate::upgrade::KERNEL_ROOT_HASH;
+use crate::upgrade::KERNEL_ROOT_HASH_KEY;
 
-const BACKUP_KERNEL_BOOT_PATH: RefPath =
-    RefPath::assert_from(b"/base/__backup_kernel/boot.wasm");
+const BACKUP_KERNEL_BOOT_PATH_KEY: Key = Key::from_static(b"/__backup_kernel/boot.wasm");
 
-const BACKUP_KERNEL_ROOT_HASH: RefPath =
-    RefPath::assert_from(b"/base/__backup_kernel/root_hash");
+const BACKUP_KERNEL_ROOT_HASH_KEY: Key = Key::from_static(b"/__backup_kernel/root_hash");
 
-pub fn backup_current_kernel<Host>(host: &mut Host) -> Result<(), RuntimeError>
+pub fn backup_current_kernel<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
+) -> anyhow::Result<()>
 where
     Host: StorageV1,
 {
@@ -31,24 +33,27 @@ where
     // If there is a kernel root hash (which is not mandatory after origination,
     // we copy it to the backup, otherwise we just copy empty bytes to have
     // something to fallback on.
-    match host.store_read(&KERNEL_ROOT_HASH, 0, PREIMAGE_HASH_SIZE) {
-        Ok(root_hash) => {
-            host.store_write(&BACKUP_KERNEL_ROOT_HASH, &root_hash, 0)?;
+    match base.get_prefix_exact::<PREIMAGE_HASH_SIZE>(&KERNEL_ROOT_HASH_KEY) {
+        Some(root_hash) => {
+            base.set(&BACKUP_KERNEL_ROOT_HASH_KEY, root_hash)?;
         }
-        Err(RuntimeError::PathNotFound) => {
-            host.store_write(&BACKUP_KERNEL_ROOT_HASH, &[0; PREIMAGE_HASH_SIZE], 0)?;
+        None => {
+            base.set(&BACKUP_KERNEL_ROOT_HASH_KEY, [0; PREIMAGE_HASH_SIZE])?;
         }
-        Err(e) => return Err(e),
     };
 
     match host.store_read_all(&KERNEL_BOOT_PATH) {
-        Ok(kernel) => host.store_write_all(&BACKUP_KERNEL_BOOT_PATH, &kernel),
-        Err(RuntimeError::PathNotFound) => Ok(()),
-        Err(e) => Err(e),
+        Ok(kernel) => base.set(&BACKUP_KERNEL_BOOT_PATH_KEY, &kernel)?,
+        Err(RuntimeError::PathNotFound) => {}
+        Err(e) => return Err(e.into()),
     }
+    Ok(())
 }
 
-pub fn fallback_backup_kernel<Host>(host: &mut Host) -> Result<(), RuntimeError>
+pub fn fallback_backup_kernel<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
+) -> anyhow::Result<()>
 where
     Host: StorageV1,
 {
@@ -57,9 +62,14 @@ where
         "Something went wrong, fallback mechanism is triggered."
     );
 
-    let backup_kernel_root_hash = host.store_read_all(&BACKUP_KERNEL_ROOT_HASH)?;
-    host.store_write_all(&KERNEL_ROOT_HASH, &backup_kernel_root_hash)?;
+    let backup_kernel_root_hash = base
+        .get(&BACKUP_KERNEL_ROOT_HASH_KEY)
+        .ok_or(RuntimeError::PathNotFound)?;
+    base.set(&KERNEL_ROOT_HASH_KEY, &backup_kernel_root_hash)?;
 
-    let backup_kernel_boot = host.store_read_all(&BACKUP_KERNEL_BOOT_PATH)?;
-    host.store_write_all(&KERNEL_BOOT_PATH, &backup_kernel_boot)
+    let backup_kernel_boot = base
+        .get(&BACKUP_KERNEL_BOOT_PATH_KEY)
+        .ok_or(RuntimeError::PathNotFound)?;
+    host.store_write_all(&KERNEL_BOOT_PATH, &backup_kernel_boot)?;
+    Ok(())
 }

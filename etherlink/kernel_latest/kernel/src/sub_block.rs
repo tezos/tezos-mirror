@@ -41,18 +41,22 @@ use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
-use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
 use tezos_tezlink::block::OperationsWithReceipts;
 use tezos_tracing::trace_kernel;
 
-const SINGLE_TX_EXECUTION_INPUT: RefPath =
-    RefPath::assert_from(b"/base/instant_confirmation/input_tx");
+// Key to the single-transaction execution input, inside the `/base` keyspace.
+// Resolves to the durable path `/base/instant_confirmation/input_tx`.
+const SINGLE_TX_EXECUTION_INPUT_KEY: Key =
+    Key::from_static(b"/instant_confirmation/input_tx");
 
-const ASSEMBLE_BLOCK_INPUT: RefPath =
-    RefPath::assert_from(b"/base/instant_confirmation/assemble_block/input");
+// Key to the assemble-block input, inside the `/base` keyspace. Resolves to the
+// durable path `/base/instant_confirmation/assemble_block/input`.
+const ASSEMBLE_BLOCK_INPUT_KEY: Key =
+    Key::from_static(b"/instant_confirmation/assemble_block/input");
 
 pub struct SingleTxExecutionInput {
     pub tx: TezosXTransaction,
@@ -115,30 +119,28 @@ impl Decodable for AssembleBlockInput {
 }
 
 pub fn read_assemble_block_input(
-    host: &mut impl StorageV1,
+    base: &mut impl KeySpace,
 ) -> Result<Option<AssembleBlockInput>, Error> {
-    match host.store_read_all(&ASSEMBLE_BLOCK_INPUT) {
-        Ok(bytes) => {
+    match base.get(&ASSEMBLE_BLOCK_INPUT_KEY) {
+        Some(bytes) => {
             let input = AssembleBlockInput::from_rlp_bytes(&bytes)?;
-            host.store_delete(&ASSEMBLE_BLOCK_INPUT)?;
+            base.delete(&ASSEMBLE_BLOCK_INPUT_KEY);
             Ok(Some(input))
         }
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(err.into()),
+        None => Ok(None),
     }
 }
 
 pub fn read_single_tx_execution_input(
-    host: &mut impl StorageV1,
+    base: &mut impl KeySpace,
 ) -> Result<Option<SingleTxExecutionInput>, Error> {
-    match host.store_read_all(&SINGLE_TX_EXECUTION_INPUT) {
-        Ok(bytes) => {
+    match base.get(&SINGLE_TX_EXECUTION_INPUT_KEY) {
+        Some(bytes) => {
             let input = SingleTxExecutionInput::from_rlp_bytes(&bytes)?;
-            host.store_delete(&SINGLE_TX_EXECUTION_INPUT)?;
+            base.delete(&SINGLE_TX_EXECUTION_INPUT_KEY);
             Ok(Some(input))
         }
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(err.into()),
+        None => Ok(None),
     }
 }
 
@@ -190,10 +192,11 @@ where
 #[trace_kernel]
 pub fn handle_run_transaction<Host>(
     host: &mut Host,
+    base: &impl KeySpace,
     input_data: SingleTxExecutionInput,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WithGas + KeySpaceLoader,
+    Host: StorageV1 + WithGas,
 {
     let __attrs = [
         (
@@ -216,7 +219,7 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host);
+    let config = fetch_tezosx_configuration(host, base);
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
     let sequencer_pool_address = (block_constants.evm_runtime_block_constants.coinbase
@@ -225,7 +228,7 @@ where
 
     // Read the HTTP-trace replay flag before wrapping the host in
     // [SafeStorage] — see [block::produce] for the rationale.
-    let http_trace_enabled = crate::storage::is_http_trace_enabled(host);
+    let http_trace_enabled = crate::storage::is_http_trace_enabled(base);
 
     let mut safe_host = SafeStorage {
         host,
@@ -324,10 +327,11 @@ fn read_current_block_hash(host: &impl StorageV1) -> Result<H256, Error> {
 #[trace_kernel]
 pub fn assemble_block<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     input_data: AssembleBlockInput,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + WasmHost + IsEvmNode,
 {
     let __attrs = [
         (
@@ -343,11 +347,11 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host);
+    let config = fetch_tezosx_configuration(host, base);
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
 
-    let mut configuration = fetch_configuration(host);
+    let mut configuration = fetch_configuration(host, base);
     let mut safe_host = SafeStorage {
         host,
         world_states: config
@@ -376,13 +380,14 @@ where
     let timestamp = block.timestamp();
     promote_block(
         &mut safe_host,
+        base,
         &outbox_queue,
         &BlockInProgressProvenance::Storage,
         block.header(),
         &mut configuration,
         delayed_hashes,
     )?;
-    upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
+    upgrade::possible_sequencer_key_change(safe_host.host, base, timestamp)?;
 
     Ok(())
 }

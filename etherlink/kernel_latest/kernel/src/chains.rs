@@ -50,7 +50,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
@@ -139,11 +139,8 @@ pub struct DebugFeatures {
 }
 
 impl DebugFeatures {
-    pub fn read_from_storage<Host>(host: &mut Host) -> Self
-    where
-        Host: StorageV1,
-    {
-        let enable_debug_precompiles = crate::storage::enable_debug_precompiles(host);
+    pub fn read_from_storage(base: &impl KeySpace) -> Self {
+        let enable_debug_precompiles = crate::storage::enable_debug_precompiles(base);
 
         DebugFeatures {
             enable_debug_precompiles,
@@ -160,16 +157,11 @@ pub struct ExperimentalFeatures {
 }
 
 impl ExperimentalFeatures {
-    pub fn read_from_storage(host: &mut (impl StorageV1 + KeySpaceLoader)) -> Self {
-        let (enable_michelson_gas_refund, tezos_runtime_enabled) = {
-            let base = crate::storage::load_base_keyspace(host).expect(
-                "no other `/base` keyspace handle may be live when reading experimental features",
-            );
-            (
-                crate::storage::enable_michelson_gas_refund(&base),
-                crate::storage::enable_tezos_runtime(&base),
-            )
-        };
+    pub fn read_from_storage(host: &impl StorageV1, base: &impl KeySpace) -> Self {
+        let (enable_michelson_gas_refund, tezos_runtime_enabled) = (
+            crate::storage::enable_michelson_gas_refund(base),
+            crate::storage::enable_tezos_runtime(base),
+        );
 
         let enabled_michelson_target_sunrise_level = if tezos_runtime_enabled {
             // The target sunrise level defaults to 0 if not set. This allows
@@ -568,18 +560,18 @@ impl TezosXChainConfig {
         }
     }
 
-    pub fn fetch_hashes_from_delayed_inbox<Host>(
-        host: &mut Host,
+    pub fn fetch_hashes_from_delayed_inbox(
+        host: &impl StorageV1,
+        base: &impl KeySpace,
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &DelayedInbox,
         current_blueprint_size: usize,
         block_number: U256,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
-    where
-        Host: StorageV1 + KeySpaceLoader,
     {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
             host,
+            base,
             delayed_hashes,
             delayed_inbox,
             current_blueprint_size,
@@ -725,12 +717,13 @@ impl TezosXChainConfig {
     pub fn start_simulation_mode<Host>(
         &self,
         host: &mut Host,
+        base: &mut impl KeySpace,
         registry: &impl Registry,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + WasmHost + KeySpaceLoader,
+        Host: StorageV1 + WasmHost,
     {
-        start_simulation_mode(host, registry, &self.spec_id)
+        start_simulation_mode(host, base, registry, &self.spec_id)
     }
 
     pub fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath> {

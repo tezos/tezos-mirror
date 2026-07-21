@@ -7,7 +7,7 @@
 //! production setup.
 
 use crate::configuration::{fetch_configuration, fetch_tezosx_configuration};
-use crate::storage::ADMIN;
+use crate::storage::ADMIN_KEY;
 use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_PATH;
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -16,11 +16,12 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
-use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
-const CONFIG_PATH: RefPath = RefPath::assert_from(b"/base/__tmp/reveal_config");
+// Key to the temporary reveal configuration, inside the `/base` keyspace.
+// Resolves to the durable path `/base/__tmp/reveal_config`.
+const CONFIG_KEY: Key = Key::from_static(b"/__tmp/reveal_config");
 
 #[derive(Debug)]
 struct Set {
@@ -57,24 +58,22 @@ impl Decodable for Sets {
     }
 }
 
-pub fn is_revealed_storage(host: &impl StorageV1) -> bool {
-    matches!(
-        host.store_has(&CONFIG_PATH).unwrap_or_default(),
-        Some(ValueType::Value)
-    )
+pub fn is_revealed_storage(base: &impl KeySpace) -> bool {
+    base.contains(&CONFIG_KEY)
 }
 
 pub fn reveal_storage<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     sequencer: Option<PublicKey>,
     admin: Option<ContractKt1Hash>,
 ) where
-    Host: StorageV1 + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + IsEvmNode,
 {
     log!(Info, "Starting the reveal dump");
 
-    let config_bytes = host
-        .store_read_all(&CONFIG_PATH)
+    let config_bytes = base
+        .get(&CONFIG_KEY)
         .expect("Failed reading the configuration");
 
     // Decode the RLP list of instructions.
@@ -91,8 +90,7 @@ pub fn reveal_storage<Host>(
     }
 
     // Remove temporary configuration
-    host.store_delete(&CONFIG_PATH)
-        .expect("Failed to remove the configuration");
+    base.delete(&CONFIG_KEY);
 
     // Change the sequencer if asked:
     if let Some(sequencer) = sequencer {
@@ -105,13 +103,13 @@ pub fn reveal_storage<Host>(
     if let Some(admin) = admin {
         let kt1_b58 = admin.to_base58_check();
         let bytes = String::as_bytes(&kt1_b58);
-        host.store_write(&ADMIN, bytes, 0).unwrap();
+        base.set(&ADMIN_KEY, bytes).unwrap();
     }
 
     log!(Info, "Done revealing");
 
-    let chain_config = fetch_tezosx_configuration(host);
-    let configuration = fetch_configuration(host);
+    let chain_config = fetch_tezosx_configuration(host, base);
+    let configuration = fetch_configuration(host, base);
     log!(Info, "Chain Configuration {chain_config:?}");
     log!(Info, "Configuration {}", configuration);
 }

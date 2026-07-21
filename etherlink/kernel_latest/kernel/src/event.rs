@@ -15,8 +15,7 @@ use tezos_ethereum::rlp_helpers::{append_timestamp, append_u256_le};
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 pub const UPGRADE_TAG: u8 = 0x01;
 pub const SEQUENCER_UPGRADE_TAG: u8 = 0x02;
@@ -85,12 +84,13 @@ impl Encodable for Event<'_> {
 }
 
 impl Event<'_> {
-    pub fn store<Host>(&self, host: &mut Host) -> anyhow::Result<()>
-    where
-        Host: StorageV1 + IsEvmNode + KeySpaceLoader,
-    {
+    pub fn store(
+        &self,
+        host: &impl IsEvmNode,
+        base: &mut impl KeySpace,
+    ) -> anyhow::Result<()> {
         if !host.is_evm_node() {
-            storage::store_event(host, self)?;
+            storage::store_event(base, self)?;
         }
 
         Ok(())

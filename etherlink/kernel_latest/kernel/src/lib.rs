@@ -12,7 +12,7 @@ use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
 use crate::stage_one::fetch_blueprints;
-use crate::storage::{load_base_keyspace, read_sequencer_pool_address, PRIVATE_FLAG_KEY};
+use crate::storage::{read_sequencer_pool_address, PRIVATE_FLAG_KEY};
 use anyhow::Context;
 use block::health_check;
 use chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
@@ -41,7 +41,7 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tracing::trace_kernel;
 
 mod apply;
@@ -85,11 +85,13 @@ extern crate alloc;
 // This needs to be set to the frozen commit on snapshot time
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
-fn switch_to_public_rollup<Host>(host: &mut Host) -> Result<(), Error>
+fn switch_to_public_rollup<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
+) -> Result<(), Error>
 where
-    Host: StorageV1 + WasmHost + KeySpaceLoader,
+    Host: StorageV1 + WasmHost,
 {
-    let mut base = load_base_keyspace(host)?;
     if base.contains(&PRIVATE_FLAG_KEY) {
         log!(Info, "Submitting outbox message to make the rollup public.");
         let whitelist_update: OutboxMessage<_> =
@@ -104,13 +106,16 @@ where
 }
 
 #[trace_kernel]
-pub fn stage_zero<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
+pub fn stage_zero<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
+) -> Result<MigrationStatus, Error>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + WasmHost + IsEvmNode,
 {
     log!(Debug, "Entering stage zero.");
-    init_storage_versioning(host)?;
-    switch_to_public_rollup(host)?;
+    init_storage_versioning(host, base)?;
+    switch_to_public_rollup(host, base)?;
     storage_migration(host)
 }
 
@@ -121,53 +126,59 @@ where
 #[cfg_attr(feature = "benchmark", inline(never))]
 pub fn stage_one<Host>(
     host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
     chain_config: &chains::TezosXChainConfig,
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode + KeySpaceLoader,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     log!(Debug, "Entering stage one.");
     log!(Debug, "Chain Configuration: {chain_config:?}");
     log!(Debug, "Configuration: {}", configuration);
 
-    enter_stage_one(host)?;
-    let res = fetch_blueprints(host, smart_rollup_address, chain_config, configuration);
-    leave_stage_one(host)?;
+    enter_stage_one(base)?;
+    let res = fetch_blueprints(
+        host,
+        base,
+        smart_rollup_address,
+        chain_config,
+        configuration,
+    );
+    leave_stage_one(base)?;
     res
 }
 
-fn set_kernel_version(host: &mut (impl StorageV1 + KeySpaceLoader)) -> Result<(), Error> {
-    match read_kernel_version(host) {
+fn set_kernel_version(base: &mut impl KeySpace) -> Result<(), Error> {
+    match read_kernel_version(base) {
         Ok(kernel_version) => {
             if kernel_version != KERNEL_VERSION {
-                store_kernel_version(host, KERNEL_VERSION)?
+                store_kernel_version(base, KERNEL_VERSION)?
             };
             Ok(())
         }
-        Err(_) => store_kernel_version(host, KERNEL_VERSION),
+        Err(_) => store_kernel_version(base, KERNEL_VERSION),
     }
 }
 
 fn init_storage_versioning(
-    host: &mut (impl StorageV1 + KeySpaceLoader),
+    host: &mut impl StorageV1,
+    base: &mut impl KeySpace,
 ) -> Result<(), Error> {
-    // Check both the `/base` keyspace and the legacy /evm/ path.
-    // If either exists, storage versioning is already initialised and the
-    // migration framework will take it from here.
-    use crate::storage::{is_storage_version_initialised, LEGACY_STORAGE_VERSION_PATH};
-    let initialised = {
-        let base = load_base_keyspace(host)?;
-        is_storage_version_initialised(&base)
-    };
-    if initialised {
+    // Reconcile the storage version into the `/base` keyspace once, at stage
+    // zero: this is the only place that reads the legacy /evm/ path.
+    use crate::storage::{LEGACY_STORAGE_VERSION_PATH, STORAGE_VERSION_KEY};
+    if base.contains(&STORAGE_VERSION_KEY) {
+        Ok(())
+    } else if let Ok(version) = host.store_read_all(&LEGACY_STORAGE_VERSION_PATH) {
+        // Upgrading from the pre-`/base` layout: carry the recorded version
+        // over verbatim so the migration framework still resumes from it.
+        base.set(&STORAGE_VERSION_KEY, version)?;
+        let _ = host.store_delete(&LEGACY_STORAGE_VERSION_PATH);
         Ok(())
     } else {
-        match host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, 0) {
-            Ok(_) => Ok(()),
-            Err(_) => store_storage_version(host, STORAGE_VERSION),
-        }
+        store_storage_version(base, STORAGE_VERSION)
     }
 }
 
@@ -237,15 +248,15 @@ where
     Ok(block_fees)
 }
 
-pub fn run<Host>(host: &mut Host) -> Result<(), anyhow::Error>
+pub fn run<Host>(host: &mut Host, base: &mut impl KeySpace) -> Result<(), anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode + KeySpaceLoader,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
 {
     // Reboot by default, to ensure the health check implemented before the stage 2 is executed in
     // the same L1 level
     host.mark_for_reboot()
         .expect("This function should never fail");
-    match single_run(host) {
+    match single_run(host, base) {
         Ok(SingleRunStatus::Reboot) => Ok(()),
         Ok(SingleRunStatus::Finished) => {
             host.clear_reboot_mark()
@@ -265,19 +276,22 @@ pub enum SingleRunStatus {
     Finished,
 }
 
-pub fn single_run<Host>(host: &mut Host) -> Result<SingleRunStatus, anyhow::Error>
+pub fn single_run<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
+) -> Result<SingleRunStatus, anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode + KeySpaceLoader,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
 {
     // We always start by doing the migration if needed.
-    match stage_zero(host) {
+    match stage_zero(host, base) {
         Ok(MigrationStatus::None) => {
             // No migration in progress. However as we want to have the kernel
             // version written in the storage, we check for its existence
             // at every kernel run.
             // The alternative is to enforce every new kernels use the
             // installer configuration to initialize this value.
-            set_kernel_version(host)?;
+            set_kernel_version(base)?;
         }
         // If the migration is still in progress or was finished, we abort the
         // current kernel run.
@@ -287,15 +301,15 @@ where
         Ok(MigrationStatus::Done) => {
             // If a migration was finished, we update the kernel version
             // in the storage.
-            set_kernel_version(host)?;
-            let configuration = fetch_configuration(host);
+            set_kernel_version(base)?;
+            let configuration = fetch_configuration(host, base);
             log!(Info, "Configuration after migration: {}", configuration);
             return Ok(SingleRunStatus::Reboot);
         }
         Err(Error::UpgradeError(Fallback)) => {
             // If the migration failed we backup to the previous kernel
             // and force a reboot to reload the kernel.
-            fallback_backup_kernel(host)?;
+            fallback_backup_kernel(host, base)?;
             return Ok(SingleRunStatus::Reboot);
         }
         Err(err) => return Err(err.into()),
@@ -316,14 +330,14 @@ where
     let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let chain_configuration = fetch_tezosx_configuration(host);
-    let mut configuration = fetch_configuration(host);
+    let chain_configuration = fetch_tezosx_configuration(host, base);
+    let mut configuration = fetch_configuration(host, base);
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it
     // before the stage one because stage one reboots and would clear the flag.
     if !host.is_evm_node() {
-        health_check::<Host>(host, &mut configuration)?;
+        health_check(host, base, &mut configuration)?;
     }
 
     // Initialize custom precompile
@@ -337,6 +351,7 @@ where
     // inbox.
     if let StageOneStatus::Reboot = stage_one(
         host,
+        base,
         smart_rollup_address,
         &chain_configuration,
         &mut configuration,
@@ -347,7 +362,7 @@ where
         return Ok(SingleRunStatus::Reboot);
     };
 
-    let trace_input = read_tracer_input(host)?;
+    let trace_input = read_tracer_input(base)?;
 
     // Start processing blueprints
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
@@ -355,6 +370,7 @@ where
         log!(Debug, "Entering stage two.");
         if let block::ComputationResult::Finished = block::produce(
             host,
+            base,
             &chain_configuration,
             &mut configuration,
             sequencer_pool_address,
@@ -461,9 +477,12 @@ where
             .unwrap();
     }
 
-    if is_revealed_storage(&host) {
+    let mut base = crate::storage::load_base_keyspace(&mut host)
+        .expect("Failed to load the `/base` keyspace");
+    if is_revealed_storage(&base) {
         reveal_storage(
             &mut host,
+            &mut base,
             option_env!("EVM_SEQUENCER").map(|s| {
                 PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
             }),
@@ -473,7 +492,7 @@ where
         );
     }
 
-    match run(&mut host) {
+    match run(&mut host, &mut base) {
         Ok(()) => (),
         Err(err) => {
             log!(Fatal, "The kernel produced an error: {:?}", err);
@@ -680,8 +699,9 @@ mod tests {
         host.host.add_external(message);
 
         // run kernel twice to get to the stage with block creation:
-        run(&mut host).expect("Kernel error");
-        run(&mut host).expect("Kernel error");
+        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+        run(&mut host, &mut base).expect("Kernel error");
+        run(&mut host, &mut base).expect("Kernel error");
 
         // verify outbox is not empty
         let outbox = host.host.outbox_at(level + 1);
@@ -766,9 +786,10 @@ mod tests {
         mock_host.host.add_transfer(payload, &metadata);
 
         // run kernel
-        run(&mut mock_host).expect("Kernel error");
+        let mut base = crate::storage::load_base_keyspace(&mut mock_host).unwrap();
+        run(&mut mock_host, &mut base).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [1]
-        run(&mut mock_host).expect("Kernel error");
+        run(&mut mock_host, &mut base).expect("Kernel error");
 
         // reconstruct ticket
         let ticket = FA2_1Ticket::new(
@@ -913,9 +934,10 @@ mod tests {
         mock_host.host.add_external(message);
 
         // run kernel
-        run(&mut mock_host).expect("Kernel error");
+        let mut base = crate::storage::load_base_keyspace(&mut mock_host).unwrap();
+        run(&mut mock_host, &mut base).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [2]
-        run(&mut mock_host).expect("Kernel error");
+        run(&mut mock_host, &mut base).expect("Kernel error");
 
         mock_host.host.outbox_at(level + 1)
     }

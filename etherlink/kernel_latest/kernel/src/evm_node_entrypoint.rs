@@ -37,22 +37,22 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_smart_rollup::outbox::OutboxQueue;
-use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
 #[cfg(target_arch = "wasm32")]
 use tezos_smart_rollup_core::rollup_host::RollupHost;
 
-const DELAYED_INPUT_PATH: RefPath = RefPath::assert_from(b"/base/__delayed_input");
+// Keys inside the `/base` keyspace. Each resolves to the durable path formed by
+// prefixing `/base` to the relative key below.
+const DELAYED_INPUT_KEY: Key = Key::from_static(b"/__delayed_input");
 
-const TEZOSX_SIMULATION_INPUT: RefPath =
-    RefPath::assert_from(b"/base/__simulation/input");
-const TEZOSX_SIMULATION_RESULT: RefPath =
-    RefPath::assert_from(b"/base/__simulation/result");
+const TEZOSX_SIMULATION_INPUT_KEY: Key = Key::from_static(b"/__simulation/input");
+const TEZOSX_SIMULATION_RESULT_KEY: Key = Key::from_static(b"/__simulation/result");
 
-pub(crate) const TEZOSX_ENTRYPOINTS_INPUT: RefPath =
-    RefPath::assert_from(b"/base/tezosx_entrypoints/input");
-pub(crate) const TEZOSX_ENTRYPOINTS_RESULT: RefPath =
-    RefPath::assert_from(b"/base/tezosx_entrypoints/result");
+pub(crate) const TEZOSX_ENTRYPOINTS_INPUT_KEY: Key =
+    Key::from_static(b"/tezosx_entrypoints/input");
+pub(crate) const TEZOSX_ENTRYPOINTS_RESULT_KEY: Key =
+    Key::from_static(b"/tezosx_entrypoints/result");
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
@@ -68,11 +68,12 @@ where
         + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
+    let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+    let payload = base.get(&DELAYED_INPUT_KEY).unwrap();
     let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
-    let mut delayed_inbox = DelayedInbox::new(&mut host).unwrap();
+    let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
     delayed_inbox
-        .save_transaction(&mut host, transaction, 0.into(), 0u32)
+        .save_transaction(&host, &mut base, transaction, 0.into(), 0u32)
         .unwrap();
 }
 
@@ -90,11 +91,12 @@ where
         + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
+    let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
+    let payload = base.get(&DELAYED_INPUT_KEY).unwrap();
     let transaction_hash: TransactionHash = decode_tx_hash(Rlp::new(&payload)).unwrap();
-    let mut delayed_inbox = DelayedInbox::new(&mut host).unwrap();
+    let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
     delayed_inbox
-        .delete(&mut host, crate::delayed_inbox::Hash(transaction_hash))
+        .delete(&mut base, crate::delayed_inbox::Hash(transaction_hash))
         .unwrap();
 }
 #[cfg(target_arch = "wasm32")]
@@ -111,7 +113,14 @@ where
         + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let tx_input = match sub_block::read_single_tx_execution_input(&mut host) {
+    let mut base = match crate::storage::load_base_keyspace(&mut host) {
+        Ok(base) => base,
+        Err(err) => {
+            log!(Error, "Error loading the `/base` keyspace: {:?}", err);
+            return;
+        }
+    };
+    let tx_input = match sub_block::read_single_tx_execution_input(&mut base) {
         Ok(Some(input)) => input,
         Ok(None) => {
             log!(
@@ -129,7 +138,7 @@ where
             return;
         }
     };
-    match sub_block::handle_run_transaction(&mut host, tx_input) {
+    match sub_block::handle_run_transaction(&mut host, &base, tx_input) {
         Ok(()) => (),
         Err(err) => {
             log!(
@@ -155,7 +164,14 @@ where
         + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let assemble_block_input = match sub_block::read_assemble_block_input(&mut host) {
+    let mut base = match crate::storage::load_base_keyspace(&mut host) {
+        Ok(base) => base,
+        Err(err) => {
+            log!(Error, "Error loading the `/base` keyspace: {:?}", err);
+            return;
+        }
+    };
+    let assemble_block_input = match sub_block::read_assemble_block_input(&mut base) {
         Ok(Some(input)) => input,
         Ok(None) => {
             log!(Error, "No assemble block input found in storage");
@@ -166,7 +182,7 @@ where
             return;
         }
     };
-    match sub_block::assemble_block(&mut host, assemble_block_input) {
+    match sub_block::assemble_block(&mut host, &mut base, assemble_block_input) {
         Ok(()) => (),
         Err(err) => {
             log!(Error, "Error while assembling block: {:?}", err);
@@ -188,10 +204,17 @@ where
         + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let input = match host.store_read_all(&TEZOSX_SIMULATION_INPUT) {
-        Ok(bytes) => bytes,
+    let mut base = match crate::storage::load_base_keyspace(&mut host) {
+        Ok(base) => base,
         Err(err) => {
-            log!(Error, "Error reading Tezos X simulation input: {:?}", err);
+            log!(Error, "Error loading the `/base` keyspace: {:?}", err);
+            return;
+        }
+    };
+    let input = match base.get(&TEZOSX_SIMULATION_INPUT_KEY) {
+        Some(bytes) => bytes,
+        None => {
+            log!(Error, "Tezos X simulation input not found");
             return;
         }
     };
@@ -238,8 +261,8 @@ where
         transaction_bytes.len()
     );
 
-    let chain_config = fetch_tezosx_configuration(&mut host);
-    let blueprint_header = match read_current_blueprint_header(&mut host) {
+    let chain_config = fetch_tezosx_configuration(&mut host, &base);
+    let blueprint_header = match read_current_blueprint_header(&base) {
         Ok(h) => h,
         Err(err) => {
             log!(
@@ -347,7 +370,7 @@ where
     // simulate used by `eth_call` / `eth_estimateGas`, which leave the flag
     // unset and pay no trace clone. Read on the base host, before any
     // `SafeStorage` wrapping, exactly as the applied path does.
-    trace_journal.set_http_trace_enabled(crate::storage::is_http_trace_enabled(&host));
+    trace_journal.set_http_trace_enabled(crate::storage::is_http_trace_enabled(&base));
     let execution_result = match transaction {
         chains::TezosXTransaction::Tezos(operation) => {
             let enable_gas_refund = chain_config
@@ -413,7 +436,7 @@ where
 
     // Store captured HTTP traces.
     let traces = trace_journal.into_http_traces();
-    if let Err(err) = crate::storage::store_simulation_http_traces(&mut host, &traces) {
+    if let Err(err) = crate::storage::store_simulation_http_traces(&mut base, &traces) {
         log!(
             Error,
             "Tezos X simulation: failed to store HTTP traces: {:?}",
@@ -459,7 +482,7 @@ where
     // Result is RLP-encoded as a value containing the serialized operation.
     let mut stream = RlpStream::new();
     stream.append(&op_bytes);
-    if let Err(err) = host.store_write_all(&TEZOSX_SIMULATION_RESULT, &stream.out()) {
+    if let Err(err) = base.set(&TEZOSX_SIMULATION_RESULT_KEY, stream.out()) {
         log!(Error, "Error writing Tezos X simulation result: {:?}", err);
     }
 }
@@ -474,21 +497,34 @@ pub extern "C" fn tezosx_michelson_entrypoints() {
 #[allow(dead_code)]
 pub fn tezosx_michelson_entrypoints_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime,
+    Host: tezos_smart_rollup_host::runtime::Runtime
+        + tezos_smart_rollup_host::storage::CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let input = match host.store_read_all(&TEZOSX_ENTRYPOINTS_INPUT) {
-        Ok(bytes) => bytes,
+    let mut base = match crate::storage::load_base_keyspace(&mut host) {
+        Ok(base) => base,
         Err(err) => {
-            log!(Error, "Error reading tezosx entrypoints input: {:?}", err);
+            log!(Error, "Error loading the `/base` keyspace: {:?}", err);
             return;
         }
     };
-    handle_query_entrypoints_to(&mut host, &input, &TEZOSX_ENTRYPOINTS_RESULT);
+    let input = match base.get(&TEZOSX_ENTRYPOINTS_INPUT_KEY) {
+        Some(bytes) => bytes,
+        None => {
+            log!(Error, "Tezos X entrypoints input not found");
+            return;
+        }
+    };
+    handle_query_entrypoints_to(
+        &mut host,
+        &mut base,
+        &input,
+        &TEZOSX_ENTRYPOINTS_RESULT_KEY,
+    );
 }
 
 /// Query the entrypoints and synthetic views of a contract and write
-/// the result to `result_path`.
+/// the result through the `/base` keyspace at `result_key`.
 ///
 /// This works for both originated and enshrined smart contracts of
 /// the Michelson runtime but is currently only used for enshrined
@@ -500,8 +536,9 @@ where
 /// Input: binary-encoded contract AddressHash (22 bytes).
 fn handle_query_entrypoints_to<Host, R>(
     host: &mut KernelHost<R, Host>,
+    base: &mut impl KeySpace,
     payload: &[u8],
-    result_path: &RefPath,
+    result_key: &Key,
 ) where
     R: tezos_smart_rollup_host::runtime::Runtime,
     Host: std::borrow::BorrowMut<R> + std::borrow::Borrow<R>,
@@ -539,7 +576,7 @@ fn handle_query_entrypoints_to<Host, R>(
             return;
         }
     };
-    if let Err(err) = host.store_write_all(result_path, &result) {
+    if let Err(err) = base.set(result_key, result) {
         log!(Error, "Error writing tezos entrypoints result: {:?}", err);
     }
 }
@@ -645,15 +682,15 @@ mod tests {
     use mir::gas::Gas;
     use mir::parser::Parser;
     use std::collections::HashMap;
-    use tezos_smart_rollup_host::storage::StorageV1;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_keyspace::KeySpace;
 
-    use crate::evm_node_entrypoint::{
-        tezosx_michelson_entrypoints_fn, TEZOSX_ENTRYPOINTS_INPUT,
-        TEZOSX_ENTRYPOINTS_RESULT,
+    use crate::evm_node_entrypoint::tezosx_michelson_entrypoints_fn;
+
+    use super::{
+        encode_entrypoints_result, TEZOSX_ENTRYPOINTS_INPUT_KEY,
+        TEZOSX_ENTRYPOINTS_RESULT_KEY,
     };
-
-    use super::encode_entrypoints_result;
     use tezos_execution::enshrined_contracts::EnshrinedContracts;
 
     /// Decodes the output of `encode_entrypoints_result` back into a
@@ -905,17 +942,24 @@ mod tests {
         assert_eq!(*return_ty, Type::Bytes);
     }
 
-    fn run_entrypoints_query(host: &mut MockHost, addr_hash: &[u8]) -> Vec<u8> {
-        host.store_write_all(&TEZOSX_ENTRYPOINTS_INPUT, addr_hash)
-            .expect("write input");
-        tezosx_michelson_entrypoints_fn(host);
-        host.store_read_all(&TEZOSX_ENTRYPOINTS_RESULT)
+    fn run_entrypoints_query(host: &mut MockKernelHost, addr_hash: &[u8]) -> Vec<u8> {
+        // The node seeds the input and reads the result through the `/base`
+        // keyspace, and `tezosx_michelson_entrypoints_fn` consumes/produces
+        // them the same way.
+        {
+            let mut base = crate::storage::load_base_keyspace(host).unwrap();
+            base.set(&TEZOSX_ENTRYPOINTS_INPUT_KEY, addr_hash)
+                .expect("write input");
+        }
+        tezosx_michelson_entrypoints_fn(&mut host.host);
+        let base = crate::storage::load_base_keyspace(host).unwrap();
+        base.get(&TEZOSX_ENTRYPOINTS_RESULT_KEY)
             .expect("entrypoints result should have been written")
     }
 
     #[test]
     fn test_entrypoints_query_gateway() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let result = run_entrypoints_query(
             &mut host,
             &EnshrinedContracts::TezosXGateway.address_hash_bytes(),
@@ -966,7 +1010,7 @@ mod tests {
 
     #[test]
     fn test_entrypoints_query_erc20() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let result = run_entrypoints_query(
             &mut host,
             &EnshrinedContracts::ERC20Wrapper.address_hash_bytes(),
@@ -982,7 +1026,7 @@ mod tests {
 
     #[test]
     fn test_entrypoints_query_unknown_contract_returns_none() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
         let unknown_kt1: [u8; 22] =
             hex::decode("01AABBCC000000000000000000000000000000000100")
                 .unwrap()
