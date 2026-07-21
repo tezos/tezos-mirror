@@ -31,6 +31,7 @@
 *)
 
 open Rpc.Syntax
+open Test_helpers
 
 (* ── Shared constants ─────────────────────────────────────────────────── *)
 
@@ -129,16 +130,6 @@ let string_from hex offset_word_pos =
     |> Bytes.to_string
 
 (* ── Michelson contract helpers ───────────────────────────────────────── *)
-
-let tezlink_foreign_endpoint sequencer =
-  let r = Evm_node.rpc_endpoint_record sequencer in
-  {r with path = "/tezlink"}
-
-let tezlink_endpoint sequencer =
-  Client.Foreign_endpoint (tezlink_foreign_endpoint sequencer)
-
-let tezlink_client sequencer =
-  Client.init ~endpoint:(tezlink_endpoint sequencer) ()
 
 let contract_prg script_name =
   Michelson_script.find script_name Michelson_contracts.tezlink_protocol

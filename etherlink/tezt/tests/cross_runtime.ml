@@ -15,25 +15,13 @@
  *)
 
 open Rpc.Syntax
+open Test_helpers
 
 (** Base-fee floor for the CRAC test setups.  Mirrors the production
     Etherlink floor (1 GWei) so the mutez<->EVM gas conversion driving
     alias-mat and other CRAC-borne storage costs uses the same factor
     as on-chain.  The forge helpers below scale [~fee] accordingly. *)
 let crac_minimum_base_fee_per_gas = Wei.of_string "1000000000"
-
-(** Foreign endpoint of the tezlink RPC served by [evm_node]. *)
-let tezlink_foreign_endpoint_from_evm_node evm_node =
-  let evm_node_endpoint = Evm_node.rpc_endpoint_record evm_node in
-  {evm_node_endpoint with Endpoint.path = "/tezlink"}
-
-(** Client whose endpoint is the tezlink RPC served by [evm_node], for
-    direct injection of Michelson operations. *)
-let tezlink_client_from_evm_node evm_node =
-  let endpoint =
-    Client.Foreign_endpoint (tezlink_foreign_endpoint_from_evm_node evm_node)
-  in
-  Client.init ~endpoint ()
 
 module EvmContract = struct
   let tezosx_evm_chain_id = 1337
@@ -151,7 +139,7 @@ module TezContract = struct
     let*@ _count = Rpc.produce_block sequencer in
     let* all_passes =
       RPC_core.call
-        (tezlink_foreign_endpoint_from_evm_node sequencer)
+        (tezlink_foreign_endpoint sequencer)
         (RPC.get_chain_block_operations ())
     in
     match
@@ -394,7 +382,7 @@ module TezContract = struct
    *  tezlink RPC of [sequencer]. *)
   let get_storage ~sequencer contract_address =
     RPC_core.call
-      (tezlink_foreign_endpoint_from_evm_node sequencer)
+      (tezlink_foreign_endpoint sequencer)
       (RPC.get_chain_block_context_contract_storage ~id:contract_address ())
 end
 
@@ -3107,7 +3095,7 @@ let register_crac_runner_test ~title ?(tags = [])
   let* client =
     Client.init_mockup ~protocol:Michelson_contracts.tezlink_protocol ()
   in
-  let* client_tezlink = tezlink_client_from_evm_node sequencer in
+  let* client_tezlink = tezlink_client sequencer in
   let (module Wrapper) =
     CracRunnerWrapper.build
       ~counter:1
@@ -6919,7 +6907,7 @@ let test_internal_nonces_are_block_contiguous_at_scale () =
   @@ fun sequencer ->
   let source = Constant.bootstrap5 in
   let* client = Client.init_mockup ~protocol () in
-  let* client_tezlink = tezlink_client_from_evm_node sequencer in
+  let* client_tezlink = tezlink_client sequencer in
   let* _hex, emitter =
     TezContract.originate_contract_via_tezlink
       ~client
@@ -9767,13 +9755,7 @@ let test_crac_receipt_tez_not_first_tx () =
   let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_runner in
   let* tez_runner = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
   (* Create a Tezlink client for direct L2 Michelson injection. *)
-  let tezlink_endpoint =
-    Client.(
-      Foreign_endpoint
-        Endpoint.
-          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
-  in
-  let* client_tezlink = Client.init ~endpoint:tezlink_endpoint () in
+  let* client_tezlink = tezlink_client sequencer in
   (* Inject a dummy Michelson transfer into the mempool (no block produced).
      Per the RFC, CRAC-ID tx_index is per-runtime, so this dummy
      Michelson tx occupies tx_index 0 in the Michelson block. *)
@@ -9862,13 +9844,7 @@ let test_crac_receipt_evm_then_tez_same_block () =
   let*@ _dummy_hash = Rpc.send_raw_transaction ~raw_tx:raw_dummy sequencer in
   (* Step 2: Inject the TEZ→EVM CRAC call via the Tezlink RPC
      (no block produced yet). *)
-  let tezlink_endpoint =
-    Client.(
-      Foreign_endpoint
-        Endpoint.
-          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
-  in
-  let* client_tezlink = Client.init ~endpoint:tezlink_endpoint () in
+  let* client_tezlink = tezlink_client sequencer in
   let (`Tez_runner (_, tez_runner_dest)) = tez_runner in
   let* arg = Client.convert_data_to_json ~data:"Unit" client in
   let* branch = tez_branch client_tezlink in
@@ -11377,7 +11353,7 @@ let test_l1_vs_tezosx_nested_failwith_receipt =
   let node = sequencer_setup.node in
   let source = Constant.bootstrap5 in
   let {Setup.sequencer; _} = sequencer_setup in
-  let* client_tezlink = tezlink_client_from_evm_node sequencer in
+  let* client_tezlink = tezlink_client sequencer in
   let tez_counter = ref 1 in
   let next_tez_counter () =
     let c = !tez_counter in
@@ -13626,7 +13602,7 @@ let crac_register ~title ~tags body =
   let {Setup.sc_rollup_node; sequencer; client; evm_version; _} =
     sequencer_setup
   in
-  let* client_tezlink = tezlink_client_from_evm_node sequencer in
+  let* client_tezlink = tezlink_client sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let source = Constant.bootstrap5 in
   let ref_nonce = ref 0 in
@@ -13681,7 +13657,7 @@ let crac_orig_register
   let* client =
     Client.init_mockup ~protocol:Michelson_contracts.tezlink_protocol ()
   in
-  let* client_tezlink = tezlink_client_from_evm_node sequencer in
+  let* client_tezlink = tezlink_client sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let source = Constant.bootstrap5 in
   let ref_nonce = ref 0 in
@@ -15880,7 +15856,7 @@ let test_michelson_runtime_rejects_invalid_key () =
   let* client =
     Client.init_mockup ~protocol:Michelson_contracts.tezlink_protocol ()
   in
-  let* client_tezlink = tezlink_client_from_evm_node sequencer in
+  let* client_tezlink = tezlink_client sequencer in
   let prg = "parameter unit; storage key; code { CDR; NIL operation; PAIR }" in
   let* code = Client.convert_script_to_json ~script:prg client in
   let counter = ref 0 in
