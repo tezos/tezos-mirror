@@ -76,7 +76,7 @@ mod upgrade;
 
 extern crate alloc;
 
-const KERNEL_VERSION: &str = "7af992cf274a0902c172b5e9829397107e817178";
+const KERNEL_VERSION: &str = "a6d2d723241e1664b6d7046291427896601516f4";
 
 fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     if let Some(ValueType::Value) = host.store_has(&PRIVATE_FLAG_PATH)? {
