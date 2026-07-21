@@ -805,35 +805,19 @@ module type COMPONENT_API = sig
     job
 
   val register_scheduled_pipeline :
-    description:string ->
-    ?legacy_jobs:Tezos_ci.tezos_job list ->
-    string ->
-    (trigger * job) list ->
-    unit
+    description:string -> string -> (trigger * job) list -> unit
 
   val register_dedicated_release_pipeline :
-    ?tag_rex:string ->
-    ?legacy_jobs:Tezos_ci.tezos_job list ->
-    (trigger * job) list ->
-    unit
+    ?tag_rex:string -> (trigger * job) list -> unit
 
   val register_dedicated_test_release_pipeline :
-    ?tag_rex:string ->
-    ?legacy_jobs:Tezos_ci.tezos_job list ->
-    (trigger * job) list ->
-    unit
+    ?tag_rex:string -> (trigger * job) list -> unit
 
   val register_dedicated_prerelease_pipeline :
-    ?tag_rex:string ->
-    ?legacy_jobs:Tezos_ci.tezos_job list ->
-    (trigger * job) list ->
-    unit
+    ?tag_rex:string -> (trigger * job) list -> unit
 
   val register_dedicated_test_prerelease_pipeline :
-    ?tag_rex:string ->
-    ?legacy_jobs:Tezos_ci.tezos_job list ->
-    (trigger * job) list ->
-    unit
+    ?tag_rex:string -> (trigger * job) list -> unit
 end
 
 type global_pipeline =
@@ -1435,8 +1419,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
      - prefixing the name of the pipeline with the name of the component;
      - including the DataDog job.
      Returns the pipeline name. *)
-  let register_pipeline ?interruptible_pipeline ~description ?(legacy_jobs = [])
-      ~jobs name rules =
+  let register_pipeline ?interruptible_pipeline ~description ~jobs name rules =
     let job_datadog_pipeline_trace =
       match !job_datadog_pipeline_trace with
       | None ->
@@ -1448,14 +1431,13 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     Tezos_ci.Pipeline.register
       ~description
       ~jobs:
-        (legacy_jobs
-        @ convert_jobs
-            ?interruptible_pipeline
-            ((Auto, job_datadog_pipeline_trace) :: jobs))
+        (convert_jobs
+           ?interruptible_pipeline
+           ((Auto, job_datadog_pipeline_trace) :: jobs))
       (make_name name)
       rules
 
-  let register_scheduled_pipeline ~description ?legacy_jobs name jobs =
+  let register_scheduled_pipeline ~description name jobs =
     (* Scheduled pipelines are non-interruptible:
        we don't want them to be canceled just because
        a new commit was merged into master. *)
@@ -1463,7 +1445,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       name
       ~description
       ~interruptible_pipeline:false
-      ?legacy_jobs
       ~jobs
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
@@ -1501,7 +1482,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       already_called := true ;
       f x
 
-  let register_dedicated_release_pipeline ?tag_rex ?legacy_jobs =
+  let register_dedicated_release_pipeline ?tag_rex =
     only_once "register_dedicated_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
@@ -1509,13 +1490,12 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "release"
       ~description:(sf "Release %s." component_name)
-      ?legacy_jobs
       ~jobs
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
 
-  let register_dedicated_test_release_pipeline ?tag_rex ?legacy_jobs =
+  let register_dedicated_test_release_pipeline ?tag_rex =
     only_once "register_dedicated_test_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
@@ -1523,13 +1503,12 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "test_release"
       ~description:(sf "Release %s (test)." component_name)
-      ?legacy_jobs
       ~jobs
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
 
-  let register_dedicated_prerelease_pipeline ?tag_rex ?legacy_jobs =
+  let register_dedicated_prerelease_pipeline ?tag_rex =
     only_once "register_dedicated_prerelease_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_prerelease_pipeline"
     @@ fun component_name ->
@@ -1537,13 +1516,12 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "prerelease"
       ~description:(sf "Prerelease %s." component_name)
-      ?legacy_jobs
       ~jobs
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
 
-  let register_dedicated_test_prerelease_pipeline ?tag_rex ?legacy_jobs =
+  let register_dedicated_test_prerelease_pipeline ?tag_rex =
     only_once "register_dedicated_test_prerelease_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_test_prerelease_pipeline"
     @@ fun component_name ->
@@ -1551,7 +1529,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "test_prerelease"
       ~description:(sf "Prerelease %s (test)." component_name)
-      ?legacy_jobs
       ~jobs
       Tezos_ci.Rules.(
         Gitlab_ci.If.(

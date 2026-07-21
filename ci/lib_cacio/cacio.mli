@@ -334,17 +334,9 @@ module type COMPONENT_API = sig
       This does not actually register the pipeline in GitLab.
       The pipeline must manually be set up in GitLab
       to run with variable [TZ_SCHEDULE_KIND] equal to the name of the pipeline
-      (including the prefix, which is the component's name).
-
-      Use [legacy_jobs] to include jobs that were not migrated to Cacio yet.
-      Cacio does not add them automatically for you even if they are dependencies
-      of Cacio jobs. *)
+      (including the prefix, which is the component's name). *)
   val register_scheduled_pipeline :
-    description:string ->
-    ?legacy_jobs:Tezos_ci.tezos_job list ->
-    string ->
-    (trigger * job) list ->
-    unit
+    description:string -> string -> (trigger * job) list -> unit
 
   (** {2 Releases} *)
 
@@ -362,16 +354,9 @@ module type COMPONENT_API = sig
       [tag_rex] allows to specify a custom tag regular expression.
       It is registered to be returned by {!get_release_tag_rexes}.
 
-      Not implemented for the [Shared] component.
-
-      Use [legacy_jobs] to include jobs that were not migrated to Cacio yet.
-      Cacio does not add them automatically for you even if they are dependencies
-      of Cacio jobs. *)
+      Not implemented for the [Shared] component. *)
   val register_dedicated_release_pipeline :
-    ?tag_rex:string ->
-    ?legacy_jobs:Tezos_ci.tezos_job list ->
-    (trigger * job) list ->
-    unit
+    ?tag_rex:string -> (trigger * job) list -> unit
 
   (** Register jobs to be included in the test release pipeline of the current component.
 
@@ -383,16 +368,9 @@ module type COMPONENT_API = sig
       [tag_rex] allows to specify a custom tag regular expression.
       It is registered to be returned by {!get_release_tag_rexes}.
 
-      Not implemented for the [Shared] component.
-
-      Use [legacy_jobs] to include jobs that were not migrated to Cacio yet.
-      Cacio does not add them automatically for you even if they are dependencies
-      of Cacio jobs. *)
+      Not implemented for the [Shared] component. *)
   val register_dedicated_test_release_pipeline :
-    ?tag_rex:string ->
-    ?legacy_jobs:Tezos_ci.tezos_job list ->
-    (trigger * job) list ->
-    unit
+    ?tag_rex:string -> (trigger * job) list -> unit
 
   (** Register jobs to be included in the prerelease pipeline of the current component.
 
@@ -406,10 +384,7 @@ module type COMPONENT_API = sig
 
       Not implemented for the [Shared] component. *)
   val register_dedicated_prerelease_pipeline :
-    ?tag_rex:string ->
-    ?legacy_jobs:Tezos_ci.tezos_job list ->
-    (trigger * job) list ->
-    unit
+    ?tag_rex:string -> (trigger * job) list -> unit
 
   (** Register jobs to be included in the test prerelease pipeline of the current component.
 
@@ -423,10 +398,7 @@ module type COMPONENT_API = sig
 
       Not implemented for the [Shared] component. *)
   val register_dedicated_test_prerelease_pipeline :
-    ?tag_rex:string ->
-    ?legacy_jobs:Tezos_ci.tezos_job list ->
-    (trigger * job) list ->
-    unit
+    ?tag_rex:string -> (trigger * job) list -> unit
 end
 
 (** The main functor of Cacio. *)
