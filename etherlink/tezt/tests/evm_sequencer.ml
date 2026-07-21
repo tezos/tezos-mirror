@@ -8480,29 +8480,37 @@ let test_trace_transaction_call_tracer_with_logs =
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_logger = Solidity_contracts.simple_logger evm_version in
+  (* [LoggerA.run] emits a log, calls [LoggerB] (which emits its own log and
+     returns), then emits another log. We check that the callTracer attributes
+     each log to the frame that actually emitted it: the two [LoggerA] logs to
+     the top-level frame, and the single [LoggerB] log to the nested call. *)
+  let* logger_nested = Solidity_contracts.logger_nested evm_version in
   let* () =
-    Eth_cli.add_abi ~label:simple_logger.label ~abi:simple_logger.abi ()
+    Eth_cli.add_abi ~label:logger_nested.label ~abi:logger_nested.abi ()
   in
   let* contract_address, _ =
     send_transaction_to_sequencer
       (Eth_cli.deploy
          ~source_private_key:sender.Eth_account.private_key
          ~endpoint
-         ~abi:simple_logger.label
-         ~bin:simple_logger.bin)
+         ~abi:logger_nested.label
+         ~bin:logger_nested.bin)
       sequencer
   in
   let* _ = produce_block sequencer in
-  let value = 251197 in
+  (* Three distinct values so each log is unambiguously identifiable: the first
+     and third are emitted by [LoggerA], the second (nested) by [LoggerB]. *)
+  let value_a1 = 251197 in
+  let value_b = 424242 in
+  let value_a2 = 999001 in
   let* tx_hash =
     send_transaction_to_sequencer
       (Eth_cli.contract_send
          ~source_private_key:sender.private_key
          ~endpoint
-         ~abi_label:simple_logger.label
+         ~abi_label:logger_nested.label
          ~address:contract_address
-         ~method_call:(Format.sprintf "logValue(%d)" value))
+         ~method_call:(Format.sprintf "run(%d,%d,%d)" value_a1 value_b value_a2))
       sequencer
   in
   let* _ = produce_block sequencer in
@@ -8510,23 +8518,73 @@ let test_trace_transaction_call_tracer_with_logs =
     Rpc.trace_transaction
       ~tracer:"callTracer"
       ~transaction_hash:tx_hash
-      ~tracer_config:[("withLog", `Bool true)]
+      ~tracer_config:[("withLog", `Bool true); ("onlyTopCall", `Bool false)]
       sequencer
   in
-  let logs = JSON.(trace_result |-> "logs" |> as_list) in
+  (* The emitted value is carried in the second topic; the first topic is the
+     event selector, which is irrelevant here. Log addresses are compared
+     against the frame's own ["to"] field, so we don't depend on address
+     casing. *)
+  let log_topic_value log =
+    let topics = JSON.(log |-> "topics" |> as_list) in
+    JSON.(List.nth topics 1 |> as_string)
+  in
+  let log_address log = JSON.(log |-> "address" |> as_string) in
+  let expected_topic value = add_0x @@ hex_256_of_int value in
+  (* Top-level frame: [LoggerA]. *)
+  let addr_a = JSON.(trace_result |-> "to" |> as_string) in
+  let logs_a = JSON.(trace_result |-> "logs" |> as_list) in
   Check.(
-    (List.length @@ logs = 1)
+    (List.length logs_a = 2)
       int
-      ~error_msg:"Wrong logs size, expected %R but got %L") ;
-  let log = List.hd logs in
-  let topics = JSON.(log |-> "topics" |> as_list) in
-  (* The first topic is the selector of the function which isn't relevant for the test.
-     We will match the second topic which is the value that was emitted, i.e: 251197. *)
-  let topic_value = JSON.(List.nth topics 1 |> as_string) in
+      ~error_msg:"Wrong number of logs on the LoggerA frame, expected %R got %L") ;
+  (* Nested frame: the single call to [LoggerB]. *)
+  let calls = JSON.(trace_result |-> "calls" |> as_list) in
   Check.(
-    (topic_value = add_0x @@ hex_256_of_int value)
+    (List.length calls = 1)
+      int
+      ~error_msg:"Wrong number of nested calls, expected %R but got %L") ;
+  let call_b = List.hd calls in
+  let addr_b = JSON.(call_b |-> "to" |> as_string) in
+  let logs_b = JSON.(call_b |-> "logs" |> as_list) in
+  Check.(
+    (List.length logs_b = 1)
+      int
+      ~error_msg:"Wrong number of logs on the LoggerB frame, expected %R got %L") ;
+  Check.(
+    (String.lowercase_ascii addr_a <> String.lowercase_ascii addr_b)
       string
-      ~error_msg:"Wrong topic value, expected %R but got %L") ;
+      ~error_msg:"LoggerA and LoggerB should live at distinct addresses") ;
+  (* Attribution: both LoggerA logs belong to the top frame, in emission
+     order (value_a1 then value_a2), each with LoggerA's address. *)
+  let log_a1 = List.nth logs_a 0 and log_a2 = List.nth logs_a 1 in
+  Check.(
+    (log_topic_value log_a1 = expected_topic value_a1)
+      string
+      ~error_msg:"Wrong first LoggerA log value, expected %R but got %L") ;
+  Check.(
+    (log_topic_value log_a2 = expected_topic value_a2)
+      string
+      ~error_msg:"Wrong second LoggerA log value, expected %R but got %L") ;
+  List.iter
+    (fun log ->
+      Check.(
+        (String.lowercase_ascii (log_address log)
+        = String.lowercase_ascii addr_a)
+          string
+          ~error_msg:"LoggerA log misattributed, expected address %R but got %L"))
+    logs_a ;
+  (* Attribution: the single LoggerB log belongs to the nested frame, with
+     LoggerB's address. *)
+  let log_b = List.hd logs_b in
+  Check.(
+    (log_topic_value log_b = expected_topic value_b)
+      string
+      ~error_msg:"Wrong LoggerB log value, expected %R but got %L") ;
+  Check.(
+    (String.lowercase_ascii (log_address log_b) = String.lowercase_ascii addr_b)
+      string
+      ~error_msg:"LoggerB log misattributed, expected address %R but got %L") ;
   unit
 
 let test_trace_transaction_call_trace_certain_depth =

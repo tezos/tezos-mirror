@@ -251,9 +251,6 @@ impl CallTracer {
         }
 
         if let Some(mut call_trace) = self.call_trace.remove(&depth) {
-            if self.config.with_logs {
-                call_trace.add_logs(Some(context.journal_mut().take_logs()));
-            }
             call_trace.add_gas_used(gas_spent + self.initial_gas);
             call_trace.add_output(Some(output.to_vec()));
             call_trace.add_error_from_instruction_result(instruction_result);
@@ -425,5 +422,24 @@ where
             outcome.output(),
             outcome.instruction_result(),
         );
+    }
+
+    fn log(&mut self, context: &mut CTX, log: Log) {
+        if !self.config.with_logs {
+            return;
+        }
+
+        let depth = context.journal().depth() as u16;
+        // NB: `depth` is the journal depth *while a frame is executing*, i.e. the depth of the
+        // frame that emitted the LOG opcode.
+        //
+        // That frame's CallTrace was inserted (in `call`/`create`) keyed by the depth reported when
+        // the frame was *entered*, which is one less. So we subtract 1 to map the log back onto its
+        // enclosing call's trace.
+        if let Some(key) = depth.checked_sub(1) {
+            if let Some(t) = self.call_trace.get_mut(&key) {
+                t.logs.get_or_insert_with(Vec::new).push(log);
+            }
+        }
     }
 }
