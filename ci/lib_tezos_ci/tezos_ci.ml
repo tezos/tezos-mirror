@@ -1199,9 +1199,16 @@ module Base_images = struct
   let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
 
   (* Version tag shared by all base images below (built together by the
-     [base_images.daily] pipeline). Current version created by
-     https://gitlab.com/tezos/tezos/-/pipelines/2791229003 (commit 18884dda). *)
-  let base_images_tag = "master-18884dda"
+     [base_images.daily] pipeline). Its value lives in [ci/ci_version.sh] and
+     is read from the [base_images_tag] environment variable, which the CI
+     build sources before running the generator (see [ci/makefile]). *)
+  let base_images_tag =
+    match Sys.getenv_opt "base_images_tag" with
+    | Some tag when tag <> "" -> tag
+    | None | Some _ ->
+        failwith
+          "environment variable base_images_tag is unset or empty; source \
+           ci/ci_version.sh before running the CI generator"
 
   let make_img distro =
     Image.mk_external
