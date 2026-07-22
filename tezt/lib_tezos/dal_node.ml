@@ -554,32 +554,62 @@ let point_str node =
   let addr, port = point node in
   addr ^ ":" ^ port
 
+let last_processed_level_file_layout ~root_dir () =
+  let filepath = Filename.concat root_dir "last_processed_level" in
+  Tezos_stdlib_unix.Key_value_store.layout
+    ~encoding:Data_encoding.int32
+    ~filepath
+    ~eq:Stdlib.( = )
+    ~index_of:(fun () -> 0)
+    ~number_of_keys_per_file:1
+    ()
+
 let load_last_finalized_processed_level dal_node =
   let open Tezos_stdlib_unix in
   let aux () =
     let open Lwt_result.Syntax in
     let open Lwt_result in
-    let last_processed_level_filename = "last_processed_level" in
     let root_dir = sf "%s/store" (data_dir dal_node) in
     let* kvs =
       Key_value_store.Internal_for_tests.init ~lru_size:1 ~root_dir ()
     in
-    let file_layout ~root_dir () =
-      let filepath = Filename.concat root_dir last_processed_level_filename in
-      Key_value_store.layout
-        ~encoding:Data_encoding.int32
-        ~filepath
-        ~eq:Stdlib.( = )
-        ~index_of:(fun () -> 0)
-        ~number_of_keys_per_file:1
-        ()
+    let* value_res =
+      Key_value_store.read_value kvs last_processed_level_file_layout () ()
     in
-    let* value_res = Key_value_store.read_value kvs file_layout () () in
     let* () = Key_value_store.close kvs in
     Int32.to_int value_res |> return
   in
   let* v_res = aux () in
   match v_res with Ok v -> Lwt.return_some v | Error _ -> Lwt.return_none
+
+let save_last_finalized_processed_level dal_node ~level =
+  let open Tezos_stdlib_unix in
+  let aux () =
+    let open Lwt_result.Syntax in
+    let root_dir = sf "%s/store" (data_dir dal_node) in
+    let* kvs =
+      Key_value_store.Internal_for_tests.init ~lru_size:1 ~root_dir ()
+    in
+    let* () =
+      Key_value_store.write_value
+        ~override:true
+        kvs
+        last_processed_level_file_layout
+        ()
+        ()
+        (Int32.of_int level)
+    in
+    Key_value_store.close kvs
+  in
+  let* v_res = aux () in
+  match v_res with
+  | Ok () -> Lwt.return_unit
+  | Error err ->
+      Test.fail
+        "Could not write last_processed_level in the store of %s: %s"
+        (name dal_node)
+        (Tezos_error_monad.Error_monad.pp_print_trace Format.str_formatter err ;
+         Format.flush_str_formatter ())
 
 let debug_print_store_schemas ?path ?hooks () =
   let args =

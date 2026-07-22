@@ -954,15 +954,17 @@ module Statuses = struct
     match slot_cell with
     | None -> return_none
     | Some (cell, attestation_lag) ->
+        let attested_level =
+          Int32.(add slot_id.slot_level (of_int attestation_lag))
+        in
         let*? (module Plugin : Dal_plugin.T) =
-          let level = Int32.(add slot_id.slot_level (of_int attestation_lag)) in
-          Node_context.get_plugin_for_level ctxt ~level
+          Node_context.get_plugin_for_level ctxt ~level:attested_level
         in
         Dal_proto_types.Skip_list_cell.to_proto
           Plugin.Skip_list.cell_encoding
           cell
         |> Plugin.Skip_list.proto_attestation_status
-        |> Option.map (fun s -> (s :> Types.header_status))
+        |> Option.map (fun s -> ((s :> Types.header_status), attested_level))
         |> return
 
   let find_status ctxt (slot_id : Types.slot_id) =
@@ -974,7 +976,7 @@ module Statuses = struct
     | None -> (
         let*! status = get_status_from_skip_list ctxt slot_id in
         match status with
-        | Ok (Some res) -> return res
+        | Ok (Some (res, _attested_level)) -> return res
         | Ok None -> fail `Not_found
         | Error e -> fail (`Other e))
 end
@@ -984,6 +986,9 @@ let update_slot_header_status node_store slot_id status =
   Store.Statuses_cache.update_slot_header_status statuses_cache slot_id status
 
 let get_slot_status ~slot_id ctxt = Statuses.find_status ctxt slot_id
+
+let get_slot_status_from_skip_list ~slot_id ctxt =
+  Statuses.get_status_from_skip_list ctxt slot_id
 
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   Store.Shards.read (Store.shards store) slot_id shard_index
