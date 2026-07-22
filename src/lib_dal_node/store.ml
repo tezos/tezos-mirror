@@ -707,9 +707,20 @@ module Traps = struct
   type payload =
     Signature.Public_key_hash.t * Cryptobox.share * Cryptobox.shard_proof
 
-  type t = payload Shard_index_map.t Slot_index_map.t Level_map.t
+  type map = payload Shard_index_map.t Slot_index_map.t Level_map.t
 
-  let create ~capacity = Level_map.create capacity
+  (* [Level_map] is an [Aches.Vache] map, which is not domain-safe. This store
+     is accessed concurrently from several OCaml 5 domains (the batch
+     validation writers, the single-message writer, and the accuser reader).
+     We therefore guard every access to [map] with a stdlib [Mutex.t]
+     (not [Eio.Mutex], since the batch path runs under Eio and forbids Lwt
+     while the accuser is Lwt-side; a stdlib mutex is taken correctly from both
+     and across domains). The critical section is tiny (an immutable [Map]
+     rebuild) and traps are rare, so contention is negligible. *)
+  type t = {map : map; mutex : Mutex.t}
+
+  let create ~capacity =
+    {map = Level_map.create capacity; mutex = Mutex.create ()}
 
   let add_slot_index t ~slot_index ~shard_index ~delegate ~share ~shard_proof =
     let shard_index_map_opt = Slot_index_map.find_opt slot_index t in
@@ -726,7 +737,8 @@ module Traps = struct
 
   let add t ~slot_id ~shard_index ~delegate ~share ~shard_proof =
     let Types.Slot_id.{slot_level; slot_index} = slot_id in
-    let slot_index_map_opt = Level_map.find_opt t slot_level in
+    Mutex.protect t.mutex @@ fun () ->
+    let slot_index_map_opt = Level_map.find_opt t.map slot_level in
     let slot_index_map =
       Option.value ~default:Slot_index_map.empty slot_index_map_opt
     in
@@ -739,10 +751,23 @@ module Traps = struct
         ~share
         ~shard_proof
     in
-    Level_map.replace t slot_level new_slot_index_map
+    Level_map.replace t.map slot_level new_slot_index_map
+
+  (* Builds a fresh cache of the given [capacity] holding a copy of the current
+     entries of [t]. The read of [t.map] is guarded by [t.mutex]; the returned
+     cache is brand new and thus not yet shared, so it gets its own mutex. *)
+  let resize t ~capacity =
+    Mutex.protect t.mutex @@ fun () ->
+    let new_map = Level_map.create capacity in
+    Level_map.fold
+      (fun level slots () -> Level_map.replace new_map level slots)
+      t.map
+      () ;
+    {map = new_map; mutex = Mutex.create ()}
 
   let find t ~level =
-    match Level_map.find_opt t level with
+    Mutex.protect t.mutex @@ fun () ->
+    match Level_map.find_opt t.map level with
     | None -> []
     | Some m ->
         Slot_index_map.fold
@@ -1009,12 +1034,7 @@ let resize_caches t proto_parameters =
         ~attestation_lag
         ~traps_fraction
     in
-    let cache = Traps.create ~capacity in
-    Traps.Level_map.fold
-      (fun level slots () -> Traps.Level_map.replace cache level slots)
-      t.traps
-      () ;
-    cache
+    Traps.resize t.traps ~capacity
   in
   t.statuses_cache <- new_statuses_cache ;
   t.finalized_commitments <- new_finalized_commitments ;
