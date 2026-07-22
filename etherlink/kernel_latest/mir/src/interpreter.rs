@@ -1099,7 +1099,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::MapOptionAfter => {
                 let stk = active_stack_mut(stacks)?;
                 let result = pop_value(stk)?;
-                stk.push(TypedValue::new_option(Some(TypedValue::unwrap_rc(result))));
+                stk.push(TypedValue::new_option_rc(Some(result)));
             }
             InterpFrame::MapMapAccum {
                 body,
@@ -5185,6 +5185,24 @@ mod interpreter_tests {
         assert!(
             allocated < SIZE as u64,
             "VIEW input deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn map_option_forwards_shared_result_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(V::new_option_rc(Some(Rc::clone(&operand)))); // option holding a leaf shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(&[Map(overloads::Map::Option, vec![])], &mut ctx, &mut stack).unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "MAP over option deep-copied its {SIZE}-byte shared operand \
              ({allocated} bytes allocated); it must forward it behind its Rc.",
         );
     }
