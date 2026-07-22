@@ -43,3 +43,7 @@ let image distro =
 let main_image = function
   | Debian -> image (debian "trixie")
   | Ubuntu -> image (ubuntu 24 04)
+
+let supported_releases = function
+  | Debian -> ["bookworm"; "trixie"]
+  | Ubuntu -> ["22.04"; "24.04"; "26.04"]

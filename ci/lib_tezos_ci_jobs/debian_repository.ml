@@ -37,12 +37,9 @@ module CI = Cacio.Shared
    - Full: we run the complete test matrix *)
 type repository_pipeline = Full | Partial | Release
 
-let supported_releases (distro : Distro.name) pipeline_type =
-  match (distro, pipeline_type) with
-  | Debian, Partial -> ["trixie"]
-  | Debian, (Full | Release) -> ["bookworm"; "trixie"]
-  | Ubuntu, Partial -> ["22.04"]
-  | Ubuntu, (Full | Release) -> ["22.04"; "24.04"; "26.04"]
+let supported_releases (distro : Distro.name) = function
+  | Full | Release -> Distro.supported_releases distro
+  | Partial -> ( match distro with Debian -> ["trixie"] | Ubuntu -> ["22.04"])
 
 (** Return a tuple (ARCHITECTURES, <archs>) based on the type
     of repository pipeline. *)

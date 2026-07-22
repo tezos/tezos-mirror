@@ -166,11 +166,7 @@ module Files = struct
     ]
 end
 
-let releases = function
-  | Distro.Debian -> ["bookworm"; "trixie"]
-  | Distro.Ubuntu -> ["22.04"; "24.04"; "26.04"]
-
-let release_matrix distro = [("RELEASE", releases distro)]
+let release_matrix distro = [("RELEASE", Distro.supported_releases distro)]
 
 let dockerfile = function
   | Distro.Debian | Ubuntu -> "images/base-images/Dockerfile.debian"
