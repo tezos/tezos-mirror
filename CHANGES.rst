@@ -74,5 +74,10 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- Fixed a DAL node crash that could occur after a restart with a persisted
+  store: the startup status backfill could leave a slot's status inconsistent
+  with the skip-list store, tearing down the node's daemon (gossipsub, P2P and
+  RPC) while the process stayed alive. (MR :gl:`!22469`)
+
 Miscellaneous
 -------------
