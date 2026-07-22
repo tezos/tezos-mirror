@@ -136,6 +136,15 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- Fixed an issue where the attester branch of the shard reception callback
+  could issue L1 committee RPCs for message levels far beyond the current
+  head. The fetch is now skipped when the committee level exceeds
+  ``head_level + attestation_lag + validation_slack``. Additionally, the
+  application callback in the P2P receive loop is now spawned
+  asynchronously, so a slow callback on one peer connection no longer
+  delays shard ingestion from other peers.
+  (MR :gl:`!22542`)
+
 - Decoupled the storage lifetimes of slot payloads and shards. Shards are now
   always retained for a single, profile-independent period (about 150 levels);
   slot payloads of slot indices in the node's operator profile are retained
