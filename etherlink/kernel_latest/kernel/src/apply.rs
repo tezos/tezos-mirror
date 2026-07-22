@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
-use evm_inspectors::{get_tracer_configuration, Tracer, TracerInput};
+use evm_inspectors::{get_tracer_configuration, TracerInput};
 use primitive_types::{H160, U256};
 use revm::primitives::alloy_primitives::IntoLogData;
 use revm::primitives::hardfork::SpecId;
@@ -581,7 +581,6 @@ pub fn revm_run_transaction<Host>(
     maximum_gas_per_transaction: u64,
     authorization_list: Option<AuthorizationList>,
     spec_id: &SpecId,
-    tracer: Option<&mut Tracer>,
     is_simulation: bool,
     origin: revm_etherlink::TransactionOrigin,
 ) -> Result<ExecutionOutcome, Error>
@@ -626,7 +625,6 @@ where
         gas_data,
         revm::primitives::U256::from_le_slice(&bytes),
         authorization_list.map(signed_authorization),
-        tracer,
         is_simulation,
         origin,
     )
@@ -717,7 +715,7 @@ where
         block_constants.number.low_u64(),
     );
 
-    let (mut journal, mut tracer) = journal::prepare_tezosx_journal(
+    let mut journal = journal::prepare_tezosx_journal(
         crac_id,
         &operation_hash,
         block_constants,
@@ -743,7 +741,6 @@ where
         limits.maximum_gas_limit,
         transaction.authorization_list.clone(),
         spec_id,
-        tracer.as_mut(),
         false,
         TransactionOrigin::UserInput {
             access_list: revm_etherlink::helpers::legacy::access_list_to_revm(
@@ -843,7 +840,7 @@ where
     // Seed the journal with the deposit's own transaction hash so any
     // origination nonce stays deterministic and unique even though the
     // kernel-managed XTZ bridge does not NAC into Michelson today.
-    let (mut journal, mut tracer) = journal::prepare_tezosx_journal(
+    let mut journal = journal::prepare_tezosx_journal(
         CracId::mock(RuntimeId::Ethereum),
         &tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
         &block_constants,
@@ -869,7 +866,6 @@ where
         maximum_gas_limit,
         None,
         spec_id,
-        tracer.as_mut(),
         false,
         TransactionOrigin::UserInput {
             access_list: revm::context::transaction::AccessList::default(),
@@ -987,7 +983,7 @@ where
     // Seed the journal with the deposit's own transaction hash so any
     // origination nonce stays deterministic and unique even though the
     // kernel-managed FA bridge does not NAC into Michelson today.
-    let (mut journal, mut tracer) = journal::prepare_tezosx_journal(
+    let mut journal = journal::prepare_tezosx_journal(
         CracId::mock(RuntimeId::Ethereum),
         &tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
         &block_constants,
@@ -1013,7 +1009,6 @@ where
         maximum_gas_limit,
         None,
         spec_id,
-        tracer.as_mut(),
         false,
         TransactionOrigin::UserInput {
             access_list: revm::context::transaction::AccessList::default(),

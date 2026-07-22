@@ -151,7 +151,6 @@ impl EthereumRuntime {
             gas_data,
             AlloyU256::ZERO, // no value transfer
             None,            // no authorization list
-            None,            // no tracer
             false,           // not a simulation
             TransactionOrigin::CrossRuntime { credit: None },
         )
@@ -479,7 +478,6 @@ where
         gas_data,
         hdrs.amount,
         None,
-        None,
         // Disable EIP-3607 (via `is_simulation = true`): an inbound CRAC
         // caller is not a user-signed EVM transaction but a trusted,
         // gateway-supplied address. A same-runtime EVM-to-EVM round-trip
@@ -587,7 +585,6 @@ where
         call_data,
         gas_data,
         revm::primitives::U256::ZERO,
-        None,
         None,
         // `is_simulation = true` disables EIP-3607 so a contract-aliased
         // caller (e.g. a Michelson contract's deterministic EVM alias,
