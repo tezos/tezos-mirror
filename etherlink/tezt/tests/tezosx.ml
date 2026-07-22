@@ -2213,6 +2213,113 @@ let test_nested_crac () =
       ~error_msg:"Expected storage %R but got %L") ;
   unit
 
+(* This test exercises EVM storage preservation across a nested cross-runtime
+   round-trip, for both transient (Cancun's EIP-1153) and regular (persistent)
+   storage:
+     EVM (SC1.start: TSTORE + SSTORE) -> Michelson (%run)
+       -> EVM (SC1.run: TLOAD + SLOAD).
+   [SC1] writes a magic value to a transient slot and another to a regular
+   slot, issues an EVM->Michelson CRAC, and the Michelson contract calls back
+   into [SC1.run], which reads both slots and persists what it observed. If the
+   storage is preserved across the boundary, the re-entered EVM frame observes
+   both magic values; otherwise it observes 0. *)
+let test_transient_storage_nested_crac () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:
+      "EVM transient and regular storage preserved across nested cross-runtime \
+       CRAC"
+    ~tags:["cross_runtime"; "transient_storage"; "storage"; "nested"; "cancun"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  let source = Constant.bootstrap5 in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  (* Step 1: Deploy [SC1], which stashes a transient value and a regular value
+     then bounces through Michelson back into itself. TSTORE/TLOAD require an
+     EVM version >= Cancun. *)
+  let* sc1_contract =
+    Solidity_contracts.storage_crac
+      (Evm_version.max
+         (Kernel.select_evm_version Kernel.Latest)
+         Evm_version.Cancun)
+  in
+  let bytecode = Tezt.Base.read_file sc1_contract.bin in
+  let* sc1_address =
+    deploy_evm_contract
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:0
+      ~init_code:("0x" ^ bytecode)
+      ()
+  in
+  (* Sanity: the [observedTransient] (slot 0) and [observedRegular] (slot 1)
+     slots start at 0, so a non-zero value after the round-trip is
+     meaningful. *)
+  let zero = "0x" ^ String.make 64 '0' in
+  let*@ observed_transient_before =
+    Rpc.get_storage_at ~address:sc1_address ~pos:"0x0" sandbox
+  in
+  let*@ observed_regular_before =
+    Rpc.get_storage_at ~address:sc1_address ~pos:"0x1" sandbox
+  in
+  Check.(
+    (observed_transient_before = zero)
+      string
+      ~error_msg:"Sanity: expected fresh EVM slot 0 = %R before start, got %L") ;
+  Check.(
+    (observed_regular_before = zero)
+      string
+      ~error_msg:"Sanity: expected fresh EVM slot 1 = %R before start, got %L") ;
+  (* Step 2: Originate the Michelson middle hop. Its [%run] entrypoint issues a
+     state-mutating CRAC back to [http://ethereum/<sc1>] invoking [run()]
+     (selector 0xc0406226). Storage: Pair count destination. *)
+  let* kt1_address =
+    sandbox_originate_michelson_contract
+      ~source
+      ~script_name:["mini_scenarios"; "cross_runtime_http_call_evm"]
+      ~init_storage_data:(sf {|Pair 0 "%s"|} sc1_address)
+      sandbox
+  in
+  (* Step 3: Kick off the round-trip with an EVM transaction to [SC1.start],
+     passing the Michelson KT1 as the callback destination. *)
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:1
+      ~value:Wei.zero
+      ~address:sc1_address
+      ~abi_signature:"start(string)"
+      ~arguments:[kt1_address]
+      ~gas:5_000_000
+      ()
+  in
+  (* Step 4: [run] persisted both the transient value (slot 0) and the regular
+     value (slot 1) it observed after the EVM->Michelson->EVM round-trip. The
+     transient one must equal 0xdeadbeef and the regular one 0xcafebabe; a 0
+     would mean the corresponding slot was not preserved when the same EVM
+     contract was re-entered through the Michelson runtime. *)
+  let expected_transient = "0x" ^ String.make 56 '0' ^ "deadbeef" in
+  let expected_regular = "0x" ^ String.make 56 '0' ^ "cafebabe" in
+  let*@ observed_transient_after =
+    Rpc.get_storage_at ~address:sc1_address ~pos:"0x0" sandbox
+  in
+  let*@ observed_regular_after =
+    Rpc.get_storage_at ~address:sc1_address ~pos:"0x1" sandbox
+  in
+  Check.(
+    (observed_transient_after = expected_transient)
+      string
+      ~error_msg:
+        "Expected EVM transient value %R observed in the re-entered frame, got \
+         %L") ;
+  Check.(
+    (observed_regular_after = expected_regular)
+      string
+      ~error_msg:
+        "Expected EVM regular value %R observed in the re-entered frame, got %L") ;
+  unit
+
 let test_cross_runtime_call_executes_evm_bytecode () =
   Setup.register_sandbox_test
     ~uses_client:true
@@ -7522,6 +7629,7 @@ let () =
   test_state_root_blueprint_uniqueness ~runtime:Tezos () ;
   test_state_root_pure_michelson_divergence () ;
   test_nested_crac () ;
+  test_transient_storage_nested_crac () ;
   test_call_from_evm_to_michelson ~runtime:Tezos () ;
   test_call_from_michelson_to_evm ~runtime:Tezos () ;
   test_tezosx_simulation () ;

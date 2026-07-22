@@ -266,6 +266,13 @@ let transient_storage_multiplier =
     ~label:"transient_storage_multiplier"
     ~contract:"TransientStorageMultiplier"
 
+(** The info for the "storage_crac.sol" contract. *)
+let storage_crac =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/storage_crac.sol")
+    ~label:"storage_crac"
+    ~contract:"StorageCrac"
+
 (** The info for the "recursive.sol" contract. *)
 let recursive =
   compile_contract
