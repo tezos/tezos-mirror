@@ -80,6 +80,11 @@ pub struct CallTrace {
     logs: Option<Vec<Log>>,
     /// `depth` is helpful to reconstruct the tree of call on the EVM node's side.
     depth: u16,
+    /// Intrinsic gas of the transaction this frame belongs to, captured when
+    /// the frame opens (an inner cross-runtime leg has its own TxEnv, so a
+    /// tracer-global value would be overwritten mid-crossing). Added to
+    /// `gas_used` at close; not part of the encoded trace.
+    initial_gas: u64,
 }
 
 impl Encodable for CallTrace {
@@ -135,6 +140,7 @@ impl CallTrace {
             error: None,
             logs: None,
             depth,
+            initial_gas: 0,
         }
     }
 
@@ -198,7 +204,6 @@ pub struct CallTracer {
     /// deferred to flush time so the buffer remains readable.
     pending_traces: Vec<CallTrace>,
     pub(crate) transaction_hash: Option<B256>,
-    initial_gas: u64,
     spec_id: SpecId,
 }
 
@@ -213,16 +218,15 @@ impl CallTracer {
             call_trace: Vec::with_capacity(1),
             pending_traces: Vec::new(),
             transaction_hash,
-            initial_gas: 0,
             spec_id,
         }
     }
 
     #[inline]
-    fn set_initial_gas(&mut self, tx: impl Transaction) {
+    fn initial_gas(&self, tx: impl Transaction) -> u64 {
         let InitialAndFloorGas { initial_gas, .. } =
             calculate_initial_tx_gas_for_tx(tx, self.spec_id);
-        self.initial_gas = initial_gas;
+        initial_gas
     }
 
     fn end_transaction_layer<CTX>(
@@ -239,7 +243,8 @@ impl CallTracer {
             // In `only_top_call` mode nested frames are still pushed to keep
             // the stack in sync, but only the top-level frame is reported.
             if !(self.config.only_top_call && call_trace.depth > 0) {
-                call_trace.add_gas_used(gas_spent + self.initial_gas);
+                let initial_gas = call_trace.initial_gas;
+                call_trace.add_gas_used(gas_spent + initial_gas);
                 call_trace.add_output(Some(output.to_vec()));
                 call_trace.add_error_from_instruction_result(instruction_result);
 
@@ -278,7 +283,7 @@ where
         // is pushed.
         let depth = self.call_trace.len() as u16;
 
-        self.set_initial_gas(context.tx());
+        let initial_gas = self.initial_gas(context.tx());
 
         let (type_, from) = match inputs.scheme {
             CallScheme::Call => ("CALL", inputs.caller),
@@ -297,8 +302,9 @@ where
             depth,
         );
 
+        call_trace.initial_gas = initial_gas;
         call_trace.add_to(Some(inputs.bytecode_address));
-        call_trace.add_gas(Some(inputs.gas_limit + self.initial_gas));
+        call_trace.add_gas(Some(inputs.gas_limit + initial_gas));
 
         self.call_trace.push(call_trace);
 
@@ -324,7 +330,7 @@ where
         // is pushed.
         let depth = self.call_trace.len() as u16;
 
-        self.set_initial_gas(context.tx());
+        let initial_gas = self.initial_gas(context.tx());
 
         let (type_, from) = match inputs.scheme() {
             CreateScheme::Create => ("CREATE", inputs.caller()),
@@ -341,7 +347,8 @@ where
             depth,
         );
 
-        call_trace.add_gas(Some(inputs.gas_limit() + self.initial_gas));
+        call_trace.initial_gas = initial_gas;
+        call_trace.add_gas(Some(inputs.gas_limit() + initial_gas));
 
         self.call_trace.push(call_trace);
 
