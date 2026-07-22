@@ -125,6 +125,17 @@ val commitment_info_from_json : JSON.t -> commitment_info
     stored by the rollup node.  *)
 val get_global_last_stored_commitment : unit -> commitment_and_hash RPC_core.t
 
+type lcc_with_commitment = {
+  hash : string;
+  level : int;
+  commitment : RPC.smart_rollup_commitment option;
+}
+
+(** RPC: [GET global/last_cemented_commitment] gets the hash and level of the
+    last cemented commitment known to the rollup node, together with its
+    content when it is available in the node's storage. *)
+val get_global_last_cemented_commitment : unit -> lcc_with_commitment RPC_core.t
+
 (** RPC: [GET local/last_published_commitment] gets the last commitment published by the
     rollup node, with its hash and level when the commitment was first published
     and the level it was included. *)

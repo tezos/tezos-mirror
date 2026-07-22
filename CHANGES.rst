@@ -102,6 +102,13 @@ Smart Rollup node
   cementation when the ``operating`` and ``cementing`` purposes share the same
   key. (MR :gl:`!22414`)
 
+- **Breaking change** The RPC ``GET /global/last_cemented_commitment`` now
+  always returns the last cemented commitment ``commitment_hash`` and
+  ``level`` known from L1, with the commitment content in an optional
+  ``commitment`` field, instead of returning ``null`` when the content is
+  not available in the node's storage (e.g. after a snapshot import in
+  full mode). (MR :gl:`!22415`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

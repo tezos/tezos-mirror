@@ -241,8 +241,11 @@ module Encodings = struct
       (opt "first_published_at_level" int32)
       (opt "published_at_level" int32)
 
-  let lcc =
-    obj2 (req "commitment_hash" Commitment.Hash.encoding) (req "level" int32)
+  let lcc_with_commitment =
+    obj3
+      (req "commitment_hash" Commitment.Hash.encoding)
+      (req "level" int32)
+      (opt "commitment" Commitment.encoding)
 
   let outbox =
     obj2
@@ -1005,9 +1008,11 @@ module Global = struct
 
   let last_cemented_commitment =
     Tezos_rpc.Service.get_service
-      ~description:"Last commitment computed by the node"
+      ~description:
+        "Last cemented commitment known to the rollup node, with its content \
+         when available in the node's storage"
       ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.option Encodings.commitment_with_hash)
+      ~output:Encodings.lcc_with_commitment
       (path / "last_cemented_commitment")
 
   let global_block_watcher =

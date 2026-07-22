@@ -284,7 +284,7 @@ let () =
   let open Lwt_result_syntax in
   let lcc = Reference.get node_ctxt.lcc in
   let+ commitment = Node_context.find_commitment node_ctxt lcc.commitment in
-  Option.map (fun c -> (c, lcc.commitment)) commitment
+  (lcc.commitment, lcc.level, commitment)
 
 (* Sets up a block watching service. It creates a stream to
    observe block events and asynchronously fetches the next

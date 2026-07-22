@@ -195,6 +195,23 @@ let commitment_info_from_json json =
 let get_global_last_stored_commitment () =
   make GET ["global"; "last_stored_commitment"] commitment_with_hash_from_json
 
+type lcc_with_commitment = {
+  hash : string;
+  level : int;
+  commitment : RPC.smart_rollup_commitment option;
+}
+
+let get_global_last_cemented_commitment () =
+  make GET ["global"; "last_cemented_commitment"] (fun json ->
+      JSON.
+        {
+          hash = json |-> "commitment_hash" |> as_string;
+          level = json |-> "level" |> as_int;
+          commitment =
+            json |-> "commitment" |> as_opt
+            |> Option.map RPC.smart_rollup_commitment_from_json;
+        })
+
 let get_local_last_published_commitment () =
   make GET ["local"; "last_published_commitment"] commitment_info_from_json
 
