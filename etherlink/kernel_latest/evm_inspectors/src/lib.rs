@@ -83,6 +83,170 @@ impl Tracer {
     }
 }
 
+/// Access to the [`Tracer`] owned by a journal, for [`TracerInspector`].
+///
+/// [`Self::take_tracer`] and [`Self::restore_tracer`] come as a pair: a
+/// caller detaching the tracer is expected to re-attach it once done.
+pub trait TracerContainer {
+    /// Detach the journal's tracer, if any.
+    fn take_tracer(&mut self) -> Option<Box<Tracer>>;
+
+    /// Re-attach a tracer detached with [`Self::take_tracer`].
+    fn restore_tracer(&mut self, tracer: Option<Box<Tracer>>);
+}
+
+/// Stateless [`Inspector`] adapter for a journal-owned [`Tracer`].
+///
+/// The tracer must be reachable from the journal so it can follow a
+/// transaction across execution contexts: a cross-runtime call spawns a
+/// fresh EVM context which only receives the journal. Rather than sharing
+/// the tracer between the journal and the inspector slot of the `Evm`
+/// context, the journal is the tracer's single owner and this zero-sized
+/// handle fills the inspector slot. Every hook briefly takes the tracer out
+/// of the journal — through the `&mut CTX` the hook already receives — runs
+/// it, and puts it back. Detaching the tracer while it runs keeps unique
+/// borrows sound: the tracer's own hooks receive the full `&mut CTX` and
+/// must not be able to reach themselves through it.
+///
+/// See [`TracerInspector::selfdestruct`] for the one hook this handle
+/// cannot route to the journal-owned tracer.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TracerInspector;
+
+impl TracerInspector {
+    fn with_tracer<CTX, F>(&mut self, context: &mut CTX, f: F)
+    where
+        CTX: ContextTr<Db: HasHost<H: StorageV1>, Journal: TracerContainer>,
+        F: FnOnce(&mut Tracer, &mut CTX),
+    {
+        let Some(mut tracer) = context.journal_mut().take_tracer() else {
+            return;
+        };
+        f(&mut tracer, context);
+        context.journal_mut().restore_tracer(Some(tracer));
+    }
+
+    fn bind_tracer<CTX, T, F>(&mut self, context: &mut CTX, f: F) -> Option<T>
+    where
+        CTX: ContextTr<Db: HasHost<H: StorageV1>, Journal: TracerContainer>,
+        F: FnOnce(&mut Tracer, &mut CTX) -> Option<T>,
+    {
+        let mut tracer = context.journal_mut().take_tracer()?;
+        let outcome = f(&mut tracer, context);
+        context.journal_mut().restore_tracer(Some(tracer));
+        outcome
+    }
+}
+
+macro_rules! dispatch {
+    ($method:ident, $tracer:expr, $($arg:expr),* $(,)?) => {
+        match &mut *$tracer {
+            Tracer::CallTracer(t) => {
+                <CallTracer as Inspector<CTX, INTR>>::$method(t, $($arg),*)
+            }
+            Tracer::StructLogger(t) => {
+                <StructLogger as Inspector<CTX, INTR>>::$method(t, $($arg),*)
+            }
+        }
+    };
+}
+
+impl<CTX, INTR> Inspector<CTX, INTR> for TracerInspector
+where
+    CTX: ContextTr<Db: HasHost<H: StorageV1>, Journal: TracerContainer>,
+    INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl>,
+{
+    fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
+        self.with_tracer(context, |tracer, context| {
+            dispatch!(initialize_interp, tracer, interp, context)
+        });
+    }
+
+    fn step(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
+        self.with_tracer(context, |tracer, context| {
+            dispatch!(step, tracer, interp, context)
+        });
+    }
+
+    fn step_end(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
+        self.with_tracer(context, |tracer, context| {
+            dispatch!(step_end, tracer, interp, context)
+        });
+    }
+
+    fn call(
+        &mut self,
+        context: &mut CTX,
+        inputs: &mut CallInputs,
+    ) -> Option<CallOutcome> {
+        self.bind_tracer(context, |tracer, context| {
+            dispatch!(call, tracer, context, inputs)
+        })
+    }
+
+    fn call_end(
+        &mut self,
+        context: &mut CTX,
+        inputs: &CallInputs,
+        outcome: &mut CallOutcome,
+    ) {
+        self.with_tracer(context, |tracer, context| {
+            dispatch!(call_end, tracer, context, inputs, outcome)
+        });
+    }
+
+    fn create(
+        &mut self,
+        context: &mut CTX,
+        inputs: &mut CreateInputs,
+    ) -> Option<CreateOutcome> {
+        self.bind_tracer(context, |tracer, context| {
+            dispatch!(create, tracer, context, inputs)
+        })
+    }
+
+    fn create_end(
+        &mut self,
+        context: &mut CTX,
+        inputs: &CreateInputs,
+        outcome: &mut CreateOutcome,
+    ) {
+        self.with_tracer(context, |tracer, context| {
+            dispatch!(create_end, tracer, context, inputs, outcome)
+        });
+    }
+
+    #[inline]
+    fn log(&mut self, context: &mut CTX, log: Log) {
+        self.with_tracer(context, |tracer, context| {
+            dispatch!(log, tracer, context, log)
+        });
+    }
+
+    fn log_full(
+        &mut self,
+        interpreter: &mut Interpreter<INTR>,
+        context: &mut CTX,
+        log: Log,
+    ) {
+        self.with_tracer(context, |tracer, context| {
+            dispatch!(log_full, tracer, interpreter, context, log)
+        });
+    }
+
+    /// Deliberately a no-op.
+    ///
+    /// `selfdestruct` is the only [`Inspector`] hook without a context
+    /// parameter, so the journal-owned tracer cannot be reached from here.
+    /// This is only sound because neither supported tracer
+    /// ([`CallTracer`], [`StructLogger`]) implements `selfdestruct`: the
+    /// current tracers do not self-destruct either, so there is nothing to
+    /// route to. If either ever needs this hook, the journal-owned-tracer
+    /// design breaks — the tracer would have to be reachable without a
+    /// context, and this override would then need to forward to it.
+    fn selfdestruct(&mut self, _contract: Address, _target: Address, _value: U256) {}
+}
+
 impl<CTX, INTR> Inspector<CTX, INTR> for Tracer
 where
     CTX: ContextTr<Db: HasHost<H: StorageV1>>,
