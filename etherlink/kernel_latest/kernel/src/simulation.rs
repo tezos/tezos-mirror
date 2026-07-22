@@ -516,7 +516,7 @@ impl Evaluation {
         // EVM-entered applied path so a gateway crossing captures the EVM
         // caller as Ethereum-native. The operation-hash seed is left zero
         // (simulated KT1s are non-authoritative, see above).
-        let (mut journal, mut tracer) = journal::prepare_tezosx_journal(
+        let mut journal = journal::prepare_tezosx_journal(
             CracId::mock(RuntimeId::Ethereum),
             &Default::default(),
             &constants,
@@ -542,7 +542,6 @@ impl Evaluation {
             max_gas_limit,
             None,
             spec_id,
-            tracer.as_mut(),
             true,
             // TODO: Replace this by the decoded access lists if any.
             TransactionOrigin::UserInput {
@@ -850,7 +849,6 @@ mod tests {
             call_data.into(),
             GasData::new(gas_limit, gas_price.try_into().unwrap(), gas_limit),
             revm::primitives::U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {

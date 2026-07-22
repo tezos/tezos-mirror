@@ -435,7 +435,6 @@ pub fn main() {
                         ),
                         transaction.value[indexes.value],
                         transaction.authorization_list.clone(),
-                        None,
                         false,
                         TransactionOrigin::UserInput {
                             access_list: access_lists,

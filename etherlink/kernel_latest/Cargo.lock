@@ -3699,6 +3699,7 @@ name = "tezosx-journal"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "evm-inspectors",
  "evm-types",
  "http",
  "michelson-types",

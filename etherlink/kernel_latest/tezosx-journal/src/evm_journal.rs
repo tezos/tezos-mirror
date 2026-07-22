@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use anyhow::anyhow;
+use evm_inspectors::Tracer;
 use revm::{
     context::{transaction::AccessList, JournalInner},
     primitives::Address,
@@ -73,7 +74,36 @@ pub struct EvmJournal {
     /// block-invariant, so the value set at the top is correct for every
     /// re-entrant frame (L2-1417).
     outer_block: BlockConstants,
+    /// Tracer of the transaction being executed, when tracing was
+    /// requested. The journal owns it so it can follow the transaction
+    /// across execution contexts (a cross-runtime call spawns a fresh EVM
+    /// context which only receives the journal); the `Evm` inspector slot
+    /// holds a stateless handle that borrows it per hook through
+    /// `evm_inspectors::TracerContainer`.
+    tracer: TracerSlot,
 }
+
+/// Owned tracer slot. The tracer is transient diagnostics state: it is
+/// opaque to `Debug` and irrelevant to journal-state equality.
+struct TracerSlot(Option<Box<Tracer>>);
+
+impl core::fmt::Debug for TracerSlot {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(if self.0.is_some() {
+            "TracerSlot(..)"
+        } else {
+            "TracerSlot(none)"
+        })
+    }
+}
+
+impl PartialEq for TracerSlot {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for TracerSlot {}
 
 impl EvmJournal {
     /// Construct an EVM journal seeded with the originating block
@@ -93,6 +123,7 @@ impl EvmJournal {
             cross_runtime_originator: None,
             outer_block,
             pending_alias_delegation: None,
+            tracer: TracerSlot(None),
         }
     }
 }
@@ -215,6 +246,28 @@ impl EvmJournal {
     /// Whether an incoming CRAC has been received.
     pub fn has_crac_data(&self) -> bool {
         self.crac_tx_info.is_some()
+    }
+
+    pub fn set_tracer(&mut self, tracer: Tracer) {
+        self.tracer.0 = Some(Box::new(tracer))
+    }
+
+    pub fn tracer(&self) -> Option<&Tracer> {
+        self.tracer.0.as_deref()
+    }
+
+    pub fn has_tracer(&self) -> bool {
+        self.tracer.0.is_some()
+    }
+
+    /// Detach the owned tracer, if any. Pair with [`Self::restore_tracer`].
+    pub fn take_tracer(&mut self) -> Option<Box<Tracer>> {
+        self.tracer.0.take()
+    }
+
+    /// Re-attach a tracer detached by [`Self::take_tracer`].
+    pub fn restore_tracer(&mut self, tracer: Option<Box<Tracer>>) {
+        self.tracer.0 = tracer
     }
 }
 
