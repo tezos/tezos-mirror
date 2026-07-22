@@ -46,7 +46,7 @@ let base_images : docker_image list =
           Images.Base_images.(
             Format.asprintf "tezos-debian-%s-%s" release base_images_tag);
       })
-    (Base_images.Distribution.releases Debian)
+    (Base_images.releases Debian)
   @ List.map
       (fun release ->
         {
@@ -58,7 +58,7 @@ let base_images : docker_image list =
             Images.Base_images.(
               Format.asprintf "tezos-ubuntu-%s-%s" release base_images_tag);
         })
-      (Base_images.Distribution.releases Ubuntu)
+      (Base_images.releases Ubuntu)
 
 (* Scans [docker_image:docker_tag] image. A scanning report artifact is produced.
    The source image is pulled, pushed to GCP Artifact Registry at
