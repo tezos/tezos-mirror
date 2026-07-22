@@ -185,6 +185,7 @@ impl CallTrace {
     }
 }
 
+#[derive(Debug)]
 pub struct CallTracer {
     config: CallTracerConfig,
     call_trace: HashMap<u16, CallTrace>,
