@@ -623,7 +623,7 @@ oc.docker:promote_revision_to_version:
     action: access
   retry: 0
 
-publish:release-page-packaging-revision:
+release_page.deploy-assets-packaging-revision:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
@@ -647,7 +647,7 @@ publish:release-page-packaging-revision:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
-  - ./scripts/releases/publish-release-page-packaging-revision.sh
+  - ./scripts/releases/deploy-release-page-assets-packaging-revision.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -656,6 +656,41 @@ publish:release-page-packaging-revision:
     DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
     S3_BUCKET: site-prod.octez.tezos.com
     URL: octez.tezos.com
+  environment:
+    name: release-page
+    action: access
+  retry: 0
+
+release_page.publish:
+  image: ${ci_image_name}/release-page:${ci_image_tag}
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - oc.docker:ci:amd64
+  - release_page.deploy-assets-packaging-revision
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - ./scripts/releases/publish-release-page.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    BUCKET_PATH: /releases
+    DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+    S3_BUCKET: site-prod.octez.tezos.com
+    URL: octez.tezos.com
+  environment:
+    name: release-page
+    action: access
   artifacts:
     expire_in: 1 day
     paths:

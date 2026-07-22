@@ -611,7 +611,7 @@ oc.docker:promote_revision_to_version:
     DOCKER_VERSION: 28.5.1
   retry: 0
 
-publish:release-page-packaging-revision:
+release_page.deploy-assets-packaging-revision:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
@@ -635,13 +635,46 @@ publish:release-page-packaging-revision:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
-  - ./scripts/releases/publish-release-page-packaging-revision.sh
+  - ./scripts/releases/deploy-release-page-assets-packaging-revision.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     DISTRIBUTION_ID: E19JF46UG3Z747
     S3_BUCKET: release-page-test.nomadic-labs.com
+  environment:
+    name: release-page
+    action: access
+  retry: 0
+
+release_page.publish:
+  image: ${ci_image_name}/release-page:${ci_image_tag}
+  stage: publish
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  - release_page.deploy-assets-packaging-revision
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - ./scripts/releases/publish-release-page.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DISTRIBUTION_ID: E19JF46UG3Z747
+    S3_BUCKET: release-page-test.nomadic-labs.com
+  environment:
+    name: release-page
+    action: access
   artifacts:
     expire_in: 1 day
     paths:
