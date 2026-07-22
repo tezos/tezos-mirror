@@ -1155,8 +1155,7 @@ fn run_interp_driver<'a, 'b>(
                     saved_balance,
                 );
                 let result = pop_value(&mut sub)?;
-                active_stack_mut(stacks)?
-                    .push(TypedValue::new_option(Some(TypedValue::unwrap_rc(result))));
+                active_stack_mut(stacks)?.push(TypedValue::new_option_rc(Some(result)));
             }
         }
     }
@@ -5203,6 +5202,50 @@ mod interpreter_tests {
         assert!(
             allocated < SIZE as u64,
             "MAP over option deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn view_forwards_shared_result_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let kt1: AddressHash = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye".try_into().unwrap();
+        let view_name = "someview".to_string();
+        let car_body = [Micheline::prim0_uncarbonated(Prim::CAR)];
+        let view = crate::ast::View {
+            input_type: Type::Bytes,
+            output_type: Type::Bytes,
+            code: Micheline::Seq(&car_body),
+        };
+        let mut kt1_views = HashMap::new();
+        kt1_views.insert(view_name.clone(), view);
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        ctx.views.insert(kt1.clone(), kt1_views);
+        ctx.storage.insert(kt1.clone(), (Type::Unit, V::Unit));
+        let address = V::Address(addr::Address {
+            hash: kt1,
+            entrypoint: Entrypoint::default(),
+        });
+        stack.push(address);
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(Rc::clone(&operand)); // view input on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(
+            &[IView {
+                name: view_name,
+                arg_type: Type::Bytes,
+                return_type: Type::Bytes,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "VIEW result deep-copied its {SIZE}-byte shared operand \
              ({allocated} bytes allocated); it must forward it behind its Rc.",
         );
     }
