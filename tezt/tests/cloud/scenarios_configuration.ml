@@ -67,6 +67,24 @@ module DAL = struct
         (fun (num, den) -> Q.make num den)
         (obj2 (req "numerator" z) (req "denominator" z))
     in
+    (* Validate, at JSON-decoding time, that baker secret keys coming from a
+       configuration file are well-formed unencrypted (base58check-encoded)
+       secret keys, mirroring the CLI-side validation of [--bakers] in
+       [Scenarios_cli]. *)
+    let unencrypted_secret_key_encoding =
+      conv_with_guard
+        Fun.id
+        (fun s ->
+          match Tezos_crypto.Signature.Secret_key.of_b58check_opt s with
+          | Some _ -> Ok s
+          | None ->
+              Error
+                (sf
+                   "invalid unencrypted secret key %S (expected a \
+                    base58check-encoded secret key, e.g. edsk...)"
+                   s))
+        string
+    in
     conv
       (fun {
              blocks_history;
@@ -280,7 +298,7 @@ module DAL = struct
                   (opt "snapshot" Snapshot_helpers.encoding)
                   (opt "bootstrap" bool)
                   (opt "stake" Stake_repartition.Dal.encoding)
-                  (dft "bakers" (list string) [])
+                  (dft "bakers" (list unencrypted_secret_key_encoding) [])
                   (dft "stake_machine_type" (list string) []))
                (merge_objs
                   (obj8
