@@ -41,9 +41,9 @@ val encoding : t Data_encoding.t
 val map_encoding : (t -> 'value Data_encoding.t) -> 'value Map.t Data_encoding.t
 
 (** [compare_priority] Comparison over tag for order of
-    importance. Order is given by the list {!all}. it's the following:
+    importance. It's the following:
 
-   Timeout < Refute < [Publish; Publish_dal_commitment; Cement] <
+   Timeout < Refute < Cement < [Publish; Publish_dal_commitment] <
    Recover < Add_messages < Execute_outbox_message.
 *)
 val compare_priority : t -> t -> int

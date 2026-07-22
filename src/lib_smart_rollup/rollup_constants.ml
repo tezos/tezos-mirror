@@ -48,6 +48,7 @@ type sc_rollup_constants = {
   reveal_activation_level : reveal_activation_level option;
   max_number_of_stored_cemented_commitments : int;
   max_active_outbox_levels : int;
+  max_lookahead_in_blocks : int32;
 }
 
 type protocol_constants = {
@@ -106,6 +107,7 @@ let encoding =
                reveal_activation_level;
                max_number_of_stored_cemented_commitments;
                max_active_outbox_levels;
+               max_lookahead_in_blocks;
              };
            dal =
              {
@@ -124,7 +126,8 @@ let encoding =
           commitment_period_in_blocks,
           reveal_activation_level,
           max_number_of_stored_cemented_commitments,
-          max_active_outbox_levels ),
+          max_active_outbox_levels,
+          max_lookahead_in_blocks ),
         ( feature_enable,
           attestation_lag,
           attestation_lags,
@@ -137,7 +140,8 @@ let encoding =
              commitment_period_in_blocks,
              reveal_activation_level,
              max_number_of_stored_cemented_commitments,
-             max_active_outbox_levels ),
+             max_active_outbox_levels,
+             max_lookahead_in_blocks ),
            ( feature_enable,
              attestation_lag,
              attestation_lags,
@@ -155,6 +159,7 @@ let encoding =
             reveal_activation_level;
             max_number_of_stored_cemented_commitments;
             max_active_outbox_levels;
+            max_lookahead_in_blocks;
           };
         dal =
           {
@@ -171,12 +176,13 @@ let encoding =
        (req "delay_increment_per_round" int64)
        (req
           "sc_rollup"
-          (obj5
+          (obj6
              (req "challenge_window_in_blocks" int31)
              (req "commitment_period_in_blocks" int31)
              (opt "reveal_activation_level" reveal_activation_level_encoding)
              (req "max_number_of_stored_cemented_commitments" int31)
-             (req "max_active_outbox_levels" int31)))
+             (req "max_active_outbox_levels" int31)
+             (req "max_lookahead_in_blocks" int32)))
        (req
           "dal"
           (obj6

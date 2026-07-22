@@ -98,6 +98,19 @@ module Simple = struct
       ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
+  let publish_commitment_delayed =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_commitment_publish_commitment_delayed"
+      ~msg:
+        "Publication of commitment {hash} for inbox level {level} is delayed \
+         until cementation advances the last cemented commitment, because it \
+         is beyond the maximum lookahead window allowed by the protocol"
+      ~level:Info
+      ~pp1:Commitment.Hash.pp_short
+      ("hash", Commitment.Hash.encoding)
+      ("level", Data_encoding.int32)
+
   let recover_bond =
     declare_1
       ~section
@@ -204,6 +217,9 @@ let new_commitment head level = Simple.(emit new_commitment (head, level))
 
 let publish_commitment head level =
   Simple.(emit publish_commitment (head, level))
+
+let publish_commitment_delayed head level =
+  Simple.(emit publish_commitment_delayed (head, level))
 
 let recover_bond staker = Simple.(emit recover_bond staker)
 
