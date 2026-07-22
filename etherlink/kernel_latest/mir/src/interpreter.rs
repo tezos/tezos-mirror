@@ -3077,10 +3077,10 @@ fn interpret_one<'a>(
         I::CheckSignature => {
             let key = pop!(V::Key);
             let sig = pop!(V::Signature);
-            let msg = pop!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas()
-                .consume(interpret_cost::check_signature(&key, &msg)?)?;
-            stack.push(V::Bool(key.verify_signature(&sig, &msg).unwrap_or(false)));
+                .consume(interpret_cost::check_signature(&key, msg)?)?;
+            stack.push(V::Bool(key.verify_signature(&sig, msg).unwrap_or(false)));
         }
         I::TransferTokens => {
             let param = pop!();

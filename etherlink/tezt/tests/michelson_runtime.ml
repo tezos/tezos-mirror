@@ -6508,7 +6508,39 @@ code {
     in
     unit
 
-  let register () = test_hashes [Alpha]
+  let test_check_signature =
+    register_tezosx_test
+      ~title:
+        "Michelson CHECK_SIGNATURE does not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "check_signature"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"checksignature"
+      ~outcome:(Fails_with "Gas_exhaustion")
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       PUSH signature "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7" ;
+       PUSH key "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" ;
+       CHECK_SIGNATURE ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+
+  let register () =
+    test_hashes [Alpha] ;
+    test_check_signature [Alpha]
 end
 
 let () =
