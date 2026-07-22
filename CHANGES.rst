@@ -81,6 +81,15 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- Fixed an issue where the attester branch of the shard reception callback
+  could issue L1 committee RPCs for message levels far beyond the current
+  head. The fetch is now skipped when the committee level exceeds
+  ``head_level + attestation_lag + validation_slack``. Additionally, the
+  application callback in the P2P receive loop is now spawned
+  asynchronously, so a slow callback on one peer connection no longer
+  delays shard ingestion from other peers.
+  (MR :gl:`!22542`)
+
 - The ``/profiles/<pkh>/monitor/attestable_slots`` streaming RPC now emits a
   periodic heartbeat event (one per level), letting consumers detect a stalled
   connection during periods with no attestable-slot activity. (MR :gl:`!22471`)
