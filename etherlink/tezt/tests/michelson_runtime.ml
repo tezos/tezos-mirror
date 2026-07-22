@@ -6538,9 +6538,37 @@ code {
        DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
      }|}
 
+  let test_unpack =
+    register_tezosx_test
+      ~title:"Michelson UNPACK does not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "unpack"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"unpack"
+      ~outcome:Succeeds
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       UNPACK nat ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+
   let register () =
     test_hashes [Alpha] ;
-    test_check_signature [Alpha]
+    test_check_signature [Alpha] ;
+    test_unpack [Alpha]
 end
 
 let () =

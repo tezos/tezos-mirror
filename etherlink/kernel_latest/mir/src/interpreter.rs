@@ -3047,11 +3047,11 @@ fn interpret_one<'a>(
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {
-            let bytes = pop!(V::Bytes);
+            pop_ref!(bytes, Bytes);
             ctx.gas()
                 .consume(interpret_cost::unpack(bytes.as_slice())?)?;
             let mut try_unpack = || -> Option<TypedValue> {
-                let mich = Micheline::decode_packed(arena, &bytes, ctx.gas())
+                let mich = Micheline::decode_packed(arena, bytes, ctx.gas())
                     .ok()?
                     .ok()?;
                 // UNPACK must not accept forged lazy-storage ids (mirrors L1's
