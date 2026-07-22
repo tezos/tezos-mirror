@@ -328,7 +328,12 @@ let fetch_committees ctxt ~level =
           Committee_fetch_tbl.replace in_flight level promise ;
           Lwt.on_any
             promise
-            (fun _ -> Committee_fetch_tbl.remove in_flight level)
+            (fun result ->
+              (match result with
+              | Error trace ->
+                  Event.emit_dont_wait__committee_fetch_failed ~level ~trace
+              | Ok _ -> ()) ;
+              Committee_fetch_tbl.remove in_flight level)
             (fun _ -> Committee_fetch_tbl.remove in_flight level) ;
           Lwt.protected promise)
 

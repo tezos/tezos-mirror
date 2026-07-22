@@ -1363,6 +1363,29 @@ open struct
       ("sender", Types.Peer.encoding)
       ~pp4:Types.Peer.pp
 
+  let shard_committee_level_out_of_window =
+    declare_2
+      ~section:["dal_shards"; "reception"]
+      ~name:"shard_committee_level_out_of_window"
+      ~msg:
+        "Skipping committee fetch: committee level {committee_level} exceeds \
+         the fetch window (head level {head_level}); shard dropped."
+      ~level:Notice
+      ("committee_level", Data_encoding.int32)
+      ("head_level", Data_encoding.int32)
+
+  let committee_fetch_failed =
+    declare_2
+      ~section:["dal_shards"; "reception"]
+      ~name:"committee_fetch_failed"
+      ~msg:
+        "Committee fetch for level {level} failed; shard reception metric \
+         skipped. Failure: {trace}"
+      ~level:Warning
+      ~pp2:Error_monad.pp_print_trace
+      ("level", Data_encoding.int32)
+      ("trace", Error_monad.trace_encoding)
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
   let skip_attesting_shards =
     declare_1
@@ -1904,6 +1927,12 @@ let emit_validation_of_shard_update ~level ~slot_index ~slot_metrics =
 
 let emit_reception_of_shard_detailed ~level ~slot_index ~shard_index ~sender =
   emit reception_of_shard_detailed (level, slot_index, shard_index, sender)
+
+let emit_shard_committee_level_out_of_window ~committee_level ~head_level =
+  emit shard_committee_level_out_of_window (committee_level, head_level)
+
+let emit_dont_wait__committee_fetch_failed ~level ~trace =
+  emit__dont_wait__use_with_care committee_fetch_failed (level, trace)
 
 let emit_skip_attesting_shards ~level = emit skip_attesting_shards level
 
