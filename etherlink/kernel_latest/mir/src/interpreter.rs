@@ -1554,7 +1554,7 @@ fn interpret_step<'a, 'b>(
         },
         I::Exec => {
             ctx.gas().consume(interpret_cost::EXEC)?;
-            let mut arg = TypedValue::unwrap_rc(pop_value(stack)?);
+            let mut arg = pop_value(stack)?;
             let mut closure = pop_v!(V::Lambda);
             // Inline APPLY unwrapping (constant work, not stack recursive).
             loop {
@@ -1569,22 +1569,22 @@ fn interpret_step<'a, 'b>(
                             let code_clone = Rc::clone(&code);
                             // Recursive lambdas put themselves on top of
                             // the body's stack so the body can EXEC again.
-                            let initial = stk![
-                                V::Lambda(Closure::Lambda(Lambda::LambdaRec {
-                                    in_ty,
-                                    out_ty,
-                                    micheline_code,
-                                    code,
-                                })),
-                                arg
-                            ];
+                            let mut initial = IStack::new();
+                            initial.push(V::Lambda(Closure::Lambda(Lambda::LambdaRec {
+                                in_ty,
+                                out_ty,
+                                micheline_code,
+                                code,
+                            })));
+                            initial.push(arg);
                             return Ok(StepResult::OpenExec {
                                 code: code_clone,
                                 initial,
                             });
                         }
                         Lambda::Lambda { code, .. } => {
-                            let initial = stk![arg];
+                            let mut initial = IStack::new();
+                            initial.push(arg);
                             return Ok(StepResult::OpenExec { code, initial });
                         }
                     },
@@ -1599,7 +1599,7 @@ fn interpret_step<'a, 'b>(
                         // re-push), only the gas is brought in line.
                         ctx.gas().consume(interpret_cost::PUSH)?;
                         ctx.gas().consume(interpret_cost::PAIR)?;
-                        arg = V::new_pair_rc(Rc::clone(capture.arg_val()), Rc::new(arg));
+                        arg = Rc::new(V::new_pair_rc(Rc::clone(capture.arg_val()), arg));
                         closure = Closure::unwrap_rc(inner);
                     }
                 }
@@ -5132,6 +5132,29 @@ mod interpreter_tests {
                  clone work is unbounded (L2-1794)",
             );
         }
+    }
+
+    #[test]
+    fn exec_forwards_shared_argument_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let lambda = V::Lambda(Closure::Lambda(Lambda::Lambda {
+            micheline_code: Micheline::Seq(&[]),
+            code: vec![Drop(None), Unit].into(),
+        }));
+        stack.push(lambda);
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(Rc::clone(&operand)); // argument on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(&[Exec], &mut ctx, &mut stack).unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "EXEC deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
     }
 
     #[test]
