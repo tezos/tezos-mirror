@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use evm_inspectors::{Tracer, TracerInput};
+use evm_inspectors::TracerInput;
 use revm::primitives::hardfork::SpecId;
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_ethereum::block::BlockConstants;
@@ -20,7 +20,7 @@ pub fn prepare_tezosx_journal(
     debug_features: &DebugFeatures,
     internal_operations_base: u128,
     tracer_input: Option<TracerInput>,
-) -> (TezosXJournal, Option<Tracer>) {
+) -> TezosXJournal {
     let mut journal =
         TezosXJournal::new(crac_id, operation_hash.clone(), block_constants.clone());
     // Fold the block's prior internal ops into this op's cap (anti-DoS).
@@ -32,7 +32,9 @@ pub fn prepare_tezosx_journal(
         journal.enable_debug_precompiles();
     }
 
-    let tracer = tracer_input.map(|input| input.tracer(*spec_id));
+    if let Some(input) = tracer_input {
+        journal.evm.set_tracer(input.tracer(*spec_id));
+    }
 
-    (journal, tracer)
+    journal
 }

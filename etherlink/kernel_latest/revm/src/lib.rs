@@ -7,7 +7,7 @@ use crate::{journal::Journal, storage::world_state_handler::StorageAccount};
 use database::EtherlinkVMDB;
 pub use error::{EvmDbError, EvmKernelError, EvmRunError};
 use evm_inspectors::struct_logger::StructLogger;
-use evm_inspectors::Tracer;
+use evm_inspectors::TracerInspector;
 use handler::EtherlinkHandler;
 use helpers::storage::u256_to_le_bytes;
 pub use michelson_types::Withdrawal;
@@ -356,11 +356,10 @@ fn build_evm_inspector_context<'a, Host, R>(
     precompiles: EtherlinkPrecompiles,
     chain_id: u64,
     spec_id: SpecId,
-    inspector: &'a mut Tracer,
     is_simulation: bool,
     is_cross_runtime: bool,
     alias_delegation: Option<Address>,
-) -> Result<EvmInspection<'a, Host, &'a mut Tracer, R>, EvmRunError>
+) -> Result<EvmInspection<'a, Host, TracerInspector, R>, EvmRunError>
 where
     Host: StorageV1,
     R: Registry,
@@ -397,7 +396,7 @@ where
         error: Ok(()),
     };
     let mut evm = ctx
-        .build_mainnet_with_inspector(inspector)
+        .build_mainnet_with_inspector(TracerInspector)
         .with_precompiles(precompiles);
     install_etherlink_origin(&mut evm);
     if is_cross_runtime {
@@ -540,7 +539,6 @@ pub fn run_transaction<'a, Host, R: Registry>(
     gas_data: GasData,
     value: U256,
     authorization_list: Option<Vec<SignedAuthorization>>,
-    tracer: Option<&'a mut Tracer>,
     is_simulation: bool,
     mut origin: TransactionOrigin,
 ) -> Result<ExecutionOutcome, EvmRunError>
@@ -577,7 +575,14 @@ where
     let classify_native = (!is_cross_runtime).then_some(caller);
     let db = EtherlinkVMDB::new(host, registry, block_constants, classify_native)?;
 
-    if let Some(tracer) = tracer {
+    if journal.evm.has_tracer() {
+        // Capture the struct logger's identity up front: the `Evm` context
+        // borrows the journal (which owns the tracer) for the whole run.
+        let struct_logger_tx_hash = journal
+            .evm
+            .tracer()
+            .filter(|tracer| tracer.is_struct_logger())
+            .map(|tracer| tracer.transaction_hash());
         let precompiles =
             EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled());
         let mut evm_context = build_evm_inspector_context(
@@ -589,7 +594,6 @@ where
             precompiles,
             block_constants.chain_id.as_u64(),
             spec_id,
-            tracer,
             is_simulation,
             is_cross_runtime,
             alias_delegation,
@@ -635,13 +639,13 @@ where
             }
         }
 
-        if evm_context.inspector.is_struct_logger() {
+        if let Some(transaction_hash) = struct_logger_tx_hash {
             StructLogger::store_outcome(
                 evm_context.ctx.db_mut().host,
                 result.is_success(),
                 result.output(),
                 result.gas_used(),
-                evm_context.inspector.transaction_hash(),
+                transaction_hash,
             )?
         }
 
@@ -1259,7 +1263,6 @@ mod test {
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_sent,
             None,
-            None,
             false,
             TransactionOrigin::UserInput {
                 access_list: AccessList::default(),
@@ -1342,7 +1345,6 @@ mod test {
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_sent,
             None,
-            None,
             false,
             TransactionOrigin::UserInput {
                 access_list: AccessList::default(),
@@ -1423,7 +1425,6 @@ mod test {
             calldata.into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_sent,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -1533,7 +1534,6 @@ mod test {
             Bytes::new(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             value_sent,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -1654,7 +1654,6 @@ mod test {
                 GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
                 U256::ZERO,
                 None,
-                None,
                 false,
                 TransactionOrigin::CrossRuntime { credit: None },
             )
@@ -1733,7 +1732,6 @@ mod test {
             Bytes::from_hex("6080604052600160005534801561001557600080fd5b50610133806100256000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c80633fa4f24514603757806355241077146051575b600080fd5b603d6069565b604051604891906090565b60405180910390f35b606760048036038101906063919060d5565b606f565b005b60005481565b8060008190555050565b6000819050919050565b608a816079565b82525050565b600060208201905060a360008301846083565b92915050565b600080fd5b60b5816079565b811460bf57600080fd5b50565b60008135905060cf8160ae565b92915050565b60006020828403121560e85760e760a9565b5b600060f48482850160c2565b9150509291505056fea26469706673582212202dba9d4631e2c42eb5a90449e79df9c7031f4e73f695987b580809d987c057c864736f6c63430008120033").unwrap(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput { access_list: AccessList::default() },
@@ -1826,7 +1824,6 @@ mod test {
             Bytes::from_hex(calldata).unwrap(),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             withdrawn_amount,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -1923,7 +1920,6 @@ mod test {
                 Bytes::copy_from_slice(&calldata),
                 GasData::new(10_000_000, 0, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -2039,7 +2035,6 @@ mod test {
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::MAX,
             None,
-            None,
             false,
             TransactionOrigin::UserInput {
                 access_list: AccessList::default(),
@@ -2090,7 +2085,6 @@ mod test {
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             U256::ZERO,
             None,
-            None,
             false,
             TransactionOrigin::UserInput { access_list: AccessList::default() },
         );
@@ -2122,7 +2116,6 @@ mod test {
             Bytes::from_hex("a0712d68000000000000000000000000000000000000000000000000000000000000002a").unwrap(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput { access_list: AccessList::default() },
@@ -2171,7 +2164,6 @@ mod test {
             deploy_call_and_revert_bytecode,
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2259,7 +2251,6 @@ mod test {
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::ZERO,
             None,
-            None,
             false,
             TransactionOrigin::UserInput {
                 access_list: AccessList::default(),
@@ -2319,7 +2310,6 @@ mod test {
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
             None,
-            None,
             false,
             TransactionOrigin::UserInput {
                 access_list: AccessList::default(),
@@ -2361,7 +2351,6 @@ mod test {
             Bytes::from(create_and_revert_call.abi_encode()),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2446,7 +2435,6 @@ mod test {
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
             None,
-            None,
             false,
             TransactionOrigin::UserInput {
                 access_list: AccessList::default(),
@@ -2507,7 +2495,6 @@ mod test {
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_sent,
             Some(vec![]),
-            None,
             false,
             TransactionOrigin::UserInput {
                 access_list: AccessList::default(),
@@ -2555,7 +2542,6 @@ mod test {
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
             None,
-            None,
             false,
             TransactionOrigin::UserInput {
                 access_list: AccessList::default(),
@@ -2582,7 +2568,6 @@ mod test {
             .into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2650,7 +2635,6 @@ mod test {
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
             None,
-            None,
             false,
             TransactionOrigin::UserInput {
                 access_list: AccessList::default(),
@@ -2690,7 +2674,6 @@ mod test {
             FABridge::queueCall { deposit }.abi_encode().into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2744,7 +2727,6 @@ mod test {
             Bytes::from(call_and_revert_call.abi_encode()),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2927,7 +2909,6 @@ mod test {
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
                 None,
-                None,
                 false,
                 TransactionOrigin::UserInput {
                     access_list: AccessList::default(),
@@ -2965,7 +2946,6 @@ mod test {
                 .into(),
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -3008,7 +2988,6 @@ mod test {
                 GasData::new(gas_limit, 0, GAS_LIMIT),
                 value,
                 None,
-                None,
                 false,
                 TransactionOrigin::UserInput {
                     access_list: AccessList::default(),
@@ -3037,7 +3016,6 @@ mod test {
                 calldata,
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -3752,7 +3730,6 @@ mod test {
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
                 None,
-                None,
                 false,
                 TransactionOrigin::UserInput {
                     access_list: AccessList::default(),
@@ -3788,7 +3765,6 @@ mod test {
                 calldata,
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -4022,7 +3998,6 @@ mod test {
                 calldata,
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -4350,10 +4325,13 @@ mod test {
             caller: Address,
             to: Option<Address>,
             calldata: Bytes,
-            tracer: Option<&mut Tracer>,
+            tracer: Option<Tracer>,
         ) -> ExecutionOutcome {
             let registry = Registry::new();
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+            if let Some(tracer) = tracer {
+                journal.evm.set_tracer(tracer);
+            }
             run_transaction(
                 host,
                 &registry,
@@ -4367,7 +4345,6 @@ mod test {
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
                 None,
-                tracer,
                 false,
                 TransactionOrigin::UserInput {
                     access_list: AccessList::default(),
@@ -4398,7 +4375,7 @@ mod test {
             caller: Address,
             destination: Address,
             calldata: Bytes,
-            tracer: &mut Tracer,
+            tracer: Tracer,
         ) -> ExecutionOutcome {
             run(host, caller, Some(destination), calldata, Some(tracer))
         }
@@ -4470,9 +4447,8 @@ mod test {
                 .into();
 
             let tx_hash = B256::from([0xC1; 32]);
-            let mut tracer = call_tracer(tx_hash);
-            let outcome =
-                run_traced(&mut host, caller, static_caller, calldata, &mut tracer);
+            let tracer = call_tracer(tx_hash);
+            let outcome = run_traced(&mut host, caller, static_caller, calldata, tracer);
             assert!(
                 outcome.result.is_success(),
                 "static call to the identity precompile should succeed"
@@ -4512,9 +4488,8 @@ mod test {
             let input = Bytes::from(vec![0x42; 96]);
 
             let tx_hash = B256::from([0xD2; 32]);
-            let mut tracer = call_tracer(tx_hash);
-            let outcome =
-                run_traced(&mut host, caller, identity, input.clone(), &mut tracer);
+            let tracer = call_tracer(tx_hash);
+            let outcome = run_traced(&mut host, caller, identity, input.clone(), tracer);
             assert!(
                 outcome.result.is_success(),
                 "call to the identity precompile should succeed"
@@ -4591,7 +4566,6 @@ mod test {
             Bytes::new(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             value_sent,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -5291,7 +5265,6 @@ mod test {
             Bytes::new(), // empty calldata triggers receive()
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_to_send,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {

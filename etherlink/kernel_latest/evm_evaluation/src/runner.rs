@@ -275,7 +275,6 @@ fn execute_transaction(
         revm::primitives::U256::from_le_slice(&bytes),
         // TODO: add authorization list when Prague tests are enabled.
         None,
-        None,
         false,
         TransactionOrigin::UserInput { access_list },
     )
