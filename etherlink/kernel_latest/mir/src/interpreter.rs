@@ -1610,7 +1610,7 @@ fn interpret_step<'a, 'b>(
             arg_type,
             return_type,
         } => {
-            let input = TypedValue::unwrap_rc(pop_value(stack)?);
+            let input = pop_value(stack)?;
             let Address {
                 hash,
                 entrypoint: _,
@@ -1692,7 +1692,7 @@ fn interpret_step<'a, 'b>(
                 return Ok(StepResult::Done);
             }
 
-            let initial = stk![TypedValue::new_pair(input, storage)];
+            let initial = stk![TypedValue::new_pair_rc(input, Rc::new(storage))];
             Ok(StepResult::OpenView {
                 code,
                 initial,
@@ -5153,6 +5153,38 @@ mod interpreter_tests {
         assert!(
             allocated < SIZE as u64,
             "EXEC deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn view_forwards_shared_input_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let address = V::Address(addr::Address {
+            hash: "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".try_into().unwrap(),
+            entrypoint: Entrypoint::default(),
+        });
+        stack.push(address);
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(Rc::clone(&operand)); // input on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(
+            &[IView {
+                name: "someview".to_string(),
+                arg_type: Type::Bytes,
+                return_type: Type::Bytes,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "VIEW input deep-copied its {SIZE}-byte shared operand \
              ({allocated} bytes allocated); it must forward it behind its Rc.",
         );
     }
