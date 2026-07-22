@@ -101,6 +101,12 @@ let next_commitment_level node_ctxt last_commitment_level =
 type state = {
   node_ctxt : Node_context.rw;
   inbox_checked : unit Commitment.Hash.Table.t;
+  mutable reported_delayed_level : int32;
+      (** Highest inbox level for which a [publish_commitment_delayed] event
+          has been emitted (0 if none was). Since the LCC and the L1
+          finalized level only increase, commitments enter the withheld set
+          at strictly increasing inbox levels, so this high-water mark is
+          enough to report each delayed commitment at most once. *)
 }
 
 let tick_of_level (node_ctxt : _ Node_context.t) inbox_level =
@@ -256,7 +262,36 @@ let process_head plugin (node_ctxt : _ Node_context.t) ~predecessor
       in
       return_some commitment_hash
 
-let missing_commitments (node_ctxt : _ Node_context.t) =
+(* Emit [publish_commitment_delayed] for the commitments of [delayed] whose
+   inbox level is above the [reported_delayed_level] high-water mark.
+   [missing_commitments] runs on every publisher tick, so without this
+   deduplication a node that is far behind on cementation would re-emit the
+   event for every out-of-window commitment on every tick. A commitment is
+   withheld iff [lcc.level + max_lookahead < inbox_level <= finalized_level]
+   and both bounds only increase, so commitments enter the withheld set at
+   strictly increasing inbox levels: everything at or below the mark has
+   already been reported (or can never become withheld). *)
+let report_delayed_commitments state delayed =
+  let newly_delayed =
+    List.filter
+      (fun (_, (commitment : Commitment.t)) ->
+        commitment.inbox_level > state.reported_delayed_level)
+      delayed
+  in
+  state.reported_delayed_level <-
+    List.fold_left
+      (fun level (_, (commitment : Commitment.t)) ->
+        if commitment.inbox_level > level then commitment.inbox_level else level)
+      state.reported_delayed_level
+      newly_delayed ;
+  List.iter_s
+    (fun (commitment_hash, (commitment : Commitment.t)) ->
+      Commitment_event.publish_commitment_delayed
+        commitment_hash
+        commitment.inbox_level)
+    newly_delayed
+
+let missing_commitments ({node_ctxt; _} as state) =
   let open Lwt_result_syntax in
   let lpc_level =
     match Reference.get node_ctxt.lpc with
@@ -272,7 +307,8 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
     sc_rollup_challenge_window node_ctxt |> Int32.of_int
   in
   let max_lookahead = sc_rollup_max_lookahead node_ctxt in
-  let rec gather acc (commitment_hash : Commitment.Hash.t) =
+  let rec gather ((to_publish, delayed) as acc)
+      (commitment_hash : Commitment.Hash.t) =
     let* commitment = Node_context.find_commitment node_ctxt commitment_hash in
     let lcc = Reference.get node_ctxt.lcc in
     match commitment with
@@ -316,21 +352,15 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
            commitment for a non-final inbox level, an honest node guarantees
            it can never become a party to a refutation game over a tick range
            that an L1 reorg could invalidate. *)
-        let*! acc =
-          let open Lwt_syntax in
+        let acc =
           if is_finalized && not past_curfew then
             if within_lookahead then
-              return ((commitment_hash, commitment) :: acc)
+              ((commitment_hash, commitment) :: to_publish, delayed)
             else
               (* The commitment is withheld solely because of the lookahead
                  window. *)
-              let* () =
-                Commitment_event.publish_commitment_delayed
-                  commitment_hash
-                  commitment.inbox_level
-              in
-              return acc
-          else return acc
+              (to_publish, (commitment_hash, commitment) :: delayed)
+          else acc
         in
         (* We keep walking to the previous commitment even when this one is
            not gathered: older commitments, closer to the LCC, may still be
@@ -346,7 +376,9 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
       let commitment =
         Sc_rollup_block.most_recent_commitment finalized.header
       in
-      gather [] commitment
+      let* to_publish, delayed = gather ([], []) commitment in
+      let*! () = report_delayed_commitments state delayed in
+      return to_publish
 
 let publish_commitment (node_ctxt : _ Node_context.t)
     (commitment_hash, (commitment : Octez_smart_rollup.Commitment.t)) =
@@ -388,7 +420,7 @@ let check_l1_inbox (module Plugin : Protocol_plugin_sig.S) node_ctxt
   in
   Plugin.Inbox.same_as_layer_1 node_ctxt commitment.inbox_level inbox
 
-let run_inbox_checks {node_ctxt; inbox_checked} commitments =
+let run_inbox_checks {node_ctxt; inbox_checked; _} commitments =
   let open Lwt_result_syntax in
   unless (commitments = []) @@ fun () ->
   let commitments = List.to_seq commitments in
@@ -417,7 +449,7 @@ let run_inbox_checks {node_ctxt; inbox_checked} commitments =
 
 let on_publish_commitments ({node_ctxt; _} as state) =
   let open Lwt_result_syntax in
-  let* commitments = missing_commitments node_ctxt in
+  let* commitments = missing_commitments state in
   let* () = run_inbox_checks state commitments in
   List.iter_es (publish_commitment node_ctxt) commitments
 
@@ -708,7 +740,11 @@ module Handlers = struct
 
   let on_launch _w () Types.{node_ctxt} =
     Lwt_result.return
-      {node_ctxt; inbox_checked = Commitment.Hash.Table.create 31}
+      {
+        node_ctxt;
+        inbox_checked = Commitment.Hash.Table.create 31;
+        reported_delayed_level = 0l;
+      }
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
       [`Continue | `Shutdown] tzresult Lwt.t =
