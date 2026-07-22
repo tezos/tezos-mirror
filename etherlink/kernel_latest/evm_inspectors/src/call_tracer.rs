@@ -193,7 +193,7 @@ pub struct CallTracer {
     /// each transaction (depth == 0).  RLP encoding is deferred to flush
     /// time so the buffer remains readable.
     pending_traces: Vec<CallTrace>,
-    pub transaction_hash: Option<B256>,
+    pub(crate) transaction_hash: Option<B256>,
     initial_gas: u64,
     spec_id: SpecId,
 }
