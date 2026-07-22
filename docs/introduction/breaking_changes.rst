@@ -430,6 +430,18 @@ This removes an ACL bypass by which metrics were exposed even under the
 DAL nodes. Setups scraping ``/metrics`` on the RPC port must now run the
 node with ``--metrics-addr``.
 
+Smart rollup node ``/global/last_cemented_commitment`` RPC
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The smart rollup node RPC ``GET /global/last_cemented_commitment`` no
+longer returns an optional value. It now always returns an object with
+the last cemented commitment ``commitment_hash`` and ``level`` known from L1,
+and an optional ``commitment`` field containing the commitment content when
+it is available in the node's storage. Previously, the RPC returned
+``null`` whenever the commitment content was absent from the node's
+storage (e.g. after a snapshot import in full mode), even though the
+last cemented commitment hash and level were known.
+
 
 .. _alpha_breaking_changes:
 
