@@ -803,7 +803,7 @@ mod test {
     mod utilities {
         use alloy_sol_types::sol;
         use primitive_types::U256 as PU256;
-        use revm::primitives::hardfork::SpecId;
+        use revm::primitives::{hardfork::SpecId, Address, U256};
         use tezos_smart_rollup_host::{
             path::{concat, OwnedPath, RefPath},
             storage::StorageV1,
@@ -815,11 +815,34 @@ mod test {
         };
         use tezosx_journal::TezosXJournal;
 
-        use crate::test::GAS_LIMIT;
+        use crate::{
+            storage::world_state_handler::{AccountInfo, StorageAccount},
+            test::GAS_LIMIT,
+        };
 
         /// Milligas consumed by the mock Tezos runtime for every CRAC call.
         /// 10_000 milligas = 1_000 EVM gas (Tezos milligas / 10).
         pub(crate) const MOCK_TEZOS_GAS_CONSUMED: u64 = 10_000;
+
+        /// Compiled deploy bytecode for `contracts/tests/static_caller.sol`,
+        /// shared across the test submodules that probe precompile
+        /// dispatch through a Solidity `StaticCaller` helper.
+        pub(crate) const STATIC_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033";
+
+        /// Give `address` an effectively unlimited balance so it can act
+        /// as the caller/originator of a test transaction.
+        pub(crate) fn fund(host: &mut impl StorageV1, address: Address) {
+            let mut account = StorageAccount::from_address(&address).unwrap();
+            account
+                .set_info(
+                    host,
+                    AccountInfo {
+                        balance: U256::MAX,
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+        }
 
         // Test-only Registry struct that implements the Registry trait from tezosx-interfaces.
         // It contains a MockTezosRuntime for testing cross-runtime functionality,
@@ -2793,9 +2816,10 @@ mod test {
                     MockFaBridgeWrapper::{Burn, Mint},
                 },
                 utilities::{
+                    fund,
                     FABridge::{claimCall, queueCall, withdrawCall, Deposit, Withdrawal},
                     ITable::FaDepositWithProxy,
-                    Registry, DEFAULT_SPEC_ID,
+                    Registry, DEFAULT_SPEC_ID, STATIC_CALLER_BYTECODE,
                 },
                 GAS_LIMIT,
             },
@@ -2998,16 +3022,7 @@ mod test {
             caller: Address,
             calldata: Bytes,
         ) -> Address {
-            let mut caller_account = StorageAccount::from_address(&caller).unwrap();
-            caller_account
-                .set_info(
-                    host,
-                    AccountInfo {
-                        balance: U256::MAX,
-                        ..Default::default()
-                    },
-                )
-                .unwrap();
+            fund(host, caller);
             let registry = Registry::new();
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let result_create = run_transaction(
@@ -3095,7 +3110,7 @@ mod test {
             init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
-            let static_call_bytecode = Bytes::from_hex("6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033").unwrap();
+            let static_call_bytecode = Bytes::from_hex(STATIC_CALLER_BYTECODE).unwrap();
             let static_caller = deploy_contract(&mut host, caller, static_call_bytecode);
 
             let ticket_owner = Address::from([1; 20]);
@@ -3690,10 +3705,10 @@ mod test {
                 },
             },
             run_transaction,
-            storage::world_state_handler::{AccountInfo, StorageAccount},
             test::{
                 utilities::{
-                    last_recorded_sender, last_recorded_source, Registry, DEFAULT_SPEC_ID,
+                    fund, last_recorded_sender, last_recorded_source, Registry,
+                    DEFAULT_SPEC_ID, STATIC_CALLER_BYTECODE,
                 },
                 GAS_LIMIT,
             },
@@ -3707,11 +3722,6 @@ mod test {
         use self::DelegateCaller::makeDelegateCallCall;
         use self::StaticCaller::makeStaticCallCall;
 
-        // Compiled deploy bytecode for `contracts/tests/static_caller.sol`.
-        // Mirrors the inline literal used by `mod fa_bridge` —
-        // duplicated here to keep the module self-contained.
-        const STATIC_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033";
-
         // Compiled deploy bytecode for `contracts/tests/delegate_caller.sol`.
         const DELEGATE_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80638771074f1461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855af49150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220065aceddd10343ed6e9faf40c53bcf49432de8e786641789238cf6d0eaf59c7364736f6c634300081e0033";
 
@@ -3719,18 +3729,6 @@ mod test {
             let mut bc = BlockConstants::test_block_with_no_fees();
             bc.tezos_experimental_features = true;
             bc
-        }
-
-        fn fund_caller(host: &mut MockKernelHost, caller: Address) {
-            let mut acct = StorageAccount::from_address(&caller).unwrap();
-            acct.set_info(
-                host,
-                AccountInfo {
-                    balance: U256::MAX,
-                    ..Default::default()
-                },
-            )
-            .unwrap();
         }
 
         fn deploy(
@@ -3842,7 +3840,7 @@ mod test {
         fn runtime_gateway_rejects_delegate_call_on_call_michelson() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let delegate_caller = deploy(&mut host, caller, DELEGATE_CALLER_BYTECODE);
 
             let outer = makeDelegateCallCall::new((
@@ -3867,7 +3865,7 @@ mod test {
         fn runtime_gateway_rejects_delegate_call_on_call_michelson_view() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let delegate_caller = deploy(&mut host, caller, DELEGATE_CALLER_BYTECODE);
 
             let outer = makeDelegateCallCall::new((
@@ -3896,7 +3894,7 @@ mod test {
         fn runtime_gateway_rejects_static_call_on_call_michelson() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -3924,7 +3922,7 @@ mod test {
         fn runtime_gateway_rejects_static_call_on_call_post() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -3955,7 +3953,7 @@ mod test {
         fn runtime_gateway_allows_static_call_on_call_michelson_view() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -3980,7 +3978,7 @@ mod test {
         fn runtime_gateway_allows_static_call_on_call_get() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -4059,7 +4057,7 @@ mod test {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]); // immediate sender
             let originator = Address::from([2u8; 20]); // transitive source
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
 
             let res = call_gateway_with_originator(
                 &mut host,
@@ -4099,7 +4097,7 @@ mod test {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
             let originator = Address::from([2u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
 
             let res = call_gateway_with_originator(
                 &mut host,
@@ -4150,7 +4148,7 @@ mod test {
             fn view_gas(input_len: usize) -> u64 {
                 let mut host = MockKernelHost::default();
                 let caller = Address::from([1u8; 20]);
-                fund_caller(&mut host, caller);
+                fund(&mut host, caller);
                 let payload =
                     RuntimeGatewayCalls::callMichelsonView(callMichelsonViewCall {
                         destination: "KT1abc".to_string(),
@@ -4176,7 +4174,7 @@ mod test {
             fn get_gas(body_len: usize) -> u64 {
                 let mut host = MockKernelHost::default();
                 let caller = Address::from([1u8; 20]);
-                fund_caller(&mut host, caller);
+                fund(&mut host, caller);
                 let payload = RuntimeGatewayCalls::call(callCall {
                     url: "http://tezos/KT1abc/balanceOf".to_string(),
                     headers: vec![],
@@ -4248,7 +4246,7 @@ mod test {
             // Typed surface: callMichelson(destination, entrypoint, params).
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let typed = call_into(
                 &mut host,
                 caller,
@@ -4270,7 +4268,7 @@ mod test {
 
             // Generic surface: call(POST) to the same contract+entrypoint.
             let mut host = MockKernelHost::default();
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let generic = call_into(
                 &mut host,
                 caller,
@@ -4303,6 +4301,233 @@ mod test {
                 typed_target, generic_target,
                 "targetAddress must not depend on the ABI surface"
             );
+        }
+    }
+
+    mod call_tracer_precompile {
+        use alloy_sol_types::{sol, SolCall};
+        use evm_inspectors::{
+            call_tracer::{CallTracer, CallTracerConfig},
+            storage::trace_tx_path,
+            Tracer,
+        };
+        use revm::{
+            context::{
+                result::{ExecutionResult, Output},
+                transaction::AccessList,
+            },
+            primitives::{hex::FromHex, Address, Bytes, B256, U256},
+        };
+        use rlp::Rlp;
+        use tezos_ethereum::block::BlockConstants;
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_indexable_storage::IndexableStorage;
+        use tezos_smart_rollup_host::path::RefPath;
+        use tezosx_interfaces::RuntimeId;
+        use tezosx_journal::TezosXJournal;
+
+        use crate::{
+            run_transaction,
+            test::{
+                utilities::{fund, Registry, DEFAULT_SPEC_ID, STATIC_CALLER_BYTECODE},
+                GAS_LIMIT,
+            },
+            ExecutionOutcome, GasData, TransactionOrigin,
+        };
+
+        sol!("contracts/tests/static_caller.sol");
+        use self::StaticCaller::makeStaticCallCall;
+
+        fn identity_precompile() -> Address {
+            Address::from_hex("0000000000000000000000000000000000000004").unwrap()
+        }
+
+        // Shared driver for both the deploy and the traced-call paths;
+        // they differ only in the destination (`None` creates a contract)
+        // and whether a tracer is attached.
+        fn run(
+            host: &mut MockKernelHost,
+            caller: Address,
+            to: Option<Address>,
+            calldata: Bytes,
+            tracer: Option<&mut Tracer>,
+        ) -> ExecutionOutcome {
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+            run_transaction(
+                host,
+                &registry,
+                &mut journal,
+                DEFAULT_SPEC_ID,
+                &BlockConstants::test_block_with_no_fees(),
+                None,
+                caller,
+                to,
+                calldata,
+                GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
+                U256::ZERO,
+                None,
+                tracer,
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
+            )
+            .unwrap()
+        }
+
+        fn deploy(host: &mut MockKernelHost, caller: Address) -> Address {
+            let outcome = run(
+                host,
+                caller,
+                None,
+                Bytes::from_hex(STATIC_CALLER_BYTECODE).unwrap(),
+                None,
+            );
+            match outcome.result {
+                ExecutionResult::Success {
+                    output: Output::Create(_, Some(addr)),
+                    ..
+                } => addr,
+                other => panic!("StaticCaller deploy failed: {other:?}"),
+            }
+        }
+
+        fn run_traced(
+            host: &mut MockKernelHost,
+            caller: Address,
+            destination: Address,
+            calldata: Bytes,
+            tracer: &mut Tracer,
+        ) -> ExecutionOutcome {
+            run(host, caller, Some(destination), calldata, Some(tracer))
+        }
+
+        fn call_tracer(tx_hash: B256) -> Tracer {
+            Tracer::CallTracer(CallTracer::new(
+                CallTracerConfig {
+                    only_top_call: false,
+                    with_logs: false,
+                },
+                DEFAULT_SPEC_ID,
+                Some(tx_hash),
+            ))
+        }
+
+        // The `CallTracer` flushes its buffered traces, RLP-encoded, into
+        // an `IndexableStorage` keyed on the transaction hash. There is no
+        // Rust decoder for `CallTrace` (the node side decodes the RLP), so
+        // we read the raw encodings back and inspect them positionally.
+        fn read_traces(host: &MockKernelHost, tx_hash: B256) -> Vec<Vec<u8>> {
+            let path =
+                trace_tx_path(&Some(tx_hash), &RefPath::assert_from(b"/call_trace"))
+                    .unwrap();
+            let storage = IndexableStorage::new_owned_path(path);
+            let length = storage.length(host).unwrap();
+            (0..length)
+                .map(|index| storage.get_value(host, index).unwrap())
+                .collect()
+        }
+
+        // Positional accessors over `CallTrace::rlp_append` (a list of 11
+        // fields: type, from, to, value, gas, gas_used, input, output,
+        // error, logs, depth).
+        fn trace_type(trace: &Rlp) -> Vec<u8> {
+            trace.val_at(0).unwrap()
+        }
+
+        fn trace_to(trace: &Rlp) -> Option<Address> {
+            trace
+                .val_at::<Option<Vec<u8>>>(2)
+                .unwrap()
+                .map(|bytes| Address::from_slice(&bytes))
+        }
+
+        fn trace_output(trace: &Rlp) -> Option<Vec<u8>> {
+            trace.val_at(7).unwrap()
+        }
+
+        fn trace_depth(trace: &Rlp) -> u16 {
+            let bytes: Vec<u8> = trace.val_at(10).unwrap();
+            let mut buffer = [0u8; 2];
+            buffer[..bytes.len()].copy_from_slice(&bytes);
+            u16::from_le_bytes(buffer)
+        }
+
+        /// A precompile invoked as a nested `STATICCALL` must be recorded
+        /// as its own child frame carrying the precompile's real output.
+        #[test]
+        fn nested_precompile_call_records_real_outcome() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([0x11; 20]);
+            fund(&mut host, caller);
+            let static_caller = deploy(&mut host, caller);
+
+            let identity = identity_precompile();
+            let payload = Bytes::from(vec![0xAB; 64]);
+            let calldata: Bytes = makeStaticCallCall::new((identity, payload.clone()))
+                .abi_encode()
+                .into();
+
+            let tx_hash = B256::from([0xC1; 32]);
+            let mut tracer = call_tracer(tx_hash);
+            let outcome =
+                run_traced(&mut host, caller, static_caller, calldata, &mut tracer);
+            assert!(
+                outcome.result.is_success(),
+                "static call to the identity precompile should succeed"
+            );
+
+            let traces = read_traces(&host, tx_hash);
+            assert_eq!(
+                traces.len(),
+                2,
+                "expected the outer CALL and the nested precompile frame"
+            );
+
+            let precompile_frame = traces
+                .iter()
+                .map(|bytes| Rlp::new(bytes))
+                .find(|trace| trace_depth(trace) == 1)
+                .expect("nested precompile frame should be recorded");
+
+            assert_eq!(trace_type(&precompile_frame), b"STATICCALL".to_vec());
+            assert_eq!(trace_to(&precompile_frame), Some(identity));
+            // The identity precompile echoes its input; recording the real
+            // `call_end` outcome means the frame's output is the echoed
+            // payload rather than empty (the frame being dropped) or a
+            // duplicated pre-simulation.
+            assert_eq!(trace_output(&precompile_frame), Some(payload.to_vec()));
+        }
+
+        /// A transaction sent directly to a builtin precompile must record
+        /// a single top-level frame carrying the precompile's real output.
+        #[test]
+        fn top_level_precompile_call_records_real_outcome() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([0x11; 20]);
+            fund(&mut host, caller);
+
+            let identity = identity_precompile();
+            let input = Bytes::from(vec![0x42; 96]);
+
+            let tx_hash = B256::from([0xD2; 32]);
+            let mut tracer = call_tracer(tx_hash);
+            let outcome =
+                run_traced(&mut host, caller, identity, input.clone(), &mut tracer);
+            assert!(
+                outcome.result.is_success(),
+                "call to the identity precompile should succeed"
+            );
+
+            let traces = read_traces(&host, tx_hash);
+            assert_eq!(traces.len(), 1, "expected a single top-level frame");
+
+            let frame = Rlp::new(&traces[0]);
+            assert_eq!(trace_depth(&frame), 0);
+            assert_eq!(trace_type(&frame), b"CALL".to_vec());
+            assert_eq!(trace_to(&frame), Some(identity));
+            assert_eq!(trace_output(&frame), Some(input.to_vec()));
         }
     }
 

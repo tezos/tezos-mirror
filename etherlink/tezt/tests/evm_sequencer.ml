@@ -9109,62 +9109,47 @@ let test_trace_transaction_calltracer_precompiles =
       ~error_msg:"Wrong call list size, expected %R but got %L") ;
   List.iteri
     (fun position call ->
-      match position with
-      | 0 ->
-          Check.(
-            (JSON.(call |-> "to" |> as_string)
-            = "0x0000000000000000000000000000000000000001")
-              string
-              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
-      | 1 ->
-          Check.(
-            (JSON.(call |-> "to" |> as_string)
-            = "0x0000000000000000000000000000000000000002")
-              string
-              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
-      | 2 ->
-          Check.(
-            (JSON.(call |-> "to" |> as_string)
-            = "0x0000000000000000000000000000000000000003")
-              string
-              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
-      | 3 ->
-          Check.(
-            (JSON.(call |-> "to" |> as_string)
-            = "0x0000000000000000000000000000000000000004")
-              string
-              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
-      | 4 ->
-          Check.(
-            (JSON.(call |-> "to" |> as_string)
-            = "0x0000000000000000000000000000000000000005")
-              string
-              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
-      | 5 ->
-          Check.(
-            (JSON.(call |-> "to" |> as_string)
-            = "0x0000000000000000000000000000000000000006")
-              string
-              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
-      | 6 ->
-          Check.(
-            (JSON.(call |-> "to" |> as_string)
-            = "0x0000000000000000000000000000000000000007")
-              string
-              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
-      | 7 ->
-          Check.(
-            (JSON.(call |-> "to" |> as_string)
-            = "0x0000000000000000000000000000000000000008")
-              string
-              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
-      | 8 ->
-          Check.(
-            (JSON.(call |-> "to" |> as_string)
-            = "0x0000000000000000000000000000000000000009")
-              string
-              ~error_msg:"Wrong precompiled contract, expected %R but got %L")
-      | _ -> failwith "Impossible case, call list's size should be 9")
+      let precompile_number = position + 1 in
+      (* Each precompile is reached through a Solidity `staticcall` from
+         the caller contract, so every frame is a STATICCALL originating
+         from [contract_address] and targeting the precompile address
+         0x00..0{precompile_number}. *)
+      Check.(
+        (JSON.(call |-> "type" |> as_string) = "STATICCALL")
+          string
+          ~error_msg:
+            (Format.sprintf
+               "Wrong call type for precompile %d, expected %%R but got %%L"
+               precompile_number)) ;
+      Check.(
+        (JSON.(call |-> "from" |> as_string)
+        = String.lowercase_ascii contract_address)
+          string
+          ~error_msg:
+            (Format.sprintf
+               "Wrong caller for precompile %d, expected %%R but got %%L"
+               precompile_number)) ;
+      Check.(
+        (JSON.(call |-> "to" |> as_string)
+        = Format.sprintf "0x%040x" precompile_number)
+          string
+          ~error_msg:
+            (Format.sprintf
+               "Wrong precompiled contract for frame %d, expected %%R but got \
+                %%L"
+               precompile_number)) ;
+      if precompile_number = 4 then (
+        Check.(
+          (JSON.(call |-> "output" |> as_string) = "0x46726565")
+            string
+            ~error_msg:
+              "Wrong identity precompile output, expected %R but got %L") ;
+        Check.(
+          (JSON.(call |-> "gasUsed" |> as_string) <> "0x0")
+            string
+            ~error_msg:
+              "Identity precompile frame should record a non-zero gasUsed, got \
+               %L")))
     call_list ;
   unit
 

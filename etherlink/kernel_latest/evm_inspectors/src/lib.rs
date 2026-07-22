@@ -5,7 +5,6 @@
 use call_tracer::{CallTracer, CallTracerInput};
 use revm::{
     context::ContextTr,
-    handler::EthPrecompiles,
     interpreter::{
         interpreter::ReturnDataImpl, CallInputs, CallOutcome, CreateInputs,
         CreateOutcome, Interpreter, InterpreterTypes, Stack,
@@ -37,17 +36,14 @@ pub enum TracerInput {
 }
 
 impl TracerInput {
-    pub fn tracer(&self, precompiles: EthPrecompiles, spec_id: SpecId) -> Tracer {
+    pub fn tracer(&self, spec_id: SpecId) -> Tracer {
         match self {
             TracerInput::CallTracer(CallTracerInput {
                 config,
                 transaction_hash,
-            }) => Tracer::CallTracer(CallTracer::new(
-                *config,
-                precompiles,
-                spec_id,
-                *transaction_hash,
-            )),
+            }) => {
+                Tracer::CallTracer(CallTracer::new(*config, spec_id, *transaction_hash))
+            }
             TracerInput::StructLogger(StructLoggerInput {
                 config,
                 transaction_hash,
