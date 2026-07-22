@@ -6565,10 +6565,66 @@ code {
        DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
      }|}
 
+  let test_shift_bytes =
+    register_tezosx_test
+      ~title:"Michelson LSL/LSR bytes do not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "shift"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"lsl"
+        ~outcome:(Fails_with "Gas_exhaustion")
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       DIP { PUSH nat 8 } ;
+       LSL ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"lsr"
+        ~outcome:(Fails_with "Gas_exhaustion")
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       PUSH nat 8 ;
+       SWAP ;
+       LSR ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+    in
+    unit
+
   let register () =
     test_hashes [Alpha] ;
     test_check_signature [Alpha] ;
-    test_unpack [Alpha]
+    test_unpack [Alpha] ;
+    test_shift_bytes [Alpha]
 end
 
 let () =

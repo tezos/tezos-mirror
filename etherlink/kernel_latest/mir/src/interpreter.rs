@@ -2292,7 +2292,7 @@ fn interpret_one<'a>(
                 stack.push(V::Nat(o1.shl(o2_usize)));
             }
             overloads::Lsl::Bytes => {
-                let o1 = pop!(V::Bytes);
+                pop_ref!(o1, Bytes);
                 let o2 = pop!(V::Nat);
 
                 if o2 > BigUint::from(64000u16) {
@@ -2301,7 +2301,7 @@ fn interpret_one<'a>(
 
                 let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
                 ctx.gas()
-                    .consume(interpret_cost::lsl_bytes(&o1, &o2_usize)?)?;
+                    .consume(interpret_cost::lsl_bytes(o1, &o2_usize)?)?;
 
                 let byte_shifts = o2_usize / 8;
                 let bit_shifts = o2_usize % 8;
@@ -2340,7 +2340,7 @@ fn interpret_one<'a>(
                 stack.push(V::Nat(o1.shr(o2_usize)));
             }
             overloads::Lsr::Bytes => {
-                let o1 = pop!(V::Bytes);
+                pop_ref!(o1, Bytes);
                 let o2 = pop!(V::Nat);
 
                 // L1 deliberately leaves `LSR bytes` unbounded on the shift
@@ -2354,7 +2354,7 @@ fn interpret_one<'a>(
                 // an empty vector.
                 let o2_usize = o2.to_usize().unwrap_or(usize::MAX);
                 ctx.gas()
-                    .consume(interpret_cost::lsr_bytes(&o1, &o2_usize)?)?;
+                    .consume(interpret_cost::lsr_bytes(o1, &o2_usize)?)?;
 
                 let byte_shifts = min(o2_usize / 8, o1.len());
                 let bit_shifts = o2_usize % 8;
