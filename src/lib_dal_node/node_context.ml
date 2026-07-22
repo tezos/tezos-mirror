@@ -24,6 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Committee_fetch_tbl =
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+    (struct
+      include Int32
+
+      let hash = Hashtbl.hash
+    end)
+
 type migration_status_entry = {
   is_migration_pending : bool;
   period_end_level : int32;
@@ -41,6 +49,13 @@ type t = {
   store : Store.t;
   tezos_node_cctxt : Tezos_rpc.Context.generic;
   committee_cache : Committee_cache.t;
+  (* Deduplicates concurrent [fetch_committees] calls for the same level.
+     When the shard receive loop is decoupled (via [Lwt.dont_wait]), a burst
+     of shards for an uncached committee level would otherwise each trigger an
+     independent L1 RPC.  An in-flight promise is stored here and shared with
+     subsequent callers; it is removed on completion so later misses retry. *)
+  committee_fetch_in_flight :
+    Committee_cache.committee tzresult Lwt.t Committee_fetch_tbl.t;
   attestation_ops_cache : Attestation_ops_cache.t;
   gs_worker : Gossipsub.Worker.t;
   transport_layer : Gossipsub.Transport_layer.t;
@@ -73,6 +88,8 @@ let init config ~identity ~network_name profile_ctxt proto_cryptoboxes
     tezos_node_cctxt = cctxt;
     committee_cache =
       Committee_cache.create ~max_size:Constants.committee_cache_size;
+    committee_fetch_in_flight =
+      Committee_fetch_tbl.create Constants.committee_cache_size;
     attestation_ops_cache =
       Attestation_ops_cache.create
         ~max_size:Constants.attestation_ops_cache_size;
@@ -319,14 +336,34 @@ let get_ignore_pkhs ctxt = ctxt.ignore_pkhs
 
 let fetch_committees ctxt ~level =
   let open Lwt_result_syntax in
-  let {tezos_node_cctxt = cctxt; committee_cache = cache; _} = ctxt in
+  let {
+    tezos_node_cctxt = cctxt;
+    committee_cache = cache;
+    committee_fetch_in_flight = in_flight;
+    _;
+  } =
+    ctxt
+  in
   match Committee_cache.find cache ~level with
   | Some committee -> return committee
-  | None ->
-      let*? (module Plugin) = get_plugin_for_level ctxt ~level in
-      let+ committees = Plugin.get_committees cctxt ~level in
-      Committee_cache.add cache ~level ~committee:committees ;
-      committees
+  | None -> (
+      match Committee_fetch_tbl.find_opt in_flight level with
+      | Some promise ->
+          (* A fetch for this level is already in flight; share its promise. *)
+          Lwt.protected promise
+      | None ->
+          let promise =
+            let*? (module Plugin) = get_plugin_for_level ctxt ~level in
+            let+ committees = Plugin.get_committees cctxt ~level in
+            Committee_cache.add cache ~level ~committee:committees ;
+            committees
+          in
+          Committee_fetch_tbl.replace in_flight level promise ;
+          Lwt.on_any
+            promise
+            (fun _ -> Committee_fetch_tbl.remove in_flight level)
+            (fun _ -> Committee_fetch_tbl.remove in_flight level) ;
+          Lwt.protected promise)
 
 let fetch_assigned_shard_indices ctxt ~level ~pkh =
   let open Lwt_result_syntax in

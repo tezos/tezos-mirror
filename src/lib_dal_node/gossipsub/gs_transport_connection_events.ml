@@ -43,6 +43,20 @@ let app_message_callback_failed =
     ("message_id", Types.Message_id.encoding)
     ("failure", trace_encoding)
 
+let app_in_callback_failed =
+  declare_2
+    ~section
+    ~prefix_name_with_section:true
+    ~name:"app_in_callback_failed"
+    ~msg:
+      "Shard reception callback failed for message id {message_id}. Failure is \
+       {failure}"
+    ~level:Warning
+    ~pp1:Worker.GS.Message_id.pp
+    ~pp2:pp_print_trace
+    ("message_id", Types.Message_id.encoding)
+    ("failure", trace_encoding)
+
 let send_p2p_message_failed =
   declare_2
     ~section
