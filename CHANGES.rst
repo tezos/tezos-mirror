@@ -51,6 +51,13 @@ Baker
   end-of-stream that a reset or half-open connection never delivers. (MR
   :gl:`!22471`)
 
+- Fixed the baker blocking on its DAL node health check: the periodic health
+  request was awaited while building attestations, so an unresponsive DAL node
+  (e.g. an unreachable or half-open connection) could stall block production and
+  attestation for all of the baker's delegates. The health check now runs
+  asynchronously, off the consensus path, and is bounded by a timeout.
+  (MR :gl:`!22538`)
+
 Accuser
 -------
 
