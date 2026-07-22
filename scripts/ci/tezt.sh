@@ -93,6 +93,34 @@ if [ "$WITH_SELECT_TEZTS" = unknown ]; then
   exit 1
 fi
 
+# --- PID-reuse instrumentation ---------------------------------------------
+# Tezt measures a test's memory by summing Pss over the test process and its
+# children (PIDs read from /proc). A child PID recorded in a snapshot can be
+# recycled to an unrelated process before we read its smaps, poisoning the
+# reading. Reuse only happens once the kernel's sequential PID allocator wraps
+# at kernel.pid_max. To estimate how fast the counter grows during a single
+# run, we log pid_max and a sample of the "current" PID before and after the
+# tests. If the growth approaches (or exceeds, i.e. wraps) pid_max, PID reuse
+# is plausible and the memory measurements cannot be trusted.
+#
+# This instrumentation is only useful while we try to investigate why some tests
+# are reported to be using very large amounts of memory (sometimes > 30 GB).
+# It can be removed after. The goal is to find an example of test for which the
+# measured amount is huge, and see what the value of pid_max is for this job,
+# and how many PIDs were consumed by the job. Basically, estimate whether
+# PID reuse actually occurred.
+
+# Approximate the kernel's next-to-be-allocated PID: spawn a process and report
+# the PID it was assigned. This costs one PID (it increments the very counter
+# we are trying to measure), which is negligible for an estimate.
+probe_next_pid() {
+  sh -c 'echo $$'
+}
+
+PID_MAX=$(cat /proc/sys/kernel/pid_max 2> /dev/null || echo "?")
+PID_BEFORE=$(probe_next_pid)
+echo "[pid-instrumentation] before tests: pid_max=$PID_MAX current_pid~=$PID_BEFORE"
+
 if [ "$WITH_SELECT_TEZTS" = yes ]; then
   if [ ! -f selected_tezts.tsl ]; then
     echo "Cannot find the artifact of select_tezts: selected_tezts.tsl"
@@ -109,6 +137,14 @@ else
   echo "Test selection is disabled."
   _build/default/"$TEZT_EXE" "$@"
   TEZT_EXIT_CODE="$?"
+fi
+
+PID_AFTER=$(probe_next_pid)
+echo "[pid-instrumentation] after tests: pid_max=$PID_MAX current_pid~=$PID_AFTER"
+if [ "$PID_BEFORE" -ge 0 ] 2> /dev/null && [ "$PID_AFTER" -ge 0 ] 2> /dev/null; then
+  # A negative delta means the counter wrapped past pid_max at least once
+  # during the run, which is a strong indicator that PID reuse occurred.
+  echo "[pid-instrumentation] approx PIDs consumed during run: $((PID_AFTER - PID_BEFORE)) (negative => counter wrapped past pid_max at least once)"
 fi
 
 if [ $TEZT_EXIT_CODE -eq 3 ]; then
