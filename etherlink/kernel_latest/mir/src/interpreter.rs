@@ -57,7 +57,7 @@ pub enum InterpretError<'a> {
     NegativeMutez,
     /// Interpreter reached a `FAILWITH` instruction.
     #[error("failed with: {1:?} of type {0:?}")]
-    FailedWith(Type, TypedValue<'a>),
+    FailedWith(Type, Rc<TypedValue<'a>>),
     /// Encountered an argument outside of the bounds defined in the documentation. We keep the message prompted by the octez implementaiton.
     #[error("Overflow")]
     Overflow,
@@ -135,42 +135,22 @@ impl<'a> From<crate::context::AddressRegistryError> for InterpretError<'a> {
     }
 }
 
-/// `FAILWITH` embeds its popped argument directly in
-/// `InterpretError::FailedWith(_, TypedValue<'a>)`. A deep runtime-built
-/// value -- e.g. a `LOOP`-built right-comb of `PAIR` cells -- would
-/// otherwise overflow the kernel's ~1 MiB Rust stack on the auto-derived
-/// `TypedValue` destructor when the error is dropped (L2-1446). Draining
-/// here, at the last drop point, lets the kernel's `#[error]` formatter
-/// observe the value's original structural shape (matching L1 protocol
-/// observability and the TZT `expectation` matcher) before the children
-/// are flattened to unit sentinels by [`drain_deep_typed_value`].
+/// The `FailedWith` payload is held behind a shared `Rc`, so this `Drop` must
+/// not mutate a value that other holders still see. It drains the deep spine
+/// in place — severing a `LOOP`/`PAIR`-built comb so the derived destructor
+/// cannot recurse and overflow the kernel's Rust stack — only when the error
+/// uniquely owns the value (`Rc::get_mut`). A still-shared value is dropped as
+/// a plain refcount decrement and torn down later by its last owner's own
+/// iterative `TypedValue` `Drop`.
 ///
-/// The `Drop` impl forbids partial-move destructuring of `InterpretError`
-/// anywhere in the workspace. Existing match sites all consume the error
-/// by *reference*: `tzt/expectation.rs::unify_interpreter_error` takes
-/// `err: &InterpretError`, and the kernel's
-/// `tezosx-tezos-runtime::view::classify_interpret_error` matches on
-/// `&e`. Both use match-ergonomics auto-borrow on the inner fields, so
-/// `Drop` is irrelevant to their soundness.
-///
-/// Scope note: this `Drop` closes the *drop-time* overflow on a deep
-/// `FailedWith` payload. The *observation-time* overflow via the auto-
-/// derived `Debug` walk on `TypedValue` (reached by the kernel's
-/// `BadRequest(format!("{e:?}"))` and the `#[error("…{1:?}…")]` derive)
-/// is independent and is closed by !21988 (iterative `Debug for
-/// TypedValue`, Linear L2-1436). The two MRs are conjugate: this MR
-/// makes the drop safe; !21988 makes the observation safe.
+/// The impl also forbids partial-move destructuring of `InterpretError`; every
+/// match site consumes the error by reference.
 impl<'a> Drop for InterpretError<'a> {
     fn drop(&mut self) {
-        // Only `FailedWith` currently carries a `TypedValue` payload that
-        // can be deep at runtime. If a future variant gains an owned
-        // `TypedValue` / `Rc<TypedValue>` reachable from attacker input
-        // (e.g. a richer FAILWITH-with-context variant, or a Closure-
-        // returning error), extend this match — otherwise its
-        // auto-derived destructor would re-introduce the L2-1446
-        // overflow on `Drop` of the `Err`.
-        if let InterpretError::FailedWith(_, ref mut v) = self {
-            crate::ast::drain_deep_typed_value(v);
+        if let InterpretError::FailedWith(_, v) = self {
+            if let Some(inner) = Rc::get_mut(v) {
+                crate::ast::drain_deep_typed_value(inner);
+            }
         }
     }
 }
@@ -2643,7 +2623,8 @@ fn interpret_one<'a>(
             stack.swap(0, 1)?;
         }
         I::Failwith(ty) => {
-            let x = pop!();
+            // `pop_rc!` keeps the value shared instead of deep-copying it.
+            let x = pop_rc!();
             return Err(InterpretError::FailedWith(ty.clone(), x));
         }
         I::Never => {
@@ -4014,7 +3995,7 @@ mod interpreter_tests {
         // through the full `ContractInterpretError` Display chain.
         let cie = ContractInterpretError::from(InterpretError::FailedWith(
             Type::Int,
-            value.clone(),
+            Rc::new(value.clone()),
         ));
         let rendered = display_bounded(&cie, CAP);
         assert!(
@@ -4033,7 +4014,7 @@ mod interpreter_tests {
         );
 
         // Debug sink (view path `classify_interpret_error` default arm).
-        let err = InterpretError::FailedWith(Type::Int, value);
+        let err = InterpretError::FailedWith(Type::Int, Rc::new(value));
         let rendered_dbg = debug_bounded(&err, CAP);
         assert!(
             rendered_dbg.len() <= CAP + TRUNCATION_SUFFIX.len(),
@@ -5659,7 +5640,7 @@ mod interpreter_tests {
                 &mut Ctx::default(),
                 &mut stk![V::nat(20)]
             ),
-            Err(InterpretError::FailedWith(Type::Nat, V::nat(20)))
+            Err(InterpretError::FailedWith(Type::Nat, Rc::new(V::nat(20))))
         );
     }
 

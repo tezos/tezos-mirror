@@ -1552,7 +1552,7 @@ mod multisig_tests {
             assert_eq!(
                 collect_ops(interp_res),
                 Err(ContractInterpretError::InterpretError(
-                    InterpretError::FailedWith(T::Unit, TV::Unit)
+                    InterpretError::FailedWith(T::Unit, std::rc::Rc::new(TV::Unit))
                 ))
             );
         })

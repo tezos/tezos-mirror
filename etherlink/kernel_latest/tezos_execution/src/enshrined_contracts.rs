@@ -1811,10 +1811,10 @@ fn make_invalid_runtime_id_error<'a>(
 ) -> mir::interpreter::InterpretError<'a> {
     mir::interpreter::InterpretError::FailedWith(
         mir::ast::Type::new_pair(mir::ast::Type::String, mir::ast::Type::Nat),
-        TypedValue::new_pair(
+        Rc::new(TypedValue::new_pair(
             TypedValue::String("INVALID_RUNTIME_ID".to_owned()),
             TypedValue::Nat(received.clone()),
-        ),
+        )),
     )
 }
 
@@ -5471,7 +5471,7 @@ pub(crate) mod tests {
         );
         match result {
             Err(mir::interpreter::InterpretError::FailedWith(_, ref tv)) => {
-                let TypedValue::Pair(msg, received) = tv else {
+                let TypedValue::Pair(msg, received) = tv.as_ref() else {
                     panic!("expected Pair payload, got: {tv:?}")
                 };
                 assert!(
@@ -5789,7 +5789,7 @@ pub(crate) mod tests {
         );
         match result {
             Err(mir::interpreter::InterpretError::FailedWith(_, ref tv)) => {
-                let TypedValue::Pair(msg, received) = tv else {
+                let TypedValue::Pair(msg, received) = tv.as_ref() else {
                     panic!("expected Pair payload, got: {tv:?}")
                 };
                 assert!(

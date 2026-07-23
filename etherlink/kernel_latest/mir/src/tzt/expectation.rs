@@ -96,9 +96,10 @@ fn unify_interpreter_error<'a>(
             // typed of the failed value we get from the interpreter. The
             // expectation may reference a big_map from the test environment.
             match typecheck_value(value, ctx, typ, AllowForgedLazyStorageId::Yes) {
-                Ok(exp_typed_val) => {
-                    compare_typed_values(exp_typed_val, failed_typed_value.clone())
-                }
+                Ok(exp_typed_val) => compare_typed_values(
+                    exp_typed_val,
+                    TypedValue::unwrap_rc(failed_typed_value.clone()),
+                ),
                 Err(_) => false,
             }
         }
