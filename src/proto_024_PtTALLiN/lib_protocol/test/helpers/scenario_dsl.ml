@@ -101,7 +101,12 @@ let register_test ~__FILE__ ~tags ((title, is_slow, test) : test_closure) : unit
       ~uses_client:false
       ~uses_admin_client:false
       test
-      [T024])
+      (* Tallinn is frozen: this library only survives because Etherlink's
+         tezlink uses parts of it at runtime, and tezlink registers no
+         test. The empty protocol list (rather than [T024]) makes any
+         future call fail loudly at registration time instead of silently
+         scheduling tests on a frozen protocol. *)
+      [])
 
 let register_tests ~__FILE__ ~tags (l : test_closure list) : unit =
   List.iter (register_test ~__FILE__ ~tags) l
