@@ -4615,6 +4615,240 @@ mod test {
         }
     }
 
+    /// A frame must account the intrinsic (initial) gas of *its own*
+    /// transaction — captured when the frame opens — rather than a
+    /// tracer-global value that an inner cross-runtime leg can overwrite
+    /// mid-crossing.
+    ///
+    /// The regression: `CallTracer` used to hold a single `initial_gas`
+    /// field refreshed on every `call`/`create`. An inner cross-runtime
+    /// leg carries its own `TxEnv` (hence its own intrinsic gas); when it
+    /// opened its frame it clobbered that field, and the outer frame —
+    /// closing after the crossing returned — added the inner leg's
+    /// intrinsic gas to its own `gas_used`.
+    ///
+    /// We drive the tracer's `Inspector` hooks directly to reproduce the
+    /// exact interleaving (outer opens; inner opens under a different
+    /// `TxEnv`; inner closes; outer closes) and assert the outer frame's
+    /// recorded `gas_used` reflects the *outer* transaction's intrinsic
+    /// gas. Before the fix it recorded the inner leg's instead. Using only
+    /// the stable `Inspector` API, this test compiles on both revisions
+    /// and fails on the pre-fix one.
+    mod call_tracer_frame_intrinsic_gas {
+        use evm_inspectors::{
+            call_tracer::{CallTracer, CallTracerConfig},
+            storage::trace_tx_path,
+        };
+        use revm::{
+            context::{CfgEnv, Context, LocalContext, TxEnv},
+            context_interface::journaled_state::JournalTr,
+            interpreter::{
+                gas::{calculate_initial_tx_gas_for_tx, Gas},
+                interpreter::EthInterpreter,
+                CallInput, CallInputs, CallOutcome, CallScheme, CallValue,
+                InstructionResult, InterpreterResult,
+            },
+            primitives::{Address, Bytes, TxKind, B256, U256},
+            Inspector,
+        };
+        use rlp::Rlp;
+        use tezos_ethereum::block::BlockConstants;
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_indexable_storage::IndexableStorage;
+        use tezos_smart_rollup_host::path::RefPath;
+        use tezosx_interfaces::RuntimeId;
+        use tezosx_journal::TezosXJournal;
+
+        use crate::{
+            block_env,
+            database::EtherlinkVMDB,
+            journal::Journal,
+            test::utilities::{Registry, DEFAULT_SPEC_ID},
+        };
+
+        // `CallTrace::rlp_append` emits 11 little-endian fields;
+        // `gas_used` is at index 5 and `depth` at index 10.
+        fn trace_gas_used(trace: &Rlp) -> u64 {
+            let bytes: Vec<u8> = trace.val_at(5).unwrap();
+            let mut buf = [0u8; 8];
+            buf[..bytes.len()].copy_from_slice(&bytes);
+            u64::from_le_bytes(buf)
+        }
+
+        fn trace_depth(trace: &Rlp) -> u16 {
+            let bytes: Vec<u8> = trace.val_at(10).unwrap();
+            let mut buf = [0u8; 2];
+            buf[..bytes.len()].copy_from_slice(&bytes);
+            u16::from_le_bytes(buf)
+        }
+
+        fn call_inputs(gas_limit: u64) -> CallInputs {
+            CallInputs {
+                input: CallInput::Bytes(Bytes::new()),
+                return_memory_offset: 0..0,
+                gas_limit,
+                bytecode_address: Address::ZERO,
+                known_bytecode: None,
+                target_address: Address::ZERO,
+                caller: Address::ZERO,
+                value: CallValue::Transfer(U256::ZERO),
+                scheme: CallScheme::Call,
+                is_static: false,
+            }
+        }
+
+        // A frame that closes successfully having spent `gas_spent`.
+        fn call_outcome(gas_spent: u64) -> CallOutcome {
+            let mut gas = Gas::new(1_000_000);
+            let _ = gas.record_cost(gas_spent);
+            CallOutcome::new(
+                InterpreterResult {
+                    result: InstructionResult::Return,
+                    output: Bytes::new(),
+                    gas,
+                },
+                0..0,
+            )
+        }
+
+        #[test]
+        fn outer_frame_keeps_its_own_intrinsic_gas_across_crossing() {
+            let mut host = MockKernelHost::default();
+            let registry = Registry::new();
+            let block_constants = BlockConstants::test_block_with_no_fees();
+            let block = block_env(&block_constants).unwrap();
+
+            // Two legs with deliberately different calldata so their
+            // intrinsic gas differs: the crossing swaps one for the other
+            // while the outer frame is still open.
+            let outer_tx = TxEnv {
+                kind: TxKind::Call(Address::ZERO),
+                data: Bytes::new(),
+                ..Default::default()
+            };
+            let inner_tx = TxEnv {
+                kind: TxKind::Call(Address::ZERO),
+                // 256 non-zero calldata bytes: a strictly larger intrinsic
+                // gas than the empty outer calldata.
+                data: Bytes::from(vec![0xFFu8; 256]),
+                ..Default::default()
+            };
+
+            let outer_initial =
+                calculate_initial_tx_gas_for_tx(&outer_tx, DEFAULT_SPEC_ID).initial_gas;
+            let inner_initial =
+                calculate_initial_tx_gas_for_tx(&inner_tx, DEFAULT_SPEC_ID).initial_gas;
+            assert_ne!(
+                outer_initial, inner_initial,
+                "the two legs must have distinct intrinsic gas for the test \
+                 to tell per-frame accounting apart from tracer-global"
+            );
+
+            let outer_gas_spent = 50_000u64;
+            let tx_hash = B256::from([0xE7; 32]);
+
+            let mut tracer = CallTracer::new(
+                CallTracerConfig {
+                    only_top_call: false,
+                    with_logs: false,
+                },
+                DEFAULT_SPEC_ID,
+                Some(tx_hash),
+            );
+
+            {
+                let db = EtherlinkVMDB::new(&mut host, &registry, &block_constants, None)
+                    .unwrap();
+                let mut evm_journal = TezosXJournal::mock(RuntimeId::Ethereum);
+                let mut journaled_state = Journal::new_with_inner(db, &mut evm_journal);
+                journaled_state.set_spec_id(DEFAULT_SPEC_ID);
+
+                let cfg = CfgEnv::new()
+                    .with_chain_id(block_constants.chain_id.as_u64())
+                    .with_spec_and_mainnet_gas_params(DEFAULT_SPEC_ID);
+
+                let mut ctx = Context {
+                    tx: &outer_tx,
+                    block: &block,
+                    cfg,
+                    journaled_state,
+                    chain: (),
+                    local: LocalContext::default(),
+                    error: Ok(()),
+                };
+
+                let mut outer_inputs = call_inputs(900_000);
+                let mut inner_inputs = call_inputs(400_000);
+
+                // depth 0: the outer frame opens under the outer tx.
+                Inspector::<_, EthInterpreter>::call(
+                    &mut tracer,
+                    &mut ctx,
+                    &mut outer_inputs,
+                );
+
+                // The cross-runtime leg installs its own TxEnv one frame
+                // deeper.
+                ctx.journaled_state.checkpoint();
+                ctx.tx = &inner_tx;
+
+                // depth 1: the inner frame opens and closes under the
+                // inner tx.
+                Inspector::<_, EthInterpreter>::call(
+                    &mut tracer,
+                    &mut ctx,
+                    &mut inner_inputs,
+                );
+                let mut inner_outcome = call_outcome(10_000);
+                Inspector::<_, EthInterpreter>::call_end(
+                    &mut tracer,
+                    &mut ctx,
+                    &inner_inputs,
+                    &mut inner_outcome,
+                );
+
+                // The crossing returns to depth 0. The inner TxEnv is left
+                // in place — exactly the state a tracer-global intrinsic
+                // gas would have been overwritten into.
+                ctx.journaled_state.checkpoint_commit();
+
+                // depth 0: the outer frame closes. The frame stack empties,
+                // so the tracer flushes both frames to storage.
+                let mut outer_outcome = call_outcome(outer_gas_spent);
+                Inspector::<_, EthInterpreter>::call_end(
+                    &mut tracer,
+                    &mut ctx,
+                    &outer_inputs,
+                    &mut outer_outcome,
+                );
+            }
+
+            // Read the flushed traces back and locate the top frame.
+            let path =
+                trace_tx_path(&Some(tx_hash), &RefPath::assert_from(b"/call_trace"))
+                    .unwrap();
+            let storage = IndexableStorage::new_owned_path(path);
+            let length = storage.length(&host).unwrap();
+            let traces: Vec<Vec<u8>> = (0..length)
+                .map(|index| storage.get_value(&host, index).unwrap())
+                .collect();
+            assert_eq!(traces.len(), 2, "expected the outer and inner frames");
+
+            let outer_frame = traces
+                .iter()
+                .map(|bytes| Rlp::new(bytes))
+                .find(|trace| trace_depth(trace) == 0)
+                .expect("the top-level frame should be recorded");
+
+            assert_eq!(
+                trace_gas_used(&outer_frame),
+                outer_gas_spent + outer_initial,
+                "the top frame must account its own transaction's intrinsic \
+                 gas, not the inner cross-runtime leg's"
+            );
+        }
+    }
+
     #[test]
     fn test_osaka_clz_is_enabled() {
         let mut host = MockKernelHost::default();
