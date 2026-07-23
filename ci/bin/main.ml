@@ -352,9 +352,7 @@ let () =
   register
     "schedule_extended_test"
     schedule_extended_tests
-    ~jobs:
-      (Cacio.get_jobs Schedule_extended_test
-      |> List.map (with_interruptible false))
+    ~jobs:(Cacio.get_jobs Schedule_extended_test)
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
        This pipeline unconditionally executes all jobs in 'before_merging' \
@@ -371,16 +369,13 @@ let () =
   register
     "homebrew.daily"
     homebrew_daily
-    ~jobs:
-      (Cacio.get_jobs Cacio.Homebrew_daily
-      |> List.map (with_interruptible false))
+    ~jobs:(Cacio.get_jobs Cacio.Homebrew_daily)
     ~description:
       "Daily pipeline containing all Homebrew jobs (build and extended tests)." ;
   register
     "base_images.daily"
     base_images_daily
-    ~jobs:
-      (Cacio.get_jobs Base_images_daily |> List.map (with_interruptible false))
+    ~jobs:(Cacio.get_jobs Base_images_daily)
     ~description:
       "Daily pipeline containing all Base Images jobs (build and merge)." ;
 
@@ -396,7 +391,7 @@ let () =
   register
     "schedule_extended_rpc_test"
     schedule_extended_rpc_tests
-    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
+    ~jobs:custom_extended_test_jobs
     ~description:
       "Scheduled run of all tezt tests with external RPC servers, weekly on \
        'master'.\n\n\
@@ -405,7 +400,7 @@ let () =
   register
     "schedule_extended_validation_test"
     schedule_extended_validation_tests
-    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
+    ~jobs:custom_extended_test_jobs
     ~description:
       "Scheduled run of all tezt tests with single-process validation, weekly \
        on 'master'.\n\n\
@@ -414,7 +409,7 @@ let () =
   register
     "schedule_extended_baker_remote_mode_test"
     schedule_extended_baker_remote_mode_tests
-    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
+    ~jobs:custom_extended_test_jobs
     ~description:
       "Scheduled run of all tezt tests with baker using remote node, weekly on \
        'master'.\n\n\
@@ -422,7 +417,7 @@ let () =
   register
     "schedule_extended_dal_use_baker"
     schedule_extended_dal_use_baker
-    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
+    ~jobs:custom_extended_test_jobs
     ~description:
       "Scheduled run of all tezt tests with dal using baker commands weekly on \
        'master'.\n\n\
@@ -444,9 +439,7 @@ let () =
   register
     "schedule_docker_master_snapshot"
     schedule_docker_master_snapshot
-    ~jobs:
-      (Cacio.get_jobs Scheduled_docker_master_snapshot
-      |> List.map (with_interruptible false))
+    ~jobs:(Cacio.get_jobs Scheduled_docker_master_snapshot)
     ~description:
       "Scheduled pipeline publishing a dated master Docker image to Docker \
        Hub.\n\n\

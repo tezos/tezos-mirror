@@ -1224,15 +1224,6 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description
     template = None;
   }
 
-let map_non_trigger_job ?error_on_trigger (tezos_job : tezos_job)
-    (f : Gitlab_ci.Types.job -> Gitlab_ci.Types.job) : tezos_job =
-  match tezos_job.job with
-  | Job job -> {tezos_job with job = Job (f job)}
-  | _ -> (
-      match error_on_trigger with
-      | None -> tezos_job
-      | Some error_on_trigger -> failwith "%s" error_on_trigger)
-
 let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
   let all_files =
     let root = "." in
@@ -1288,13 +1279,6 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
         \  rm %s"
         (error_not_generated |> String_set.elements |> String.concat " ")) ;
   if !Cli.has_error then exit 1
-
-(* The reason we don't use [error_on_trigger] here is that this is intended to be
-   used with [List.map] on a whole pipeline, and it's just more convenient to
-   not have to filter out the trigger job to then put it back. *)
-let with_interruptible value tezos_job =
-  map_non_trigger_job tezos_job @@ fun job ->
-  {job with interruptible = Some value}
 
 (* Define [stages:]
 

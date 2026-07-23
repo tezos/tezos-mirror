@@ -7,7 +7,7 @@
 
 open Gitlab_ci.Base
 
-type stage = Build | Test | Publish | Test_publication
+type stage = Start | Build | Test | Publish | Test_publication
 
 (* Should actually be equivalent to [Stdlib.compare]
    if stages are defined in the right order.
@@ -18,18 +18,22 @@ type stage = Build | Test | Publish | Test_publication
    and thus this comment. *)
 let compare_stages a b =
   match (a, b) with
+  | Start, Start -> 0
+  | Start, (Build | Test | Publish | Test_publication) -> -1
+  | Build, Start -> 1
   | Build, Build -> 0
   | Build, (Test | Publish | Test_publication) -> -1
-  | Test, Build -> 1
+  | Test, (Start | Build) -> 1
   | Test, Test -> 0
   | Test, (Publish | Test_publication) -> -1
-  | Publish, (Build | Test) -> 1
+  | Publish, (Start | Build | Test) -> 1
   | Publish, Publish -> 0
   | Publish, Test_publication -> -1
-  | Test_publication, (Build | Test | Publish) -> 1
+  | Test_publication, (Start | Build | Test | Publish) -> 1
   | Test_publication, Test_publication -> 0
 
 let show_stage = function
+  | Start -> "start"
   | Build -> "build"
   | Test -> "test"
   | Publish -> "publish"
@@ -485,8 +489,8 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
 
 (* Add a dependency on [job_trigger] in all jobs that are not [Immediate] or [Manual].
    See GRAPH TRANSFORMATIONS above (step 4). *)
-let add_dependency_on_job_trigger (job_trigger : Tezos_ci.tezos_job)
-    (graph : fixed_job_graph) : fixed_job_graph =
+let add_dependency_on_job_trigger (job_trigger : job) (graph : fixed_job_graph)
+    : fixed_job_graph =
   (* The actual [trigger] job is defined deep inside [code_verification.ml]
      (look for [job_start]). CIAO only really cares about the name of the job,
      so we hackishly redefine it here. *)
@@ -494,16 +498,12 @@ let add_dependency_on_job_trigger (job_trigger : Tezos_ci.tezos_job)
   match node.trigger with
   | Immediate | Manual -> node
   | Auto ->
-      let job =
-        {
-          node.job with
-          needs_legacy = (Job, job_trigger) :: node.job.needs_legacy;
-        }
-      in
+      let job = {node.job with needs = (Job, job_trigger) :: node.job.needs} in
       {node with job}
 
 let convert_stage (trigger : trigger) (stage : stage) : Tezos_ci.Stage.t =
   match (stage, trigger) with
+  | Start, _ -> Tezos_ci.Stages.start
   | Build, _ -> Tezos_ci.Stages.build
   | Test, Immediate ->
       (* In the future, we plan to remove the sanity stage.
@@ -532,8 +532,8 @@ type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
    If it is [false], its conditions are ignored.
    Conditions are typically only used in merge request pipelines such as [before_merging]. *)
 let convert_graph ?(interruptible_pipeline = true)
-    ?(interruptible_publish = false) ~with_condition (graph : fixed_job_graph) :
-    tezos_job_graph =
+    ?(interruptible_publish = false) ?(with_condition = false)
+    (graph : fixed_job_graph) : tezos_job_graph =
   (* To build the graph, we take all jobs from [graph], convert them,
      and add them to [result].
      But before we convert a job, we need the converted version of its dependencies.
@@ -629,27 +629,33 @@ let convert_graph ?(interruptible_pipeline = true)
               in
               let interruptible, interruptible_runner =
                 match stage with
-                | Build | Test ->
+                | Start | Build | Test ->
                     (* Build and test jobs are canceled if another pipeline starts.
-                         This can be overridden by [interruptible_pipeline].
-                         The runner itself can always be preempted, to reduce costs. *)
+                       This can be overridden by [interruptible_pipeline].
+                       The runner itself can always be preempted, to reduce costs.
+                       Start jobs cannot be non-interruptible if we want build and test
+                       jobs to be interruptible, because a rule of GitLab is that as soon
+                       as a non-interruptible job started, the whole pipeline can no
+                       longer be interrupted
+                       (see https://docs.gitlab.com/ci/yaml/#interruptible).
+                       So we use the same interruptibility for the start stage. *)
                     if interruptible_pipeline then (true, None)
                     else (false, None)
                 | Publish ->
                     (* Publish jobs are not canceled if another pipeline starts.
-                         This is to avoid partial publications.
-                         This can be overridden by [interruptible_publish].
-                         The runner can be preempted only if the job is interruptible,
-                         for the same reason (avoiding partial publications). *)
+                       This is to avoid partial publications.
+                       This can be overridden by [interruptible_publish].
+                       The runner can be preempted only if the job is interruptible,
+                       for the same reason (avoiding partial publications). *)
                     if interruptible_publish then (true, None)
                     else (false, Some false)
                 | Test_publication ->
                     (* Tests that are performed after publish jobs are not canceled
-                         if another pipeline starts, because we do want to check
-                         that published artifacts are working.
-                         However, this is not a strong enough requirement for us
-                         to justify the increased costs,
-                         so the runners can still be preempted. *)
+                       if another pipeline starts, because we do want to check
+                       that published artifacts are working.
+                       However, this is not a strong enough requirement for us
+                       to justify the increased costs,
+                       so the runners can still be preempted. *)
                     if interruptible_publish then (true, None) else (false, None)
               in
               let retry : Gitlab_ci.Types.retry option =
@@ -657,7 +663,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 | Some _ -> retry
                 | None -> (
                     match stage with
-                    | Build | Test | Test_publication -> None
+                    | Start | Build | Test | Test_publication -> None
                     | Publish -> Some Tezos_ci.no_retry)
               in
               let dev_infra =
@@ -711,7 +717,7 @@ let convert_graph ?(interruptible_pipeline = true)
 (* Convert user-specified jobs into [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS. *)
 let convert_jobs ?interruptible_pipeline ?interruptible_publish
-    ?with_job_trigger ~with_condition (jobs : (trigger * job) list) :
+    ?with_job_trigger ?with_condition (jobs : (trigger * job) list) :
     Tezos_ci.tezos_job list =
   jobs |> make_graph |> fix_graph
   |> (match with_job_trigger with
@@ -720,7 +726,7 @@ let convert_jobs ?interruptible_pipeline ?interruptible_publish
   |> convert_graph
        ?interruptible_pipeline
        ?interruptible_publish
-       ~with_condition
+       ?with_condition
   |> UID_map.bindings |> List.map snd
 
 let parameterize make =
@@ -904,79 +910,38 @@ let register_test_release_jobs jobs =
   register_jobs Major_release_tag_test jobs ;
   register_jobs Beta_release_tag_test jobs
 
-(* The purpose of this job is to implement a manual trigger
-   for [before_merging] pipelines, instead of running it on
-   each update to the merge request.
+(* Defined at the end of this module. *)
+let job_trigger : job option ref = ref None
 
-   This job is defined directly with CIAO instead of Cacio on purpose.
-
-   - If it was defined in Cacio we would have to add the [start] stage to
-     the [stage] type, allowing other jobs to use the [start] stage,
-     which is probably not what we want.
-
-   - We don't gain anything by declaring it via Cacio.
-     One could think that it would help add the trigger job automatically
-     to pipelines where a job depends on the trigger job,
-     but what we actually want is for jobs to depend on the trigger job
-     only in [before_merging]. So adding the trigger job as a dependency
-     would be a mistake.
-
-   - This job is not component-specific. *)
-let job_trigger =
-  Tezos_ci.job
-    ~__POS__
-    ~image:Tezos_ci.Images.datadog_ci
-    ~stage:Tezos_ci.Stages.start
-    ~rules:[Gitlab_ci.Util.job_rule ~allow_failure:No ~when_:Manual ()]
-    ~timeout:(Minutes 10)
-    ~name:"trigger"
-    [
-      "echo 'Trigger pipeline!'";
-      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
-       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
-    ]
-
-(* This job is defined directly with CIAO instead of Cacio mostly to avoid
-   having to add the [start] stage to the [stage] type.
-   Also we are automatically adding the job to all pipelines,
-   not registering it via the [register_*] functions. *)
-let job_datadog_pipeline_trace =
-  Tezos_ci.job
-    ~__POS__
-    ~allow_failure:Yes
-    ~name:"datadog_pipeline_trace"
-    ~image:Tezos_ci.Images.datadog_ci
-    ~stage:Tezos_ci.Stages.start
-    [
-      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
-       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
-    ]
+(* Defined at the end of this module. *)
+let job_datadog_pipeline_trace : job option ref = ref None
 
 let get_jobs pipeline =
   let jobs = Hashtbl.find_all global_jobs pipeline |> List.rev in
-  [
-    (match pipeline with
-    | Before_merging ->
-        (* [job_trigger] includes what [job_datadog_pipeline_trace] does. *)
-        job_trigger
-    | _ -> job_datadog_pipeline_trace);
-  ]
-  @
+  let job_trigger, job_datadog_pipeline_trace =
+    match (!job_trigger, !job_datadog_pipeline_trace) with
+    | None, _ | _, None ->
+        (* [get_jobs] is not supposed to be called before this module
+           is fully initialized. *)
+        assert false
+    | Some a, Some b -> (a, b)
+  in
+  let jobs =
+    match pipeline with
+    | Before_merging -> (Manual, job_trigger) :: jobs
+    | _ -> (Auto, job_datadog_pipeline_trace) :: jobs
+  in
   match pipeline with
   | Before_merging ->
       convert_jobs ~with_job_trigger:job_trigger ~with_condition:true jobs
   | Merge_train -> convert_jobs ~with_condition:true jobs
-  | Schedule_extended_test ->
-      convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
-  | Master ->
-      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
-  | Packaging_revision_test ->
-      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
-  | Base_images_daily ->
-      convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
-  | _ -> convert_jobs ~with_condition:false jobs
+  | Master -> convert_jobs ~interruptible_publish:true jobs
+  | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
+  | Schedule_extended_test | Custom_extended_test | Base_images_daily
+  | Homebrew_daily | Scheduled_docker_master_snapshot ->
+      (* Scheduled pipelines. *)
+      convert_jobs ~interruptible_pipeline:false jobs
+  | _ -> convert_jobs jobs
 
 let release_tag_rexes = ref String_set.empty
 
@@ -1477,24 +1442,36 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
      - prefixing the name of the pipeline with the name of the component;
      - including the DataDog job.
      Returns the pipeline name. *)
-  let register_pipeline ~description ~jobs name rules =
+  let register_pipeline ?interruptible_pipeline ~description ?(legacy_jobs = [])
+      ~jobs name rules =
+    let job_datadog_pipeline_trace =
+      match !job_datadog_pipeline_trace with
+      | None ->
+          (* [register_pipeline] is not supposed to be called before this module
+               is fully initialized. *)
+          assert false
+      | Some a -> a
+    in
     Tezos_ci.Pipeline.register
       ~description
-      ~jobs:(job_datadog_pipeline_trace :: jobs)
+      ~jobs:
+        (legacy_jobs
+        @ convert_jobs
+            ?interruptible_pipeline
+            ((Auto, job_datadog_pipeline_trace) :: jobs))
       (make_name name)
       rules
 
-  let register_scheduled_pipeline ~description ?(legacy_jobs = []) name jobs =
+  let register_scheduled_pipeline ~description ?legacy_jobs name jobs =
     (* Scheduled pipelines are non-interruptible:
        we don't want them to be canceled just because
        a new commit was merged into master. *)
     register_pipeline
       name
       ~description
-      ~jobs:
-        (legacy_jobs
-        @ convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
-        )
+      ~interruptible_pipeline:false
+      ?legacy_jobs
+      ~jobs
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           scheduled && var "TZ_SCHEDULE_KIND" == str (make_name name)))
@@ -1531,7 +1508,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       already_called := true ;
       f x
 
-  let register_dedicated_release_pipeline ?tag_rex ?(legacy_jobs = []) =
+  let register_dedicated_release_pipeline ?tag_rex ?legacy_jobs =
     only_once "register_dedicated_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
@@ -1539,12 +1516,13 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "release"
       ~description:(sf "Release %s." component_name)
-      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      ?legacy_jobs
+      ~jobs
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
 
-  let register_dedicated_test_release_pipeline ?tag_rex ?(legacy_jobs = []) =
+  let register_dedicated_test_release_pipeline ?tag_rex ?legacy_jobs =
     only_once "register_dedicated_test_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
@@ -1552,12 +1530,13 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "test_release"
       ~description:(sf "Release %s (test)." component_name)
-      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      ?legacy_jobs
+      ~jobs
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
 
-  let register_dedicated_prerelease_pipeline ?tag_rex ?(legacy_jobs = []) =
+  let register_dedicated_prerelease_pipeline ?tag_rex ?legacy_jobs =
     only_once "register_dedicated_prerelease_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_prerelease_pipeline"
     @@ fun component_name ->
@@ -1565,12 +1544,13 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "prerelease"
       ~description:(sf "Prerelease %s." component_name)
-      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      ?legacy_jobs
+      ~jobs
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
 
-  let register_dedicated_test_prerelease_pipeline ?tag_rex ?(legacy_jobs = []) =
+  let register_dedicated_test_prerelease_pipeline ?tag_rex ?legacy_jobs =
     only_once "register_dedicated_test_prerelease_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_test_prerelease_pipeline"
     @@ fun component_name ->
@@ -1578,7 +1558,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "test_prerelease"
       ~description:(sf "Prerelease %s (test)." component_name)
-      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      ?legacy_jobs
+      ~jobs
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
@@ -1590,6 +1571,48 @@ module Shared = Make (struct
 
   let paths = []
 end)
+
+(* Initialize [job_trigger]. *)
+let () =
+  job_trigger :=
+    Some
+      (Shared.job
+         "trigger"
+         ~__POS__
+         ~description:"Manual job that does nothing but guard other jobs."
+         ~image:Tezos_ci.Images.datadog_ci
+         ~stage:Start
+         ~timeout:(Minutes 10)
+         ~allow_failure:No
+         ~force:true
+         ~script:
+           [
+             "echo 'Trigger pipeline!'";
+             "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+             "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+              pipeline_type:$PIPELINE_TYPE --tags \
+              mr_number:$CI_MERGE_REQUEST_IID";
+           ])
+
+(* Initialize [job_pipeline_trace]. *)
+let () =
+  job_datadog_pipeline_trace :=
+    Some
+      (Shared.job
+         "datadog_pipeline_trace"
+         ~__POS__
+         ~description:"Send the initial pipeline information to DataDog."
+         ~allow_failure:Yes
+         ~image:Tezos_ci.Images.datadog_ci
+         ~stage:Start
+         ~force:true
+         ~script:
+           [
+             "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+             "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+              pipeline_type:$PIPELINE_TYPE --tags \
+              mr_number:$CI_MERGE_REQUEST_IID";
+           ])
 
 (* Initialize [job_select_tezts]. *)
 let () =

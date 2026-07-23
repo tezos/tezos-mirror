@@ -7,6 +7,11 @@
 
 (** Pipeline stages.
 
+    [Start] jobs are for internal use only.
+    The [Start] stage is meant to contain either the manual [trigger] job
+    or [datadog_pipeline_trace], i.e. what needs to be done before anything else.
+    Jobs defined with Cacio outside of Cacio itself should thus not use this stage.
+
     The purpose of [Build] jobs is to produce artifacts for other jobs.
     They can depend on other build jobs.
     If there is no job that uses the artifacts of a build job,
@@ -41,7 +46,7 @@
     include the relevant build jobs that they depend on.
     This reflects the fact that the purpose of build jobs is only to
     make artifacts for other jobs. *)
-type stage = Build | Test | Publish | Test_publication
+type stage = Start | Build | Test | Publish | Test_publication
 
 (** Dependency relationships.
 

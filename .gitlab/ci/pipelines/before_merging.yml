@@ -6726,7 +6726,9 @@ trigger:
     allow_failure: false
   needs: []
   dependencies: []
+  allow_failure: false
   timeout: 10 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
