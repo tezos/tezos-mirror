@@ -10,6 +10,7 @@ use num_bigint::{BigInt, BigUint};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 use typed_arena::Arena;
 
 use crate::ast::big_map::{BigMapId, InMemoryLazyStorage, MapInfo};
@@ -192,7 +193,7 @@ fn typecheck_tzt_operation<'a>(
             Ok(TypedValue::new_operation(
                 Operation::Emit(Emit {
                     tag,
-                    value: tc_value,
+                    value: Rc::new(tc_value),
                     arg_ty: Or::Left(arg_ty),
                 }),
                 // The operation counter is dropped when an operation is

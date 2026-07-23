@@ -1040,7 +1040,7 @@ mod tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(Emit {
                     tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
-                    value: TypedValue::nat(10),
+                    value: Rc::new(TypedValue::nat(10)),
                     arg_ty: Or::Right(parse("nat").unwrap())
                 }),
                 100
@@ -1061,7 +1061,7 @@ mod tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(Emit {
                     tag: None,
-                    value: TypedValue::nat(10),
+                    value: Rc::new(TypedValue::nat(10)),
                     arg_ty: Or::Right(parse("nat").unwrap())
                 }),
                 100
@@ -1082,7 +1082,7 @@ mod tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(Emit {
                     tag: None,
-                    value: TypedValue::nat(10),
+                    value: Rc::new(TypedValue::nat(10)),
                     arg_ty: Or::Left(Type::Nat)
                 }),
                 100
@@ -1172,7 +1172,7 @@ mod tests {
             Operation::CreateContract(CreateContract {
                 delegate: None,
                 amount: 100,
-                storage: TypedValue::Unit,
+                storage: Rc::new(TypedValue::Unit),
                 code: Rc::new(cs),
                 micheline_code: &cs_mich,
                 address: ContractKt1Hash::try_from(expected_addr).unwrap(),
@@ -1267,6 +1267,7 @@ mod multisig_tests {
     use crate::lexer::Prim;
     use crate::parser::test_helpers::parse_contract_script;
     use num_bigint::BigUint;
+    use std::rc::Rc;
     use typed_arena::Arena;
     use Type as T;
     use TypedValue as TV;
@@ -1416,7 +1417,7 @@ mod multisig_tests {
                 Ok((
                     vec![OperationInfo {
                         operation: Operation::TransferTokens(TransferTokens {
-                            param: TV::Unit,
+                            param: Rc::new(TV::Unit),
                             destination_address: transfer_destination.try_into().unwrap(),
                             amount: transfer_amount,
                         }),

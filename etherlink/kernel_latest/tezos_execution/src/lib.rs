@@ -977,8 +977,18 @@ where
                     },
                 )?);
                 let dest_contract = contract_from_address(destination_address.hash)?;
-                let value =
-                    param.into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?;
+                // Unparsing needs the parameter by value, so a parameter still
+                // shared with the other occurrences of a `DUP`ed operation is
+                // copied here. This copy is NOT metered: `unwrap_rc` completes
+                // before `into_micheline_optimized_legacy` charges anything,
+                // and the per-operation gas limit allows building a value
+                // large enough that a single extra copy exceeds the heap. It
+                // is one transient copy rather than the N simultaneous ones
+                // MIR's finalization used to make (L2-1831), which is a
+                // reduction, not a bound. Bounding it needs the copy charged
+                // up front, or the unparser working from the borrow.
+                let value = TypedValue::unwrap_rc(param)
+                    .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?;
                 let encoded_value = value.encode(tc_ctx.gas())?.map_err(|e| {
                     TransferError::MichelineSerializationError(e.to_string())
                 })?;
@@ -1097,8 +1107,7 @@ where
                 };
                 let script = Script {
                     code: micheline_code.encode(tc_ctx.gas())?.map_err(encode_err)?,
-                    storage: storage
-                        .clone()
+                    storage: TypedValue::unwrap_rc(storage.clone())
                         .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
                         .encode(tc_ctx.gas())?
                         .map_err(encode_err)?,
@@ -1115,7 +1124,7 @@ where
                             &frame.sender,
                             &amount,
                             Some(&script.code),
-                            storage,
+                            TypedValue::unwrap_rc(storage),
                             &Origin::Native,
                         );
                         match receipt {
@@ -1164,7 +1173,7 @@ where
                     ApplyOperationError::EmitMichelineSerializationError(e.to_string())
                 };
                 let payload = Some(
-                    value
+                    TypedValue::unwrap_rc(value)
                         .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
                         .encode(tc_ctx.gas())?
                         .map_err(emit_err)?

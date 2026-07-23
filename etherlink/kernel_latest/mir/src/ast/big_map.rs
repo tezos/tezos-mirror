@@ -962,12 +962,15 @@ impl<'a> TypedValue<'a> {
                             // Can contain only pushable values, thus no big maps
                             results.push(None)
                         }
-                        // `param` and `storage` are owned, not `Rc`-shared, so
-                        // they are queued directly and never memoized.
+                        // `param` and `storage` are `Rc`-shared like every other
+                        // deep value (L2-1831), so they go through
+                        // `push_child`: an operation `DUP`ed into the returned
+                        // list several times shares one payload, and that is
+                        // exactly the shape the memo exists for.
                         Operation(op) => match &op.operation {
                             crate::ast::Operation::TransferTokens(t) => {
                                 frames.push(Frame::BuildTransferTokens(op, t));
-                                frames.push(Frame::Visit(&t.param));
+                                push_child(&mut frames, &t.param);
                             }
                             crate::ast::Operation::SetDelegate(_) => results.push(None),
                             crate::ast::Operation::Emit(_) => {
@@ -976,7 +979,7 @@ impl<'a> TypedValue<'a> {
                             }
                             crate::ast::Operation::CreateContract(cc) => {
                                 frames.push(Frame::BuildCreateContract(op, cc));
-                                frames.push(Frame::Visit(&cc.storage));
+                                push_child(&mut frames, &cc.storage);
                             }
                         },
                     }
@@ -1051,8 +1054,9 @@ impl<'a> TypedValue<'a> {
                         rebuilt_operation(
                             op,
                             crate::ast::Operation::TransferTokens(TransferTokens {
-                                // Sole owner of a freshly built value: moves.
-                                param: TypedValue::unwrap_rc(param),
+                                // Already an `Rc`, and freshly built: stored
+                                // as is, no unwrap and no copy.
+                                param,
                                 destination_address: t.destination_address.clone(),
                                 amount: t.amount,
                             }),
@@ -1066,7 +1070,7 @@ impl<'a> TypedValue<'a> {
                         rebuilt_operation(
                             op,
                             crate::ast::Operation::CreateContract(CreateContract {
-                                storage: TypedValue::unwrap_rc(storage),
+                                storage,
                                 delegate: cc.delegate.clone(),
                                 amount: cc.amount,
                                 code: cc.code.clone(),
@@ -1860,7 +1864,7 @@ mod review_verification {
         let operation_carrying = |inner: TypedValue<'static>| {
             TypedValue::new_operation(
                 crate::ast::Operation::TransferTokens(TransferTokens {
-                    param: inner,
+                    param: Rc::new(inner),
                     destination_address:
                         crate::ast::michelson_address::Address::try_from(
                             "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
@@ -2491,7 +2495,7 @@ mod review_verification {
         .unwrap();
         let mut root = TypedValue::new_operation(
             crate::ast::Operation::TransferTokens(TransferTokens {
-                param: leaf_big_map(3),
+                param: Rc::new(leaf_big_map(3)),
                 destination_address: destination.clone(),
                 amount: 123_456,
             }),
@@ -2547,7 +2551,7 @@ mod review_verification {
             crate::ast::Operation::CreateContract(CreateContract {
                 delegate: Some(delegate.clone()),
                 amount: 999,
-                storage: leaf_big_map(4),
+                storage: Rc::new(leaf_big_map(4)),
                 code: code.clone(),
                 micheline_code: &micheline_code,
                 address: address.clone(),
