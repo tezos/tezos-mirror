@@ -140,6 +140,10 @@
 
 ### Michelson Runtime
 
+- **Security fix:** the instructions that only forward a value without
+  reading it no longer deep-clone that value when it is `DUP`-shared
+  (an OOM-crash vector); it is now forwarded behind its shared
+  pointer. (!22585)
 - **Bug fix:** `FAILWITH` no longer deep-copies its failure value. The value is
   only carried in the error for reporting, so it is now held behind the shared
   `Rc` it already lives behind on the stack; a large shared value (e.g.
