@@ -301,6 +301,29 @@ let set_ongoing_amplifications ctxt ongoing_amplifications =
 
 let get_ignore_pkhs ctxt = ctxt.ignore_pkhs
 
+let apply_fetch_dedup ~in_flight ~fetch_fn level =
+  match Committee_fetch_tbl.find_opt in_flight level with
+  | Some promise ->
+      (* A fetch for this level is already in flight; share its promise.
+         Lwt.protected ensures a cancellation of one caller's handle does not
+         propagate into the shared fetch or reach other callers. *)
+      Lwt.protected promise
+  | None ->
+      let promise = fetch_fn level in
+      Committee_fetch_tbl.replace in_flight level promise ;
+      (* Attach cleanup to the raw promise so the entry is removed when the
+         fetch settles, regardless of whether any caller was cancelled. *)
+      Lwt.on_any
+        promise
+        (fun result ->
+          (match result with
+          | Error trace ->
+              Event.emit_dont_wait__committee_fetch_failed ~level ~trace
+          | Ok _ -> ()) ;
+          Committee_fetch_tbl.remove in_flight level)
+        (fun _ -> Committee_fetch_tbl.remove in_flight level) ;
+      Lwt.protected promise
+
 let fetch_committees ctxt ~level =
   let open Lwt_result_syntax in
   let {
@@ -313,29 +336,15 @@ let fetch_committees ctxt ~level =
   in
   match Committee_cache.find cache ~level with
   | Some committee -> return committee
-  | None -> (
-      match Committee_fetch_tbl.find_opt in_flight level with
-      | Some promise ->
-          (* A fetch for this level is already in flight; share its promise. *)
-          Lwt.protected promise
-      | None ->
-          let promise =
-            let*? (module Plugin) = get_plugin_for_level ctxt ~level in
-            let+ committees = Plugin.get_committees cctxt ~level in
-            Committee_cache.add cache ~level ~committee:committees ;
-            committees
-          in
-          Committee_fetch_tbl.replace in_flight level promise ;
-          Lwt.on_any
-            promise
-            (fun result ->
-              (match result with
-              | Error trace ->
-                  Event.emit_dont_wait__committee_fetch_failed ~level ~trace
-              | Ok _ -> ()) ;
-              Committee_fetch_tbl.remove in_flight level)
-            (fun _ -> Committee_fetch_tbl.remove in_flight level) ;
-          Lwt.protected promise)
+  | None ->
+      apply_fetch_dedup
+        ~in_flight
+        ~fetch_fn:(fun level ->
+          let*? (module Plugin) = get_plugin_for_level ctxt ~level in
+          let+ committees = Plugin.get_committees cctxt ~level in
+          Committee_cache.add cache ~level ~committee:committees ;
+          committees)
+        level
 
 let fetch_assigned_shard_indices ctxt ~level ~pkh =
   let open Lwt_result_syntax in
@@ -669,4 +678,14 @@ module P2P = struct
         map
         []
   end
+end
+
+module Internal_for_tests = struct
+  type fetch_in_flight =
+    Committee_cache.committee tzresult Lwt.t Committee_fetch_tbl.t
+
+  let create_fetch_in_flight () =
+    Committee_fetch_tbl.create Constants.committee_cache_size
+
+  let apply_fetch_dedup = apply_fetch_dedup
 end
