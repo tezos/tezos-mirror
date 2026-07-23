@@ -60,6 +60,12 @@
   duplicated with `DUP`) could otherwise be copied into a second full allocation
   and trap the kernel on the 4 GiB wasm heap. The copy is now gas-charged, so an
   oversized value runs out of gas first. (!22587)
+- **Bug fix:** `FAILWITH` no longer deep-copies its failure value. The value is
+  only carried in the error for reporting, so it is now held behind the shared
+  `Rc` it already lives behind on the stack; a large shared value (e.g.
+  duplicated with `DUP`) could otherwise be copied into a second full allocation
+  and push the interpreter past the 4 GiB wasm heap, trapping the kernel before
+  it runs out of gas. (!22582)
 
 ### Native Atomic Composability
 
