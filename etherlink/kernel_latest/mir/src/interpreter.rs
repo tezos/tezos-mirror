@@ -3761,6 +3761,39 @@ mod interpreter_tests {
         );
     }
 
+    /// L2-1837: `FAILWITH` on a shared value must embed it behind its `Rc`,
+    /// not deep-copy it. A `DUP` leaves the operand shared (refcount 2); pre-
+    /// fix `FAILWITH` popped with `pop!` -> `unwrap_rc`, deep-cloning the
+    /// whole `~SIZE`-byte value into a second allocation — enough coexisting
+    /// copies exceed the 4 GiB wasm heap and trap the kernel. Post-fix
+    /// `FAILWITH` pops with `pop_rc!`, so the allocation is O(1) in `SIZE`.
+    /// The bound is far below `SIZE`, so a linear deep copy fails it while
+    /// the shared-`Rc` path passes.
+    #[test]
+    fn failwith_shared_value_is_not_deep_copied() {
+        const SIZE: usize = 16 * 1024 * 1024; // 16 MiB leaf value
+        let mut stack = stk![V::Bytes(vec![0u8; SIZE])];
+        let mut ctx = Ctx::default();
+        // DUP shares the operand; FAILWITH then embeds the (still shared)
+        // value in the error. Built before measuring so only interpretation
+        // is counted.
+        let prog = [Dup(None), Failwith(Type::Bytes)];
+        let bytes_before = thread_allocated_bytes();
+        let outcome = interpret(&prog, &mut ctx, &mut stack);
+        let allocated = thread_allocated_bytes() - bytes_before;
+        assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+        assert!(
+            allocated < (SIZE as u64) / 8,
+            "FAILWITH on a shared {SIZE}-byte value allocated {allocated} bytes \
+             (bound {}): the shared operand was deep-copied instead of being \
+             held behind its Rc.",
+            SIZE / 8,
+        );
+        // Keep both alive until after the measurement, then drop explicitly.
+        drop(outcome);
+        drop(stack);
+    }
+
     fn unparse_type_cost(ty: &Type) -> u32 {
         let arena = Arena::new();
         let mut gas = Gas::default();
