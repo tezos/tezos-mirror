@@ -2765,6 +2765,8 @@ fn interpret_one<'a>(
                 let s2 = pop!(V::String);
                 ctx.gas()
                     .consume(interpret_cost::concat_string_pair(s1.len(), s2.len())?)?;
+                s1.try_reserve_exact(s2.len())
+                    .map_err(|_| InterpretError::Overflow)?;
                 s1.push_str(&s2);
                 stack.push(V::String(s1));
             }
@@ -2773,6 +2775,8 @@ fn interpret_one<'a>(
                 let bs2 = pop!(V::Bytes);
                 ctx.gas()
                     .consume(interpret_cost::concat_bytes_pair(bs1.len(), bs2.len())?)?;
+                bs1.try_reserve_exact(bs2.len())
+                    .map_err(|_| InterpretError::Overflow)?;
                 bs1.extend_from_slice(&bs2);
                 stack.push(V::Bytes(bs1))
             }
@@ -2798,7 +2802,11 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::concat_string_list(total_len)?)?;
 
-                let mut result = String::with_capacity(total_len.ok_or(OutOfGas)?);
+                let total_len = total_len.ok_or(InterpretError::Overflow)?;
+                let mut result = String::new();
+                result
+                    .try_reserve_exact(total_len)
+                    .map_err(|_| InterpretError::Overflow)?;
                 for val in list {
                     let s = match val.as_ref() {
                         V::String(s) => s,
@@ -2836,7 +2844,11 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::concat_bytes_list(total_len)?)?;
 
-                let mut result = Vec::with_capacity(total_len.ok_or(OutOfGas)?);
+                let total_len = total_len.ok_or(InterpretError::Overflow)?;
+                let mut result = Vec::new();
+                result
+                    .try_reserve_exact(total_len)
+                    .map_err(|_| InterpretError::Overflow)?;
                 for val in list {
                     let bs = match val.as_ref() {
                         V::Bytes(bs) => bs,
