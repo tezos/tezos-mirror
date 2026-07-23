@@ -28,6 +28,10 @@
 
 ### Michelson Runtime
 
+- **Security fix:** the instructions that only forward a value without
+  reading it no longer deep-clone that value when it is `DUP`-shared
+  (an OOM-crash vector); it is now forwarded behind its shared
+  pointer. (!22585)
 - **Security fix:** the instructions that only read a bytes operand no
   longer deep-clone it when it is `DUP`-shared (an OOM-crash vector);
   the operand is now read borrowed. (!22580)
