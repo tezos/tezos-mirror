@@ -3329,29 +3329,29 @@ fn interpret_one<'a>(
             }
         }
         I::Blake2b => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::blake2b(msg)?)?;
-            *msg = blake2b_256(msg).to_vec();
+            stack.push(V::Bytes(blake2b_256(msg).to_vec()));
         }
         I::Keccak => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::keccak(msg)?)?;
-            *msg = keccak256(msg).to_vec();
+            stack.push(V::Bytes(keccak256(msg).to_vec()));
         }
         I::Sha256 => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::sha256(msg)?)?;
-            *msg = sha256(msg).to_vec();
+            stack.push(V::Bytes(sha256(msg).to_vec()));
         }
         I::Sha3 => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::sha3(msg)?)?;
-            *msg = sha3_256(msg).to_vec();
+            stack.push(V::Bytes(sha3_256(msg).to_vec()));
         }
         I::Sha512 => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::sha512(msg)?)?;
-            *msg = sha512(msg).to_vec();
+            stack.push(V::Bytes(sha512(msg).to_vec()));
         }
         I::Balance => {
             ctx.gas().consume(interpret_cost::BALANCE)?;
