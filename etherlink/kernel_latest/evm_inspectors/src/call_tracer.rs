@@ -215,11 +215,6 @@ impl CallTracer {
     }
 
     #[inline]
-    pub fn tx_hash(&self) -> Option<B256> {
-        self.transaction_hash
-    }
-
-    #[inline]
     fn set_call_trace(&mut self, depth: u16, call_trace: CallTrace) {
         self.call_trace.insert(depth, call_trace);
     }
