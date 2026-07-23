@@ -2124,7 +2124,7 @@ images.debian:
   variables:
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
-    IMAGE_PATH: debian:$RELEASE
+    IMAGE_PATH: debian:$RELEASE-slim
     PLATFORM: linux/amd64,linux/arm64
   retry:
     max: 2
