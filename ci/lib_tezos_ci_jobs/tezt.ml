@@ -66,11 +66,10 @@ let common_needs =
 
 (* Specialization of Cacio's [tezt_job] with defaults that are specific
    to Tezt jobs defined in this module / the [Shared] component. *)
-let tezt_job ?(retry_tests = 1) ?(needs = common_needs) ?(needs_legacy = []) =
+let tezt_job ?(retry_tests = 1) ?(needs = common_needs) =
   CI.tezt_job
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs
-    ~needs_legacy
     ~retry_tests
 
 let job_tezt =
