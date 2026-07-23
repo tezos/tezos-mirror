@@ -12,6 +12,7 @@ Resources
    :maxdepth: 2
 
    hardware-metrics-switching
+   delegates-dashboard
 
 Jsonnet
 ~~~~~~~
@@ -65,6 +66,8 @@ with ``dashboard_name`` one of:
   - ``logs``: same as ``basic`` but also displaying node's logs (thanks to `Loki and promtail <https://github.com/grafana/loki>`__)
   - ``full``: same as ``logs`` but also displaying hardware metrics (thanks to `netdata <https://www.netdata.cloud/>`__)
   - ``dal-basic``: a simple dashboard displaying some DAL node's metrics,
+  - ``delegates``: a dashboard monitoring delegates (bakers) health,
+    participation and staking, see :doc:`delegates-dashboard`,
 
 To create the dashboards for a different branch
 

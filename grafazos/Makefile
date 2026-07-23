@@ -1,4 +1,4 @@
-all: basic logs full compact dal-basic profiling tezt_cloud-layer1 compare-hardware
+all: basic logs full compact dal-basic profiling tezt_cloud-layer1 compare-hardware delegates
 
 NODE_INSTANCE_LABEL ?= instance
 LOGS_LABEL ?= job
@@ -57,3 +57,5 @@ profiling: octez-profiling.jsonnet
 tezt_cloud-layer1: tezt_cloud-layer1.jsonnet
 
 compare-hardware: compare-hardware.jsonnet
+
+delegates: octez-delegates.jsonnet
