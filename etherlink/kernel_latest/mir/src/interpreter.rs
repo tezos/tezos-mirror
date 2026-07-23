@@ -3038,9 +3038,11 @@ fn interpret_one<'a>(
         }
         I::Pack => {
             ctx.gas().consume(interpret_cost::PACK)?;
-            let v = pop!();
-            let arena = Arena::new();
-            let mich = v.into_micheline_optimized_legacy(&arena, ctx.gas())?;
+            // `pop_rc!` + borrowed unparse: read the value through its shared
+            // `Rc` instead of deep-copying it, charging gas before cloning any
+            // leaf so an oversized value runs out of gas rather than out of heap.
+            let v = pop_rc!();
+            let mich = v.clone_into_micheline_optimized_legacy(arena, ctx.gas())?;
             let encoded = mich.encode_for_pack()??;
             stack.push(V::Bytes(encoded));
         }
