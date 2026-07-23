@@ -1,0 +1,818 @@
+From 37b1ceeb5429dd53c59d26432d399cb05454a274 Mon Sep 17 00:00:00 2001
+From: Julien Tesson <julien.tesson@nomadic-labs.com>
+Date: Thu, 23 Jul 2026 14:45:09 +0200
+Subject: [PATCH 1/1] Proto/Ushuaia: profiler patch
+
+---
+ src/lib_protocol_environment/sigs/v16.in.ml   |  2 +
+ src/lib_protocol_environment/sigs/v16.ml      | 85 +++++++++++++----
+ .../sigs/v16/profiler.mli                     | 39 ++++++++
+ src/proto_025_PsUshuai/lib_protocol/apply.ml  | 17 ++--
+ src/proto_025_PsUshuai/lib_protocol/baking.ml |  4 +-
+ .../lib_protocol/dal_slot_storage.ml          | 10 +-
+ .../lib_protocol/delegate_cycles.ml           | 91 +++++++++++++++----
+ src/proto_025_PsUshuai/lib_protocol/dune      |  2 +
+ .../lib_protocol/init_storage.ml              | 30 +++++-
+ src/proto_025_PsUshuai/lib_protocol/main.ml   | 43 +++++++--
+ .../lib_protocol/raw_context.ml               |  4 +-
+ .../lib_protocol/script_cache.ml              | 19 ++--
+ .../lib_protocol/script_interpreter.ml        | 21 ++++-
+ .../lib_protocol/script_ir_translator.ml      | 26 ++++--
+ 14 files changed, 311 insertions(+), 82 deletions(-)
+ create mode 100644 src/lib_protocol_environment/sigs/v16/profiler.mli
+
+diff --git a/src/lib_protocol_environment/sigs/v16.in.ml b/src/lib_protocol_environment/sigs/v16.in.ml
+index e4372cbc3bb..7d8acf506a1 100644
+--- a/src/lib_protocol_environment/sigs/v16.in.ml
++++ b/src/lib_protocol_environment/sigs/v16.in.ml
+@@ -107,6 +107,8 @@ module type T = sig
+ 
+   module Operation_list_list_hash : [%sig "v16/operation_list_list_hash.mli"]
+ 
++  module Profiler : [%sig "v16/profiler.mli"]
++
+   module Protocol_hash : [%sig "v16/protocol_hash.mli"]
+ 
+   module Context_hash : [%sig "v16/context_hash.mli"]
+diff --git a/src/lib_protocol_environment/sigs/v16.ml b/src/lib_protocol_environment/sigs/v16.ml
+index c859b32f81c..91c60ec8b63 100644
+--- a/src/lib_protocol_environment/sigs/v16.ml
++++ b/src/lib_protocol_environment/sigs/v16.ml
+@@ -10128,6 +10128,51 @@ end
+ # 108 "v16.in.ml"
+ 
+ 
++  module Profiler : sig
++# 1 "v16/profiler.mli"
++(*****************************************************************************)
++(*                                                                           *)
++(* SPDX-License-Identifier: MIT                                              *)
++(* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
++(*                                                                           *)
++(*****************************************************************************)
++
++type metadata = (string * string) list
++
++type id = string * metadata
++
++type ids = string list * metadata
++
++type verbosity = Notice | Info | Debug
++
++val record : cpu:bool option -> verbosity -> id -> unit
++
++val record_f : cpu:bool option -> verbosity -> id -> (unit -> 'a) -> 'a
++
++val record_s :
++  cpu:bool option -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++
++val aggregate : cpu:bool option -> verbosity -> id -> unit
++
++val aggregate_f : cpu:bool option -> verbosity -> id -> (unit -> 'a) -> 'a
++
++val aggregate_s :
++  cpu:bool option -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++
++val span_f : cpu:bool option -> verbosity -> ids -> (unit -> 'a) -> 'a
++
++val span_s :
++  cpu:bool option -> verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++
++val stop : unit -> unit
++
++val stamp : cpu:bool option -> verbosity -> id -> unit
++
++val mark : verbosity -> ids -> unit
++end
++# 110 "v16.in.ml"
++
++
+   module Protocol_hash : sig
+ # 1 "v16/protocol_hash.mli"
+ (*****************************************************************************)
+@@ -10158,7 +10203,7 @@ end
+ (** Protocol hashes / IDs. *)
+ include S.HASH
+ end
+-# 110 "v16.in.ml"
++# 112 "v16.in.ml"
+ 
+ 
+   module Context_hash : sig
+@@ -10211,7 +10256,7 @@ end
+ 
+ type version = Version.t
+ end
+-# 112 "v16.in.ml"
++# 114 "v16.in.ml"
+ 
+ 
+   module Sapling : sig
+@@ -10359,7 +10404,7 @@ module Verification : sig
+   val final_check : t -> UTXO.transaction -> string -> bool
+ end
+ end
+-# 114 "v16.in.ml"
++# 116 "v16.in.ml"
+ 
+ 
+   module Timelock : sig
+@@ -10416,7 +10461,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
+     Used for gas accounting*)
+ val get_plaintext_size : chest -> int
+ end
+-# 116 "v16.in.ml"
++# 118 "v16.in.ml"
+ 
+ 
+   module Vdf : sig
+@@ -10504,7 +10549,7 @@ val prove : discriminant -> challenge -> difficulty -> result * proof
+     @raise Invalid_argument when inputs are invalid *)
+ val verify : discriminant -> challenge -> difficulty -> result -> proof -> bool
+ end
+-# 118 "v16.in.ml"
++# 120 "v16.in.ml"
+ 
+ 
+   module Micheline : sig
+@@ -10564,7 +10609,7 @@ val annotations : ('l, 'p) node -> string list
+ 
+ val strip_locations : (_, 'p) node -> 'p canonical
+ end
+-# 120 "v16.in.ml"
++# 122 "v16.in.ml"
+ 
+ 
+   module Block_header : sig
+@@ -10621,7 +10666,7 @@ type t = {shell : shell_header; protocol_data : bytes}
+ 
+ include S.HASHABLE with type t := t and type hash := Block_hash.t
+ end
+-# 122 "v16.in.ml"
++# 124 "v16.in.ml"
+ 
+ 
+   module Bounded : sig
+@@ -10770,7 +10815,7 @@ module Int8 (B : BOUNDS with type ocaml_type := int) :
+ module Uint8 (B : BOUNDS with type ocaml_type := int) :
+   S with type ocaml_type := int
+ end
+-# 124 "v16.in.ml"
++# 126 "v16.in.ml"
+ 
+ 
+   module Fitness : sig
+@@ -10804,7 +10849,7 @@ end
+     compared in a lexicographical order (longer list are greater). *)
+ include S.T with type t = bytes list
+ end
+-# 126 "v16.in.ml"
++# 128 "v16.in.ml"
+ 
+ 
+   module Operation : sig
+@@ -10848,7 +10893,7 @@ type t = {shell : shell_header; proto : bytes}
+ 
+ include S.HASHABLE with type t := t and type hash := Operation_hash.t
+ end
+-# 128 "v16.in.ml"
++# 130 "v16.in.ml"
+ 
+ 
+   module Context : sig
+@@ -11485,7 +11530,7 @@ module Cache :
+      and type key = cache_key
+      and type value = cache_value
+ end
+-# 130 "v16.in.ml"
++# 132 "v16.in.ml"
+ 
+ 
+   module Updater : sig
+@@ -12021,7 +12066,7 @@ end
+     not complete until [init] in invoked. *)
+ val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
+ end
+-# 132 "v16.in.ml"
++# 134 "v16.in.ml"
+ 
+ 
+   module RPC_context : sig
+@@ -12175,7 +12220,7 @@ val make_opt_call3 :
+   'i ->
+   'o option shell_tzresult Lwt.t
+ end
+-# 134 "v16.in.ml"
++# 136 "v16.in.ml"
+ 
+ 
+   module Context_binary : sig
+@@ -12218,7 +12263,7 @@ module Tree :
+ 
+ val make_empty_context : ?root:string -> unit -> t
+ end
+-# 136 "v16.in.ml"
++# 138 "v16.in.ml"
+ 
+ 
+   module Plonk : sig
+@@ -12337,7 +12382,7 @@ val scalar_array_encoding : scalar array Data_encoding.t
+     on the given [inputs] according to the [public_parameters]. *)
+ val verify : public_parameters -> verifier_inputs -> proof -> bool
+ end
+-# 138 "v16.in.ml"
++# 140 "v16.in.ml"
+ 
+ 
+   module Dal : sig
+@@ -12492,7 +12537,7 @@ val share_is_trap :
+   traps_fraction:Q.t ->
+   (bool, [> `Decoding_error]) Result.t
+ end
+-# 140 "v16.in.ml"
++# 142 "v16.in.ml"
+ 
+ 
+   module Skip_list : sig
+@@ -12724,7 +12769,7 @@ module Make (_ : sig
+   val basis : int
+ end) : S
+ end
+-# 142 "v16.in.ml"
++# 144 "v16.in.ml"
+ 
+ 
+   module Smart_rollup : sig
+@@ -12781,7 +12826,7 @@ module Inbox_hash : S.HASH
+ (** Smart rollup merkelized payload hashes' hash *)
+ module Merkelized_payload_hashes_hash : S.HASH
+ end
+-# 144 "v16.in.ml"
++# 146 "v16.in.ml"
+ 
+ 
+   module Wasm_2_0_0 : sig
+@@ -12894,7 +12939,7 @@ val wasm_pvm_machine :
+       and type state = wasm_pvm_machine_state
+       and type proof = wasm_pvm_machine_proof)
+ end
+-# 146 "v16.in.ml"
++# 148 "v16.in.ml"
+ 
+ 
+   module Riscv : sig
+@@ -12957,6 +13002,6 @@ val bytes_to_output_proof : bytes -> (output_proof, string) result
+ 
+ val get_current_level : state -> int32 option Lwt.t
+ end
+-# 148 "v16.in.ml"
++# 150 "v16.in.ml"
+ 
+ end
+diff --git a/src/lib_protocol_environment/sigs/v16/profiler.mli b/src/lib_protocol_environment/sigs/v16/profiler.mli
+new file mode 100644
+index 00000000000..efbc52c38ab
+--- /dev/null
++++ b/src/lib_protocol_environment/sigs/v16/profiler.mli
+@@ -0,0 +1,39 @@
++(*****************************************************************************)
++(*                                                                           *)
++(* SPDX-License-Identifier: MIT                                              *)
++(* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
++(*                                                                           *)
++(*****************************************************************************)
++
++type metadata = (string * string) list
++
++type id = string * metadata
++
++type ids = string list * metadata
++
++type verbosity = Notice | Info | Debug
++
++val record : cpu:bool option -> verbosity -> id -> unit
++
++val record_f : cpu:bool option -> verbosity -> id -> (unit -> 'a) -> 'a
++
++val record_s :
++  cpu:bool option -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++
++val aggregate : cpu:bool option -> verbosity -> id -> unit
++
++val aggregate_f : cpu:bool option -> verbosity -> id -> (unit -> 'a) -> 'a
++
++val aggregate_s :
++  cpu:bool option -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++
++val span_f : cpu:bool option -> verbosity -> ids -> (unit -> 'a) -> 'a
++
++val span_s :
++  cpu:bool option -> verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++
++val stop : unit -> unit
++
++val stamp : cpu:bool option -> verbosity -> id -> unit
++
++val mark : verbosity -> ids -> unit
+diff --git a/src/proto_025_PsUshuai/lib_protocol/apply.ml b/src/proto_025_PsUshuai/lib_protocol/apply.ml
+index f128a25b226..cbd29956743 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/apply.ml
++++ b/src/proto_025_PsUshuai/lib_protocol/apply.ml
+@@ -2595,7 +2595,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
+     ~source ~operation contents_list =
+   let open Lwt_result_syntax in
+   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
+-  let* ctxt, fees_updated_contents_list = take_fees ctxt contents_list in
++  let* ctxt, fees_updated_contents_list =
++    (take_fees
++       ctxt
++       contents_list [@profiler.record_s {verbosity = Notice} "take_fees"])
++  in
+   let gas_cost_for_sig_check =
+     let algo =
+       Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key_hash source
+@@ -2874,11 +2878,12 @@ let may_start_new_cycle ctxt =
+   match Level.dawn_of_a_new_cycle ctxt with
+   | None -> return (ctxt, [], [])
+   | Some last_cycle ->
+-      let* ctxt, balance_updates, deactivated =
+-        Delegate.cycle_end ctxt last_cycle
+-      in
+-      let+ ctxt = Bootstrap.cycle_end ctxt last_cycle in
+-      (ctxt, balance_updates, deactivated)
++      (let* ctxt, balance_updates, deactivated =
++         Delegate.cycle_end ctxt last_cycle
++       in
++       let+ ctxt = Bootstrap.cycle_end ctxt last_cycle in
++       (ctxt, balance_updates, deactivated))
++      [@profiler.record_s {verbosity = Notice} "delegate end cycle"]
+ 
+ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
+   let open Lwt_result_syntax in
+diff --git a/src/proto_025_PsUshuai/lib_protocol/baking.ml b/src/proto_025_PsUshuai/lib_protocol/baking.ml
+index 616ca63c329..13043031c13 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/baking.ml
++++ b/src/proto_025_PsUshuai/lib_protocol/baking.ml
+@@ -114,7 +114,7 @@ type ordered_slots = {
+ (* Slots returned by this function are assumed by consumers to be in increasing
+    order, hence the use of [Slot.Range.rev_fold_es]. *)
+ let attesting_rights (ctxt : t) ~attested_level =
+-  let consensus_committee_size = Constants.consensus_committee_size ctxt in
++  (let consensus_committee_size = Constants.consensus_committee_size ctxt in
+   let all_bakers_attest_enabled =
+     Attesting_power.check_all_bakers_attest_at_level ctxt ~attested_level
+   in
+@@ -219,7 +219,7 @@ let attesting_rights (ctxt : t) ~attested_level =
+         map
+     else map
+   in
+-  return (ctxt, map)
++  return (ctxt, map)) [@profiler.record_s {verbosity = Notice} "attesting_rights"]
+ 
+ let incr_slot att_rights =
+   let one = Attesting_power.make ~slots:1 ~baking_power:0L in
+diff --git a/src/proto_025_PsUshuai/lib_protocol/dal_slot_storage.ml b/src/proto_025_PsUshuai/lib_protocol/dal_slot_storage.ml
+index 81ea04fc3ea..0d99307bd8b 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/dal_slot_storage.ml
++++ b/src/proto_025_PsUshuai/lib_protocol/dal_slot_storage.ml
+@@ -903,8 +903,14 @@ let finalize_pending_slot_headers ctxt =
+   in
+   if dynamic_lag || reset_dummy_genesis then
+     (* Normal path: use new multi-lag attestation history. *)
+-    finalize_attestation_history ctxt
+-  else finalize_and_migrate_attestation_history_for_U ctxt
++    (finalize_attestation_history
++       ctxt
++     [@profiler.record_s {verbosity = Notice} "finalize_attestation_history"])
++  else
++    (finalize_and_migrate_attestation_history_for_U
++       ctxt
++     [@profiler.record_s
++       {verbosity = Notice} "finalize_and_migrate_attestation_history_for_U"])
+ 
+ module Internal_for_tests = struct
+   let get_delegate_ordering = get_delegate_ordering
+diff --git a/src/proto_025_PsUshuai/lib_protocol/delegate_cycles.ml b/src/proto_025_PsUshuai/lib_protocol/delegate_cycles.ml
+index 73d5aa93569..3c3f38dc44d 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/delegate_cycles.ml
++++ b/src/proto_025_PsUshuai/lib_protocol/delegate_cycles.ml
+@@ -225,21 +225,41 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
+ let cycle_end ctxt last_cycle =
+   let open Lwt_result_syntax in
+   (* attributing attesting rewards   *)
+-  let* ctxt, unrevealed_nonces = Seed_storage.cycle_end ctxt last_cycle in
++  let* ctxt, unrevealed_nonces =
++    (Seed_storage.cycle_end
++       ctxt
++       last_cycle
++     [@profiler.record_s {verbosity = Notice} "seed storage cycle end"])
++  in
+   let* ctxt, attesting_balance_updates =
+-    distribute_attesting_rewards ctxt last_cycle unrevealed_nonces
++    (distribute_attesting_rewards
++       ctxt
++       last_cycle
++       unrevealed_nonces
++     [@profiler.record_s {verbosity = Notice} "distribute attesting rewards"])
+   in
+   (* Applying slashing related to expiring denunciations *)
+   let* ctxt, slashing_balance_updates =
+-    Delegate_slashed_deposits_storage.apply_and_clear_denunciations ctxt
++    (Delegate_slashed_deposits_storage.apply_and_clear_denunciations
++       ctxt
++     [@profiler.record_s {verbosity = Notice} "apply and clear denunciations"])
+   in
+   let new_cycle = Cycle_repr.add last_cycle 1 in
+-  let*! ctxt = Already_denounced_storage.clear_outdated_cycle ctxt ~new_cycle in
++  let*! ctxt =
++    (Already_denounced_storage.clear_outdated_cycle
++       ctxt
++       ~new_cycle
++     [@profiler.record_s {verbosity = Notice} "clear outdated cycle"])
++  in
+   let*! ctxt =
+     Dal_already_denounced_storage.clear_outdated_cycle ctxt ~new_cycle
+   in
+   (* Deactivating delegates which didn't participate to consensus for too long *)
+-  let* ctxt, deactivated_delegates = update_activity ctxt last_cycle in
++  let* ctxt, deactivated_delegates =
++    (update_activity
++       ctxt
++       last_cycle [@profiler.record_s {verbosity = Notice} "update activity"])
++  in
+   (* Reset SWRR credits for delegates deactivated at cycle end.
+ 
+    Must run before computing next-cycle SWRR selection state, so that
+@@ -260,31 +280,70 @@ let cycle_end ctxt last_cycle =
+      so allocations are included. *)
+   let* ctxt =
+     if Constants_storage.native_contracts_enable ctxt then
+-      Clst_stake_allocation.rebalance_at_cycle_end ctxt ~new_cycle
++      Clst_stake_allocation.rebalance_at_cycle_end
++        ctxt
++        ~new_cycle
++      [@profiler.record_s
++        {verbosity = Notice} "rebalance stez stake allocation at cycle end"]
+     else return ctxt
+   in
+   (* Computing future staking rights *)
+   let* ctxt =
+-    Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle
++    (Delegate_sampler.select_new_distribution_at_cycle_end
++       ctxt
++       ~new_cycle
++     [@profiler.record_s
++       {verbosity = Notice} "select new distribution at cycle end"])
+   in
+   (* Activating consensus key for the cycle to come *)
+-  let*! ctxt = Delegate_consensus_key.activate ctxt ~new_cycle in
++  let*! ctxt =
++    (Delegate_consensus_key.activate
++       ctxt
++       ~new_cycle
++     [@profiler.record_s {verbosity = Notice} "activate consensus key"])
++  in
+   (* trying to unforbid delegates for the cycle to come. *)
+   let* ctxt =
+-    Forbidden_delegates_storage.update_at_cycle_end_after_slashing
+-      ctxt
+-      ~new_cycle
++    (Forbidden_delegates_storage.update_at_cycle_end_after_slashing
++       ctxt
++       ~new_cycle
++     [@profiler.record_s
++       {verbosity = Notice} "update at cycle end after slashing"])
+   in
+   (* clear deprecated cycles data.  *)
+-  let* ctxt = Stake_storage.clear_at_cycle_end ctxt ~new_cycle in
+-  let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
++  let* ctxt =
++    (Stake_storage.clear_at_cycle_end
++       ctxt
++       ~new_cycle
++     [@profiler.record_s {verbosity = Notice} "clear stake storage"])
++  in
++  let* ctxt =
++    (Delegate_sampler.clear_outdated_sampling_data
++       ctxt
++       ~new_cycle
++     [@profiler.record_s {verbosity = Notice} "clear outdated sampling data"])
++  in
+   (* activate delegate parameters for the cycle to come.  *)
+-  let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
+-  let*! ctxt = Clst_delegates_storage.activate_parameters ctxt ~new_cycle in
++  let*! ctxt =
++    (Delegate_staking_parameters.activate
++       ctxt
++       ~new_cycle
++     [@profiler.record_s {verbosity = Notice} "activate staking parameters"])
++  in
++  let*! ctxt =
++    (Clst_delegates_storage.activate_parameters
++       ctxt
++       ~new_cycle
++     [@profiler.record_s {verbosity = Notice} "activate CLST parameters"])
++  in
+   (* updating AI coefficient. It should remain after all balance changes of the
+      cycle-end operations *)
+   let* ctxt =
+-    Adaptive_issuance_storage.update_stored_rewards_at_cycle_end ctxt ~new_cycle
++    (Adaptive_issuance_storage.update_stored_rewards_at_cycle_end
++       ctxt
++       ~new_cycle
++     [@profiler.record_s
++       {verbosity = Notice} "update stored rewards at cycle end"])
+   in
+   let balance_updates = slashing_balance_updates @ attesting_balance_updates in
+   return (ctxt, balance_updates, deactivated_delegates)
+diff --git a/src/proto_025_PsUshuai/lib_protocol/dune b/src/proto_025_PsUshuai/lib_protocol/dune
+index 2cea5cda33f..8338c9e2421 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/dune
++++ b/src/proto_025_PsUshuai/lib_protocol/dune
+@@ -23,6 +23,8 @@
+  (instrumentation (backend bisect_ppx))
+  (libraries
+   tezos-protocol-025-PsUshuai.protocol.environment)
++ (preprocess (pps octez-libs.ppx_profiler))
++ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
+  (library_flags (:standard -linkall))
+  (flags
+   (:standard)
+diff --git a/src/proto_025_PsUshuai/lib_protocol/init_storage.ml b/src/proto_025_PsUshuai/lib_protocol/init_storage.ml
+index ffcf148a14d..763ed42330d 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/init_storage.ml
++++ b/src/proto_025_PsUshuai/lib_protocol/init_storage.ml
+@@ -260,22 +260,42 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
+         (* Start of U025 stitching. Comment used for automatic snapshot *)
+     | U025 ->
+-        let* ctxt = Storage.Protocol_activation_level.update ctxt level in
++        let* ctxt =
++          (Storage.Protocol_activation_level.update
++             ctxt
++             level
++           [@profiler.record_s
++             {verbosity = Notice} "Protocol_activation_level.update"])
++        in
+         (* Migration of refutation games needs to be kept for each protocol. *)
+         let* ctxt =
+-          Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
++          (Sc_rollup_refutation_storage.migrate_clean_refutation_games
++             ctxt
++           [@profiler.record_s
++             {verbosity = Notice}
++               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
+         in
+         return (ctxt, [])
+         (* End of U025 stitching. Comment used for automatic snapshot *)
+         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
+     | T024 ->
+         let* ctxt =
+-          let*! ctxt = Storage.Tenderbake.First_level_of_protocol.remove ctxt in
+-          Storage.Protocol_activation_level.init ctxt level
++          (let*! ctxt =
++             Storage.Tenderbake.First_level_of_protocol.remove ctxt
++           in
++           Storage.Protocol_activation_level.init
++             ctxt
++             level
++           [@profiler.record_s
++             {verbosity = Notice} "Protocol_activation_level.init"])
+         in
+         (* Migration of refutation games needs to be kept for each protocol. *)
+         let* ctxt =
+-          Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
++          (Sc_rollup_refutation_storage.migrate_clean_refutation_games
++             ctxt
++           [@profiler.record_s
++             {verbosity = Notice}
++               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
+         in
+         let*! cycles =
+           Storage.Stake.Selected_distribution_for_cycle.keys ctxt
+diff --git a/src/proto_025_PsUshuai/lib_protocol/main.ml b/src/proto_025_PsUshuai/lib_protocol/main.ml
+index acacb1ef263..7da9c504b72 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/main.ml
++++ b/src/proto_025_PsUshuai/lib_protocol/main.ml
+@@ -163,7 +163,15 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
+   let open Lwt_result_syntax in
+   let open Alpha_context in
+   let* ctxt, attestations_map =
+-    Baking.attesting_rights_by_first_slot ctxt ~attested_level:predecessor_level
++    (Baking.attesting_rights_by_first_slot
++       ctxt
++       ~attested_level:predecessor_level
++     [@profiler.record_s
++       {verbosity = Notice}
++         (Format.asprintf
++            "Block: attesting_rights - AL: %a"
++            Level.pp
++            predecessor_level)])
+   in
+   let*? can_contain_preattestations = can_contain_preattestations mode in
+   let current_level = Level.current ctxt in
+@@ -175,13 +183,24 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
+      skip them when there is no locked round, causing divergent cache domains
+      and context hashes. *)
+   let* ctxt, preattestations_map =
+-    Baking.attesting_rights_by_first_slot ctxt ~attested_level:current_level
++    (Baking.attesting_rights_by_first_slot
++       ctxt
++       ~attested_level:current_level
++     [@profiler.record_s
++       {verbosity = Notice}
++         (Format.asprintf
++            "Block: attesting_rights - AL: %a"
++            Level.pp
++            current_level)])
+   in
+   let allowed_preattestations =
+     if can_contain_preattestations then Some preattestations_map else None
+   in
+   let* ctxt, delegate_to_shard_count =
+-    delegate_to_shard_count ctxt ~attested_levels:[current_level]
++    (delegate_to_shard_count
++       ctxt
++       ~attested_levels:[current_level]
++     [@profiler.record_s {verbosity = Notice} "Block: delegate_to_shard_count"])
+   in
+   let ctxt =
+     Consensus.initialize_consensus_operation
+@@ -216,16 +235,26 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
+     List.fold_left_es
+       (fun (ctxt, minimal_slots) level ->
+         let* ctxt, level_minimal_slot =
+-          Baking.attesting_rights_by_first_slot ctxt ~attested_level:level
++          (Baking.attesting_rights_by_first_slot
++             ctxt
++             ~attested_level:level
++           [@profiler.record_s
++             {verbosity = Notice}
++               (Format.asprintf
++                  "Mempool: attesting_rights - AL: %a"
++                  Level.pp
++                  level)])
+         in
+         return (ctxt, Level.Map.add level level_minimal_slot minimal_slots))
+       (ctxt, Level.Map.empty)
+       allowed_levels
+   in
+   let* ctxt, delegate_to_shard_count =
+-    delegate_to_shard_count
+-      ctxt
+-      ~attested_levels:(List.map (Level.succ ctxt) allowed_levels)
++    (delegate_to_shard_count
++       ctxt
++       ~attested_levels:(List.map (Level.succ ctxt) allowed_levels)
++     [@profiler.record_s
++       {verbosity = Notice} "Mempool: delegate_to_shard_count"])
+   in
+   let ctxt =
+     (* Store the resulting map in the context as [allowed_consensus]. *)
+diff --git a/src/proto_025_PsUshuai/lib_protocol/raw_context.ml b/src/proto_025_PsUshuai/lib_protocol/raw_context.ml
+index 1b6d717e263..dc381c389be 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/raw_context.ml
++++ b/src/proto_025_PsUshuai/lib_protocol/raw_context.ml
+@@ -1679,12 +1679,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
+     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
+   in
+   let+ ctxt =
+-    prepare
++    (prepare
+       ctxt
+       ~level
+       ~predecessor_timestamp:timestamp
+       ~timestamp
+-      ~all_bakers_attest_first_level:None
++      ~all_bakers_attest_first_level:None [@profiler.record_s {verbosity = Notice} "Prepare"])
+   in
+   (previous_proto, previous_proto_constants, ctxt)
+ 
+diff --git a/src/proto_025_PsUshuai/lib_protocol/script_cache.ml b/src/proto_025_PsUshuai/lib_protocol/script_cache.ml
+index 35cc6b51781..5c679ad606b 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/script_cache.ml
++++ b/src/proto_025_PsUshuai/lib_protocol/script_cache.ml
+@@ -98,15 +98,16 @@ let find ctxt addr =
+   | Some (unparsed_script, ex_script) ->
+       return (ctxt, identifier, Some (unparsed_script, ex_script))
+   | None -> (
+-      let* ctxt, result = load_and_elaborate ctxt addr in
+-      match result with
+-      | None -> return (ctxt, identifier, None)
+-      | Some (unparsed_script, script_ir, size) ->
+-          let cached_value = (unparsed_script, script_ir) in
+-          let*? ctxt =
+-            Cache.update ctxt identifier (Some (cached_value, size))
+-          in
+-          return (ctxt, identifier, Some (unparsed_script, script_ir)))
++      (let* ctxt, result = load_and_elaborate ctxt addr in
++       match result with
++       | None -> return (ctxt, identifier, None)
++       | Some (unparsed_script, script_ir, size) ->
++           let cached_value = (unparsed_script, script_ir) in
++           let*? ctxt =
++             Cache.update ctxt identifier (Some (cached_value, size))
++           in
++           return (ctxt, identifier, Some (unparsed_script, script_ir)))
++      [@profiler.record_s {verbosity = Notice} "cache_miss"])
+ 
+ let update ctxt identifier updated_script approx_size =
+   Cache.update ctxt identifier (Some (updated_script, approx_size))
+diff --git a/src/proto_025_PsUshuai/lib_protocol/script_interpreter.ml b/src/proto_025_PsUshuai/lib_protocol/script_interpreter.ml
+index cbd5047eb36..db83a3b68bb 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/script_interpreter.ml
++++ b/src/proto_025_PsUshuai/lib_protocol/script_interpreter.ml
+@@ -1856,15 +1856,17 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+     match implementation with
+     | Lambda {code; _} ->
+         let* (op, new_storage), ctxt =
+-          trace
+-            (Runtime_contract_error step_constants.self)
+-            (interp logger (ctxt, step_constants) code (arg, old_storage))
++          (trace
++             (Runtime_contract_error step_constants.self)
++             (interp logger (ctxt, step_constants) code (arg, old_storage))
++           [@profiler.record_s {verbosity = Notice} "interprete"])
+         in
+         return ((op, new_storage, []), ctxt)
+     | Native {kind} ->
+         trace
+           (Runtime_contract_error step_constants.self)
+           (Script_native.execute (ctxt, step_constants) kind arg old_storage)
++        [@profiler.record_s {verbosity = Notice} "interprete_native"]
+   in
+   let* storage, lazy_storage_diff, ctxt =
+     Script_ir_translator.extract_lazy_storage_diff
+@@ -1942,6 +1944,19 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+       },
+       ctxt )
+ 
++let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
++    unparsed_script cached_script arg =
++  execute_any_arg
++    logger
++    ctxt
++    mode
++    step_constants
++    ~entrypoint
++    ~internal
++    unparsed_script
++    cached_script
++    arg [@profiler.record_s {verbosity = Notice} "execute"]
++
+ let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
+     ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
+   execute_any_arg
+diff --git a/src/proto_025_PsUshuai/lib_protocol/script_ir_translator.ml b/src/proto_025_PsUshuai/lib_protocol/script_ir_translator.ml
+index e48748c928c..8b9a693b5d2 100644
+--- a/src/proto_025_PsUshuai/lib_protocol/script_ir_translator.ml
++++ b/src/proto_025_PsUshuai/lib_protocol/script_ir_translator.ml
+@@ -5319,21 +5319,27 @@ let parse_script :
+            storage ) =
+       match script with
+       | Script {code; storage} ->
+-          let* ex_code = parse_code ~unparse_code_rec ~elab_conf ctxt ~code in
++          let* ex_code =
++            (parse_code
++               ~unparse_code_rec
++               ~elab_conf
++               ctxt
++               ~code [@profiler.record_s {verbosity = Notice} "parse_code"])
++          in
+           return (ex_code, storage)
+       | Native {kind; storage} ->
+           let* ex_code = get_typed_native_code ctxt ~kind in
+           return (ex_code, storage)
+     in
+     let+ storage, ctxt =
+-      parse_storage
+-        ~unparse_code_rec
+-        ~elab_conf
+-        ctxt
+-        ~allow_forged_tickets:allow_forged_tickets_in_storage
+-        ~allow_forged_lazy_storage_id:allow_forged_lazy_storage_id_in_storage
+-        storage_type
+-        ~storage
++      (parse_storage
++         ~unparse_code_rec
++         ~elab_conf
++         ctxt
++         ~allow_forged_tickets:allow_forged_tickets_in_storage
++         ~allow_forged_lazy_storage_id:allow_forged_lazy_storage_id_in_storage
++         storage_type
++         ~storage [@profiler.record_s {verbosity = Notice} "parse_storage"])
+     in
+     ( Ex_script
+         (Script
+@@ -6039,7 +6045,7 @@ let parse_data ~elab_conf ctxt ~allow_forged_tickets
+     ~stack_depth:0
+     ctxt
+     ty
+-    t
++    t [@profiler.record_s {verbosity = Notice} "parse_data"]
+ 
+ let parse_view ~elab_conf ctxt ty view =
+   parse_view ~unparse_code_rec ~elab_conf ctxt ty view
+-- 
+2.53.0
+
