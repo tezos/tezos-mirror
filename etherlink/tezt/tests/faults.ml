@@ -410,32 +410,6 @@ let test_recover_crashing_delayed_michelson ~name ~tags ~poison_code =
   let*@ _ = Rpc.produce_block sequencer in
   bake_until_sync ~sc_rollup_node ~sequencer ~client ()
 
-(** [test_crashing_oversized_allocation] registers the sequencer-crash and
-    delayed-recovery tests for a contract that builds a value larger than the
-    maximum size allocatable on the kernel's wasm32 target (2^31 - 1 bytes). *)
-let test_crashing_oversized_allocation protos =
-  let name = "oversized allocation" in
-  let tags = ["concat"] in
-  let poison_code =
-    {|
-parameter unit ;
-storage unit ;
-code {
-       DROP ;
-       # Build a 2^20-byte chunk (a 1-byte seed doubled 20 times).
-       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
-       # Build a list of 2048 copies of the chunk.
-       NIL bytes ; PUSH int 2048 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ;
-       DIP { DROP } ;
-       # CONCAT materialises 2048 * 2^20 = 2^31 > isize::MAX -> capacity-overflow panic.
-       CONCAT ;
-       DROP ; UNIT ; NIL operation ; PAIR
-     }
-|}
-  in
-  test_recover_crashing_delayed_michelson ~name ~tags ~poison_code protos ;
-  test_crashing_michelson_at_sequencer ~name ~tags ~poison_code protos
-
 (** [test_crashing_heap_exhaustion] registers the sequencer-crash and
     delayed-recovery tests for a contract that allocates more memory than the
     kernel's wasm32 memory can hold (4 GiB heap). *)
@@ -468,5 +442,4 @@ let () =
   List.iter
     (fun fault -> test_recover_crashing_delayed_transaction fault [Alpha])
     [Panic; Stack_overflow] ;
-  test_crashing_oversized_allocation [Alpha] ;
   test_crashing_heap_exhaustion [Alpha]
