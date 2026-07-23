@@ -5,9 +5,9 @@ FROM ${IMAGE}
 
 COPY scripts/packaging/homebrew_install.sh /tmp
 
-#hadolint ignore=DL3008,DL3015,DL3009
+#hadolint ignore=DL3008,DL3009
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
     curl autoconf cmake g++ libev-dev libffi-dev libgmp-dev git \
     libprotobuf-dev libsqlite3-dev libzstd-dev protobuf-compiler libhidapi-dev \
     pkg-config zlib1g-dev libpq-dev cargo && \

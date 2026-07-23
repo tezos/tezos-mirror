@@ -32,7 +32,8 @@ type compilation =
 type upstream_image = Pipeline_dep of string | Upstream of string
 (* Datatype to differenciate between variable passed with IMAGE_PATH to the
    dockerfile via --build-arg IMAGE=IMAGE_PATH.
-   Upstream is the name of an upstream image ( eg. debian:trixie )
+   Upstream is the full upstream image ref ( eg. debian:$RELEASE or
+   debian:$RELEASE-slim ).
    Pipeline_dep is the name of an image generate in this pipeline ( eg.
    ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:trixie-$COMMIT_REF_SLUG )
 *)
@@ -199,8 +200,9 @@ let docker_job ?(extra_variables = []) ?(retry = Tezos_ci.dind_retry) ~script =
 (* Partial application of [docker_job] that fixes the image-build variables
    (DISTRIBUTION, IMAGE_PATH, PLATFORM) and the compilation strategy
    (tag and matrix). All other arguments are left for the caller. *)
-let base_image_job ~image_name ?(base_name = Upstream image_name) ~matrix
-    ~compilation ?(extra_variables = []) dockerfile =
+let base_image_job ~image_name
+    ?(base_name = Upstream (image_name ^ ":$RELEASE")) ~matrix ~compilation
+    ?(extra_variables = []) dockerfile =
   let platform, extra_tags =
     match compilation with
     | Amd64_only -> ("linux/amd64", [])
@@ -220,7 +222,7 @@ let base_image_job ~image_name ?(base_name = Upstream image_name) ~matrix
          ("DISTRIBUTION", image_name);
          ( "IMAGE_PATH",
            match base_name with
-           | Upstream name -> Format.asprintf "%s:$RELEASE" name
+           | Upstream image_ref -> image_ref
            | Pipeline_dep name -> base_dep_img_name name );
          ("PLATFORM", platform);
        ]
@@ -237,8 +239,12 @@ let base_image_job ~image_name ?(base_name = Upstream image_name) ~matrix
 (* Root job. Cacio propagates the changeset to dependent jobs automatically
    via [~needs], so only the files this job directly depends on are listed. *)
 let job_debian_based_images =
+  (* Build from the slim upstream variant. The slim suffix is on the upstream
+     [FROM] only: [RELEASE], and hence the tag we produce, is unchanged, so
+     consumers and pinned versions keep referring to e.g. [debian:trixie-...]. *)
   base_image_job
     ~image_name:"debian"
+    ~base_name:(Upstream "debian:$RELEASE-slim")
     ~matrix:Distribution.(release_matrix Debian)
     ~compilation:Emulated
     (Distribution.dockerfile Debian)
