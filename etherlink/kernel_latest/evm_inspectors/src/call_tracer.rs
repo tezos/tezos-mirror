@@ -12,13 +12,13 @@ use super::{
 };
 
 use revm::{
-    context::{ContextTr, CreateScheme, JournalTr, Transaction},
+    context::{ContextTr, CreateScheme, Transaction},
     interpreter::{
         gas::calculate_initial_tx_gas_for_tx, interpreter::ReturnDataImpl, CallInputs,
         CallOutcome, CallScheme, CreateInputs, CreateOutcome, InitialAndFloorGas,
         InstructionResult, InterpreterTypes,
     },
-    primitives::{hardfork::SpecId, hash_map::HashMap, Address, Bytes, Log, B256, U256},
+    primitives::{hardfork::SpecId, Address, Bytes, Log, B256, U256},
     Inspector,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
@@ -188,10 +188,14 @@ impl CallTrace {
 #[derive(Debug)]
 pub struct CallTracer {
     config: CallTracerConfig,
-    call_trace: HashMap<u16, CallTrace>,
+    /// Stack of currently-open call frames: `call`/`create` push a frame on
+    /// entry and `call_end`/`create_end` pop it on exit. The frame's entry
+    /// depth is its position in this stack, so no separate depth counter is
+    /// needed.
+    call_trace: Vec<CallTrace>,
     /// Traces buffered in memory, flushed to storage once at the end of
-    /// each transaction (depth == 0).  RLP encoding is deferred to flush
-    /// time so the buffer remains readable.
+    /// each transaction (when the frame stack empties).  RLP encoding is
+    /// deferred to flush time so the buffer remains readable.
     pending_traces: Vec<CallTrace>,
     pub(crate) transaction_hash: Option<B256>,
     initial_gas: u64,
@@ -206,17 +210,12 @@ impl CallTracer {
     ) -> Self {
         Self {
             config,
-            call_trace: HashMap::with_capacity(1),
+            call_trace: Vec::with_capacity(1),
             pending_traces: Vec::new(),
             transaction_hash,
             initial_gas: 0,
             spec_id,
         }
-    }
-
-    #[inline]
-    fn set_call_trace(&mut self, depth: u16, call_trace: CallTrace) {
-        self.call_trace.insert(depth, call_trace);
     }
 
     #[inline]
@@ -235,23 +234,22 @@ impl CallTracer {
     ) where
         CTX: ContextTr<Db: HasHost<H: StorageV1>>,
     {
-        let depth = context.journal().depth() as u16;
+        // Leaving a frame: pop it off the stack.
+        if let Some(mut call_trace) = self.call_trace.pop() {
+            // In `only_top_call` mode nested frames are still pushed to keep
+            // the stack in sync, but only the top-level frame is reported.
+            if !(self.config.only_top_call && call_trace.depth > 0) {
+                call_trace.add_gas_used(gas_spent + self.initial_gas);
+                call_trace.add_output(Some(output.to_vec()));
+                call_trace.add_error_from_instruction_result(instruction_result);
 
-        if self.config.only_top_call && depth > 0 {
-            return;
+                self.pending_traces.push(call_trace);
+            }
         }
 
-        if let Some(mut call_trace) = self.call_trace.remove(&depth) {
-            call_trace.add_gas_used(gas_spent + self.initial_gas);
-            call_trace.add_output(Some(output.to_vec()));
-            call_trace.add_error_from_instruction_result(instruction_result);
-
-            self.pending_traces.push(call_trace);
-        }
-
-        // At depth 0 (end of top-level transaction), flush all buffered
-        // traces to storage in a single batch operation.
-        if depth == 0 && !self.pending_traces.is_empty() {
+        // Once the frame stack empties (end of top-level transaction), flush
+        // all buffered traces to storage in a single batch operation.
+        if self.call_trace.is_empty() && !self.pending_traces.is_empty() {
             let traces = std::mem::take(&mut self.pending_traces);
             flush_call_traces(
                 context.db_mut().as_host_mut(),
@@ -276,11 +274,9 @@ where
         context: &mut CTX,
         inputs: &mut CallInputs,
     ) -> Option<CallOutcome> {
-        let depth = context.journal().depth() as u16;
-
-        if self.config.only_top_call && depth > 0 {
-            return None;
-        }
+        // Entering a frame: its depth is the current stack height, before it
+        // is pushed.
+        let depth = self.call_trace.len() as u16;
 
         self.set_initial_gas(context.tx());
 
@@ -304,7 +300,7 @@ where
         call_trace.add_to(Some(inputs.bytecode_address));
         call_trace.add_gas(Some(inputs.gas_limit + self.initial_gas));
 
-        self.set_call_trace(depth, call_trace);
+        self.call_trace.push(call_trace);
 
         // NB: Always return [None] or else the result of the call will be overriden.
         None
@@ -324,11 +320,9 @@ where
         context: &mut CTX,
         inputs: &mut CreateInputs,
     ) -> Option<CreateOutcome> {
-        let depth = context.journal().depth() as u16;
-
-        if self.config.only_top_call && depth > 0 {
-            return None;
-        }
+        // Entering a frame: its depth is the current stack height, before it
+        // is pushed.
+        let depth = self.call_trace.len() as u16;
 
         self.set_initial_gas(context.tx());
 
@@ -349,7 +343,7 @@ where
 
         call_trace.add_gas(Some(inputs.gas_limit() + self.initial_gas));
 
-        self.set_call_trace(depth, call_trace);
+        self.call_trace.push(call_trace);
 
         // NB: Always return [None] or else the result of the create will be overriden.
         None
@@ -361,8 +355,9 @@ where
         _: &CreateInputs,
         outcome: &mut CreateOutcome,
     ) {
-        let depth = context.journal().depth() as u16;
-        if let Some(call_trace) = self.call_trace.get_mut(&depth) {
+        // The frame being left is on top of the stack: record the created
+        // address on it before `end_transaction_layer` pops it.
+        if let Some(call_trace) = self.call_trace.last_mut() {
             call_trace.add_to(outcome.address);
         }
         self.end_transaction_layer(
@@ -373,22 +368,15 @@ where
         );
     }
 
-    fn log(&mut self, context: &mut CTX, log: Log) {
+    fn log(&mut self, _context: &mut CTX, log: Log) {
         if !self.config.with_logs {
             return;
         }
 
-        let depth = context.journal().depth() as u16;
-        // NB: `depth` is the journal depth *while a frame is executing*, i.e. the depth of the
-        // frame that emitted the LOG opcode.
-        //
-        // That frame's CallTrace was inserted (in `call`/`create`) keyed by the depth reported when
-        // the frame was *entered*, which is one less. So we subtract 1 to map the log back onto its
-        // enclosing call's trace.
-        if let Some(key) = depth.checked_sub(1) {
-            if let Some(t) = self.call_trace.get_mut(&key) {
-                t.logs.get_or_insert_with(Vec::new).push(log);
-            }
+        // The frame that emitted the LOG opcode is the one currently
+        // executing, i.e. the frame on top of the stack.
+        if let Some(t) = self.call_trace.last_mut() {
+            t.logs.get_or_insert_with(Vec::new).push(log);
         }
     }
 }
