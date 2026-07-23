@@ -140,6 +140,9 @@
 
 ### Michelson Runtime
 
+- **Security fix:** the instructions that only read a bytes operand no
+  longer deep-clone it when it is `DUP`-shared (an OOM-crash vector);
+  the operand is now read borrowed. (!22580)
 - **Bug fix:** `PACK` no longer deep-copies the value it serializes. The value
   is only read to produce its serialization, so it is now read through the
   shared `Rc` it already lives behind on the stack; a large shared value (e.g.
