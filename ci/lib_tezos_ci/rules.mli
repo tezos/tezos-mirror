@@ -78,6 +78,10 @@ val homebrew_daily : If.t
     [TZ_SCHEDULE_KIND] set to [base_images.daily]. *)
 val base_images_daily : If.t
 
+(** Like {!base_images_daily}, but restricted to the [master-ci-images] branch:
+    the base-images refresh pipeline. *)
+val base_images_refresh : If.t
+
 (** A rule that is true for scheduled extended RPC test pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and

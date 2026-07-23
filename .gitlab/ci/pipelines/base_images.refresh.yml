@@ -1,0 +1,711 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+stages:
+- start
+- build
+
+datadog_pipeline_trace:
+  image: datadog/ci:v5.18.0@sha256:07475bc65fc5efec461feeaca7a16cc32c13742393db6cce5352fc5f7e1bd5a2
+  stage: start
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+images.alpine-ci-all.merge:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - images.alpine-ci-all:amd64
+  - images.alpine-ci-all:arm64
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - docker buildx create --driver docker-container --use --name tezos
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-runtime:${TAG}" "${REGISTRY}/alpine-runtime:${TAG}-amd64"
+    "${REGISTRY}/alpine-runtime:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-monitoring:${TAG}" "${REGISTRY}/alpine-monitoring:${TAG}-amd64"
+    "${REGISTRY}/alpine-monitoring:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-prebuild:${TAG}" "${REGISTRY}/alpine-prebuild:${TAG}-amd64"
+    "${REGISTRY}/alpine-prebuild:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-build:${TAG}" "${REGISTRY}/alpine-build:${TAG}-amd64"
+    "${REGISTRY}/alpine-build:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-release-page:${TAG}"
+    "${REGISTRY}/alpine-release-page:${TAG}-amd64" "${REGISTRY}/alpine-release-page:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-test:${TAG}" "${REGISTRY}/alpine-test:${TAG}-amd64"
+    "${REGISTRY}/alpine-test:${TAG}-arm64"
+  - docker buildx imagetools create --tag "${REGISTRY}/alpine-e2etest:${TAG}" "${REGISTRY}/alpine-e2etest:${TAG}-amd64"
+    "${REGISTRY}/alpine-e2etest:${TAG}-arm64"
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    REGISTRY: ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos
+    TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+
+images.alpine-ci-all:amd64:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs: []
+  dependencies: []
+  timeout: 90 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - docker buildx create --driver docker-container --use --name tezos
+  - docker buildx bake --allow=fs.read=/tmp/npm_token.txt --push --set "*.platform=linux/amd64"
+    $(if [ "${DOCKER_FORCE_BUILD:-false}" = "true" ]; then echo "--no-cache"; fi)
+    -f images/ci/ci-images.hcl
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    REGISTRY: ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos
+    TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+
+images.alpine-ci-all:arm64:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp_arm64
+  needs: []
+  dependencies: []
+  timeout: 90 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - docker buildx create --driver docker-container --use --name tezos
+  - docker buildx bake --allow=fs.read=/tmp/npm_token.txt --push --set "*.platform=linux/arm64"
+    $(if [ "${DOCKER_FORCE_BUILD:-false}" = "true" ]; then echo "--no-cache"; fi)
+    -f images/ci/ci-images.hcl
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    REGISTRY: ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos
+    TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-arm64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+
+images.alpine-docker-ci:
+  image: docker:28.5.1@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - images/scripts/install-gcloud-apk.sh
+  - export PATH=$PATH:/google-cloud-sdk/bin
+  - scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.alpine-docker-ci
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    CI_DOCKER_HUB: "false"
+    DISTRIBUTION: alpine-docker-ci
+    DOCKER_DIGEST: sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+    DOCKER_VERSION: 28.5.1
+    GCLOUD_VERSION: 543.0.0
+    HADOLINT_VERSION: 2.10.0
+    IMAGE_PATH: ""
+    PLATFORM: linux/amd64,linux/arm64
+    REGCTL_VERSION: v0.4.3
+    RELEASE: 28.5.1
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+
+images.ci-release:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-release
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: ci-release
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
+
+images.debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: debian
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: debian:$RELEASE-slim
+    PLATFORM: linux/amd64,linux/arm64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+
+images.debian-build:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-build
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: debian-build
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: ""
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+      TAGS:
+      - gcp_very_high_cpu
+      - gcp_arm64
+
+images.debian-build.merge:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - images.debian-build
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-build
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+
+images.debian-homebrew:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-homebrew
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: debian-homebrew
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
+
+images.debian-jsonnet:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-jsonnet
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: debian-jsonnet
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
+
+images.debian-rust:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.rust
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: debian-rust
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: ""
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
+      TAGS:
+      - gcp_very_high_cpu
+      - gcp_arm64
+
+images.debian-rust-sdk-bindings:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.rust-sdk-bindings
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: debian-rust-sdk-bindings
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
+
+images.debian-rust.merge:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - images.debian-rust
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
+    RELEASE: trixie
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+
+images.debian-systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs:
+  - images.debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-systemd
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: debian-systemd
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+
+images.ubuntu:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: ubuntu
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: ubuntu:$RELEASE
+    PLATFORM: linux/amd64,linux/arm64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "26.04"
+
+images.ubuntu-build:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - images.ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-build
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: ubuntu-build
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: ""
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "26.04"
+      TAGS:
+      - gcp_very_high_cpu
+      - gcp_arm64
+
+images.ubuntu-build.merge:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - images.ubuntu-build
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DOCKER_VERSION: 28.5.1
+    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/ubuntu-build
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "26.04"
+
+images.ubuntu-systemd:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs:
+  - images.ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-systemd
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    DISTRIBUTION: ubuntu-systemd
+    DOCKER_VERSION: 28.5.1
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  retry:
+    max: 2
+    when:
+    - script_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "26.04"
