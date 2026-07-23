@@ -14,7 +14,13 @@ use tezos_crypto_rs::{hash::ContractKt1Hash, public_key_hash::PublicKeyHash};
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TransferTokens<'a> {
     /// Transfer parameter.
-    pub param: TypedValue<'a>,
+    ///
+    /// Shared behind an [Rc] like every other deep value, so that cloning an
+    /// operation is O(1). `operation` is duplicable, so the same operation can
+    /// be `DUP`ed into the returned operation list several times; storing the
+    /// parameter inline made every such clone a full copy of it, enough to
+    /// exhaust the kernel's `wasm32` heap (L2-1831).
+    pub param: Rc<TypedValue<'a>>,
     /// Transfer destination.
     pub destination_address: Address,
     /// Transfer amount.
@@ -31,7 +37,9 @@ pub struct Emit<'a> {
     /// Event tag.
     pub tag: Option<FieldAnnotation<'a>>,
     /// Event value.
-    pub value: TypedValue<'a>,
+    ///
+    /// Shared behind an [Rc], see [TransferTokens::param].
+    pub value: Rc<TypedValue<'a>>,
 
     /// Event type.
     ///
@@ -54,7 +62,9 @@ pub struct CreateContract<'a> {
     /// Contract's inital balance.
     pub amount: i64,
     /// Contract's initial storage.
-    pub storage: TypedValue<'a>,
+    ///
+    /// Shared behind an [Rc], see [TransferTokens::param].
+    pub storage: Rc<TypedValue<'a>>,
     /// Contract's typechecked code.
     pub code: Rc<ContractScript<'a>>,
     /// Raw [Micheline] representation of the contract's code. The operation

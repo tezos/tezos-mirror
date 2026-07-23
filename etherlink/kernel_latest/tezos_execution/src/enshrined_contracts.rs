@@ -641,7 +641,7 @@ fn dispatch_callback<'a>(
     let counter = ctx.operation_counter();
     Ok(vec![OperationInfo {
         operation: Operation::TransferTokens(TransferTokens {
-            param: TypedValue::Bytes(response_body),
+            param: Rc::new(TypedValue::Bytes(response_body)),
             destination_address: destination,
             // The callback only delivers the response body.
             // Any value transfers from the EVM side happen as
@@ -4827,7 +4827,7 @@ pub(crate) mod tests {
         );
         match &op.operation {
             Operation::TransferTokens(tt) => {
-                assert_eq!(tt.param, TypedValue::Bytes(body));
+                assert_eq!(*tt.param, TypedValue::Bytes(body));
                 assert_eq!(tt.destination_address, destination);
                 assert_eq!(tt.amount, 0);
             }
