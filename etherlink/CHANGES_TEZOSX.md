@@ -46,6 +46,12 @@
 - The Michelson runtime charges substantially more gas to typecheck `key` and
   `signature` literals, reflecting the actual decode and curve point-validation
   cost (benchmarked on the MIR interpreter). (!22503)
+- **Bug fix:** `PACK` no longer deep-copies the value it serializes. The value
+  is only read to produce its serialization, so it is now read through the
+  shared `Rc` it already lives behind on the stack; a large shared value (e.g.
+  duplicated with `DUP`) could otherwise be copied into a second full allocation
+  and trap the kernel on the 4 GiB wasm heap. The copy is now gas-charged, so an
+  oversized value runs out of gas first. (!22587)
 
 ### Native Atomic Composability
 
