@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Michelson runtime: `CONCAT` now rejects a result larger than the maximum
+  allocatable size with a bounded `Overflow` error, instead of aborting the
+  kernel with a capacity-overflow panic (!22534).
 - Michelson runtime: support the `INDEX_ADDRESS` and `GET_ADDRESS_INDEX`
   instructions. `INDEX_ADDRESS` registers an address in the global address
   registry and returns its unique index (idempotently); `GET_ADDRESS_INDEX`
