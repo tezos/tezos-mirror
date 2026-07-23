@@ -140,6 +140,12 @@
 
 ### Michelson Runtime
 
+- **Bug fix:** `FAILWITH` no longer deep-copies its failure value. The value is
+  only carried in the error for reporting, so it is now held behind the shared
+  `Rc` it already lives behind on the stack; a large shared value (e.g.
+  duplicated with `DUP`) could otherwise be copied into a second full allocation
+  and push the interpreter past the 4 GiB wasm heap, trapping the kernel before
+  it runs out of gas. (!22582)
 - **Security fix:** the instructions that only read a bytes operand no
   longer deep-clone it when it is `DUP`-shared (an OOM-crash vector);
   the operand is now read borrowed. (!22580)
