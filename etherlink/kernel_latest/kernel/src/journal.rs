@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 use evm_inspectors::TracerInput;
-use revm::primitives::hardfork::SpecId;
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_ethereum::block::BlockConstants;
 use tezosx_journal::{CracId, TezosXJournal};
@@ -15,7 +14,6 @@ pub fn prepare_tezosx_journal(
     crac_id: CracId,
     operation_hash: &OperationHash,
     block_constants: &BlockConstants,
-    spec_id: &SpecId,
     http_trace_enabled: bool,
     debug_features: &DebugFeatures,
     internal_operations_base: u128,
@@ -33,7 +31,9 @@ pub fn prepare_tezosx_journal(
     }
 
     if let Some(input) = tracer_input {
-        journal.evm.set_tracer(input.tracer(*spec_id));
+        journal
+            .evm
+            .set_tracer(input.tracer(block_constants.spec_id));
     }
 
     journal

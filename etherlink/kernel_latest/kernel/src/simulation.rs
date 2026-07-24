@@ -428,6 +428,7 @@ impl Evaluation {
                     block_fees,
                     chain_id: evm_chain_id,
                     prevrandao: None,
+                    spec_id: *spec_id,
                 }
             }
             Err(_) => {
@@ -454,6 +455,7 @@ impl Evaluation {
                     block_fees,
                     crate::block::GAS_LIMIT,
                     coinbase,
+                    spec_id,
                 )
             }
         };
@@ -518,7 +520,6 @@ impl Evaluation {
             CracId::mock(RuntimeId::Ethereum),
             &Default::default(),
             &constants,
-            spec_id,
             crate::storage::is_http_trace_enabled(host),
             &debug_features,
             0,
@@ -539,7 +540,6 @@ impl Evaluation {
             gas_price,
             max_gas_limit,
             None,
-            spec_id,
             true,
             // TODO: Replace this by the decoded access lists if any.
             TransactionOrigin::UserInput {
@@ -817,6 +817,7 @@ mod tests {
             block_fees.unwrap(),
             crate::block::GAS_LIMIT,
             H160::zero(),
+            &SpecId::default(),
         );
 
         let caller =
@@ -839,7 +840,6 @@ mod tests {
             host,
             &registry,
             &mut journal,
-            revm::primitives::hardfork::SpecId::SHANGHAI,
             &block,
             None,
             caller,

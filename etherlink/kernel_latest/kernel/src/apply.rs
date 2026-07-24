@@ -10,7 +10,6 @@ use alloy_sol_types::{sol, SolCall};
 use evm_inspectors::{get_tracer_configuration, TracerInput};
 use primitive_types::{H160, U256};
 use revm::primitives::alloy_primitives::IntoLogData;
-use revm::primitives::hardfork::SpecId;
 use revm::primitives::{Address, Bytes};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
 use revm_etherlink::precompiles::constants::{
@@ -580,7 +579,6 @@ pub fn revm_run_transaction<Host>(
     effective_gas_price: U256,
     maximum_gas_per_transaction: u64,
     authorization_list: Option<AuthorizationList>,
-    spec_id: &SpecId,
     is_simulation: bool,
     origin: revm_etherlink::TransactionOrigin,
 ) -> Result<ExecutionOutcome, Error>
@@ -616,7 +614,6 @@ where
         host,
         registry,
         journal,
-        *spec_id,
         block_constants,
         transaction_hash,
         Address::from_slice(&caller.0),
@@ -641,7 +638,6 @@ fn apply_ethereum_transaction_common<Host>(
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     is_delayed: bool,
     tracer_input: Option<TracerInput>,
-    spec_id: &SpecId,
     limits: &EvmLimits,
     crac_id: CracId,
     http_trace_enabled: bool,
@@ -719,7 +715,6 @@ where
         crac_id,
         &operation_hash,
         block_constants,
-        spec_id,
         http_trace_enabled,
         debug_features,
         internal_operations_base,
@@ -740,7 +735,6 @@ where
         effective_gas_price,
         limits.maximum_gas_limit,
         transaction.authorization_list.clone(),
-        spec_id,
         false,
         TransactionOrigin::UserInput {
             access_list: revm_etherlink::helpers::legacy::access_list_to_revm(
@@ -804,7 +798,6 @@ pub fn pure_xtz_deposit<Host>(
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     maximum_gas_limit: u64,
-    spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, Error>
 where
@@ -844,7 +837,6 @@ where
         CracId::mock(RuntimeId::Ethereum),
         &tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
         &block_constants,
-        spec_id,
         false, // http_trace_enabled,
         &DebugFeatures::default(),
         0,
@@ -865,7 +857,6 @@ where
         effective_gas_price,
         maximum_gas_limit,
         None,
-        spec_id,
         false,
         TransactionOrigin::UserInput {
             access_list: revm::context::transaction::AccessList::default(),
@@ -950,7 +941,6 @@ pub fn pure_fa_deposit<Host>(
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     maximum_gas_limit: u64,
-    spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, Error>
 where
@@ -987,7 +977,6 @@ where
         CracId::mock(RuntimeId::Ethereum),
         &tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
         &block_constants,
-        spec_id,
         false, // http_trace_enabled,
         &DebugFeatures::default(),
         0,
@@ -1008,7 +997,6 @@ where
         effective_gas_price,
         maximum_gas_limit,
         None,
-        spec_id,
         false,
         TransactionOrigin::UserInput {
             access_list: revm::context::transaction::AccessList::default(),
@@ -1024,7 +1012,6 @@ fn apply_fa_deposit<Host>(
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     tracer_input: Option<TracerInput>,
-    spec_id: &SpecId,
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, Error>
 where
@@ -1037,7 +1024,6 @@ where
         block_constants,
         transaction_hash,
         limits.maximum_gas_limit,
-        spec_id,
         tracer_input,
     )?;
 
@@ -1243,7 +1229,6 @@ pub fn apply_transaction<Host>(
     index: u32,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
-    spec_id: &SpecId,
     limits: &EvmLimits,
     http_trace_enabled: bool,
     // Block's prior internal-op count, threaded so the EVM-origin delayed and
@@ -1267,7 +1252,6 @@ where
             transaction.tx_hash,
             false,
             tracer_input,
-            spec_id,
             limits,
             crac_id,
             http_trace_enabled,
@@ -1282,7 +1266,6 @@ where
             transaction.tx_hash,
             true,
             tracer_input,
-            spec_id,
             limits,
             crac_id,
             http_trace_enabled,
@@ -1298,7 +1281,6 @@ where
                 block_constants,
                 transaction.tx_hash,
                 tracer_input,
-                spec_id,
                 limits,
             )?
         }
@@ -1311,7 +1293,6 @@ where
                 block_constants,
                 transaction.tx_hash,
                 tracer_input,
-                spec_id,
                 limits,
             )?
         }
@@ -1353,6 +1334,7 @@ pub(crate) mod tests {
         fees::gas_for_fees,
     };
     use primitive_types::{H160, U256};
+    use revm::primitives::hardfork::SpecId;
     use revm_etherlink::{
         helpers::legacy::{h160_to_alloy, u256_to_alloy},
         storage::world_state_handler::StorageAccount,
@@ -1379,6 +1361,7 @@ pub(crate) mod tests {
             block_fees,
             crate::block::GAS_LIMIT,
             H160::zero(),
+            &SpecId::default(),
         )
     }
 
