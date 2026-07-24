@@ -338,10 +338,17 @@ module Tezlink_TALLiN_protocol = struct
 
     let constant = (Tezlink_constants.all_constants ()).parametric in
     let* voting_period_info =
-      voting_period_info
-        ~block_per_cycle:constant.blocks_per_cycle
-        ~cycles_per_voting_period:constant.cycles_per_voting_period
-        ~level_info
+      let* imported_protocol_period_info =
+        voting_period_info
+          ~block_per_cycle:constant.blocks_per_cycle
+          ~cycles_per_voting_period:constant.cycles_per_voting_period
+          ~level_info
+      in
+      Tezos_types.convert_using_serialization
+        ~name:"TALLiN period info"
+        ~src:Imported_context.Voting_period.info_encoding
+        ~dst:TALLiN_context.Voting_period.info_encoding
+        imported_protocol_period_info
     in
     let* level_info = Protocol_types.Level.convert_tallin level_info in
     return
