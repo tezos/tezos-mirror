@@ -91,19 +91,22 @@ module Tezos_block = struct
   end
 
   module Protocol = struct
-    type t = S023 | T024
+    type t = S023 | T024 | U025
 
     let from_bytes (bytes : bytes) : t =
       match Rlp.decode_int bytes with
       | Ok 23 -> S023
       | Ok 24 -> T024
+      | Ok 25 -> U025
       | Ok _ -> raise (Invalid_argument "Expected a valid protocol")
       | Error _ ->
           (* TODO: Instead of raising an exception, return the Result *)
           raise (Invalid_argument "Unexpected protocol read")
 
     let to_bytes (protocol : t) : bytes =
-      let protocol = match protocol with S023 -> 23 | T024 -> 24 in
+      let protocol =
+        match protocol with S023 -> 23 | T024 -> 24 | U025 -> 25
+      in
       Rlp.encode_int protocol
   end
 
