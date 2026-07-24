@@ -21,10 +21,6 @@ module type NDS_BACKEND = sig
       cross-checked against the [/pvm/nds_hash] marker. *)
   module Proof : Octez_riscv_nds_common.Intf.PROOF
 
-  (** Hash of a freshly created empty registry — the expected
-      [/pvm/nds_hash] on the (host-function-free) activation tick. *)
-  val empty_registry_hash : bytes
-
   (** An in-progress [Prove]-mode session.  An NDS handle runs in one of
       three modes: [Normal] during live kernel execution, [Prove] to
       record a step's host-function operations, and [Verify] to replay
@@ -51,16 +47,35 @@ module type NDS_BACKEND = sig
       [proof]. *)
   val open_verify_session : Proof.t -> Octez_riscv_nds_common.Nds.t
 
-  (** Mints the empty NDS handle installed at the activation boundary. *)
-  val make_empty_nds : unit -> Octez_riscv_nds_common.Nds.t
+  (** [copy nds] returns a handle independent of [nds]: mutations to
+      either handle are invisible to the other; both stay backed by the
+      same underlying store.  Copy-on-write — at most one lazy copy of
+      the registry state, deferred to the next mutation of either side.
+
+      Only [Normal]-mode handles can be copied — [Prove]/[Verify]
+      handles are transient in-step sessions and never live in a state
+      at rest.  Raises [Invalid_argument] otherwise (same precedent as
+      {!open_prove_session}). *)
+  val copy : Octez_riscv_nds_common.Nds.t -> Octez_riscv_nds_common.Nds.t
 end
+
+(** Content hash of an empty NDS registry — the expected
+    [/pvm/nds_hash] marker on the (host-function-free) activation tick.
+
+    A constant of the NDS hashing scheme, not of any backend: a proof
+    produced against one backend is verified against another (the
+    rollup node proves on disk, the protocol verifies in memory), so
+    the activation-tick cross-checks only make sense if every backend
+    hashes the empty registry identically.  Defined once here rather
+    than required from each {!NDS_BACKEND}. *)
+val empty_registry_hash : bytes
 
 (** [Make (Irmin) (Backend)] specialises the dual-state WASM PVM to a
     concrete Irmin durable and NDS [Backend].
 
     {1 State}
 
-    [state] is a pair [(irmin, nds_state)].  The encoder keeps the halves
+    [state] is a record [{irmin; nds}].  The encoder keeps the halves
     consistent by writing the active registry's hash to the durable at
     [/pvm/nds_hash] on every [Dual] encode, so [state_hash] (the
     Irmin tree's hash) already commits to the NDS state — no external
@@ -84,6 +99,50 @@ module Make
     (** Activation tag carried alongside the Irmin tree: [Inactive] is
         pre-activation, [Active nds] carries the live NDS handle. *)
     type nds_state = Inactive | Active of Octez_riscv_nds_common.Nds.t
+
+    (** The dual state: the Irmin durable tree paired with the NDS
+        activation tag.
+
+        {b Beware}: an [Active] handle is intrinsically mutable, so a
+        [state] value is only as immutable as the discipline around it.
+        Values obtained from {!to_imm} are genuine snapshots (the handle
+        is severed); values built by hand share whatever handle was put
+        in them. *)
+    type state = {irmin : Irmin.state; nds : nds_state}
+
+    (** Mutable counterpart of [state], for in-place PVM evaluation:
+        [irmin] is replaced whole on every step (the tree is
+        persistent); [nds] is replaced on the activation flip and
+        mutated through the live handle during kernel execution. *)
+    type mut_state = {mutable irmin : Irmin.state; mutable nds : nds_state}
+
+    (** [to_imm m] snapshots [m]: the [Active] NDS handle is severed
+        with {!NDS_BACKEND.copy}, so later evaluation through [m] leaves
+        the snapshot unchanged.  Copy-on-write, at most one lazy copy. *)
+    val to_imm : mut_state -> state
+
+    (** [from_imm s] is a fresh mutable state seeded from [s]; the
+        [Active] NDS handle is severed with {!NDS_BACKEND.copy}, so
+        evaluation through the result leaves [s] unchanged. *)
+    val from_imm : state -> mut_state
+
+    (** [read m] is [m]'s current state {b without} severing the NDS
+        handle — the result aliases [m]'s live handle.  For the PVM's
+        mutable-state wrapper (read, evaluate, {!write} back); use
+        {!to_imm} for snapshots. *)
+    val read : mut_state -> state
+
+    (** [write m s] installs [s] into [m] (both fields, no copy) —
+        including the [Inactive -> Active] activation flip, which cannot
+        propagate through handle aliasing since [Inactive] carries no
+        handle. *)
+    val write : mut_state -> state -> unit
+
+    (** Durable path of the NDS marker, relative to the PVM state root.
+        Consumers reconstructing the NDS half from a persisted state
+        (e.g. a context backend restoring on checkout) read the marker
+        at this path. *)
+    val nds_hash_path : string list
 
     (** Composite proof: an Irmin proof of the durable transition plus an
         NDS proof of the step's host-function operations. *)
@@ -139,7 +198,7 @@ module Make
 
     include
       Tezos_scoru_wasm.Wasm_pvm_sig.STATE_PROOF
-        with type state = Irmin.state * nds_state
+        with type state := state
          and type context = Irmin.context
          and type proof := proof
 
@@ -160,10 +219,18 @@ module Make
     end
   end
 
-  (** [wasm_pvm_machine_dual ~config] returns a WASM PVM machine over
-      {!Dual_state}. *)
+  (** [wasm_pvm_machine_dual ~config ~make_empty_nds] returns a WASM
+      PVM machine over {!Dual_state}.
+
+      [make_empty_nds] is the activation-boundary factory: the
+      [Normal]-mode handle the VM installs when the kernel opens the
+      NDS gate.  It is a runtime argument (not part of {!NDS_BACKEND})
+      because it is the only place a backend's store handle enters the
+      machine — e.g. the on-disk backend closes it over the rocksdb
+      repository the node opened at startup. *)
   val wasm_pvm_machine_dual :
     config:Tezos_scoru_wasm.Wasm_pvm_config.t ->
+    make_empty_nds:(unit -> Octez_riscv_nds_common.Nds.t) ->
     (module Tezos_scoru_wasm.Wasm_pvm_sig.S
        with type context = Dual_state.context
         and type state = Dual_state.state

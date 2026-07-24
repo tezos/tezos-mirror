@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_smart_rollup_nds_on_disk)
+ (public_name octez-l2-libs.smart-rollup-nds-on-disk)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.smart-rollup-wasm-dual-state
+  octez-libs.riscv-nds-common
+  octez-riscv-nds.disk)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))

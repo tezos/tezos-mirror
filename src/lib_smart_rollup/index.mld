@@ -19,5 +19,6 @@ It contains the following libraries:
 - {{!module-Tezos_scoru_wasm_helpers_functor}Tezos_scoru_wasm_helpers_functor}: Helpers for the smart rollup wasm functionality and debugger (functor)
 - {{!module-Tezos_scoru_wasm_helpers_intf}Tezos_scoru_wasm_helpers_intf}: Helpers for the smart rollup wasm functionality and debugger (signatures)
 - {{!module-Tezos_scoru_wasm_test_helpers}Tezos_scoru_wasm_test_helpers}: Helpers for test of the smart rollup wasm functionality
+- {{!module-Tezos_smart_rollup_nds_on_disk}Tezos_smart_rollup_nds_on_disk}: On-disk NDS backend for the dual-state WASM PVM
 - {{!module-Tezos_wasmer}Tezos_wasmer}: Wasmer bindings for SCORU WASM
 - {{!module-Tezos_webassembly_interpreter_extra}Tezos_webassembly_interpreter_extra}: Additional modules from the WebAssembly REPL used in testing
