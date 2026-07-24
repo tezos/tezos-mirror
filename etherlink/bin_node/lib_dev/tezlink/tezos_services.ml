@@ -70,12 +70,6 @@ module Protocol_types = struct
         ~dst:Ushuai_context.Level.encoding
         ~src:conversion_encoding
 
-    let convert_seoulo : level -> SeouLo_context.Level.t tzresult =
-      Tezos_types.convert_using_serialization
-        ~name:"level"
-        ~dst:SeouLo_context.Level.encoding
-        ~src:conversion_encoding
-
     let convert : level -> Imported_context.Level.t tzresult =
       Tezos_types.convert_using_serialization
         ~name:"level"
@@ -208,89 +202,6 @@ let voting_period_info ~block_per_cycle ~cycles_per_voting_period ~level_info =
     Imported_context.Voting_period.{voting_period; position; remaining}
   in
   return voting_period_info
-
-(** We add to Imported_protocol the mocked protocol data used in headers *)
-module Tezlink_SeouLo_protocol = struct
-  include SeouLo_protocol
-
-  let contents : Block_header_repr.contents =
-    {
-      payload_hash = Block_payload_hash.zero;
-      payload_round = Round_repr.zero;
-      seed_nonce_hash = None;
-      proof_of_work_nonce =
-        Bytes.make Constants_repr.proof_of_work_nonce_size '\000';
-      per_block_votes =
-        {
-          liquidity_baking_vote = Per_block_vote_pass;
-          adaptive_issuance_vote = Per_block_vote_pass;
-        };
-    }
-
-  let signature : SeouLo_context.signature =
-    Unknown (Bytes.make Tezos_crypto.Signature.Ed25519.size '\000')
-
-  let mock_protocol_data : Block_header_repr.protocol_data =
-    {contents; signature}
-
-  let mock_block_header_data ~chain_id:_ : block_header_data tzresult =
-    Tezos_types.convert_using_serialization
-      ~name:"block_header_data"
-      ~dst:block_header_data_encoding
-      ~src:Block_header_repr.protocol_data_encoding
-      mock_protocol_data
-
-  let mock_block_header_metadata level_info =
-    let open Apply_results in
-    let open Result_syntax in
-    let proposer =
-      SeouLo_context.Consensus_key.
-        {
-          delegate = Tezlink_mock.seoulo_baker_pkh;
-          consensus_pkh = Tezlink_mock.seoulo_baker_pkh;
-        }
-    in
-    let balance_updates =
-      let amount = SeouLo_context.Tez.of_mutez_exn 0L in
-      Tezlink_mock.seoulo_balance_udpdate_rewards
-        ~baker:Tezlink_mock.seoulo_baker_pkh
-        ~amount
-    in
-
-    let constant = (Tezlink_constants.all_constants ()).parametric in
-    let* voting_period_info =
-      let* imported_protocol_period_info =
-        voting_period_info
-          ~block_per_cycle:constant.blocks_per_cycle
-          ~cycles_per_voting_period:constant.cycles_per_voting_period
-          ~level_info
-      in
-      Tezos_types.convert_using_serialization
-        ~name:"SeouLo period info"
-        ~src:Imported_context.Voting_period.info_encoding
-        ~dst:SeouLo_context.Voting_period.info_encoding
-        imported_protocol_period_info
-    in
-    let* level_info = Protocol_types.Level.convert_seoulo level_info in
-    return
-      {
-        proposer;
-        baker = proposer;
-        level_info;
-        voting_period_info;
-        nonce_hash = None;
-        consumed_gas = SeouLo_context.Gas.Arith.zero;
-        deactivated = [];
-        balance_updates;
-        liquidity_baking_toggle_ema =
-          SeouLo_context.Per_block_votes.Liquidity_baking_toggle_EMA.zero;
-        adaptive_issuance_vote_ema =
-          SeouLo_context.Per_block_votes.Adaptive_issuance_launch_EMA.zero;
-        adaptive_issuance_launch_cycle = None;
-        implicit_operations_results = [];
-        dal_attestation = SeouLo_context.Dal.Attestation.empty;
-      }
-end
 
 (** We add to Imported_protocol_024 the mocked protocol data used in headers *)
 module Tezlink_TALLiN_protocol = struct

@@ -78,10 +78,6 @@ let baker_account =
 (* [baker_account.pkh] is typed against the imported protocol; the other
    supported protocols may use a different environment, so build their
    [public_key_hash] from the shared raw Ed25519 key separately. *)
-let seoulo_baker_pkh : SeouLo_context.public_key_hash =
-  Ed25519
-    (Tezos_crypto.Signature.Ed25519.Public_key.hash baker_ed25519_public_key)
-
 let tallin_baker_pkh : TALLiN_context.public_key_hash =
   Ed25519
     (Tezos_crypto.Signature.Ed25519.Public_key.hash baker_ed25519_public_key)
@@ -341,18 +337,6 @@ module Voting_period = struct
             int32))
 end
 
-let seoulo_balance_udpdate_rewards ~(baker : SeouLo_context.public_key_hash)
-    ~amount =
-  let open SeouLo_context.Receipt in
-  let debited_rewards =
-    item Baking_rewards (Debited amount) Block_application
-  in
-  let baker = frozen_baker baker in
-  let credited_rewards =
-    item (Deposits baker) (Credited amount) Block_application
-  in
-  [debited_rewards; credited_rewards]
-
 let tallin_balance_udpdate_rewards ~(baker : TALLiN_context.public_key_hash)
     ~amount =
   let open TALLiN_context.Receipt in
@@ -420,7 +404,7 @@ let list_entrypoints code normalize_types =
   let expr = Script.lazy_expr code in
   (* The following is taken verbatim from the implementation of the contract
      services in the plugin:
-         src/proto_023_PtSeouLo/lib_plugin/contract_services.ml
+         src/proto_025_PsUshuai/lib_plugin/contract_services.ml
   *)
   let legacy = true in
   let open Script_ir_translator in
