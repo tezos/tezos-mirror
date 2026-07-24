@@ -30,7 +30,6 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_journal::{RuntimeId, TezosXJournal};
 
 mod deserializer;
-mod evalhost;
 mod fixture;
 mod helpers;
 
