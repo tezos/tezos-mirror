@@ -6677,11 +6677,68 @@ code {
     in
     unit
 
+  let test_concat_pair =
+    register_tezosx_test
+      ~title:
+        "Michelson CONCAT (two operands) does not exhaust memory on a shared \
+         operand"
+      ~tags:["michelson"; "oom"; "concat"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"concatstring"
+        ~outcome:(Fails_with "Gas_exhaustion")
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH string "0" ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL string ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       SWAP ;
+       NIL string ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH string "0" ;
+       DUP 2 ;
+       CONCAT ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }
+|}
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"concatbytes"
+        ~outcome:(Fails_with "Gas_exhaustion")
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       SWAP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       PUSH bytes 0x ;
+       CONCAT ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }
+|}
+    in
+    unit
+
   let register () =
     test_hashes [Alpha] ;
     test_check_signature [Alpha] ;
     test_unpack [Alpha] ;
-    test_shift_bytes [Alpha]
+    test_shift_bytes [Alpha] ;
+    test_concat_pair [Alpha]
 end
 
 let () =

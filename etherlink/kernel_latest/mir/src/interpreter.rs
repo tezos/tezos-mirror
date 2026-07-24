@@ -2741,24 +2741,38 @@ fn interpret_one<'a>(
         }
         I::Concat(overload) => match overload {
             overloads::Concat::TwoStrings => {
-                let mut s1 = pop!(V::String);
-                let s2 = pop!(V::String);
+                pop_ref!(s1, String);
+                pop_ref!(s2, String);
                 ctx.gas()
                     .consume(interpret_cost::concat_string_pair(s1.len(), s2.len())?)?;
-                s1.try_reserve_exact(s2.len())
+                let total = s1
+                    .len()
+                    .checked_add(s2.len())
+                    .ok_or(InterpretError::Overflow)?;
+                let mut result = String::new();
+                result
+                    .try_reserve_exact(total)
                     .map_err(|_| InterpretError::Overflow)?;
-                s1.push_str(&s2);
-                stack.push(V::String(s1));
+                result.push_str(s1);
+                result.push_str(s2);
+                stack.push(V::String(result));
             }
             overloads::Concat::TwoBytes => {
-                let mut bs1 = pop!(V::Bytes);
-                let bs2 = pop!(V::Bytes);
+                pop_ref!(bs1, Bytes);
+                pop_ref!(bs2, Bytes);
                 ctx.gas()
                     .consume(interpret_cost::concat_bytes_pair(bs1.len(), bs2.len())?)?;
-                bs1.try_reserve_exact(bs2.len())
+                let total = bs1
+                    .len()
+                    .checked_add(bs2.len())
+                    .ok_or(InterpretError::Overflow)?;
+                let mut result = Vec::new();
+                result
+                    .try_reserve_exact(total)
                     .map_err(|_| InterpretError::Overflow)?;
-                bs1.extend_from_slice(&bs2);
-                stack.push(V::Bytes(bs1))
+                result.extend_from_slice(bs1);
+                result.extend_from_slice(bs2);
+                stack.push(V::Bytes(result))
             }
             overloads::Concat::ListOfStrings => {
                 pop_ref!(list, List);
@@ -5268,6 +5282,54 @@ mod interpreter_tests {
             "UPDATE n deep-copied its {SIZE}-byte shared operand \
              ({allocated} bytes allocated); it must store it behind its Rc.",
         );
+    }
+
+    #[test]
+    fn concat_pair_does_not_clone_a_shared_operand() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        // strings: the shared operand is the first (top) operand.
+        {
+            let operand = Rc::new(V::String("0".repeat(SIZE)));
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(1000); // below concat_string_pair(SIZE)
+            let mut stack = IStack::new();
+            stack.push(V::String(String::new())); // second operand (small)
+            stack.push(Rc::clone(&operand)); // first operand on top, shared
+            let before = thread_allocated_bytes();
+            let outcome = interpret(
+                &[Concat(overloads::Concat::TwoStrings)],
+                &mut ctx,
+                &mut stack,
+            );
+            let allocated = thread_allocated_bytes() - before;
+            drop(operand);
+            assert!(matches!(outcome, Err(InterpretError::OutOfGas)));
+            assert!(
+                allocated < SIZE as u64,
+                "CONCAT (strings) cloned its {SIZE}-byte shared operand \
+                 ({allocated} bytes) before the gas charge; read it borrowed.",
+            );
+        }
+        // bytes: the shared operand is the second operand.
+        {
+            let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(1000); // below concat_bytes_pair(SIZE)
+            let mut stack = IStack::new();
+            stack.push(Rc::clone(&operand)); // second operand, shared
+            stack.push(V::Bytes(vec![])); // first operand on top (small)
+            let before = thread_allocated_bytes();
+            let outcome =
+                interpret(&[Concat(overloads::Concat::TwoBytes)], &mut ctx, &mut stack);
+            let allocated = thread_allocated_bytes() - before;
+            drop(operand);
+            assert!(matches!(outcome, Err(InterpretError::OutOfGas)));
+            assert!(
+                allocated < SIZE as u64,
+                "CONCAT (bytes) cloned its {SIZE}-byte shared operand \
+                 ({allocated} bytes) before the gas charge; read it borrowed.",
+            );
+        }
     }
 
     #[test]
