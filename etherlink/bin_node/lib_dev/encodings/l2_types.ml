@@ -91,11 +91,10 @@ module Tezos_block = struct
   end
 
   module Protocol = struct
-    type t = S023 | T024 | U025
+    type t = T024 | U025
 
     let from_bytes (bytes : bytes) : t =
       match Rlp.decode_int bytes with
-      | Ok 23 -> S023
       | Ok 24 -> T024
       | Ok 25 -> U025
       | Ok _ -> raise (Invalid_argument "Expected a valid protocol")
@@ -104,9 +103,7 @@ module Tezos_block = struct
           raise (Invalid_argument "Unexpected protocol read")
 
     let to_bytes (protocol : t) : bytes =
-      let protocol =
-        match protocol with S023 -> 23 | T024 -> 24 | U025 -> 25
-      in
+      let protocol = match protocol with T024 -> 24 | U025 -> 25 in
       Rlp.encode_int protocol
   end
 
@@ -337,7 +334,8 @@ module Tezos_block = struct
                "Expected a RLP list of 6 elements (including the version field)")
 
     (* Upgrade a V0 block to V1. V0 lacked the protocol fields added
-       in V1; fill them with the pre-upgrade S023 protocol. *)
+       in V1; fill them with the oldest protocol the Michelson runtime
+       still supports (T024), since S023 support has been dropped. *)
     let to_v1 ({hash; level; timestamp; parent_hash; operations} : t) : V1.t =
       {
         hash;
@@ -345,8 +343,8 @@ module Tezos_block = struct
         timestamp;
         parent_hash;
         operations;
-        protocol = Protocol.S023;
-        next_protocol = Protocol.S023;
+        protocol = Protocol.T024;
+        next_protocol = Protocol.T024;
       }
 
     let to_latest (v : t) : Latest.t = V2.of_v1 (to_v1 v)
