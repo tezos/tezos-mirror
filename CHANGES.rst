@@ -32,6 +32,9 @@ Release".
 General
 -------
 
+- The Tallinn protocol (024) has been frozen. The ``octez-baker-PtTALLiN`` and
+  ``octez-accuser-PtTALLiN`` executables have been removed.
+
 - Fixed a file descriptor leak in the RPC client: the connection of each
   followed HTTP redirect was never released. This affected every Octez
   executable issuing RPC calls through an endpoint answering redirects

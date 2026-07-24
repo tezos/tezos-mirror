@@ -34,100 +34,6 @@ let count_event ?(get_count_from_event = fun _event -> 1) sequencer event
 let count_blueprint_sent_on_inbox sequencer counter =
   count_event sequencer "blueprint_injection_on_inbox.v0" counter
 
-(* This test is similar to {Evm_sequencer.test_publish_blueprints} but it also checks
-   that all 5 blueprints sent from the sequencer were published on the
-   DAL (and none on the inbox). *)
-let test_publish_blueprints_on_dal ~dal_slot =
-  register_test
-    ~time_between_blocks:Nothing
-    ~tags:["evm"; "sequencer"; "data"]
-    ~title:
-      (sf "Sequencer publishes the blueprints on DAL slot index %d" dal_slot)
-    ~dal_slots:(Some [dal_slot])
-  (* We want this test in the CI so we put no extra tags when DAL
-     is active to avoid having the [ci_disabled] or [slow] tag. *)
-  @@ fun {sequencer; client; sc_rollup_node; enable_dal; _} _protocol ->
-  let number_of_blueprints = 5 in
-
-  let number_of_blueprints_sent_to_inbox = ref 0 in
-  let number_of_blueprints_sent_to_dal = ref 0 in
-  let number_of_signals = ref 0 in
-
-  let inbox_counter_p =
-    count_blueprint_sent_on_inbox sequencer number_of_blueprints_sent_to_inbox
-  in
-
-  let dal_counter_p =
-    count_event
-      sequencer
-      "blueprint_injection_on_DAL.v0"
-      number_of_blueprints_sent_to_dal
-  in
-
-  let signal_counter_p =
-    count_event
-      ~get_count_from_event:(fun event ->
-        JSON.(event |-> "signals" |> as_list |> List.length))
-      sequencer
-      "signal_publisher_signal_signed.v0"
-      number_of_signals
-  in
-
-  let* _ =
-    repeat number_of_blueprints (fun () ->
-        let*@ _ = produce_block sequencer in
-        unit)
-  in
-
-  (* Wait more to avoid flakiness, in particular with DAL *)
-  let timeout = if enable_dal then 50. else 5. in
-  let* () =
-    Evm_node.wait_for_blueprint_injected ~timeout sequencer number_of_blueprints
-  in
-
-  (* At this point, the evm node should call the batcher endpoint to publish
-     all the blueprints. Stopping the node is then not a problem. *)
-  let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer () in
-
-  let* () =
-    (* bake 2 block when DAL is enabled so evm_node sees it as
-       finalized in `rollup_node_follower` *)
-    if enable_dal then
-      repeat 2 (fun () ->
-          let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-          unit)
-    else unit
-  in
-
-  let* () =
-    check_rollup_head_consistency ~evm_node:sequencer ~sc_rollup_node ()
-  in
-  let expected_nb_of_bp_on_dal, expected_nb_of_bp_on_inbox =
-    if enable_dal then (number_of_blueprints, 0) else (0, number_of_blueprints)
-  in
-  let expected_nb_of_signals =
-    1
-    (* We sent few blueprints and they are empty. They all fit in a single DAL slot. *)
-  in
-  Check.(expected_nb_of_bp_on_dal = !number_of_blueprints_sent_to_dal)
-    ~__LOC__
-    Check.int
-    ~error_msg:
-      "Wrong number of blueprints published on the DAL; Expected %L, got %R." ;
-  Check.(expected_nb_of_signals = !number_of_signals)
-    ~__LOC__
-    Check.int
-    ~error_msg:"Wrong number of signals signed; Expected %L, got %R." ;
-  Check.(expected_nb_of_bp_on_inbox = !number_of_blueprints_sent_to_inbox)
-    ~__LOC__
-    Check.int
-    ~error_msg:
-      "Wrong number of blueprints published on the inbox; Expected %L, got %R." ;
-  Lwt.cancel dal_counter_p ;
-  Lwt.cancel inbox_counter_p ;
-  Lwt.cancel signal_counter_p ;
-  unit
-
 (* This test verifies DAL publishers whitelist for protocols > 024.
    It checks that only whitelisted publishers can have their DAL slots processed. *)
 let test_publish_blueprints_on_dal_with_whitelist ~dal_slot
@@ -468,43 +374,29 @@ let test_more_than_one_slot_per_l1_level =
 
 let protocols = Protocol.all
 
-(* Split protocols: legacy DAL signals (≤ 024) vs DalAttestedSlots with
-   whitelist (> 024) *)
-let protocols_legacy_dal =
-  List.filter (fun p -> Protocol.number p <= 024) protocols
-
-let protocols_with_whitelist =
-  List.filter (fun p -> Protocol.number p > 024) protocols
-
 let () =
-  (* Test legacy DAL signals for protocols ≤ 024 *)
-  test_publish_blueprints_on_dal ~dal_slot:4 protocols_legacy_dal ;
-  (* Also run the test for slot index 0 because it is a particular
-     case in the RLP encoding used to send signals to the rollup. *)
-  test_publish_blueprints_on_dal ~dal_slot:0 protocols_legacy_dal ;
-
   (* Test DalAttestedSlots with whitelist for protocols after Tallinn (> 024) *)
   (* Test acceptance: bootstrap1 is whitelisted *)
   test_publish_blueprints_on_dal_with_whitelist
     ~dal_slot:4
     ~dal_publishers_whitelist:[Constant.bootstrap1.public_key_hash]
-    protocols_with_whitelist ;
+    protocols ;
   (* Test rejection: only bootstrap2 is whitelisted, so bootstrap1's slots are rejected *)
   test_publish_blueprints_on_dal_with_whitelist
     ~dal_slot:0
     ~dal_publishers_whitelist:[Constant.bootstrap2.public_key_hash]
-    protocols_with_whitelist ;
+    protocols ;
   (* Test rejection: empty whitelist, bootstrap1's slots are rejected *)
   test_publish_blueprints_on_dal_with_whitelist
     ~dal_slot:0
     ~dal_publishers_whitelist:[]
-    protocols_with_whitelist ;
+    protocols ;
   (* Test acceptance with multiple publishers in whitelist *)
   test_publish_blueprints_on_dal_with_whitelist
     ~dal_slot:0
     ~dal_publishers_whitelist:
       [Constant.bootstrap2.public_key_hash; Constant.bootstrap1.public_key_hash]
-    protocols_with_whitelist ;
+    protocols ;
 
   test_chunked_blueprints_on_dal protocols ;
   test_more_than_one_slot_per_l1_level protocols

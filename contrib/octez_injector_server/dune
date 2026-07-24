@@ -17,9 +17,6 @@
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-libs.data-encoding
-  (select void_for_linking-octez_injector_PtTALLiN from
-   (octez_injector_PtTALLiN -> void_for_linking-octez_injector_PtTALLiN.empty)
-   (-> void_for_linking-octez_injector_PtTALLiN.empty))
   (select void_for_linking-octez_injector_PsUshuai from
    (octez_injector_PsUshuai -> void_for_linking-octez_injector_PsUshuai.empty)
    (-> void_for_linking-octez_injector_PsUshuai.empty))
@@ -44,6 +41,5 @@
 (rule
  (action
   (progn
-   (write-file void_for_linking-octez_injector_PtTALLiN.empty "")
    (write-file void_for_linking-octez_injector_PsUshuai.empty "")
    (write-file void_for_linking-octez_injector_alpha.empty ""))))

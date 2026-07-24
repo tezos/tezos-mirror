@@ -24,7 +24,12 @@ let register_test ~__FILE__ ?(file_tags = []) ~title ?(additional_tags = [])
     ~uses_client:false
     ~uses_admin_client:false
     (fun _protocol -> f ())
-    [T024]
+    (* Tallinn is frozen: this library only survives because Etherlink's
+       tezlink uses parts of it at runtime, and tezlink registers no
+       test. The empty protocol list (rather than [T024]) makes any
+       future call fail loudly at registration time instead of silently
+       scheduling tests on a frozen protocol. *)
+    []
 
 (** Same as [register_test], but for a test function returning [unit
     tzresult Lwt.t]. If the result is an error, the test fails. *)

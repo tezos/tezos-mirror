@@ -3607,8 +3607,6 @@ oc.build_arm64-released:
     - octez-node
     - octez-accuser-PsUshuai
     - octez-baker-PsUshuai
-    - octez-accuser-PtTALLiN
-    - octez-baker-PtTALLiN
     - src/proto_*/parameters/*.json
     when: on_success
 
@@ -3967,8 +3965,6 @@ oc.build_x86_64-released:
     - octez-node
     - octez-accuser-PsUshuai
     - octez-baker-PsUshuai
-    - octez-accuser-PtTALLiN
-    - octez-baker-PtTALLiN
     - src/proto_*/parameters/*.json
     when: on_success
 

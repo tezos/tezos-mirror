@@ -129,20 +129,6 @@
     PsUshuai_machine.real.ml))))
 
 (rule
- (target PtTALLiN_machine.real.ml)
- (mode fallback)
- (deps next_machine.real.ml)
- (action
-  (progn
-   (copy next_machine.real.ml PtTALLiN_machine.real.ml)
-   (run
-    sed
-    -i.bak -e s/Tezos_client_next/Tezos_client_PtTALLiN/g -e
-    s/Tezos_protocol_next/Tezos_protocol_PtTALLiN/g -e
-    s/Tezos_protocol_plugin_next/Tezos_protocol_plugin_PtTALLiN/g
-    PtTALLiN_machine.real.ml))))
-
-(rule
  (target next_machine.real.ml)
  (mode fallback)
  (deps alpha_machine.real.ml)

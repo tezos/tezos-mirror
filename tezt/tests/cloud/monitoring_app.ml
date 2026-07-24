@@ -38,9 +38,7 @@ let network_to_image_url : Network.t -> string = function
       "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/shadownet.png"
   | `Ghostnet ->
       "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/ghostnet.png"
-  | `Nextnet _ | `Tallinnnet ->
-      "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/tallinnnet.png"
-  | `Ushuaianet | `Sandbox | `Weeklynet _ -> "no_image_yet"
+  | `Nextnet _ | `Ushuaianet | `Sandbox | `Weeklynet _ -> "no_image_yet"
 
 module Format_app = struct
   (* Helper for Slack App message format block-kit

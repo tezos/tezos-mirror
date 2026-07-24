@@ -248,10 +248,12 @@ let () =
     | Frozen | Overridden ->
         (* Protocol 000 is always needed,
            if only to be able to bootstrap Mainnet. *)
-        (* Seoul (023) test_helpers is kept for Etherlink's tezlink.
-           Remove this exception when Etherlink migrates to TALLiN. *)
+        (* Seoul (023) and Tallinn (024) test_helpers are kept for
+           Etherlink's tezlink. Remove these exceptions when Etherlink
+           migrates to newer protocols. *)
         Octez.Protocol.number protocol <> V 000
         && Octez.Protocol.number protocol <> V 023
+        && Octez.Protocol.number protocol <> V 024
     | Not_mainnet ->
         (* Demo protocols are useful for tests,
            and slim mode is intended for developers
