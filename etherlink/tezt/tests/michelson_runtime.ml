@@ -4186,6 +4186,72 @@ code {
     ~error_msg:"Expected a clean FAILWITH failure, got %L" ;
   unit
 
+(* Returns a storage holding a large value twice, [Pair (Pair V V) W], built
+   with [DUP ; PAIR] so both halves of the inner pair are one allocation. The
+   end-of-execution walk that looks for big maps to persist descends the whole
+   returned value; it must do so through the shared [Rc]s rather than unsharing
+   each container child, which would deep-copy [V] even though no big map, and
+   no operation, is involved anywhere. Without that, the extra copy pushes past
+   the WASM heap and traps the kernel; with it the result is serialized under
+   gas, so an oversized storage runs out of gas cleanly instead (L2-1840). *)
+let test_michelson_oom_big_map_walk =
+  register_tezosx_test
+    ~title:
+      "Michelson finalization walk does not exhaust memory on a shared leaf"
+    ~tags:["gas"; "exhaustion"; "oom"; "big_map"; "walk"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint sequencer in
+  let script =
+    {|
+parameter unit ;
+storage (pair (pair bytes bytes) bytes) ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ; PAIR ; PAIR ;
+       NIL operation ;
+       PAIR
+     }|}
+  in
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"big_map_walk_oom"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"Pair (Pair 0x 0x) 0x"
+      ~prg:script
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  let process =
+    Client.spawn_transfer
+      ~endpoint
+      ~amount:Tez.zero
+      ~fee:(Tez.of_mutez_int 100_000)
+      ~gas_limit:660_000
+      ~storage_limit:0
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:contract
+      ~arg:"Unit"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  (* The Michelson runtime surfaces this as [Transfer(OutOfGas(OutOfGas))]
+     rather than the protocol's [Gas_exhaustion]; what matters is that it is a
+     bounded error at all, where before the fix the kernel trapped. *)
+  Check.(err =~ rex "OutOfGas")
+    ~error_msg:"Expected a clean out-of-gas failure, got %L" ;
+  unit
+
 (* Tests that the [/mempool/filter] RPC returns the expected
     [minimal_nanotez_per_gas_unit] and [minimal_nanotez_per_byte] computed
     from the kernel's [base_fee_per_gas] and [michelson_to_evm_gas_multiplier]
@@ -6891,6 +6957,7 @@ let () =
   test_michelson_oom_concat [Alpha] ;
   test_michelson_oom_pack [Alpha] ;
   test_michelson_oom_failwith [Alpha] ;
+  test_michelson_oom_big_map_walk [Alpha] ;
   test_mempool_filter_fields [Alpha] ;
   test_gas_refund_on_transfer ~enable_refund:true [Alpha] ;
   test_gas_refund_on_transfer ~enable_refund:false [Alpha] ;

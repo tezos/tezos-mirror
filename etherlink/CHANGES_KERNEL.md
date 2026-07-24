@@ -11,6 +11,16 @@
   milligas per node of the returned storage and of each outgoing operation, so
   an operation returning a large storage consumes marginally more gas than
   before. Big-map identifiers are still allocated in the same order (!22602).
+- Michelson runtime: a contract that duplicates a large value and returns it can
+  no longer exhaust the kernel heap. Serializing the returned storage took
+  ownership of each child, which deep-copies one that is still shared —
+  `DUP ; PAIR` leaves `Pair(V, V)` as a single allocation — and did so before
+  charging any gas for it, so the copy could push past the 4 GiB limit and abort
+  the kernel on a WASM trap. The storage is now unparsed through a walk that
+  reads through the shared pointers and clones only leaf payloads, charging
+  before it allocates. Together with the copy-on-write walk above, such a
+  contract now fails with a bounded out-of-gas error instead of aborting the
+  kernel (!22603).
 - Michelson runtime: `CONCAT` now rejects a result larger than the maximum
   allocatable size with a bounded `Overflow` error, instead of aborting the
   kernel with a capacity-overflow panic (!22534).
