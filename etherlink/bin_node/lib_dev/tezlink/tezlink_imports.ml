@@ -21,6 +21,14 @@ module TALLiN_env = Tezos_protocol_environment_024_PtTALLiN
 module TALLiN_plugin = Tezos_protocol_plugin_024_PtTALLiN
 module TALLiN_test_helpers = Tezos_024_PtTALLiN_test_helpers
 
+(* Ushuai modules *)
+module Ushuai_protocol = Tezos_protocol_025_PsUshuai.Protocol
+module Ushuai_context = Ushuai_protocol.Alpha_context
+module Ushuai_parameter = Tezos_protocol_025_PsUshuai_parameters
+module Ushuai_env = Tezos_protocol_environment_025_PsUshuai
+module Ushuai_plugin = Tezos_protocol_plugin_025_PsUshuai
+module Ushuai_test_helpers = Tezos_025_PsUshuai_test_helpers
+
 (* Current Tezlink protocol *)
 module Imported_protocol = TALLiN_protocol
 module Imported_protocol_plugin = TALLiN_plugin

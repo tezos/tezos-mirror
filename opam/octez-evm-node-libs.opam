@@ -34,6 +34,8 @@ depends: [
   "tezos-protocol-023-PtSeouLo"
   "octez-protocol-024-PtTALLiN-libs"
   "tezos-protocol-024-PtTALLiN"
+  "octez-protocol-025-PsUshuai-libs"
+  "tezos-protocol-025-PsUshuai"
   "dream" { >= "1.0.0~alpha8-octez" }
   "octez-connpool"
   "octez-version"
