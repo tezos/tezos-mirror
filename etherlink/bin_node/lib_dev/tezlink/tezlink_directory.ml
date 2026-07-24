@@ -44,7 +44,7 @@ let () =
     (function Failed_operation_forging -> Some () | _ -> None)
     (fun () -> Failed_operation_forging)
 
-module Mempool = Tezos_protocol_plugin_024_PtTALLiN.Mempool
+module Mempool = Tezos_protocol_plugin_025_PsUshuai.Mempool
 
 let check_chain =
   let open Result_syntax in
@@ -91,12 +91,20 @@ let make_contract_info contract_balance counter_opt contract_script =
         let* counter = Protocol_types.Counter.of_z counter_z in
         return_some counter
   in
+  (* The [script] RPC returns a bare [michelson_with_storage], but the
+     contract [info] record carries a full [Script.t]; wrap it as a
+     (non-native) Michelson script. *)
+  let script =
+    Option.map
+      (fun s -> Tezlink_imports.Imported_context.Script.Script s)
+      contract_script
+  in
   return
     {
       balance = contract_balance;
       delegate = None;
       counter;
-      script = contract_script;
+      script;
       revealed = None;
     }
 

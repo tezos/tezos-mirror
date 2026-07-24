@@ -50,7 +50,7 @@ let convert_using_serialization ~name ~dst ~src value =
 module Contract = struct
   type t = Tezlink_imports.Imported_context.Contract.t
 
-  type implicit = Signature.V2.Public_key_hash.t
+  type implicit = Signature.V3.Public_key_hash.t
 
   let encoding = Tezlink_imports.Imported_context.Contract.encoding
 
@@ -132,7 +132,7 @@ module Operation = struct
   module ImportedOperation = Tezlink_imports.Imported_context.Operation
 
   type t = {
-    source : Signature.V2.public_key_hash;
+    source : Signature.V3.public_key_hash;
     first_counter : Z.t;
     length : int;
     op : Tezlink_imports.Imported_context.packed_operation;
@@ -158,7 +158,7 @@ module Operation = struct
       (fun (source, first_counter, length, op, raw, fee, gas_limit) ->
         {source; first_counter; length; op; raw; fee; gas_limit})
       (tup7
-         Signature.V2.Public_key_hash.encoding
+         Signature.V3.Public_key_hash.encoding
          z
          int31
          (dynamic_size Tezlink_imports.Imported_context.Operation.encoding)
