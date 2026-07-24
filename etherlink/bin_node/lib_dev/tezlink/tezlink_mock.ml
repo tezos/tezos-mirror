@@ -47,17 +47,25 @@ type account = {
   balance : int64;
 }
 
+(* The mock baker's raw Ed25519 public key. It is environment-agnostic, so
+   each protocol module can wrap it into its own [public_key_hash] type (the
+   protocol [public_key_hash] variants differ once the protocol environment
+   is bumped). *)
+let baker_ed25519_public_key =
+  match
+    Tezos_crypto.Signature.Ed25519.Public_key.of_bytes_without_validation
+      (Bytes.make 32 '\000')
+  with
+  | None -> (* Unreachable *) assert false
+  | Some pk -> pk
+
 let baker_account =
-  let public_key_internal =
-    let pk_opt =
-      Tezos_crypto.Signature.Ed25519.Public_key.of_bytes_without_validation
-        (Bytes.make 32 '\000')
-    in
-    match pk_opt with None -> (* Unreachable *) assert false | Some pk -> pk
+  let public_key : Imported_context.public_key =
+    Ed25519 baker_ed25519_public_key
   in
-  let public_key : Imported_context.public_key = Ed25519 public_key_internal in
   let public_key_hash : Imported_context.public_key_hash =
-    Ed25519 (Tezos_crypto.Signature.Ed25519.Public_key.hash public_key_internal)
+    Ed25519
+      (Tezos_crypto.Signature.Ed25519.Public_key.hash baker_ed25519_public_key)
   in
   {
     pkh = public_key_hash;
@@ -66,6 +74,12 @@ let baker_account =
          in L1 sandbox *)
     balance = baker_initial_balance;
   }
+
+(* [baker_account.pkh] is typed against the imported protocol; Ushuai (025)
+   uses a newer environment, so provide its [public_key_hash] separately. *)
+let ushuai_baker_pkh : Ushuai_context.public_key_hash =
+  Ed25519
+    (Tezos_crypto.Signature.Ed25519.Public_key.hash baker_ed25519_public_key)
 
 let contents : Imported_context.Block_header.contents =
   {
@@ -342,6 +356,18 @@ let seoulo_balance_udpdate_rewards ~(baker : SeouLo_context.public_key_hash)
 let tallin_balance_udpdate_rewards ~(baker : TALLiN_context.public_key_hash)
     ~amount =
   let open TALLiN_context.Receipt in
+  let debited_rewards =
+    item Baking_rewards (Debited amount) Block_application
+  in
+  let baker = frozen_baker baker in
+  let credited_rewards =
+    item (Deposits baker) (Credited amount) Block_application
+  in
+  [debited_rewards; credited_rewards]
+
+let ushuai_balance_udpdate_rewards ~(baker : Ushuai_context.public_key_hash)
+    ~amount =
+  let open Ushuai_context.Receipt in
   let debited_rewards =
     item Baking_rewards (Debited amount) Block_application
   in
