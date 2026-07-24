@@ -3,6 +3,86 @@
 Changelog Smart Rollup Node
 '''''''''''''''''''''''''''
 
+Version 20260724 (2026-07-24)
+=============================
+
+- **Security fix** Fixed the public ``secure`` RPC ACL, which did not deny the
+  mutating ``/local/dal/**`` endpoints (``POST /local/dal/batcher/injection``,
+  ``POST /local/dal/slot/indices`` and
+  ``POST /local/dal/injection/<id>/forget``). On a publicly exposed node an
+  unauthenticated caller could enqueue DAL payloads that the operator node
+  published as an operator-funded ``dal_publish_commitment`` operation on L1.
+  These endpoints are now denied like the other ``/local/**`` mutating
+  endpoints. (MR :gl:`!22597`)
+
+- Added support for the Ushuaia protocol (protocol 025, ``PsUshuai``): its
+  protocol plugin is now included in release builds of the rollup node. (MR
+  :gl:`!22485`)
+
+- The injector now splits batches when individual operations fail simulation
+  with gas exhaustion (instead of repeatedly dropping them), and re-queues the
+  operations set aside by a batch split so they are reconsidered in a later
+  injection round. This fixes a permanent stall with large backlogs of
+  same-tag operations (e.g. cementation). (MR :gl:`!22417`)
+
+- The injector now gives cementation operations strictly higher priority than
+  commitment publication, and the rollup node no longer enqueues commitments
+  that are beyond the protocol's ``smart_rollup_max_lookahead_in_blocks``
+  window. This prevents a backlog of failing publish operations from starving
+  cementation when the ``operating`` and ``cementing`` purposes share the same
+  key. (MR :gl:`!22414`)
+
+- **Breaking change** The RPC ``GET /global/last_cemented_commitment`` now
+  always returns the last cemented commitment ``commitment_hash`` and
+  ``level`` known from L1, with the commitment content in an optional
+  ``commitment`` field, instead of returning ``null`` when the content is
+  not available in the node's storage (e.g. after a snapshot import in
+  full mode). (MR :gl:`!22415`)
+
+- The fast WASM execution engine (Wasmer) now trusts deterministic WASM traps
+  (``unreachable``, out-of-bounds memory access, division by zero, indirect
+  call type mismatch): the trap is recorded as a failed ``kernel_run`` in the
+  PVM state, mirroring the reference WASM PVM behaviour, instead of aborting
+  fast execution (which by default makes the node exit, or falls back to the
+  slow interpreter with ``--slow-vm-fallback``). A warning event is emitted
+  with the trap message. (MR :gl:`!22299`)
+
+- Hardened ``snapshot import``: archive members whose path would resolve
+  outside the destination directory are now rejected. (MR :gl:`!22100`)
+
+- Fixed a file descriptor leak in the RPC client: the connection of each
+  followed HTTP redirect was never released. This affected the rollup node
+  when its L1 endpoint answers redirects (e.g. behind a reverse proxy). (MR
+  :gl:`!22138`)
+
+- The rollup node RPC server now enables TCP keepalive on accepted
+  connections, so that connections whose peer has disappeared without closing
+  (e.g. behind a NAT or load balancer that drops idle flows) are eventually
+  closed and their resources released, instead of being retained until
+  restart. (MR :gl:`!22167`)
+
+Internal
+--------
+
+- Moved reading of WASM durable storage outside the PVM plugin interface: the
+  durable storage RPCs, ``dump durable storage`` command and kernel preload
+  now decode the durable storage through a shared helper instead of
+  per-protocol plugin accessors. (MR :gl:`!22255`)
+
+- Added a shared WASM 2.0.0 PVM Irmin state module, used by all protocol
+  plugins. (MR :gl:`!22254`)
+
+- Added ``Durable.fold`` to the WASM PVM durable storage API. (MR :gl:`!22205`)
+
+- Made the WASM PVM dual proof encoding embeddable, keeping proofs
+  byte-identical. (MR :gl:`!22400`)
+
+- Renamed the ``tree`` type of the PVM plugin signature to ``state``. (MR
+  :gl:`!22192`)
+
+- Fast WASM execution engine: dropped the singleton VM instance and exposed
+  the ``Make_vm``/``Make_pvm`` functor surface. (MR :gl:`!22047`)
+
 Version 20260511 (2026-05-11)
 =============================
 
