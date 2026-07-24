@@ -3001,9 +3001,9 @@ fn interpret_one<'a>(
         }
         I::UpdateN(n) => {
             ctx.gas().consume(interpret_cost::update_n(*n as usize)?)?;
-            let new_val = pop!();
-            let field = get_nth_field_ref(*n, Rc::make_mut(stack.get_mut(0)?))?;
-            *field = new_val;
+            let new_val = pop_rc!();
+            let slot = get_nth_field_slot_mut(*n, stack.get_mut(0)?)?;
+            *slot = new_val;
         }
         I::ChainId => {
             ctx.gas().consume(interpret_cost::CHAIN_ID)?;
@@ -3532,24 +3532,25 @@ pub fn compute_contract_address(
     ContractKt1Hash::from(digest_160(&input))
 }
 
-fn get_nth_field_ref<'a, 'b>(
+fn get_nth_field_slot_mut<'a, 'b>(
     mut m: u16,
-    mut val: &'a mut TypedValue<'b>,
-) -> Result<&'a mut TypedValue<'b>, InterpretError<'b>> {
+    mut slot: &'a mut Rc<TypedValue<'b>>,
+) -> Result<&'a mut Rc<TypedValue<'b>>, InterpretError<'b>> {
     use TypedValue as V;
     loop {
-        match (m, val) {
-            (0, val_) => break Ok(val_),
-            (1, V::Pair(l, _)) => {
-                break Ok(Rc::make_mut(l));
-            }
-
-            (_, V::Pair(_, r)) => {
-                val = Rc::make_mut(r);
+        if m == 0 {
+            return Ok(slot);
+        }
+        match Rc::make_mut(slot) {
+            V::Pair(l, r) => {
+                if m == 1 {
+                    return Ok(l);
+                }
+                slot = r;
                 m -= 2;
             }
             _ => {
-                break Err(InterpretError::InternalError(
+                return Err(InterpretError::InternalError(
                     InterpretInvariant::TypeMismatch {
                         expected: "V::Pair",
                     },
@@ -5247,6 +5248,25 @@ mod interpreter_tests {
             allocated < SIZE as u64,
             "VIEW result deep-copied its {SIZE}-byte shared operand \
              ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn update_n_forwards_shared_value_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(V::new_pair(V::Bytes(vec![]), V::Unit));
+        stack.push(Rc::clone(&operand)); // new field value on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(&[UpdateN(1)], &mut ctx, &mut stack).unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "UPDATE n deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must store it behind its Rc.",
         );
     }
 
