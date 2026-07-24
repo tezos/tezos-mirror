@@ -26,13 +26,13 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-use crate::evalhost::EvalHost;
 use crate::fillers::{output_result, process, TestResult};
 use crate::helpers::{
     construct_folder_path, string_of_hexa, LabelIndexes, OutputOptions,
 };
 use crate::models::{Env, FillerSource, SkipData, SpecName, Test, TestSuite, TestUnit};
 use crate::{write_host, write_out, DiffMap, Opt, ReportMap};
+use tezos_evm_runtime::runtime::MockKernelHost;
 
 const MAP_CALLER_KEYS: [(H256, H160); 6] = [
     (
@@ -88,22 +88,18 @@ fn read_testsuite(path: &Path) -> Result<TestSuite, TestError> {
     serde_json::from_reader(&*json_reader).map_err(TestError::from)
 }
 
-fn prepare_host() -> EvalHost {
-    EvalHost::default_with_buffer_reset()
+fn prepare_host() -> MockKernelHost {
+    tezos_evm_logging::DEBUG_LOG.with_borrow_mut(|log| log.truncate(0));
+    MockKernelHost::default()
 }
 
 fn prepare_filler_source(
-    host: &EvalHost,
     unit: &TestUnit,
     opt: &Opt,
 ) -> Result<Option<FillerSource>, TestError> {
     let full_filler_path =
         construct_folder_path(&unit._info.source, &opt.eth_tests, &None);
-    write_host!(
-        host,
-        "Filler source: {}",
-        &full_filler_path.to_str().unwrap()
-    );
+    write_host!("Filler source: {}", &full_filler_path.to_str().unwrap());
     let filler_path = Path::new(&full_filler_path);
     let reader = std::fs::read(filler_path).unwrap();
     if unit._info.source.contains(".json") {
@@ -119,18 +115,18 @@ fn prepare_filler_source(
     }
 }
 
-fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
-    write_host!(host, "\n[START] Accounts initialisation");
+fn initialize_accounts(host: &mut MockKernelHost, unit: &TestUnit) {
+    write_host!("\n[START] Accounts initialisation");
 
     for (address, info) in unit.pre.to_owned().iter() {
         let h160_address: H160 = address.as_fixed_bytes().into();
-        write_host!(host, "\nAccount is {}", h160_address);
+        write_host!("\nAccount is {}", h160_address);
         let mut account =
             StorageAccount::from_address(&address.as_fixed_bytes().into()).unwrap();
         if info.nonce != 0 {
-            write_host!(host, "Nonce is set for {} : {}", address, info.nonce);
+            write_host!("Nonce is set for {} : {}", address, info.nonce);
         }
-        write_host!(host, "Balance for {} was added : {}", address, info.balance);
+        write_host!("Balance for {} was added : {}", address, info.balance);
         let code_hash = keccak256(&info.code);
         if !info.code.is_empty() {
             CodeStorage::add(host, &info.code, Some(code_hash)).unwrap();
@@ -149,7 +145,7 @@ fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
                 },
             )
             .unwrap();
-        write_host!(host, "Code was set for {}", address);
+        write_host!("Code was set for {}", address);
         for (index, value) in info.storage.iter() {
             account
                 .set_storage(
@@ -161,7 +157,7 @@ fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
         }
     }
 
-    write_host!(host, "\n[END] Accounts initialisation\n");
+    write_host!("\n[END] Accounts initialisation\n");
 }
 
 fn initialize_env(unit: &TestUnit) -> Result<Env, TestError> {
@@ -211,7 +207,7 @@ fn u256_to_u128(value: U256) -> u128 {
 
 #[allow(clippy::too_many_arguments)]
 fn execute_transaction(
-    host: &mut EvalHost,
+    host: &mut MockKernelHost,
     unit: &TestUnit,
     env: &mut Env,
     spec_id: SpecId,
@@ -246,7 +242,6 @@ fn execute_transaction(
     let access_list = revm_etherlink::helpers::legacy::access_list_to_revm(access_list);
 
     write_host!(
-        host,
         "Executing transaction with:\n\
                     \t- data: {}\n\
                     \t- gas: {} gas\n\
@@ -292,7 +287,6 @@ fn data_to_skip(name: &str, data: &[u8], skip_data: &SkipData) -> bool {
 }
 
 fn check_results(
-    host: &EvalHost,
     name: &str,
     test: &Test,
     exec_result: &Result<ExecutionOutcome, EvmRunError>,
@@ -304,22 +298,21 @@ fn check_results(
             } else {
                 "[FAILURE]"
             };
-            write_host!(host, "\nOutcome status: {}", outcome_status);
+            write_host!("\nOutcome status: {}", outcome_status);
         }
-        Err(e) => write_host!(host, "\nA test failed due to {:?}", e),
+        Err(e) => write_host!("\nA test failed due to {:?}", e),
     }
 
-    write_host!(host, "\nFinal check: ");
+    write_host!("\nFinal check: ");
     match (test.expect_exception.clone(), exec_result) {
         (None, Ok(_)) => {
-            write_host!(host, "No unexpected exception.")
+            write_host!("No unexpected exception.")
         }
         (Some(_), Err(_)) => {
-            write_host!(host, "Exception was expected.")
+            write_host!("Exception was expected.")
         }
         _ => {
             write_host!(
-                host,
                 "\nSomething unexpected happened for test {}.\n\
                  Expected exception is the following: {:?}\n\
                  Further details on the execution result: {:?}",
@@ -329,7 +322,7 @@ fn check_results(
             );
         }
     }
-    write_host!(host, "\n=======> OK! <=======\n");
+    write_host!("\n=======> OK! <=======\n");
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -345,13 +338,13 @@ pub fn run_test(
     skip_data: &SkipData,
 ) -> Result<(), TestError> {
     let suit = read_testsuite(path)?;
-    let mut host = prepare_host();
+    let mut host;
 
     for (name, unit) in suit.0.into_iter() {
         if output.log {
             write_out!(output_file, "Running unit test: {}", name);
         }
-        let filler_source = prepare_filler_source(&host, &unit, opt)?;
+        let filler_source = prepare_filler_source(&unit, opt)?;
 
         let mut env = initialize_env(&unit)?;
         let info = &unit._info;
@@ -452,12 +445,11 @@ pub fn run_test(
                         }
                     }
                     None => write_host!(
-                        host,
                         "No filler file, the outcome of this test is uncertain."
                     ),
                 };
 
-                check_results(&host, &name, test_execution, &exec_result);
+                check_results(&name, test_execution, &exec_result);
             }
         }
     }
