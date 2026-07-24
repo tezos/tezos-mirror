@@ -2440,6 +2440,7 @@ mod tests {
                 block_fees.unwrap(),
                 crate::block::GAS_LIMIT,
                 H160::zero(),
+                &SpecId::default(),
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level: (0.into()),

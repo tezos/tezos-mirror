@@ -491,6 +491,7 @@ impl TezosXChainConfig {
                 crate::block::GAS_LIMIT,
                 coinbase,
                 self.is_tezos_runtime_enabled(level.into()),
+                self.spec_id,
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level,
@@ -671,7 +672,6 @@ impl TezosXChainConfig {
                     index,
                     sequencer_pool_address,
                     tracer_input,
-                    &self.spec_id,
                     &self.limits,
                     http_trace_enabled,
                     internal_operations_base,

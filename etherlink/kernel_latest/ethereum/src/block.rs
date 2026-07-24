@@ -13,6 +13,7 @@ use crate::rlp_helpers::{
 use crate::transaction::TransactionHash;
 use ethbloom::Bloom;
 use primitive_types::{H160, H256, U256};
+use revm::primitives::hardfork::SpecId;
 use rlp::{DecoderError, Rlp, RlpStream};
 use sha3::{Digest, Keccak256};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -95,6 +96,7 @@ pub struct BlockConstants {
     /// NB: this field is not relevant for Etherlink but is required to enable other
     /// relevant test from the Ethereum test suit
     pub prevrandao: Option<H256>,
+    pub spec_id: SpecId,
 }
 
 impl BlockConstants {
@@ -107,6 +109,7 @@ impl BlockConstants {
         block_fees: BlockFees,
         gas_limit: u64,
         coinbase: H160,
+        spec_id: &SpecId,
     ) -> Self {
         Self {
             number: U256::zero(),
@@ -117,6 +120,7 @@ impl BlockConstants {
             chain_id,
             tezos_experimental_features: false,
             prevrandao: None,
+            spec_id: *spec_id,
         }
     }
 
@@ -144,6 +148,7 @@ impl BlockConstants {
             BlockFees::new(U256::zero(), U256::zero(), U256::zero()),
             u64::MAX,
             H160::zero(),
+            &SpecId::default(),
         )
     }
 }
@@ -160,6 +165,7 @@ impl BlockConstants {
             BlockFees::new(U256::from(1), U256::from(1), U256::from(1)),
             Self::TEST_GAS_LIMIT,
             H160::zero(),
+            &SpecId::default(),
         )
     }
 
@@ -170,6 +176,7 @@ impl BlockConstants {
             BlockFees::new(U256::zero(), U256::zero(), U256::zero()),
             Self::TEST_GAS_LIMIT,
             H160::zero(),
+            &SpecId::default(),
         )
     }
 }

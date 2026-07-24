@@ -233,6 +233,7 @@ fn execute_transaction(
         tezos_experimental_features: false,
         chain_id: U256::from(1337),
         prevrandao: env.block.prevrandao,
+        spec_id,
     };
     let address = env.tx.transact_to.map(|addr| addr.to_fixed_bytes().into());
     let caller = env.tx.caller.to_fixed_bytes().into();
@@ -260,7 +261,6 @@ fn execute_transaction(
         host,
         &registry,
         &mut journal,
-        spec_id,
         &block_constants,
         None,
         caller,

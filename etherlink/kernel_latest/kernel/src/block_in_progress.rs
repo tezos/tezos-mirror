@@ -31,6 +31,7 @@ use evm_inspectors::storage::{
 };
 use evm_inspectors::TracerInput;
 use primitive_types::{H160, H256, U256};
+use revm::primitives::hardfork::SpecId;
 use revm_etherlink::helpers::legacy::alloy_to_log;
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
@@ -339,6 +340,7 @@ impl BlockInProgress {
 
     /// Derive `BlockConstants` based on current block in progress.
     /// Number and timestamp are taken from `self`.
+    #[allow(clippy::too_many_arguments)]
     pub fn constants(
         &self,
         chain_id: U256,
@@ -347,6 +349,7 @@ impl BlockInProgress {
         gas_limit: u64,
         coinbase: H160,
         tezos_experimental_features: bool,
+        spec_id: SpecId,
     ) -> BlockConstants {
         let timestamp = U256::from(self.timestamp.as_u64());
         let block_fees = BlockFees::new(
@@ -363,6 +366,7 @@ impl BlockInProgress {
             chain_id,
             tezos_experimental_features,
             prevrandao: None,
+            spec_id,
         }
     }
 
