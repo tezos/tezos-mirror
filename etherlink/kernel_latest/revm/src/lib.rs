@@ -1684,6 +1684,142 @@ mod test {
         );
     }
 
+    /// The cross-runtime balance credit wraps the leg's run in a journal
+    /// checkpoint that bumps `JournalInner::depth`, but it is not a call
+    /// frame. Now that the `CallTracer` tracks frame nesting on its own
+    /// stack instead of reading the journal depth, that bump must not
+    /// shift the frames it records — a value-carrying crossing takes the
+    /// credit checkpoint while a zero-amount one does not, so a depth
+    /// leak would surface only under value. Run the same CALL-chain leg
+    /// with and without a value-carrying credit and assert the recorded
+    /// traces are byte-identical.
+    #[test]
+    fn test_credit_checkpoint_keeps_call_tracer_depths() {
+        use evm_inspectors::{
+            call_tracer::{CallTracer, CallTracerConfig},
+            storage::trace_tx_path,
+            Tracer,
+        };
+        use tezos_indexable_storage::IndexableStorage;
+        use tezos_smart_rollup_host::path::RefPath;
+
+        // Same shape as `test_revm_call_depth_caps_inner_revm_chain`: the
+        // contract CALLs into 0x3333... and returns the CALL result.
+        let code_hex = concat!(
+            "60006000600060006000",
+            "73",
+            "3333333333333333333333333333333333333333",
+            "5af1",
+            "60005260206000f3",
+        );
+        let bytecode = Bytecode::new_raw(Bytes::from_hex(code_hex).unwrap());
+        let callee_bytecode = Bytecode::new_raw(Bytes::from_hex("00").unwrap());
+
+        let run_with_credit = |credit: Option<(Address, U256)>| -> Vec<Vec<u8>> {
+            let mut host = MockKernelHost::default();
+            let block_constants = BlockConstants::test_block_with_no_fees();
+            let caller =
+                Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+            let contract =
+                Address::from_hex("2222222222222222222222222222222222222222").unwrap();
+            let callee =
+                Address::from_hex("3333333333333333333333333333333333333333").unwrap();
+            StorageAccount::from_address(&caller)
+                .unwrap()
+                .set_info_without_code(
+                    &mut host,
+                    AccountInfo {
+                        balance: U256::MAX,
+                        nonce: 0,
+                        code_hash: Default::default(),
+                        origin: AccountOrigin::Unclassified,
+                        code: None,
+                    },
+                )
+                .unwrap();
+            StorageAccount::from_address(&contract)
+                .unwrap()
+                .set_info(
+                    &mut host,
+                    AccountInfo {
+                        balance: U256::ZERO,
+                        nonce: 0,
+                        code_hash: bytes_hash(bytecode.original_byte_slice()),
+                        origin: AccountOrigin::Unclassified,
+                        code: Some(bytecode.clone()),
+                    },
+                )
+                .unwrap();
+            StorageAccount::from_address(&callee)
+                .unwrap()
+                .set_info(
+                    &mut host,
+                    AccountInfo {
+                        balance: U256::ZERO,
+                        nonce: 0,
+                        code_hash: bytes_hash(callee_bytecode.original_byte_slice()),
+                        origin: AccountOrigin::Unclassified,
+                        code: Some(callee_bytecode.clone()),
+                    },
+                )
+                .unwrap();
+
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+            journal.evm.set_tracer(Tracer::CallTracer(CallTracer::new(
+                CallTracerConfig {
+                    only_top_call: false,
+                    with_logs: false,
+                },
+                DEFAULT_SPEC_ID,
+                None,
+            )));
+
+            run_transaction(
+                &mut host,
+                &registry,
+                &mut journal,
+                &block_constants,
+                None,
+                caller,
+                Some(contract),
+                Bytes::new(),
+                GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+                U256::ZERO,
+                None,
+                false,
+                TransactionOrigin::CrossRuntime { credit },
+            )
+            .unwrap();
+
+            // The `CallTracer` flushes its buffered frames to storage once
+            // the frame stack empties at the end of the top-level run, so
+            // the traces are already persisted here. With no tx hash on
+            // the tracer they land under the base trace path.
+            let path =
+                trace_tx_path(&None, &RefPath::assert_from(b"/call_trace")).unwrap();
+            let store = IndexableStorage::new_owned_path(path);
+            let len = store.length(&host).unwrap();
+            (0..len)
+                .map(|i| store.get_value(&host, i).unwrap())
+                .collect()
+        };
+
+        let without_credit = run_with_credit(None);
+        let with_credit = run_with_credit(Some((
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap(),
+            U256::from(42u64),
+        )));
+        assert!(
+            !without_credit.is_empty(),
+            "expected the leg's frames to be recorded"
+        );
+        assert_eq!(
+            without_credit, with_credit,
+            "a value-carrying credit must not shift the recorded call traces"
+        );
+    }
+
     #[test]
     fn test_contract_deployment() {
         let mut host = MockKernelHost::default();
