@@ -5148,6 +5148,103 @@ mod interpreter_tests {
         }
     }
 
+    // A large operand kept live by extra copies on the stack must not be
+    // copied by the op. A reintroduced operand copy shows up as one extra buffer.
+    #[test]
+    fn dup_shared_bitwise_operands_are_not_copied() {
+        const OPERAND: usize = 262144;
+
+        fn bytes_v() -> TypedValue<'static> {
+            V::Bytes(vec![0xABu8; OPERAND])
+        }
+
+        // Top byte kept clear so increment of the magnitude cannot grow
+        // the limb vector, which would count a reallocation as a copy.
+        fn nat_v() -> TypedValue<'static> {
+            let mut be = vec![0xFFu8; OPERAND];
+            be[0] = 0x7F;
+            V::Nat(BigUint::from_bytes_be(&be))
+        }
+
+        fn int_neg_v() -> TypedValue<'static> {
+            let mut be = vec![0xFFu8; OPERAND];
+            be[0] = 0x80;
+            V::Int(BigInt::from_signed_bytes_be(&be))
+        }
+
+        fn int_pos_v() -> TypedValue<'static> {
+            let mut be = vec![0xFFu8; OPERAND];
+            be[0] = 0x7F;
+            V::Int(BigInt::from_signed_bytes_be(&be))
+        }
+
+        fn buffers<'a>(mut stack: IStack<'a>, prog: &[Instruction<'a>]) -> u64 {
+            let mut ctx = Ctx::default();
+            let before = thread_allocated_bytes();
+            interpret(prog, &mut ctx, &mut stack).unwrap();
+            (thread_allocated_bytes() - before) / OPERAND as u64
+        }
+
+        let binary = |op| vec![Dup(None), Dup(None), op];
+        let unary = |op| vec![Dup(None), op];
+        let int_nat = || vec![Dip(None, vec![Dup(None)]), And(overloads::And::IntNat)];
+        for (name, stack, prog, expected_buffers) in [
+            (
+                "AND bytes",
+                stk![bytes_v()],
+                binary(And(overloads::And::Bytes)),
+                1,
+            ),
+            (
+                "AND nat-nat",
+                stk![nat_v()],
+                binary(And(overloads::And::NatNat)),
+                1,
+            ),
+            ("AND int-nat pos", stk![nat_v(), int_pos_v()], int_nat(), 1),
+            ("AND int-nat neg", stk![nat_v(), int_neg_v()], int_nat(), 1),
+            (
+                "OR bytes",
+                stk![bytes_v()],
+                binary(Or(overloads::Or::Bytes)),
+                1,
+            ),
+            ("OR nat", stk![nat_v()], binary(Or(overloads::Or::Nat)), 1),
+            (
+                "XOR bytes",
+                stk![bytes_v()],
+                binary(Xor(overloads::Xor::Bytes)),
+                1,
+            ),
+            (
+                "XOR nat",
+                stk![nat_v()],
+                binary(Xor(overloads::Xor::Nat)),
+                1,
+            ),
+            (
+                "NOT bytes",
+                stk![bytes_v()],
+                unary(Not(overloads::Not::Bytes)),
+                1,
+            ),
+            (
+                "NOT int",
+                stk![int_neg_v()],
+                unary(Not(overloads::Not::Int)),
+                1,
+            ),
+            ("NOT nat", stk![nat_v()], unary(Not(overloads::Not::Nat)), 1),
+        ] {
+            let allocated = buffers(stack, &prog);
+            assert_eq!(
+                allocated, expected_buffers,
+                "{name}: allocated {allocated} operand-width buffers, expected \
+                 {expected_buffers}; an operand is being copied",
+            );
+        }
+    }
+
     #[test]
     fn exec_forwards_shared_argument_without_copy() {
         const SIZE: usize = 16 * 1024 * 1024;
