@@ -59,7 +59,7 @@ let from_address_of_tx_object = function
       in
       sender
   | Michelson operation ->
-      Signature.V2.Public_key_hash.to_string operation.source
+      Signature.V3.Public_key_hash.to_string operation.source
 
 let bitset_add_nonce bitset = function
   | Evm_nonce (Ethereum_types.Qty nonce) -> Nonce_bitset.add bitset ~nonce

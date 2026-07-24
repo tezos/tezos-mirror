@@ -672,7 +672,7 @@ module Tezlink_Ushuai_protocol = struct
       }
 end
 
-module Tezlink_imported_protocol = Tezlink_TALLiN_protocol
+module Tezlink_imported_protocol = Tezlink_Ushuai_protocol
 module Current_block_services =
   Make_block_service (Tezlink_imported_protocol) (Tezlink_imported_protocol)
 
@@ -1082,7 +1082,7 @@ let get_script :
       tezlink_rpc_context * Tezos_types.Contract.t,
       unit,
       unit,
-      Imported_context.Script.t )
+      Imported_context.Script.michelson_with_storage )
     Tezos_rpc.Service.t =
   import_service_with_arg Imported_protocol_plugin.Contract_services.S.script
 
