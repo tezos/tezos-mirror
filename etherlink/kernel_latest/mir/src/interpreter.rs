@@ -3038,9 +3038,11 @@ fn interpret_one<'a>(
         }
         I::Pack => {
             ctx.gas().consume(interpret_cost::PACK)?;
-            let v = pop!();
-            let arena = Arena::new();
-            let mich = v.into_micheline_optimized_legacy(&arena, ctx.gas())?;
+            // `pop_rc!` + borrowed unparse: read the value through its shared
+            // `Rc` instead of deep-copying it, charging gas before cloning any
+            // leaf so an oversized value runs out of gas rather than out of heap.
+            let v = pop_rc!();
+            let mich = v.clone_into_micheline_optimized_legacy(arena, ctx.gas())?;
             let encoded = mich.encode_for_pack()??;
             stack.push(V::Bytes(encoded));
         }
@@ -7300,6 +7302,35 @@ mod interpreter_tests {
         }
         let (n1, n2) = (100usize, 1100usize);
         assert_eq!(pack_gas(n2) - pack_gas(n1), 10 * (n2 - n1) as u32);
+    }
+
+    /// L2-1838: `PACK` on a shared value must read it through its `Rc`, not
+    /// deep-copy it. With a gas budget too small to serialize the value, PACK
+    /// must run out of gas *without* first cloning the shared operand. Pre-fix
+    /// `pop!` -> `unwrap_rc` clones the whole `~SIZE`-byte value (an uncharged
+    /// allocation that can exhaust the heap) before any serialization gas is
+    /// charged; post-fix the borrowed unparse charges before cloning any leaf,
+    /// so the out-of-gas fires after only `O(gas)` allocation.
+    #[test]
+    fn pack_shared_value_is_not_deep_copied() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        // Two `Rc` siblings (refcount 2) — the runtime shape of `DUP ; PACK`.
+        let shared = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        let mut stack: IStack = Stack::new();
+        stack.push(Rc::clone(&shared));
+        stack.push(shared);
+        let mut ctx = Ctx::default();
+        ctx.gas = Gas::new(1000); // far too little to serialize 16 MiB
+        let bytes_before = thread_allocated_bytes();
+        let outcome = interpret_one(&Pack, &mut ctx, &mut stack);
+        let allocated = thread_allocated_bytes() - bytes_before;
+        assert!(matches!(outcome, Err(InterpretError::OutOfGas)));
+        assert!(
+            allocated < (SIZE as u64) / 8,
+            "PACK on a shared {SIZE}-byte value allocated {allocated} bytes before \
+             running out of gas: the shared operand was deep-copied instead of \
+             being read through its Rc.",
+        );
     }
 
     #[test]
