@@ -799,7 +799,7 @@ mod tests {
     use tezos_smart_rollup_host::path::{concat, RefPath};
     use tezos_tezlink::operation::sign_operation;
     use tezos_tezlink::operation::Parameters;
-    use tezos_tezlink::protocol::{Protocol, TARGET_TEZOS_PROTOCOL};
+    use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL, TARGET_TEZOS_PROTOCOL};
 
     fn read_current_number(base: &impl KeySpace) -> anyhow::Result<U256> {
         Ok(crate::blueprint_storage::read_current_blueprint_header(base)?.number)
@@ -3243,8 +3243,13 @@ mod tests {
         let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut rk);
         let mut config = dummy_configuration();
 
-        let previous_protocol = Protocol::S023;
+        // The oldest still-supported protocol upgrading to the target one.
+        let previous_protocol = INITIAL_PROTOCOL;
         let current_protocol = TARGET_TEZOS_PROTOCOL;
+        assert_ne!(
+            previous_protocol, current_protocol,
+            "the test needs two distinct protocols to observe an upgrade"
+        );
 
         // Store a TezBlockHeader with next_protocol set to the previous
         // protocol to simulate that the previous block was produced from

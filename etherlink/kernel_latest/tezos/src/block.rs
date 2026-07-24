@@ -146,6 +146,7 @@ mod tests {
     use crate::lazy_storage_diff::*;
     use crate::operation::*;
     use crate::operation_result::*;
+    use crate::protocol::{INITIAL_PROTOCOL, TARGET_TEZOS_PROTOCOL};
     use mir::ast::annotations::NO_ANNS;
     use mir::ast::micheline::Micheline;
     use mir::ast::Entrypoint;
@@ -164,10 +165,12 @@ mod tests {
         let number: BlockNumber = 1u32.into();
         let ts = tezos_smart_rollup::types::Timestamp::from(1_700_000_000i64);
         let parent = H256::zero();
+        let previous_protocol = INITIAL_PROTOCOL;
+        let current_protocol = TARGET_TEZOS_PROTOCOL;
 
         let a = TezBlock::new(
-            Protocol::S023,
-            Protocol::S023,
+            previous_protocol,
+            current_protocol,
             number,
             ts,
             parent,
@@ -176,8 +179,8 @@ mod tests {
         )
         .expect("TezBlock::new with fixed state_root");
         let b = TezBlock::new(
-            Protocol::S023,
-            Protocol::S023,
+            previous_protocol,
+            current_protocol,
             number,
             ts,
             parent,
