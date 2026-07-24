@@ -229,6 +229,23 @@ impl From<mir::serializer::DecodeError> for TransferError {
     }
 }
 
+/// The borrowed unparser refuses only `operation`, which is neither pushable
+/// nor storable and so cannot appear in a value reaching these paths. Map it
+/// to a serialization error rather than panicking: the kernel must not abort
+/// on any input, however unreachable.
+impl From<mir::ast::BorrowedUnparseError> for TransferError {
+    fn from(err: mir::ast::BorrowedUnparseError) -> Self {
+        match err {
+            mir::ast::BorrowedUnparseError::OutOfGas => Self::OutOfGas(gas::OutOfGas),
+            mir::ast::BorrowedUnparseError::NonPushable => {
+                Self::MichelineSerializationError(
+                    "value carries an operation, which is not storable".to_string(),
+                )
+            }
+        }
+    }
+}
+
 impl From<mir::interpreter::ContractInterpretError<'_>> for TransferError {
     fn from(err: mir::interpreter::ContractInterpretError) -> Self {
         use mir::interpreter::{
