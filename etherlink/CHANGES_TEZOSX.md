@@ -140,6 +140,9 @@
 
 ### Michelson Runtime
 
+- **Security fix:** `UPDATE n` no longer deep-clones the new field value
+  when it is `DUP`-shared (an OOM-crash vector); the value is now stored
+  in the field behind its shared pointer. (!22590)
 - **Security fix:** the instructions that only forward a value without
   reading it no longer deep-clone that value when it is `DUP`-shared
   (an OOM-crash vector); it is now forwarded behind its shared
