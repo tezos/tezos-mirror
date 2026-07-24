@@ -396,7 +396,7 @@ where
 // `kernel_loop` shouldn't be called in tests, as it won't use `MockInternal` for the
 // internal runtime. Use `kernel` instead.
 #[entrypoint::main]
-pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime + CoreStorage>(
+pub fn kernel_loop<Host: StorageV1 + CoreStorage + HostReveal + WasmHost>(
     host: &mut Host,
 ) {
     kernel(host)
@@ -404,7 +404,7 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime + CoreStorage
 
 pub fn kernel<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime + CoreStorage,
+    Host: StorageV1 + CoreStorage + HostReveal + WasmHost,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
 
