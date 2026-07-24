@@ -246,14 +246,14 @@ module Tezlink_SeouLo_protocol = struct
     let proposer =
       SeouLo_context.Consensus_key.
         {
-          delegate = Tezlink_mock.baker_account.pkh;
-          consensus_pkh = Tezlink_mock.baker_account.pkh;
+          delegate = Tezlink_mock.seoulo_baker_pkh;
+          consensus_pkh = Tezlink_mock.seoulo_baker_pkh;
         }
     in
     let balance_updates =
       let amount = SeouLo_context.Tez.of_mutez_exn 0L in
       Tezlink_mock.seoulo_balance_udpdate_rewards
-        ~baker:Tezlink_mock.baker_account.pkh
+        ~baker:Tezlink_mock.seoulo_baker_pkh
         ~amount
     in
 
@@ -325,14 +325,14 @@ module Tezlink_TALLiN_protocol = struct
     let proposer =
       TALLiN_context.Consensus_key.
         {
-          delegate = Tezlink_mock.baker_account.pkh;
-          consensus_pkh = Tezlink_mock.baker_account.pkh;
+          delegate = Tezlink_mock.tallin_baker_pkh;
+          consensus_pkh = Tezlink_mock.tallin_baker_pkh;
         }
     in
     let balance_updates =
       let amount = TALLiN_context.Tez.of_mutez_exn 0L in
       Tezlink_mock.tallin_balance_udpdate_rewards
-        ~baker:Tezlink_mock.baker_account.pkh
+        ~baker:Tezlink_mock.tallin_baker_pkh
         ~amount
     in
 

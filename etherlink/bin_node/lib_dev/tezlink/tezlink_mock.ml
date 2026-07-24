@@ -75,8 +75,17 @@ let baker_account =
     balance = baker_initial_balance;
   }
 
-(* [baker_account.pkh] is typed against the imported protocol; Ushuai (025)
-   uses a newer environment, so provide its [public_key_hash] separately. *)
+(* [baker_account.pkh] is typed against the imported protocol; the other
+   supported protocols may use a different environment, so build their
+   [public_key_hash] from the shared raw Ed25519 key separately. *)
+let seoulo_baker_pkh : SeouLo_context.public_key_hash =
+  Ed25519
+    (Tezos_crypto.Signature.Ed25519.Public_key.hash baker_ed25519_public_key)
+
+let tallin_baker_pkh : TALLiN_context.public_key_hash =
+  Ed25519
+    (Tezos_crypto.Signature.Ed25519.Public_key.hash baker_ed25519_public_key)
+
 let ushuai_baker_pkh : Ushuai_context.public_key_hash =
   Ed25519
     (Tezos_crypto.Signature.Ed25519.Public_key.hash baker_ed25519_public_key)
