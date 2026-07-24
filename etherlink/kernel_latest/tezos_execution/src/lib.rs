@@ -2376,8 +2376,15 @@ fn execute_smart_contract_originated<'a>(
     )?;
 
     // Encode the new storage
+    // Unparse through the borrowed walk: the consuming `IntoMicheline`
+    // `unwrap_rc`s each child, which deep-copies one that is still shared
+    // (`DUP ; PAIR` leaves `Pair(V, V)` sharing a single allocation) *before*
+    // any gas is charged for it. The borrowed walk reads through the `Rc` and
+    // clones only leaf payloads, through constructors that charge first, so an
+    // oversized storage runs out of gas instead of exhausting the heap
+    // (L2-1840).
     let new_storage = new_storage
-        .into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
+        .clone_into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
         .encode(ctx.gas())?
         .map_err(|e| TransferError::MichelineSerializationError(e.to_string()))?;
 

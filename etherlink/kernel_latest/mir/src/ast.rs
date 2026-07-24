@@ -1520,7 +1520,7 @@ impl<'a> TypedValue<'a> {
     /// arbitrarily large integers and collection structure before their
     /// unparsing gas was charged. This borrowed worklist walks collections in
     /// place and only clones leaf payloads through charged constructors.
-    pub(crate) fn clone_into_micheline_optimized_legacy(
+    pub fn clone_into_micheline_optimized_legacy(
         &self,
         arena: &'a Arena<Micheline<'a>>,
         gas: &mut Gas,
@@ -1533,9 +1533,27 @@ impl<'a> TypedValue<'a> {
             ListNext(michelson_list::Iter<'v, Rc<TypedValue<'a>>>),
             SetNext(std::vec::IntoIter<&'v Rc<TypedValue<'a>>>),
             MapNext(std::vec::IntoIter<(&'v Rc<TypedValue<'a>>, &'v Rc<TypedValue<'a>>)>),
+            /// A big map's in-memory entries. Distinct from [Frame::MapNext]
+            /// because a big map owns its keys and values rather than sharing
+            /// them behind an `Rc`.
+            BigMapEltNext(std::vec::IntoIter<(&'v TypedValue<'a>, &'v TypedValue<'a>)>),
+            /// A `FromId` big map's pending overlay; a `None` value marks a
+            /// removal.
+            OverlayNext(
+                std::vec::IntoIter<(&'v TypedValue<'a>, &'v Option<TypedValue<'a>>)>,
+            ),
+            /// Emit an already-built node (the `None` arm of an overlay entry).
+            Leaf(Micheline<'a>),
             BuildPrim1(Prim),
             BuildPrim2(Prim),
-            BuildSeqOf { count: usize },
+            BuildSeqOf {
+                count: usize,
+            },
+            /// Pops `count`: assembles `prim2(Pair, id_part, Seq([elts]))`.
+            BuildBigMapFromId {
+                id_part: Micheline<'a>,
+                count: usize,
+            },
         }
 
         let mut frames = vec![Frame::Visit(self)];
@@ -1563,6 +1581,29 @@ impl<'a> TypedValue<'a> {
                         frames.push(Frame::Visit(key));
                     }
                 }
+                Frame::BigMapEltNext(mut iter) => {
+                    if let Some((key, value)) = iter.next() {
+                        frames.push(Frame::BigMapEltNext(iter));
+                        frames.push(Frame::BuildPrim2(Prim::Elt));
+                        frames.push(Frame::Visit(value));
+                        frames.push(Frame::Visit(key));
+                    }
+                }
+                Frame::OverlayNext(mut iter) => {
+                    if let Some((key, value)) = iter.next() {
+                        frames.push(Frame::OverlayNext(iter));
+                        frames.push(Frame::BuildPrim2(Prim::Elt));
+                        match value {
+                            Some(value) => {
+                                frames.push(Frame::BuildPrim1(Prim::Some));
+                                frames.push(Frame::Visit(value));
+                            }
+                            None => frames.push(Frame::Leaf(V::prim0(Prim::None, gas)?)),
+                        }
+                        frames.push(Frame::Visit(key));
+                    }
+                }
+                Frame::Leaf(node) => results.push(node),
                 Frame::Visit(value) => match value {
                     TV::Int(i) | TV::Timestamp(i) => results.push(V::int_cloned(i, gas)?),
                     TV::Nat(i) => results.push(V::nat_cloned(i, gas)?),
@@ -1643,9 +1684,60 @@ impl<'a> TypedValue<'a> {
                             values.iter().collect::<Vec<_>>().into_iter(),
                         ));
                     }
-                    // The typechecker only emits `APPLY` for pushable capture
-                    // types, which exclude these variants.
-                    TV::BigMap(_) | TV::Operation(_) | TV::Ticket(_) => {
+                    // Not pushable, so unreachable from `APPLY`, but reachable
+                    // from the returned storage — which is unparsed through
+                    // this borrowed walk precisely so a shared child is not
+                    // deep-copied before its cost is charged (L2-1840).
+                    TV::BigMap(map) => match &map.content {
+                        big_map::BigMapContent::InMemory(entries) => {
+                            frames.push(Frame::BuildSeqOf {
+                                count: entries.size(),
+                            });
+                            frames.push(Frame::BigMapEltNext(
+                                entries.iter().collect::<Vec<_>>().into_iter(),
+                            ));
+                        }
+                        big_map::BigMapContent::FromId(from_id) => {
+                            let id_part = V::int_cloned(&from_id.id.value.0, gas)?;
+                            if from_id.overlay.is_empty() {
+                                results.push(id_part);
+                            } else {
+                                frames.push(Frame::BuildBigMapFromId {
+                                    id_part,
+                                    count: from_id.overlay.size(),
+                                });
+                                frames.push(Frame::OverlayNext(
+                                    from_id
+                                        .overlay
+                                        .iter()
+                                        .collect::<Vec<_>>()
+                                        .into_iter(),
+                                ));
+                            }
+                        }
+                    },
+                    TV::Ticket(ticket) => {
+                        // Mirrors `unwrap_ticket`: Pair(ticketer, Pair(content,
+                        // amount)). The two leaves are charged eagerly; only
+                        // the content is walked, so it is never copied whole.
+                        let ticketer = V::bytes(
+                            Address {
+                                hash: ticket.ticketer.clone(),
+                                entrypoint: Entrypoint::default(),
+                            }
+                            .to_bytes_vec(),
+                            gas,
+                        )?;
+                        let amount = V::nat_cloned(&ticket.amount, gas)?;
+                        frames.push(Frame::BuildPrim2(Prim::Pair));
+                        frames.push(Frame::BuildPrim2(Prim::Pair));
+                        frames.push(Frame::Leaf(amount));
+                        frames.push(Frame::Visit(&ticket.content));
+                        frames.push(Frame::Leaf(ticketer));
+                    }
+                    // Operations are neither pushable nor storable, so they
+                    // cannot reach this walk.
+                    TV::Operation(_) => {
                         return Err(BorrowedUnparseError::NonPushable);
                     }
                 },
@@ -1664,6 +1756,13 @@ impl<'a> TypedValue<'a> {
                     let values = arena.alloc_extend(results.drain(start..));
                     results.push(V::seq(values, gas)?);
                 }
+                Frame::BuildBigMapFromId { id_part, count } => {
+                    let start = results.len() - count;
+                    #[allow(clippy::disallowed_methods)]
+                    let values = arena.alloc_extend(results.drain(start..));
+                    let map_part = V::seq(values, gas)?;
+                    results.push(V::prim2(arena, Prim::Pair, id_part, map_part, gas)?);
+                }
             }
         }
 
@@ -1671,9 +1770,17 @@ impl<'a> TypedValue<'a> {
     }
 }
 
+/// Why [TypedValue::clone_into_micheline_optimized_legacy] could not produce a
+/// [Micheline].
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub(crate) enum BorrowedUnparseError {
+pub enum BorrowedUnparseError {
+    /// The unparsing gas charged along the way exceeded the budget. Because
+    /// this walk charges *before* cloning a leaf payload, running out here
+    /// means the copy was never attempted.
     OutOfGas,
+    /// The value carries an `operation`, which this walk cannot unparse.
+    /// Unreachable in practice: `operation` is neither pushable nor storable,
+    /// so it cannot occur in an `APPLY` capture or in a contract's storage.
     NonPushable,
 }
 
@@ -2729,13 +2836,85 @@ mod test_untypers {
 
     #[test]
     fn borrowed_unparser_rejects_non_pushable_values_without_panicking() {
+        // `operation` is the only variant the borrowed walk still refuses:
+        // it is neither pushable nor storable, so nothing can reach this
+        // walk carrying one. `big_map` and `ticket` used to be refused too,
+        // until the returned storage started being unparsed through here
+        // (L2-1840) — see `borrowed_unparser_matches_owned_on_storage_values`.
         let arena = Arena::new();
-        let value = TypedValue::BigMap(BigMap::empty(Type::Nat, Type::Unit));
+        let value = TypedValue::new_operation(
+            Operation::SetDelegate(michelson_operation::SetDelegate(None)),
+            0,
+        );
 
         assert_eq!(
             value.clone_into_micheline_optimized_legacy(&arena, &mut Gas::default()),
             Err(BorrowedUnparseError::NonPushable)
         );
+    }
+
+    /// The borrowed unparser must agree with the consuming one on every shape
+    /// the *returned storage* can hold, not just the pushable ones it was
+    /// originally written for. `assert_borrowed_owned_unparse_match` compares
+    /// both the Micheline and the gas charged, so a divergence in either the
+    /// node order or the cost of the new `BigMap` / `Ticket` arms fails here.
+    ///
+    /// Storage is now unparsed through the borrowed walk so that a shared
+    /// child is not deep-copied before its cost is charged (L2-1840).
+    #[test]
+    fn borrowed_unparser_matches_owned_on_storage_values() {
+        let in_memory = |entries: Vec<(TypedValue<'static>, TypedValue<'static>)>| {
+            TypedValue::BigMap(BigMap::new(
+                Type::Nat,
+                Type::Unit,
+                RedBlackTreeMap::from_iter(entries),
+            ))
+        };
+        // `InMemory`: empty, one entry, several entries.
+        assert_borrowed_owned_unparse_match(&in_memory(vec![]));
+        assert_borrowed_owned_unparse_match(&in_memory(vec![(
+            TypedValue::nat(1u64),
+            TypedValue::Unit,
+        )]));
+        assert_borrowed_owned_unparse_match(&in_memory(vec![
+            (TypedValue::nat(2u64), TypedValue::Unit),
+            (TypedValue::nat(1u64), TypedValue::Unit),
+            (TypedValue::nat(3u64), TypedValue::Unit),
+        ]));
+
+        // `FromId`: bare id, and an overlay carrying both an update and a
+        // removal — the `None` arm is the one that needs its own frame.
+        let from_id =
+            |overlay: Vec<(TypedValue<'static>, Option<TypedValue<'static>>)>| {
+                TypedValue::BigMap(BigMap {
+                    content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                        id: 4i64.into(),
+                        overlay: RedBlackTreeMap::from_iter(overlay),
+                    }),
+                    key_type: Type::Nat,
+                    value_type: Type::Unit,
+                })
+            };
+        assert_borrowed_owned_unparse_match(&from_id(vec![]));
+        assert_borrowed_owned_unparse_match(&from_id(vec![
+            (TypedValue::nat(1u64), Some(TypedValue::Unit)),
+            (TypedValue::nat(2u64), None),
+        ]));
+
+        // Nested under containers, and beside a shared leaf — the shape the
+        // fix exists for.
+        let shared = Rc::new(TypedValue::Bytes(vec![0xab; 32]));
+        assert_borrowed_owned_unparse_match(&TypedValue::new_pair_rc(
+            shared.clone(),
+            shared.clone(),
+        ));
+        assert_borrowed_owned_unparse_match(&TypedValue::new_pair(
+            in_memory(vec![(TypedValue::nat(1u64), TypedValue::Unit)]),
+            TypedValue::List(MichelsonList::from(vec![
+                Rc::new(from_id(vec![])),
+                shared.clone(),
+            ])),
+        ));
     }
 
     // We used to have a bug in which a panic was raised in the
