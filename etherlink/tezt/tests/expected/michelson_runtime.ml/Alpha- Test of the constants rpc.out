@@ -4,7 +4,7 @@
   "max_anon_ops_per_block": 132, "max_operation_data_length": 32768,
   "max_proposals_per_delegate": 20, "max_micheline_node_count": 50000,
   "max_micheline_bytes_limit": 50000,
-  "max_allowed_global_constants_depth": 10000, "cache_layout_size": 3,
+  "max_allowed_global_constants_depth": 10000, "cache_layout_size": 5,
   "michelson_maximum_type_size": 2001, "denunciation_period": 1,
   "slashing_delay": 1, "smart_rollup_max_wrapped_proof_binary_size": 30000,
   "smart_rollup_message_size_limit": 4096,
@@ -37,16 +37,18 @@
   "max_slashing_per_block": 10000,
   "max_slashing_threshold": { "numerator": 1, "denominator": 3 },
   "cache_script_size": 100000000, "cache_stake_distribution_cycles": 5,
-  "cache_sampler_state_cycles": 5,
+  "cache_sampler_state_cycles": 5, "cache_stake_info_cycles": 5,
+  "cache_swrr_selected_distribution_cycles": 5,
   "dal_parametric":
     { "feature_enable": true, "incentives_enable": true,
-      "number_of_slots": 32, "attestation_lag": 8,
+      "dynamic_lag_enable": true, "number_of_slots": 160,
+      "attestation_lag": 5, "attestation_lags": [ 1, 2, 3, 4, 5 ],
       "attestation_threshold": 66,
       "minimal_participation_ratio":
         { "numerator": "16", "denominator": "25" },
       "rewards_ratio": { "numerator": "1", "denominator": "10" },
       "traps_fraction": { "numerator": "1", "denominator": "2000" },
-      "redundancy_factor": 8, "page_size": 3967, "slot_size": 126944,
+      "redundancy_factor": 8, "page_size": 3967, "slot_size": 380832,
       "number_of_shards": 512 }, "smart_rollup_arith_pvm_enable": false,
   "smart_rollup_origination_size": 6314,
   "smart_rollup_challenge_window_in_blocks": 201600,
@@ -63,7 +65,9 @@
     { "raw_data": { "Blake2B": 0 }, "metadata": 0, "dal_page": 1,
       "dal_parameters": 1, "dal_attested_slots_validity_lag": 241920 },
   "smart_rollup_private_enable": true,
-  "smart_rollup_riscv_pvm_enable": false, "zk_rollup_enable": false,
+  "smart_rollup_riscv_pvm_enable": false,
+  "smart_rollup_canonical_rollup_address":
+    "[SMART_ROLLUP_HASH]", "zk_rollup_enable": false,
   "zk_rollup_origination_size": 4000, "zk_rollup_min_pending_to_process": 10,
   "zk_rollup_max_ticket_payload_size": 2048,
   "global_limit_of_staking_over_baking": 9,
@@ -82,5 +86,7 @@
   "direct_ticket_spending_enable": false, "aggregate_attestation": true,
   "allow_tz4_delegate_enable": true,
   "all_bakers_attest_activation_threshold":
-    { "numerator": 1, "denominator": 2 }, "issuance_modification_delay": 2,
-  "consensus_key_activation_delay": 2, "unstake_finalization_delay": 3 }
+    { "numerator": 1, "denominator": 2 }, "native_contracts_enable": false,
+  "swrr_new_baker_lottery_enable": false, "tz5_account_enable": false,
+  "issuance_modification_delay": 2, "consensus_key_activation_delay": 2,
+  "unstake_finalization_delay": 3 }
