@@ -19,7 +19,10 @@ use tezos_data_encoding::types::Zarith;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use typed_arena::Arena;
 
-use super::{Micheline, Type, TypedValue};
+use super::{
+    CreateContract, Micheline, MichelsonList, OperationInfo, TransferTokens, Type,
+    TypedValue,
+};
 use crate::gas::OutOfGas;
 use crate::serializer::DecodeError;
 use crate::typechecker::TcError;
@@ -686,91 +689,341 @@ mod test_big_map_operations {
 
 impl<'a> TypedValue<'a> {
     /// Traverses a `TypedValue` in AST pre-order and applies `f` to every big
-    /// map inside it. Big maps nested in a map value are reached via
-    /// [RedBlackTreeMap::get_mut], which path-copies the node so `f`'s writes
-    /// stick.
+    /// map inside it, replacing self with the updated value — or leaving it
+    /// untouched, if it held no big map at all.
     fn for_each_big_map_mut(&mut self, f: &mut impl FnMut(&mut BigMap<'a>)) {
-        use crate::ast::Or::*;
-        use TypedValue::*;
-        match self {
-            Int(_) => {}
-            Nat(_) => {}
-            Mutez(_) => {}
-            Bool(_) => {}
-            Unit => {}
-            String(_) => {}
-            Bytes(_) => {}
-            Address(_) => {}
-            KeyHash(_) => {}
-            Key(_) => {}
-            Signature(_) => {}
-            ChainId(_) => {}
-            Contract(_) => {}
-            Timestamp(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381Fr(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381G1(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381G2(_) => {}
-            Pair(l, r) => {
-                Rc::make_mut(l).for_each_big_map_mut(f);
-                Rc::make_mut(r).for_each_big_map_mut(f);
-            }
-            Or(p) => match p {
-                Left(l) => Rc::make_mut(l).for_each_big_map_mut(f),
-                Right(r) => Rc::make_mut(r).for_each_big_map_mut(f),
-            },
-            Option(p) => {
-                if let Some(x) = p.as_mut() {
-                    Rc::make_mut(x).for_each_big_map_mut(f)
-                }
-            }
-            List(l) => l
-                .iter_mut()
-                .for_each(|v| Rc::make_mut(v).for_each_big_map_mut(f)),
-            Set(_) => {
-                // Elements are comparable and so have no big maps
-            }
-            Map(m) => {
-                // Keys are comparable (no big maps); visit each value via
-                // get_mut. Collect the keys first so we can call get_mut,
-                // which borrows the map mutably, one at a time.
-                let keys: Vec<Rc<TypedValue<'a>>> = m.keys().cloned().collect();
-                for k in keys {
-                    if let Some(v) = m.get_mut(&k) {
-                        Rc::make_mut(v).for_each_big_map_mut(f)
-                    }
-                }
-            }
-            BigMap(m) => f(m),
-            Ticket(_) => {
-                // Value is comparable, has no big map
-            }
-            Lambda(_) => {
-                // Can contain only pushable values, thus no big maps
-            }
-            Operation(op) => match &mut op.as_mut().operation {
-                crate::ast::Operation::TransferTokens(t) => {
-                    t.param.for_each_big_map_mut(f)
-                }
-                crate::ast::Operation::SetDelegate(_) => {}
-                crate::ast::Operation::Emit(_) => {
-                    // Can contain only pushable values, thus no big maps
-                }
-                crate::ast::Operation::CreateContract(cc) => {
-                    cc.storage.for_each_big_map_mut(f)
-                }
-            },
+        if let Some(updated) = self.update_big_maps(f) {
+            // Sole owner of a freshly built value, so this moves, never clones.
+            *self = TypedValue::unwrap_rc(updated);
         }
     }
 
-    /// Read-only counterpart of [TypedValue::for_each_big_map_mut]: applies
+    /// Copy-on-write core of [TypedValue::for_each_big_map_mut]: applies `f`
+    /// to every big map in self, in AST pre-order, and returns
+    /// `Some(rebuilt)` when self held at least one big map, `None` when it
+    /// held none (in which case self is left untouched).
+    ///
+    /// Only the spine leading to a big map is rebuilt; every other child is
+    /// carried over as an `Rc::clone`. Descending with [Rc::make_mut]
+    /// instead would deep-copy *every* shared child on the way down, big map
+    /// below it or not — including leaves that can hold gigabytes, such as
+    /// `bytes`. A value duplicated N times then cost N full copies, enough to
+    /// exhaust the kernel's `wasm32` heap and abort it (L2-1831).
+    ///
+    /// A shared subtree is still visited once per occurrence and each
+    /// occurrence gets its own rebuilt big map, so [dump_one_big_map]'s dedup
+    /// sees them separately exactly as the `Rc::make_mut` walk made it. Only
+    /// the *absence* of a big map is ever memoized, never a rebuild — see
+    /// `big_map_free` below.
+    ///
+    /// Kept exhaustive (no catch-all) and in lock-step with
+    /// [TypedValue::for_each_big_map], see that function's comment.
+    ///
+    /// # Why this is iterative
+    ///
+    /// The walk descends once per level of a value whose depth the contract
+    /// chooses, against the kernel's 1 MiB `wasm32` stack. Michelson has no
+    /// recursive types, so a value's depth is bounded by its type's depth —
+    /// but this walk only ever sees values at *declared* types (the returned
+    /// storage, a callee's parameter, a `CREATE_CONTRACT` storage), and
+    /// `MICHELSON_MAXIMUM_TYPE_SIZE` still permits about 2 000 levels through
+    /// a `list` spine, which a recursive formulation does not survive. So the
+    /// walk runs on an explicit `frames`/`results` worklist, in the same shape
+    /// as the iterative `Drop`, `Debug`, comparison and untyper walks
+    /// (L2-1446, L2-1672); depth now costs heap, which is already bounded by
+    /// the size of the value being walked.
+    fn update_big_maps<'b>(
+        &'b self,
+        f: &mut impl FnMut(&mut BigMap<'a>),
+    ) -> Option<Rc<Self>> {
+        use crate::ast::Or::*;
+        use TypedValue::*;
+
+        /// One step of the walk. `Visit` descends a source node and pushes
+        /// exactly one result; each `Build*` pops the results its children
+        /// pushed and assembles the replacement node from them.
+        enum Frame<'b, 'a> {
+            Visit(&'b TypedValue<'a>),
+            /// Pops 2: the left child's result, then the right one's.
+            BuildPair(&'b Rc<TypedValue<'a>>, &'b Rc<TypedValue<'a>>),
+            /// Pops 1.
+            BuildOr {
+                is_left: bool,
+            },
+            /// Pops 1.
+            BuildOption,
+            /// Pops one per element, in element order.
+            BuildList(&'b MichelsonList<Rc<TypedValue<'a>>>),
+            /// Pops one per entry, in ascending key order.
+            BuildMap(&'b RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>),
+            /// Pops 1: the transfer parameter.
+            BuildTransferTokens(&'b OperationInfo<'a>, &'b TransferTokens<'a>),
+            /// Pops 1: the originated storage.
+            BuildCreateContract(&'b OperationInfo<'a>, &'b CreateContract<'a>),
+            /// Pops nothing, peeks: records a shared subtree that turned out
+            /// to hold no big map.
+            Memoize(*const TypedValue<'a>),
+        }
+
+        // Subtrees already known to hold no big map, keyed by address.
+        //
+        // Sound because the walk never mutates the source and the caller keeps
+        // it alive throughout, so every address here denotes one live node for
+        // the whole walk and cannot be recycled under us. Sound to *act* on
+        // because "holds no big map" is a property of an immutable subtree,
+        // independent of which occurrence we reached it by: skipping a repeat
+        // visit calls no `f`, allocates no id, records nothing in
+        // `seen_source_ids` and rebuilds nothing, so it is unobservable.
+        //
+        // Caching a `Some` would *not* be: each occurrence of a shared big map
+        // must get its own rebuilt copy, which is what `dump_one_big_map`'s
+        // dedup keys off.
+        //
+        // Without this, a value whose in-memory DAG unfolds to a `2^K`-node
+        // tree — `DUP` is an `Rc::clone`, so `DUP; NIL t; SWAP; CONS; SWAP;
+        // CONS` doubles the occurrence count per level for `O(K)` gas while
+        // the *type* grows by one node — is walked as that tree. The walk is
+        // charged no gas and, since it no longer allocates per visit, has
+        // nothing else bounding it (L2-1831).
+        let mut big_map_free: BTreeSet<*const TypedValue<'a>> = BTreeSet::new();
+        let mut frames: Vec<Frame<'b, 'a>> = vec![Frame::Visit(self)];
+        let mut results: Vec<std::option::Option<Rc<TypedValue<'a>>>> = Vec::new();
+
+        /// Queues `child`, remembering the answer if it is shared: only a
+        /// node reachable through more than one `Rc` can be visited twice, so
+        /// memoizing the rest would cost an insert per node and never pay.
+        fn push_child<'b, 'a>(
+            frames: &mut Vec<Frame<'b, 'a>>,
+            child: &'b Rc<TypedValue<'a>>,
+        ) {
+            if Rc::strong_count(child) > 1 {
+                frames.push(Frame::Memoize(Rc::as_ptr(child)));
+            }
+            frames.push(Frame::Visit(child.as_ref()));
+        }
+
+        /// Wraps a rebuilt operation back up, carrying the nonce over.
+        fn rebuilt_operation<'a>(
+            op: &OperationInfo<'a>,
+            operation: crate::ast::Operation<'a>,
+        ) -> std::option::Option<Rc<TypedValue<'a>>> {
+            Some(Rc::new(TypedValue::Operation(Box::new(OperationInfo {
+                operation,
+                counter: op.counter,
+            }))))
+        }
+
+        while let Some(frame) = frames.pop() {
+            match frame {
+                Frame::Visit(v) => {
+                    if big_map_free.contains(&(v as *const TypedValue<'a>)) {
+                        results.push(None);
+                        continue;
+                    }
+                    match v {
+                        Int(_) => results.push(None),
+                        Nat(_) => results.push(None),
+                        Mutez(_) => results.push(None),
+                        Bool(_) => results.push(None),
+                        Unit => results.push(None),
+                        String(_) => results.push(None),
+                        Bytes(_) => results.push(None),
+                        Address(_) => results.push(None),
+                        KeyHash(_) => results.push(None),
+                        Key(_) => results.push(None),
+                        Signature(_) => results.push(None),
+                        ChainId(_) => results.push(None),
+                        Contract(_) => results.push(None),
+                        Timestamp(_) => results.push(None),
+                        #[cfg(feature = "bls")]
+                        Bls12381Fr(_) => results.push(None),
+                        #[cfg(feature = "bls")]
+                        Bls12381G1(_) => results.push(None),
+                        #[cfg(feature = "bls")]
+                        Bls12381G2(_) => results.push(None),
+                        // Children are queued back-to-front throughout, so
+                        // they are visited front-to-back: [dump_one_big_map]
+                        // allocates lazy-storage ids in visit order, which
+                        // makes that order consensus-observable.
+                        Pair(l, r) => {
+                            frames.push(Frame::BuildPair(l, r));
+                            push_child(&mut frames, r);
+                            push_child(&mut frames, l);
+                        }
+                        Or(p) => match p {
+                            Left(x) => {
+                                frames.push(Frame::BuildOr { is_left: true });
+                                push_child(&mut frames, x);
+                            }
+                            Right(x) => {
+                                frames.push(Frame::BuildOr { is_left: false });
+                                push_child(&mut frames, x);
+                            }
+                        },
+                        Option(None) => results.push(None),
+                        Option(Some(x)) => {
+                            frames.push(Frame::BuildOption);
+                            push_child(&mut frames, x);
+                        }
+                        List(l) => {
+                            frames.push(Frame::BuildList(l));
+                            for x in l.iter().rev() {
+                                push_child(&mut frames, x);
+                            }
+                        }
+                        Set(_) => {
+                            // Elements are comparable and so have no big maps
+                            results.push(None)
+                        }
+                        Map(m) => {
+                            // Keys are comparable (no big maps); only values
+                            // are visited.
+                            frames.push(Frame::BuildMap(m));
+                            for (_, x) in m.iter().rev() {
+                                push_child(&mut frames, x);
+                            }
+                        }
+                        BigMap(m) => {
+                            let mut m = m.clone();
+                            f(&mut m);
+                            results.push(Some(Rc::new(BigMap(m))));
+                        }
+                        Ticket(_) => {
+                            // Value is comparable, has no big map
+                            results.push(None)
+                        }
+                        Lambda(_) => {
+                            // Can contain only pushable values, thus no big maps
+                            results.push(None)
+                        }
+                        // `param` and `storage` are owned, not `Rc`-shared, so
+                        // they are queued directly and never memoized.
+                        Operation(op) => match &op.operation {
+                            crate::ast::Operation::TransferTokens(t) => {
+                                frames.push(Frame::BuildTransferTokens(op, t));
+                                frames.push(Frame::Visit(&t.param));
+                            }
+                            crate::ast::Operation::SetDelegate(_) => results.push(None),
+                            crate::ast::Operation::Emit(_) => {
+                                // Can contain only pushable values, thus no big maps
+                                results.push(None)
+                            }
+                            crate::ast::Operation::CreateContract(cc) => {
+                                frames.push(Frame::BuildCreateContract(op, cc));
+                                frames.push(Frame::Visit(&cc.storage));
+                            }
+                        },
+                    }
+                }
+                Frame::Memoize(node) => {
+                    // The result just pushed is this node's, since the `Visit`
+                    // this frame was queued behind pushes exactly one.
+                    if matches!(results.last(), Some(None)) {
+                        big_map_free.insert(node);
+                    }
+                }
+                Frame::BuildPair(l, r) => {
+                    let new_r = results.pop().expect("BuildPair: missing right");
+                    let new_l = results.pop().expect("BuildPair: missing left");
+                    results.push(match (new_l, new_r) {
+                        (None, None) => None,
+                        (new_l, new_r) => Some(Rc::new(Pair(
+                            new_l.unwrap_or_else(|| l.clone()),
+                            new_r.unwrap_or_else(|| r.clone()),
+                        ))),
+                    });
+                }
+                Frame::BuildOr { is_left } => {
+                    let new = results.pop().expect("BuildOr: missing child");
+                    results.push(
+                        new.map(|x| {
+                            Rc::new(Or(if is_left { Left(x) } else { Right(x) }))
+                        }),
+                    );
+                }
+                Frame::BuildOption => {
+                    let new = results.pop().expect("BuildOption: missing child");
+                    results.push(new.map(|x| Rc::new(Option(Some(x)))));
+                }
+                Frame::BuildList(orig) => {
+                    let at = results.len() - orig.len();
+                    if results[at..].iter().all(std::option::Option::is_none) {
+                        // No big map anywhere in the list: leave it shared,
+                        // without even allocating one pointer per element.
+                        results.truncate(at);
+                        results.push(None);
+                    } else {
+                        let new: Vec<Rc<TypedValue<'a>>> = orig
+                            .iter()
+                            .zip(results.drain(at..))
+                            .map(|(x, new_x)| new_x.unwrap_or_else(|| x.clone()))
+                            .collect();
+                        results.push(Some(Rc::new(List(new.into()))));
+                    }
+                }
+                Frame::BuildMap(orig) => {
+                    let at = results.len() - orig.size();
+                    if results[at..].iter().all(std::option::Option::is_none) {
+                        results.truncate(at);
+                        results.push(None);
+                    } else {
+                        // `insert_mut` path-copies, so `orig` and every other
+                        // holder of it are left untouched; the entries that
+                        // did not change stay shared with it.
+                        let mut new = orig.clone();
+                        for ((k, _), new_v) in orig.iter().zip(results.drain(at..)) {
+                            if let Some(new_v) = new_v {
+                                new.insert_mut(k.clone(), new_v);
+                            }
+                        }
+                        results.push(Some(Rc::new(Map(new))));
+                    }
+                }
+                Frame::BuildTransferTokens(op, t) => {
+                    let new = results.pop().expect("BuildTransferTokens: missing param");
+                    results.push(new.and_then(|param| {
+                        rebuilt_operation(
+                            op,
+                            crate::ast::Operation::TransferTokens(TransferTokens {
+                                // Sole owner of a freshly built value: moves.
+                                param: TypedValue::unwrap_rc(param),
+                                destination_address: t.destination_address.clone(),
+                                amount: t.amount,
+                            }),
+                        )
+                    }));
+                }
+                Frame::BuildCreateContract(op, cc) => {
+                    let new =
+                        results.pop().expect("BuildCreateContract: missing storage");
+                    results.push(new.and_then(|storage| {
+                        rebuilt_operation(
+                            op,
+                            crate::ast::Operation::CreateContract(CreateContract {
+                                storage: TypedValue::unwrap_rc(storage),
+                                delegate: cc.delegate.clone(),
+                                amount: cc.amount,
+                                code: cc.code.clone(),
+                                micheline_code: cc.micheline_code,
+                                address: cc.address.clone(),
+                            }),
+                        )
+                    }));
+                }
+            }
+        }
+
+        // The root's `Visit` pushed exactly one result and every `Build*`
+        // replaces the ones it popped, so this is the whole answer.
+        results.pop().flatten()
+    }
+
+    /// Read-only counterpart of [TypedValue::update_big_maps]: applies
     /// `f` to every big map inside self in AST order without mutating it. Map
     /// values are walked via [RedBlackTreeMap::values].
     ///
     /// Kept exhaustive (no catch-all) and in lock-step with
-    /// [TypedValue::for_each_big_map_mut] on purpose: this read-only walk feeds
+    /// [TypedValue::update_big_maps] on purpose: this read-only walk feeds
     /// `started_with_map_ids` while the mutable walk feeds `seen_source_ids`,
     /// and [dump_big_map_updates] removes ids present in the former but not the
     /// latter. A new big-map-carrying variant must be added to both walks or a
