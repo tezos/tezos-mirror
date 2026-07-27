@@ -140,6 +140,11 @@
 
 ### Michelson Runtime
 
+- **Bug fix:** inter-contract internal-operation processing is now iterative (an
+  explicit heap worklist) instead of recursive. A deep `TRANSFER_TOKENS` call
+  chain is bounded by gas rather than by the kernel stack, so a contract
+  emitting a deep self-referential transfer chain no longer overflows the fast
+  executor's stack and diverges from the reference PVM. (!22608)
 - **Security fix:** a `Reveal`-first manager batch whose payload public
   key does not hash to the batch source is now rejected during
   validation, before any fee is debited or counter incremented.

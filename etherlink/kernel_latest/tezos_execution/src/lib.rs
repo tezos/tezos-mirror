@@ -609,13 +609,179 @@ enum Disposition {
     Apply,
 }
 
+/// One suspended batch of sibling internal operations, plus the bookkeeping
+/// needed to finalize the operation that emitted it.
+///
+/// This is the heap-allocated stand-in for what used to be a native stack
+/// frame of [`execute_internal_operations`]. A Michelson call chain (`KT1_a`
+/// calls `KT1_b` calls `KT1_c` ...) used to recurse through
+/// `execute_internal_operations` -> `transfer` -> `execute_internal_operations`,
+/// so its depth grew the wasm shadow stack — a fixed 1 MiB that cannot grow,
+/// and good for only a few hundred levels once the MIR interpreter frames are
+/// counted, while the per-operation gas limit affords well over a thousand.
+/// Nesting now grows this `Vec` on the heap instead, leaving gas as the only
+/// bound — as in L1, where `Apply.apply_internal_operations` loops over a queue
+/// rather than recursing.
+struct InternalOpFrame<'a> {
+    /// Operations still to execute at this nesting level, in emission order.
+    pending: std::vec::IntoIter<OperationInfo<'a>>,
+    /// The contract that emitted `pending`; the `sender` of their receipts.
+    sender: crate::account_storage::TezosOriginatedAccount,
+    /// Set once any sibling at this level has failed; every remaining sibling
+    /// is then reported as `Skipped`.
+    failed: bool,
+}
+
+/// The transfer a nested [`InternalOpFrame`] is the subtree of: its receipt is
+/// built, but whether it reads `Applied`, `BackTracked` or `Failed` depends on
+/// how that subtree ends. Built pre-order, placed post-order by
+/// [`settle_parent_transfer`].
+struct PendingParent {
+    receipt: InternalContentWithMetadata<TransferContent>,
+    /// Where `receipt` goes in `all_internal_receipts`: the length the list had
+    /// when the transfer ran, so the receipt lands ahead of everything its
+    /// subtree contributes and the flat list stays in DFS order.
+    ///
+    /// What DFS order needs is that relative position, not a fixed absolute
+    /// offset — the receipt has to precede its own subtree, nothing more. So
+    /// the load-bearing property is that no insertion lands *before* a live
+    /// parent's `receipt_at`, and every insertion satisfies it:
+    ///
+    /// - an operation's own receipt is appended, at the end of the list;
+    /// - [`splice_reentrant_crac_ops`] splices just after an operation of the
+    ///   innermost frame, itself appended;
+    /// - [`settle_parent_transfer`] inserts at the `receipt_at` of the
+    ///   innermost pending parent, and `receipt_at` never decreases with
+    ///   nesting depth (the list only grows), so that index is at or after
+    ///   every enclosing one.
+    ///
+    /// The last case is routinely an *equality*, not a corner: a linear call
+    /// chain appends nothing on the way down, so every level captures the same
+    /// index — 0 for a chain hanging off the first operation — and settles
+    /// insert there in turn, innermost first. Each ancestor then still lands
+    /// ahead of the whole subtree it is inserting in front of, which is all
+    /// that is required. Anything that inserts further up the list breaks this
+    /// and has to place these receipts differently.
+    receipt_at: usize,
+    /// Storage cost the transfer delegated, dropped if the subtree raises.
+    delegated_storage_cost: u64,
+    /// `(pending, failed, backtracked)` CRAC list lengths captured before the
+    /// subtree ran; see [`splice_reentrant_crac_ops`].
+    crac_watermarks: (usize, usize, usize),
+}
+
+/// Drain the re-entrant CRAC ops accumulated while the operation whose receipt
+/// sits at `receipt_at` executed (a gateway leg that re-entered the Michelson
+/// runtime) and splice the synthetic frame in at `receipt_at + 1` — right after
+/// that operation and ahead of its inline children (e.g. the `%on_result`
+/// callback). The leg runs before the callback that consumes its payload, so
+/// the frame must precede it. Empty drain → no-op.
+fn splice_reentrant_crac_ops(
+    journal: &mut TezosXJournal,
+    all_internal_receipts: &mut Vec<TaggedInternalOp>,
+    receipt_at: usize,
+    (pending, failed, backtracked): (usize, usize, usize),
+) {
+    let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
+        journal,
+        pending,
+        failed,
+        backtracked,
+    );
+    let frame_at = receipt_at + 1;
+    all_internal_receipts.splice(
+        frame_at..frame_at,
+        reentrant_ops.into_iter().map(TaggedInternalOp::from_crac),
+    );
+}
+
+/// How the internal-operation subtree of a [`PendingParent`] ended.
+enum SubtreeEnd {
+    /// Every operation in it was dequeued; some may have failed receipts.
+    Drained,
+    /// Executing it raised, which the recursive version surfaced out of
+    /// `transfer` as `FailedToExecuteInternalOperation`.
+    Raised(ApplyOperationError),
+}
+
+/// Place the receipt of the transfer whose subtree just ended, resolved against
+/// how it ended, and fail `enclosing` — the batch that transfer belongs to — if
+/// it did not stay `Applied`, so its siblings are `Skipped`.
+fn settle_parent_transfer(
+    journal: &mut TezosXJournal,
+    all_internal_receipts: &mut Vec<TaggedInternalOp>,
+    enclosing: &mut InternalOpFrame<'_>,
+    parent: PendingParent,
+    end: SubtreeEnd,
+) {
+    let PendingParent {
+        mut receipt,
+        receipt_at,
+        delegated_storage_cost,
+        crac_watermarks,
+    } = parent;
+    let (applied, delegated_storage_cost) = match end {
+        // Read the tail of the subtree's receipts, before the CRAC splice
+        // below, exactly where and when the recursive version read it.
+        SubtreeEnd::Drained => {
+            let applied = all_internal_receipts
+                .get(receipt_at..)
+                .and_then(|sub_ops| sub_ops.last())
+                .is_none_or(|t| t.op.is_applied());
+            if !applied {
+                receipt.result.backtrack_if_applied();
+            }
+            (applied, delegated_storage_cost)
+        }
+        SubtreeEnd::Raised(err) => {
+            let err = TransferError::FailedToExecuteInternalOperation(err.to_string());
+            log!(Error, "Internal transfer failed: {err:?}");
+            receipt.result = ContentResult::Failed(ApplyOperationError::from(err).into());
+            // The transfer's own `TransferSuccess` and delegated storage cost
+            // are dropped on this path, exactly as they were when the error
+            // travelled out of `transfer` instead.
+            (false, 0)
+        }
+    };
+    if !applied {
+        enclosing.failed = true;
+    }
+    // Insert the receipt BEFORE the subtree's own so the flat list follows DFS
+    // order: parent op, then its sub-ops. See [`PendingParent::receipt_at`].
+    all_internal_receipts.insert(
+        receipt_at,
+        TaggedInternalOp::own(
+            InternalOperationSum::Transfer(receipt),
+            delegated_storage_cost,
+        ),
+    );
+    splice_reentrant_crac_ops(
+        journal,
+        all_internal_receipts,
+        receipt_at,
+        crac_watermarks,
+    );
+}
+
+/// Execute `internal_operations` and everything they transitively emit,
+/// appending their receipts to `all_internal_receipts` in DFS order.
+///
+/// Iterative by design: `nested` is the explicit DFS worklist that replaces what
+/// used to be native recursion through [`transfer`] — see [`InternalOpFrame`].
+/// Only [`transfer_step`] is reached from here, never [`transfer`], so the cycle
+/// is gone.
+///
+/// Every nested frame is paired with the transfer it is the subtree of, and the
+/// batch handed in by the caller is held apart as `root`, so "the frame below
+/// this one" is always a frame and "the outermost batch" is always the one
+/// without a [`PendingParent`].
 #[allow(clippy::too_many_arguments)]
 fn execute_internal_operations<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    internal_operations: impl Iterator<Item = OperationInfo<'a>>,
+    internal_operations: Vec<OperationInfo<'a>>,
     sender_account: &crate::account_storage::TezosOriginatedAccount,
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
@@ -624,10 +790,93 @@ fn execute_internal_operations<'a, Host>(
 where
     Host: StorageV1,
 {
-    let mut failed = None;
-    for (index, OperationInfo { operation, counter }) in
-        internal_operations.into_iter().enumerate()
-    {
+    let mut root = InternalOpFrame {
+        pending: internal_operations.into_iter(),
+        sender: sender_account.clone(),
+        failed: false,
+    };
+    let mut nested: Vec<(PendingParent, InternalOpFrame<'a>)> = vec![];
+    loop {
+        let frame = nested.last_mut().map_or(&mut root, |(_, frame)| frame);
+        let end = match execute_pending_operations(
+            tc_ctx,
+            operation_ctx,
+            registry,
+            journal,
+            frame,
+            parser,
+            all_internal_receipts,
+            nonce_counter,
+        ) {
+            // One of the operations emitted a batch of its own: run that first.
+            // The transfer that emitted it is settled when this frame comes
+            // back on top and drains.
+            Ok(Some(child)) => {
+                nested.push(child);
+                continue;
+            }
+            Ok(None) => SubtreeEnd::Drained,
+            // A block abort is never contained: it aborts everything.
+            Err(err @ ApplyOperationError::BlockAbort(_)) => return Err(err),
+            // Containment, one nesting level at a time, as in the recursive
+            // version: an error abandons the batch it was raised in, the
+            // transfer that emitted that batch is reported as `Failed`, and
+            // *its* siblings carry on (as `Skipped`).
+            Err(err) => SubtreeEnd::Raised(err),
+        };
+        let Some((parent, _)) = nested.pop() else {
+            // `root` ended, so everything has: there is no transfer left to
+            // settle, and nobody here to contain an error raised in it.
+            return match end {
+                SubtreeEnd::Drained => Ok(()),
+                SubtreeEnd::Raised(err) => Err(err),
+            };
+        };
+        let enclosing = nested.last_mut().map_or(&mut root, |(_, frame)| frame);
+        settle_parent_transfer(journal, all_internal_receipts, enclosing, parent, end);
+    }
+}
+
+/// Execute the operations still pending in `frame`, appending a receipt per
+/// operation to `all_internal_receipts`, until either the batch drains
+/// (`Ok(None)`) or one of them is a transfer whose callee emitted internal
+/// operations of its own (`Ok(Some(..))`, that transfer and the batch it
+/// emitted).
+///
+/// Returning that batch instead of executing it here is what keeps a Michelson
+/// call chain off the native stack. The transfer's own receipt travels with it
+/// as a [`PendingParent`], to be placed by [`settle_parent_transfer`] once the
+/// returned frame has drained. `frame` keeps its iterator, so a later call
+/// resumes this batch where it left off.
+#[allow(clippy::too_many_arguments)]
+fn execute_pending_operations<'a, Host>(
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a>,
+    registry: &impl Registry,
+    journal: &mut TezosXJournal,
+    // The batch to execute: supplies each operation's `sender` and carries the
+    // `failed` short-circuit shared by its siblings.
+    frame: &mut InternalOpFrame<'a>,
+    parser: &'a Parser<'a>,
+    all_internal_receipts: &mut Vec<TaggedInternalOp>,
+    nonce_counter: &mut u16,
+) -> Result<Option<(PendingParent, InternalOpFrame<'a>)>, ApplyOperationError>
+where
+    Host: StorageV1,
+{
+    for OperationInfo { operation, counter } in frame.pending.by_ref() {
+        // Where this operation's own receipt, appended below, lands.
+        let receipt_at = all_internal_receipts.len();
+        // Watermarks for the CRAC drain. Everything pushed to the three CRAC
+        // lists between here and the drain belongs to this op's own re-entrant
+        // subtree. Splicing it at the parent site keeps DFS order rather than
+        // letting it reach the top-level merge with a smaller seq than its
+        // outer parent (would invert DFS — L2-1300).
+        let crac_watermarks = (
+            journal.michelson.pending_crac_receipts.len(),
+            journal.michelson.failed_crac_receipts.len(),
+            journal.michelson.backtracked_crac_receipts.len(),
+        );
         tc_ctx
             .operation_gas
             .consume(Cost::manager_operation())
@@ -649,30 +898,19 @@ where
         // is rejected (matching L1 `Internal_operation_replay`) instead
         // of being applied a second time under a fresh display nonce.
         let is_replay = !operation_ctx.applied_counters.insert(counter);
-        let receipts_before = all_internal_receipts.len();
-        // Watermarks for `drain_reentrant_crac_ops`. Execution is
-        // synchronous and stack-nested, so everything pushed to the three
-        // CRAC lists between here and the drain below is this op's own
-        // re-entrant subtree. Splicing it at the parent site keeps DFS
-        // order rather than letting it reach the top-level merge with a
-        // smaller seq than its outer parent (would invert DFS — L2-1300).
-        let pending_crac_receipts_before = journal.michelson.pending_crac_receipts.len();
-        let failed_crac_receipts_before = journal.michelson.failed_crac_receipts.len();
-        let backtracked_crac_receipts_before =
-            journal.michelson.backtracked_crac_receipts.len();
         // Resolve the disposition once: a prior failure short-circuits
         // every kind to `Skip`, a replayed counter to `Replay`, and a
         // replay also fails the enclosing operation. Only `Apply` needs
         // the per-kind logic below.
-        let disposition = if failed.is_some() {
+        let disposition = if frame.failed {
             Disposition::Skip
         } else if is_replay {
-            failed = Some(index);
+            frame.failed = true;
             Disposition::Replay
         } else {
             Disposition::Apply
         };
-        let (internal_receipt, delegated_storage_cost_delta) = match operation {
+        match operation {
             mir::ast::Operation::TransferTokens(TransferTokens {
                 param,
                 destination_address,
@@ -697,13 +935,14 @@ where
                         value: encoded_value,
                     },
                 };
-                let (result, delegated_storage_cost_delta) = match disposition {
-                    Disposition::Skip => (ContentResult::Skipped, 0),
+                let (result, delegated_storage_cost_delta, subtree) = match disposition {
+                    Disposition::Skip => (ContentResult::Skipped, 0, None),
                     Disposition::Replay => (
                         ContentResult::Failed(
                             ApplyOperationError::InternalOperationReplay.into(),
                         ),
                         0,
+                        None,
                     ),
                     Disposition::Apply => {
                         // Internal-operation parameters were produced and
@@ -711,65 +950,81 @@ where
                         // execution, so they may legitimately reference
                         // big_maps it owns.
                         let allow_forged_lazy_storage_id = AllowForgedLazyStorageId::Yes;
-                        let receipt = transfer(
+                        // `transfer_step`, not `transfer`: the callee's own
+                        // internal operations come back to the driver as a
+                        // new frame instead of recursing through here.
+                        let step = transfer_step(
                             tc_ctx,
                             operation_ctx,
                             registry,
                             journal,
-                            sender_account,
+                            &frame.sender,
                             &content.amount,
                             &content.destination,
                             &content.parameters.entrypoint,
                             value,
                             parser,
-                            all_internal_receipts,
                             false,
                             allow_forged_lazy_storage_id,
-                            nonce_counter,
                         );
-                        let delegated_storage_cost_delta = match &receipt {
-                            Ok((_, delta)) => *delta,
-                            Err(_) => 0,
-                        };
-                        let result = match receipt {
-                            Ok((success, _)) => {
-                                let sub_ops_succeeded = all_internal_receipts
-                                    .get(receipts_before..)
-                                    .and_then(|s| s.last())
-                                    .is_none_or(|t| t.op.is_applied());
-                                if sub_ops_succeeded {
-                                    ContentResult::Applied(success.into())
-                                } else {
-                                    failed = Some(index);
-                                    ContentResult::BackTracked(BacktrackedResult {
-                                        errors: None,
-                                        result: success.into(),
-                                    })
-                                }
-                            }
+                        match step {
+                            Ok(TransferStep {
+                                success,
+                                delegated_storage_cost,
+                                emitted,
+                            }) => (
+                                // Provisional: `settle_parent_transfer` demotes it
+                                // to `BackTracked` should `emitted` end in a
+                                // failure.
+                                ContentResult::Applied(success.into()),
+                                delegated_storage_cost,
+                                emitted,
+                            ),
                             Err(CracError::BlockAbort(msg)) => {
                                 return Err(ApplyOperationError::BlockAbort(msg));
                             }
                             Err(CracError::Operation(err)) => {
-                                failed = Some(index);
+                                frame.failed = true;
                                 log!(Error, "Internal transfer failed: {err:?}");
-                                ContentResult::Failed(
-                                    ApplyOperationError::from(err).into(),
+                                (
+                                    ContentResult::Failed(
+                                        ApplyOperationError::from(err).into(),
+                                    ),
+                                    0,
+                                    None,
                                 )
                             }
-                        };
-                        (result, delegated_storage_cost_delta)
+                        }
                     }
                 };
-                (
-                    InternalOperationSum::Transfer(InternalContentWithMetadata {
-                        content,
-                        sender: sender_account.contract(),
-                        nonce,
-                        result,
-                    }),
+                let receipt = InternalContentWithMetadata {
+                    content,
+                    sender: frame.sender.contract(),
+                    nonce,
+                    result,
+                };
+                if let Some((callee, ops)) = subtree {
+                    // Hand the callee's batch back to the driver rather than
+                    // running it here, and let the receipt ride along: where it
+                    // ends up in `all_internal_receipts` is settled with it.
+                    return Ok(Some((
+                        PendingParent {
+                            receipt,
+                            receipt_at,
+                            delegated_storage_cost: delegated_storage_cost_delta,
+                            crac_watermarks,
+                        },
+                        InternalOpFrame {
+                            pending: ops.into_iter(),
+                            sender: callee,
+                            failed: false,
+                        },
+                    )));
+                }
+                all_internal_receipts.push(TaggedInternalOp::own(
+                    InternalOperationSum::Transfer(receipt),
                     delegated_storage_cost_delta,
-                )
+                ));
             }
             mir::ast::Operation::CreateContract(mir::ast::CreateContract {
                 delegate,
@@ -802,7 +1057,7 @@ where
                         let receipt = originate_contract(
                             tc_ctx,
                             address,
-                            sender_account,
+                            &frame.sender,
                             &amount,
                             Some(&script.code),
                             storage,
@@ -811,7 +1066,7 @@ where
                         match receipt {
                             Ok(success) => ContentResult::Applied(success),
                             Err(err) => {
-                                failed = Some(index);
+                                frame.failed = true;
                                 log!(Error, "Internal origination failed: {err:?}");
                                 ContentResult::Failed(
                                     ApplyOperationError::from(err).into(),
@@ -820,19 +1075,19 @@ where
                         }
                     }
                 };
-                (
+                all_internal_receipts.push(TaggedInternalOp::own(
                     InternalOperationSum::Origination(InternalContentWithMetadata {
                         content: OriginationContent {
                             balance: amount,
                             delegate,
                             script,
                         },
-                        sender: sender_account.contract(),
+                        sender: frame.sender.contract(),
                         nonce,
                         result,
                     }),
                     0,
-                )
+                ));
             }
             mir::ast::Operation::SetDelegate(set_delegate) => {
                 return Err(ApplyOperationError::UnSupportedSetDelegate(format!(
@@ -885,47 +1140,26 @@ where
                         ContentResult::Applied(EventSuccess { consumed_milligas })
                     }
                 };
-                (
+                all_internal_receipts.push(TaggedInternalOp::own(
                     InternalOperationSum::Event(InternalContentWithMetadata {
                         content: EventContent { tag, payload, ty },
-                        sender: sender_account.contract(),
+                        sender: frame.sender.contract(),
                         nonce,
                         result,
                     }),
                     0,
-                )
+                ));
             }
-        };
+        }
         log!(Debug, "Internal operation executed successfully");
-        // Insert the parent receipt BEFORE its children so the flat
-        // list follows DFS order: parent op, then its sub-ops.
-        // `receipts_before` was captured before `transfer()` added the
-        // child receipts, so inserting at that index puts the parent
-        // receipt in the correct position.
-        all_internal_receipts.insert(
-            receipts_before,
-            TaggedInternalOp::own(internal_receipt, delegated_storage_cost_delta),
-        );
-        // Drain the re-entrant CRAC ops accumulated during this op's
-        // execution (a gateway leg that re-entered the Michelson runtime)
-        // and splice the synthetic frame in at `receipts_before + 1` —
-        // right after the parent (just inserted at `receipts_before`) and
-        // ahead of its inline children (e.g. the %on_result callback). The
-        // leg runs before the callback that consumes its payload, so the
-        // frame must precede it. Empty drain → no-op (`frame_at == len`).
-        let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
+        splice_reentrant_crac_ops(
             journal,
-            pending_crac_receipts_before,
-            failed_crac_receipts_before,
-            backtracked_crac_receipts_before,
-        );
-        let frame_at = receipts_before + 1;
-        all_internal_receipts.splice(
-            frame_at..frame_at,
-            reentrant_ops.into_iter().map(TaggedInternalOp::from_crac),
+            all_internal_receipts,
+            receipt_at,
+            crac_watermarks,
         );
     }
-    Ok(())
+    Ok(None)
 }
 
 /// The internal operations a transfer's callee emitted, together with that
@@ -998,7 +1232,7 @@ where
             operation_ctx,
             registry,
             journal,
-            internal_operations.into_iter(),
+            internal_operations,
             &callee,
             parser,
             all_internal_receipts,
