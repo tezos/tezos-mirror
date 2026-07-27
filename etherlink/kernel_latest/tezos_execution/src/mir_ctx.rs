@@ -1426,6 +1426,13 @@ fn set_total_bytes(
 }
 
 impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
+    /// The kernel's metered implementation: this is the one that has to bite,
+    /// since the end-of-execution walk runs here over an attacker-shaped value
+    /// inside a 4 GiB heap and against the PVM's tick ceiling.
+    fn consume_gas(&mut self, milligas: u32) -> Result<(), LazyStorageError> {
+        Ok(self.gas().consume(milligas)?)
+    }
+
     fn big_map_get(
         &mut self,
         arena: &'a Arena<Micheline<'a>>,

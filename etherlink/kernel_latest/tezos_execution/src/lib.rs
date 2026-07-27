@@ -4409,7 +4409,7 @@ mod tests {
                             balance_updates: vec![],
                             ticket_receipt: vec![],
                             originated_contracts: vec![],
-                            consumed_milligas: 1158974_u64.into(),
+                            consumed_milligas: 1159854_u64.into(),
                             storage_size: 69_u64.into(), // code (67) + unit (2)
                             paid_storage_size_diff: 0_u64.into(), // unit unchanged
                             allocated_destination_contract: false,
@@ -4674,7 +4674,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 1153428_u64.into(),
+                        consumed_milligas: 1153868_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -4869,7 +4869,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 1153428_u64.into(),
+                        consumed_milligas: 1153868_u64.into(),
                         storage_size: 44_u64.into(), // code (33) + "Hello world" (11)
                         paid_storage_size_diff: 4_u64.into(), // "Hello world" (11) − "initial" (7)
                         allocated_destination_contract: false,
@@ -5898,7 +5898,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_kt1.clone(),
                     }],
-                    consumed_milligas: 2_352_448_u64.into(),
+                    consumed_milligas: 2_352_668_u64.into(),
                     storage_size: 38u64.into(),
                     paid_storage_size_diff: 38u64.into(),
                     lazy_storage_diff: None,
@@ -7714,7 +7714,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1.clone(),
                         }],
-                        consumed_milligas: 2_352_448_u64.into(),
+                        consumed_milligas: 2_352_668_u64.into(),
                         storage_size: 38_u64.into(),
                         paid_storage_size_diff: 38_u64.into(),
                         lazy_storage_diff: None,
@@ -7903,7 +7903,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address.clone(),
                     }],
-                    consumed_milligas: 2_302_203_u64.into(),
+                    consumed_milligas: 2_302_423_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -8317,7 +8317,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_3,
                     },],
-                    consumed_milligas: 2_302_215_u64.into(),
+                    consumed_milligas: 2_302_435_u64.into(),
                     storage_size: 33_u64.into(),
                     paid_storage_size_diff: 33_u64.into(),
                     lazy_storage_diff: None,
@@ -8377,7 +8377,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_2,
                     }],
-                    consumed_milligas: 2_302_303_u64.into(),
+                    consumed_milligas: 2_302_523_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -8593,7 +8593,7 @@ mod tests {
                             originated_contracts: vec![Originated {
                                 contract: expected_kt1_1.clone(),
                             }],
-                            consumed_milligas: 2_303_578_u64.into(),
+                            consumed_milligas: 2_303_798_u64.into(),
                             storage_size: 30.into(),
                             paid_storage_size_diff: 30.into(),
                             lazy_storage_diff: None,
@@ -8663,7 +8663,7 @@ mod tests {
                             originated_contracts: vec![Originated {
                                 contract: expected_kt1_2.clone(),
                             }],
-                            consumed_milligas: 2_303_578_u64.into(),
+                            consumed_milligas: 2_303_798_u64.into(),
                             storage_size: 30.into(),
                             paid_storage_size_diff: 30.into(),
                             lazy_storage_diff: None,
