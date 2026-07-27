@@ -2193,7 +2193,9 @@ mod review_verification {
     /// consensus-observable — [dump_one_big_map] gives each occurrence its own
     /// id and keys its dedup off having seen the source before.
     ///
-    /// Deliberately shallow: this one really is exponential, by design.
+    /// Deliberately shallow, and deliberately unmetered: this one really is
+    /// exponential by design, and what stops it in the kernel is gas — see
+    /// [metered_walk_runs_out_of_gas_on_an_exponentially_shared_big_map].
     #[test]
     fn walk_still_visits_every_occurrence_of_a_shared_big_map() {
         const LEVELS: u32 = 4;
@@ -2208,6 +2210,138 @@ mod review_verification {
             2usize.pow(LEVELS),
             "the memo skipped an occurrence of a shared big map"
         );
+    }
+
+    /// [InMemoryLazyStorage] with a gas budget, so a test can watch the walk
+    /// exhaust one. The in-memory storage is unmetered by design, and the
+    /// kernel's own metered implementation lives in another crate.
+    struct MeteredStorage<'a> {
+        inner: InMemoryLazyStorage<'a>,
+        gas: crate::gas::Gas,
+    }
+
+    impl<'a> LazyStorage<'a> for MeteredStorage<'a> {
+        fn consume_gas(&mut self, milligas: u32) -> Result<(), LazyStorageError> {
+            Ok(self.gas.consume(milligas)?)
+        }
+
+        fn big_map_get(
+            &mut self,
+            arena: &'a Arena<Micheline<'a>>,
+            id: &BigMapId,
+            key: &TypedValue,
+            value_type: &Type,
+        ) -> Result<std::option::Option<TypedValue<'a>>, LazyStorageError> {
+            self.inner.big_map_get(arena, id, key, value_type)
+        }
+
+        fn big_map_mem(
+            &mut self,
+            id: &BigMapId,
+            key: &TypedValue,
+        ) -> Result<bool, LazyStorageError> {
+            self.inner.big_map_mem(id, key)
+        }
+
+        fn big_map_update(
+            &mut self,
+            id: &BigMapId,
+            key: TypedValue<'a>,
+            value: std::option::Option<TypedValue<'a>>,
+        ) -> Result<(), LazyStorageError> {
+            self.inner.big_map_update(id, key, value)
+        }
+
+        fn big_map_new(
+            &mut self,
+            key_type: &Type,
+            value_type: &Type,
+            temporary: bool,
+        ) -> Result<BigMapId, LazyStorageError> {
+            self.inner.big_map_new(key_type, value_type, temporary)
+        }
+
+        fn big_map_copy(
+            &mut self,
+            id: &BigMapId,
+            temporary: bool,
+        ) -> Result<BigMapId, LazyStorageError> {
+            self.inner.big_map_copy(id, temporary)
+        }
+
+        fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
+            self.inner.big_map_remove(id)
+        }
+    }
+
+    /// The memo bounds a big-map-*free* DAG, but put a big map under the
+    /// shared spine and every result is `Some`, so nothing is cacheable and
+    /// the `2^K` unfolding is back — that is
+    /// [walk_still_visits_every_occurrence_of_a_shared_big_map], and the
+    /// multiplicity is required, since each occurrence needs its own id.
+    ///
+    /// What bounds *that* is the per-node gas charge. `DUP` is an `Rc::clone`
+    /// and `list t` costs one type node per level, so the shape is `O(K²)`
+    /// gas to build for `2^K` occurrences; the walk must run out of gas
+    /// rather than out of heap or time. At `LEVELS` 20 an unmetered walk
+    /// would visit over a million nodes.
+    #[test]
+    fn metered_walk_runs_out_of_gas_on_an_exponentially_shared_big_map() {
+        const LEVELS: usize = 20;
+        const BUDGET: u32 = 1_000_000;
+
+        let mut storage = MeteredStorage {
+            inner: InMemoryLazyStorage::new(),
+            gas: crate::gas::Gas::new(BUDGET),
+        };
+        let mut root = shared_dag(leaf_big_map(0), LEVELS);
+
+        let mut visited = 0;
+        let result = root.for_each_big_map_mut(&mut storage, &mut |_, _| {
+            visited += 1;
+            Ok(())
+        });
+
+        assert!(
+            matches!(result, Err(LazyStorageError::OutOfGasError(_))),
+            "the walk completed instead of exhausting its budget: {result:?}"
+        );
+        // It stopped when the budget ran out, not after unfolding the DAG.
+        let affordable = (BUDGET / tc_cost::LAZY_STORAGE_CYCLE) as usize;
+        assert!(
+            visited <= affordable,
+            "visited {visited} big maps, but the budget only pays for {affordable} nodes"
+        );
+        assert!(
+            visited < 2usize.pow(LEVELS as u32),
+            "the walk unfolded the whole DAG despite running out of gas"
+        );
+    }
+
+    /// The charge must not price ordinary contracts out: a storage of a few
+    /// hundred nodes costs a few hundred cycles, not a meaningful fraction of
+    /// an operation's budget.
+    #[test]
+    fn metered_walk_completes_on_an_ordinary_value() {
+        const WIDTH: usize = 200;
+
+        let mut storage = MeteredStorage {
+            inner: InMemoryLazyStorage::new(),
+            gas: crate::gas::Gas::new(crate::gas::DEFAULT_GAS_AMOUNT),
+        };
+        let mut root = TypedValue::List(MichelsonList::from(
+            (0..WIDTH)
+                .map(|i| Rc::new(TypedValue::int(i as i64)))
+                .collect::<Vec<_>>(),
+        ));
+
+        let before = storage.gas.milligas().expect("budget is set");
+        root.for_each_big_map_mut(&mut storage, &mut |_, _| Ok(()))
+            .expect("an ordinary value must not exhaust the budget");
+        let spent = before - storage.gas.milligas().expect("budget is set");
+
+        // One cycle for the list itself plus one per element.
+        assert_eq!(spent, (WIDTH as u32 + 1) * tc_cost::LAZY_STORAGE_CYCLE);
     }
 
     /// Only the elements holding a big map are rebuilt; everything around them
