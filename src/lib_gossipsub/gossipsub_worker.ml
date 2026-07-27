@@ -542,7 +542,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** When a [Subscribe] request from a remote peer is received, the worker just
       forwards it to the automaton. There is nothing else to do. *)
   let handle_subscribe = function
-    | state, (GS.Subscribed | Subscribe_to_unknown_peer) -> state
+    | ( state,
+        ( GS.Subscribed | Subscribe_to_unknown_peer
+        | Subscribe_ignored_topic_limit_exceeded ) ) ->
+        state
 
   (** When a [Unsubscribe] request from a remote peer is received, the worker just
       forwards it to the automaton. There is nothing else to do. *)

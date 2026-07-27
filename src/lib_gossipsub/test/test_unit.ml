@@ -2524,9 +2524,102 @@ let test_scoring_p7_grafts_before_backoff rng _limits parameters =
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
    Add test for the described test scenario *)
 
+(** Subscribing a peer to more than [max_topics_per_peer] distinct topics must
+    return [Subscribe_ignored_topic_limit_exceeded] instead of growing state
+    further, capping the per-peer memory. *)
+let test_subscribe_flood_is_capped rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Subscribe flood is capped at max_topics_per_peer"
+    ~tags:["gossipsub"; "subscribe"; "spam"]
+  @@ fun () ->
+  let peer = 0 in
+  let state =
+    GS.make rng limits parameters |> fun state ->
+    let state, _ =
+      GS.add_peer
+        {peer; direct = false; outbound = false; bootstrap = false}
+        state
+    in
+    state
+  in
+  let max_topics = limits.max_topics_per_peer in
+  (* Subscribe to exactly [max_topics] distinct topics — all must succeed. *)
+  let state =
+    Stdlib.List.init max_topics string_of_int
+    |> List.fold_left
+         (fun state topic ->
+           let state, output = GS.handle_subscribe {topic; peer} state in
+           assert_output ~__LOC__ output GS.Subscribed ;
+           state)
+         state
+  in
+  (* One more distinct topic must be rejected without growing state. *)
+  let _state, output = GS.handle_subscribe {topic = "overflow"; peer} state in
+  assert_output ~__LOC__ output GS.Subscribe_ignored_topic_limit_exceeded ;
+  (* State still holds exactly [max_topics] subscribed topics. *)
+  let actual_count =
+    GS.Introspection.(get_subscribed_topics peer (view _state)) |> List.length
+  in
+  if actual_count <> max_topics then
+    Test.fail
+      ~__LOC__
+      "Expected %d subscribed topics after cap, got %d"
+      max_topics
+      actual_count ;
+  unit
+
+(** Regression test: a peer that has saturated its subscription quota must not
+    be able to bypass the cap via Graft.  A Graft for a new topic when
+    [max_topics_per_peer] is already reached must be rejected
+    ([Peer_filtered]) and must not add the peer to the mesh. *)
+let test_graft_rejected_when_topic_cap_reached rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"Gossipsub: Graft is rejected when topic cap is reached (regression)"
+    ~tags:["gossipsub"; "graft"; "spam"; "regression"]
+  @@ fun () ->
+  let peer = 0 in
+  let graft_topic = "graft_topic" in
+  (* The local node joins [graft_topic] so the Graft check_subscribed passes. *)
+  let state =
+    GS.make rng limits parameters |> fun state ->
+    let state, _ = GS.join {topic = graft_topic} state in
+    let state, _ =
+      GS.add_peer
+        {peer; direct = false; outbound = false; bootstrap = false}
+        state
+    in
+    state
+  in
+  let max_topics = limits.max_topics_per_peer in
+  (* Fill the quota with Subscribe messages on distinct topics. *)
+  let state =
+    Stdlib.List.init max_topics string_of_int
+    |> List.fold_left
+         (fun state topic ->
+           let state, output = GS.handle_subscribe {topic; peer} state in
+           assert_output ~__LOC__ output GS.Subscribed ;
+           state)
+         state
+  in
+  (* Graft on the joined topic must be rejected — quota is full and
+     [graft_topic] is not yet in [connection.topics]. *)
+  let state, output = GS.handle_graft {peer; topic = graft_topic} state in
+  assert_output ~__LOC__ output GS.Peer_filtered ;
+  (* The peer must NOT appear in the mesh for [graft_topic]. *)
+  let in_mesh = GS.Introspection.(in_mesh graft_topic peer (view state)) in
+  if in_mesh then
+    Test.fail
+      ~__LOC__
+      "Peer must not be in mesh for graft_topic after a rejected Graft" ;
+  unit
+
 let register ~message_handlings rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
+  test_subscribe_flood_is_capped rng limits parameters ;
+  test_graft_rejected_when_topic_cap_reached rng limits parameters ;
   test_join_adds_peers_to_mesh rng limits parameters ;
   test_join_adds_fanout_to_mesh rng limits parameters ;
   test_publish_without_flood_publishing rng limits parameters ;

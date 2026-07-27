@@ -93,6 +93,7 @@ let limits =
     opportunistic_graft_peers;
     opportunistic_graft_threshold;
     seen_history_length;
+    max_topics_per_peer;
     score_limits;
   }
 

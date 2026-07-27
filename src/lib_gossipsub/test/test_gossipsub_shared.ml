@@ -257,6 +257,7 @@ let pp_limits fmtr
     opportunistic_graft_peers;
     opportunistic_graft_threshold;
     seen_history_length;
+    max_topics_per_peer = _;
     score_limits;
   } =
     l
