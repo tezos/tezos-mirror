@@ -6733,12 +6733,89 @@ code {
     in
     unit
 
+  let test_not_bytes =
+    register_tezosx_test
+      ~title:"Michelson NOT bytes does not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "not"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"not"
+      ~outcome:(Fails_with "Gas_exhaustion")
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 450 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       SWAP ;
+       NIL bytes ; PUSH int 1900 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       NOT ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+
+  let test_bitwise_bytes =
+    let bitwise_contract ~op =
+      sf
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       %s ;
+       DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+        op
+    in
+    register_tezosx_test
+      ~title:
+        "Michelson AND/OR/XOR bytes do not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "bitwise"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"and"
+        ~outcome:(Fails_with "Gas_exhaustion")
+      @@ bitwise_contract ~op:"AND"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"or"
+        ~outcome:(Fails_with "Gas_exhaustion")
+      @@ bitwise_contract ~op:"OR"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"xor"
+        ~outcome:(Fails_with "Gas_exhaustion")
+      @@ bitwise_contract ~op:"XOR"
+    in
+    unit
+
   let register () =
     test_hashes [Alpha] ;
     test_check_signature [Alpha] ;
     test_unpack [Alpha] ;
     test_shift_bytes [Alpha] ;
-    test_concat_pair [Alpha]
+    test_concat_pair [Alpha] ;
+    test_not_bytes [Alpha] ;
+    test_bitwise_bytes [Alpha]
 end
 
 let () =
