@@ -12,7 +12,6 @@ use crate::error::UpgradeProcessError;
 use crate::storage::{read_evm_chain_id, StorageVersion};
 use revm_etherlink::storage::block::BLOCKS_STORED;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
@@ -100,7 +99,7 @@ fn migrate_to<Host>(
     version: StorageVersion,
 ) -> anyhow::Result<MigrationStatus>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1,
 {
     log!(Info, "Migrating to {:?}", version);
     match version {
@@ -558,7 +557,7 @@ where
 //
 fn migration<Host>(host: &mut Host) -> anyhow::Result<MigrationStatus>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1,
 {
     match legacy::migration_read_storage_version(host)?.next() {
         Some(next_version) => {
@@ -581,7 +580,7 @@ where
 
 pub fn storage_migration<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1,
 {
     let migration_result = migration(host);
     migration_result.map_err(|_| Error::UpgradeError(UpgradeProcessError::Fallback))

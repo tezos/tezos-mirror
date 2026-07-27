@@ -31,7 +31,7 @@ use storage::{
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime::{IsEvmNode, KernelHost};
+use tezos_evm_runtime::runtime::KernelHost;
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
@@ -111,7 +111,7 @@ pub fn stage_zero<Host>(
     base: &mut impl KeySpace,
 ) -> Result<MigrationStatus, Error>
 where
-    Host: StorageV1 + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost,
 {
     log!(Debug, "Entering stage zero.");
     init_storage_versioning(host, base)?;
@@ -132,7 +132,7 @@ pub fn stage_one<Host>(
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     log!(Debug, "Entering stage one.");
     log!(Debug, "Chain Configuration: {chain_config:?}");
@@ -250,7 +250,7 @@ where
 
 pub fn run<Host>(host: &mut Host, base: &mut impl KeySpace) -> Result<(), anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas,
 {
     // Reboot by default, to ensure the health check implemented before the stage 2 is executed in
     // the same L1 level
@@ -281,7 +281,7 @@ pub fn single_run<Host>(
     base: &mut impl KeySpace,
 ) -> Result<SingleRunStatus, anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas,
 {
     // We always start by doing the migration if needed.
     match stage_zero(host, base) {
@@ -336,7 +336,7 @@ where
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it
     // before the stage one because stage one reboots and would clear the flag.
-    if !host.is_evm_node() {
+    if !configuration.common.evm_node_flag {
         health_check(host, base, &mut configuration)?;
     }
 

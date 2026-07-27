@@ -25,7 +25,7 @@ use tezos_crypto_rs::{
     hash::{ChainId, ContractKt1Hash},
 };
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::IsEvmNode;
+use tezos_evm_runtime::runtime::evm_node_flag;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpace;
@@ -39,51 +39,73 @@ pub struct DalConfiguration {
     pub slot_indices: Vec<u8>,
 }
 
+pub struct SequencerConfig {
+    pub delayed_bridge: ContractKt1Hash,
+    pub delayed_inbox: Box<DelayedInbox>,
+    pub sequencer: PublicKey,
+    pub dal: Option<DalConfiguration>,
+    pub max_blueprint_lookahead_in_seconds: i64,
+}
+
 pub enum ConfigurationMode {
     Proxy,
-    Sequencer {
-        delayed_bridge: ContractKt1Hash,
-        delayed_inbox: Box<DelayedInbox>,
-        sequencer: PublicKey,
-        dal: Option<DalConfiguration>,
-        evm_node_flag: bool,
-        max_blueprint_lookahead_in_seconds: i64,
-    },
+    Sequencer(SequencerConfig),
+}
+
+impl std::fmt::Display for SequencerConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let SequencerConfig {
+            delayed_bridge,
+            delayed_inbox: _, // Ignoring delayed_inbox
+            sequencer,
+            dal,
+            max_blueprint_lookahead_in_seconds,
+        } = self;
+        write!(
+            f,
+            "Sequencer {{ delayed_bridge: {delayed_bridge:?}, sequencer: {sequencer:?}, dal: {dal:?}, max_blueprints_lookahead_in_seconds: {max_blueprint_lookahead_in_seconds} }}"
+        )
+    }
 }
 
 impl std::fmt::Display for ConfigurationMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ConfigurationMode::Proxy => write!(f, "Proxy"),
-            ConfigurationMode::Sequencer {
-                delayed_bridge,
-                delayed_inbox: _, // Ignoring delayed_inbox
-                sequencer,
-                dal,
-                evm_node_flag,
-                max_blueprint_lookahead_in_seconds,
-            } => write!(
-                f,
-                "Sequencer {{ delayed_bridge: {delayed_bridge:?}, sequencer: {sequencer:?}, dal: {dal:?}, evm_node_flag: {evm_node_flag}, max_blueprints_lookahead_in_seconds: {max_blueprint_lookahead_in_seconds} }}"
-            ),
+            ConfigurationMode::Sequencer(seq) => write!(f, "{seq}"),
+        }
+    }
+}
+
+/// Configuration shared by every mode (proxy and sequencer alike).
+pub struct CommonConfig {
+    pub tezos_contracts: TezosContracts,
+    pub maximum_allowed_ticks: u64,
+    pub enable_fa_bridge: bool,
+    pub evm_node_flag: bool,
+}
+
+impl Default for CommonConfig {
+    fn default() -> Self {
+        Self {
+            tezos_contracts: TezosContracts::default(),
+            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
+            enable_fa_bridge: false,
+            evm_node_flag: false,
         }
     }
 }
 
 pub struct Configuration {
-    pub tezos_contracts: TezosContracts,
+    pub common: CommonConfig,
     pub mode: ConfigurationMode,
-    pub maximum_allowed_ticks: u64,
-    pub enable_fa_bridge: bool,
 }
 
 impl Default for Configuration {
     fn default() -> Self {
         Self {
-            tezos_contracts: TezosContracts::default(),
+            common: CommonConfig::default(),
             mode: ConfigurationMode::Proxy,
-            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
-            enable_fa_bridge: false,
         }
     }
 }
@@ -93,7 +115,7 @@ impl std::fmt::Display for Configuration {
         write!(
             f,
             "Tezos Contracts: {}, Mode: {}, Enable FA Bridge: {}",
-            &self.tezos_contracts, &self.mode, &self.enable_fa_bridge
+            &self.common.tezos_contracts, &self.mode, &self.common.enable_fa_bridge
         )
     }
 }
@@ -284,17 +306,31 @@ where
     )
 }
 
-pub fn fetch_configuration<Host>(host: &mut Host, base: &impl KeySpace) -> Configuration
+pub fn fetch_common_config<Host>(host: &mut Host, base: &impl KeySpace) -> CommonConfig
 where
-    Host: StorageV1 + IsEvmNode,
+    Host: StorageV1,
 {
     let tezos_contracts = fetch_tezos_contracts(host, base);
     let maximum_allowed_ticks =
         read_maximum_allowed_ticks(base).unwrap_or(MAX_ALLOWED_TICKS);
-    let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(base);
-    let evm_node_flag = host.is_evm_node();
-    let dal: Option<DalConfiguration> = fetch_dal_configuration(base, evm_node_flag);
+    let evm_node_flag = evm_node_flag(host);
+    CommonConfig {
+        tezos_contracts,
+        maximum_allowed_ticks,
+        enable_fa_bridge,
+        evm_node_flag,
+    }
+}
+
+pub fn fetch_configuration<Host>(host: &mut Host, base: &impl KeySpace) -> Configuration
+where
+    Host: StorageV1,
+{
+    let sequencer = sequencer(host).unwrap_or_default();
+    let common = fetch_common_config(host, base);
+    let dal: Option<DalConfiguration> =
+        fetch_dal_configuration(base, common.evm_node_flag);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(base)
@@ -312,17 +348,14 @@ where
                     .unwrap_or(DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS);
             match DelayedInbox::from_base(base) {
                 Ok(delayed_inbox) => Configuration {
-                    tezos_contracts,
-                    mode: ConfigurationMode::Sequencer {
+                    common,
+                    mode: ConfigurationMode::Sequencer(SequencerConfig {
                         delayed_bridge,
                         delayed_inbox: Box::new(delayed_inbox),
                         sequencer,
                         dal,
-                        evm_node_flag,
                         max_blueprint_lookahead_in_seconds,
-                    },
-                    maximum_allowed_ticks,
-                    enable_fa_bridge,
+                    }),
                 },
                 Err(err) => {
                     log!(Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
@@ -331,10 +364,8 @@ where
             }
         }
         None => Configuration {
-            tezos_contracts,
+            common,
             mode: ConfigurationMode::Proxy,
-            maximum_allowed_ticks,
-            enable_fa_bridge,
         },
     }
 }

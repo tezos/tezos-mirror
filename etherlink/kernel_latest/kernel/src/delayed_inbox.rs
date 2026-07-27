@@ -4,6 +4,7 @@
 use crate::{
     bridge::Deposit,
     chains::TezosXTransaction,
+    configuration::CommonConfig,
     event::Event,
     linked_list::LinkedList,
     storage::{self, read_last_info_per_level_timestamp},
@@ -19,7 +20,6 @@ use tezos_ethereum::{
     tx_common::EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
@@ -211,11 +211,12 @@ impl DelayedInbox {
 
     pub fn save_transaction(
         &mut self,
-        host: &(impl StorageV1 + IsEvmNode),
+        host: &impl StorageV1,
         base: &mut impl KeySpace,
         tx: TezosXTransaction,
         timestamp: Timestamp,
         level: u32,
+        common: &CommonConfig,
     ) -> Result<()> {
         match tx {
             TezosXTransaction::Ethereum(tx) => {
@@ -245,7 +246,7 @@ impl DelayedInbox {
                     level,
                 };
 
-                Event::NewDelayedTransaction(tx).store(host, base)?;
+                Event::NewDelayedTransaction(tx).store(base, common)?;
 
                 self.0.push(base, &Hash(tx_hash), &item)?;
                 log!(
@@ -427,6 +428,7 @@ mod tests {
     use super::Hash;
     use crate::block_storage;
     use crate::chains::{make_test_operation, TEZ_SAFE_STORAGE_ROOT_PATH};
+    use crate::configuration::CommonConfig;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
     use primitive_types::{H160, H256, U256};
@@ -496,7 +498,14 @@ mod tests {
         let timestamp: Timestamp =
             read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         delayed_inbox
-            .save_transaction(&host, &mut base, tx.clone().into(), timestamp, 0)
+            .save_transaction(
+                &host,
+                &mut base,
+                tx.clone().into(),
+                timestamp,
+                0,
+                &CommonConfig::default(),
+            )
             .expect("Tx should be saved in the delayed inbox");
 
         let delayed_inbox =
@@ -532,7 +541,14 @@ mod tests {
         let timestamp =
             read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         delayed_inbox
-            .save_transaction(&host, &mut base, tx.clone().into(), timestamp, 0)
+            .save_transaction(
+                &host,
+                &mut base,
+                tx.clone().into(),
+                timestamp,
+                0,
+                &CommonConfig::default(),
+            )
             .expect("Tezos operation should be saved in the delayed inbox");
 
         let delayed_inbox =
@@ -565,7 +581,14 @@ mod tests {
             read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         // Dropping is not an error: the call succeeds but nothing is stored.
         delayed_inbox
-            .save_transaction(&host, &mut base, tx.clone().into(), timestamp, 0)
+            .save_transaction(
+                &host,
+                &mut base,
+                tx.clone().into(),
+                timestamp,
+                0,
+                &CommonConfig::default(),
+            )
             .expect("save_transaction should drop, not fail");
 
         let delayed_inbox =
@@ -593,8 +616,14 @@ mod tests {
 
         let timestamp: Timestamp =
             read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
-        let res =
-            delayed_inbox.save_transaction(&host, &mut base, tx.into(), timestamp, 0);
+        let res = delayed_inbox.save_transaction(
+            &host,
+            &mut base,
+            tx.into(),
+            timestamp,
+            0,
+            &CommonConfig::default(),
+        );
 
         assert!(res.is_err());
     }

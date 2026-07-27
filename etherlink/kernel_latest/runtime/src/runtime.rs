@@ -33,10 +33,6 @@ use tezos_smart_rollup_mock::MockHost;
 // Set by the node, contains the verbosity for the logs
 pub const VERBOSITY_PATH: RefPath = RefPath::assert_from(b"/base/logging_verbosity");
 
-pub trait IsEvmNode {
-    fn is_evm_node(&self) -> bool;
-}
-
 // This type has two interesting parts:
 // 1. Host: BorrowMut<R> + Borrow<R>
 //
@@ -56,7 +52,6 @@ pub trait IsEvmNode {
 pub struct KernelHost<R, Host: BorrowMut<R> + Borrow<R>> {
     pub host: Host,
     pub execution_gas_used: u64,
-    pub is_evm_node: bool,
     pub _pd: PhantomData<R>,
     registry: IrminKeySpaceRegistry,
 }
@@ -310,22 +305,14 @@ impl<R, Host: BorrowMut<R> + Borrow<R>> WithGas for KernelHost<R, Host> {
     }
 }
 
-impl<R, Host: BorrowMut<R> + Borrow<R>> IsEvmNode for KernelHost<R, Host> {
-    fn is_evm_node(&self) -> bool {
-        self.is_evm_node
-    }
-}
-
 impl<R: StorageV1, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host> {
     pub fn init(host: Host) -> Self {
         let logs_verbosity = read_logs_verbosity(host.borrow());
         tezos_evm_logging::set_global_verbosity(logs_verbosity);
 
-        let is_evm_node = evm_node_flag(host.borrow());
         Self {
             host,
             execution_gas_used: 0,
-            is_evm_node,
             _pd: PhantomData,
             registry: IrminKeySpaceRegistry::new(),
         }
@@ -338,7 +325,6 @@ impl Default for MockKernelHost {
         Self {
             host: MockHost::default(),
             execution_gas_used: 0,
-            is_evm_node: false,
             _pd: PhantomData,
             registry: IrminKeySpaceRegistry::new(),
         }
@@ -351,7 +337,6 @@ impl MockKernelHost {
         KernelHost {
             host,
             execution_gas_used: 0,
-            is_evm_node: false,
             _pd: PhantomData,
             registry: IrminKeySpaceRegistry::new(),
         }

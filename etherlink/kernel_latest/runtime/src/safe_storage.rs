@@ -6,7 +6,6 @@
 // SPDX-License-Identifier: MIT
 
 use crate::extensions::WithGas;
-use crate::runtime::IsEvmNode;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path, RefPath},
@@ -199,12 +198,6 @@ impl<Host: WithGas> WithGas for SafeStorage<&mut Host> {
 
     fn executed_gas(&self) -> u64 {
         self.host.executed_gas()
-    }
-}
-
-impl<Host: IsEvmNode> IsEvmNode for SafeStorage<&mut Host> {
-    fn is_evm_node(&self) -> bool {
-        self.host.is_evm_node()
     }
 }
 

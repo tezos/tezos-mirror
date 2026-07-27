@@ -5,7 +5,7 @@
 
 use crate::blueprint::Blueprint;
 use crate::chains::{ExperimentalFeatures, TezosXChainConfig, TezosXTransaction};
-use crate::configuration::{Configuration, ConfigurationMode};
+use crate::configuration::{Configuration, ConfigurationMode, SequencerConfig};
 use crate::error::{Error, StorageError};
 use crate::l2block::L2Block;
 use crate::sequencer_blueprint::{
@@ -830,19 +830,18 @@ fn read_all_chunks_and_validate(
     }
     match &config.mode {
         ConfigurationMode::Proxy => Ok((None, size)),
-        ConfigurationMode::Sequencer {
+        ConfigurationMode::Sequencer(SequencerConfig {
             delayed_inbox,
-            evm_node_flag,
             max_blueprint_lookahead_in_seconds,
             ..
-        } => {
+        }) => {
             let validity: (BlueprintValidity, usize) = parse_and_validate_blueprint(
                 host,
                 base,
                 chunks.concat().as_slice(),
                 delayed_inbox,
                 size,
-                *evm_node_flag,
+                config.common.evm_node_flag,
                 *max_blueprint_lookahead_in_seconds,
                 previous_chain_header,
                 previous_timestamp,
@@ -979,7 +978,7 @@ mod tests {
 
     use super::*;
     use crate::block::GENESIS_PARENT_HASH;
-    use crate::configuration::{DalConfiguration, TezosContracts};
+    use crate::configuration::{CommonConfig, DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::{
         rlp_roundtrip, rlp_roundtrip_f, LATEST_BLUEPRINT_VERSION,
@@ -1013,17 +1012,19 @@ mod tests {
             None
         };
         let mut config = Configuration {
-            tezos_contracts: TezosContracts::default(),
-            mode: ConfigurationMode::Sequencer {
+            common: CommonConfig {
+                tezos_contracts: TezosContracts::default(),
+                maximum_allowed_ticks: MAX_ALLOWED_TICKS,
+                enable_fa_bridge: false,
+                evm_node_flag: false,
+            },
+            mode: ConfigurationMode::Sequencer(SequencerConfig {
                 delayed_bridge,
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
                 dal,
-                evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
-            },
-            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
-            enable_fa_bridge: false,
+            }),
         };
 
         let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);
