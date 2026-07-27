@@ -2,17 +2,18 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::error::InspectorError;
+
 use super::{
     rlp_helpers::{
         append_address, append_option_address, append_option_canonical,
         append_option_u64_le, append_u16_le, append_u256_le, append_u64_le,
     },
     storage::flush_call_traces,
-    HasHost,
 };
 
 use revm::{
-    context::{ContextTr, CreateScheme, Transaction},
+    context::{result::ExecutionResult, ContextTr, CreateScheme, Transaction},
     interpreter::{
         gas::calculate_initial_tx_gas_for_tx, interpreter::ReturnDataImpl, CallInputs,
         CallOutcome, CallScheme, CreateInputs, CreateOutcome, InitialAndFloorGas,
@@ -199,9 +200,9 @@ pub struct CallTracer {
     /// depth is its position in this stack, so no separate depth counter is
     /// needed.
     call_trace: Vec<CallTrace>,
-    /// Traces buffered in memory, flushed to storage once at the end of
-    /// each transaction (when the frame stack empties).  RLP encoding is
-    /// deferred to flush time so the buffer remains readable.
+    /// Traces buffered in memory, flushed to storage in one batch by
+    /// [`CallTracer::finalize`].  RLP encoding is deferred to flush time
+    /// so the buffer remains readable.
     pending_traces: Vec<CallTrace>,
     pub(crate) transaction_hash: Option<B256>,
     spec_id: SpecId,
@@ -229,15 +230,12 @@ impl CallTracer {
         initial_gas
     }
 
-    fn end_transaction_layer<CTX>(
+    fn end_transaction_layer(
         &mut self,
-        context: &mut CTX,
         gas_spent: u64,
         output: &Bytes,
         instruction_result: &InstructionResult,
-    ) where
-        CTX: ContextTr<Db: HasHost<H: StorageV1>>,
-    {
+    ) {
         // Leaving a frame: pop it off the stack.
         if let Some(mut call_trace) = self.call_trace.pop() {
             // In `only_top_call` mode nested frames are still pushed to keep
@@ -251,27 +249,33 @@ impl CallTracer {
                 self.pending_traces.push(call_trace);
             }
         }
+    }
 
-        // Once the frame stack empties (end of top-level transaction), flush
-        // all buffered traces to storage in a single batch operation.
-        if self.call_trace.is_empty() && !self.pending_traces.is_empty() {
+    /// Flush the buffered traces to storage in one batch.
+    pub fn finalize<Host>(
+        &mut self,
+        host: &mut Host,
+        _result: &ExecutionResult,
+    ) -> Result<(), InspectorError>
+    where
+        Host: StorageV1,
+    {
+        if !self.pending_traces.is_empty() {
             let traces = std::mem::take(&mut self.pending_traces);
-            flush_call_traces(
-                context.db_mut().as_host_mut(),
-                &traces,
-                &self.transaction_hash,
-            )
-            .inspect_err(|err| {
-                log!(Debug, "Flushing call traces failed with: {err:?}");
-            })
-            .ok();
+            flush_call_traces(host, &traces, &self.transaction_hash)
+                .inspect_err(|err| {
+                    log!(Debug, "Flushing call traces failed with: {err:?}");
+                })
+                .ok();
         }
+
+        Ok(())
     }
 }
 
 impl<CTX, INTR> Inspector<CTX, INTR> for CallTracer
 where
-    CTX: ContextTr<Db: HasHost<H: StorageV1>>,
+    CTX: ContextTr,
     INTR: InterpreterTypes<ReturnData = ReturnDataImpl>,
 {
     fn call(
@@ -312,9 +316,8 @@ where
         None
     }
 
-    fn call_end(&mut self, context: &mut CTX, _: &CallInputs, outcome: &mut CallOutcome) {
+    fn call_end(&mut self, _: &mut CTX, _: &CallInputs, outcome: &mut CallOutcome) {
         self.end_transaction_layer(
-            context,
             outcome.gas().spent(),
             outcome.output(),
             outcome.instruction_result(),
@@ -356,19 +359,13 @@ where
         None
     }
 
-    fn create_end(
-        &mut self,
-        context: &mut CTX,
-        _: &CreateInputs,
-        outcome: &mut CreateOutcome,
-    ) {
+    fn create_end(&mut self, _: &mut CTX, _: &CreateInputs, outcome: &mut CreateOutcome) {
         // The frame being left is on top of the stack: record the created
         // address on it before `end_transaction_layer` pops it.
         if let Some(call_trace) = self.call_trace.last_mut() {
             call_trace.add_to(outcome.address);
         }
         self.end_transaction_layer(
-            context,
             outcome.gas().spent(),
             outcome.output(),
             outcome.instruction_result(),
