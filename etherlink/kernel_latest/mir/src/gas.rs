@@ -192,6 +192,21 @@ pub mod tc_cost {
     // charged twice as often as in MIR.
     pub const INSTR_STEP: u32 = 220 * 2;
 
+    // Charged once per node visited by the end-of-execution lazy-storage walk
+    // (`crate::ast::big_map::dump_big_map_walk`).
+    //
+    // Corresponds to `Typecheck_costs.parse_instr_cycle` in the Tezos
+    // protocol, which `extract_lazy_storage_updates` consumes at the top of
+    // every recursion step, before it even matches on the node
+    // (`script_ir_translator.ml`). Unlike `INSTR_STEP` the protocol charges
+    // this once per node rather than twice, so it is `cost_TYPECHECKING_CODE`
+    // unscaled.
+    //
+    // Without it the walk is free, and since `DUP` shares a pointer, a value
+    // whose in-memory graph unfolds to a `2^K`-node tree costs `O(K²)` gas to
+    // build and `2^K` uncharged visits to walk.
+    pub const LAZY_STORAGE_CYCLE: u32 = 220;
+
     pub const VALUE_STEP: u32 = 100;
 
     // Corresponds to cost_PARSE_TYPE1 in the Tezos protocol.
