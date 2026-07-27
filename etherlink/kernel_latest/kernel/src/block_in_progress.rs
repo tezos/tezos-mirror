@@ -269,6 +269,22 @@ fn decode_tx_objects(
     Ok(objects)
 }
 
+/// Deterministic hash of the fake EVM transaction mirroring a cross-runtime
+/// operation. The block number is included to ensure uniqueness across
+/// blocks, since the CRAC-ID only contains the transaction index within a
+/// block.
+pub(crate) fn compute_crac_fake_tx_hash(block_number: U256, crac_id: &str) -> [u8; 32] {
+    use sha3::{Digest, Keccak256};
+
+    let mut hasher = Keccak256::new();
+    hasher.update(b"CROSS-RUNTIME-CALL-TX");
+    let mut block_number_bytes = [0u8; 32];
+    block_number.to_big_endian(&mut block_number_bytes);
+    hasher.update(block_number_bytes);
+    hasher.update(crac_id.as_bytes());
+    hasher.finalize().into()
+}
+
 impl BlockInProgress {
     pub fn queue_length(&self) -> usize {
         self.tx_queue.len()
@@ -676,19 +692,8 @@ impl BlockInProgress {
         Host: StorageV1,
     {
         use revm::primitives::B256;
-        use sha3::{Digest, Keccak256};
 
-        // Compute deterministic tx hash from block number and CRAC-ID.
-        // The block number is included to ensure uniqueness across blocks,
-        // since the CRAC-ID only contains the transaction index within a
-        // block.
-        let mut hasher = Keccak256::new();
-        hasher.update(b"CROSS-RUNTIME-CALL-TX");
-        let mut block_number_bytes = [0u8; 32];
-        self.number.to_big_endian(&mut block_number_bytes);
-        hasher.update(block_number_bytes);
-        hasher.update(effect.crac_id.as_bytes());
-        let hash_bytes: [u8; 32] = hasher.finalize().into();
+        let hash_bytes = compute_crac_fake_tx_hash(self.number, &effect.crac_id);
 
         // Neutral envelope: `from == to == originator alias`, carrying no
         // value. The originator (`X-Tezos-Source`) is the only invariant,
