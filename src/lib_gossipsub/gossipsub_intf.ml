@@ -337,6 +337,12 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
       (** [seen_history_length] controls the size of the message cache used for
           recording seen messages. The seen messages cache will remember messages for
           [seen_history_length] heartbeats. *)
+  max_topics_per_peer : int;
+      (** The maximum number of distinct topics a single remote peer may
+          subscribe to at once. A [Subscribe] message that would exceed this
+          per-peer ceiling is rejected with
+          [Subscribe_ignored_topic_limit_exceeded] without growing state,
+          bounding the heap a peer can force us to allocate. *)
 }
 
 type ('peer, 'message_id) parameters = {
@@ -793,6 +799,10 @@ module type AUTOMATON = sig
     | Subscribe_to_unknown_peer : [`Subscribe] output
         (** The output returned when we receive a subscribe message from a peer
             we don't know.*)
+    | Subscribe_ignored_topic_limit_exceeded : [`Subscribe] output
+        (** The output returned when we ignore a subscribe message because the
+            peer is already subscribed to the maximum number of distinct
+            topics tracked per peer. *)
     | Unsubscribed : [`Unsubscribe] output
         (** The output returned once we successfully processed an unsubscribe
             request sent from a peer. *)
