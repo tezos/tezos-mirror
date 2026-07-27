@@ -37,6 +37,8 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_smart_rollup::outbox::OutboxQueue;
+use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
 #[cfg(target_arch = "wasm32")]
@@ -64,8 +66,7 @@ pub extern "C" fn populate_delayed_inbox() {
 #[allow(dead_code)]
 pub fn populate_delayed_inbox_with_durable_storage<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime
-        + tezos_smart_rollup_host::storage::CoreStorage,
+    Host: StorageV1 + CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
@@ -87,8 +88,7 @@ pub extern "C" fn drop_delayed_transaction() {
 #[allow(dead_code)]
 pub fn drop_delayed_transaction_with_durable_storage<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime
-        + tezos_smart_rollup_host::storage::CoreStorage,
+    Host: StorageV1 + CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
@@ -109,8 +109,7 @@ pub extern "C" fn single_tx_execution() {
 #[allow(dead_code)]
 pub fn single_tx_execution_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime
-        + tezos_smart_rollup_host::storage::CoreStorage,
+    Host: StorageV1 + CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let mut base = match crate::storage::load_base_keyspace(&mut host) {
@@ -160,8 +159,7 @@ pub extern "C" fn assemble_block() {
 #[allow(dead_code)]
 pub fn assemble_block_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime
-        + tezos_smart_rollup_host::storage::CoreStorage,
+    Host: StorageV1 + CoreStorage + WasmHost,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let mut base = match crate::storage::load_base_keyspace(&mut host) {
@@ -200,8 +198,7 @@ pub extern "C" fn tezosx_simulate() {
 #[allow(dead_code)]
 pub fn tezosx_simulate_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime
-        + tezos_smart_rollup_host::storage::CoreStorage,
+    Host: StorageV1 + CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let mut base = match crate::storage::load_base_keyspace(&mut host) {
@@ -497,8 +494,7 @@ pub extern "C" fn tezosx_michelson_entrypoints() {
 #[allow(dead_code)]
 pub fn tezosx_michelson_entrypoints_fn<Host>(host: &mut Host)
 where
-    Host: tezos_smart_rollup_host::runtime::Runtime
-        + tezos_smart_rollup_host::storage::CoreStorage,
+    Host: StorageV1 + CoreStorage,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
     let mut base = match crate::storage::load_base_keyspace(&mut host) {
@@ -540,7 +536,7 @@ fn handle_query_entrypoints_to<Host, R>(
     payload: &[u8],
     result_key: &Key,
 ) where
-    R: tezos_smart_rollup_host::runtime::Runtime,
+    R: StorageV1,
     Host: std::borrow::BorrowMut<R> + std::borrow::Borrow<R>,
 {
     let address = match mir::ast::AddressHash::try_from(payload) {
