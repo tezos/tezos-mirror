@@ -1040,8 +1040,10 @@ etherlink.test_kernel:
     - etherlink/kernel_latest/mir/**/*.rs
     - etherlink/kernel_latest/mir/**/*.toml
     - etherlink/kernel_latest/mir/**/Cargo.lock
+    - etherlink/kernel_latest/tezos/regressions/**/*
     - sdk/rust/**/*
     - src/kernel_sdk/**/*
+    - tezt/tests/expected/encoding.ml/**/*
     when: on_success
   needs:
   - oc.build_kernels

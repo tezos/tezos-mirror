@@ -18,6 +18,12 @@ module Files = struct
 
   let kernel = ["etherlink.mk"; "etherlink/**/*.rs"]
 
+  let kernel_test_data =
+    [
+      "tezt/tests/expected/encoding.ml/**/*";
+      "etherlink/kernel_latest/tezos/regressions/**/*";
+    ]
+
   let evm_compatibility =
     [
       "etherlink.mk";
@@ -45,7 +51,8 @@ module Files = struct
 
   (* [evm_compatibility] and [revm_compatibility] are already included
      in [node @ kernel] *)
-  let all = sdks @ lib_wasm_runtime_rust @ node @ kernel @ mir @ tzt
+  let all =
+    sdks @ lib_wasm_runtime_rust @ node @ kernel @ kernel_test_data @ mir @ tzt
 end
 
 module CI = Cacio.Make (struct
@@ -215,7 +222,7 @@ let job_test_kernel =
     ~stage:Test
     ~description:"Check and test the etherlink kernel."
     ~image:Images.Base_images.debian_rust_trixie
-    ~only_if_changed:Files.(kernel @ sdks @ mir)
+    ~only_if_changed:Files.(kernel @ kernel_test_data @ sdks @ mir)
     ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
