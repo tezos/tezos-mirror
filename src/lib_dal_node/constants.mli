@@ -64,6 +64,13 @@ val shards_verification_sampling_frequency : int
     avoid keeping a pending promise forever. *)
 val amplification_timeout : float
 
+(** [amplification_queue_max_length] is the maximum number of
+    in-flight amplification reconstructions (jobs queued in the amplificator's
+    query pipe plus those being processed). Beyond this bound, new amplification
+    requests are dropped (and logged) instead of being enqueued, bounding the
+    query pipe to prevent OOM under a sustained shard flood. *)
+val amplification_queue_max_length : int
+
 (** Initial reconnection delay to L1 node from the DAL crawler in seconds. *)
 val initial_l1_crawler_reconnection_delay : float
 
