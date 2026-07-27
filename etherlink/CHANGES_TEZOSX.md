@@ -38,6 +38,11 @@
   reading it no longer deep-clone that value when it is `DUP`-shared
   (an OOM-crash vector); it is now forwarded behind its shared
   pointer. (!22585)
+- **Bug fix:** inter-contract internal-operation processing is now iterative (an
+  explicit heap worklist) instead of recursive. A deep `TRANSFER_TOKENS` call
+  chain is bounded by gas rather than by the kernel stack, so a contract
+  emitting a deep self-referential transfer chain no longer overflows the fast
+  executor's stack and diverges from the reference PVM. (!22608)
 - **Security fix:** the instructions that only read a bytes operand no
   longer deep-clone it when it is `DUP`-shared (an OOM-crash vector);
   the operand is now read borrowed. (!22580)
