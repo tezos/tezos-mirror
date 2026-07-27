@@ -82,6 +82,16 @@ impl<'a, T> Iterator for Iter<'a, T> {
 
 impl<T> ExactSizeIterator for Iter<'_, T> {}
 
+/// Iterating from the tail is free: the backing `Vec` is already stored
+/// tail-first, so [Iter] is a `Rev` over it. Lets a caller that must queue the
+/// elements onto a LIFO worklist push them back-to-front without collecting
+/// them first (see [`crate::ast::TypedValue::update_big_maps`]).
+impl<T> DoubleEndedIterator for Iter<'_, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back()
+    }
+}
+
 impl<T> IntoIterator for MichelsonList<T> {
     type IntoIter = IntoIter<T>;
     type Item = T;
