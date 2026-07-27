@@ -7,7 +7,7 @@
 
 use crate::apply::{
     CrossRuntimeEffect, EthereumExecutionInfo, EvmCracEffect, RuntimeExecutionInfo,
-    TransactionReceiptInfo,
+    TezosExecutionInfo, TransactionReceiptInfo,
 };
 use crate::block_storage;
 use crate::blueprint_storage::{
@@ -459,11 +459,11 @@ impl BlockInProgress {
                     .list
                     .extend(pending_crac_receipts);
             }
-            RuntimeExecutionInfo::Tezos {
+            RuntimeExecutionInfo::Tezos(TezosExecutionInfo {
                 op: operation_and_receipt,
                 cross_runtime_effects,
                 consumed_milligas,
-            } => {
+            }) => {
                 let cumulative_execution_gas =
                     crate::chains::michelson_milligas_to_evm_gas(
                         consumed_milligas,

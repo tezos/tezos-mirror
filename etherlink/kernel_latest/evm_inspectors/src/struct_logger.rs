@@ -8,7 +8,7 @@ use super::{
 };
 
 use revm::{
-    context::{ContextTr, JournalTr},
+    context::{result::ExecutionResult, ContextTr, JournalTr},
     inspector::inspectors::GasInspector,
     interpreter::{
         interpreter::ReturnDataImpl,
@@ -205,6 +205,23 @@ impl StructLogger {
             store_return_value(host, return_value, &transaction_hash)?;
         };
         Ok(())
+    }
+
+    pub fn finalize<Host>(
+        &mut self,
+        host: &mut Host,
+        result: &ExecutionResult,
+    ) -> Result<(), InspectorError>
+    where
+        Host: StorageV1,
+    {
+        Self::store_outcome(
+            host,
+            result.is_success(),
+            result.output(),
+            result.gas_used(),
+            self.transaction_hash,
+        )
     }
 }
 
