@@ -191,6 +191,7 @@ let job_unit_tests =
     ~stage:Test
     ~description:"Etherlink unit tests."
     ~image:Images.CI.build
+    ~cpu:Runner.CPU.Very_high
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
       (Gitlab_ci.Util.artifacts
