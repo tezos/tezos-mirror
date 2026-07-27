@@ -1099,7 +1099,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::MapOptionAfter => {
                 let stk = active_stack_mut(stacks)?;
                 let result = pop_value(stk)?;
-                stk.push(TypedValue::new_option(Some(TypedValue::unwrap_rc(result))));
+                stk.push(TypedValue::new_option_rc(Some(result)));
             }
             InterpFrame::MapMapAccum {
                 body,
@@ -1155,8 +1155,7 @@ fn run_interp_driver<'a, 'b>(
                     saved_balance,
                 );
                 let result = pop_value(&mut sub)?;
-                active_stack_mut(stacks)?
-                    .push(TypedValue::new_option(Some(TypedValue::unwrap_rc(result))));
+                active_stack_mut(stacks)?.push(TypedValue::new_option_rc(Some(result)));
             }
         }
     }
@@ -1554,7 +1553,7 @@ fn interpret_step<'a, 'b>(
         },
         I::Exec => {
             ctx.gas().consume(interpret_cost::EXEC)?;
-            let mut arg = TypedValue::unwrap_rc(pop_value(stack)?);
+            let mut arg = pop_value(stack)?;
             let mut closure = pop_v!(V::Lambda);
             // Inline APPLY unwrapping (constant work, not stack recursive).
             loop {
@@ -1569,22 +1568,22 @@ fn interpret_step<'a, 'b>(
                             let code_clone = Rc::clone(&code);
                             // Recursive lambdas put themselves on top of
                             // the body's stack so the body can EXEC again.
-                            let initial = stk![
-                                V::Lambda(Closure::Lambda(Lambda::LambdaRec {
-                                    in_ty,
-                                    out_ty,
-                                    micheline_code,
-                                    code,
-                                })),
-                                arg
-                            ];
+                            let mut initial = IStack::new();
+                            initial.push(V::Lambda(Closure::Lambda(Lambda::LambdaRec {
+                                in_ty,
+                                out_ty,
+                                micheline_code,
+                                code,
+                            })));
+                            initial.push(arg);
                             return Ok(StepResult::OpenExec {
                                 code: code_clone,
                                 initial,
                             });
                         }
                         Lambda::Lambda { code, .. } => {
-                            let initial = stk![arg];
+                            let mut initial = IStack::new();
+                            initial.push(arg);
                             return Ok(StepResult::OpenExec { code, initial });
                         }
                     },
@@ -1599,7 +1598,7 @@ fn interpret_step<'a, 'b>(
                         // re-push), only the gas is brought in line.
                         ctx.gas().consume(interpret_cost::PUSH)?;
                         ctx.gas().consume(interpret_cost::PAIR)?;
-                        arg = V::new_pair_rc(Rc::clone(capture.arg_val()), Rc::new(arg));
+                        arg = Rc::new(V::new_pair_rc(Rc::clone(capture.arg_val()), arg));
                         closure = Closure::unwrap_rc(inner);
                     }
                 }
@@ -1610,7 +1609,7 @@ fn interpret_step<'a, 'b>(
             arg_type,
             return_type,
         } => {
-            let input = TypedValue::unwrap_rc(pop_value(stack)?);
+            let input = pop_value(stack)?;
             let Address {
                 hash,
                 entrypoint: _,
@@ -1692,7 +1691,7 @@ fn interpret_step<'a, 'b>(
                 return Ok(StepResult::Done);
             }
 
-            let initial = stk![TypedValue::new_pair(input, storage)];
+            let initial = stk![TypedValue::new_pair_rc(input, Rc::new(storage))];
             Ok(StepResult::OpenView {
                 code,
                 initial,
@@ -5132,6 +5131,123 @@ mod interpreter_tests {
                  clone work is unbounded (L2-1794)",
             );
         }
+    }
+
+    #[test]
+    fn exec_forwards_shared_argument_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let lambda = V::Lambda(Closure::Lambda(Lambda::Lambda {
+            micheline_code: Micheline::Seq(&[]),
+            code: vec![Drop(None), Unit].into(),
+        }));
+        stack.push(lambda);
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(Rc::clone(&operand)); // argument on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(&[Exec], &mut ctx, &mut stack).unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "EXEC deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn view_forwards_shared_input_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let address = V::Address(addr::Address {
+            hash: "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".try_into().unwrap(),
+            entrypoint: Entrypoint::default(),
+        });
+        stack.push(address);
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(Rc::clone(&operand)); // input on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(
+            &[IView {
+                name: "someview".to_string(),
+                arg_type: Type::Bytes,
+                return_type: Type::Bytes,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "VIEW input deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn map_option_forwards_shared_result_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(V::new_option_rc(Some(Rc::clone(&operand)))); // option holding a leaf shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(&[Map(overloads::Map::Option, vec![])], &mut ctx, &mut stack).unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "MAP over option deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn view_forwards_shared_result_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let kt1: AddressHash = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye".try_into().unwrap();
+        let view_name = "someview".to_string();
+        let car_body = [Micheline::prim0_uncarbonated(Prim::CAR)];
+        let view = crate::ast::View {
+            input_type: Type::Bytes,
+            output_type: Type::Bytes,
+            code: Micheline::Seq(&car_body),
+        };
+        let mut kt1_views = HashMap::new();
+        kt1_views.insert(view_name.clone(), view);
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        ctx.views.insert(kt1.clone(), kt1_views);
+        ctx.storage.insert(kt1.clone(), (Type::Unit, V::Unit));
+        let address = V::Address(addr::Address {
+            hash: kt1,
+            entrypoint: Entrypoint::default(),
+        });
+        stack.push(address);
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(Rc::clone(&operand)); // view input on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(
+            &[IView {
+                name: view_name,
+                arg_type: Type::Bytes,
+                return_type: Type::Bytes,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "VIEW result deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
     }
 
     #[test]
