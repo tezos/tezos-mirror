@@ -28,6 +28,9 @@
 
 ### Michelson Runtime
 
+- **Security fix:** the two-operand overloads of `CONCAT` (string and
+  bytes) no longer deep-clone a `DUP`-shared operand (an OOM-crash
+  vector); the operands are now read borrowed. (!22594)
 - **Security fix:** `UPDATE n` no longer deep-clones the new field value
   when it is `DUP`-shared (an OOM-crash vector); the value is now stored
   in the field behind its shared pointer. (!22590)
