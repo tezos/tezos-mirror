@@ -72,11 +72,14 @@ pub fn trim_trailing_zeros(vec: &mut Vec<u8>) {
 
 #[macro_export]
 macro_rules! write_host {
-    ($host: expr, $($args: expr),*) => {
+    ($($args: expr),*) => {
         {
             if cfg!(not(feature = "disable-file-logs")) {
                 extern crate alloc;
-                $host.writeln({ &alloc::format!($($args), *) });
+                ::tezos_evm_logging::DEBUG_LOG.with_borrow_mut(|log| {
+                    log.extend_from_slice(alloc::format!($($args), *).as_bytes());
+                    log.push(b'\n');
+                })
             }
         }
     };

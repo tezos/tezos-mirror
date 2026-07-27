@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::evalhost::EvalHost;
 use crate::helpers::{
     parse_and_get_cmp, purify_network, trim_trailing_zeros, LabelIndexes, OutputOptions,
 };
@@ -11,6 +10,7 @@ use crate::models::{
     AccountInfoFiller, FillerResultIndexes, FillerSource, IndexKind, SpecName,
 };
 use crate::{write_host, write_out, DiffMap, ReportMap, ReportValue};
+use tezos_evm_runtime::runtime::MockKernelHost;
 
 use crate::models::TxPartIndices;
 
@@ -90,7 +90,7 @@ fn check_if_network_match(filler_network: &str, spec_name: &SpecName) -> bool {
 }
 
 fn check_should_not_exist(
-    host: &mut EvalHost,
+    host: &mut MockKernelHost,
     account: &StorageAccount,
     invalid_state: &mut bool,
     shouldnotexist: &Option<String>,
@@ -109,16 +109,16 @@ fn check_should_not_exist(
         let nonce_is_zero = nonce == 0;
 
         if balance_is_zero && no_code && nonce_is_zero {
-            write_host!(host, "Account {} rightfully does not exist.", hex_address);
+            write_host!("Account {} rightfully does not exist.", hex_address);
         } else {
-            write_host!(host, "Account {} should not exist.", hex_address);
+            write_host!("Account {} should not exist.", hex_address);
             *invalid_state = true;
         }
     }
 }
 
 fn check_balance(
-    host: &mut EvalHost,
+    host: &mut MockKernelHost,
     account: &StorageAccount,
     invalid_state: &mut bool,
     balance: &Option<primitive_types::U256>,
@@ -129,21 +129,21 @@ fn check_balance(
             Ok(current_info) => {
                 if current_info.balance != u256_to_alloy(balance) {
                     *invalid_state = true;
-                    write_host!( host, "Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_info.balance);
+                    write_host!("Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_info.balance);
                 } else {
-                    write_host!(host, "Account {}: balance matched.", hex_address);
+                    write_host!("Account {}: balance matched.", hex_address);
                 }
             }
             Err(_) => {
                 *invalid_state = true;
-                write_host!(host, "Account {} should have a balance.", hex_address);
+                write_host!("Account {} should have a balance.", hex_address);
             }
         }
     }
 }
 
 fn check_code(
-    host: &mut EvalHost,
+    host: &mut MockKernelHost,
     account: &StorageAccount,
     invalid_state: &mut bool,
     code: &Option<Bytes>,
@@ -159,21 +159,21 @@ fn check_code(
                 trim_trailing_zeros(&mut current_code);
                 if current_code != code {
                     *invalid_state = true;
-                    write_host!( host, "Account {}: code don't match current one, {:02x?} was expected, but got {:02x?}.", hex_address, code, current_code);
+                    write_host!("Account {}: code don't match current one, {:02x?} was expected, but got {:02x?}.", hex_address, code, current_code);
                 } else {
-                    write_host!(host, "Account {}: code matched.", hex_address);
+                    write_host!("Account {}: code matched.", hex_address);
                 }
             }
             Ok(None) | Err(_) => {
                 *invalid_state = true;
-                write_host!(host, "Account {} should have a code.", hex_address);
+                write_host!("Account {} should have a code.", hex_address);
             }
         }
     }
 }
 
 fn check_nonce(
-    host: &mut EvalHost,
+    host: &mut MockKernelHost,
     account: &StorageAccount,
     invalid_state: &mut bool,
     nonce: &Option<u64>,
@@ -184,21 +184,21 @@ fn check_nonce(
             Ok(current_info) => {
                 if current_info.nonce != *nonce {
                     *invalid_state = true;
-                    write_host!( host, "Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_info.nonce);
+                    write_host!("Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_info.nonce);
                 } else {
-                    write_host!(host, "Account {}: nonce matched.", hex_address);
+                    write_host!("Account {}: nonce matched.", hex_address);
                 }
             }
             Err(_) => {
                 *invalid_state = true;
-                write_host!(host, "Account {} should have a nonce.", hex_address);
+                write_host!("Account {} should have a nonce.", hex_address);
             }
         }
     }
 }
 
 fn check_storage(
-    host: &mut EvalHost,
+    host: &mut MockKernelHost,
     account: &StorageAccount,
     invalid_state: &mut bool,
     storage: &Option<HashMap<H256, H256>>,
@@ -206,11 +206,7 @@ fn check_storage(
 ) {
     if let Some(storage) = &storage {
         if storage.is_empty() {
-            write_host!(
-                host,
-                "Account {}: storage matched (both empty).",
-                hex_address
-            );
+            write_host!("Account {}: storage matched (both empty).", hex_address);
         }
         for (index, value) in storage.iter() {
             match account.get_storage(host, &U256::from_be_bytes(h256_to_alloy(index).0))
@@ -221,10 +217,9 @@ fn check_storage(
                         != U256::from_be_bytes(h256_to_alloy(storage_value).0)
                     {
                         *invalid_state = true;
-                        write_host!( host, "Account {}: storage don't match current one for index {}, {} was expected, but got {}.", hex_address, index, storage_value, current_storage_value);
+                        write_host!("Account {}: storage don't match current one for index {}, {} was expected, but got {}.", hex_address, index, storage_value, current_storage_value);
                     } else {
                         write_host!(
-                            host,
                             "Account {}: storage matched for index {}.",
                             hex_address,
                             index
@@ -233,7 +228,7 @@ fn check_storage(
                 }
                 Err(_) => {
                     *invalid_state = true;
-                    write_host!(host, "Account {} should have a storage.", hex_address);
+                    write_host!("Account {} should have a storage.", hex_address);
                 }
             }
         }
@@ -241,7 +236,7 @@ fn check_storage(
 }
 
 fn check_durable_storage(
-    host: &mut EvalHost,
+    host: &mut MockKernelHost,
     filler_expectation_result: &HashMap<String, AccountInfoFiller>,
     status: &mut TestResult,
 ) {
@@ -295,9 +290,9 @@ fn check_durable_storage(
         if invalid_state {
             *status = TestResult::Failure;
             // One invalid state will cause the entire test to be a failure.
-            write_host!(host, "==> [INVALID STATE]\n");
+            write_host!("==> [INVALID STATE]\n");
         } else {
-            write_host!(host, "==> [CORRECT STATE]\n");
+            write_host!("==> [CORRECT STATE]\n");
         }
     }
 }
@@ -325,7 +320,7 @@ pub fn output_result(file: &mut Option<File>, name: &str, status: TestResult) {
 
 #[allow(clippy::too_many_arguments)]
 pub fn process(
-    host: &mut EvalHost,
+    host: &mut MockKernelHost,
     filler_source: FillerSource,
     spec_name: &SpecName,
     report_map: &mut ReportMap,
@@ -341,7 +336,6 @@ pub fn process(
 
     for (name, fillers) in filler_source.0.into_iter() {
         write_host!(
-            host,
             "Processing checks with filler: {}Filler and config: {}\n",
             name,
             tx_indices
@@ -354,8 +348,8 @@ pub fn process(
                     tx_indices,
                 ) && check_if_network_match(&filler_network, spec_name)
                 {
-                    write_host!(host, "CONFIG NETWORK ---- {}", spec_name.to_str());
-                    write_host!(host, "CHECK  NETWORK ---- {}\n", filler_network);
+                    write_host!("CONFIG NETWORK ---- {}", spec_name.to_str());
+                    write_host!("CHECK  NETWORK ---- {}\n", filler_network);
 
                     check_durable_storage(host, &filler_expectation.result, &mut status);
                 }
@@ -379,7 +373,14 @@ pub fn process(
         }
         TestResult::Failure => {
             if output.log {
-                write_out!(output_file, "{}", String::from_utf8(host.buffer()).unwrap());
+                write_out!(
+                    output_file,
+                    "{}",
+                    String::from_utf8(
+                        tezos_evm_logging::DEBUG_LOG.with_borrow(|log| log.clone())
+                    )
+                    .unwrap()
+                );
             }
             report_map.entry(report_key).and_modify(|report_value| {
                 *report_value = ReportValue {
