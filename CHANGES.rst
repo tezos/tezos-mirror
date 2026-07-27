@@ -110,5 +110,10 @@ DAL node
   and report slots as attested by a baker that did not attest them.
   (MR :gl:`!22472`)
 
+- The DAL gossipsub worker now caps the number of distinct topics a remote peer
+  may subscribe to (default 65,536) and the depth of the P2P input queue
+  (default 8,192); excess subscriptions and messages are silently dropped.
+  (MR :gl:`!22611`)
+
 Miscellaneous
 -------------
