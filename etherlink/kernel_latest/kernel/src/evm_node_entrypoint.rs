@@ -10,7 +10,10 @@
 //! using the inbox and a specific message.
 
 use crate::{
-    apply::{ExecutionResult, RuntimeExecutionInfo, WITHDRAWAL_OUTBOX_QUEUE},
+    apply::{
+        ExecutionResult, RuntimeExecutionInfo, TezosExecutionInfo,
+        WITHDRAWAL_OUTBOX_QUEUE,
+    },
     block::bip_from_blueprint,
     blueprint::Blueprint,
     blueprint_storage::read_current_blueprint_header,
@@ -373,6 +376,12 @@ where
                 true,
                 false, // da fees are disabled in simulation
             )
+            .map(|x| match x {
+                ExecutionResult::Valid(res) => {
+                    ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(res))
+                }
+                ExecutionResult::Invalid => ExecutionResult::Invalid,
+            })
         }
         _ => chain_config.apply_transaction(
             &block_in_progress,
@@ -417,11 +426,11 @@ where
     }
 
     let applied_operation = match execution_result {
-        ExecutionResult::Valid(RuntimeExecutionInfo::Tezos {
+        ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(TezosExecutionInfo {
             op,
             cross_runtime_effects: _,
             consumed_milligas: _,
-        }) => op,
+        })) => op,
         ExecutionResult::Valid(RuntimeExecutionInfo::Ethereum(_)) => {
             log!(
                 Error,

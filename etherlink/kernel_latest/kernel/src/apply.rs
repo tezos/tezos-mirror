@@ -48,7 +48,7 @@ use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
 use crate::chains::{DebugFeatures, EvmLimits};
 use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
-use crate::journal;
+use crate::journal::{self, close_tezosx_journal};
 use crate::transaction::{Transaction, TransactionContent};
 
 sol! {
@@ -754,11 +754,19 @@ where
         &journal,
     );
 
-    let execution_outcome = run_result?;
+    let execution_outcome = match run_result {
+        Ok(outcome) => outcome,
+        Err(err) => {
+            close_tezosx_journal(host, journal, None)?;
+            return Err(err.into());
+        }
+    };
 
     // Drain any CRAC receipts produced by EVM→Michelson calls during
     // this transaction so they can be included in the Michelson runtime block.
     let crac_receipts = drain_pending_crac_receipts(&mut journal);
+
+    close_tezosx_journal(host, journal, Some(&execution_outcome.result))?;
 
     let transaction_result =
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
@@ -816,14 +824,10 @@ where
     let to = Some(alloy_to_h160(&XTZ_BRIDGE_SOL_ADDR));
     let gas_limit = XTZ_DEPOSIT_EXECUTION_COST;
     let value = deposit.amount;
-    // Prefund the feeder address for the xtz deposit. The REVM credit-
-    // checkpoint mechanism (`TransactionOrigin::CrossRuntime { credit }`)
-    // can't be reused here: it wraps the transaction in an extra
-    // `journaled_state.checkpoint()`, which increments REVM's call depth
-    // and shifts the top-level frame off depth 0 — breaking the
-    // `CallTracer` whose flush hook keys on `depth == 0`. We therefore
-    // keep the prefund out-of-band and explicitly refund on every
-    // !is_success() exit below.
+    // Prefund the feeder address, refunded on every !is_success() exit
+    // below. `TransactionOrigin::CrossRuntime { credit }` would revert
+    // the credit automatically, but it also skips the journal commit
+    // this top-level transaction needs.
     caller_account.add_balance(host, u256_to_alloy(&value))?;
     let call_data = handle_xtz_depositCall {
         deposit: SolXTZDeposit::from(deposit),
@@ -863,6 +867,7 @@ where
         },
     ) {
         Ok(execution_outcome) => {
+            close_tezosx_journal(host, journal, Some(&execution_outcome.result))?;
             // An EVM-internal revert returns `Ok` with a non-success result,
             // so we must also refund the prefund here, otherwise the deposit
             // value is stranded on FEED_DEPOSIT_ADDR while the receiver is
@@ -870,9 +875,11 @@ where
             if !execution_outcome.result.is_success() {
                 caller_account.sub_balance(host, u256_to_alloy(&value))?;
             }
+
             Ok(execution_outcome)
         }
         Err(err) => {
+            close_tezosx_journal(host, journal, None)?;
             // Something went wrong, we remove the added balance for the xtz deposit.
             caller_account.sub_balance(host, u256_to_alloy(&value))?;
             Err(err)
@@ -983,7 +990,7 @@ where
         tracer_input,
     );
 
-    revm_run_transaction(
+    let outcome = revm_run_transaction(
         host,
         registry,
         &mut journal,
@@ -1001,7 +1008,18 @@ where
         TransactionOrigin::UserInput {
             access_list: revm::context::transaction::AccessList::default(),
         },
-    )
+    );
+
+    match outcome {
+        Ok(outcome) => {
+            close_tezosx_journal(host, journal, Some(&outcome.result))?;
+            Ok(outcome)
+        }
+        Err(err) => {
+            close_tezosx_journal(host, journal, None)?;
+            Err(err)
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1078,17 +1096,52 @@ pub struct EvmCracEffect {
     pub gas_used: U256,
 }
 
+pub struct TezosExecutionInfo {
+    pub op: AppliedOperation,
+    pub cross_runtime_effects: Vec<CrossRuntimeEffect>,
+    /// Total milligas consumed by the batch, computed from the gas
+    /// tracker (correct for all outcomes including Failed).
+    pub consumed_milligas: u64,
+}
+
+impl TezosExecutionInfo {
+    /// Build the EVM [`revm::context::result::ExecutionResult`] describing this applied Tezos
+    /// operation, to feed the journal-owned tracer in [`crate::journal::close_tezosx_journal`].
+    pub fn to_execution_result(
+        &self,
+        michelson_to_evm_gas_multiplier: u64,
+    ) -> revm::context::result::ExecutionResult {
+        use revm::context::result::{ExecutionResult, Output, ResultGas, SuccessReason};
+        use tezos_tezlink::operation_result::OperationDataAndMetadata;
+        let gas_used = crate::chains::michelson_milligas_to_evm_gas(
+            self.consumed_milligas,
+            michelson_to_evm_gas_multiplier,
+        );
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            self.op.op_and_receipt;
+        let is_success = batch.operations.iter().all(|op| op.receipt.is_applied());
+        if is_success {
+            ExecutionResult::Success {
+                reason: SuccessReason::Stop,
+                gas: ResultGas::new(gas_used, gas_used, 0, 0, 0),
+                logs: vec![],
+                output: Output::Call(Bytes::new()),
+            }
+        } else {
+            ExecutionResult::Revert {
+                gas: ResultGas::new(gas_used, gas_used, 0, 0, 0),
+                logs: vec![],
+                output: Bytes::new(),
+            }
+        }
+    }
+}
+
 /// Enum distinguishing between Ethereum and Tezos execution info.
 #[allow(clippy::large_enum_variant)]
 pub enum RuntimeExecutionInfo {
     Ethereum(EthereumExecutionInfo),
-    Tezos {
-        op: AppliedOperation,
-        cross_runtime_effects: Vec<CrossRuntimeEffect>,
-        /// Total milligas consumed by the batch, computed from the gas
-        /// tracker (correct for all outcomes including Failed).
-        consumed_milligas: u64,
-    },
+    Tezos(TezosExecutionInfo),
 }
 
 pub enum ExecutionResult<T> {
@@ -1208,11 +1261,11 @@ where
             consumed_milligas,
         } => {
             push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
-            Ok(RuntimeExecutionInfo::Tezos {
+            Ok(RuntimeExecutionInfo::Tezos(TezosExecutionInfo {
                 op,
                 cross_runtime_effects,
                 consumed_milligas,
-            })
+            }))
         }
     }
 }

@@ -6,7 +6,6 @@
 use crate::{journal::Journal, storage::world_state_handler::StorageAccount};
 use database::EtherlinkVMDB;
 pub use error::{EvmDbError, EvmKernelError, EvmRunError};
-use evm_inspectors::struct_logger::StructLogger;
 use evm_inspectors::TracerInspector;
 use handler::EtherlinkHandler;
 use helpers::storage::u256_to_le_bytes;
@@ -77,13 +76,9 @@ pub enum TransactionOrigin {
     /// If `credit` is `Some`, inject a balance credit into the REVM journal
     /// before executing the transaction.
     ///
-    /// Note: the credit lives behind a `journaled_state.checkpoint()`,
-    /// which increments REVM's call depth. That's safe for cross-runtime
-    /// calls (already nested below a real top-level frame) but would
-    /// shift the top-level call off depth 0 for a `UserInput` caller —
-    /// breaking the `CallTracer` whose flush hook keys on `depth == 0`.
-    /// Top-level callers that need a prefund (e.g. the XTZ-deposit
-    /// feeder) must do it out-of-band on `StorageAccount` instead.
+    /// Note: the credit lives behind an extra `journaled_state.checkpoint()`;
+    /// the `CallTracer` keeps its own frame stack, so recorded traces are
+    /// unaffected (`test_credit_checkpoint_keeps_call_tracer_depths`).
     CrossRuntime { credit: Option<(Address, U256)> },
     /// Read-only cross-runtime call: no balance credit, no journal
     /// commit, and the top-level frame runs with `is_static = true`
@@ -575,13 +570,6 @@ where
     let db = EtherlinkVMDB::new(host, registry, block_constants, classify_native)?;
 
     if journal.evm.has_tracer() {
-        // Capture the struct logger's identity up front: the `Evm` context
-        // borrows the journal (which owns the tracer) for the whole run.
-        let struct_logger_tx_hash = journal
-            .evm
-            .tracer()
-            .filter(|tracer| tracer.is_struct_logger())
-            .map(|tracer| tracer.transaction_hash());
         let precompiles =
             EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled());
         let mut evm_context = build_evm_inspector_context(
@@ -635,20 +623,6 @@ where
                 evm_context.ctx.journaled_state.checkpoint_commit();
             } else {
                 evm_context.ctx.journaled_state.checkpoint_revert(cp);
-            }
-        }
-
-        // Cross-runtime legs inherit the outer transaction's tracer; only
-        // the outer run's outcome belongs in storage.
-        if !is_cross_runtime {
-            if let Some(transaction_hash) = struct_logger_tx_hash {
-                StructLogger::store_outcome(
-                    evm_context.ctx.db_mut().host,
-                    result.is_success(),
-                    result.output(),
-                    result.gas_used(),
-                    transaction_hash,
-                )?
             }
         }
 
@@ -1775,7 +1749,7 @@ mod test {
                 None,
             )));
 
-            run_transaction(
+            let outcome = run_transaction(
                 &mut host,
                 &registry,
                 &mut journal,
@@ -1792,10 +1766,15 @@ mod test {
             )
             .unwrap();
 
-            // The `CallTracer` flushes its buffered frames to storage once
-            // the frame stack empties at the end of the top-level run, so
-            // the traces are already persisted here. With no tx hash on
-            // the tracer they land under the base trace path.
+            journal
+                .evm
+                .take_tracer()
+                .expect("tracer should still be attached")
+                .finalize(&mut host, &outcome.result)
+                .expect("tracer finalization should succeed");
+
+            // With no tx hash on the tracer the traces land under the base
+            // trace path.
             let path =
                 trace_tx_path(&None, &RefPath::assert_from(b"/call_trace")).unwrap();
             let store = IndexableStorage::new_owned_path(path);
@@ -4442,7 +4421,7 @@ mod test {
             if let Some(tracer) = tracer {
                 journal.evm.set_tracer(tracer);
             }
-            run_transaction(
+            let outcome = run_transaction(
                 host,
                 &registry,
                 &mut journal,
@@ -4459,7 +4438,14 @@ mod test {
                     access_list: AccessList::default(),
                 },
             )
-            .unwrap()
+            .unwrap();
+
+            if let Some(mut tracer) = journal.evm.take_tracer() {
+                tracer
+                    .finalize(host, &outcome.result)
+                    .expect("tracer finalization should succeed");
+            }
+            outcome
         }
 
         fn deploy(host: &mut MockKernelHost, caller: Address) -> Address {
@@ -4640,7 +4626,10 @@ mod test {
             storage::trace_tx_path,
         };
         use revm::{
-            context::{CfgEnv, Context, LocalContext, TxEnv},
+            context::{
+                result::{ExecutionResult, Output, ResultGas, SuccessReason},
+                CfgEnv, Context, LocalContext, TxEnv,
+            },
             context_interface::journaled_state::JournalTr,
             interpreter::{
                 gas::{calculate_initial_tx_gas_for_tx, Gas},
@@ -4812,8 +4801,8 @@ mod test {
                 // gas would have been overwritten into.
                 ctx.journaled_state.checkpoint_commit();
 
-                // depth 0: the outer frame closes. The frame stack empties,
-                // so the tracer flushes both frames to storage.
+                // depth 0: the outer frame closes and both frames move to
+                // the tracer's pending buffer.
                 let mut outer_outcome = call_outcome(outer_gas_spent);
                 Inspector::<_, EthInterpreter>::call_end(
                     &mut tracer,
@@ -4822,6 +4811,17 @@ mod test {
                     &mut outer_outcome,
                 );
             }
+
+            // The CallTracer ignores the outcome's content: any result does.
+            let result = ExecutionResult::Success {
+                reason: SuccessReason::Stop,
+                gas: ResultGas::new(1_000_000, outer_gas_spent, 0, 0, 0),
+                logs: vec![],
+                output: Output::Call(Bytes::new()),
+            };
+            tracer
+                .finalize(&mut host, &result)
+                .expect("tracer finalization should succeed");
 
             // Read the flushed traces back and locate the top frame.
             let path =

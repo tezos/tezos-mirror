@@ -712,6 +712,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::apply::TezosExecutionInfo;
     use crate::block_in_progress::BlockInProgress;
     use crate::block_storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
@@ -2041,7 +2042,7 @@ mod tests {
                 ExecutionResult::Valid(info) => info,
                 ExecutionResult::Invalid => panic!("delayed op must be valid"),
             };
-            let RuntimeExecutionInfo::Tezos { op, .. } = info else {
+            let RuntimeExecutionInfo::Tezos(TezosExecutionInfo { op, .. }) = info else {
                 panic!("delayed op must yield Tezos execution info");
             };
             let OperationDataAndMetadata::OperationWithMetadata(batch) =

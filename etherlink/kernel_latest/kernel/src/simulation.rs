@@ -12,6 +12,7 @@ use crate::apply::revm_run_transaction;
 use crate::chains::{DebugFeatures, ExperimentalFeatures};
 use crate::configuration::fetch_evm_chain_id;
 use crate::fees::simulation_add_gas_for_fees;
+use crate::journal::close_tezosx_journal;
 use crate::storage::{
     read_last_info_per_level_timestamp, read_or_set_maximum_gas_per_transaction,
     read_sequencer_pool_address, read_tracer_input,
@@ -526,7 +527,7 @@ impl Evaluation {
             tracer_input,
         );
 
-        let sim_result = match revm_run_transaction(
+        let run_result = revm_run_transaction(
             host,
             registry,
             &mut journal,
@@ -545,7 +546,19 @@ impl Evaluation {
             TransactionOrigin::UserInput {
                 access_list: revm::context::transaction::AccessList::default(),
             },
-        ) {
+        );
+
+        let traces = journal.http_traces().to_owned();
+
+        // Close before the fee post-processing below: a failure there must
+        // not skip the tracer finalization.
+        close_tezosx_journal(
+            host,
+            journal,
+            run_result.as_ref().ok().map(|outcome| &outcome.result),
+        )?;
+
+        let sim_result = match run_result {
             Ok(outcome) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
                     Result::Ok(outcome).into();
@@ -567,7 +580,7 @@ impl Evaluation {
             }
             Err(err) => Ok(SimulationResult::Err(err.to_string())),
         };
-        let traces = journal.into_http_traces();
+
         sim_result.map(|r| (r, traces))
     }
 }

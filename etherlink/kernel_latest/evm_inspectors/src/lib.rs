@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use call_tracer::{CallTracer, CallTracerInput};
+use error::InspectorError;
 use revm::{
-    context::ContextTr,
+    context::{result::ExecutionResult, ContextTr},
     interpreter::{
         interpreter::ReturnDataImpl, CallInputs, CallOutcome, CreateInputs,
         CreateOutcome, Interpreter, InterpreterTypes, Stack,
@@ -79,6 +80,23 @@ impl Tracer {
             Tracer::StructLogger(StructLogger {
                 transaction_hash, ..
             }) => *transaction_hash,
+        }
+    }
+
+    /// Run the tracer's end-of-transaction logic. To be called exactly
+    /// once, by the tracer's owner, after the top-level run —
+    /// cross-runtime legs must not finalize the tracer they share.
+    pub fn finalize<Host>(
+        &mut self,
+        host: &mut Host,
+        result: &ExecutionResult,
+    ) -> Result<(), InspectorError>
+    where
+        Host: StorageV1,
+    {
+        match self {
+            Tracer::CallTracer(call_tracer) => call_tracer.finalize(host, result),
+            Tracer::StructLogger(struct_logger) => struct_logger.finalize(host, result),
         }
     }
 }
