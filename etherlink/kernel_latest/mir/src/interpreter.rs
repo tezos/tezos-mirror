@@ -2292,7 +2292,7 @@ fn interpret_one<'a>(
                 stack.push(V::Nat(o1.shl(o2_usize)));
             }
             overloads::Lsl::Bytes => {
-                let o1 = pop!(V::Bytes);
+                pop_ref!(o1, Bytes);
                 let o2 = pop!(V::Nat);
 
                 if o2 > BigUint::from(64000u16) {
@@ -2301,7 +2301,7 @@ fn interpret_one<'a>(
 
                 let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
                 ctx.gas()
-                    .consume(interpret_cost::lsl_bytes(&o1, &o2_usize)?)?;
+                    .consume(interpret_cost::lsl_bytes(o1, &o2_usize)?)?;
 
                 let byte_shifts = o2_usize / 8;
                 let bit_shifts = o2_usize % 8;
@@ -2340,7 +2340,7 @@ fn interpret_one<'a>(
                 stack.push(V::Nat(o1.shr(o2_usize)));
             }
             overloads::Lsr::Bytes => {
-                let o1 = pop!(V::Bytes);
+                pop_ref!(o1, Bytes);
                 let o2 = pop!(V::Nat);
 
                 // L1 deliberately leaves `LSR bytes` unbounded on the shift
@@ -2354,7 +2354,7 @@ fn interpret_one<'a>(
                 // an empty vector.
                 let o2_usize = o2.to_usize().unwrap_or(usize::MAX);
                 ctx.gas()
-                    .consume(interpret_cost::lsr_bytes(&o1, &o2_usize)?)?;
+                    .consume(interpret_cost::lsr_bytes(o1, &o2_usize)?)?;
 
                 let byte_shifts = min(o2_usize / 8, o1.len());
                 let bit_shifts = o2_usize % 8;
@@ -3047,11 +3047,11 @@ fn interpret_one<'a>(
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {
-            let bytes = pop!(V::Bytes);
+            pop_ref!(bytes, Bytes);
             ctx.gas()
                 .consume(interpret_cost::unpack(bytes.as_slice())?)?;
             let mut try_unpack = || -> Option<TypedValue> {
-                let mich = Micheline::decode_packed(arena, &bytes, ctx.gas())
+                let mich = Micheline::decode_packed(arena, bytes, ctx.gas())
                     .ok()?
                     .ok()?;
                 // UNPACK must not accept forged lazy-storage ids (mirrors L1's
@@ -3077,10 +3077,10 @@ fn interpret_one<'a>(
         I::CheckSignature => {
             let key = pop!(V::Key);
             let sig = pop!(V::Signature);
-            let msg = pop!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas()
-                .consume(interpret_cost::check_signature(&key, &msg)?)?;
-            stack.push(V::Bool(key.verify_signature(&sig, &msg).unwrap_or(false)));
+                .consume(interpret_cost::check_signature(&key, msg)?)?;
+            stack.push(V::Bool(key.verify_signature(&sig, msg).unwrap_or(false)));
         }
         I::TransferTokens => {
             let param = pop!();
@@ -3329,29 +3329,29 @@ fn interpret_one<'a>(
             }
         }
         I::Blake2b => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::blake2b(msg)?)?;
-            *msg = blake2b_256(msg).to_vec();
+            stack.push(V::Bytes(blake2b_256(msg).to_vec()));
         }
         I::Keccak => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::keccak(msg)?)?;
-            *msg = keccak256(msg).to_vec();
+            stack.push(V::Bytes(keccak256(msg).to_vec()));
         }
         I::Sha256 => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::sha256(msg)?)?;
-            *msg = sha256(msg).to_vec();
+            stack.push(V::Bytes(sha256(msg).to_vec()));
         }
         I::Sha3 => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::sha3(msg)?)?;
-            *msg = sha3_256(msg).to_vec();
+            stack.push(V::Bytes(sha3_256(msg).to_vec()));
         }
         I::Sha512 => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::sha512(msg)?)?;
-            *msg = sha512(msg).to_vec();
+            stack.push(V::Bytes(sha512(msg).to_vec()));
         }
         I::Balance => {
             ctx.gas().consume(interpret_cost::BALANCE)?;

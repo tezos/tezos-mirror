@@ -28,6 +28,9 @@
 
 ### Michelson Runtime
 
+- **Security fix:** the instructions that only read a bytes operand no
+  longer deep-clone it when it is `DUP`-shared (an OOM-crash vector);
+  the operand is now read borrowed. (!22580)
 - The EVM node's Michelson runtime now embeds Tezos protocol U025 (Ushuai)
   instead of T024 (Tallinn, now frozen) as its current protocol, and decodes
   and serves U025-tagged blocks. ML-DSA (Mldsa44) keys, added by the protocol

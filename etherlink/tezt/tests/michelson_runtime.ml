@@ -6397,6 +6397,236 @@ code {
   in
   unit
 
+(* Regression tests for the value-clone OOM class. *)
+module Oom_regression_tests = struct
+  let hard_gas_limit = 660_000
+
+  type outcome = Succeeds | Fails_with of string
+
+  let check ~sequencer ~client ~alias ?(init = "Unit") ?(arg = "Unit") ~outcome
+      contract =
+    let endpoint = tezlink_endpoint sequencer in
+    let* c =
+      Client.originate_contract
+        ~endpoint
+        ~amount:Tez.zero
+        ~alias
+        ~src:Constant.bootstrap1.public_key_hash
+        ~init
+        ~prg:contract
+        ~burn_cap:Tez.one
+        client
+    in
+    let*@ _ = Rpc.produce_block sequencer in
+    let process =
+      Client.spawn_transfer
+        ~endpoint
+        ~amount:Tez.zero
+        ~fee:(Tez.of_mutez_int 100_000)
+        ~gas_limit:hard_gas_limit
+        ~storage_limit:0
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:c
+        ~arg
+        ~burn_cap:Tez.one
+        client
+    in
+    match outcome with
+    | Succeeds -> Process.check process
+    | Fails_with expected ->
+        let* err = Process.check_and_read_stderr ~expect_failure:true process in
+        Check.(err =~ rex expected)
+          ~error_msg:
+            (sf "%s: expected kernel error matching %S, got %%L" alias expected) ;
+        unit
+
+  let test_hashes =
+    let hash_contract ~op =
+      sf
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       %s ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+        op
+    in
+    register_tezosx_test
+      ~title:
+        "Michelson hash instructions do not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "hash"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"blake2b"
+        ~outcome:(Fails_with "Gas_exhaustion")
+      @@ hash_contract ~op:"BLAKE2B"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"keccak"
+        ~outcome:(Fails_with "arithmetic overflow in cost computation")
+      @@ hash_contract ~op:"KECCAK"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"sha256"
+        ~outcome:(Fails_with "arithmetic overflow in cost computation")
+      @@ hash_contract ~op:"SHA256"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"sha3"
+        ~outcome:(Fails_with "arithmetic overflow in cost computation")
+      @@ hash_contract ~op:"SHA3"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"sha512"
+        ~outcome:(Fails_with "Gas_exhaustion")
+      @@ hash_contract ~op:"SHA512"
+    in
+    unit
+
+  let test_check_signature =
+    register_tezosx_test
+      ~title:
+        "Michelson CHECK_SIGNATURE does not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "check_signature"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"checksignature"
+      ~outcome:(Fails_with "Gas_exhaustion")
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       PUSH signature "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7" ;
+       PUSH key "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" ;
+       CHECK_SIGNATURE ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+
+  let test_unpack =
+    register_tezosx_test
+      ~title:"Michelson UNPACK does not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "unpack"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"unpack"
+      ~outcome:Succeeds
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       UNPACK nat ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+
+  let test_shift_bytes =
+    register_tezosx_test
+      ~title:"Michelson LSL/LSR bytes do not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "shift"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"lsl"
+        ~outcome:(Fails_with "Gas_exhaustion")
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       DIP { PUSH nat 8 } ;
+       LSL ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"lsr"
+        ~outcome:(Fails_with "Gas_exhaustion")
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       PUSH nat 8 ;
+       SWAP ;
+       LSR ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+    in
+    unit
+
+  let register () =
+    test_hashes [Alpha] ;
+    test_check_signature [Alpha] ;
+    test_unpack [Alpha] ;
+    test_shift_bytes [Alpha]
+end
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -6495,4 +6725,5 @@ let () =
   test_deep_container_lambda_storage_drop [Alpha] ;
   test_recursive_lambda_exhausts_gas [Alpha] ;
   test_deep_type_in_invalid_arg_error [Alpha] ;
-  test_concat_rejects_oversized_result [Alpha]
+  test_concat_rejects_oversized_result [Alpha] ;
+  Oom_regression_tests.register ()
