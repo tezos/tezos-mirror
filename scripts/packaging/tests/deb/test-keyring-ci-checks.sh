@@ -64,8 +64,11 @@ keyring_key_ids=$(gpg --no-default-keyring \
 verify_gnupghome=$(mktemp -d)
 
 # Verify Release.gpg (detached signature)
+# --status-fd 1 adds GnuPG's machine-readable status lines (e.g. VALIDSIG) to
+# the captured output alongside the normal human-readable text, so the
+# distinct-signing-key check below does not depend on gpg's locale.
 gpg_verify_output=$(GNUPGHOME="$verify_gnupghome" gpg --no-default-keyring \
-  --keyring "$KEYRING" \
+  --keyring "$KEYRING" --status-fd 1 \
   --verify "$release_dir/Release.gpg" "$release_dir/Release" 2>&1) || true
 echo "$gpg_verify_output"
 
@@ -75,6 +78,22 @@ if [ "$sig_count" -lt 2 ]; then
   exit 1
 fi
 echo "PASS: Release.gpg contains $sig_count valid signatures (dual-signing)"
+
+# The primary-id match below only proves both signatures trace back to a
+# certificate in the keyring; a dual-signing regression where both -u flags
+# resolve to the *same* signing subkey (e.g. the "!" pin in
+# scripts/ci/create_debian_repo.sh being dropped) would still pass it, since
+# both signatures share one primary. Each VALIDSIG status line carries the
+# fingerprint of the (sub)key that produced that signature, so require at
+# least 2 distinct ones to catch that regression.
+release_signing_keys=$(echo "$gpg_verify_output" |
+  awk '/^\[GNUPG:\] VALIDSIG/ {print $3}' | sort -u)
+release_signing_key_count=$(echo "$release_signing_keys" | grep -c . || true)
+if [ "$release_signing_key_count" -lt 2 ]; then
+  echo "FAIL: expected >= 2 distinct signing (sub)keys in Release.gpg (found $release_signing_key_count: $release_signing_keys)" >&2
+  exit 1
+fi
+echo "PASS: Release.gpg signatures come from $release_signing_key_count distinct signing (sub)keys"
 
 # Match each keyring key id against the verify output with spaces stripped.
 # keyring_key_ids holds primary key ids; when a key signs with a dedicated
@@ -91,7 +110,7 @@ done
 
 # Verify InRelease (clearsigned)
 inrelease_verify_output=$(GNUPGHOME="$verify_gnupghome" gpg --no-default-keyring \
-  --keyring "$KEYRING" \
+  --keyring "$KEYRING" --status-fd 1 \
   --verify "$release_dir/InRelease" 2>&1) || true
 echo "$inrelease_verify_output"
 
@@ -101,6 +120,17 @@ if [ "$inrelease_sig_count" -lt 2 ]; then
   exit 1
 fi
 echo "PASS: InRelease contains $inrelease_sig_count valid signatures (dual-signing)"
+
+# See the Release.gpg check above: require distinct signing (sub)keys, not
+# just a shared primary, to catch a regression to same-subkey dual signing.
+inrelease_signing_keys=$(echo "$inrelease_verify_output" |
+  awk '/^\[GNUPG:\] VALIDSIG/ {print $3}' | sort -u)
+inrelease_signing_key_count=$(echo "$inrelease_signing_keys" | grep -c . || true)
+if [ "$inrelease_signing_key_count" -lt 2 ]; then
+  echo "FAIL: expected >= 2 distinct signing (sub)keys in InRelease (found $inrelease_signing_key_count: $inrelease_signing_keys)" >&2
+  exit 1
+fi
+echo "PASS: InRelease signatures come from $inrelease_signing_key_count distinct signing (sub)keys"
 
 for key_id in $keyring_key_ids; do
   if ! echo "$inrelease_verify_output" | tr -d ' ' | grep -q "$key_id"; then
