@@ -925,11 +925,30 @@ where
     Ok(())
 }
 
-/// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
+/// The internal operations a transfer's callee emitted, together with that
+/// callee — their `sender`. `None` when no code ran (implicit destination) or
+/// when the transfer was not applied at all, in which case there is no subtree.
+type Subtree<'a> = Option<(
+    crate::account_storage::TezosOriginatedAccount,
+    Vec<OperationInfo<'a>>,
+)>;
+
+/// Outcome of [`transfer_step`]: everything the transfer's own receipt needs,
+/// plus the internal operations its callee emitted, left for the caller to
+/// execute.
+struct TransferStep<'a> {
+    success: TransferSuccess,
+    delegated_storage_cost: u64,
+    emitted: Subtree<'a>,
+}
+
+/// Handles manager transfer operations for both implicit and originated
+/// contracts but with a MIR context, including the internal operations the
+/// callee emits.
 ///
-/// When `skip_sender_debit` is true, only the receiver is credited without
-/// debiting the sender. This is used for cross-runtime calls (e.g. EVM gateway)
-/// where the sender's balance was already debited by the calling runtime.
+/// Only for the outermost transfer of an operation. Internal transfers go
+/// through [`transfer_step`] driven by [`execute_internal_operations`], so
+/// that a Michelson call chain does not recurse on the native stack.
 #[allow(clippy::too_many_arguments)]
 fn transfer<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
@@ -949,6 +968,82 @@ fn transfer<'a, Host>(
     allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     nonce_counter: &mut u16,
 ) -> Result<(TransferSuccess, u64), CracError>
+where
+    Host: StorageV1,
+{
+    let TransferStep {
+        success,
+        delegated_storage_cost,
+        emitted,
+    } = transfer_step(
+        tc_ctx,
+        operation_ctx,
+        registry,
+        journal,
+        sender_account,
+        amount,
+        dest_contract,
+        entrypoint,
+        param,
+        parser,
+        skip_sender_debit,
+        allow_forged_lazy_storage_id,
+    )?;
+    if let Some((callee, internal_operations)) = emitted {
+        match execute_internal_operations(
+            tc_ctx,
+            operation_ctx,
+            registry,
+            journal,
+            internal_operations.into_iter(),
+            &callee,
+            parser,
+            all_internal_receipts,
+            nonce_counter,
+        ) {
+            Ok(()) => {}
+            Err(ApplyOperationError::BlockAbort(msg)) => {
+                return Err(CracError::BlockAbort(msg))
+            }
+            Err(other) => {
+                return Err(CracError::Operation(
+                    TransferError::FailedToExecuteInternalOperation(other.to_string()),
+                ))
+            }
+        }
+    }
+    Ok((success, delegated_storage_cost))
+}
+
+/// Executes a transfer up to — but not including — the internal operations the
+/// callee emitted, which are returned in [`TransferStep::emitted`] instead.
+///
+/// The split is what makes internal-operation execution iterative: the
+/// transfer's own receipt is fully determined at this point (its
+/// `consumed_milligas` is even reset here, so children's gas is not attributed
+/// to it, matching L1's `Gas.consumed ~since:ctxt_before_op`), so nothing needs
+/// to stay on the native stack while the subtree runs.
+///
+/// When `skip_sender_debit` is true, only the receiver is credited without
+/// debiting the sender. This is used for cross-runtime calls (e.g. EVM gateway)
+/// where the sender's balance was already debited by the calling runtime.
+#[allow(clippy::too_many_arguments)]
+fn transfer_step<'a, Host>(
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a>,
+    registry: &impl Registry,
+    journal: &mut TezosXJournal,
+    sender_account: &impl TezosAccount,
+    amount: &Narith,
+    dest_contract: &Contract,
+    entrypoint: &Entrypoint,
+    param: Micheline<'a>,
+    parser: &'a Parser<'a>,
+    skip_sender_debit: bool,
+    // Whether a forged big_map id (a bare lazy-storage reference) is allowed in
+    // `param`. See [`mir::typechecker::AllowForgedLazyStorageId`].
+    allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
+) -> Result<TransferStep<'a>, CracError>
 where
     Host: StorageV1,
 {
@@ -988,8 +1083,8 @@ where
             } else {
                 transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
             };
-            Ok((
-                TransferSuccess {
+            Ok(TransferStep {
+                success: TransferSuccess {
                     allocated_destination_contract: !already_allocated,
                     consumed_milligas: tc_ctx
                         .operation_gas
@@ -997,8 +1092,11 @@ where
                         .map_err(TransferError::OutOfGas)?,
                     ..receipt
                 },
-                0,
-            ))
+                delegated_storage_cost: 0,
+                // No code runs for an implicit destination, so there is
+                // nothing to emit.
+                emitted: None,
+            })
         }
         Contract::Originated(kt1) => {
             let dest_account = context::originated_from_kt1(kt1)
@@ -1177,32 +1275,9 @@ where
                 allocated_bytes: paid_storage_size_diff,
             } = storage_space;
 
-            match execute_internal_operations(
-                tc_ctx,
-                operation_ctx,
-                registry,
-                journal,
-                internal_operations.into_iter(),
-                &dest_account,
-                parser,
-                all_internal_receipts,
-                nonce_counter,
-            ) {
-                Ok(()) => {}
-                Err(ApplyOperationError::BlockAbort(msg)) => {
-                    return Err(CracError::BlockAbort(msg))
-                }
-                Err(other) => {
-                    return Err(CracError::Operation(
-                        TransferError::FailedToExecuteInternalOperation(
-                            other.to_string(),
-                        ),
-                    ))
-                }
-            }
             log!(Debug, "Transfer operation succeeded");
-            Ok((
-                TransferSuccess {
+            Ok(TransferStep {
+                success: TransferSuccess {
                     storage: if new_storage.is_empty() {
                         None
                     } else {
@@ -1216,7 +1291,12 @@ where
                     ..receipt
                 },
                 delegated_storage_cost,
-            ))
+                // The operations the callee emitted are deliberately NOT run
+                // here: doing so is what made a Michelson call chain recurse
+                // on the native stack. The caller drives them iteratively —
+                // see `execute_internal_operations`.
+                emitted: Some((dest_account, internal_operations)),
+            })
         }
     }
 }
