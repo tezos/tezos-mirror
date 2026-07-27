@@ -2,12 +2,15 @@
 
 ## Unreleased
 
-- Michelson runtime: the end-of-execution walk that persists big maps no
-  longer copies values it does not rewrite, revisits a subtree reachable by
-  several pointers, or recurses. A contract could previously use it to exhaust
-  the kernel's heap, stall it for an unbounded time, or overflow its stack,
-  none of it gas-charged. Results are unchanged — big-map identifiers are
-  still allocated in the same order (!22602).
+- Michelson runtime: **gas change.** The end-of-execution walk that persists
+  big maps is now charged per node visited, as L1 charges the same walk, and
+  no longer copies values it does not rewrite, revisits a big-map-free subtree
+  reachable by several pointers, or recurses. A contract could previously use
+  it to exhaust the kernel's heap, stall it for an unbounded time, or overflow
+  its stack, none of it gas-charged. Contracts now pay for the walk: 220
+  milligas per node of the returned storage and of each outgoing operation, so
+  an operation returning a large storage consumes marginally more gas than
+  before. Big-map identifiers are still allocated in the same order (!22602).
 - Michelson runtime: `CONCAT` now rejects a result larger than the maximum
   allocatable size with a bounded `Overflow` error, instead of aborting the
   kernel with a capacity-overflow panic (!22534).
