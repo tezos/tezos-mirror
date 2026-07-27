@@ -1258,6 +1258,7 @@ module type WORKER = sig
     ?events_logging:(event -> unit Monad.t) ->
     ?initial_points:(unit -> Point.t list) ->
     ?batching_interval:GS.span ->
+    ?max_transport_input_queue_length:int ->
     self:GS.Peer.t ->
     Random.State.t ->
     (GS.Topic.t, GS.Peer.t, GS.Message_id.t, GS.span) limits ->
@@ -1281,6 +1282,22 @@ module type WORKER = sig
   (** [p2p_input state p2p_input] adds the given P2P input [p2p_input] to the
       worker's input stream. *)
   val p2p_input : t -> p2p_input -> unit
+
+  (** Default value of the [?max_transport_input_queue_length] parameter to
+      [make]. Exposed so callers and tests can reference the default without
+      constructing a worker. *)
+  val default_max_transport_input_queue_length : int
+
+  (** Like [p2p_input], but drops the event (without enqueuing it) when the
+      worker's input stream already holds at least
+      [max_transport_input_queue_length] unprocessed events (as supplied to
+      [make]).
+
+      The transport layer must use this function instead of [p2p_input] so
+      that a flooding remote peer cannot grow the input queue without bound.
+      Internal callers (heartbeats, application inputs) must continue to use
+      [p2p_input] because those event sources are self-bounded. *)
+  val bounded_p2p_input : t -> p2p_input -> unit
 
   (** [p2p_output_stream t] returns the output stream containing data for the
       P2P layer. *)

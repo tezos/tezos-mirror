@@ -378,8 +378,48 @@ let test_worker_join rng limits parameters =
       ~error_msg:"Expected is_subscribed to return %R, got %L") ;
   unit
 
+(** Regression test for the transport input queue OOM vulnerability.
+
+    [bounded_p2p_input] is the function the transport handler must call
+    instead of [p2p_input] so that a flooding remote peer cannot grow the
+    worker's input queue without bound. The cap is supplied via the
+    [?max_transport_input_queue_length] parameter of [Worker.make]; the
+    default is [Worker.default_max_transport_input_queue_length]. *)
+let test_bounded_p2p_input_caps_queue rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"GS worker: bounded_p2p_input caps the input queue (regression)"
+    ~tags:["gossipsub"; "worker"; "spam"; "queue"; "regression"]
+  @@ fun () ->
+  let cap = Worker.default_max_transport_input_queue_length in
+  let worker =
+    Worker.make
+      ~max_transport_input_queue_length:cap
+      ~self:(-1)
+      rng
+      limits
+      parameters
+  in
+  (* Simulate a flooding peer: push one event beyond the cap without running
+     the worker loop (so nothing drains the queue). *)
+  for _ = 1 to cap + 1 do
+    Worker.bounded_p2p_input
+      worker
+      (In_message {from_peer = -1; p2p_message = Subscribe {topic = "t"}})
+  done ;
+  let len = Worker.Stream.length (Worker.input_events_stream worker) in
+  if len > cap then
+    Test.fail
+      ~__LOC__
+      "Input queue grew to %d events (cap is %d). bounded_p2p_input must drop \
+       events when the queue is full."
+      len
+      cap ;
+  unit
+
 let register rng limits parameters =
   test_worker_start_and_stop rng limits parameters ;
   test_worker_connect_and_graft rng limits parameters ;
   test_worker_filter_messages_for_app rng limits parameters ;
-  test_worker_join rng limits parameters
+  test_worker_join rng limits parameters ;
+  test_bounded_p2p_input_caps_queue rng limits parameters

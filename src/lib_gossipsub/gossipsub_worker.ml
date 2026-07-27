@@ -308,6 +308,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     mutable state : worker_state;
     self : Peer.t;
     main_loop_promise : unit Lwt.t * unit Lwt.u;
+    max_transport_input_queue_length : int;
   }
 
   let maybe_reachable_point = C.maybe_reachable_point
@@ -1006,6 +1007,19 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   let p2p_input t input = push (P2P_input input) t
 
+  (* Default cap for [?max_transport_input_queue_length] in [make].  Bounds the
+     worker's input backlog when a peer floods with expensive messages (e.g. DAL
+     shards, which require KZG verification and storage writes).  Subscribe
+     bursts from a bootstrap peer should not be a concern: we expect that
+     Subscribes drain in microseconds and the queue clears well before the cap
+     is reached. *)
+  let default_max_transport_input_queue_length = 8192
+
+  let bounded_p2p_input t input =
+    if Stream.length t.state.events_stream >= t.max_transport_input_queue_length
+    then () (* drop — caller may log *)
+    else push (P2P_input input) t
+
   (** This function returns a {!cancellation_handle} for a looping monad
       that pushes [Heartbeat] events in the [t.events_stream] every
       [heartbeat_span].
@@ -1106,11 +1120,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         event_loop_promise
 
   let make ?(events_logging = fun _event -> Monad.return ())
-      ?(initial_points = fun () -> []) ?batching_interval ~self rng limits
-      parameters =
+      ?(initial_points = fun () -> []) ?batching_interval
+      ?(max_transport_input_queue_length =
+        default_max_transport_input_queue_length) ~self rng limits parameters =
     {
       self;
       status = Starting;
+      max_transport_input_queue_length;
       state =
         {
           persistent_points = initial_points;
