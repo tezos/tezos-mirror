@@ -712,7 +712,7 @@ etherlink.unit_tests:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:
