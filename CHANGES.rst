@@ -65,6 +65,13 @@ Signer
 Baker
 -----
 
+- Fixed the baker silently stopping to include DAL attestations after its DAL
+  node restarted or the connection to it was reset or left half-open. The baker
+  now detects a stalled ``/profiles/<pkh>/monitor/attestable_slots`` stream (via
+  a periodic heartbeat) and reconnects on its own, instead of relying on a clean
+  end-of-stream that a reset or half-open connection never delivers. (MR
+  :gl:`!22471`)
+
 Accuser
 -------
 
@@ -148,6 +155,10 @@ DAL node
   on a steady-state node already synchronized with L1 (the underlying watcher
   only fires on status transitions). The current L1 crawler status is now
   pushed as the first stream element on subscription. (MR :gl:`!21864`)
+
+- The ``/profiles/<pkh>/monitor/attestable_slots`` streaming RPC now emits a
+  periodic heartbeat event (one per level), letting consumers detect a stalled
+  connection during periods with no attestable-slot activity. (MR :gl:`!22471`)
 
 - The DAL node now stops if it detects that a registered attester attested a slot
   containing traps, preventing further reward loss. (MR :gl:`!21544`)

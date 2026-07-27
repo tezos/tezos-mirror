@@ -33,9 +33,15 @@
 
 type t
 
-(** [update_streams_subscriptions state dal_node_rpc_ctxt ~delegate_ids] reconciles
-    the active set of streams using [~delegate_ids] by computing the list of streams
-    to subscribe to. *)
+(** [update_streams_subscriptions state dal_node_rpc_ctxt ~delegate_ids]
+    reconciles the active set of streams using [~delegate_ids] by computing the
+    list of streams to subscribe to.
+
+    It also runs a liveness watchdog: each stream is aged by one level on every
+    call, and any stream that has received no event (heartbeats included) for
+    more than an internal threshold is force-closed so that it gets re-subscribed
+    in the same pass. This recovers streams whose underlying connection died
+    silently (e.g. a DAL node crash leaving a reset or half-open connection). *)
 val update_streams_subscriptions :
   t ->
   Tezos_rpc.Context.generic ->

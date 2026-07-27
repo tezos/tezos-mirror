@@ -186,6 +186,19 @@ let may_notify_not_in_committee ctxt committee ~committee_level =
           ~committee_level)
     subscribers
 
+(** [notify_heartbeat ctxt ~level] pushes a [Heartbeat] event carrying
+    [~level] to every subscribed pkh's stream. This is a per-level liveness
+    signal that lets consumers (the baker) detect a dead stream even when there
+    is no attestability information to report. *)
+let notify_heartbeat ctxt =
+  let module T = Attestable_slots_watcher_table in
+  let attestable_slots_watcher_table =
+    Node_context.get_attestable_slots_watcher_table ctxt
+  in
+  Seq.iter
+    (fun pkh -> T.notify_heartbeat attestable_slots_watcher_table pkh)
+    (T.elements attestable_slots_watcher_table)
+
 (** [get_backfill_payload ctxt ~pkh] computes a compact “backfill” payload for
     the freshly subscribed delegate [~pkh].
 

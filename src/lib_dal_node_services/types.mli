@@ -436,6 +436,9 @@ module Attestable_event : sig
         (** the [slot_id] is a trap for the delegate *)
     | Backfill of {backfill_payload : backfill_payload}
         (** information about the delegate attestation status from the past *)
+    | Heartbeat
+        (** periodic liveness signal emitted once per level; used by consumers to
+            detect a dead stream during periods with no other event *)
 
   val encoding : t Data_encoding.t
 end
