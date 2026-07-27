@@ -28,7 +28,8 @@ type error +=
   | Not_a_manager_operation of clue
   | Unsupported_manager_operation of clue
   | Oversized_operation of clue * int * int
-  | Bls_is_not_allowed of clue * Signature.V2.public_key_hash
+  | Bls_is_not_allowed of clue * Signature.V3.public_key_hash
+  | Mldsa44_is_not_allowed of clue * Signature.V3.public_key_hash
   | Insufficient_fees of string * string
   | Outdated_operation of clue
 
@@ -63,14 +64,36 @@ let () =
         "Failed to validate operation %a: tz4 keys are forbidden %a"
         pp_clue
         clue
-        Signature.V2.Public_key_hash.pp
+        Signature.V3.Public_key_hash.pp
         key)
     Data_encoding.(
       obj2
         (req "operation" clue_encoding)
-        (req "key" Signature.V2.Public_key_hash.encoding))
+        (req "key" Signature.V3.Public_key_hash.encoding))
     (function Bls_is_not_allowed (clue, err) -> Some (clue, err) | _ -> None)
     (fun (clue, err) -> Bls_is_not_allowed (clue, err)) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.mldsa44_is_not_allowed"
+    ~title:"Failed to validate an operation: ML-DSA keys are forbidden"
+    ~description:
+      "Validation of the operation failed because ML-DSA (Mldsa44) addresses \
+       are not supported by Tezlink."
+    ~pp:(fun ppf (clue, key) ->
+      Format.fprintf
+        ppf
+        "Failed to validate operation %a: ML-DSA keys are forbidden %a"
+        pp_clue
+        clue
+        Signature.V3.Public_key_hash.pp
+        key)
+    Data_encoding.(
+      obj2
+        (req "operation" clue_encoding)
+        (req "key" Signature.V3.Public_key_hash.encoding))
+    (function
+      | Mldsa44_is_not_allowed (clue, err) -> Some (clue, err) | _ -> None)
+    (fun (clue, err) -> Mldsa44_is_not_allowed (clue, err)) ;
   register_error_kind
     `Permanent
     ~id:"evm_node.dev.tezlink.parsing_failure"
@@ -181,7 +204,7 @@ let validate_manager_info ~state ~error_clue (Contents op : packed_contents) =
       | (None | Some (Hash _)), Reveal {public_key; _} ->
           (* The operation might be the reveal of the public key we're
              searching for. *)
-          let open Signature.V2 in
+          let open Signature.V3 in
           let pkh_revealed = Public_key.hash public_key in
           if Public_key_hash.equal source pkh_revealed then
             return @@ Ok (public_key, source, counter)
@@ -236,29 +259,32 @@ type batch_validation_context = {
          override). *)
 }
 
-let is_tz4 pkh =
-  match
-    Imported_protocol.Michelson_v1_gas.Cost_of.Interpreter
-    .algo_of_public_key_hash
-      pkh
-  with
-  | Bls -> true
-  | _ -> false
-
 let validate_reveal ctxt (Reveal {public_key; _}) =
   let open Lwt_result_syntax in
   match public_key with
   | Bls _ ->
       tzfail
       @@ Bls_is_not_allowed
-           (ctxt.error_clue, Signature.V2.Public_key.hash public_key)
-  | _ -> return (Ok ())
+           (ctxt.error_clue, Signature.V3.Public_key.hash public_key)
+  | Mldsa44 _ ->
+      tzfail
+      @@ Mldsa44_is_not_allowed
+           (ctxt.error_clue, Signature.V3.Public_key.hash public_key)
+  | Ed25519 _ | Secp256k1 _ | P256 _ -> return (Ok ())
 
 let validate_transaction ctxt (Transaction {destination; _}) =
   let open Lwt_result_syntax in
   match destination with
-  | Implicit destination when is_tz4 destination ->
-      tzfail @@ Bls_is_not_allowed (ctxt.error_clue, destination)
+  | Implicit destination -> (
+      match
+        Imported_protocol.Michelson_v1_gas.Cost_of.Interpreter
+        .algo_of_public_key_hash
+          destination
+      with
+      | Bls -> tzfail @@ Bls_is_not_allowed (ctxt.error_clue, destination)
+      | Mldsa44 ->
+          tzfail @@ Mldsa44_is_not_allowed (ctxt.error_clue, destination)
+      | Ed25519 | Secp256k1 | P256 -> return (Ok ()))
   | _ -> return (Ok ())
 
 (** Not all the operation defined in the protocol are supported by Tezlink. *)
@@ -273,7 +299,7 @@ let validate_supported_operation (type kind) ~ctxt
 
 let validate_source ~ctxt second_source =
   let open Lwt_result_syntax in
-  if Signature.V2.Public_key_hash.equal ctxt.source second_source then
+  if Signature.V3.Public_key_hash.equal ctxt.source second_source then
     return (Ok ())
   else
     tzfail_p
@@ -501,7 +527,7 @@ let validate_signature ~check_signature shell contents pk signature =
     if
       (* That watermark ({!Generic_operation}) is used for all operations
          except endorsement, which we don't support. *)
-      Signature.V2.check
+      Signature.V3.check
         ~watermark:Generic_operation
         pk
         signature
@@ -514,7 +540,9 @@ let validate_signature ~check_signature shell contents pk signature =
     in `etherlink/kernel_latest/mir/src/gas.rs`); the protocol's
     [Operation_costs.check_signature_cost] carries the pre-benchmark values
     and would make this floor reject operations the kernel accepts. *)
-let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
+let signature_cost ~error_clue pk
+    {shell; protocol_data = Operation_data protocol_data} =
+  let open Result_syntax in
   let algo =
     Imported_protocol.Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key pk
   in
@@ -522,14 +550,21 @@ let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
     Imported_protocol.Alpha_context.Operation.unsigned_operation_length
       {shell; protocol_data}
   in
-  let milligas =
+  let* milligas =
     match algo with
-    | Ed25519 -> 48_395 + (size lsr 4) + (size lsr 5) + size
-    | Secp256k1 -> 183_265 + (size lsr 3) + size
-    | P256 -> 487_855 + (size lsr 3) + size
-    | Bls -> 1_570_000 + (size * 35)
+    | Ed25519 -> return (48_395 + (size lsr 4) + (size lsr 5) + size)
+    | Secp256k1 -> return (183_265 + (size lsr 3) + size)
+    | P256 -> return (487_855 + (size lsr 3) + size)
+    | Bls -> return (1_570_000 + (size * 35))
+    | Mldsa44 ->
+        (* The kernel does not support Mldsa44 (ML-DSA) keys, so such an
+           operation is not applicable on Tezlink: reject it here instead
+           of pricing a signature check that will never happen. *)
+        tzfail
+          (Mldsa44_is_not_allowed (error_clue, Signature.V3.Public_key.hash pk))
   in
-  Gas.atomic_step_cost (Imported_protocol.Saturation_repr.safe_int milligas)
+  return
+  @@ Gas.atomic_step_cost (Imported_protocol.Saturation_repr.safe_int milligas)
 
 let compute_minimal_fees ~(op_raw_size : int) ~(op_gas_limit : Z.t)
     ~(da_fee_per_byte : Tezos_types.Tez.t)
@@ -589,7 +624,7 @@ let parse_and_validate_for_queue ?michelson_hard_gas_limit_per_block
   let** pk, source, first_counter =
     validate_manager_info ~state ~error_clue first
   in
-  let signature_check_cost = signature_cost pk op in
+  let*? signature_check_cost = signature_cost ~error_clue pk op in
   let* balance_left =
     Tezlink_durable_storage.balance
       state
@@ -675,12 +710,12 @@ let gas_limit_could_fit state (operation : Tezos_types.Operation.t) =
     <= hard_gas_limit_per_block state.michelson_config.constants)
 
 let add_ source cache =
-  String.Map.add (Signature.V2.Public_key_hash.to_b58check source) cache
+  String.Map.add (Signature.V3.Public_key_hash.to_b58check source) cache
 
 let get_ read cache source =
   let open Lwt_result_syntax in
   match
-    String.Map.find (Signature.V2.Public_key_hash.to_b58check source) cache
+    String.Map.find (Signature.V3.Public_key_hash.to_b58check source) cache
   with
   | Some v -> return v
   | None -> read source

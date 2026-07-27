@@ -127,7 +127,7 @@ let make_l2 ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           (fun manager ->
             let make_account_field key value converter =
               let path_prefix =
-                manager |> Signature.V2.Public_key.hash
+                manager |> Signature.V3.Public_key.hash
                 |> Tezos_types.Contract.of_implicit
                 |> Durable_storage_path.michelson_contract_dir
                 |> String.split_on_char '/' |> clean_path
@@ -253,7 +253,7 @@ let make_l2 ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
   Installer_config.to_file (config_instrs @ world_state_instrs) ~output
 
 let make_tezos_bootstrap_instr tez_bootstrap_balance
-    (tez_bootstrap_accounts : Signature.V2.public_key list) =
+    (tez_bootstrap_accounts : Signature.V3.public_key list) =
   List.map
     (fun manager ->
       let tezos_account_info =
@@ -264,10 +264,10 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance
             public_key = Some manager;
           }
       in
-      let address = Signature.V2.Public_key.hash manager in
+      let address = Signature.V3.Public_key.hash manager in
       let (Address (Hex alias)) =
         Tezosx.Ethereum_runtime.generate_alias
-          (Signature.V2.Public_key_hash.to_b58check address)
+          (Signature.V3.Public_key_hash.to_b58check address)
       in
       let payload =
         Tezosx.Tezos_runtime.encode_account_info tezos_account_info
@@ -281,7 +281,7 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance
             "tez";
             "tez_accounts";
             "tezosx";
-            Signature.V2.Public_key_hash.to_b58check address;
+            Signature.V3.Public_key_hash.to_b58check address;
           ]
         (Some ("info", Bytes.to_string payload))
       @ make_instr

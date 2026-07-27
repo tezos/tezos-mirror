@@ -163,6 +163,7 @@ let protocol_typ =
         match protocol with
         | L2_types.Tezos_block.Protocol.S023 -> "S023"
         | L2_types.Tezos_block.Protocol.T024 -> "T024"
+        | L2_types.Tezos_block.Protocol.U025 -> "U025"
       in
       Format.pp_print_string fmt string_protocol)
     ( = )

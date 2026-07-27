@@ -28,6 +28,11 @@
 
 ### Michelson Runtime
 
+- The EVM node's Michelson runtime now embeds Tezos protocol U025 (Ushuai)
+  instead of T024 (Tallinn, now frozen) as its current protocol, and decodes
+  and serves U025-tagged blocks. ML-DSA (Mldsa44) keys, added by the protocol
+  environment bump, are rejected during operation validation as they are not
+  supported by the kernel. (!22598)
 - **Bug fix:** `EXEC` of a lambda with a deeply nested body no longer
   overflows the native stack, and no longer costs `O(D²)` work for `O(D)` gas.
   The runtime body is walked borrowed from a keep-alive arena instead of

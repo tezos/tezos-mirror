@@ -18,7 +18,10 @@
   octez-protocol-023-PtSeouLo-libs.test-helpers
   octez-protocol-024-PtTALLiN-libs.plugin
   tezos-protocol-024-PtTALLiN.parameters
-  octez-protocol-024-PtTALLiN-libs.test-helpers)
+  octez-protocol-024-PtTALLiN-libs.test-helpers
+  octez-protocol-025-PsUshuai-libs.plugin
+  tezos-protocol-025-PsUshuai.parameters
+  octez-protocol-025-PsUshuai-libs.test-helpers)
  (flags
   (:standard)
   -open Evm_node_lib_dev_encoding

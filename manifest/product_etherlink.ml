@@ -293,7 +293,9 @@ let evm_node_lib_dev_tezlink =
     in
     [protocol_plugin; protocol_parameters; Protocol.test_helpers_exn proto]
   in
-  let proto_deps = List.concat_map proto_deps ["PtSeouLo"; "PtTALLiN"] in
+  let proto_deps =
+    List.concat_map proto_deps ["PtSeouLo"; "PtTALLiN"; "PsUshuai"]
+  in
   let tezlink_genesis_proto =
     List.find (fun proto -> Protocol.short_hash proto = "Ps9mPmXa") Protocol.all
   in

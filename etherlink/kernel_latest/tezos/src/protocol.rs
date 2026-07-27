@@ -7,9 +7,10 @@
 pub enum Protocol {
     S023 = 23,
     T024 = 24,
+    U025 = 25,
 }
 
-pub const TARGET_TEZOS_PROTOCOL: Protocol = Protocol::T024;
+pub const TARGET_TEZOS_PROTOCOL: Protocol = Protocol::U025;
 
 /// The first protocol to support the `next_protocol` field in block
 /// headers. Used as the default when decoding headers from kernels
@@ -29,6 +30,7 @@ impl rlp::Decodable for Protocol {
         match val {
             23 => Ok(Protocol::S023),
             24 => Ok(Protocol::T024),
+            25 => Ok(Protocol::U025),
             _ => Err(rlp::DecoderError::Custom("Unknown protocol version")),
         }
     }
@@ -85,6 +87,33 @@ mod tests {
     pub fn rlp_roundtrip_protocol_t024() {
         let mut stream = rlp::RlpStream::new();
         let protocol = Protocol::T024;
+        stream.append(&protocol);
+        let encoded = stream.out();
+        let rlp = rlp::Rlp::new(&encoded);
+        let decoded: Protocol = rlp.as_val().unwrap();
+        assert_eq!(decoded, protocol);
+    }
+
+    #[test]
+    pub fn rpl_encode_protocol_u025() {
+        let mut stream = rlp::RlpStream::new();
+        stream.append(&Protocol::U025);
+        let out = stream.out();
+        assert_eq!(out, vec![25]);
+    }
+
+    #[test]
+    pub fn rlp_decode_protocol_u025() {
+        let encoded = vec![25];
+        let rlp = rlp::Rlp::new(&encoded);
+        let decoded: Protocol = rlp.as_val().unwrap();
+        assert_eq!(decoded, Protocol::U025);
+    }
+
+    #[test]
+    pub fn rlp_roundtrip_protocol_u025() {
+        let mut stream = rlp::RlpStream::new();
+        let protocol = Protocol::U025;
         stream.append(&protocol);
         let encoded = stream.out();
         let rlp = rlp::Rlp::new(&encoded);
