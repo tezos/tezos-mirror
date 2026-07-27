@@ -98,7 +98,7 @@ gpg_detach_sign_and_verify() {
   echo "Output: ${output_sig}"
   echo "$GPG_PASSPHRASE" |
     gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-      -u "$GPG_KEY_ID" \
+      -u "${GPG_KEY_ID}!" \
       -o "${output_sig}" \
       --detach-sign "${input_file}"
 
@@ -109,7 +109,7 @@ gpg_detach_sign_and_verify() {
     echo "Output: ${output_sig}.bis"
     echo "$GPG_PASSPHRASE_BIS" |
       gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-        -u "$GPG_KEY_ID_BIS" \
+        -u "${GPG_KEY_ID_BIS}!" \
         -o "${output_sig}.bis" \
         --detach-sign "${input_file}"
 
@@ -118,8 +118,15 @@ gpg_detach_sign_and_verify() {
     rm "${output_sig}.bis"
   fi
 
-  # Verify GPG signatures against the exported public key
-  "${ROOT_DIR}/scripts/ci/verify_gpg_signature.sh" "${output_sig}" "${input_file}" "${ROOT_DIR}/public/octez.asc" "${label}"
+  # Verify GPG signatures against the exported public key. When dual-signing,
+  # require 2 distinct signing (sub)keys so a same-subkey regression (e.g. the
+  # "!" pins above being dropped) fails here instead of publishing silently.
+  if [ "$GPG_DUAL_SIGNING" = "true" ]; then
+    expected_sig_count=2
+  else
+    expected_sig_count=1
+  fi
+  "${ROOT_DIR}/scripts/ci/verify_gpg_signature.sh" "${output_sig}" "${input_file}" "${ROOT_DIR}/public/octez.asc" "${label}" "${expected_sig_count}"
 }
 
 # Create the repository root directory and copy the public key
