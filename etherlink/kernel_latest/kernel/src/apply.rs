@@ -848,7 +848,6 @@ where
         },
     ) {
         Ok(execution_outcome) => {
-            close_tezosx_journal(host, journal, Some(&execution_outcome.result))?;
             // An EVM-internal revert returns `Ok` with a non-success result,
             // so we must also refund the prefund here, otherwise the deposit
             // value is stranded on FEED_DEPOSIT_ADDR while the receiver is
@@ -856,6 +855,7 @@ where
             if !execution_outcome.result.is_success() {
                 caller_account.sub_balance(host, u256_to_alloy(&value))?;
             }
+            close_tezosx_journal(host, journal, Some(&execution_outcome.result))?;
 
             Ok(execution_outcome)
         }
