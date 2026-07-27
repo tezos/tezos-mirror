@@ -184,6 +184,7 @@ where
             block_fees,
             chain_id: config.get_evm_chain_id(),
             prevrandao: None,
+            spec_id: config.spec_id,
         },
         michelson_runtime_block_constants,
     })

@@ -8,7 +8,7 @@ use crate::{
 };
 use revm::{
     context::{result::ExecutionResult, transaction::AccessList},
-    primitives::{Address, HashMap, U256},
+    primitives::{hardfork::SpecId, Address, HashMap, U256},
     state::AccountInfo,
 };
 use revm_etherlink::{
@@ -304,7 +304,11 @@ fn check_result(
 // TODO: These conversions will be droppped once we remove
 // previous evm execution. The API to run transaction should
 // not depend on BlockConstants anymore.
-fn get_block_constants(env: &Env, chain_id: primitive_types::U256) -> BlockConstants {
+fn get_block_constants(
+    env: &Env,
+    chain_id: primitive_types::U256,
+    spec_id: SpecId,
+) -> BlockConstants {
     BlockConstants {
         number: primitive_types::U256::from(env.current_number.to_le_bytes()),
         coinbase: primitive_types::H160::from(Into::<[u8; 20]>::into(
@@ -322,6 +326,7 @@ fn get_block_constants(env: &Env, chain_id: primitive_types::U256) -> BlockConst
         prevrandao: Some(primitive_types::H256::from(
             env.current_difficulty.to_le_bytes(),
         )),
+        spec_id,
     }
 }
 
@@ -402,7 +407,7 @@ pub fn main() {
                     let spec_id = spec_name.clone().into();
                     write_out!(output_file, "EVM spec: {spec_name:?}");
                     let block_constants =
-                        get_block_constants(&env, config.chainid.into());
+                        get_block_constants(&env, config.chainid.into(), spec_id);
                     let effective_gas_price = transaction.derive_gas_price(u256_to_u128(
                         block_constants.base_fee_per_gas(),
                     ));
@@ -421,7 +426,6 @@ pub fn main() {
                         &mut host,
                         &registry,
                         &mut journal,
-                        spec_id,
                         &block_constants,
                         None,
                         transaction.sender,

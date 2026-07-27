@@ -21,7 +21,6 @@ use revm_etherlink::{
     run_transaction,
     storage::{
         code::CodeStorage,
-        version::read_evm_version,
         world_state_handler::{AccountInfo, AccountOrigin, StorageAccount},
     },
     EvmRunError, ExecutionOutcome, GasData, TransactionOrigin,
@@ -120,7 +119,6 @@ impl EthereumRuntime {
         .abi_encode();
 
         // Set up block constants for EVM execution
-        let evm_version = read_evm_version(host);
         let block_constants = self.create_block_constants(host, journal, context);
 
         // Use the caller's remaining gas so it controls the budget. The
@@ -142,7 +140,6 @@ impl EthereumRuntime {
             host,
             registry,
             journal,
-            evm_version.into(),
             &block_constants,
             None, // no transaction hash for internal transactions
             TEZOSX_CALLER_ADDRESS,
@@ -422,7 +419,6 @@ where
         block_number: hdrs.block_number,
     };
 
-    let evm_version = read_evm_version(host);
     let block_constants = runtime.create_block_constants(host, journal, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
     let crac_log = Log {
@@ -469,7 +465,6 @@ where
         host,
         registry,
         journal,
-        evm_version.into(),
         &block_constants,
         None,
         hdrs.sender,
@@ -559,7 +554,6 @@ where
         block_number: hdrs.block_number,
     };
 
-    let evm_version = read_evm_version(host);
     let block_constants = runtime.create_block_constants(host, journal, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
 
@@ -577,7 +571,6 @@ where
         host,
         registry,
         journal,
-        evm_version.into(),
         &block_constants,
         None,
         hdrs.sender,

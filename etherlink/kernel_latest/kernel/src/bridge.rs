@@ -10,7 +10,6 @@ use std::fmt::Display;
 use alloy_sol_types::SolEvent;
 use evm_inspectors::TracerInput;
 use primitive_types::{H160, H256, U256};
-use revm::primitives::hardfork::SpecId;
 use revm::primitives::{Address, Log, LogData, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, h160_to_alloy, u256_to_alloy};
 use revm_etherlink::precompiles::constants::FEED_DEPOSIT_ADDR;
@@ -487,7 +486,6 @@ pub fn apply_tezosx_xtz_deposit<Host>(
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     tracer_input: Option<TracerInput>,
-    spec_id: &SpecId,
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, crate::Error>
 where
@@ -502,7 +500,6 @@ where
                 block_constants,
                 transaction_hash,
                 limits.maximum_gas_limit,
-                spec_id,
                 tracer_input,
             )?;
 
@@ -966,10 +963,10 @@ mod tests {
                 ),
                 limits.maximum_gas_limit,
                 H160::zero(),
+                &SpecId::default(),
             ),
             [0; TRANSACTION_HASH_SIZE],
             None,
-            &SpecId::default(),
             &limits,
         )
         .unwrap();
@@ -1021,10 +1018,10 @@ mod tests {
                 ),
                 limits.maximum_gas_limit,
                 H160::zero(),
+                &SpecId::default(),
             ),
             [0; TRANSACTION_HASH_SIZE],
             None,
-            &SpecId::default(),
             &limits,
         )
         .unwrap();
@@ -1054,10 +1051,10 @@ mod tests {
                 ),
                 limits.maximum_gas_limit,
                 H160::zero(),
+                &SpecId::default(),
             ),
             [0; TRANSACTION_HASH_SIZE],
             None,
-            &SpecId::default(),
             &limits,
         )
         .unwrap();
