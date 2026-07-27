@@ -168,6 +168,11 @@ DAL node
   with the skip-list store, tearing down the node's daemon (gossipsub, P2P and
   RPC) while the process stayed alive. (MR :gl:`!22469`)
 
+- Fixed the attester monitoring logs (``attested slot(s) …``) which, with the
+  dynamic attestation lag, could attribute an attestation to the wrong delegate
+  and report slots as attested by a baker that did not attest them.
+  (MR :gl:`!22472`)
+
 Miscellaneous
 -------------
 
