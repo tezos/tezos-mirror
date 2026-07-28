@@ -1189,10 +1189,21 @@ val increase_paid_storage :
   ?endpoint:endpoint ->
   ?wait:string ->
   contract:string ->
-  amount:int ->
+  amount:Z.t ->
   payer:string ->
   t ->
   string Lwt.t
+
+(** Same as [increase_paid_storage], but do not wait for the process to exit. *)
+val spawn_increase_paid_storage :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  contract:string ->
+  amount:Z.t ->
+  payer:string ->
+  t ->
+  Process.t
 
 (** Run [octez-client get contract used storage space for <contract>]. *)
 val used_storage_space :
