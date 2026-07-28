@@ -6881,6 +6881,128 @@ let test_crac_evm_to_tez_receipt () =
   check_crac_brackets ~prefix internals ;
   unit
 
+(** A deep inter-contract [TRANSFER_TOKENS] chain must apply through the
+    kernel's iterative internal-operation worklist. The contract emits a single
+    internal transfer back to [SELF] with a decremented [nat], so a top-level
+    call with [depth] unfolds into a chain of [depth] nested internal transfers.
+    Before the worklist rewrite this grew the kernel stack one frame per hop and
+    the fast (Wasmer) executor the sequencer runs trapped a few hundred levels
+    deep — while the reference PVM completed — so producing the block failed. It
+    now applies, and the flat receipt list holds [depth] applied internal
+    transfers. This E2E exercises the real fast executor, which the kernel unit
+    tests (running the interpreter on a bounded stack) cannot. *)
+let test_deep_internal_transfer_recursion_applies () =
+  (* Deeper than the few-hundred-level stack ceiling that trapped the fast
+     executor (~150 levels), and well within tezlink's 660k per-operation gas
+     cap: one level of this chain consumed 1_121_862 milligas when this test was
+     written, so [depth] costs ~450k of the 660k. Should this test ever report
+     fewer internal transfers than [depth], compare the receipt's consumed gas
+     against that figure before suspecting the worklist: a MIR gas change eating
+     the remaining headroom looks exactly the same from here. *)
+  let depth = 400 in
+  let protocol = Michelson_contracts.tezlink_protocol in
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~uses_client:true
+    ~kernel:Latest
+    ~title:"Michelson: deep inter-contract transfer recursion applies"
+    ~tags:["tezosx"; Tezosx_runtime.(tag Tezos); "recursion"; "internal_op"]
+    ~minimum_base_fee_per_gas:crac_minimum_base_fee_per_gas
+    ~with_runtimes:Tezosx_runtime.[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sequencer ->
+  let source = Constant.bootstrap5 in
+  let* client = Client.init_mockup ~protocol () in
+  let* client_tezlink = tezlink_client sequencer in
+  (* On parameter [n], emit one internal TRANSFER_TOKENS back to SELF with
+     [n - 1], stopping at 0. *)
+  let inline_script =
+    {|
+parameter nat ;
+storage unit ;
+code { CAR ;
+       DUP ;
+       INT ;
+       EQ ;
+       IF { DROP ; UNIT ; NIL operation ; PAIR }
+          { PUSH nat 1 ;
+            SWAP ;
+            SUB ;
+            ABS ;
+            SELF ;
+            PUSH mutez 0 ;
+            DIG 2 ;
+            TRANSFER_TOKENS ;
+            NIL operation ;
+            SWAP ;
+            CONS ;
+            UNIT ;
+            SWAP ;
+            PAIR } }
+|}
+  in
+  let* _hex, contract =
+    TezContract.originate_inline_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:1
+      ~inline_script
+      ~init_storage_data:"Unit"
+      protocol
+  in
+  let* arg = Client.convert_data_to_json ~data:(string_of_int depth) client in
+  let* branch = tez_branch client_tezlink in
+  let* call_op =
+    Operation.Manager.(
+      operation
+        ~branch
+        [
+          make
+            ~fee:1_000_000
+            ~counter:2
+            ~gas_limit:660_000
+            ~storage_limit:5_000
+            ~source
+            (call ~dest:contract ~arg ~entrypoint:"default" ~amount:0 ());
+        ])
+      client
+  in
+  (* Producing the block runs the whole chain on the fast executor; before the
+     fix this trapped and [produce_block] failed. *)
+  let* op_json =
+    TezContract.inject_op_and_produce_block ~client_tezlink ~sequencer call_op
+  in
+  let metadata = JSON.(op_json |-> "contents" |=> 0 |-> "metadata") in
+  let top_status =
+    JSON.(metadata |-> "operation_result" |-> "status" |> as_string)
+  in
+  Check.(
+    (top_status = "applied")
+      string
+      ~error_msg:"Expected the top-level transfer to be %R, got %L") ;
+  let internal_ops =
+    JSON.(metadata |-> "internal_operation_results" |> as_list)
+  in
+  Check.(
+    (List.length internal_ops = depth)
+      int
+      ~error_msg:
+        "Expected the chain to unfold into %R internal transfers, got %L") ;
+  let applied =
+    List.length
+      (List.filter
+         (fun iop ->
+           JSON.(iop |-> "result" |-> "status" |> as_string) = "applied")
+         internal_ops)
+  in
+  Check.(
+    (applied = depth)
+      int
+      ~error_msg:"Expected %R applied internal transfers in the chain, got %L") ;
+  unit
+
 (** L2-1727: internal-operation receipt nonces are a single block-wide
     sequence — shared across the block, never reset per operation — so no two
     internal ops collide. [renumber_nonces] (kernel/src/apply.rs) materializes
@@ -16002,6 +16124,7 @@ let () =
   test_check_crac_brackets_unit () ;
   test_crac_evm_to_tez_receipt () ;
   test_internal_nonces_are_block_contiguous_at_scale () ;
+  test_deep_internal_transfer_recursion_applies () ;
   test_crac_forged_marker_excluded_by_sender_filter () ;
   test_crac_user_emit_in_reentrant_inner_crac () ;
   test_crac_synthetic_event_survives_failed_inner_with_emit () ;
