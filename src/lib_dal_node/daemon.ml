@@ -300,27 +300,57 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
         in
         update_metric_and_emit_event (fun () ->
             IntSet.of_list (0 -- (total_number_of_shards - 1)))
-    | Controller profile when Controller_profiles.has_attester profile ->
+    | Controller profile when Controller_profiles.has_attester profile -> (
         (* If one is not observing the slot but is an attester, then they expect
            a number of shards depending of the committee draw. *)
         let attesters = Controller_profiles.attesters profile in
-        let* committee =
-          let level =
-            Int32.add
-              level
-              (Int32.of_int (proto_parameters.Types.attestation_lag - 1))
-          in
-          Node_context.fetch_committees node_ctxt ~level
+        let committee_level =
+          Int32.add
+            level
+            (Int32.of_int (proto_parameters.Types.attestation_lag - 1))
         in
-        update_metric_and_emit_event (fun () ->
-            Signature.Public_key_hash.Set.fold
-              (fun pkh acc ->
-                match Signature.Public_key_hash.Map.find pkh committee with
-                | None -> acc
-                | Some (shard_indices, _) ->
-                    IntSet.union acc (IntSet.of_list shard_indices))
-              attesters
-              IntSet.empty)
+        let head_level = Node_context.get_l1_current_head_level node_ctxt in
+        (* Forward dual of the outdated-message check in
+           [Message_validation.gossipsub_app_messages_validation]: that check
+           drops messages whose slot level is more than
+           [attestation_lag + validation_slack] behind the head; this drops
+           fetches whose committee level is that far *ahead* of the head. *)
+        let max_committee_level =
+          Int32.add
+            head_level
+            (Int32.of_int
+               (proto_parameters.Types.attestation_lag
+              + Constants.validation_slack))
+        in
+        if Int32.compare committee_level max_committee_level > 0 then
+          let*! () =
+            Event.emit_shard_committee_level_out_of_window
+              ~committee_level
+              ~head_level
+          in
+          return_unit
+        else
+          let*! committee_result =
+            Node_context.fetch_committees node_ctxt ~level:committee_level
+          in
+          match committee_result with
+          | Error _ ->
+              (* Error already logged once via
+                 [Event.emit_dont_wait__committee_fetch_failed] in
+                 [Node_context.fetch_committees]; skip metric update. *)
+              return_unit
+          | Ok committee ->
+              update_metric_and_emit_event (fun () ->
+                  Signature.Public_key_hash.Set.fold
+                    (fun pkh acc ->
+                      match
+                        Signature.Public_key_hash.Map.find pkh committee
+                      with
+                      | None -> acc
+                      | Some (shard_indices, _) ->
+                          IntSet.union acc (IntSet.of_list shard_indices))
+                    attesters
+                    IntSet.empty))
     | _ -> return_unit
   in
   let still_to_receive_indices =
