@@ -376,6 +376,11 @@ impl TezosXJournal {
         self.finalized_http_traces
     }
 
+    /// Move the HTTP traces out of the journal, leaving it empty.
+    pub fn take_http_traces(&mut self) -> Vec<HttpTrace> {
+        std::mem::take(&mut self.finalized_http_traces)
+    }
+
     /// Get the CRAC-ID for this transaction context.
     pub fn crac_id(&self) -> &CracId {
         &self.crac_id

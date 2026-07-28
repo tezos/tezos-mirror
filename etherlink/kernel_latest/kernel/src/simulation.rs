@@ -550,7 +550,7 @@ impl Evaluation {
             },
         );
 
-        let traces = journal.http_traces().to_owned();
+        let traces = journal.take_http_traces();
 
         // Close before the fee post-processing below: a failure there must
         // not skip the tracer finalization.
