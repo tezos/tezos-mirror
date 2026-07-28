@@ -48,6 +48,8 @@ This release will not apply any migration to the node’s store (version
   advances by exactly one per change: at scheduling time for a precompile
   change (so its signed calldata is immediately single-use) and at activation
   time for a governance change.
+- Fix the `/constants` RPC of the Michelson runtime reporting an incorrect
+  `cost_per_byte` value (was 250mutez instead of 1). (!22549)
 
 ### Monitoring changes
 
