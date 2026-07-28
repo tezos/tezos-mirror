@@ -4,14 +4,17 @@
 
 use crate::{
     apply::{extract_cross_runtime_effects, RuntimeExecutionInfo, TezosExecutionInfo},
-    block_in_progress::BlockInProgress,
+    block_in_progress::{compute_crac_fake_tx_hash, BlockInProgress},
     blueprint_storage::{DelayedTransactionFetchingResult, EVMBlockHeader},
     bridge::{execute_tezlink_deposit, Deposit, TEZLINK_DEPOSITOR},
     configuration::EVM_CHAIN_ID,
     delayed_inbox::DelayedInbox,
     error,
     fees::{DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER, MINIMUM_BASE_FEE_PER_GAS},
-    journal::{close_tezosx_journal, prepare_tezosx_journal},
+    journal::{
+        close_tezosx_journal, fake_top_level_call_from_tezos_operation,
+        prepare_tezosx_journal, TezosXHashes,
+    },
     l2block::L2Block,
     registry_impl::RegistryImpl,
     simulation::start_simulation_mode,
@@ -25,7 +28,10 @@ use evm_inspectors::TracerInput;
 use mir::ast::PublicKeyHash;
 use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
-use revm::primitives::hardfork::SpecId;
+use revm::{
+    context::result::ExecutionResult,
+    primitives::{hardfork::SpecId, B256},
+};
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     storage::{block::BLOCKS_STORED, world_state_handler::StorageAccount},
@@ -767,16 +773,28 @@ impl TezosXChainConfig {
     {
         let tx_hash = operation.tx_hash;
         let crac_id = tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
-        // The journal holds the single origination nonce for the whole
-        // manager operation, seeded from the operation hash. Both arms seed
-        // it with the very hash the operation's receipt carries, so the KT1s
-        // a `CREATE_CONTRACT` derives and the hash observers see in the Tezos
-        // block cannot drift apart.
-        let operation_hash = match &operation.content {
-            TezlinkContent::Tezos(operation) => operation.hash()?,
-            // Mirroring `pure_xtz_deposit` / `pure_fa_deposit` in apply.rs, which likewise seed the
-            // journal with the deposit's own `transaction_hash`
-            TezlinkContent::Deposit(_) => OperationHash::from(operation.tx_hash),
+        let operation_hashes = TezosXHashes {
+            // The EVM-side identity of this operation is the fake transaction
+            // it registers in the EVM block, NOT its Tezos hash: that fake
+            // hash is what a `debug_trace*` request targets. Recompute it
+            // exactly as `register_crac_evm_transaction` does at block
+            // generation, or the tracer filter never matches and the trace
+            // silently comes back empty.
+            evm: B256::from(compute_crac_fake_tx_hash(
+                block_in_progress.number,
+                &crac_id.to_string(),
+            )),
+            // The journal holds the single origination nonce for the whole
+            // manager operation, seeded from the Tezos operation hash. Both
+            // arms seed it with the very hash the operation's receipt carries,
+            // so the KT1s a `CREATE_CONTRACT` derives and the hash observers
+            // see in the Tezos block cannot drift apart.
+            michelson: match &operation.content {
+                TezlinkContent::Tezos(operation) => operation.hash()?,
+                // Mirroring `pure_xtz_deposit` / `pure_fa_deposit` in apply.rs, which likewise seed the
+                // journal with the deposit's own `transaction_hash`
+                TezlinkContent::Deposit(_) => OperationHash::from(operation.tx_hash),
+            },
         };
         // Seed the journal with this block's EVM environment so any
         // inbound CRAC the Michelson operation dispatches to the EVM
@@ -784,12 +802,20 @@ impl TezosXChainConfig {
         // GASLIMIT, ...) rather than zero.
         let mut journal = prepare_tezosx_journal(
             crac_id,
-            &operation_hash,
+            &operation_hashes,
             &block_constants.evm_runtime_block_constants,
             http_trace_enabled,
             &DebugFeatures::default(),
             0,
-            None, // TODO: feed tracer_input once the support is properly implemented
+            tracer_input,
+        );
+        fake_top_level_call_from_tezos_operation(
+            &mut journal,
+            registry,
+            &operation,
+            block_constants
+                .michelson_runtime_block_constants
+                .michelson_to_evm_gas_multiplier,
         );
         let result = apply_tezos_operation(
             &self.michelson_chain_id,
@@ -834,6 +860,15 @@ impl TezosXChainConfig {
             Ok(crate::apply::ExecutionResult::Valid(res)) => {
                 let result = res.to_execution_result(
                     self.michelson_to_evm_gas_multiplier(block_constants),
+                );
+                journal.fake_top_level_call_end(
+                    michelson_milligas_to_evm_gas(
+                        res.consumed_milligas,
+                        block_constants
+                            .michelson_runtime_block_constants
+                            .michelson_to_evm_gas_multiplier,
+                    ),
+                    matches!(result, ExecutionResult::Success { .. }),
                 );
                 close_tezosx_journal(host, journal, Some(&result))?;
                 Ok(crate::apply::ExecutionResult::Valid(
@@ -1003,7 +1038,7 @@ pub(crate) fn michelson_milligas_to_evm_gas(
 /// Deposits have no user-declared gas limit, so they are reported
 /// as zero (always fitting). Their cost is bounded by the bridge
 /// precompile.
-fn tezos_op_evm_gas_limit(
+pub(crate) fn tezos_op_evm_gas_limit(
     op: &TezlinkOperation,
     michelson_to_evm_gas_multiplier: u64,
 ) -> anyhow::Result<u64> {
@@ -1214,8 +1249,11 @@ where
             // runs `JournalInner::finalize()` which clears
             // `inner.logs` as part of revm's standard cleanup, so
             // reading them after gives an empty buffer.
-            let cross_runtime_effects =
-                extract_cross_runtime_effects(journal, consumed_milligas);
+            let cross_runtime_effects = extract_cross_runtime_effects(
+                journal,
+                consumed_milligas,
+                block_constants,
+            );
 
             if let (Some(outbox_queue), Some(evm_block_constants)) =
                 (outbox_queue, evm_block_constants)

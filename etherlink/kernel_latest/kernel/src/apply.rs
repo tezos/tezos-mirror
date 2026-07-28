@@ -7,9 +7,9 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
-use evm_inspectors::{get_tracer_configuration, TracerInput};
+use evm_inspectors::TracerInput;
 use primitive_types::{H160, U256};
-use revm::primitives::{Address, Bytes};
+use revm::primitives::{Address, Bytes, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
@@ -44,7 +44,9 @@ use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::{CracId, TezosXJournal};
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
-use crate::chains::{DebugFeatures, EvmLimits};
+use crate::chains::{
+    michelson_milligas_to_evm_gas, DebugFeatures, EvmLimits, TezlinkBlockConstants,
+};
 use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
 use crate::journal::{self, close_tezosx_journal};
@@ -260,6 +262,7 @@ pub enum RuntimeTransactionResult {
 pub fn extract_cross_runtime_effects(
     journal: &mut TezosXJournal,
     consumed_milligas: u64,
+    block_constants: &TezlinkBlockConstants,
 ) -> Vec<CrossRuntimeEffect> {
     let mut effects = Vec::new();
 
@@ -271,14 +274,10 @@ pub fn extract_cross_runtime_effects(
             crac_id,
             logs,
             source: H160(*tx_info.source.0),
-            gas_used: U256::from(
-                tezosx_interfaces::gas::convert(
-                    RuntimeId::Tezos,
-                    RuntimeId::Ethereum,
-                    consumed_milligas,
-                )
-                .unwrap_or(0),
-            ),
+            gas_used: U256::from(michelson_milligas_to_evm_gas(
+                consumed_milligas,
+                block_constants.michelson_to_evm_gas_multiplier,
+            )),
         }));
     }
 
@@ -686,15 +685,22 @@ where
     let call_data = transaction.data.clone();
     log_transaction_type(to, &call_data);
     let value = transaction.value;
-    let operation_hash = TezosXJournal::synthetic_operation_hash(
-        &crac_id,
-        block_constants.chain_id.low_u64(),
-        block_constants.number.low_u64(),
-    );
+    // An EVM-entered synthetic Michelson manager operation has no real
+    // Tezos operation hash, so the origination-nonce seed is derived; the
+    // tracer, however, must key off the Ethereum transaction hash this
+    // transaction's receipt reports.
+    let operation_hashes = journal::TezosXHashes {
+        evm: B256::from(transaction_hash),
+        michelson: TezosXJournal::synthetic_operation_hash(
+            &crac_id,
+            block_constants.chain_id.low_u64(),
+            block_constants.number.low_u64(),
+        ),
+    };
 
     let mut journal = journal::prepare_tezosx_journal(
         crac_id,
-        &operation_hash,
+        &operation_hashes,
         block_constants,
         http_trace_enabled,
         debug_features,
@@ -815,12 +821,18 @@ where
     }
     .abi_encode();
     let effective_gas_price = block_constants.base_fee_per_gas();
-    // Seed the journal with the deposit's own transaction hash so any
-    // origination nonce stays deterministic and unique even though the
-    // kernel-managed XTZ bridge does not NAC into Michelson today.
+    // Both hashes are the deposit's own transaction hash: it is what the
+    // deposit's receipt reports, so the tracer keys off it, and reusing it
+    // as the origination-nonce seed keeps that seed deterministic and
+    // unique even though the kernel-managed XTZ bridge does not NAC into
+    // Michelson today.
+    let operation_hashes = journal::TezosXHashes {
+        evm: B256::from(transaction_hash),
+        michelson: tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+    };
     let mut journal = journal::prepare_tezosx_journal(
         CracId::mock(RuntimeId::Ethereum),
-        &tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+        &operation_hashes,
         &block_constants,
         false, // http_trace_enabled,
         &DebugFeatures::default(),
@@ -958,12 +970,18 @@ where
         .abi_encode(),
     };
     let effective_gas_price = block_constants.base_fee_per_gas();
-    // Seed the journal with the deposit's own transaction hash so any
-    // origination nonce stays deterministic and unique even though the
-    // kernel-managed FA bridge does not NAC into Michelson today.
+    // Both hashes are the deposit's own transaction hash, as in
+    // `pure_xtz_deposit`: it is what the deposit's receipt reports, so the
+    // tracer keys off it, and reusing it as the origination-nonce seed keeps
+    // that seed deterministic and unique even though the kernel-managed FA
+    // bridge does not NAC into Michelson today.
+    let operation_hashes = journal::TezosXHashes {
+        evm: B256::from(transaction_hash),
+        michelson: tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+    };
     let mut journal = journal::prepare_tezosx_journal(
         CracId::mock(RuntimeId::Ethereum),
-        &tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+        &operation_hashes,
         &block_constants,
         false, // http_trace_enabled,
         &DebugFeatures::default(),
@@ -1273,10 +1291,6 @@ pub fn apply_transaction<Host>(
 where
     Host: StorageV1,
 {
-    let tracer_input = get_tracer_configuration(
-        revm::primitives::B256::from_slice(&transaction.tx_hash),
-        tracer_input,
-    );
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,

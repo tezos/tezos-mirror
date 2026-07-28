@@ -225,6 +225,10 @@ impl StructLogger {
     }
 
     pub fn inject_log(&mut self, _log: Log) {}
+
+    pub fn fake_top_level_call(&mut self, _caller: Address, _gas_limit: u64) {}
+
+    pub fn fake_top_level_call_end(&mut self, _gas_spent: u64, _status: bool) {}
 }
 
 fn to_structured_stack(st: &Stack) -> Vec<B256> {

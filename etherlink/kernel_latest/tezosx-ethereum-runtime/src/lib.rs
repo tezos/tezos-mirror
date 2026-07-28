@@ -439,7 +439,12 @@ where
         }
         .into_log_data(),
     };
-    journal.evm.inner.log(crac_log);
+
+    journal.evm.inner.log(crac_log.clone());
+    if let Some(mut tracer) = journal.evm.take_tracer() {
+        tracer.inject_log(crac_log);
+        journal.evm.restore_tracer(Some(tracer));
+    }
 
     // `tx.origin` returns the inbound CRAC originator
     // (`X-Tezos-Source`) instead of `TxEnv.caller`, via a custom
