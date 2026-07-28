@@ -226,6 +226,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | App_input of app_input
     | Check_unknown_messages
     | Process_batch of (GS.receive_message * Peer.Set.t) list
+    | Subscribe_topic_cap_exceeded of {peer : Peer.t; max_topics : int}
+    | P2P_queue_drop of {depth : int}
+
+  type rate_limit_timestamps = {
+    mutable last_subscribe_cap : float;
+    mutable last_queue_drop : float;
+  }
 
   module Bounded_message_map = struct
     (* We maintain the invariant that:
@@ -300,6 +307,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     unreachable_points : int64 Point.Map.t;
         (* For each point, stores the next heartbeat tick when we can try to recontact this point again. *)
     message_handling : GS.message_handling;
+    rate_limit_timestamps : rate_limit_timestamps;
+        (* Shared mutable record; fields are mutated in place so the same object
+           is referenced across [worker_state] copies. *)
   }
 
   (** A worker instance is made of its status and state. *)
@@ -858,11 +868,27 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             ["apply_event"; "P2P_input"; "In_message"; "Graft"]]
     | Subscribe {topic} ->
         let subscribe : GS.subscribe = {peer = from_peer; topic} in
-        (GS.handle_subscribe subscribe gossip_state
-        |> update_gossip_state state |> handle_subscribe)
+        ((let ((new_state, output) as result) =
+            GS.handle_subscribe subscribe gossip_state
+            |> update_gossip_state state
+          in
+          (match output with
+          | GS.Subscribe_ignored_topic_limit_exceeded ->
+              let now = Unix.gettimeofday () in
+              let rlt = new_state.rate_limit_timestamps in
+              if now -. rlt.last_subscribe_cap >= 60. then (
+                rlt.last_subscribe_cap <- now ;
+                let max_topics =
+                  (View.view new_state.gossip_state).limits.max_topics_per_peer
+                in
+                Stream.push
+                  (Subscribe_topic_cap_exceeded {peer = from_peer; max_topics})
+                  new_state.events_stream)
+          | _ -> ()) ;
+          handle_subscribe result)
         [@profiler.span_f
           {verbosity = Notice}
-            ["apply_event"; "P2P_input"; "In_message"; "Subscribe"]]
+            ["apply_event"; "P2P_input"; "In_message"; "Subscribe"]])
     | Unsubscribe {topic} ->
         let unsubscribe : GS.unsubscribe = {peer = from_peer; topic} in
         (GS.handle_unsubscribe unsubscribe gossip_state
@@ -998,6 +1024,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           batch
         [@profiler.span_f
           {verbosity = Notice} ["apply_event"; "apply_batch_event"]]
+    | Subscribe_topic_cap_exceeded _ | P2P_queue_drop _ ->
+        (* These are observability-only events; the automaton state is unchanged. *)
+        state
 
   (** A helper function that pushes events in the state *)
   let push e {status = _; state; self = _; _} =
@@ -1016,8 +1045,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let default_max_transport_input_queue_length = 8192
 
   let bounded_p2p_input t input =
-    if Stream.length t.state.events_stream >= t.max_transport_input_queue_length
-    then () (* drop — caller may log *)
+    let depth = Stream.length t.state.events_stream in
+    if depth >= t.max_transport_input_queue_length then (
+      let now = Unix.gettimeofday () in
+      let rlt = t.state.rate_limit_timestamps in
+      if now -. rlt.last_queue_drop >= 60. then (
+        rlt.last_queue_drop <- now ;
+        Stream.push (P2P_queue_drop {depth}) t.state.events_stream))
     else push (P2P_input input) t
 
   (** This function returns a {!cancellation_handle} for a looping monad
@@ -1144,6 +1178,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             (match batching_interval with
             | None -> Sequentially
             | Some time_interval -> In_batches {time_interval});
+          rate_limit_timestamps =
+            {last_subscribe_cap = neg_infinity; last_queue_drop = neg_infinity};
         };
       main_loop_promise = Lwt.wait ();
     }

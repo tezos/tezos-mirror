@@ -1247,6 +1247,13 @@ module type WORKER = sig
     | App_input of app_input
     | Check_unknown_messages
     | Process_batch of (GS.receive_message * GS.Peer.Set.t) list
+    | Subscribe_topic_cap_exceeded of {peer : GS.Peer.t; max_topics : int}
+        (** Emitted at most once per 60 s when a remote peer's Subscribe is
+            dropped because it would exceed [max_topics_per_peer]. *)
+    | P2P_queue_drop of {depth : int}
+        (** Emitted at most once per 60 s when [bounded_p2p_input] drops a
+            message because the worker's input queue is at capacity. [depth]
+            is the queue length at the time of the drop. *)
 
   (** [make ~events_logging ~initial_points rng limits parameters] initializes
       a new Gossipsub automaton with the given arguments. Then, it initializes
