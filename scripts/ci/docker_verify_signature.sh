@@ -9,6 +9,15 @@
 
 set -eu
 
+# In every real pipeline GCP_SIGNER_SERVICE_ACCOUNT is set, so an empty value
+# means a misconfiguration (the matching images would not have been signed).
+# Fail with a clear error rather than crash on the unbound variable under
+# [set -eu].
+if [ -z "${GCP_SIGNER_SERVICE_ACCOUNT:-}" ]; then
+  echo "GCP_SIGNER_SERVICE_ACCOUNT is not set; cannot verify image signatures." >&2
+  exit 1
+fi
+
 echo "Starting Docker image signature verification process..."
 
 # Check if argument is valid
