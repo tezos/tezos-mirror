@@ -44,6 +44,10 @@ let main_image = function
   | Debian -> image (debian "trixie")
   | Ubuntu -> image (ubuntu 24 04)
 
+(* The set of Debian/Ubuntu releases Octez ships packages for.
+   Editing this affects base-image builds (base_images.ml),
+   the Full debian-repository test matrix (debian_repository.ml),
+   and security scans (security_scans.ml). *)
 let supported_releases = function
   | Debian -> ["bookworm"; "trixie"]
   | Ubuntu -> ["22.04"; "24.04"; "26.04"]
