@@ -152,6 +152,11 @@ DAL node
   delays shard ingestion from other peers.
   (MR :gl:`!22542`)
 
+- The wire encodings for the Gossipsub IHave, IWant, and Prune control
+  messages now enforce upper bounds on the lengths of their list fields
+  (``message_ids`` for IHave/IWant, ``px`` for Prune), consistent with
+  the limits already applied on the send side. (MR :gl:`!22537`)
+
 - Decoupled the storage lifetimes of slot payloads and shards. Shards are now
   always retained for a single, profile-independent period (about 150 levels);
   slot payloads of slot indices in the node's operator profile are retained
