@@ -50,11 +50,7 @@ pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/base/blueprints");
 const BLUEPRINT_CURRENT_GENERATION_KEY: Key = Key::from_static(b"/blueprints/generation");
 
 // The current block header is read and written through the `/base` keyspace at
-// this relative key. The absolute form is kept only for tests asserting the key
-// resolves to the historical durable path.
-#[cfg(test)]
-const EVM_CURRENT_BLOCK_HEADER: RefPath =
-    RefPath::assert_from(b"/base/current_block_header");
+// this relative key.
 const EVM_CURRENT_BLOCK_HEADER_KEY: Key = Key::from_static(b"/current_block_header");
 
 const TEZ_CURRENT_BLOCK_HEADER: RefPath =
@@ -991,6 +987,11 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
+
+    // Absolute form of [`super::EVM_CURRENT_BLOCK_HEADER_KEY`], asserting the
+    // relative key resolves to the historical durable path.
+    const EVM_CURRENT_BLOCK_HEADER: RefPath =
+        RefPath::assert_from(b"/base/current_block_header");
 
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockKernelHost::default();
