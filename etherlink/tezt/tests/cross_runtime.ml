@@ -14,6 +14,12 @@
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file cross_runtime.ml
  *)
 
+(* Several tests below cite worked examples ("Example B", "Example F", ...),
+   principles and section numbers of the cross-runtime tracing RFC:
+   https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1
+   Citing comments also describe the exercised call shape inline; the RFC is
+   the source of the naming and of the normative expectations. *)
+
 open Rpc.Syntax
 
 (** Base-fee floor for the CRAC test setups.  Mirrors the production
@@ -4118,12 +4124,401 @@ let test_crac_tez_to_evm_block_observables_visible () =
          (%R)") ;
   unit
 
+(* [test_crac_debug_trace_transaction] is defined below, after the
+   incoming-NAC callTracer helpers it relies on (L2-1782). *)
+
+(* ── outgoing-NAC callTracer helpers (L2-1781) ─────────────────────────── *)
+
+(** The runtime gateway precompile address (lowercase hex, as it appears in
+    callTracer JSON). *)
+let gateway_precompile_address = "0xff00000000000000000000000000000000000007"
+
+(** First 4 bytes of `keccak256(signature)` as a `0x…` hex string — the
+    Solidity function selector. *)
+let solidity_selector signature =
+  let digest =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string signature)
+  in
+  "0x" ^ (Hex.of_bytes (Bytes.sub digest 0 4) |> Hex.show)
+
+(** The deterministic EVM alias of a Michelson contract: the first 20 bytes of
+    `keccak256(utf8(KT1…))`, matching the kernel's `compute_alias`
+    (tezosx-ethereum-runtime). This is the [from] of a re-entrant EVM frame
+    entered from Michelson. *)
+let evm_alias_of_kt1 kt1 =
+  let digest = Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string kt1) in
+  String.lowercase_ascii
+    ("0x" ^ (Hex.of_bytes (Bytes.sub digest 0 20) |> Hex.show))
+
+(** Direct sub-calls of a callTracer frame, [] when absent. *)
+let trace_subcalls frame =
+  match JSON.(frame |-> "calls" |> as_opt) with
+  | None -> []
+  | Some j -> JSON.as_list j
+
+let trace_field_lc frame field =
+  String.lowercase_ascii JSON.(frame |-> field |> as_string)
+
+(** The kernel-internal handler address the EVM runtime uses as [from] when
+    priming an alias forwarder ([init_tezosx_alias], see [ensure_alias] in
+    tezosx-ethereum-runtime). Priming runs are traced like any other EVM
+    execution, so the first crossing entered from a given Michelson caller
+    shows one extra [handler -> alias] frame ahead of the actual leg. *)
+let tezosx_handler_address = "0x7e20580000000000000000000000000000000001"
+
+(** Whether a callTracer frame is an alias-forwarder priming run. *)
+let is_priming_frame frame =
+  trace_field_lc frame "from" = tezosx_handler_address
+
+(** Direct sub-calls of a frame with the alias-priming frames filtered out:
+    the user-visible crossing legs themselves. *)
+let crossing_subcalls frame =
+  List.filter (fun f -> not (is_priming_frame f)) (trace_subcalls frame)
+
+(** The alias-priming frames among a frame's direct sub-calls. *)
+let priming_subcalls frame = List.filter is_priming_frame (trace_subcalls frame)
+
+(* The (address, topics, data) triple of a trace log, lowercased for parity
+   comparison against [eth_getLogs]. *)
+let crac_trace_log_body log =
+  let open JSON in
+  ( String.lowercase_ascii (log |-> "address" |> as_string),
+    List.map
+      (fun t -> String.lowercase_ascii (as_string t))
+      (log |-> "topics" |> as_list),
+    String.lowercase_ascii (log |-> "data" |> as_string) )
+
+(* The logs of a single callTracer frame, [] when absent. *)
+let trace_frame_logs frame =
+  match JSON.(frame |-> "logs" |> as_opt) with
+  | None -> []
+  | Some j -> JSON.as_list j
+
+(* Collect every log of a callTracer tree, depth-first. The kernel wire format
+   carries no geth [position] field, so no execution order can be
+   reconstructed from the trace: log comparisons are made as unordered
+   multisets (sort both sides before comparing). Mirrors the helper in
+   evm_sequencer.ml. *)
+let rec collect_crac_trace_logs frame =
+  trace_frame_logs frame
+  @ List.concat_map collect_crac_trace_logs (trace_subcalls frame)
+
+(* Collect every gateway frame anywhere in a callTracer tree. *)
+let rec gateway_frames_of frame =
+  let here =
+    if trace_field_lc frame "to" = gateway_precompile_address then [frame]
+    else []
+  in
+  List.concat_map gateway_frames_of (trace_subcalls frame) @ here
+
+(* topic0 of an event: keccak256(signature), 0x-prefixed lowercase hex. *)
+let event_topic signature =
+  let digest =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string signature)
+  in
+  String.lowercase_ascii ("0x" ^ (Hex.of_bytes digest |> Hex.show))
+
+(* topic0 of the gateway's [CrossRuntimeCallSent] sentinel event, attached to
+   the gateway frame that dispatched an outgoing crossing. *)
+let crac_sent_event_topic =
+  event_topic "CrossRuntimeCallSent(string,string,string,uint256)"
+
+(* topic0 of a trace log, lowercased; [None] when the log has no topics. *)
+let trace_log_topic0 log =
+  match JSON.(log |-> "topics" |> as_list) with
+  | t :: _ -> Some (String.lowercase_ascii (JSON.as_string t))
+  | [] -> None
+
+(* Depth of the deepest sub-call chain of a callTracer frame (leaf = 0). *)
+let rec trace_tree_depth frame =
+  match trace_subcalls frame with
+  | [] -> 0
+  | calls -> 1 + List.fold_left (fun m c -> max m (trace_tree_depth c)) 0 calls
+
+(* Depth of the deepest [innerTraces] chain of an http_trace node (leaf = 0). *)
+let rec http_trace_inner_depth node =
+  match JSON.(node |-> "innerTraces" |> as_opt) with
+  | None -> 0
+  | Some j -> (
+      match JSON.as_list j with
+      | [] -> 0
+      | inner ->
+          1
+          + List.fold_left (fun m c -> max m (http_trace_inner_depth c)) 0 inner
+      )
+
+(* Assert the union of a callTracer tree's logs equals [eth_getLogs] for the
+   block, compared as an unordered multiset (the kernel wire format carries no
+   geth [position] field, so no execution order is available). This is the
+   log-parity invariant of the cross-runtime tracing RFC:
+   https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1
+   Only meaningful on happy paths: reverted frames KEEP their trace logs
+   (the kernel does no revert-drop), so a trace containing a reverted
+   log-emitting frame intentionally diverges from [eth_getLogs]. *)
+let assert_crac_trace_log_parity ~sequencer ~prefix ~block_number trace =
+  let trace_logs =
+    List.sort
+      compare
+      (List.map crac_trace_log_body (collect_crac_trace_logs trace))
+  in
+  let*@ receipt_logs =
+    Rpc.get_logs
+      ~from_block:(Number block_number)
+      ~to_block:(Number block_number)
+      sequencer
+  in
+  let receipt =
+    List.sort
+      compare
+      (List.map
+         (fun (l : Transaction.tx_log) ->
+           ( String.lowercase_ascii l.address,
+             List.map String.lowercase_ascii l.topics,
+             String.lowercase_ascii l.data ))
+         receipt_logs)
+  in
+  Check.(
+    (trace_logs = receipt)
+      (list (tuple3 string (list string) string))
+      ~error_msg:(prefix ^ ": trace log multiset %L must equal eth_getLogs %R")) ;
+  unit
+
+(* Fetch a callTracer trace for [tx_hash], failing the test on an RPC error. *)
+let get_call_trace ?(tracer_config = []) ~prefix ~tx_hash sequencer =
+  let* r =
+    Rpc.trace_transaction
+      ~transaction_hash:tx_hash
+      ~tracer:"callTracer"
+      ~tracer_config
+      sequencer
+  in
+  match r with
+  | Ok t -> return t
+  | Error e -> Test.fail "%s: callTracer failed: %s" prefix e.Rpc.message
+
+let latest_block ~sequencer = Rpc.get_block_by_number ~block:"latest" sequencer
+
+let first_tx_hash ~prefix (block : Block.t) =
+  match block.transactions with
+  | Block.Hash (h :: _) -> h
+  | _ -> Test.fail "%s: expected a tx hash in the latest EVM block" prefix
+
+(* ── incoming-NAC callTracer helpers (L2-1782) ─────────────────────────── *)
+
+(* topic0 of the gateway's [CrossRuntimeCallReceived] sentinel — the border
+   event an inbound crossing pushes outside any EVM frame, so it lands on the
+   fake tx's synthetic root rather than on a crossing child. Its first ABI
+   field is the NAC id. *)
+let crac_received_event_topic =
+  event_topic
+    "CrossRuntimeCallReceived(string,string,string,string,string,uint256)"
+
+(* OCaml re-derivation of the kernel's [compute_crac_fake_tx_hash]:
+   keccak256("CROSS-RUNTIME-CALL-TX" || block_number_be32 || crac_id). Pins the
+   cross-runtime fake-tx hashing recipe independently of the kernel. *)
+let compute_crac_fake_tx_hash ~block_number ~crac_id =
+  let be32 = Bytes.make 32 '\000' in
+  let n = ref block_number in
+  for i = 31 downto 0 do
+    Bytes.set be32 i (Char.chr (!n land 0xff)) ;
+    n := !n lsr 8
+  done ;
+  let payload =
+    Bytes.concat
+      Bytes.empty
+      [Bytes.of_string "CROSS-RUNTIME-CALL-TX"; be32; Bytes.of_string crac_id]
+  in
+  let digest = Tezos_crypto.Hacl.Hash.Keccak_256.digest payload in
+  String.lowercase_ascii ("0x" ^ (Hex.of_bytes digest |> Hex.show))
+
+(* Read a callTracer hex-quantity field (e.g. [gas], [value]) as an int. *)
+let trace_qty frame field = int_of_string JSON.(frame |-> field |> as_string)
+
+(* [hay] contains [needle] as a substring. *)
+let string_contains hay needle =
+  let nl = String.length needle and hl = String.length hay in
+  let rec go i = i + nl <= hl && (String.sub hay i nl = needle || go (i + 1)) in
+  nl = 0 || go 0
+
+(* Recursively sort object keys so two structurally-equal callTracer JSON trees
+   compare equal regardless of field emission order (block-mode and tx-mode go
+   through the same node encoder, but nothing pins the key order). *)
+let rec sort_ezjson v =
+  match v with
+  | `O fields ->
+      `O
+        (List.sort
+           (fun (a, _) (b, _) -> String.compare a b)
+           (List.map (fun (k, v) -> (k, sort_ezjson v)) fields))
+  | `A items -> `A (List.map sort_ezjson items)
+  | (`Null | `Bool _ | `String _ | `Float _) as leaf -> leaf
+
+(* JSON deep-equality up to object field ordering. *)
+let json_deep_equal a b =
+  sort_ezjson (JSON.unannotate a) = sort_ezjson (JSON.unannotate b)
+
+(* [true] iff the block-trace entry [t]'s [txHash] is the synthetic CRAC
+   fake-tx hash recomputed from [block_number] and one of [crac_ids]
+   (["<origin_runtime>-<tx_index>"], e.g. "0-0" for the first Michelson
+   operation of a block) — i.e. [t] is an incoming Michelson-originated
+   fake-tx trace, not a plain EVM / deposit trace. *)
+let block_entry_is_crac_fake_tx ~block_number ~crac_ids t =
+  let tx_hash = String.lowercase_ascii JSON.(t |-> "txHash" |> as_string) in
+  List.exists
+    (fun crac_id -> tx_hash = compute_crac_fake_tx_hash ~block_number ~crac_id)
+    crac_ids
+
+(* For every entry of a [debug_traceBlockByNumber] result, assert its [result]
+   is JSON-deep-equal to [debug_traceTransaction(txHash)] traced with the SAME
+   callTracer config. This proves block-mode and tx-mode agree by CONTENT (not
+   merely by count): the node's positional [List.combine] pairs each trace with
+   its OWN transaction, [Inconsistent_traces] never fires, and no transaction
+   resolves to "Trace not available". *)
+let assert_block_matches_per_tx ~sequencer ~prefix ?(tracer_config = [])
+    trace_results =
+  Lwt_list.iter_s
+    (fun entry ->
+      let tx_hash = JSON.(entry |-> "txHash" |> as_string) in
+      let block_result = JSON.(entry |-> "result") in
+      let* tx_trace =
+        get_call_trace ~tracer_config ~prefix ~tx_hash sequencer
+      in
+      if not (json_deep_equal block_result tx_trace) then
+        Test.fail
+          "%s: block-mode trace for %s differs from debug_traceTransaction\n\
+           block=%s\n\
+           tx=%s"
+          prefix
+          tx_hash
+          (JSON.encode block_result)
+          (JSON.encode tx_trace) ;
+      unit)
+    trace_results
+
+(* Assert the synthetic fake-tx root frame mirrors the block's tx envelope
+   exactly, by comparing it to the [eth_getTransactionByHash] object rather
+   than hard-coded values — future-proof against a derived-block model change.
+   The envelope is neutral: self-addressed ([from] = [to]), zero value, empty
+   input, and [gas] = [gasUsed] = the whole-op gas. *)
+let assert_root_mirrors_tx_object ~sequencer ~prefix ~tx_hash root =
+  let*@ obj = Rpc.get_transaction_by_hash ~transaction_hash:tx_hash sequencer in
+  let obj =
+    match obj with
+    | Some o -> o
+    | None -> Test.fail "%s: no tx object for fake tx %s" prefix tx_hash
+  in
+  let lc = String.lowercase_ascii in
+  Check.(
+    (trace_field_lc root "type" = "call")
+      string
+      ~error_msg:(prefix ^ ": root type %L, expected %R")) ;
+  Check.(
+    (trace_field_lc root "from" = lc obj.Transaction.from)
+      string
+      ~error_msg:(prefix ^ ": root from %L, expected the tx-object from %R")) ;
+  let obj_to = lc (Option.value ~default:"" obj.Transaction.to_) in
+  Check.(
+    (trace_field_lc root "to" = obj_to)
+      string
+      ~error_msg:(prefix ^ ": root to %L, expected the tx-object to %R")) ;
+  (* Self-addressed envelope: from == to. *)
+  Check.(
+    (trace_field_lc root "from" = trace_field_lc root "to")
+      string
+      ~error_msg:
+        (prefix ^ ": root from %L must equal to %R (self-addressed envelope)")) ;
+  (* Pin the value against the tx object (root ≡ envelope), not a literal:
+     a derived-block model change must carry the trace along. The neutral
+     envelope currently makes both 0. *)
+  Check.(
+    (trace_qty root "value"
+    = int_of_string (Wei.to_string obj.Transaction.value))
+      int
+      ~error_msg:(prefix ^ ": root value %L, expected the tx-object value %R")) ;
+  Check.(
+    (JSON.(root |-> "input" |> as_string)
+    = Option.value ~default:"0x" obj.Transaction.input)
+      string
+      ~error_msg:(prefix ^ ": root input %L, expected the tx-object input %R")) ;
+  (* The neutral envelope's output is empty. *)
+  Check.(
+    (JSON.(root |-> "output" |> as_string) = "0x")
+      string
+      ~error_msg:(prefix ^ ": root output %L, expected %R")) ;
+  (* gasUsed mirrors the tx object's gas: the whole-op gas, which includes
+     pure-Michelson work — so the EVM-side children's gasUsed need NOT sum
+     to this. The root's gas is the operation's declared gas limit, which
+     the tx object does not carry: pin it as an upper bound only. *)
+  Check.(
+    (trace_qty root "gasUsed" = Int64.to_int obj.Transaction.gas)
+      int
+      ~error_msg:(prefix ^ ": root gasUsed %L, expected the tx-object gas %R")) ;
+  Check.(
+    (trace_qty root "gas" >= trace_qty root "gasUsed")
+      int
+      ~error_msg:(prefix ^ ": root gas %L must cover gasUsed %R")) ;
+  unit
+
+(* Assert the inbound border sentinel is the root's FIRST log: emitted at the
+   runtime gateway precompile, topic0
+   keccak256("CrossRuntimeCallReceived(string,string,string,string,string,uint256)"),
+   and its ABI-encoded data carrying the [crac_id] string.
+
+   The sentinel is injected while the tracer's frame stack holds only the
+   synthetic envelope, so it must be attributed to the root and precede
+   everything else there — never leak into a crossing child. *)
+let assert_crac_received_first_log ~prefix ~crac_id root =
+  let logs =
+    match JSON.(root |-> "logs" |> as_opt) with
+    | Some j -> JSON.as_list j
+    | None -> Test.fail "%s: root frame carries no logs" prefix
+  in
+  let first =
+    match logs with
+    | l :: _ -> l
+    | [] -> Test.fail "%s: root frame has an empty logs array" prefix
+  in
+  Check.(
+    (trace_field_lc first "address" = gateway_precompile_address)
+      string
+      ~error_msg:(prefix ^ ": border sentinel address %L, expected GW_E %R")) ;
+  let topic0 =
+    match JSON.(first |-> "topics" |> as_list) with
+    | t :: _ -> String.lowercase_ascii (JSON.as_string t)
+    | [] -> Test.fail "%s: border sentinel has no topics" prefix
+  in
+  Check.(
+    (topic0 = crac_received_event_topic)
+      string
+      ~error_msg:(prefix ^ ": border sentinel topic0 %L, expected %R")) ;
+  (* The ABI-encoded data carries the [crac_id] string. *)
+  let data = String.lowercase_ascii JSON.(first |-> "data" |> as_string) in
+  let id_hex = String.lowercase_ascii (Hex.of_string crac_id |> Hex.show) in
+  let data_contains_id =
+    let id_len = String.length id_hex in
+    let data_len = String.length data in
+    let rec loop i =
+      i + id_len <= data_len
+      && (String.sub data i id_len = id_hex || loop (i + 1))
+    in
+    loop 0
+  in
+  Check.(
+    (data_contains_id = true)
+      bool
+      ~error_msg:
+        (prefix ^ ": border sentinel data must contain the hex-encoded crac_id "
+       ^ crac_id)) ;
+  unit
+
 (** debug_traceTransaction on a CRAC fake transaction (TEZ→EVM).
- *
- *  Sets up a TEZ→EVM CRAC, fetches the fake tx hash from the EVM block,
- *  and calls debug_traceTransaction with both callTracer and structLogger.
- *  Verifies that the kernel produces a valid trace during Blueprint replay.
- *)
+
+    A single mutating TEZ→EVM crossing surfaces as one synthetic fake tx. Its
+    callTracer trace root mirrors the tx envelope exactly (via the RPC object),
+    exposes the real EVM execution as a child (the crossing's [to] is the EVM
+    runner, its [from] a Michelson sender alias distinct from the self-addressed
+    root), and carries the inbound [CrossRuntimeCallReceived] border sentinel as
+    its first log. The structLogger arm is unchanged. *)
 let test_crac_debug_trace_transaction () =
   register_crac_runner_test
     ~title:"CRAC: debug_traceTransaction on TEZ->EVM fake tx"
@@ -4131,42 +4526,75 @@ let test_crac_debug_trace_transaction () =
   @@ fun (module Wrapper) ->
   let open Wrapper in
   let prefix = "TRACE-CRAC" in
-  Log.debug ~prefix "Setup CRAC pipeline" ;
-  let* evm_runner, tez_runner = setup_crac_pipeline () in
-  Log.debug ~prefix "Call TEZ runner (triggers CRAC into EVM)" ;
+  (* Inline [setup_crac_pipeline] so the bridge KT1 — the IMMEDIATE Michelson
+     caller of the EVM leaf, whose alias is the child's [from] — is in
+     scope for the exact-alias pin below. *)
+  let* evm_runner = EvmMultiRunCaller.deploy_and_init () in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_runner in
+  let* tez_runner = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  let (`Evm_runner runner_addr) = evm_runner in
   let* () = TezRunner.call_run tez_runner in
-  Log.debug ~prefix "Verify CRAC completed" ;
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
-  Log.debug ~prefix "Fetch latest EVM block to get the CRAC fake tx hash" ;
   let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let crac_tx_hash =
-    match block.transactions with
-    | Block.Hash (h :: _) -> h
-    | _ -> Test.fail "Expected at least one tx hash in EVM block"
+  let crac_tx_hash = first_tx_hash ~prefix block in
+  (* Pin the fake-tx hashing recipe: the single CRAC op is tx index 0 of a
+     Tezos-originated (origin 0) crossing, so crac_id = "0-0". *)
+  let recomputed =
+    compute_crac_fake_tx_hash
+      ~block_number:(Int32.to_int block.number)
+      ~crac_id:"0-0"
   in
-  Log.info "CRAC fake tx hash: %s" crac_tx_hash ;
-  (* Test 1: callTracer *)
-  Log.debug ~prefix "debug_traceTransaction with callTracer" ;
-  let* trace_result =
-    Rpc.trace_transaction
-      ~transaction_hash:crac_tx_hash
-      ~tracer:"callTracer"
+  Check.(
+    (String.lowercase_ascii crac_tx_hash = recomputed)
+      string
+      ~error_msg:
+        (prefix
+       ^ ": block fake-tx hash %L must match the recomputed recipe hash %R")) ;
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash:crac_tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
       sequencer
   in
-  (match trace_result with
-  | Ok t ->
-      (* The trace should have a "type" field (top-level call type) *)
-      let type_ = JSON.(t |-> "type" |> as_string) in
-      Check.(
-        (type_ = "CALL")
-          string
-          ~error_msg:"Expected CALL type for CRAC trace, got %L")
-  | Error err ->
-      Test.fail
-        "debug_traceTransaction (callTracer) failed on CRAC fake tx: %s"
-        err.Rpc.message) ;
-  (* Test 2: structLogger (default tracer) *)
-  Log.debug ~prefix "debug_traceTransaction with structLogger" ;
+  let* () =
+    assert_root_mirrors_tx_object ~sequencer ~prefix ~tx_hash:crac_tx_hash trace
+  in
+  (* Exactly one crossing child: the real EVM execution (the alias-priming
+     frame of the runner's first use is filtered out). *)
+  let calls = crossing_subcalls trace in
+  Check.(
+    (List.length calls = 1)
+      int
+      ~error_msg:(prefix ^ ": expected 1 EVM child under the fake tx, got %L")) ;
+  let child = List.hd calls in
+  Check.(
+    (trace_field_lc child "to" = String.lowercase_ascii runner_addr)
+      string
+      ~error_msg:(prefix ^ ": child to %L, expected the EVM runner %R")) ;
+  (* The child's [from] is the EXACT alias of the immediate Michelson caller
+     (the bridge KT1 that issued [call_evm] — NOT the top-level
+     TezMultiRunCaller), recomputed OCaml-side. *)
+  let (`Tez_runner (_, bridge_kt1)) = tez_bridge in
+  Check.(
+    (trace_field_lc child "from" = evm_alias_of_kt1 bridge_kt1)
+      string
+      ~error_msg:
+        (prefix
+       ^ ": child from %L, expected the Michelson caller's exact alias %R")) ;
+  (* border break (parent to <> child from) is pinned by the exact alias
+     asserts above *)
+  let* () = assert_crac_received_first_log ~prefix ~crac_id:"0-0" trace in
+  (* Full log parity: logs pushed outside any frame — the top-level
+     [CrossRuntimeCallReceived] — attach to the synthetic root. *)
+  let* () =
+    assert_crac_trace_log_parity
+      ~sequencer
+      ~prefix
+      ~block_number:(Int32.to_int block.number)
+      trace
+  in
+  (* structLogger arm (unchanged): minimal successful trace. *)
   let* trace_result =
     Rpc.trace_transaction
       ~transaction_hash:crac_tx_hash
@@ -4175,26 +4603,1147 @@ let test_crac_debug_trace_transaction () =
   in
   (match trace_result with
   | Ok t ->
-      (* structLogger output should have a structLogs array *)
-      let struct_logs = JSON.(t |-> "structLogs" |> as_list) in
-      Log.info "structLogger produced %d opcode logs" (List.length struct_logs) ;
-      (* Verify structLogger fields for CRAC fake tx *)
       let failed = JSON.(t |-> "failed" |> as_bool) in
       Check.(
         (failed = false)
           bool
-          ~error_msg:"Expected failed=false for successful CRAC tx, got %L") ;
-      let gas = JSON.(t |-> "gas" |> as_int) in
-      Check.((gas > 0) int ~error_msg:"Expected positive gas value, got %L") ;
+          ~error_msg:(prefix ^ ": expected failed=false, got %L")) ;
       let return_value = JSON.(t |-> "returnValue" |> as_string) in
       Check.(
         (return_value = "0x")
           string
-          ~error_msg:"Expected empty returnValue (0x) for CRAC fake tx, got %L")
+          ~error_msg:(prefix ^ ": expected empty returnValue, got %L"))
   | Error err ->
       Test.fail
-        "debug_traceTransaction (structLogger) failed on CRAC fake tx: %s"
+        "%s: structLogger failed on CRAC fake tx: %s"
+        prefix
         err.Rpc.message) ;
+  unit
+
+(** Example F of the cross-runtime tracing RFC
+    (https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1)
+    — a pure-Michelson hop [M_0 → M_1] followed by two mutating
+    crossings from below [M_1] into two distinct EVM contracts. The fake tx's
+    trace root is the self-addressed envelope; it carries two children (one per
+    crossing), each entered from a Michelson sender alias distinct from the
+    root's [to] — the parent-to ≠ child-from border break documented in §6 of
+    the same RFC. *)
+let test_crac_call_tracer_incoming_example_f () =
+  register_crac_runner_test
+    ~title:
+      "CRAC callTracer: incoming NAC two crossings under one root (Example F)"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "incoming"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-F" in
+  (* Two EVM leaves, each reached through its own Michelson bridge. *)
+  let* evm_0 = EvmMultiRunCaller.deploy_and_init () in
+  let* evm_1 = EvmMultiRunCaller.deploy_and_init () in
+  let (`Evm_runner addr_0) = evm_0 in
+  let (`Evm_runner addr_1) = evm_1 in
+  let* bridge_0 = TezCrossRuntimeRunnerEvm.originate evm_0 in
+  let* bridge_1 = TezCrossRuntimeRunnerEvm.originate evm_1 in
+  (* M_1 fans out to the two bridges; M_0 makes the pure-Michelson hop to M_1. *)
+  let* m1 = TezMultiRunCaller.originate ~callees:[bridge_0; bridge_1] () in
+  let* m0 = TezMultiRunCaller.originate ~callees:[m1] () in
+  let* () = TezRunner.call_run m0 in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  let* () = assert_root_mirrors_tx_object ~sequencer ~prefix ~tx_hash trace in
+  let calls = crossing_subcalls trace in
+  Check.(
+    (List.length calls = 2)
+      int
+      ~error_msg:
+        (prefix ^ ": expected 2 crossing children under the root, got %L")) ;
+  (* Alias-forwarder priming frames are visible under the root like any
+     other EVM execution the operation dispatched: one [handler -> alias]
+     frame per bridge (first use as an EVM caller) plus one for the
+     operation's originator alias (the fake tx envelope address). *)
+  let priming = priming_subcalls trace in
+  let priming_tos =
+    List.sort compare (List.map (fun c -> trace_field_lc c "to") priming)
+  in
+  (* The two children hit the two distinct EVM contracts. *)
+  let child_tos =
+    List.sort compare (List.map (fun c -> trace_field_lc c "to") calls)
+  in
+  Check.(
+    (child_tos
+    = List.sort
+        compare
+        [String.lowercase_ascii addr_0; String.lowercase_ascii addr_1])
+      (list string)
+      ~error_msg:(prefix ^ ": children must target the two EVM leaves, got %L")) ;
+  (* Each crossing is entered from the EXACT alias of its immediate Michelson
+     caller (the bridge that issued [call_evm]) — recomputed OCaml-side from
+     the KT1. *)
+  let (`Tez_runner (_, bridge_kt1_0)) = bridge_0 in
+  let (`Tez_runner (_, bridge_kt1_1)) = bridge_1 in
+  let expected_aliases =
+    List.sort
+      compare
+      [evm_alias_of_kt1 bridge_kt1_0; evm_alias_of_kt1 bridge_kt1_1]
+  in
+  let child_froms =
+    List.sort compare (List.map (fun c -> trace_field_lc c "from") calls)
+  in
+  Check.(
+    (child_froms = expected_aliases)
+      (list string)
+      ~error_msg:
+        (prefix
+       ^ ": children from must be the bridges' exact aliases, expected %R but \
+          got %L")) ;
+  let expected_priming =
+    List.sort compare (trace_field_lc trace "from" :: expected_aliases)
+  in
+  Check.(
+    (priming_tos = expected_priming)
+      (list string)
+      ~error_msg:
+        (prefix
+       ^ ": expected alias-priming frames for the two bridges and the \
+          originator (the root's own [from]); expected %R but got %L")) ;
+  (* border break (parent to <> child from) is pinned by the exact alias
+     asserts above *)
+  (* Pin the sentinel-first invariant on the multi-child topology too: with two
+     crossings the root carries two [CrossRuntimeCallReceived] sentinels, and
+     the first of them must still be the root's FIRST log — neither crossing
+     may push its sentinel down into a child frame. *)
+  let* () = assert_crac_received_first_log ~prefix ~crac_id:"0-0" trace in
+  (* Full log parity: the two top-level [CrossRuntimeCallReceived] receipt
+     logs are pushed outside any frame and attach to the synthetic root. *)
+  assert_crac_trace_log_parity
+    ~sequencer
+    ~prefix
+    ~block_number:(Int32.to_int block.number)
+    trace
+
+(** [onlyTopCall: true] on an incoming NAC fake tx returns exactly the root,
+    with no children. As for native transactions, the root carries only its
+    own logs — the top-level [CrossRuntimeCallReceived] border sentinels;
+    the legs' logs belong to the suppressed frames. *)
+let test_crac_call_tracer_incoming_only_top_call () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: incoming NAC onlyTopCall returns only the root"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "incoming"; "only_top_call"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-F-TOP" in
+  let* evm_runner, tez_runner = setup_crac_pipeline () in
+  let* () = TezRunner.call_run tez_runner in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("onlyTopCall", `Bool true); ("withLog", `Bool true)]
+      sequencer
+  in
+  Check.(
+    (trace_field_lc trace "type" = "call")
+      string
+      ~error_msg:(prefix ^ ": root type %L, expected %R")) ;
+  Check.(
+    (List.length (trace_subcalls trace) = 0)
+      int
+      ~error_msg:(prefix ^ ": onlyTopCall must suppress all children, got %L")) ;
+  let* () = assert_crac_received_first_log ~prefix ~crac_id:"0-0" trace in
+  unit
+
+(** [withLog: false] on an incoming NAC fake tx: the children are still
+    rendered but NO frame carries logs — not even the root's border sentinels
+    (geth omits the [logs] field entirely without [withLog]). *)
+let test_crac_call_tracer_incoming_withlog_off () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: incoming NAC withLog:false carries no logs"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "incoming"; "with_logs"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-F-NOLOG" in
+  let* evm_runner, tez_runner = setup_crac_pipeline () in
+  let* () = TezRunner.call_run tez_runner in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool false)]
+      sequencer
+  in
+  (* The tree shape is unaffected: the real EVM child is still there. *)
+  Check.(
+    (List.length (crossing_subcalls trace) = 1)
+      int
+      ~error_msg:(prefix ^ ": expected 1 EVM child under the fake tx, got %L")) ;
+  (* No frame anywhere in the tree carries logs — including the root's
+     border sentinels. *)
+  let rec assert_no_logs frame =
+    Check.(
+      (JSON.(frame |-> "logs" |> as_opt) = None)
+        (option json)
+        ~error_msg:(prefix ^ ": no frame may carry logs under withLog:false")) ;
+    List.iter assert_no_logs (trace_subcalls frame)
+  in
+  assert_no_logs trace ;
+  unit
+
+(** Failure regime (current master): a Tez op whose mutating TEZ→EVM crossing
+    is rolled back because the operation backtracks (EVM reverter) emits NO
+    fake tx — [EvmJournal::clear] drops the CRAC identity on a backtracked op,
+    so [take_crac_data] yields nothing and no synthetic transaction (hence no
+    trace) is produced. This is unchanged by the deep-failure receipt work
+    (only the EVM→Michelson receipt error attribution changed there). *)
+let test_crac_call_tracer_incoming_backtrack_no_fake_tx () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: backtracked incoming NAC emits no fake tx"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "incoming"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-F-REVERT" in
+  let* evm_reverter = EvmMultiRunCaller.deploy_and_init ~revert:true () in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_reverter in
+  let* tez_main = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  let* () = TezRunner.call_run tez_main in
+  (* State fully reverted: the op backtracked. *)
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_reverter in
+  let*@ block = latest_block ~sequencer in
+  let tx_count =
+    match block.transactions with
+    | Block.Hash txs -> List.length txs
+    | Block.Full txs -> List.length txs
+    | Block.Empty -> 0
+  in
+  Check.(
+    (tx_count = 0)
+      int
+      ~error_msg:
+        (prefix ^ ": a backtracked incoming NAC must emit no fake tx, got %L")) ;
+  (* The recipe hash for the would-be crossing resolves to no transaction. *)
+  let fake_hash =
+    compute_crac_fake_tx_hash
+      ~block_number:(Int32.to_int block.number)
+      ~crac_id:"0-0"
+  in
+  let*@ obj =
+    Rpc.get_transaction_by_hash ~transaction_hash:fake_hash sequencer
+  in
+  (match obj with
+  | None -> ()
+  | Some _ ->
+      Test.fail
+        "%s: backtracked incoming NAC must have no fake tx at %s"
+        prefix
+        fake_hash) ;
+  unit
+
+(** Example B of the cross-runtime tracing RFC
+    (https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1)
+    — a traced EVM tx that calls [callMichelson] on a Michelson
+    leaf. The gateway crossing appears as a child frame with [to = GW_E], its
+    [input] the callMichelson calldata, and (for [callMichelson], which
+    discards the response body) an empty [output]. The leaf never calls back,
+    so the gateway frame has no children. *)
+let test_crac_call_tracer_outgoing_leaf () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: outgoing EVM->M gateway leaf frame (Example B)"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-B" in
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  let (`Evm_runner bridge_addr) = evm_bridge in
+  let* (_ : int64) = EvmRunner.call_run evm_bridge in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  (* Root: the user's CALL into the EVM bridge contract. *)
+  Check.(
+    (trace_field_lc trace "type" = "call")
+      string
+      ~error_msg:(prefix ^ ": root type %L, expected %R")) ;
+  Check.(
+    (trace_field_lc trace "to" = String.lowercase_ascii bridge_addr)
+      string
+      ~error_msg:(prefix ^ ": root to %L, expected the EVM bridge %R")) ;
+  (* Exactly one child: the gateway crossing. *)
+  let calls = trace_subcalls trace in
+  Check.(
+    (List.length calls = 1)
+      int
+      ~error_msg:(prefix ^ ": expected 1 gateway child, got %L")) ;
+  let gw = List.hd calls in
+  Check.(
+    (trace_field_lc gw "to" = gateway_precompile_address)
+      string
+      ~error_msg:(prefix ^ ": gateway frame to %L, expected GW_E %R")) ;
+  Check.(
+    (trace_field_lc gw "from" = String.lowercase_ascii bridge_addr)
+      string
+      ~error_msg:(prefix ^ ": gateway frame from %L, expected the bridge %R")) ;
+  Check.(
+    (trace_field_lc gw "type" = "call")
+      string
+      ~error_msg:(prefix ^ ": gateway frame type %L, expected %R")) ;
+  let selector = solidity_selector "callMichelson(string,string,bytes)" in
+  let gw_input = trace_field_lc gw "input" in
+  let input_has_selector =
+    String.length gw_input >= String.length selector
+    && String.sub gw_input 0 (String.length selector) = selector
+  in
+  Check.(
+    (input_has_selector = true)
+      bool
+      ~error_msg:
+        (prefix ^ ": gateway input must start with the callMichelson selector")) ;
+  (* callMichelson discards the response body → empty output. *)
+  Check.(
+    (trace_field_lc gw "output" = "0x")
+      string
+      ~error_msg:(prefix ^ ": gateway output %L, expected empty %R")) ;
+  (* The Michelson leaf never re-enters EVM → the gateway frame is a leaf. *)
+  Check.(
+    (List.length (trace_subcalls gw) = 0)
+      int
+      ~error_msg:(prefix ^ ": expected no re-entrant children, got %L")) ;
+  (* The gateway frame carries the [CrossRuntimeCallSent] sentinel among its
+     own logs — unordered membership, the wire format carries no position. *)
+  let sent_logs =
+    List.filter
+      (fun l -> trace_log_topic0 l = Some crac_sent_event_topic)
+      (trace_frame_logs gw)
+  in
+  Check.(
+    (List.length sent_logs = 1)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": the gateway frame must carry exactly 1 CrossRuntimeCallSent \
+          sentinel log, got %L")) ;
+  (* Log parity over the whole tree (happy path). *)
+  let* () =
+    assert_crac_trace_log_parity
+      ~sequencer
+      ~prefix
+      ~block_number:(Int32.to_int block.number)
+      trace
+  in
+  unit
+
+(** Example B of the cross-runtime tracing RFC
+    (https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1),
+    [callMichelsonView] variant — a traced EVM tx that reads a
+    Michelson on-chain VIEW through the gateway using STATICCALL. Unlike the
+    state-mutating [callMichelson] entrypoint, a view crossing is
+    STATICCALL-safe and returns the view's response. This closes the
+    STATICCALL-gateway case deferred from the outgoing-NAC trace work. *)
+let test_crac_call_tracer_outgoing_view_staticcall () =
+  register_crac_runner_test
+    ~title:
+      "CRAC callTracer: outgoing callMichelsonView STATICCALL frame (Example B \
+       view)"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "view"; "staticcall"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-B-VIEW" in
+  let evm_version = Kernel.select_evm_version Kernel.Latest in
+  (* A trivial Michelson contract exposing a bytes-returning on-chain view.
+     [get_bytes] ignores its unit input and returns the constant 0xdeadbeef. *)
+  let inline_script =
+    "parameter unit; storage unit; code { CDR; NIL operation; PAIR }; view \
+     \"get_bytes\" unit bytes { DROP; PUSH bytes 0xdeadbeef }"
+  in
+  let* _view_hex, view_kt1 =
+    TezContract.originate_inline_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~inline_script
+      ~init_storage_data:"Unit"
+      ()
+  in
+  (* Deploy the EVM reader and point it at the view contract + view name. *)
+  let* reader_addr =
+    EvmContract.deploy_solidity_contract
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~contract:Solidity_contracts.crac_michelson_view_staticcall
+      ()
+  in
+  let* _receipt =
+    EvmContract.craft_and_send_transaction
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~value:Wei.zero
+      ~address:reader_addr
+      ~abi_signature:"initialize(string,string)"
+      ~arguments:[view_kt1; "get_bytes"]
+      ()
+  in
+  (* Call readView(): the internal gateway crossing is a STATICCALL. *)
+  let* _receipt =
+    EvmContract.craft_and_send_transaction
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~value:Wei.zero
+      ~address:reader_addr
+      ~abi_signature:"readView()"
+      ~arguments:[]
+      ()
+  in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  Check.(
+    (trace_field_lc trace "to" = String.lowercase_ascii reader_addr)
+      string
+      ~error_msg:(prefix ^ ": root to %L, expected the EVM reader %R")) ;
+  (* Exactly one gateway child, recorded as a STATICCALL frame. *)
+  let gw_children =
+    List.filter
+      (fun c -> trace_field_lc c "to" = gateway_precompile_address)
+      (trace_subcalls trace)
+  in
+  Check.(
+    (List.length gw_children = 1)
+      int
+      ~error_msg:(prefix ^ ": expected 1 gateway view child, got %L")) ;
+  let gw = List.hd gw_children in
+  Check.(
+    (trace_field_lc gw "type" = "staticcall")
+      string
+      ~error_msg:(prefix ^ ": gateway view frame type %L, expected %R")) ;
+  let selector = solidity_selector "callMichelsonView(string,string,bytes)" in
+  let gw_input = trace_field_lc gw "input" in
+  let input_has_selector =
+    String.length gw_input >= String.length selector
+    && String.sub gw_input 0 (String.length selector) = selector
+  in
+  Check.(
+    (input_has_selector = true)
+      bool
+      ~error_msg:
+        (prefix
+       ^ ": gateway input must start with the callMichelsonView selector")) ;
+  (* The VIEW returns its response: the ABI-(bytes)-encoded output carries the
+     Micheline serialization of the view's bytes, ending with the raw view
+     bytes 0xdeadbeef (followed only by ABI zero-padding). *)
+  let gw_output = trace_field_lc gw "output" in
+  let output_carries_view_bytes =
+    let out_hex = String.sub gw_output 2 (String.length gw_output - 2) in
+    let unpadded =
+      let len = ref (String.length out_hex) in
+      while !len > 0 && out_hex.[!len - 1] = '0' do
+        decr len
+      done ;
+      String.sub out_hex 0 !len
+    in
+    let suffix = "deadbeef" in
+    String.length unpadded >= String.length suffix
+    && String.sub
+         unpadded
+         (String.length unpadded - String.length suffix)
+         (String.length suffix)
+       = suffix
+  in
+  Check.(
+    (output_carries_view_bytes = true)
+      bool
+      ~error_msg:
+        (prefix ^ ": gateway output must end with the view's raw bytes deadbeef")) ;
+  (* A read-only crossing re-enters no EVM: the frame is a leaf. *)
+  Check.(
+    (List.length (trace_subcalls gw) = 0)
+      int
+      ~error_msg:(prefix ^ ": view crossing must be a leaf frame, got %L")) ;
+  unit
+
+(** Example C of the cross-runtime tracing RFC
+    (https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1)
+    — EVM → M → EVM → M. The gateway crossing gets a re-entrant
+    EVM child frame [alias(M_1) → E_2], which itself makes a nested gateway
+    crossing [E_2 → GW_E]. Asserts the exact frame chain, the
+    [from = compute_alias(KT1)] of the re-entrant frame, the parent-to ≠
+    child-from break across the runtime border, and log parity. *)
+let test_crac_call_tracer_outgoing_nested () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: outgoing nested EVM->M->EVM->M (Example C)"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "nested"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-C" in
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  let* evm_inner = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  let (`Evm_runner inner_addr) = evm_inner in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  let (`Tez_runner (_, tez_bridge_kt1)) = tez_bridge in
+  let* evm_outer = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  let (`Evm_runner outer_addr) = evm_outer in
+  let* (_ : int64) = EvmRunner.call_run evm_outer in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  (* Root E_1 → outer gateway → re-entrant E_2 → nested gateway. *)
+  Check.(
+    (trace_field_lc trace "to" = String.lowercase_ascii outer_addr)
+      string
+      ~error_msg:(prefix ^ ": root to %L, expected E_1 %R")) ;
+  let calls = trace_subcalls trace in
+  Check.(
+    (List.length calls = 1)
+      int
+      ~error_msg:(prefix ^ ": expected the outer gateway frame, got %L children")) ;
+  let outer_gw = List.hd calls in
+  Check.(
+    (trace_field_lc outer_gw "to" = gateway_precompile_address)
+      string
+      ~error_msg:(prefix ^ ": outer gateway to %L, expected GW_E %R")) ;
+  (* The re-entrant child: from = alias(M_1), to = E_2. *)
+  let reentrant = crossing_subcalls outer_gw in
+  Check.(
+    (List.length reentrant = 1)
+      int
+      ~error_msg:(prefix ^ ": expected 1 re-entrant EVM child, got %L")) ;
+  let e2 = List.hd reentrant in
+  let expected_alias = evm_alias_of_kt1 tez_bridge_kt1 in
+  (* alias(M_1)'s first use as an EVM caller primes its forwarder: one
+     [handler -> alias] frame under the gateway, ahead of the re-entrant
+     leg, traced like any other EVM execution. *)
+  Check.(
+    (List.map (fun c -> trace_field_lc c "to") (priming_subcalls outer_gw)
+    = [expected_alias])
+      (list string)
+      ~error_msg:
+        (prefix
+       ^ ": expected exactly one alias-priming frame under the gateway, \
+          targeting alias(M_1); expected %R but got %L")) ;
+  Check.(
+    (trace_field_lc e2 "from" = expected_alias)
+      string
+      ~error_msg:
+        (prefix ^ ": re-entrant from %L, expected compute_alias(KT1) %R")) ;
+  Check.(
+    (trace_field_lc e2 "to" = String.lowercase_ascii inner_addr)
+      string
+      ~error_msg:(prefix ^ ": re-entrant to %L, expected E_2 %R")) ;
+  (* Parent-to (GW_E) ≠ child-from (alias) — the cross-runtime border break. *)
+  Check.(
+    (trace_field_lc e2 "from" <> trace_field_lc outer_gw "to")
+      string
+      ~error_msg:(prefix ^ ": expected the parent-to ≠ child-from border break")) ;
+  (* E_2 makes a nested gateway crossing to the leaf. *)
+  let nested = trace_subcalls e2 in
+  Check.(
+    (List.length nested = 1)
+      int
+      ~error_msg:(prefix ^ ": expected 1 nested gateway frame, got %L")) ;
+  let nested_gw = List.hd nested in
+  Check.(
+    (trace_field_lc nested_gw "to" = gateway_precompile_address)
+      string
+      ~error_msg:(prefix ^ ": nested gateway to %L, expected GW_E %R")) ;
+  Check.(
+    (trace_field_lc nested_gw "from" = String.lowercase_ascii inner_addr)
+      string
+      ~error_msg:(prefix ^ ": nested gateway from %L, expected E_2 %R")) ;
+  Check.(
+    (List.length (trace_subcalls nested_gw) = 0)
+      int
+      ~error_msg:(prefix ^ ": leaf gateway must have no children, got %L")) ;
+  (* Nested-sentinel dedup: each gateway frame carries the
+     [CrossRuntimeCallSent] sentinel of ITS OWN crossing only. The nested
+     crossing's Sent event must sit on the nested gateway frame and must NOT
+     be duplicated onto the outer gateway frame's logs (which would show as a
+     second Sent log there). *)
+  let sent_logs_of frame =
+    List.filter
+      (fun l -> trace_log_topic0 l = Some crac_sent_event_topic)
+      (trace_frame_logs frame)
+  in
+  Check.(
+    (List.length (sent_logs_of nested_gw) = 1)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": the nested gateway frame must carry exactly 1 CrossRuntimeCallSent \
+          sentinel log, got %L")) ;
+  Check.(
+    (List.length (sent_logs_of outer_gw) = 1)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": the outer gateway frame must carry exactly 1 CrossRuntimeCallSent \
+          sentinel log (its own; the nested crossing's must not be \
+          duplicated), got %L")) ;
+  (* Structural cross-check vs http_traceTransaction: one gateway frame per
+     top-level HTTP trace, and equal nesting depth. *)
+  let*@ http_trace = Rpc.Tezosx.http_traceTransaction ~tx_hash sequencer in
+  let http_traces = JSON.(http_trace |-> "traces" |> as_list) in
+  Check.(
+    (List.length http_traces = 1)
+      int
+      ~error_msg:(prefix ^ ": expected 1 top-level HTTP trace, got %L")) ;
+  (* Each HTTP crossing maps 1:1 to a callTracer frame (a gateway frame for an
+     EVM→M hop, a re-entrant EVM frame for an M→EVM hop), so the gateway
+     subtree's depth equals the outer HTTP trace's innerTraces depth. *)
+  Check.(
+    (trace_tree_depth outer_gw = http_trace_inner_depth (List.hd http_traces))
+      int
+      ~error_msg:
+        (prefix
+       ^ ": gateway subtree depth %L must match http_trace inner depth %R")) ;
+  (* Log parity for the whole tree (sentinels + children). *)
+  let* () =
+    assert_crac_trace_log_parity
+      ~sequencer
+      ~prefix
+      ~block_number:(Int32.to_int block.number)
+      trace
+  in
+  unit
+
+(** [onlyTopCall: true] on the Example-C NAC tx returns exactly the top frame,
+    with no gateway/re-entrant children. *)
+let test_crac_call_tracer_outgoing_only_top_call () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: outgoing NAC onlyTopCall returns only the root"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "only_top_call"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-TOP" in
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  let* evm_inner = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  let* evm_outer = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  let* (_ : int64) = EvmRunner.call_run evm_outer in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("onlyTopCall", `Bool true); ("withLog", `Bool true)]
+      sequencer
+  in
+  Check.(
+    (trace_field_lc trace "type" = "call")
+      string
+      ~error_msg:(prefix ^ ": root type %L, expected %R")) ;
+  Check.(
+    (List.length (trace_subcalls trace) = 0)
+      int
+      ~error_msg:(prefix ^ ": onlyTopCall must suppress all children, got %L")) ;
+  unit
+
+(** A single traced EVM tx that makes two independent crossings yields two
+    sibling gateway frames — the recorded groups are not conflated. *)
+let test_crac_call_tracer_outgoing_multi_crossing () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: two independent crossings -> two sibling gateways"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "multi"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-MULTI" in
+  let* tez_leaf_1 = TezMultiRunCaller.originate () in
+  let* tez_leaf_2 = TezMultiRunCaller.originate () in
+  let* evm_bridge_1 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf_1 in
+  let* evm_bridge_2 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf_2 in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_bridge_1, false); (evm_bridge_2, false)]
+      ()
+  in
+  let* (_ : int64) = EvmRunner.call_run evm_main in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  (* Collect every gateway frame anywhere in the tree. *)
+  let gws = gateway_frames_of trace in
+  Check.(
+    (List.length gws = 2)
+      int
+      ~error_msg:
+        (prefix ^ ": expected 2 gateway frames (one per crossing), got %L")) ;
+  (* Each is a leaf (both cross to Michelson leaves), so neither borrowed the
+     other's recorded frames. *)
+  List.iter
+    (fun gw ->
+      Check.(
+        (List.length (trace_subcalls gw) = 0)
+          int
+          ~error_msg:(prefix ^ ": gateway frame should have no children, got %L")))
+    gws ;
+  let* () =
+    assert_crac_trace_log_parity
+      ~sequencer
+      ~prefix
+      ~block_number:(Int32.to_int block.number)
+      trace
+  in
+  unit
+
+(** Negative case: [withLog: false] attaches no logs anywhere in the tree. *)
+let test_crac_call_tracer_outgoing_withlog_off () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: withLog:false emits no logs on the NAC tree"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "with_logs"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-NOLOG" in
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  let* (_ : int64) = EvmRunner.call_run evm_bridge in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool false)]
+      sequencer
+  in
+  let all_logs = collect_crac_trace_logs trace in
+  Check.(
+    (List.length all_logs = 0)
+      int
+      ~error_msg:(prefix ^ ": withLog:false must yield no trace logs, got %L")) ;
+  unit
+
+(** Failure case: a 4xx crossing (the Michelson target reverts) caught by the
+    outer Solidity via try/catch. DELIBERATE deviation from the parent
+    settled-decision #2: the node surfaces the raw gateway failure string
+    verbatim in [error] because the revert payload is raw UTF-8, not an ABI
+    [Error(string)], so the generic node revert-decoding leaves it as-is and
+    [revertReason] stays absent; we intentionally do not special-case it. *)
+let test_crac_call_tracer_outgoing_caught_4xx () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: caught 4xx renders a reverting gateway frame"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-4XX" in
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
+  (* evm_main calls evm_bridge inside try/catch (callee flag [true]). *)
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, true)] ()
+  in
+  (* The catch keeps the outer tx successful. *)
+  let* (_ : int64) = EvmRunner.call_run evm_main in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  (* Locate the (single) gateway frame anywhere in the tree. *)
+  let gws = gateway_frames_of trace in
+  Check.(
+    (List.length gws = 1)
+      int
+      ~error_msg:(prefix ^ ": expected exactly 1 gateway frame, got %L")) ;
+  let gw = List.hd gws in
+  (* The gateway frame reverted (4xx). The kernel inspector writes the
+     "Reverted" sentinel with the raw ["Cross-runtime call failed with status
+     …"] bytes as output; since that payload is not a Solidity [Error(string)]
+     ABI revert, the node surfaces it verbatim in [error] and leaves
+     [revertReason] absent (tracer_types.ml revert_reason_bytes_decoding). *)
+  let gw_error = JSON.(gw |-> "error" |> as_string) in
+  let expected_prefix = "Cross-runtime call failed with status 400" in
+  let error_reports_4xx =
+    String.length gw_error >= String.length expected_prefix
+    && String.sub gw_error 0 (String.length expected_prefix) = expected_prefix
+  in
+  Check.(
+    (error_reports_4xx = true)
+      bool
+      ~error_msg:
+        (prefix ^ ": gateway error must report the 4xx failure, got: "
+       ^ gw_error)) ;
+  Check.(
+    (JSON.(gw |-> "revertReason" |> as_opt) = None)
+      (option json)
+      ~error_msg:
+        (prefix ^ ": revertReason must be absent for a non-ABI 4xx payload")) ;
+  (* The raw revert payload also rides in the frame's [output] (hex of the
+     UTF-8 failure string), per the settled 4xx representation. *)
+  let gw_output = JSON.(gw |-> "output" |> as_string) in
+  let expected_output_prefix =
+    "0x" ^ Hex.show (Hex.of_string expected_prefix)
+  in
+  let output_carries_raw_string =
+    String.length gw_output >= String.length expected_output_prefix
+    && String.lowercase_ascii
+         (String.sub gw_output 0 (String.length expected_output_prefix))
+       = expected_output_prefix
+  in
+  Check.(
+    (output_carries_raw_string = true)
+      bool
+      ~error_msg:
+        (prefix
+       ^ ": gateway output must carry the raw 4xx failure string, got: "
+       ^ gw_output)) ;
+  (* No successful crossing → no re-entrant children. (The frame may still
+     carry its own sentinel log; its presence is deliberately not pinned.) *)
+  Check.(
+    (List.length (trace_subcalls gw) = 0)
+      int
+      ~error_msg:
+        (prefix ^ ": failed leaf crossing must have no children, got %L")) ;
+  unit
+
+(** The re-entrant EVM leaf of a crossing performs an internal DELEGATECALL
+    (resp. STATICCALL); the spliced subtree must preserve the exact frame
+    [type] for each. Uses [DelegateRunner]/[DelegateLib] and
+    [StaticRunner]/[StaticView] reached over the same-runtime EVM→EVM gateway
+    path, one crossing per inner-call type. This also covers the "view path"
+    STATICCALL shape (Example B's static variant) of the cross-runtime tracing
+    RFC:
+    https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1 *)
+let test_crac_call_tracer_reentrant_child_frame_types () =
+  register_crac_runner_test
+    ~title:
+      "CRAC callTracer: re-entrant child DELEGATECALL/STATICCALL frame types"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "frame_types"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-FRAMETYPE" in
+  let evm_version = Kernel.select_evm_version Kernel.Latest in
+  let deploy contract =
+    EvmContract.deploy_solidity_contract
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~contract
+      ()
+  in
+  let init ~address arguments =
+    let* _receipt =
+      EvmContract.craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce:(evm_nonce ())
+        ~value:Wei.zero
+        ~address
+        ~abi_signature:"initialize(address)"
+        ~arguments
+        ()
+    in
+    unit
+  in
+  (* DELEGATECALL leaf: DelegateRunner.run() delegatecalls DelegateLib.inc(). *)
+  let* delegate_lib = deploy Solidity_contracts.crac_call_tracer_delegate_lib in
+  let* delegate_runner =
+    deploy Solidity_contracts.crac_call_tracer_delegate_runner
+  in
+  let* () = init ~address:delegate_runner [delegate_lib] in
+  (* STATICCALL leaf: StaticRunner.run() staticcalls StaticView.readOne(). *)
+  let* static_view = deploy Solidity_contracts.crac_call_tracer_static_view in
+  let* static_runner =
+    deploy Solidity_contracts.crac_call_tracer_static_runner
+  in
+  let* () = init ~address:static_runner [static_view] in
+  (* One EVM→EVM gateway crossing per leaf. *)
+  let* caller_d =
+    EvmCracHttpCallEvm.deploy_and_init (`Evm_runner delegate_runner)
+  in
+  let* caller_s =
+    EvmCracHttpCallEvm.deploy_and_init (`Evm_runner static_runner)
+  in
+  (* All frame [type]s in a gateway's re-entrant subtree. *)
+  let rec subtree_types frame =
+    trace_field_lc frame "type"
+    :: List.concat_map subtree_types (trace_subcalls frame)
+  in
+  let gateway_subtree_types trace =
+    match gateway_frames_of trace with
+    | [gw] -> List.concat_map subtree_types (trace_subcalls gw)
+    | gws ->
+        Test.fail
+          "%s: expected exactly 1 gateway frame, got %d"
+          prefix
+          (List.length gws)
+  in
+  (* DELEGATECALL crossing. *)
+  let* (_ : int64) = EvmCracHttpCallEvm.call_run_catch caller_d in
+  let*@ block_d = latest_block ~sequencer in
+  let* trace_d =
+    get_call_trace
+      ~prefix
+      ~tx_hash:(first_tx_hash ~prefix block_d)
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  Check.(
+    (List.mem "delegatecall" (gateway_subtree_types trace_d) = true)
+      bool
+      ~error_msg:
+        (prefix ^ ": expected a DELEGATECALL frame in the re-entrant subtree")) ;
+  let* () =
+    assert_crac_trace_log_parity
+      ~sequencer
+      ~prefix
+      ~block_number:(Int32.to_int block_d.number)
+      trace_d
+  in
+  (* STATICCALL crossing. *)
+  let* (_ : int64) = EvmCracHttpCallEvm.call_run_catch caller_s in
+  let*@ block_s = latest_block ~sequencer in
+  let* trace_s =
+    get_call_trace
+      ~prefix
+      ~tx_hash:(first_tx_hash ~prefix block_s)
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  Check.(
+    (List.mem "staticcall" (gateway_subtree_types trace_s) = true)
+      bool
+      ~error_msg:
+        (prefix ^ ": expected a STATICCALL frame in the re-entrant subtree")) ;
+  let* () =
+    assert_crac_trace_log_parity
+      ~sequencer
+      ~prefix
+      ~block_number:(Int32.to_int block_s.number)
+      trace_s
+  in
+  unit
+
+(** The re-entrant EVM leaf reverts AFTER an already-closed child emitted a
+    log. The kernel tracer performs no revert-drop: reverted frames and their
+    logs stay in the trace, while the reverted log is rolled back from the
+    receipt — the trace/receipt divergence is expected and intentional. The
+    outer EVM caller wraps the crossing in try/catch so the top-level tx
+    still commits. *)
+let test_crac_call_tracer_reentrant_child_revert_keeps_logs () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: reverted re-entrant child keeps frame and logs"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "revert"; "keep_logs"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-KEEPLOGS" in
+  let evm_version = Kernel.select_evm_version Kernel.Latest in
+  let* child_addr =
+    EvmContract.deploy_solidity_contract
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~contract:Solidity_contracts.crac_trace_reverter_child
+      ()
+  in
+  let* reverter_addr =
+    EvmContract.deploy_solidity_contract
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~contract:Solidity_contracts.crac_trace_reverter
+      ()
+  in
+  let* _receipt =
+    EvmContract.craft_and_send_transaction
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~value:Wei.zero
+      ~address:reverter_addr
+      ~abi_signature:"initialize(address)"
+      ~arguments:[child_addr]
+      ()
+  in
+  let* evm_caller =
+    EvmCracHttpCallEvm.deploy_and_init (`Evm_runner reverter_addr)
+  in
+  (* runCatch swallows the failed crossing so the outer tx still commits. *)
+  let* (_ : int64) = EvmCracHttpCallEvm.call_run_catch evm_caller in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  let gws = gateway_frames_of trace in
+  Check.(
+    (List.length gws = 1)
+      int
+      ~error_msg:(prefix ^ ": expected exactly 1 gateway frame, got %L")) ;
+  let gw = List.hd gws in
+  (* Depth-first frames under (and including) the gateway. *)
+  let rec subtree frame =
+    frame :: List.concat_map subtree (trace_subcalls frame)
+  in
+  let under_gw = List.concat_map subtree (trace_subcalls gw) in
+  (* The reverting leaf frame is present and carries an error. *)
+  let reverter_frame =
+    List.find_opt
+      (fun f -> trace_field_lc f "to" = String.lowercase_ascii reverter_addr)
+      under_gw
+  in
+  (match reverter_frame with
+  | None ->
+      Test.fail
+        "%s: reverted re-entrant leaf frame is missing from the tree"
+        prefix
+  | Some f ->
+      Check.(
+        (JSON.(f |-> "error" |> as_opt) <> None)
+          (option json)
+          ~error_msg:
+            (prefix ^ ": reverted re-entrant leaf must carry an [error]"))) ;
+  (* The already-closed child frame is retained too, and it KEEPS the
+     [Marked(1)] log it emitted before its parent reverted: the kernel
+     tracer performs no revert-drop of trace logs. *)
+  let child_frame =
+    match
+      List.find_opt
+        (fun f -> trace_field_lc f "to" = String.lowercase_ascii child_addr)
+        under_gw
+    with
+    | Some f -> f
+    | None ->
+        Test.fail "%s: the reverted subtree's child frame must remain" prefix
+  in
+  let child_logs = trace_frame_logs child_frame in
+  Check.(
+    (List.length child_logs = 1)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": the reverted subtree's child frame must keep its log, got %L")) ;
+  let marked_log = List.hd child_logs in
+  Check.(
+    (trace_log_topic0 marked_log = Some (event_topic "Marked(uint256)"))
+      (option string)
+      ~error_msg:(prefix ^ ": child log topic0 %L, expected Marked(uint256) %R")) ;
+  (* The reverted child's log was rolled back from the receipt: it must NOT
+     appear in [eth_getLogs] — the trace/receipt divergence is expected and
+     intentional (no log-parity assert here). *)
+  let*@ receipt_logs =
+    Rpc.get_logs
+      ~from_block:(Number (Int32.to_int block.number))
+      ~to_block:(Number (Int32.to_int block.number))
+      sequencer
+  in
+  let receipt_bodies =
+    List.map
+      (fun (l : Transaction.tx_log) ->
+        ( String.lowercase_ascii l.address,
+          List.map String.lowercase_ascii l.topics,
+          String.lowercase_ascii l.data ))
+      receipt_logs
+  in
+  Check.(
+    (List.mem (crac_trace_log_body marked_log) receipt_bodies = false)
+      bool
+      ~error_msg:
+        (prefix
+       ^ ": the reverted child's log must NOT appear in eth_getLogs, got \
+          membership %L")) ;
+  unit
+
+(** Contrast to {!test_crac_call_tracer_outgoing_caught_4xx}: an uncaught 4xx
+    crossing is NOT wrapped in try/catch, so the whole EVM transaction reverts.
+    The trace surfaces a reverting root and the same raw "Cross-runtime call
+    failed with status 400…" gateway [error]. *)
+let test_crac_call_tracer_outgoing_uncaught_4xx () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: uncaught 4xx reverts the whole tx"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "revert"; "uncaught"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-4XX-UNCAUGHT" in
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
+  (* No try/catch: the gateway revert propagates and fails the whole tx. *)
+  let* (_ : int64) = EvmRunner.call_run ~expected_status:false evm_bridge in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  (* The whole tx reverted (uncaught): the root frame carries an error. *)
+  Check.(
+    (JSON.(trace |-> "error" |> as_opt) <> None)
+      (option json)
+      ~error_msg:(prefix ^ ": the reverted root must carry an [error]")) ;
+  let gws = gateway_frames_of trace in
+  Check.(
+    (List.length gws = 1)
+      int
+      ~error_msg:(prefix ^ ": expected exactly 1 gateway frame, got %L")) ;
+  let gw = List.hd gws in
+  let gw_error = JSON.(gw |-> "error" |> as_string) in
+  let expected_prefix = "Cross-runtime call failed with status 400" in
+  let error_reports_4xx =
+    String.length gw_error >= String.length expected_prefix
+    && String.sub gw_error 0 (String.length expected_prefix) = expected_prefix
+  in
+  Check.(
+    (error_reports_4xx = true)
+      bool
+      ~error_msg:
+        (prefix ^ ": gateway error must report the 4xx failure, got: "
+       ^ gw_error)) ;
+  (* Only the error and the structure are asserted: reverted frames keep
+     their trace logs while the reverted tx's receipt is empty, so no
+     trace/receipt log parity is asserted here. *)
   unit
 
 (** debug_traceBlockByNumber on a mixed block containing BOTH a normal
@@ -4213,6 +5762,7 @@ let test_crac_debug_trace_block () =
   let prefix = "TRACE-BLK" in
   Log.debug ~prefix "Setup CRAC pipeline" ;
   let* evm_runner, tez_runner = setup_crac_pipeline () in
+  let (`Evm_runner runner_addr) = evm_runner in
   (* Step 1: Send a dummy EVM self-transfer to the mempool (no block). *)
   Log.debug ~prefix "Send dummy EVM tx to mempool" ;
   let* _dummy_hash =
@@ -4241,7 +5791,12 @@ let test_crac_debug_trace_block () =
       ~error_msg:"Expected 2 transactions (1 normal + 1 CRAC) but got %L") ;
   Log.debug ~prefix "debug_traceBlockByNumber with callTracer" ;
   let*@ trace_results =
-    Rpc.trace_block ~block:(Number (Int32.to_int block.number)) sequencer
+    (* [withLog] explicitly: pinning the fake tx's first border sentinel below
+       relies on logs being present, so don't depend on the node's default. *)
+    Rpc.trace_block
+      ~block:(Number (Int32.to_int block.number))
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
   in
   Check.(
     (List.length trace_results = tx_count)
@@ -4261,6 +5816,53 @@ let test_crac_debug_trace_block () =
           string
           ~error_msg:"Expected CALL type in trace result, got %L"))
     trace_results ;
+  (* The CRAC fake tx is the block trace whose [txHash] matches the
+     recomputed fake-tx recipe hash (the normal self-transfer's hash cannot);
+     identify it by hash, then pin its envelope + children + sentinel log.
+     This also proves block-mode tracing keeps exactly one trace per tx
+     (the [List.combine] zip in the node never sees a mismatched arity). *)
+  let crac_traces, _ =
+    List.partition
+      (block_entry_is_crac_fake_tx
+         ~block_number:(Int32.to_int block.number)
+         ~crac_ids:["0-0"])
+      trace_results
+  in
+  Check.(
+    (List.length crac_traces = 1)
+      int
+      ~error_msg:(prefix ^ ": expected exactly 1 CRAC fake-tx trace, got %L")) ;
+  let crac = List.hd crac_traces in
+  let crac_root = JSON.(crac |-> "result") in
+  let crac_hash = JSON.(crac |-> "txHash" |> as_string) in
+  let* () =
+    assert_root_mirrors_tx_object
+      ~sequencer
+      ~prefix
+      ~tx_hash:crac_hash
+      crac_root
+  in
+  let crac_children = crossing_subcalls crac_root in
+  (* One crossing in this topology → exactly one EVM child (the
+     alias-priming frames of the first crossing are filtered out). *)
+  Check.(
+    (List.length crac_children = 1)
+      int
+      ~error_msg:
+        (prefix ^ ": CRAC fake-tx trace must expose exactly 1 EVM child, got %L")) ;
+  (* The SSTORE-ing EVM leaf surfaces as a child frame targeting the runner
+     whose counter we just observed flip to exactly 1 on-chain (via
+     [check_storage ~expected_counter:1] above, an [eth_getStorageAt] read):
+     the mutating leaf FRAME and the resulting storage change are pinned
+     together, not merely "some child exists". *)
+  let child_tos = List.map (fun c -> trace_field_lc c "to") crac_children in
+  Check.(
+    (List.mem (String.lowercase_ascii runner_addr) child_tos = true)
+      bool
+      ~error_msg:
+        (prefix ^ ": a CRAC child frame must target the SSTORE-ing EVM runner "
+       ^ runner_addr)) ;
+  let* () = assert_crac_received_first_log ~prefix ~crac_id:"0-0" crac_root in
   Log.info
     "Block trace returned %d traces matching %d transactions"
     (List.length trace_results)
@@ -4292,24 +5894,336 @@ let test_crac_debug_trace_normal_tx_in_crac_block () =
   let*@ _block_number = Rpc.produce_block sequencer in
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
   Log.debug ~prefix "debug_traceTransaction on the normal tx" ;
-  let* trace_result =
-    Rpc.trace_transaction
-      ~transaction_hash:normal_tx_hash
-      ~tracer:"callTracer"
+  let* t = get_call_trace ~prefix ~tx_hash:normal_tx_hash sequencer in
+  (* The normal transfer traces as a plain self-contained CALL to [address]
+     with no cross-runtime children — CRAC presence in the block leaves it
+     untouched. *)
+  Check.(
+    (trace_field_lc t "type" = "call")
+      string
+      ~error_msg:(prefix ^ ": normal tx trace type %L, expected %R")) ;
+  Check.(
+    (trace_field_lc t "to" = String.lowercase_ascii address)
+      string
+      ~error_msg:
+        (prefix ^ ": normal tx trace to %L, expected the transfer target %R")) ;
+  Check.(
+    (List.length (trace_subcalls t) = 0)
+      int
+      ~error_msg:(prefix ^ ": a plain transfer must have no children, got %L")) ;
+  (* And the CRAC fake tx still renders its own tree under a distinct hash. *)
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let crac_hash =
+    compute_crac_fake_tx_hash
+      ~block_number:(Int32.to_int block.number)
+      ~crac_id:"0-0"
+  in
+  Check.(
+    (String.lowercase_ascii crac_hash <> String.lowercase_ascii normal_tx_hash)
+      string
+      ~error_msg:
+        (prefix ^ ": CRAC fake-tx hash must differ from the normal tx hash")) ;
+  let* crac_trace = get_call_trace ~prefix ~tx_hash:crac_hash sequencer in
+  (* One crossing in this topology → exactly one EVM child. *)
+  Check.(
+    (List.length (crossing_subcalls crac_trace) = 1)
+      int
+      ~error_msg:
+        (prefix ^ ": CRAC fake tx must expose exactly 1 EVM child, got %L")) ;
+  Log.info "Normal tx and CRAC fake tx both trace correctly in the mixed block" ;
+  unit
+
+(** L2-1212 — [debug_traceBlockByNumber] on a block with 1 normal tx + 2
+    incoming Michelson-originated CRAC operations.
+
+    Each applied Michelson operation runs in its own SafeStorage staging cycle;
+    without the [/base/trace] straight-through passthrough, operation k+1's
+    trace promotion ([store_move]) wholesale-overwrites operation k's already
+    promoted [/base/trace] subtree, so block-mode tracing recovers fewer traces
+    than the block has transactions and [trace_block]'s positional
+    [List.combine] raises [Inconsistent_traces] ("Trace not available"). This
+    test drives two CRAC operations into one block and asserts (a) the RPC
+    succeeds, (b) it returns exactly one entry per transaction, and (c) each
+    entry's [result] is JSON-deep-equal to that transaction's
+    [debug_traceTransaction] — pinning content, not just arity. It is the
+    regression test for the SafeStorage trace-accumulation fix and closes
+    L2-1212. *)
+let test_crac_l2_1212_multi_michelson_block () =
+  register_crac_runner_test
+    ~title:"CRAC: debug_traceBlockByNumber on 1 normal + 2 CRAC block (L2-1212)"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "block"; "regression"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "L2-1212" in
+  let* evm_runner, tez_runner = setup_crac_pipeline () in
+  (* A plain EVM self-transfer to a fresh address (the "normal" tx). *)
+  let normal_addr = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
+  let* normal_tx_hash =
+    send_evm_transfer_no_block ~value:Wei.one ~address:normal_addr ()
+  in
+  (* Two independent Michelson manager operations, each triggering a TEZ->EVM
+     crossing on the same runner (counter reaches 2). Distinct counters keep
+     them valid in sequence; both land in the next produced block. *)
+  let* () = inject_crac_no_block tez_runner in
+  let* () = inject_crac_no_block tez_runner in
+  let*@ _ = Rpc.produce_block sequencer in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_runner in
+  let*@ block = latest_block ~sequencer in
+  let tx_hashes =
+    match block.transactions with
+    | Block.Hash hs -> hs
+    | _ -> Test.fail "%s: expected tx hashes in EVM block" prefix
+  in
+  Check.(
+    (List.length tx_hashes = 3)
+      int
+      ~error_msg:(prefix ^ ": expected 3 txs (1 normal + 2 CRAC), got %L")) ;
+  (* THE REPRO: on the pre-fix kernel this errors with [Inconsistent_traces]. *)
+  let*@ trace_results =
+    Rpc.trace_block
+      ~block:(Number (Int32.to_int block.number))
+      ~tracer_config:[("withLog", `Bool true)]
       sequencer
   in
-  (match trace_result with
-  | Ok t ->
-      let type_ = JSON.(t |-> "type" |> as_string) in
-      Check.(
-        (type_ = "CALL")
-          string
-          ~error_msg:"Expected CALL type for normal tx trace, got %L") ;
-      Log.info "Normal tx trace OK in mixed CRAC block"
-  | Error err ->
-      Test.fail
-        "debug_traceTransaction failed on normal tx in CRAC block: %s"
-        err.Rpc.message) ;
+  Check.(
+    (List.length trace_results = 3)
+      int
+      ~error_msg:
+        (prefix ^ ": block trace must return one entry per tx (3), got %L")) ;
+  (* Content-based pairing: each block entry deep-equals its own tx trace. *)
+  let* () =
+    assert_block_matches_per_tx
+      ~sequencer
+      ~prefix
+      ~tracer_config:[("withLog", `Bool true)]
+      trace_results
+  in
+  (* Exactly two of the three entries are CRAC fake txs, identified by their
+     recomputed fake-tx recipe hashes (the two Michelson operations of the
+     block have CRAC-IDs "0-0" and "0-1"). *)
+  let crac_entries, plain_entries =
+    List.partition
+      (block_entry_is_crac_fake_tx
+         ~block_number:(Int32.to_int block.number)
+         ~crac_ids:["0-0"; "0-1"])
+      trace_results
+  in
+  Check.(
+    (List.length crac_entries = 2)
+      int
+      ~error_msg:(prefix ^ ": expected 2 CRAC fake-tx traces, got %L")) ;
+  Check.(
+    (List.length plain_entries = 1)
+      int
+      ~error_msg:(prefix ^ ": expected 1 plain-tx trace, got %L")) ;
+  let plain = List.hd plain_entries in
+  Check.(
+    (JSON.(plain |-> "txHash" |> as_string) = normal_tx_hash)
+      string
+      ~error_msg:(prefix ^ ": plain entry txHash %L, expected the transfer %R")) ;
+  (* Each CRAC entry mirrors its own tx envelope and exposes its EVM child. *)
+  let* () =
+    Lwt_list.iter_s
+      (fun e ->
+        let tx_hash = JSON.(e |-> "txHash" |> as_string) in
+        let root = JSON.(e |-> "result") in
+        let* () =
+          assert_root_mirrors_tx_object ~sequencer ~prefix ~tx_hash root
+        in
+        (* Each CRAC op in this topology makes one crossing → one child
+           (the first operation additionally primes the runner's alias;
+           priming frames are filtered out). *)
+        Check.(
+          (List.length (crossing_subcalls root) = 1)
+            int
+            ~error_msg:
+              (prefix ^ ": CRAC fake tx must expose exactly 1 EVM child, got %L")) ;
+        unit)
+      crac_entries
+  in
+  Log.info
+    "%s: 1 normal + 2 CRAC block traced consistently (L2-1212 closed)"
+    prefix ;
+  unit
+
+(** Example E (block trace) of the cross-runtime tracing RFC
+    (https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1)
+    as a block ⇄ transaction CONSISTENCY proof for
+    a mixed block combining an EVM-originated NAC (outgoing gateway crossing)
+    and an incoming Michelson-originated fake tx.
+
+    The pending incoming CRAC operation is injected first, then the outgoing
+    EVM bridge call produces the block containing BOTH transactions. Every
+    block entry's [result] is JSON-deep-equal to its [debug_traceTransaction],
+    proving the two tx KINDS (outgoing gateway-frame tree and synthetic incoming
+    tree) render identically in block mode and tx mode, and that positional
+    pairing is by content. *)
+let test_crac_debug_trace_block_consistency_mixed () =
+  register_crac_runner_test
+    ~title:"CRAC: debug_traceBlockByNumber consistency on mixed NAC block"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "block"; "consistency"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "TRACE-BLK-MIX" in
+  (* Outgoing EVM-originated NAC bridge (EVM -> Michelson leaf). *)
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  let (`Evm_runner bridge_addr) = evm_bridge in
+  (* Incoming NAC pipeline (Michelson op -> EVM runner). *)
+  let* evm_in, tez_in = setup_crac_pipeline () in
+  (* Queue the incoming CRAC as a pending Michelson op, then run the outgoing
+     bridge: the produced block carries the outgoing EVM tx AND the incoming
+     fake tx. *)
+  let* () = inject_crac_no_block tez_in in
+  let* (_ : int64) = EvmRunner.call_run evm_bridge in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_in in
+  let*@ block = latest_block ~sequencer in
+  let tx_hashes =
+    match block.transactions with
+    | Block.Hash hs -> hs
+    | _ -> Test.fail "%s: expected tx hashes in EVM block" prefix
+  in
+  Check.(
+    (List.length tx_hashes = 2)
+      int
+      ~error_msg:
+        (prefix ^ ": expected 2 txs (outgoing NAC + incoming fake), got %L")) ;
+  let*@ trace_results =
+    Rpc.trace_block
+      ~block:(Number (Int32.to_int block.number))
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  Check.(
+    (List.length trace_results = 2)
+      int
+      ~error_msg:(prefix ^ ": block trace must return 2 entries, got %L")) ;
+  let* () =
+    assert_block_matches_per_tx
+      ~sequencer
+      ~prefix
+      ~tracer_config:[("withLog", `Bool true)]
+      trace_results
+  in
+  (* Exactly one incoming (fake-tx hash) and one outgoing (plain root) entry. *)
+  let incoming, outgoing =
+    List.partition
+      (block_entry_is_crac_fake_tx
+         ~block_number:(Int32.to_int block.number)
+         ~crac_ids:["0-0"])
+      trace_results
+  in
+  Check.(
+    (List.length incoming = 1)
+      int
+      ~error_msg:(prefix ^ ": expected 1 incoming fake-tx entry, got %L")) ;
+  Check.(
+    (List.length outgoing = 1)
+      int
+      ~error_msg:(prefix ^ ": expected 1 outgoing NAC entry, got %L")) ;
+  (* The outgoing entry roots at the EVM bridge and crosses through the
+     gateway precompile as a child frame. *)
+  let out_root = JSON.(List.hd outgoing |-> "result") in
+  Check.(
+    (trace_field_lc out_root "to" = String.lowercase_ascii bridge_addr)
+      string
+      ~error_msg:(prefix ^ ": outgoing root to %L, expected the EVM bridge %R")) ;
+  let out_children = trace_subcalls out_root in
+  let has_gateway_child =
+    List.exists
+      (fun c -> trace_field_lc c "to" = gateway_precompile_address)
+      out_children
+  in
+  Check.(
+    (has_gateway_child = true)
+      bool
+      ~error_msg:
+        (prefix
+       ^ ": outgoing NAC must expose a gateway child frame in block mode")) ;
+  unit
+
+(** [debug_traceCall] on an eth_call-style invocation of an EVM contract that
+    crosses into the Michelson runtime through the gateway. The simulation
+    reads the same [/base/trace/input] as the applied-tx tracer, so the
+    callTracer result contains the gateway crossing as a child frame — the same
+    shape as [debug_traceTransaction] on an applied EVM-originated NAC — with no
+    extra node plumbing. Cross-checked against [http_traceCall] on the SAME
+    call, which surfaces the crossing as an outgoing POST to the Michelson
+    runtime. *)
+let test_crac_debug_trace_call_with_nac () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: debug_traceCall crossing the gateway"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "trace_call"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-CALL" in
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  let (`Evm_runner bridge_addr) = evm_bridge in
+  (* [run()] takes no arguments: calldata is exactly its 4-byte selector. *)
+  let run_calldata = solidity_selector "run()" in
+  let*@ trace =
+    Rpc.trace_call
+      ~block:Latest
+      ~to_:bridge_addr
+      ~data:run_calldata
+      ~tracer:"callTracer"
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  (* Root: the simulated CALL into the EVM bridge. *)
+  Check.(
+    (trace_field_lc trace "to" = String.lowercase_ascii bridge_addr)
+      string
+      ~error_msg:(prefix ^ ": traceCall root to %L, expected the bridge %R")) ;
+  (* A gateway crossing child frame, exactly as in the applied-tx trace. *)
+  let gw_children =
+    List.filter
+      (fun c -> trace_field_lc c "to" = gateway_precompile_address)
+      (trace_subcalls trace)
+  in
+  Check.(
+    (List.length gw_children = 1)
+      int
+      ~error_msg:
+        (prefix ^ ": traceCall must expose exactly 1 gateway child, got %L")) ;
+  let gw = List.hd gw_children in
+  let selector = solidity_selector "callMichelson(string,string,bytes)" in
+  let gw_input = trace_field_lc gw "input" in
+  let input_has_selector =
+    String.length gw_input >= String.length selector
+    && String.sub gw_input 0 (String.length selector) = selector
+  in
+  Check.(
+    (input_has_selector = true)
+      bool
+      ~error_msg:
+        (prefix
+       ^ ": gateway child input must start with the callMichelson selector")) ;
+  (* Cross-check: [http_traceCall] on the SAME call surfaces the crossing as an
+     outgoing POST to the Michelson runtime. *)
+  let*@ http_result =
+    Rpc.Tezosx.http_traceCall_evm ~to_:bridge_addr ~data:run_calldata sequencer
+  in
+  let http_traces = JSON.(http_result |-> "traces" |> as_list) in
+  Check.(
+    (List.length http_traces >= 1)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": http_traceCall must surface the crossing as a POST, got %L trace(s)"
+        )) ;
+  let http = List.hd http_traces in
+  Check.(
+    (JSON.(http |-> "method" |> as_string) = "POST")
+      string
+      ~error_msg:(prefix ^ ": http_traceCall crossing method %L, expected %R")) ;
+  let http_url = JSON.(http |-> "url" |> as_string) in
+  if not (string_contains http_url "http://tezos/") then
+    Test.fail
+      "%s: http_traceCall crossing URL %s must target the Michelson runtime"
+      prefix
+      http_url ;
   unit
 
 (** Helper for the [http_trace*] tests: CRAC exchanges surface as POST
@@ -16056,8 +17970,25 @@ let () =
   test_crac_http_call_evm_to_evm_return_value () ;
   test_crac_http_call_tez_to_tez_collect_result () ;
   test_crac_debug_trace_transaction () ;
+  test_crac_call_tracer_outgoing_leaf () ;
+  test_crac_call_tracer_outgoing_view_staticcall () ;
+  test_crac_call_tracer_outgoing_nested () ;
+  test_crac_call_tracer_outgoing_only_top_call () ;
+  test_crac_call_tracer_outgoing_multi_crossing () ;
+  test_crac_call_tracer_outgoing_withlog_off () ;
+  test_crac_call_tracer_outgoing_caught_4xx () ;
+  test_crac_call_tracer_reentrant_child_frame_types () ;
+  test_crac_call_tracer_reentrant_child_revert_keeps_logs () ;
+  test_crac_call_tracer_outgoing_uncaught_4xx () ;
+  test_crac_call_tracer_incoming_example_f () ;
+  test_crac_call_tracer_incoming_only_top_call () ;
+  test_crac_call_tracer_incoming_withlog_off () ;
+  test_crac_call_tracer_incoming_backtrack_no_fake_tx () ;
   test_crac_debug_trace_block () ;
   test_crac_debug_trace_normal_tx_in_crac_block () ;
+  test_crac_l2_1212_multi_michelson_block () ;
+  test_crac_debug_trace_block_consistency_mixed () ;
+  test_crac_debug_trace_call_with_nac () ;
   test_http_trace_nested_crac () ;
   test_http_trace_multiple_independent_cracs () ;
   test_http_trace_mixed_block () ;
