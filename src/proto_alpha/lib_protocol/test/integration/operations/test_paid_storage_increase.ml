@@ -129,6 +129,15 @@ let test_negative_amount () =
     | Fees_storage.Negative_storage_input -> true
     | _ -> false)
 
+(** We test the operation when the amount given does not fit an [int64] *)
+let test_amount_overflow () =
+  let open Lwt_result_syntax in
+  let amount = Z.succ (Z.of_int64 Int64.max_int) in
+  let*! result = test_balances ~amount in
+  Assert.proto_error ~loc:__LOC__ result (function
+    | Fees_storage.Storage_increase_amount_overflow _ -> true
+    | _ -> false)
+
 (** We create an implicit account with not enough tez to pay for the
     storage increase. *)
 let test_no_tez_to_pay () =
@@ -238,6 +247,7 @@ let tests =
     Tztest.tztest "balances simple" `Quick test_balances_simple;
     Tztest.tztest "null amount" `Quick test_null_amount;
     Tztest.tztest "negative amount" `Quick test_negative_amount;
+    Tztest.tztest "amount overflow" `Quick test_amount_overflow;
     Tztest.tztest "not enough tez to pay" `Quick test_no_tez_to_pay;
     Tztest.tztest "no contract to bump its paid storage" `Quick test_no_contract;
     Tztest.tztest "effectiveness" `Quick test_effectiveness;
