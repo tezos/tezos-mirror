@@ -222,6 +222,32 @@ module Events = struct
       ~pp2:(Format.pp_print_list ~pp_sep GS.Message_id.pp)
       ("peer", P2p_peer.Id.encoding)
       ("message_ids", list Types.Message_id.encoding)
+
+  let subscribe_topic_cap_exceeded =
+    declare_2
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"subscribe_topic_cap_exceeded"
+      ~msg:
+        "Subscribe from {peer} dropped: peer has reached the per-peer topic \
+         limit of {max_topics} (rate-limited log)"
+      ~level:Warning
+      ~pp1:P2p_peer.Id.pp
+      ~pp2:Format.pp_print_int
+      ("peer", P2p_peer.Id.encoding)
+      ("max_topics", int31)
+
+  let p2p_queue_drop =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"p2p_queue_drop"
+      ~msg:
+        "P2P input message dropped: worker queue is full at {depth} events \
+         (rate-limited log)"
+      ~level:Warning
+      ~pp1:Format.pp_print_int
+      ("depth", int31)
 end
 
 let event ~verbose =
@@ -264,3 +290,6 @@ let event ~verbose =
               emit ihave (from_peer.peer_id, topic, message_ids)
           | IWant {message_ids} -> emit iwant (from_peer.peer_id, message_ids)))
   | Process_batch _ -> emit batch_treatment ()
+  | Subscribe_topic_cap_exceeded {peer; max_topics} ->
+      emit subscribe_topic_cap_exceeded (peer.peer_id, max_topics)
+  | P2P_queue_drop {depth} -> emit p2p_queue_drop depth

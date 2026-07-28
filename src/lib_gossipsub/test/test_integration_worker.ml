@@ -400,19 +400,23 @@ let test_bounded_p2p_input_caps_queue rng limits parameters =
       limits
       parameters
   in
-  (* Simulate a flooding peer: push one event beyond the cap without running
-     the worker loop (so nothing drains the queue). *)
-  for _ = 1 to cap + 1 do
+  (* Simulate a flooding peer: push many events beyond the cap without running
+     the worker loop (so nothing drains the queue).  [bounded_p2p_input] drops
+     P2P messages once the queue is full, but may push at most one
+     [P2P_queue_drop] observability event per 60 s — so the hard bound is
+     [cap + 1]. *)
+  for _ = 1 to cap + 10 do
     Worker.bounded_p2p_input
       worker
       (In_message {from_peer = -1; p2p_message = Subscribe {topic = "t"}})
   done ;
   let len = Worker.Stream.length (Worker.input_events_stream worker) in
-  if len > cap then
+  if len > cap + 1 then
     Test.fail
       ~__LOC__
       "Input queue grew to %d events (cap is %d). bounded_p2p_input must drop \
-       events when the queue is full."
+       P2P messages when the queue is full (at most one P2P_queue_drop \
+       observability event is allowed past the cap)."
       len
       cap ;
   unit
