@@ -27,7 +27,9 @@ use tezos_smart_rollup_host::{
 use tezos_smart_rollup_keyspace::irmin_ds::{
     IrminKeySpaceRegistry, StorageV1KeySpaceCompat,
 };
-use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
+use tezos_smart_rollup_keyspace::{
+    Key, KeySpace, KeySpaceLoader, KeySpaceLoaderError, Name,
+};
 use tezos_smart_rollup_mock::MockHost;
 
 // Set by the node, contains the verbosity for the logs
@@ -286,12 +288,14 @@ pub fn read_logs_verbosity(host: &impl StorageV1) -> Level {
 }
 
 // If the flag is set, the kernel consider that this is local evm node execution.
-const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/base/__evm_node");
+// Key inside the `/base` keyspace, resolving to `/base/__evm_node`.
+const EVM_NODE_FLAG_KEY: Key = Key::from_static(b"/__evm_node");
 // TODO: L2-1158 — remove legacy fallback once all kernels are past V51
+// Legacy path, at the storage root and therefore outside the `/base` keyspace.
 const LEGACY_EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 
-pub fn evm_node_flag(host: &impl StorageV1) -> bool {
-    Ok(Some(ValueType::Value)) == host.store_has(&EVM_NODE_FLAG)
+pub fn evm_node_flag(host: &impl StorageV1, base: &impl KeySpace) -> bool {
+    base.contains(&EVM_NODE_FLAG_KEY)
         || Ok(Some(ValueType::Value)) == host.store_has(&LEGACY_EVM_NODE_FLAG)
 }
 

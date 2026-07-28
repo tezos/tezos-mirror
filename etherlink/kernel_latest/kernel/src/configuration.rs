@@ -314,7 +314,7 @@ where
     let maximum_allowed_ticks =
         read_maximum_allowed_ticks(base).unwrap_or(MAX_ALLOWED_TICKS);
     let enable_fa_bridge = is_enable_fa_bridge(base);
-    let evm_node_flag = evm_node_flag(host);
+    let evm_node_flag = evm_node_flag(host, base);
     CommonConfig {
         tezos_contracts,
         maximum_allowed_ticks,
