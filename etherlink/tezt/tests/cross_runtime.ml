@@ -3751,14 +3751,13 @@ let test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks () =
  *  [journal.evm.inner.logs] AFTER [JournalInner::finalize] (called by
  *  [commit_evm_journal_from_external]) had cleared it.  Both the
  *  precompile's [CrossRuntimeCallReceived] log and any LOG0..LOG4 from the inner
- *  EVM call were lost; only the [CrossRuntimeCallIdEvent] survived because it is
- *  constructed by the receipt builder itself.
+ *  EVM call were lost, leaving an empty log list on the receipt.
  *
  *  This test deploys [events.sol], invokes [emitBoth(uint256)] via the
  *  gateway's [%call_evm], and asserts that:
  *    - the synthetic CRAC tx receipt carries the contract's two events
- *      ([EventA] + [EventB]) plus precompile bookkeeping events
- *      ([CrossRuntimeCallIdEvent] + [CrossRuntimeCallReceived]);
+ *      ([EventA] + [EventB]) plus the precompile's bookkeeping event
+ *      ([CrossRuntimeCallReceived]);
  *    - [eth_getLogs] filtered by the contract address returns those
  *      events, restoring parity with a regular EVM-EOA call.
  *)
@@ -3883,23 +3882,14 @@ let test_crac_tez_to_evm_inner_logs_in_receipt () =
       logs
   in
   Check.(
-    (List.length precompile_logs = 2)
+    (List.length precompile_logs = 1)
       int
       ~error_msg:
-        "Expected 2 precompile logs (CrossRuntimeCallIdEvent + \
-         CrossRuntimeCallReceived) on the synthetic CRAC tx receipt, got %L") ;
-  let crac_id_event_topic =
-    "0x61df1a226f0cb85d398505b17329bf903b0da0bd0daa31c054680ba2da2724e8"
-  in
+        "Expected 1 precompile log (CrossRuntimeCallReceived) on the synthetic \
+         CRAC tx receipt, got %L") ;
   let crac_received_topic =
     "0xfed9a84c1a0b3f03a08e089ccd124decdf96e24756f1963dbcef903c803d5b09"
   in
-  Check.(
-    (count_with_topic0 precompile_logs crac_id_event_topic = 1)
-      int
-      ~error_msg:
-        "Expected exactly 1 CrossRuntimeCallIdEvent log on the CRAC receipt, \
-         got %L") ;
   Check.(
     (count_with_topic0 precompile_logs crac_received_topic = 1)
       int
