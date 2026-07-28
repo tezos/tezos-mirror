@@ -24,7 +24,7 @@ use tezos_execution::{
     enshrined_contracts::CracError,
     mir_ctx::{clear_temporary_big_maps, InterpretContext, OperationCtx, TcCtx},
     originate_contract, storage_fees, typecheck_code_and_storage, CracTransferError,
-    OriginationNonce, TezlinkOperationGas,
+    TezlinkOperationGas,
 };
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
@@ -765,43 +765,30 @@ where
         interpret_context: InterpretContext::new(),
         next_temporary_id: &mut next_temp_id,
     };
-    // Resume the inbound-CRAC origination nonce from the Michelson
-    // journal so two sequential inbound CRACs in the same synthetic
-    // op (e.g. an EVM transaction calling two distinct Michelson
-    // callees in turn) keep monotonically increasing indices and
-    // therefore derive distinct child KT1s — child KT1 is
-    // `digest_160(operation_hash[32] || index[4])`, so without this
-    // each handler invocation would restart from index 0 and the
-    // two CRACs' `CREATE_CONTRACT`s would land on the same KT1
-    // (L2-1366).
+    // Nothing to set up for the origination nonce: it lives on the
+    // Michelson journal, which owns it for the whole manager operation,
+    // and `Ctx::origination_counter` claims indices straight from there
+    // (`MichelsonJournal::next_origination_index`). That is what keeps
+    // two sequential inbound CRACs — and a native origination in the
+    // same operation — on distinct child KT1s: child KT1 is
+    // `digest_160(operation_hash[32] || index[4])`, so a per-frame index
+    // restarting at 0 would collide (L2-1366). Claiming rather than
+    // resuming a local copy also covers the nested case, where an outer
+    // frame's copy would go stale as soon as an inner frame originated.
     //
-    // The operation hash is set on the journal at construction time
-    // by the caller (`TezosXJournal::new`) and is stable for the
-    // rest of the journal's lifetime; the canonical derivation
-    // (`crac:<block_number>:<crac_id>`) makes two different
-    // synthetic Michelson manager operations see distinct seeds
-    // (cross-operation and cross-block isolation), mirroring the
-    // per-op-hash entropy the native L1 path obtains from the real
-    // operation hash in `tezos_execution::apply_operation`.
-    let mut nonce = OriginationNonce {
-        operation: journal.michelson.operation_hash().clone(),
-        index: journal.michelson.origination_index(),
-    };
     // Resume the MIR internal-operation counter from the Michelson
-    // journal, mirroring `origination_index` above (L2-1676). The
-    // counter is the replay identity L1 enforces for internal
-    // operations; without resuming it, each reentrant inbound Michelson
-    // frame would restart from 0, so two internal operations in an
-    // `EVM → Michelson → EVM → Michelson` chain could share the same
-    // counter and break L1's single internal-nonce namespace for the
-    // manager operation's internal-op tree. The post-execution value is
-    // written back below (`set_internal_operation_counter`), and a
-    // subsequent `revert_frame` rolls it back to the value captured at
-    // frame entry — exactly like `origination_index`.
+    // journal (L2-1676). The counter is the replay identity L1 enforces
+    // for internal operations; without resuming it, each reentrant
+    // inbound Michelson frame would restart from 0, so two internal
+    // operations in an `EVM → Michelson → EVM → Michelson` chain could
+    // share the same counter and break L1's single internal-nonce
+    // namespace for the manager operation's internal-op tree. The
+    // post-execution value is written back below
+    // (`set_internal_operation_counter`), and a subsequent
+    // `revert_frame` rolls it back to the value captured at frame entry.
     let mut counter = journal.michelson.internal_operation_counter();
     let mut operation_ctx = OperationCtx {
         source: &source_account,
-        origination_nonce: &mut nonce,
         counter: &mut counter,
         // Fresh per inbound CRAC servicing, scoped exactly like
         // `counter`: an internal-operation replay (a DUP'd `operation`
@@ -911,23 +898,18 @@ where
     // persisted back to the journal below for the next reentrant frame
     // to resume from (L2-1676).
     let final_internal_operation_counter = *operation_ctx.counter;
-    // Persist the post-execution origination index back to the
-    // journal on every path (success, failure, OOG): MIR has had
-    // its mutable borrow of `nonce` released by `cross_runtime_transfer`
-    // returning, so `nonce.index` now reflects all `CREATE_CONTRACT`s
-    // performed during this inbound CRAC.  Writing it back here lets
-    // the next inbound CRAC in the same synthetic op (e.g. a second
-    // EVM→Michelson call in the same transaction) resume from a
-    // distinct index rather than re-using an already-consumed slot.
-    // A subsequent `revert_frame` on the enclosing EVM frame will
-    // roll the index back to the value captured at frame entry.
-    journal.michelson.set_origination_index(nonce.index);
+    // The origination index needs no write-back: MIR claimed its indices
+    // directly from the journal during execution, so the journal already
+    // reflects every `CREATE_CONTRACT` this inbound CRAC performed. A
+    // subsequent `revert_frame` on the enclosing EVM frame rolls it back
+    // to the value captured at frame entry.
+    //
     // Persist the post-execution MIR internal-operation counter back to
-    // the journal on every path, identically to `origination_index`
-    // above: the next reentrant inbound Michelson frame resumes from
-    // this value so internal-operation replay identities stay monotonic
-    // across the whole NAC transaction, and a subsequent `revert_frame`
-    // on the enclosing EVM frame rolls it back to the frame-entry value
+    // the journal on every path (success, failure, OOG): the next
+    // reentrant inbound Michelson frame resumes from this value so
+    // internal-operation replay identities stay monotonic across the
+    // whole NAC transaction, and a subsequent `revert_frame` on the
+    // enclosing EVM frame rolls it back to the frame-entry value
     // (L2-1676).
     journal
         .michelson

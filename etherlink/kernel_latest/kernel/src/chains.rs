@@ -33,7 +33,7 @@ use revm_etherlink::{
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use std::fmt::Debug;
-use tezos_crypto_rs::hash::{BlockHash, ChainId, UnknownSignature};
+use tezos_crypto_rs::hash::{BlockHash, ChainId, OperationHash, UnknownSignature};
 use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
@@ -767,18 +767,17 @@ impl TezosXChainConfig {
     {
         let tx_hash = operation.tx_hash;
         let crac_id = tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
-        // The seed must NOT be the operation's real hash: the
-        // normal Michelson path inside `apply_tezos_operation`
-        // builds its own `OriginationNonce::initial(real_hash)`
-        // starting at index 0, and if the journal's CRAC nonce
-        // shared the same seed both nonces would derive
-        // colliding KT1s at index 1.  Use a synthetic seed so
-        // the two nonce universes stay disjoint.
-        let operation_hash = TezosXJournal::synthetic_operation_hash(
-            &crac_id,
-            self.evm_chain_id.low_u64(),
-            block_in_progress.number.low_u64(),
-        );
+        // The journal holds the single origination nonce for the whole
+        // manager operation, seeded from the operation hash. Both arms seed
+        // it with the very hash the operation's receipt carries, so the KT1s
+        // a `CREATE_CONTRACT` derives and the hash observers see in the Tezos
+        // block cannot drift apart.
+        let operation_hash = match &operation.content {
+            TezlinkContent::Tezos(operation) => operation.hash()?,
+            // Mirroring `pure_xtz_deposit` / `pure_fa_deposit` in apply.rs, which likewise seed the
+            // journal with the deposit's own `transaction_hash`
+            TezlinkContent::Deposit(_) => OperationHash::from(operation.tx_hash),
+        };
         // Seed the journal with this block's EVM environment so any
         // inbound CRAC the Michelson operation dispatches to the EVM
         // runtime exposes the live block observables (BASEFEE,
@@ -1118,8 +1117,9 @@ where
 
     match operation.content {
         TezlinkContent::Tezos(operation) => {
-            // Compute the hash of the operation
-            let hash = operation.hash()?;
+            // Read the operation hash back from the journal rather than computing for a second
+            // blake2b.
+            let hash = external_journal.michelson.operation_hash().clone();
 
             let FeesData {
                 required_fees: fees,
@@ -1170,7 +1170,6 @@ where
                 host,
                 registry,
                 journal,
-                hash.clone(),
                 operation,
                 &block_ctx,
                 skip_signature_check,
