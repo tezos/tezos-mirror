@@ -199,20 +199,23 @@ pub fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
 }
 
 // Keyspace-relative keys for the blueprint sub-paths. They emit keys relative
-// to the `/base` prefix (`/blueprints/<n>/...`) that resolve, once
-// concatenated with the prefix, to the exact same durable paths as the
-// absolute `concat`-built ones above.
+// to the `/base` prefix (`/blueprints/<n>/...`) that resolve, once concatenated
+// with the prefix, to the historical durable paths. This is the sole definition
+// of that shape; a sub-key passes its own suffix, the blueprint itself none.
+fn blueprint_key(number: U256, suffix: &str) -> Result<Key, StorageError> {
+    Key::try_from(format!("/blueprints/{number}{suffix}")).map_err(StorageError::from)
+}
+
 fn blueprint_chunk_key(number: U256, chunk_index: u16) -> Result<Key, StorageError> {
-    Key::try_from(format!("/blueprints/{number}/{chunk_index}"))
-        .map_err(StorageError::from)
+    blueprint_key(number, &format!("/{chunk_index}"))
 }
 
 fn blueprint_nb_chunks_key(number: U256) -> Result<Key, StorageError> {
-    Key::try_from(format!("/blueprints/{number}/nb_chunks")).map_err(StorageError::from)
+    blueprint_key(number, "/nb_chunks")
 }
 
 fn blueprint_generation_key(number: U256) -> Result<Key, StorageError> {
-    Key::try_from(format!("/blueprints/{number}/generation")).map_err(StorageError::from)
+    blueprint_key(number, "/generation")
 }
 
 // 32-byte little-endian `U256` read/write through a keyspace handle, mirroring
