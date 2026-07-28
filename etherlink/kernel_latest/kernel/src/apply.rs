@@ -9,12 +9,11 @@
 use alloy_sol_types::{sol, SolCall};
 use evm_inspectors::{get_tracer_configuration, TracerInput};
 use primitive_types::{H160, U256};
-use revm::primitives::alloy_primitives::IntoLogData;
 use revm::primitives::{Address, Bytes};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
-    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
+    XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
 };
 use revm_etherlink::precompiles::send_outbox_message::{
     FastWithdrawalInterface, RouterInterface, Withdrawal,
@@ -50,13 +49,6 @@ use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
 use crate::journal::{self, close_tezosx_journal};
 use crate::transaction::{Transaction, TransactionContent};
-
-sol! {
-    /// Emitted once at the top of every EVM transaction receipt that
-    /// involves cross-runtime calls, whether incoming or outgoing.
-    /// Allows indexers to correlate operations across derived blocks.
-    event CrossRuntimeCallIdEvent(string crossRuntimeCallId);
-}
 
 pub struct TransactionReceiptInfo {
     pub tx_hash: TransactionHash,
@@ -273,18 +265,7 @@ pub fn extract_cross_runtime_effects(
 
     if let Some(tx_info) = journal.evm.take_crac_data() {
         let crac_id = journal.crac_id().to_string();
-
-        // Build a synthetic CrossRuntimeCallIdEvent log as the first log in the receipt.
-        let crac_id_log = revm::primitives::Log {
-            address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-            data: CrossRuntimeCallIdEvent {
-                crossRuntimeCallId: crac_id.clone(),
-            }
-            .to_log_data(),
-        };
-
-        let mut logs = vec![crac_id_log];
-        logs.extend(journal.evm.inner.logs.iter().cloned());
+        let logs = std::mem::take(&mut journal.evm.inner.logs);
 
         effects.push(CrossRuntimeEffect::Evm(EvmCracEffect {
             crac_id,
