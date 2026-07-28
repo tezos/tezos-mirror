@@ -90,4 +90,5 @@ let test_increase_paid_storage_z =
 
 let register ~protocols =
   test_increase_paid_storage protocols ;
-  test_increase_paid_storage_z (List.filter (( = ) Protocol.U025) protocols)
+  test_increase_paid_storage_z
+    (List.filter (fun p -> p = Protocol.Alpha || p = Protocol.U025) protocols)
