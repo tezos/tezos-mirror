@@ -755,6 +755,8 @@ module Make (C : AUTOMATON_CONFIG) :
   include Helpers
 
   module Subscribe = struct
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8377
+       Validate topic content before recording the subscription. *)
     let handle topic peer =
       let open Monad.Syntax in
       let*! connections in
@@ -2178,13 +2180,25 @@ module Make (C : AUTOMATON_CONFIG) :
   (* On spam protection
      ==================
 
-     We make the assumption that the bandwidth per peer can be limited. This
-     means that if the automaton allows a peer to send us an unbounded number of
-     messages, this is not a case of concern by itself. There is a case of
-     concern if this results in wasting space or CPU time.
+     Two complementary defences bound the resources a single misbehaving peer
+     can consume:
 
-     Another assumption we make is that messages are of bounded size, because
-     the message encoding should ensure this.
+     1. Automaton-level per-peer caps (documented per message type below) bound
+        how much state growth a peer can force inside the automaton, regardless
+        of how many messages it sends.
+
+     2. Worker-level input-queue cap: the gossipsub worker exposes
+        [bounded_p2p_input] (see module [Gossipsub_worker]), which drops
+        incoming P2P events when the shared input queue already holds
+        [max_transport_input_queue_length] unprocessed entries. This prevents a
+        fast peer from growing the queue without bound, at the cost of possibly
+        dropping legitimate events from other peers during a sustained flood.
+        The proper long-term fix for that residual starvation risk is per-peer
+        input isolation (a separate bounded queue per remote peer, as in
+        go-libp2p-pubsub), see https://gitlab.com/tezos/tezos/-/work_items/8376.
+
+     We also assume that messages are of bounded size, because the message
+     encoding should ensure this.
 
      We detail next for each p2p message type what checks are (or are not) in
      place concerning the receipt of "spam" and what are the concerns.
@@ -2244,7 +2258,14 @@ module Make (C : AUTOMATON_CONFIG) :
        are not counted.
      - Potential problems:
        - receiving a large number of duplicates, as all duplicate message ids
-         are stored in the cache *)
+         are stored in the cache.
+       - a peer flooding the worker's input queue with full messages is the
+         main scenario where the [bounded_p2p_input] cap (see point 2 above)
+         causes collateral drops for other peers. Full messages (e.g. DAL
+         shards) are expensive to process (KZG verification, storage writes),
+         so they drain slowly and the queue stays full for longer, extending
+         the starvation window. As a secondary concern, a count-based cap does
+         not bound total memory when messages vary greatly in size. *)
 
   (* "Getters" *)
 
