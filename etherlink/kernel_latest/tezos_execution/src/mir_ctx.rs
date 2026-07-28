@@ -7,7 +7,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::account_storage::{
     Code, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
-use crate::address::OriginationNonce;
 use crate::context::{address_registry, big_maps::*};
 use crate::get_contract_entrypoint;
 use crate::{
@@ -99,12 +98,15 @@ pub struct TcCtx<'operation, Host: StorageV1> {
 }
 
 pub struct OperationCtx<'operation> {
-    // In reality, 'source' and 'origination_nonce' have
-    // a 'batch lifetime. Downgrade it to an 'operation
-    // lifetime is not a problem for the compiler.
+    // In reality, 'source' has a 'batch lifetime. Downgrade it to an
+    // 'operation lifetime is not a problem for the compiler.
     // However, it could be misleading in terms of comprehension
     pub source: &'operation TezosImplicitAccount,
-    pub origination_nonce: &'operation mut OriginationNonce,
+    // The origination nonce is deliberately absent: it lives on the
+    // Michelson journal, which is the operation's single owner for it
+    // (see `MichelsonJournal::next_origination_index`). Keeping a `&mut`
+    // to it here would both alias `Ctx::journal` and reintroduce the
+    // stale-local-copy collision between nested frames.
     /// MIR internal-operation counter — the replay identity L1 enforces
     /// for internal operations. Incremented by `operation_counter()`
     /// each time the contract emits an operation. In the native L1 path
@@ -382,15 +384,15 @@ impl<'a, Host: StorageV1, R: tezosx_interfaces::Registry> CtxTrait<'a>
     }
 
     fn operation_group_hash(&self) -> &OperationHash {
-        &self.operation_ctx.origination_nonce.operation
+        self.journal.michelson.operation_hash()
     }
 
     fn origination_counter(&mut self) -> u32 {
-        // Use-then-increment like L1: first CREATE_CONTRACT uses index 0.
-        let c: &mut u32 = &mut self.operation_ctx.origination_nonce.index;
-        let current = *c;
-        *c += 1;
-        current
+        // Claim from the journal — the operation's single origination
+        // nonce — so a native origination and one reached through an
+        // inbound CRAC never land on the same index. Use-then-increment
+        // like L1: the first CREATE_CONTRACT uses index 0.
+        self.journal.michelson.next_origination_index()
     }
 
     fn operation_counter(&mut self) -> u128 {
@@ -2545,7 +2547,6 @@ pub mod tests {
     fn lookup_view_storage_balance_returns_none_for_unoriginated_kt1() {
         use crate::account_storage::TezosImplicitAccount;
         use crate::account_storage::TezosOriginatedAccount;
-        use crate::address::OriginationNonce;
         use mir::ast::michelson_address::AddressHash;
         use tezos_smart_rollup_host::path::RefPath;
 
@@ -2562,7 +2563,6 @@ pub mod tests {
             path: RefPath::assert_from(b"/mock_source").into(),
             pkh: bootstrap_pkh.clone(),
         };
-        let mut origination_nonce = OriginationNonce::default();
         let mut counter = 0u128;
         let level = BlockNumber { block_number: 0 };
         let now = Timestamp::from(0);
@@ -2571,7 +2571,6 @@ pub mod tests {
 
         let mut operation_ctx = OperationCtx {
             source: &source,
-            origination_nonce: &mut origination_nonce,
             counter: &mut counter,
             applied_counters: std::collections::BTreeSet::new(),
             level: &level,
@@ -3131,7 +3130,6 @@ pub mod tests {
     fn enshrined_synthetic_views_dispatch_in_sync() {
         use crate::account_storage::TezosImplicitAccount;
         use crate::account_storage::TezosOriginatedAccount;
-        use crate::address::OriginationNonce;
         use crate::enshrined_contracts::EnshrinedContracts;
         use mir::ast::michelson_address::AddressHash;
         use tezos_crypto_rs::hash::HashTrait;
@@ -3150,7 +3148,6 @@ pub mod tests {
             path: RefPath::assert_from(b"/mock_source").into(),
             pkh: bootstrap_pkh.clone(),
         };
-        let mut origination_nonce = OriginationNonce::default();
         let mut counter = 0u128;
         let level = BlockNumber { block_number: 0 };
         let now = Timestamp::from(0);
@@ -3159,7 +3156,6 @@ pub mod tests {
 
         let mut operation_ctx = OperationCtx {
             source: &source,
-            origination_nonce: &mut origination_nonce,
             counter: &mut counter,
             applied_counters: std::collections::BTreeSet::new(),
             level: &level,

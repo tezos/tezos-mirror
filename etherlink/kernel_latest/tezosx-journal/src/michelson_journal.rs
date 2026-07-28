@@ -172,23 +172,30 @@ pub struct MichelsonJournal {
     /// them block-wide from the flat list order at block
     /// finalization.
     pending_alias_origination_internals: Vec<InternalOperationSum>,
-    /// Operation hash of this synthetic Michelson manager operation.
-    /// Set once at construction and never mutated thereafter; read
-    /// through [`Self::operation_hash`].  A child KT1 originated
-    /// through an inbound `CREATE_CONTRACT` is
-    /// `digest_160(operation_hash[32] || index[4])`, so this value
-    /// MUST be deterministic AND unique: two child KT1s may collide
-    /// only when their indices collide, never across two distinct
-    /// synthetic operations.  See [`crate::TezosXJournal::new`] for
-    /// the exact seed computation.
+    /// Operation hash of this Michelson manager operation — the seed
+    /// half of the operation's single origination nonce.  Set once at
+    /// construction and never mutated thereafter; read through
+    /// [`Self::operation_hash`].  A child KT1 originated by a
+    /// `CREATE_CONTRACT` is `digest_160(operation_hash[32] ||
+    /// index[4])`, so this value MUST be deterministic AND unique: two
+    /// child KT1s may collide only when their indices collide, never
+    /// across two distinct operations.  For a Tezos-entered operation
+    /// this is the real `Operation::hash()`, matching L1; for an
+    /// EVM-entered synthetic operation — which has no real hash — see
+    /// [`crate::TezosXJournal::synthetic_operation_hash`].
     operation_hash: OperationHash,
-    /// Monotonic origination-nonce index, incremented once per
-    /// `CREATE_CONTRACT` executed through an inbound CRAC.  Persisted
-    /// across multiple inbound CRAC handler invocations within the
-    /// same synthetic Michelson manager operation so two sequential
-    /// CRACs (e.g. an EVM transaction calling two distinct Michelson
-    /// callees in turn) get consecutive indices — and therefore
-    /// distinct child KT1s — rather than restarting from 0 each time.
+    /// Index half of the operation's single origination nonce:
+    /// monotonic, incremented once per `CREATE_CONTRACT`, whether the
+    /// origination is native Michelson or reached through an inbound
+    /// CRAC.  This journal is the *sole* owner — indices are claimed
+    /// through [`Self::next_origination_index`], never copied into a
+    /// local and written back — so nested and sequential frames alike
+    /// (`EVM → Michelson → EVM → Michelson`, or a native origination
+    /// after a CRAC-reached one) draw from one sequence and cannot
+    /// collide on a child KT1.  Rolled back by `revert_frame` for
+    /// EVM-driven frames, and by
+    /// [`Self::restore_origination_index`] on the native path, which
+    /// opens no journal frame.
     origination_index: u32,
     /// Monotonic MIR internal-operation counter — the replay identity
     /// L1 enforces for internal operations (`Internal_operation_replay`).
@@ -222,12 +229,14 @@ impl Default for MichelsonJournal {
 }
 
 impl MichelsonJournal {
-    /// Construct a fresh Michelson journal for one synthetic Michelson
-    /// manager operation.  [`operation_hash`] seeds the inbound-CRAC
-    /// origination nonce; it MUST be derived deterministically from
-    /// the originating transaction's context (typically
-    /// `blake2b(crac:<block_number>:<crac_id>)`) so two distinct
-    /// synthetic ops in the same block see different seeds.
+    /// Construct a fresh Michelson journal for one Michelson manager
+    /// operation.  [`operation_hash`] seeds the operation's single
+    /// origination nonce, shared by native and CRAC-reached
+    /// originations alike; it MUST be deterministic and unique per
+    /// operation.  Pass the real `Operation::hash()` when the operation
+    /// is Tezos-entered; for an EVM-entered synthetic operation, which
+    /// has no real hash, derive it with
+    /// [`crate::TezosXJournal::synthetic_operation_hash`].
     pub fn new(operation_hash: OperationHash) -> Self {
         Self {
             snapshots: Vec::new(),
@@ -305,29 +314,54 @@ impl MichelsonJournal {
         &self.operation_hash
     }
 
-    /// Current inbound-CRAC origination-nonce index — the count of
-    /// `CREATE_CONTRACT`s already performed in this synthetic
-    /// Michelson manager operation.  Combined with
+    /// Current origination-nonce index — the count of
+    /// `CREATE_CONTRACT`s already performed in this Michelson manager
+    /// operation, native and CRAC-reached alike.  Combined with
     /// [`Self::operation_hash`] to derive the next child KT1 as
-    /// `digest_160(operation_hash || index+1)`.
+    /// `digest_160(operation_hash || index)`.
     ///
-    /// Persisted across multiple inbound CRAC handler invocations
-    /// within the same synthetic op so two sequential CRACs see
-    /// consecutive indices — and therefore distinct child KT1s —
-    /// rather than restarting from 0 each time.  Pair every read
-    /// with [`set_origination_index`](Self::set_origination_index)
-    /// to write the post-execution value back.
+    /// Read this only to snapshot the value; claim indices with
+    /// [`next_origination_index`](Self::next_origination_index) so no
+    /// caller ever holds a stale local copy.
     pub fn origination_index(&self) -> u32 {
         self.origination_index
     }
 
-    /// Persist `index` as the new origination-nonce index, typically
-    /// called by the inbound-CRAC handler at the end of an
-    /// `execute_entrypoint_call` to record the count of
-    /// `CREATE_CONTRACT`s performed in that call.  The next inbound
-    /// CRAC will resume from this value.
-    pub fn set_origination_index(&mut self, index: u32) {
+    /// Restore the origination-nonce index to a previously snapshotted
+    /// value.  Needed on the native Michelson path, which reverts
+    /// through `SafeStorage` without opening a journal frame, so the
+    /// checkpoint machinery that rolls this back for EVM-driven frames
+    /// does not fire: a backtracked batch must not consume indices, as
+    /// on L1 the nonce dies with the reverted context.
+    pub fn restore_origination_index(&mut self, index: u32) {
         self.origination_index = index;
+    }
+
+    /// Claim the next origination-nonce index, use-then-increment like
+    /// L1 (`raw_context.ml increment_origination_nonce`): the first
+    /// `CREATE_CONTRACT` of the operation gets index 0.
+    ///
+    /// This is the single source of truth for the whole manager
+    /// operation.  Native originations and those reached through an
+    /// inbound CRAC claim from the same sequence, so an
+    /// `EVM → Michelson → EVM → Michelson` chain — or a native
+    /// origination following a CRAC-reached one — can never collide on
+    /// a child KT1.  Claiming (rather than a read/write-back pair) is
+    /// what makes that safe under nesting: an outer frame holding a
+    /// local copy while an inner frame bumps the journal is exactly the
+    /// collision this avoids.
+    ///
+    /// `u32` overflow would need 2^32 originations in a single manager
+    /// operation, which no gas limit permits — use `checked_add` so the
+    /// invariant is explicit rather than saturating, which would tie two
+    /// originations to the same index and collide their KT1s.
+    pub fn next_origination_index(&mut self) -> u32 {
+        let current = self.origination_index;
+        self.origination_index = self
+            .origination_index
+            .checked_add(1)
+            .expect("origination nonce index overflowed u32");
+        current
     }
 
     /// Current MIR internal-operation counter — the highest replay
@@ -1678,16 +1712,22 @@ mod tests {
         assert_eq!(*journal.operation_hash(), dummy_hash(0xAA));
     }
 
-    // The index returned by `origination_index()` is the value last
-    // written via `set_origination_index`; consecutive inbound CRACs
-    // in the same synthetic op observe consecutive indices.
+    // Indices are claimed, use-then-increment: the first
+    // `CREATE_CONTRACT` of the operation gets 0, and every subsequent
+    // claim — from a later CRAC, a nested frame, or the native path —
+    // draws the next one from the same sequence.
     #[test]
-    fn test_origination_nonce_index_persists_across_calls() {
+    fn test_origination_nonce_index_is_claimed_in_sequence() {
         let mut journal = MichelsonJournal::new(dummy_hash(0x01));
         assert_eq!(journal.origination_index(), 0);
-        journal.set_origination_index(3); // CRAC A originated 3 children
+        // CRAC A originates three children.
+        assert_eq!(journal.next_origination_index(), 0);
+        assert_eq!(journal.next_origination_index(), 1);
+        assert_eq!(journal.next_origination_index(), 2);
         assert_eq!(journal.origination_index(), 3);
-        journal.set_origination_index(5); // CRAC B originated 2 more
+        // CRAC B continues from there rather than restarting at 0.
+        assert_eq!(journal.next_origination_index(), 3);
+        assert_eq!(journal.next_origination_index(), 4);
         assert_eq!(journal.origination_index(), 5);
     }
 
@@ -1701,7 +1741,8 @@ mod tests {
         // Outer EVM frame enters at index 0.
         journal.push_external_checkpoint();
         // Inbound CRAC inside that frame originated two children.
-        journal.set_origination_index(2);
+        journal.next_origination_index();
+        journal.next_origination_index();
         assert_eq!(journal.origination_index(), 2);
         // Outer frame reverts: index must drop back to 0.
         journal.revert_frame(&mut host).unwrap();
@@ -1716,7 +1757,8 @@ mod tests {
         let mut host = MockHost::default();
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         journal.push_external_checkpoint();
-        journal.set_origination_index(2);
+        journal.next_origination_index();
+        journal.next_origination_index();
         journal.commit_frame(&mut host).unwrap();
         assert_eq!(journal.origination_index(), 2);
     }
@@ -1727,18 +1769,39 @@ mod tests {
     fn test_origination_index_nested_revert_only_inner() {
         let mut host = MockHost::default();
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
-        // Outer frame
+        // Outer frame: outer CRAC originates 2.
         journal.push_external_checkpoint();
-        journal.set_origination_index(2); // outer CRAC originated 2
-                                          // Inner frame
+        journal.next_origination_index();
+        journal.next_origination_index();
+        // Inner frame: inner CRAC originates 3 more.
         journal.push_external_checkpoint();
-        journal.set_origination_index(5); // inner CRAC originated 3 more
-                                          // Inner reverts: index back to 2 (outer's tail), NOT to 0.
+        journal.next_origination_index();
+        journal.next_origination_index();
+        journal.next_origination_index();
+        assert_eq!(journal.origination_index(), 5);
+        // Inner reverts: index back to 2 (outer's tail), NOT to 0.
         journal.revert_frame(&mut host).unwrap();
         assert_eq!(journal.origination_index(), 2);
         // Outer commits: index stays at 2.
         journal.commit_frame(&mut host).unwrap();
         assert_eq!(journal.origination_index(), 2);
+    }
+
+    // The native Michelson path opens no journal frame (it reverts
+    // through `SafeStorage`), so it hands indices back explicitly. A
+    // backtracked batch must not consume any.
+    #[test]
+    fn test_restore_origination_index_releases_claimed_indices() {
+        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
+        journal.next_origination_index();
+        let before = journal.origination_index();
+        journal.next_origination_index();
+        journal.next_origination_index();
+        assert_eq!(journal.origination_index(), 3);
+        journal.restore_origination_index(before);
+        assert_eq!(journal.origination_index(), 1);
+        // The released slot is handed out again.
+        assert_eq!(journal.next_origination_index(), 1);
     }
 
     // L2-1676: the MIR internal-operation counter is the replay
