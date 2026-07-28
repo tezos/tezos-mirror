@@ -504,7 +504,12 @@ let job_rust_sdk_bindings_based_images =
 
    [--allow=fs.read=/tmp/npm_token.txt] grants the filesystem entitlement that
    recent buildx requires to read the npm_token secret declared on the e2etest
-   target (its src is outside the build context). *)
+   target (its src is outside the build context).
+
+   When the operator sets [DOCKER_FORCE_BUILD=true] (e.g. in the scheduled
+   [base_images.daily] pipeline), pass [--no-cache] to bake so the images are
+   rebuilt from scratch with fresh packages, as
+   [scripts/ci/build-base-images.sh] does for the other base images. *)
 let job_alpine_ci =
   Cacio.parameterize @@ fun arch ->
   let arch_str = Runner.Arch.show_uniform arch in
@@ -522,7 +527,9 @@ let job_alpine_ci =
         "docker buildx create --driver docker-container --use --name tezos";
         Format.sprintf
           "docker buildx bake --allow=fs.read=/tmp/npm_token.txt --push --set \
-           \"*.platform=linux/%s\" -f images/ci/ci-images.hcl"
+           \"*.platform=linux/%s\" $(if [ \"${DOCKER_FORCE_BUILD:-false}\" = \
+           \"true\" ]; then echo \"--no-cache\"; fi) -f \
+           images/ci/ci-images.hcl"
           arch_str;
       ]
     ~__POS__

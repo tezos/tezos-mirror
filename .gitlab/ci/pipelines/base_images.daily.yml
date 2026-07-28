@@ -91,6 +91,7 @@ images.alpine-ci-all:amd64:
   - ./scripts/ci/docker_initialize.sh
   - docker buildx create --driver docker-container --use --name tezos
   - docker buildx bake --allow=fs.read=/tmp/npm_token.txt --push --set "*.platform=linux/amd64"
+    $(if [ "${DOCKER_FORCE_BUILD:-false}" = "true" ]; then echo "--no-cache"; fi)
     -f images/ci/ci-images.hcl
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -124,6 +125,7 @@ images.alpine-ci-all:arm64:
   - ./scripts/ci/docker_initialize.sh
   - docker buildx create --driver docker-container --use --name tezos
   - docker buildx bake --allow=fs.read=/tmp/npm_token.txt --push --set "*.platform=linux/arm64"
+    $(if [ "${DOCKER_FORCE_BUILD:-false}" = "true" ]; then echo "--no-cache"; fi)
     -f images/ci/ci-images.hcl
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
