@@ -109,6 +109,30 @@ impl Tracer {
             Tracer::StructLogger(struct_logger) => struct_logger.inject_log(log),
         }
     }
+
+    /// See [`CallTracer::fake_top_level_call`]; no-op on the struct
+    /// logger, which records opcodes, not call frames.
+    pub fn fake_top_level_call(&mut self, caller: Address, gas_limit: u64) {
+        match self {
+            Tracer::CallTracer(call_tracer) => {
+                call_tracer.fake_top_level_call(caller, gas_limit)
+            }
+            Tracer::StructLogger(struct_logger) => {
+                struct_logger.fake_top_level_call(caller, gas_limit)
+            }
+        }
+    }
+
+    pub fn fake_top_level_call_end(&mut self, gas_spent: u64, status: bool) {
+        match self {
+            Tracer::CallTracer(call_tracer) => {
+                call_tracer.fake_top_level_call_end(gas_spent, status)
+            }
+            Tracer::StructLogger(struct_logger) => {
+                struct_logger.fake_top_level_call_end(gas_spent, status)
+            }
+        }
+    }
 }
 
 /// Access to the [`Tracer`] owned by a journal, for [`TracerInspector`].

@@ -215,7 +215,6 @@ where
                     execution_info,
                     host,
                     multiplier,
-                    tracer_input,
                 )?;
             }
             ExecutionResult::Invalid => {
