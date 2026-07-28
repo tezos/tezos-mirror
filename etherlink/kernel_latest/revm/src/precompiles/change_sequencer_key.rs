@@ -224,7 +224,8 @@ where
                 address: CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS,
                 data: log_data.into_log_data(),
             };
-            context.journal_mut().log(log);
+
+            super::log(context, log);
         }
     }
 

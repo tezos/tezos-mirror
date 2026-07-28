@@ -16,7 +16,7 @@ use revm::{
         CallInputs, CallOutcome, CreateInputs, CreateOutcome, InstructionResult,
         Interpreter, InterpreterTypes, Stack,
     },
-    primitives::{Address, Bytes, B256},
+    primitives::{Address, Bytes, Log, B256},
     state::AccountInfo,
     Database, Inspector,
 };
@@ -223,6 +223,8 @@ impl StructLogger {
             self.transaction_hash,
         )
     }
+
+    pub fn inject_log(&mut self, _log: Log) {}
 }
 
 fn to_structured_stack(st: &Stack) -> Vec<B256> {
