@@ -407,6 +407,8 @@ where
     Host: StorageV1 + CoreStorage + HostReveal + WasmHost,
 {
     let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
+    let mut base = crate::storage::load_base_keyspace(&mut host)
+        .expect("Failed to load the `/base` keyspace");
 
     let reboot_counter = host
         .host
@@ -477,8 +479,6 @@ where
             .unwrap();
     }
 
-    let mut base = crate::storage::load_base_keyspace(&mut host)
-        .expect("Failed to load the `/base` keyspace");
     if is_revealed_storage(&base) {
         reveal_storage(
             &mut host,
