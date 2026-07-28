@@ -99,6 +99,16 @@ impl Tracer {
             Tracer::StructLogger(struct_logger) => struct_logger.finalize(host, result),
         }
     }
+
+    /// Run the tracer logic related to logs outside of their usual emission spot (that is, within
+    /// the EVM interpreter). The kernel emits logs in unusual places like re-entrant smart
+    /// contracts (gateways) or outside of a real call frame (top-level fake EVM transactions)
+    pub fn inject_log(&mut self, log: Log) {
+        match self {
+            Tracer::CallTracer(call_tracer) => call_tracer.inject_log(log),
+            Tracer::StructLogger(struct_logger) => struct_logger.inject_log(log),
+        }
+    }
 }
 
 /// Access to the [`Tracer`] owned by a journal, for [`TracerInspector`].
