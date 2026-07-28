@@ -977,18 +977,19 @@ where
                     },
                 )?);
                 let dest_contract = contract_from_address(destination_address.hash)?;
-                // Unparsing needs the parameter by value, so a parameter still
-                // shared with the other occurrences of a `DUP`ed operation is
-                // copied here. This copy is NOT metered: `unwrap_rc` completes
-                // before `into_micheline_optimized_legacy` charges anything,
-                // and the per-operation gas limit allows building a value
-                // large enough that a single extra copy exceeds the heap. It
-                // is one transient copy rather than the N simultaneous ones
-                // MIR's finalization used to make (L2-1831), which is a
-                // reduction, not a bound. Bounding it needs the copy charged
-                // up front, or the unparser working from the borrow.
-                let value = TypedValue::unwrap_rc(param)
-                    .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?;
+                // Unparsed through the borrowed walk, which reads through the
+                // `Rc` and clones only leaf payloads, charging before it
+                // allocates. Taking the parameter by value here instead would
+                // copy it whenever it is still shared — with the other
+                // occurrences of a `DUP`ed operation, or with the returned
+                // storage — and that copy would land before any unparsing gas
+                // is charged, so the heap would run out before the gas did.
+                //
+                // A transfer parameter is `Passable`, and `operation` is not,
+                // so the walk's refusal of `operation` is unreachable here.
+                let value = param
+                    .clone_into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())
+                    .map_err(TransferError::from)?;
                 let encoded_value = value.encode(tc_ctx.gas())?.map_err(|e| {
                     TransferError::MichelineSerializationError(e.to_string())
                 })?;
@@ -1107,8 +1108,17 @@ where
                 };
                 let script = Script {
                     code: micheline_code.encode(tc_ctx.gas())?.map_err(encode_err)?,
-                    storage: TypedValue::unwrap_rc(storage.clone())
-                        .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
+                    // Borrowed, so the receipt's copy of the storage costs
+                    // nothing and `storage` stays uniquely owned for the
+                    // origination below — where `unwrap_rc` then moves rather
+                    // than copies. Taking it by value here would copy it, and
+                    // copy it again below, with the original still live.
+                    storage: storage
+                        .clone_into_micheline_optimized_legacy(
+                            &parser.arena,
+                            tc_ctx.gas(),
+                        )
+                        .map_err(OriginationError::from)?
                         .encode(tc_ctx.gas())?
                         .map_err(encode_err)?,
                 };
@@ -1172,9 +1182,26 @@ where
                 let emit_err = |e: tezos_data_encoding::enc::BinError| {
                     ApplyOperationError::EmitMichelineSerializationError(e.to_string())
                 };
+                // Borrowed, like the transfer parameter above: an `EMIT`ted
+                // value shared with the stack copy that produced it must not be
+                // copied before the unparser has charged for it.
                 let payload = Some(
-                    TypedValue::unwrap_rc(value)
-                        .into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())?
+                    value
+                        .clone_into_micheline_optimized_legacy(
+                            &parser.arena,
+                            tc_ctx.gas(),
+                        )
+                        .map_err(|e| match e {
+                            mir::ast::BorrowedUnparseError::OutOfGas => {
+                                ApplyOperationError::OutOfGas(mir::gas::OutOfGas)
+                            }
+                            mir::ast::BorrowedUnparseError::NonPushable => {
+                                ApplyOperationError::EmitMichelineSerializationError(
+                                    "value carries an operation, which is not pushable"
+                                        .to_string(),
+                                )
+                            }
+                        })?
                         .encode(tc_ctx.gas())?
                         .map_err(emit_err)?
                         .into(),
