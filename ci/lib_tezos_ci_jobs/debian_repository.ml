@@ -37,56 +37,9 @@ module CI = Cacio.Shared
    - Full: we run the complete test matrix *)
 type repository_pipeline = Full | Partial | Release
 
-(* "Distribution" would be a more proper name but the "Distro" slang
-   makes it more clear that we are talking about a Linux distribution
-   and not about the distribution of something else. (Also it's shorter.)
-
-   Feel free to move this into e.g. Tezos_ci.Images.Base_images instead.
-   For now it's only used in debian_repository.ml so we can define it here,
-   closer to where it is actually used. *)
-module Distro = struct
-  type name = Debian | Ubuntu
-
-  type t = {name : name; release : string}
-
-  let debian release = {name = Debian; release}
-
-  let ubuntu year month = {name = Ubuntu; release = sf "%02d.%02d" year month}
-
-  let name_for_humans = function Debian -> "Debian" | Ubuntu -> "Ubuntu"
-
-  let name_for_scripts distro = String.lowercase_ascii (name_for_humans distro)
-
-  let full_name_for_humans distro =
-    name_for_humans distro.name ^ " " ^ distro.release
-
-  let full_name_with_underscores distro =
-    name_for_scripts distro.name
-    ^ "_"
-    ^ String.map (function '.' -> '_' | c -> c) distro.release
-
-  let image distro =
-    let open Tezos_ci.Images.Base_images in
-    match distro with
-    | {name = Debian; release = "bookworm"} -> debian_bookworm
-    | {name = Debian; release = "trixie"} -> debian_trixie
-    | {name = Ubuntu; release = "22.04"} -> ubuntu_22_04
-    | {name = Ubuntu; release = "24.04"} -> ubuntu_24_04
-    | {name = Ubuntu; release = "26.04"} -> ubuntu_26_04
-    | _ -> failwith ("no base image for " ^ full_name_for_humans distro)
-
-  (* Image for jobs that just need one version that works, such as [apt_repo_*]. *)
-  let main_image = function
-    | Debian -> image (debian "trixie")
-    | Ubuntu -> image (ubuntu 24 04)
-
-  let supported_releases name pipeline_type =
-    match (name, pipeline_type) with
-    | Debian, Partial -> ["trixie"]
-    | Debian, (Full | Release) -> ["bookworm"; "trixie"]
-    | Ubuntu, Partial -> ["22.04"]
-    | Ubuntu, (Full | Release) -> ["22.04"; "24.04"; "26.04"]
-end
+let supported_releases (distro : Distro.name) = function
+  | Full | Release -> Distro.supported_releases distro
+  | Partial -> ( match distro with Debian -> ["trixie"] | Ubuntu -> ["22.04"])
 
 (** Return a tuple (ARCHITECTURES, <archs>) based on the type
     of repository pipeline. *)
@@ -183,7 +136,7 @@ let job_build =
        A dependency image will be built once for each combination of [RELEASE] and [TAGS]. *)
     [
       [
-        ("RELEASE", Distro.supported_releases distro pipeline_type);
+        ("RELEASE", supported_releases distro pipeline_type);
         ( "TAGS",
           match pipeline_type with
           | Partial -> [tag_amd64 ~ramfs:true]
@@ -237,7 +190,7 @@ let job_apt_repo =
           " "
           ("./scripts/ci/create_debian_repo.sh"
           :: Distro.name_for_scripts distro
-          :: Distro.supported_releases distro pipeline_type);
+          :: supported_releases distro pipeline_type);
       ]
 
 let job_lintian =
@@ -262,7 +215,7 @@ let job_lintian =
           " "
           ("./scripts/ci/lintian_debian_packages.sh"
           :: Distro.name_for_scripts distro
-          :: Distro.supported_releases distro pipeline_type);
+          :: supported_releases distro pipeline_type);
       ]
 
 (* Rebuild the Debian binary, data and keyring packages for trixie/amd64 and
@@ -408,8 +361,8 @@ let jobs pipeline_type =
   | Full | Release ->
       let concat_map l f = List.concat_map f l in
       concat_map [Distro.Debian; Ubuntu] @@ fun distro ->
-      concat_map (Distro.supported_releases distro pipeline_type)
-      @@ fun release -> jobs_for {name = distro; release} pipeline_type
+      concat_map (supported_releases distro pipeline_type) @@ fun release ->
+      jobs_for {name = distro; release} pipeline_type
 
 let () =
   (* Register the Debian partial jobs directly into before_merging and

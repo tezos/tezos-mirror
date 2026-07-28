@@ -166,20 +166,10 @@ module Files = struct
     ]
 end
 
-module Distribution = struct
-  type t = Debian | Ubuntu
+let release_matrix distro = [("RELEASE", Distro.supported_releases distro)]
 
-  let name = function Debian -> "debian" | Ubuntu -> "ubuntu"
-
-  let releases = function
-    | Debian -> ["bookworm"; "trixie"]
-    | Ubuntu -> ["22.04"; "24.04"; "26.04"]
-
-  let release_matrix distro = [("RELEASE", releases distro)]
-
-  let dockerfile = function
-    | Debian | Ubuntu -> "images/base-images/Dockerfile.debian"
-end
+let dockerfile = function
+  | Distro.Debian | Ubuntu -> "images/base-images/Dockerfile.debian"
 
 (* ── Cacio helpers ───────────────────────────────────────────────────────── *)
 
@@ -245,9 +235,9 @@ let job_debian_based_images =
   base_image_job
     ~image_name:"debian"
     ~base_name:(Upstream "debian:$RELEASE-slim")
-    ~matrix:Distribution.(release_matrix Debian)
+    ~matrix:(release_matrix Debian)
     ~compilation:Emulated
-    (Distribution.dockerfile Debian)
+    (dockerfile Debian)
     ~__POS__
     ~description:"Build debian base images"
     ~only_if_changed:Files.debian_base
@@ -258,9 +248,9 @@ let job_debian_based_images =
 let job_ubuntu_based_images =
   base_image_job
     ~image_name:"ubuntu"
-    ~matrix:Distribution.(release_matrix Ubuntu)
+    ~matrix:(release_matrix Ubuntu)
     ~compilation:Emulated
-    (Distribution.dockerfile Ubuntu)
+    (dockerfile Ubuntu)
     ~__POS__
     ~description:"Build ubuntu base images"
     ~only_if_changed:Files.debian_base
@@ -386,7 +376,7 @@ let job_debian_build_based_images =
   base_image_job
     ~image_name:"debian-build"
     ~base_name:(Pipeline_dep "debian")
-    ~matrix:Distribution.(release_matrix Debian)
+    ~matrix:(release_matrix Debian)
     ~compilation:Native
     "images/base-images/Dockerfile.debian-build"
     ~__POS__
@@ -404,7 +394,7 @@ let job_debian_build_based_images_merge =
     ~script:["scripts/ci/docker-merge-base-images.sh"]
     ~__POS__
     ~description:"Merge debian-build base image manifests"
-    ~parallel:(Matrix [Distribution.(release_matrix Debian)])
+    ~parallel:(Matrix [release_matrix Debian])
     ~only_if_changed:Files.(merge_script @ debian_build @ debian_base)
     ~needs:[(Cacio.Job, job_debian_build_based_images)]
     "images.debian-build.merge"
@@ -415,7 +405,7 @@ let job_ubuntu_build_based_images =
   base_image_job
     ~image_name:"ubuntu-build"
     ~base_name:(Pipeline_dep "ubuntu")
-    ~matrix:Distribution.(release_matrix Ubuntu)
+    ~matrix:(release_matrix Ubuntu)
     ~compilation:Native
     "images/base-images/Dockerfile.debian-build"
     ~__POS__
@@ -433,7 +423,7 @@ let job_ubuntu_build_based_images_merge =
     ~script:["scripts/ci/docker-merge-base-images.sh"]
     ~__POS__
     ~description:"Merge ubuntu-build base image manifests"
-    ~parallel:(Matrix [Distribution.(release_matrix Ubuntu)])
+    ~parallel:(Matrix [release_matrix Ubuntu])
     ~only_if_changed:Files.(merge_script @ debian_build @ debian_base)
     ~needs:[(Cacio.Job, job_ubuntu_build_based_images)]
     "images.ubuntu-build.merge"
@@ -446,7 +436,7 @@ let job_debian_systemd_based_images =
   base_image_job
     ~image_name:"debian-systemd"
     ~base_name:(Pipeline_dep "debian")
-    ~matrix:Distribution.(release_matrix Debian)
+    ~matrix:(release_matrix Debian)
     ~compilation:Amd64_only
     "images/base-images/Dockerfile.debian-systemd"
     ~__POS__
@@ -461,7 +451,7 @@ let job_ubuntu_systemd_based_images =
   base_image_job
     ~image_name:"ubuntu-systemd"
     ~base_name:(Pipeline_dep "ubuntu")
-    ~matrix:Distribution.(release_matrix Ubuntu)
+    ~matrix:(release_matrix Ubuntu)
     ~compilation:Amd64_only
     "images/base-images/Dockerfile.debian-systemd"
     ~__POS__
