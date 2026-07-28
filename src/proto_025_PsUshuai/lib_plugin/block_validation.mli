@@ -5,6 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type Environment.Error_monad.error +=
+  | Increase_paid_storage_amount_overflow of Z.t
+
 (** Fast shell-side state threaded through block validation. *)
 type block_validation_state
 
