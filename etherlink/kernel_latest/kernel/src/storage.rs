@@ -155,12 +155,6 @@ const EVM_CHAIN_ID_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/chain
 const MICHELSON_RUNTIME_CHAIN_ID: RefPath =
     RefPath::assert_from(b"/tez/world_state/chain_id");
 
-// Path to the Multichain feature flag. If there is nothing at this path,
-// a single chain is used.
-#[allow(dead_code)]
-pub const ENABLE_MULTICHAIN: RefPath =
-    RefPath::assert_from(b"/base/feature_flags/enable_multichain");
-
 // The absolute form remains for its writers (migrations and tests write the
 // flag through the raw host); the reader goes through the `/base` keyspace.
 #[cfg(test)]
