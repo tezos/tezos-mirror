@@ -550,6 +550,12 @@ let cross_runtime_run_tez =
     ~label:"cross_runtime_run_tez"
     ~contract:"CrossRuntimeRunTez"
 
+let crac_michelson_view_staticcall =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_michelson_view_staticcall.sol")
+    ~label:"crac_michelson_view_staticcall"
+    ~contract:"CracMichelsonViewStaticcall"
+
 let crac_http_call =
   compile_contract
     ~source:(solidity_contracts_path ^ "/crac_http_call.sol")
@@ -591,6 +597,49 @@ let crac_identity_recorder =
     ~source:(solidity_contracts_path ^ "/crac_identity_recorder.sol")
     ~label:"crac_identity_recorder"
     ~contract:"IdentityRecorder"
+
+(* Re-entrant EVM leaves whose [run()] performs a single inner call of a
+   given type (DELEGATECALL / STATICCALL), so the callTracer tree captured
+   under a cross-runtime crossing exercises those frame types. Used by the
+   [crac_trace] outgoing-NAC tezt suite (cross_runtime.ml). *)
+let crac_call_tracer_delegate_lib =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_call_tracer_runners.sol")
+    ~label:"crac_call_tracer_delegate_lib"
+    ~contract:"DelegateLib"
+
+let crac_call_tracer_delegate_runner =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_call_tracer_runners.sol")
+    ~label:"crac_call_tracer_delegate_runner"
+    ~contract:"DelegateRunner"
+
+let crac_call_tracer_static_view =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_call_tracer_runners.sol")
+    ~label:"crac_call_tracer_static_view"
+    ~contract:"StaticView"
+
+let crac_call_tracer_static_runner =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_call_tracer_runners.sol")
+    ~label:"crac_call_tracer_static_runner"
+    ~contract:"StaticRunner"
+
+(* Re-entrant EVM leaf whose [run()] drives a log-emitting child then reverts
+   with a known string; used by the [crac_trace] failure-matrix tezts to
+   exercise the reverted-subtree trace-log accounting (cross_runtime.ml). *)
+let crac_trace_reverter =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_trace_revert_runners.sol")
+    ~label:"crac_trace_reverter"
+    ~contract:"CracReverter"
+
+let crac_trace_reverter_child =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_trace_revert_runners.sol")
+    ~label:"crac_trace_reverter_child"
+    ~contract:"CracReverterChild"
 
 let gas_burner =
   compile_contract
