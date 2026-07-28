@@ -35,12 +35,6 @@ use tezos_storage::{keyspace, read_rlp, store_rlp};
 use tezos_tezlink::block::TezBlock;
 use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
 
-// Absolute form kept for the `migration.rs` blueprint moves (`store_move`,
-// a path-subtree op the flat keyspace API cannot express) and for tests; the
-// steady-state read/write helpers go through the `/base` keyspace at the
-// relative keys built below, resolving to these same paths.
-pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/base/blueprints");
-
 // Relative key (under the `/base` keyspace) of the current blueprint
 // generation. This generation number is used to decide if a blueprint is
 // outdated or not. Instead of deleting all blueprints when we want to
@@ -188,22 +182,17 @@ impl From<L2Block> for BlockHeader<ChainHeader> {
     }
 }
 
-// Absolute path of a blueprint, kept for `migration.rs` (`store_move`) and
-// tests. Steady-state access uses the relative `Key` builders below.
-pub fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
-    let number_as_path: Vec<u8> = format!("/{number}").into();
-    // The key being an integer value, it will always be valid as a path,
-    // `assert_from` cannot fail.
-    let number_subkey = RefPath::assert_from(&number_as_path);
-    concat(&EVM_BLUEPRINTS, &number_subkey).map_err(StorageError::from)
-}
-
 // Keyspace-relative keys for the blueprint sub-paths. They emit keys relative
 // to the `/base` prefix (`/blueprints/<n>/...`) that resolve, once concatenated
 // with the prefix, to the historical durable paths. This is the sole definition
 // of that shape; a sub-key passes its own suffix, the blueprint itself none.
 fn blueprint_key(number: U256, suffix: &str) -> Result<Key, StorageError> {
     Key::try_from(format!("/blueprints/{number}{suffix}")).map_err(StorageError::from)
+}
+
+// The blueprint's own key, with no sub-key appended.
+fn blueprint_root_key(number: U256) -> Result<Key, StorageError> {
+    blueprint_key(number, "")
 }
 
 fn blueprint_chunk_key(number: U256, chunk_index: u16) -> Result<Key, StorageError> {
@@ -772,8 +761,9 @@ fn invalidate_blueprint(
 ) -> Result<(), Error> {
     log!(
         Info,
-        "Deleting invalid blueprint at path {}, error: {:?}",
-        blueprint_path(number)?,
+        "Deleting invalid blueprint at path {}{}, error: {:?}",
+        base.name(),
+        blueprint_root_key(number)?,
         error
     );
     // Remove invalid blueprint from storage
@@ -991,10 +981,19 @@ mod tests {
     use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 
-    // Absolute form of [`super::EVM_CURRENT_BLOCK_HEADER_KEY`], asserting the
-    // relative key resolves to the historical durable path.
+    // Absolute forms of the keys above, asserting the relative keys resolve to
+    // the historical durable paths.
     const EVM_CURRENT_BLOCK_HEADER: RefPath =
         RefPath::assert_from(b"/base/current_block_header");
+    const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/base/blueprints");
+
+    fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
+        let number_as_path: Vec<u8> = format!("/{number}").into();
+        // The key being an integer value, it will always be valid as a path,
+        // `assert_from` cannot fail.
+        let number_subkey = RefPath::assert_from(&number_as_path);
+        concat(&EVM_BLUEPRINTS, &number_subkey).map_err(StorageError::from)
+    }
 
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockKernelHost::default();

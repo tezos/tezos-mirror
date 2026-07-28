@@ -768,7 +768,7 @@ where
 mod tests {
     use super::*;
     use crate::blueprint_storage::{
-        blueprint_path, store_current_block_header, BlockHeader, BlueprintHeader,
+        blueprint_exists, store_current_block_header, BlockHeader, BlueprintHeader,
         ChainHeader, EVMBlockHeader,
     };
     use crate::chains::test_tezosx_chain_config;
@@ -797,7 +797,6 @@ mod tests {
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_mock::TransferMetadata;
 
     const SMART_ROLLUP_ADDRESS: [u8; 20] = [
@@ -1462,9 +1461,8 @@ mod tests {
         )
         .unwrap();
 
-        let path = blueprint_path(unsigned_blueprint.number).unwrap();
         // The blueprint was valid if it was stored in the storage.
-        host.host.store_has(&path).unwrap().is_some()
+        blueprint_exists(&base, unsigned_blueprint.number).unwrap()
     }
 
     #[test]
