@@ -562,14 +562,29 @@ let register_dal_profiles dal_node_rpc_ctxt delegates =
     ()
     profiles
 
+(* Upper bound on how long we wait for the DAL node health check. It is
+   best-effort, so on timeout we return an error (handled as an unreachable DAL
+   node by the caller) rather than blocking indefinitely on an unresponsive
+   node. *)
+let dal_health_timeout = 10.
+
 let get_dal_health dal_node_rpc_ctxt =
   warn_on_stalling_rpc ~rpc_name:"get_dal_health"
-  @@ Tezos_rpc.Context.make_call
-       Tezos_dal_node_services.Services.health
-       dal_node_rpc_ctxt
-       ()
-       ()
-       ()
+  @@ Lwt.catch
+       (fun () ->
+         Lwt_unix.with_timeout dal_health_timeout (fun () ->
+             Tezos_rpc.Context.make_call
+               Tezos_dal_node_services.Services.health
+               dal_node_rpc_ctxt
+               ()
+               ()
+               ()))
+       (function
+         | Lwt_unix.Timeout ->
+             failwith
+               "get_dal_health timed out after %.0f seconds"
+               dal_health_timeout
+         | exn -> Lwt.reraise exn)
 
 let get_nonce cctxt ~chain ?(block = `Head 0) ~level () =
   warn_on_stalling_rpc ~rpc_name:"get_nonce"
