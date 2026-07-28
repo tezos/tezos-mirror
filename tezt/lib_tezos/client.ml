@@ -1584,8 +1584,8 @@ let spawn_unset_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src client =
     client
     (["--wait"; wait] @ ["unset"; "deposits"; "limit"; "for"; src])
 
-let increase_paid_storage ?hooks ?endpoint ?(wait = "none") ~contract ~amount
-    ~payer client =
+let spawn_increase_paid_storage ?hooks ?endpoint ?(wait = "none") ~contract
+    ~amount ~payer client =
   spawn_command
     ?hooks
     ?endpoint
@@ -1599,11 +1599,22 @@ let increase_paid_storage ?hooks ?endpoint ?(wait = "none") ~contract ~amount
         "of";
         contract;
         "by";
-        string_of_int amount;
+        Z.to_string amount;
         "bytes";
         "from";
         payer;
       ])
+
+let increase_paid_storage ?hooks ?endpoint ?(wait = "none") ~contract ~amount
+    ~payer client =
+  spawn_increase_paid_storage
+    ?hooks
+    ?endpoint
+    ~wait
+    ~contract
+    ~amount
+    ~payer
+    client
   |> Process.check_and_read_stdout
 
 let used_storage_space ?hooks ?endpoint ?(wait = "none") ~contract client =
