@@ -21,6 +21,9 @@ use tezos_tezlink::operation_result::{
 use crate::account_storage::TezosAccount;
 use crate::burn_tez;
 
+// Do NOT simply change this value. To change it, we will need (1) to bump the storage version, and
+// (2) to make the constants returned by the node dependent on the current storage version.
+// Alternatively, we can read it from the durable storage and default to this value.
 pub const COST_PER_BYTES: u64 = 1;
 // Values from src/proto_023_PtSeouLo/lib_parameters/default_parameters.ml.
 pub const ORIGINATION_SIZE: u64 = 257;

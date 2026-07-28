@@ -49,6 +49,9 @@ let parametric_repr ?hard_gas_limit_per_block () :
     hard_gas_limit_per_block =
       Imported_protocol.Gas_limit_repr.Arith.integral_of_int_exn
         hard_gas_limit_per_block;
+    (* Kept in sync with the kernel's storage-fee rate
+       [COST_PER_BYTES = 1] (tezos_execution/src/storage_fees.rs). *)
+    cost_per_byte = Imported_protocol.Tez_repr.of_mutez_exn 1L;
   }
 
 let all_constants_repr ?hard_gas_limit_per_block () :
