@@ -271,6 +271,18 @@ impl CallTracer {
 
         Ok(())
     }
+
+    pub fn inject_log(&mut self, log: Log) {
+        if !self.config.with_logs {
+            return;
+        }
+
+        // The frame that emitted the LOG opcode is the one currently
+        // executing, i.e. the frame on top of the stack.
+        if let Some(t) = self.call_trace.last_mut() {
+            t.logs.get_or_insert_with(Vec::new).push(log);
+        }
+    }
 }
 
 impl<CTX, INTR> Inspector<CTX, INTR> for CallTracer
@@ -372,15 +384,15 @@ where
         );
     }
 
-    fn log(&mut self, _context: &mut CTX, log: Log) {
-        if !self.config.with_logs {
-            return;
-        }
-
-        // The frame that emitted the LOG opcode is the one currently
-        // executing, i.e. the frame on top of the stack.
-        if let Some(t) = self.call_trace.last_mut() {
-            t.logs.get_or_insert_with(Vec::new).push(log);
-        }
+    // At-emission delivery. Deliberately not `log`: revm replays a resolved precompile frame's
+    // journal logs through that hook, which would duplicate nested logs onto the caller's frame.
+    // Precompile logs arrive via `inject_log`.
+    fn log_full(
+        &mut self,
+        _interpreter: &mut revm::interpreter::Interpreter<INTR>,
+        _context: &mut CTX,
+        log: Log,
+    ) {
+        self.inject_log(log);
     }
 }

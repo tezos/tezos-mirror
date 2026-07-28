@@ -588,7 +588,7 @@ fn emit_crac_sent<'j, CTX, Host, R>(
         }
         .into_log_data(),
     };
-    context.journal_mut().log(crac_log);
+    super::log(context, crac_log);
 }
 
 /// Build an [`OriginalSource`] for `source_addr` under the current
