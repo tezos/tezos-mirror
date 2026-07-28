@@ -21,6 +21,7 @@ depends: [
   "octez-l2-libs" { = version }
   "octez-crawler" { = version }
   "opentelemetry-lwt"
+  "octez-riscv-nds" { = version }
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]

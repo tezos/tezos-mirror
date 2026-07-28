@@ -15,6 +15,8 @@
   octez-l2-libs.smart-rollup
   octez-l2-libs.octez-smart-rollup-node-lib.store
   octez-smart-rollup-node-lib
+  octez-smart-rollup-node-lib.dual
+  octez-libs.riscv-nds-common
   octez_smart_rollup_node_test_helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
@@ -31,15 +33,21 @@
   -open Octez_smart_rollup
   -open Octez_smart_rollup_node_store
   -open Octez_smart_rollup_node
+  -open Octez_smart_rollup_node_dual
   -open Octez_smart_rollup_node_test_helpers
   -open Octez_alcotezt)
- (modules canary test_context_gc test_operation_priority test_store))
+ (modules
+  canary
+  test_context_gc
+  test_operation_priority
+  test_store
+  test_wasm_2_0_0_dual_state))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  octez-rust-deps
+  octez-rollup-node-rust-deps
   src_lib_smart_rollup_node_test__tezt_lib
   tezt)
  (link_flags

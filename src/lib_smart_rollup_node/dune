@@ -69,4 +69,31 @@
   -open Octez_crawler
   -open Tezos_workers
   -open Octez_smart_rollup)
- (modules (:standard \ store_version sql_store store_sig store)))
+ (modules
+  (:standard \ store_version sql_store store_sig store wasm_2_0_0_dual_state)))
+
+(library
+ (name octez_smart_rollup_node_dual)
+ (public_name octez-smart-rollup-node-lib.dual)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.stdlib-unix
+  octez-l2-libs.layer2_store
+  octez-l2-libs.irmin_context
+  octez-smart-rollup-node-lib
+  octez-libs.scoru-wasm
+  octez-l2-libs.scoru-wasm-fast
+  octez-libs.smart-rollup-wasm-dual-state
+  octez-l2-libs.smart-rollup-nds-on-disk
+  octez-libs.riscv-nds-common
+  octez-riscv-nds.disk)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_stdlib_unix
+  -open Tezos_layer2_store
+  -open Tezos_layer2_irmin_context
+  -open Octez_smart_rollup_node)
+ (modules wasm_2_0_0_dual_state))

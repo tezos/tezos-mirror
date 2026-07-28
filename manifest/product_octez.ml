@@ -3995,7 +3995,7 @@ let octez_riscv_nds_disk =
         octez_riscv_durable_storage_on_disk_api;
       ]
 
-let _octez_smart_rollup_nds_on_disk =
+let octez_smart_rollup_nds_on_disk =
   octez_l2_lib
     "smart-rollup-nds-on-disk"
     ~internal_name:"tezos_smart_rollup_nds_on_disk"
@@ -6095,6 +6095,8 @@ let rollup_node_sqlite_migrations =
 let octez_smart_rollup_node_store_lib_modules =
   ["store_version"; "sql_store"; "store_sig"; "store"]
 
+let octez_smart_rollup_node_dual_lib_modules = ["wasm_2_0_0_dual_state"]
+
 let octez_smart_rollup_node_store_lib =
   octez_l2_lib
     "octez-smart-rollup-node-lib.store"
@@ -6120,7 +6122,9 @@ let octez_smart_rollup_node_lib =
     ~internal_name:"octez_smart_rollup_node"
     ~path:"src/lib_smart_rollup_node"
     ~synopsis:"Octez: library for Smart Rollup node"
-    ~all_modules_except:octez_smart_rollup_node_store_lib_modules
+    ~all_modules_except:
+      (octez_smart_rollup_node_store_lib_modules
+     @ octez_smart_rollup_node_dual_lib_modules)
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -6146,6 +6150,31 @@ let octez_smart_rollup_node_lib =
         octez_scoru_wasm_fast;
         opentelemetry_lwt;
         octez_telemetry;
+      ]
+
+(* Dual-storage WASM PVM backend ([Irmin + on-disk NDS]). Kept in a separate
+   library so the rocksdb NDS FFI ([octez_smart_rollup_nds_on_disk]) is linked
+   only by binaries that exercise dual-state activation, not by every consumer
+   of [octez_smart_rollup_node]. *)
+let octez_smart_rollup_node_dual_lib =
+  public_lib
+    "octez-smart-rollup-node-lib.dual"
+    ~internal_name:"octez_smart_rollup_node_dual"
+    ~path:"src/lib_smart_rollup_node"
+    ~modules:octez_smart_rollup_node_dual_lib_modules
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_stdlib_unix |> open_;
+        octez_layer2_store |> open_;
+        octez_layer2_irmin_context |> open_;
+        octez_smart_rollup_node_lib |> open_;
+        octez_scoru_wasm;
+        octez_scoru_wasm_fast;
+        octez_smart_rollup_wasm_dual_state;
+        octez_smart_rollup_nds_on_disk;
+        octez_riscv_nds_common;
+        octez_riscv_nds_disk;
       ]
 
 let wasm_helpers_intf_modules = ["wasm_utils_intf"]
@@ -9888,7 +9917,13 @@ let _octez_smart_rollup_node_lib_tests =
         @ protocol_deps)
   in
   tezt
-    ["canary"; "test_context_gc"; "test_operation_priority"; "test_store"]
+    [
+      "canary";
+      "test_context_gc";
+      "test_operation_priority";
+      "test_store";
+      "test_wasm_2_0_0_dual_state";
+    ]
     ~path:"src/lib_smart_rollup_node/test/"
     ~opam:"tezos-smart-rollup-node-lib-test"
     ~synopsis:"Tests for the smart rollup node library"
@@ -9904,6 +9939,8 @@ let _octez_smart_rollup_node_lib_tests =
         octez_smart_rollup_lib |> open_;
         octez_smart_rollup_node_store_lib |> open_;
         octez_smart_rollup_node_lib |> open_;
+        octez_smart_rollup_node_dual_lib |> open_;
+        octez_riscv_nds_common;
         helpers |> open_;
         alcotezt;
       ]
