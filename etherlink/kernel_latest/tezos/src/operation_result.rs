@@ -252,6 +252,22 @@ impl From<mir::ast::BorrowedUnparseError> for TransferError {
     }
 }
 
+impl From<mir::ast::BorrowedUnparseError> for OriginationError {
+    /// The originated storage is unparsed through the borrowed walk, so its
+    /// refusal of `operation` has to land somewhere. It is unreachable: a
+    /// storage type is `Storable`, and `operation` is not.
+    fn from(err: mir::ast::BorrowedUnparseError) -> Self {
+        match err {
+            mir::ast::BorrowedUnparseError::OutOfGas => Self::OutOfGas(gas::OutOfGas),
+            mir::ast::BorrowedUnparseError::NonPushable => {
+                Self::MichelineSerializationError(
+                    "value carries an operation, which is not storable".to_string(),
+                )
+            }
+        }
+    }
+}
+
 impl From<mir::interpreter::ContractInterpretError<'_>> for TransferError {
     fn from(err: mir::interpreter::ContractInterpretError) -> Self {
         use mir::interpreter::{

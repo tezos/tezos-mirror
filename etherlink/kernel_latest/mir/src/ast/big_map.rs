@@ -1813,6 +1813,71 @@ mod review_verification {
         );
     }
 
+    /// Sharing an operation's payload behind an `Rc` only helps if the walk
+    /// then leaves it shared. Reaching the payload through
+    /// `Rc::make_mut(&mut t.param)` would not: `make_mut` copies whenever the
+    /// payload is shared, it runs before anything inspects the payload's type,
+    /// and it writes the clone back into the field — and since
+    /// `TypedValue::Bytes` holds its buffer inline, that "shallow" node clone
+    /// *is* the whole payload for exactly the flat values this targets. The
+    /// copy would be relocated from the instruction to the walk, not removed
+    /// (L2-1836).
+    ///
+    /// The copy-on-write walk returns `None` for a payload with no big map
+    /// under it, so the payload is never touched, however many operations
+    /// share it — and `push_child` means it is walked once rather than once
+    /// per operation.
+    #[test]
+    fn walk_leaves_shared_operation_payloads_shared() {
+        let payload = Rc::new(TypedValue::Bytes(vec![0xab; 64]));
+        let transfer = |param: Rc<TypedValue<'static>>, counter| {
+            TypedValue::new_operation(
+                crate::ast::Operation::TransferTokens(TransferTokens {
+                    param,
+                    destination_address:
+                        crate::ast::michelson_address::Address::try_from(
+                            "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
+                        )
+                        .unwrap(),
+                    amount: 0,
+                }),
+                counter,
+            )
+        };
+        // One payload, three operations — the `DUP`ed `list operation` shape.
+        let mut root = TypedValue::List(MichelsonList::from(vec![
+            Rc::new(transfer(payload.clone(), 0)),
+            Rc::new(transfer(payload.clone(), 1)),
+            Rc::new(transfer(payload.clone(), 2)),
+        ]));
+        let shared_before = Rc::strong_count(&payload);
+
+        walk_big_maps(&mut root, &mut |_| {
+            panic!("the value holds no big map, so `f` must not be called")
+        });
+
+        assert_eq!(
+            Rc::strong_count(&payload),
+            shared_before,
+            "the walk copied a shared operation payload"
+        );
+        let TypedValue::List(operations) = &root else {
+            panic!("root is no longer a list")
+        };
+        for operation in operations.iter() {
+            let TypedValue::Operation(info) = &**operation else {
+                panic!("element is no longer an operation")
+            };
+            let crate::ast::Operation::TransferTokens(t) = &info.operation else {
+                panic!("element is no longer a transfer")
+            };
+            assert!(
+                Rc::ptr_eq(&t.param, &payload),
+                "an operation's payload was replaced by a copy"
+            );
+        }
+    }
+
     /// The mutable walk must not unshare a subtree that holds no big map:
     /// `DUP` is an `Rc::clone`, so a duplicated multi-gigabyte value would
     /// otherwise be deep-copied once per occurrence and exhaust the kernel's
