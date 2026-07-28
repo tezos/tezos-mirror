@@ -140,6 +140,13 @@
 
 ### Michelson Runtime
 
+- **Bug fix:** an operation whose internal-operation subtree failed is no longer
+  reported `applied` because the last internal receipt happens to be applied. An
+  internal operation that raises — an unsupported `SET_DELEGATE`, or an
+  out-of-gas on the per-operation cost — produces no receipt of its own, so a
+  contract emitting `[EMIT ; SET_DELEGATE]` used to have its state committed
+  under a failed receipt, with the storage its callee wrote left uncharged.
+  (!22608)
 - **Bug fix:** inter-contract internal-operation processing is now iterative (an
   explicit heap worklist) instead of recursive. A deep `TRANSFER_TOKENS` call
   chain is bounded by gas rather than by the kernel stack, so a contract
