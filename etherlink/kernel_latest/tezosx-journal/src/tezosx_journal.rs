@@ -210,14 +210,15 @@ pub struct TezosXJournal {
 }
 
 impl TezosXJournal {
-    /// Construct a fresh journal for one synthetic Michelson manager
-    /// operation.  [`operation_hash`] is propagated to the Michelson
-    /// journal where it seeds the inbound-CRAC origination nonce; it
-    /// MUST be derived deterministically from `crac_id` and the
-    /// originating block so two synthetic ops in the same block see
-    /// distinct seeds — see
-    /// [`Self::synthetic_operation_hash`] for the canonical
-    /// derivation.
+    /// Construct a fresh journal for one Michelson manager operation.
+    /// [`operation_hash`] is propagated to the Michelson journal, where
+    /// it seeds the operation's single origination nonce — the one every
+    /// `CREATE_CONTRACT` of the operation claims from, native or
+    /// CRAC-reached.  It MUST be deterministic and unique per operation.
+    /// For a Tezos-entered operation pass the real `Operation::hash()`,
+    /// as L1 does.  An EVM-entered *synthetic* Michelson manager
+    /// operation has no such hash, so derive one from `crac_id` and the
+    /// originating block with [`Self::synthetic_operation_hash`].
     /// [`outer_block`] is the originating runtime's L2 block environment.
     /// Outside a block-producing context (traces, unit tests) pass
     /// [`BlockConstants::dummy`]. The cross-runtime journal is the single
@@ -305,27 +306,22 @@ impl TezosXJournal {
         self.michelson.revert_frame(host)
     }
 
-    /// Canonical derivation for the synthetic operation hash that
-    /// seeds an inbound-CRAC origination nonce.  Hashing
-    /// `crac:<chain_id>:<block_number>:<crac_id>` gives every synthetic
-    /// Michelson manager operation a distinct seed across operations,
-    /// blocks AND chains.  This mirrors L1, where the operation hash is
-    /// the hash of the signed bytes whose signature is bound to the
-    /// chain id via the signing watermark — so identical operation
-    /// bytes on two chains yield different op hashes (and child KT1s).
-    /// Folding `chain_id` in keeps the kernel safe if the same binary
-    /// runs on multiple chains (test scenarios, replays, forks).  Used
-    /// by production journal-construction sites; tests that don't care
-    /// about origination addresses may pass `OperationHash::default()`
-    /// to [`Self::new`] directly.
-    //
-    // TODO: https://linear.app/tezos/issue/L2-1440
-    // Tezos-originated paths also use this synthetic seed today to
-    // keep the CRAC and native-Michelson origination-nonce universes
-    // disjoint.  Once a single `OriginationNonce` is shared between
-    // both paths inside one synthetic op, those sites can drop the
-    // synthetic seed and pass the real `op.hash()` to
-    // [`Self::new`], matching L1's per-operation nonce semantics.
+    /// Canonical derivation of an operation hash for an *EVM-entered*
+    /// synthetic Michelson manager operation, which has no signed Tezos
+    /// operation to hash and so cannot obtain a real one.  Hashing
+    /// `cross-runtime-call:<chain_id>:<block_number>:<crac_id>` gives
+    /// each such operation a distinct seed across operations, blocks AND
+    /// chains.  This mirrors L1, where the operation hash is the hash of
+    /// the signed bytes whose signature is bound to the chain id via the
+    /// signing watermark — so identical operation bytes on two chains
+    /// yield different op hashes (and child KT1s).  Folding `chain_id`
+    /// in keeps the kernel safe if the same binary runs on multiple
+    /// chains (test scenarios, replays, forks).
+    ///
+    /// Tezos-entered operations do NOT use this: they pass their real
+    /// `Operation::hash()` to [`Self::new`], matching L1's per-operation
+    /// nonce semantics (L2-1440).  Tests that do not care about
+    /// origination addresses may pass `OperationHash::default()`.
     pub fn synthetic_operation_hash(
         crac_id: &CracId,
         chain_id: u64,
