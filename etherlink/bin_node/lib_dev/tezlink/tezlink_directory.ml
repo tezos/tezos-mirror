@@ -320,6 +320,12 @@ let build_block_static_directory ~l2_chain_id
          let*? block = check_block block in
          Backend.paid_storage_space chain block contract)
   |> register
+       ~service:Tezos_services.destination_index
+       ~impl:(fun ((((), chain), block), destination) _ _ ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.address_registry_index chain block destination)
+  |> register
        ~service:Tezos_services.list
        ~impl:(fun (((), chain), block) _ _ ->
          let*? chain = check_chain chain in

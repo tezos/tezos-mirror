@@ -162,6 +162,25 @@ let tezos_big_map_value_type id = tezos_big_map_dir id ^ "/value_type"
 
 let tezos_big_map_total_bytes id = tezos_big_map_dir id ^ "/total_bytes"
 
+(** [/tez/tez_accounts/address_registry] — root of the address-registry
+    subtree the kernel maintains for the [INDEX_ADDRESS] opcode (module
+    [address_registry] of
+    [etherlink/kernel_latest/tezos_execution/src/context.rs]). *)
+let michelson_address_registry_root = TEZ.Tez_accounts.make "/address_registry"
+
+let michelson_address_registry_index destination =
+  let raw_key =
+    Data_encoding.Binary.to_bytes_exn
+      Tezlink_imports.Imported_context.Destination.encoding
+      destination
+  in
+  (* Mirrors the kernel's [address_registry::entry_path]: the lowercase hex of
+     the 22-byte binary address. It is always 44 characters long, so it can
+     never collide with the sibling [/counter] key holding the next index to
+     hand out. *)
+  let (`Hex destination_hex) = Hex.of_bytes raw_key in
+  michelson_address_registry_root ^ "/" ^ destination_hex
+
 let michelson_ledger_root = TEZ.Tez_accounts.make "/tezosx"
 
 (* Single shared Michelson implementation backing every Tezos X alias.

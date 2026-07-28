@@ -6493,17 +6493,37 @@ let test_michelson_address_registry () =
   let check_head_registry_diff ~__LOC__ expected =
     check_head_registry_diff ~__LOC__ sandbox expected
   in
+  (* Read the registry through the node's [context/destination/<addr>/index]
+     RPC, the counterpart of L1's [Destination_services.index]. *)
+  let check_destination_index_rpc ~__LOC__ address expected =
+    let* index =
+      RPC_core.call (tezlink_foreign_endpoint sandbox)
+      @@ RPC.get_chain_block_context_destination_index address
+    in
+    Check.(
+      (index = expected)
+        (option int)
+        ~__LOC__
+        ~error_msg:"Expected the destination index RPC to return %R but got %L") ;
+    unit
+  in
   (* Originate a contract that stores the result of INDEX_ADDRESS on its
      parameter. *)
   let* idx_kt1 = originate ~script_name:["opcodes"; "index_address"] in
   Log.info "Originated index_address contract: %s" idx_kt1 ;
   (* Index 0 is reserved for the pre-registered null address (as on L1), so the
-     first user-registered address gets index 1. *)
+     first user-registered address gets index 1. The seeding happens at runtime
+     activation, so the RPC already reports the null address before any
+     registration — and it must report [Some 0], not [None]: a seeded index 0
+     and an absent entry are two distinct answers. *)
+  let* () = check_destination_index_rpc ~__LOC__ null_pkh (Some 0) in
   let bootstrap1_pkh = Constant.bootstrap1.public_key_hash in
   let* () = call ~dest:idx_kt1 bootstrap1_pkh in
   let* () = check_storage ~__LOC__ idx_kt1 "Some 1" in
   (* The fresh registration is reported on the operation receipt. *)
   let* () = check_head_registry_diff ~__LOC__ [(bootstrap1_pkh, "1")] in
+  (* ... and is readable through the destination index RPC. *)
+  let* () = check_destination_index_rpc ~__LOC__ bootstrap1_pkh (Some 1) in
   (* Registering the same address again is idempotent. *)
   let* () = call ~dest:idx_kt1 bootstrap1_pkh in
   let* () = check_storage ~__LOC__ idx_kt1 "Some 1" in
@@ -6530,6 +6550,32 @@ let test_michelson_address_registry () =
   (* An address that was never registered yields None. *)
   let* () = call ~dest:get_kt1 Constant.bootstrap3.public_key_hash in
   let* () = check_storage ~__LOC__ get_kt1 "None" in
+  (* The RPC agrees with the opcode on both the registered and the
+     never-registered address. *)
+  let* () =
+    check_destination_index_rpc
+      ~__LOC__
+      Constant.bootstrap2.public_key_hash
+      (Some 2)
+  in
+  let* () =
+    check_destination_index_rpc
+      ~__LOC__
+      Constant.bootstrap3.public_key_hash
+      None
+  in
+  (* Originated contracts are covered by the same RPC: [idx_kt1] itself was
+     never passed to INDEX_ADDRESS, so it has no index. *)
+  let* () = check_destination_index_rpc ~__LOC__ idx_kt1 None in
+  (* A KT1 is indexable like any other address, and takes the next free index
+     (0, 1 and 2 are the null address, bootstrap1 and bootstrap2). This pins the
+     originated branch of the registry key the node builds: [Destination]'s
+     binary form tags a KT1 differently from an implicit account and pads it to
+     the same 22 bytes, so the hex path must still match the kernel's. *)
+  let* () = call ~dest:idx_kt1 get_kt1 in
+  let* () = check_storage ~__LOC__ idx_kt1 "Some 3" in
+  let* () = check_head_registry_diff ~__LOC__ [(get_kt1, "3")] in
+  let* () = check_destination_index_rpc ~__LOC__ get_kt1 (Some 3) in
   unit
 
 (** L2-1452 scenario: INDEX_ADDRESS is rejected by the typechecker directly in

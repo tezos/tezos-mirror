@@ -194,6 +194,12 @@ let make (ctxt : Evm_ro_context.t) =
           in
           return_some paid
 
+    let address_registry_index chain block destination =
+      let open Lwt_result_syntax in
+      let `Main = chain in
+      let* state = get_state ~block in
+      Tezlink_durable_storage.address_registry_index state destination
+
     let big_map_get chain block id key_hash =
       let open Lwt_result_syntax in
       let `Main = chain in

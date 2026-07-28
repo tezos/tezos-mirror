@@ -189,6 +189,12 @@ type ('a, 'cap) path =
       Tezos_types.Contract.implicit
       -> (Tezos_types.Manager.t option, ro) path
   | Tezlink_counter : Tezos_types.Contract.implicit -> (Z.t option, ro) path
+  | Tezlink_address_registry_index :
+      Tezlink_imports.Imported_context.Destination.t
+      -> (Z.t option, ro) path
+      (** Index assigned to the destination by the [INDEX_ADDRESS] opcode:
+          [Some index] when the kernel indexed the address, [None] when it
+          never did. *)
   | Tezos_live_block : Block_hash.t -> (unit, ro) path
       (** Presence in the kernel's recent-block ([live_blocks]) set: [Some ()]
           when the hash is a recent Michelson block of this instance, [None]

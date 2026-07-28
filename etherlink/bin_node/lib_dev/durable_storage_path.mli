@@ -82,6 +82,18 @@ val tezos_big_map_value_type :
 val tezos_big_map_total_bytes :
   Tezlink_imports.Imported_context.Big_map.Id.t -> path
 
+(** [/tez/tez_accounts/address_registry] — root of the address-registry
+    subtree the kernel maintains for the [INDEX_ADDRESS] opcode. *)
+val michelson_address_registry_root : path
+
+(** [michelson_address_registry_index destination] is the durable storage
+    path of the index assigned to [destination] by the [INDEX_ADDRESS]
+    opcode ([/tez/tez_accounts/address_registry/<destination_hex>]),
+    maintained by the Michelson runtime kernel and encoded as a
+    [Data_encoding.n]. *)
+val michelson_address_registry_index :
+  Tezlink_imports.Imported_context.Destination.t -> path
+
 (** [/kernel/boot.wasm] — path of the kernel's WASM blob, the entry
     point [Pvm.Kernel] runs. Writable by the EVM node only for
     debugger / replay overrides. *)

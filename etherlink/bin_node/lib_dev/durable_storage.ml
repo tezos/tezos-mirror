@@ -360,6 +360,11 @@ type ('a, 'cap) path =
       Tezos_types.Contract.implicit
       -> (Tezos_types.Manager.t option, ro) path
   | Tezlink_counter : Tezos_types.Contract.implicit -> (Z.t option, ro) path
+  (* Index assigned to a destination by the [INDEX_ADDRESS] opcode. [None]
+     when the address was never indexed. *)
+  | Tezlink_address_registry_index :
+      Tezlink_imports.Imported_context.Destination.t
+      -> (Z.t option, ro) path
   | Tezos_live_block : Block_hash.t -> (unit, ro) path
   | Blueprint_current_generation : (Ethereum_types.quantity, ro) path
   | Kernel_boot_wasm : (bytes, rw) path
@@ -949,6 +954,22 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
           decode =
             Tezosx.Tezos_runtime.extract_field (fun info ->
                 Some (Z.of_int64 info.nonce));
+        }
+  | Tezlink_address_registry_index destination ->
+      (* The Michelson runtime kernel persists this index as a [Narith]
+         ([Encoding::N]), the binary counterpart of [Data_encoding.n] — not a
+         little-endian scalar, so [qty_le_ro_codec] would mis-decode it. A
+         missing key means the address was never indexed, which the readers
+         turn into [None]. *)
+      static_ro
+        {
+          path =
+            Durable_storage_path.michelson_address_registry_index destination;
+          decode =
+            (fun bytes ->
+              let open Result_syntax in
+              let+ index = safe_binary_decode Data_encoding.n bytes in
+              Some index);
         }
   | Tezos_live_block branch ->
       let (`Hex hash_hex) = Hex.of_bytes (Block_hash.to_bytes branch) in
