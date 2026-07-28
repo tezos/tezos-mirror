@@ -157,6 +157,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Removing_peer : [`Remove_peer] output
     | Subscribed : [`Subscribe] output
     | Subscribe_to_unknown_peer : [`Subscribe] output
+    | Subscribe_ignored_topic_limit_exceeded : [`Subscribe] output
     | Unsubscribed : [`Unsubscribe] output
     | Unsubscribe_from_unknown_peer : [`Unsubscribe] output
     | Set_application_score : [`Set_application_score] output
@@ -438,6 +439,7 @@ module Make (C : AUTOMATON_CONFIG) :
     assert (l.degree_out <= l.degree_optimal / 2) ;
     assert (l.history_gossip_length > 0) ;
     assert (l.history_gossip_length <= l.history_length) ;
+    assert (l.max_topics_per_peer > 0) ;
     check_score_limits l.score_limits
 
   let make : Random.State.t -> limits -> parameters -> state =
@@ -517,6 +519,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let opportunistic_graft_ticks state = state.limits.opportunistic_graft_ticks
 
     let opportunistic_graft_peers state = state.limits.opportunistic_graft_peers
+
+    let max_topics_per_peer state = state.limits.max_topics_per_peer
 
     let opportunistic_graft_threshold state =
       state.limits.opportunistic_graft_threshold
@@ -751,15 +755,25 @@ module Make (C : AUTOMATON_CONFIG) :
   include Helpers
 
   module Subscribe = struct
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8377
+       Validate topic content before recording the subscription. *)
     let handle topic peer =
       let open Monad.Syntax in
       let*! connections in
-      match Connections.subscribe peer topic connections with
-      | `unknown_peer -> return Subscribe_to_unknown_peer
-      | `subscribed connections ->
-          let* () = set_connections connections in
-          (* Note: rust-libp2p adds the peer to the mesh if needed here. *)
-          return Subscribed
+      let*! max_topics_per_peer in
+      match Connections.find peer connections with
+      | None -> return Subscribe_to_unknown_peer
+      | Some connection
+        when (not (Topic.Set.mem topic connection.topics))
+             && Topic.Set.cardinal connection.topics >= max_topics_per_peer ->
+          return Subscribe_ignored_topic_limit_exceeded
+      | Some _ -> (
+          match Connections.subscribe peer topic connections with
+          | `unknown_peer -> return Subscribe_to_unknown_peer
+          | `subscribed connections ->
+              let* () = set_connections connections in
+              (* Note: rust-libp2p adds the peer to the mesh if needed here. *)
+              return Subscribed)
   end
 
   let handle_subscribe : subscribe -> [`Subscribe] output Monad.t =
@@ -1021,6 +1035,18 @@ module Make (C : AUTOMATON_CONFIG) :
         let* () = set_backoff_for_peer prune_backoff topic peer in
         Grafting_peer_with_negative_score |> fail
 
+    let check_topic_cap connection peer topic =
+      let open Monad.Syntax in
+      let*! max_topics_per_peer in
+      if
+        Topic.Set.mem topic connection.topics
+        || Topic.Set.cardinal connection.topics < max_topics_per_peer
+      then pass ()
+      else
+        let*! prune_backoff in
+        let* () = set_backoff_for_peer prune_backoff topic peer in
+        Peer_filtered |> fail
+
     let check_mesh_size mesh connection peer topic =
       let open Monad.Syntax in
       let*! degree_high in
@@ -1074,6 +1100,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let*? () = with_score score_opt @@ check_backoff peer topic in
       let*? () = with_score score_opt @@ check_score peer topic in
       let*? () = check_mesh_size mesh connection peer topic in
+      let*? () = check_topic_cap connection peer topic in
       let* () = update_score peer (fun s -> Score.graft s topic) in
       let* () = set_mesh_topic topic (Peer.Set.add peer mesh) in
       (* Call [handle_subscribe] to ensure the invariant where all grafted peers subscribed. *)
@@ -1081,6 +1108,9 @@ module Make (C : AUTOMATON_CONFIG) :
       (match output with
       | Subscribe_to_unknown_peer ->
           (* Not possible due to invariant. *)
+          ()
+      | Subscribe_ignored_topic_limit_exceeded ->
+          (* Not possible: check_topic_cap ensures there is room. *)
           ()
       | Subscribed ->
           (* Expected case. *)
@@ -2150,13 +2180,25 @@ module Make (C : AUTOMATON_CONFIG) :
   (* On spam protection
      ==================
 
-     We make the assumption that the bandwidth per peer can be limited. This
-     means that if the automaton allows a peer to send us an unbounded number of
-     messages, this is not a case of concern by itself. There is a case of
-     concern if this results in wasting space or CPU time.
+     Two complementary defences bound the resources a single misbehaving peer
+     can consume:
 
-     Another assumption we make is that messages are of bounded size, because
-     the message encoding should ensure this.
+     1. Automaton-level per-peer caps (documented per message type below) bound
+        how much state growth a peer can force inside the automaton, regardless
+        of how many messages it sends.
+
+     2. Worker-level input-queue cap: the gossipsub worker exposes
+        [bounded_p2p_input] (see module [Gossipsub_worker]), which drops
+        incoming P2P events when the shared input queue already holds
+        [max_transport_input_queue_length] unprocessed entries. This prevents a
+        fast peer from growing the queue without bound, at the cost of possibly
+        dropping legitimate events from other peers during a sustained flood.
+        The proper long-term fix for that residual starvation risk is per-peer
+        input isolation (a separate bounded queue per remote peer, as in
+        go-libp2p-pubsub), see https://gitlab.com/tezos/tezos/-/work_items/8376.
+
+     We also assume that messages are of bounded size, because the message
+     encoding should ensure this.
 
      We detail next for each p2p message type what checks are (or are not) in
      place concerning the receipt of "spam" and what are the concerns.
@@ -2202,6 +2244,11 @@ module Make (C : AUTOMATON_CONFIG) :
      Subscribe/Unsubscribe messages:
      - Duplicates are not checked for, a duplicate Subscribe/Unsubscribed (for a
        connected peer) is always successful.
+     - The number of distinct topics a single peer may subscribe to is capped
+       at [limits.max_topics_per_peer]; a Subscribe beyond this cap returns
+       [Subscribe_ignored_topic_limit_exceeded] without growing state. A Graft
+       that would require a new subscription beyond the cap is rejected with
+       [Peer_filtered] before any state is mutated.
 
      Full messages:
      - We check for duplicates with the message cache. A duplicate is not re-routed.
@@ -2211,7 +2258,14 @@ module Make (C : AUTOMATON_CONFIG) :
        are not counted.
      - Potential problems:
        - receiving a large number of duplicates, as all duplicate message ids
-         are stored in the cache *)
+         are stored in the cache.
+       - a peer flooding the worker's input queue with full messages is the
+         main scenario where the [bounded_p2p_input] cap (see point 2 above)
+         causes collateral drops for other peers. Full messages (e.g. DAL
+         shards) are expensive to process (KZG verification, storage writes),
+         so they drain slowly and the queue stays full for longer, extending
+         the starvation window. As a secondary concern, a count-based cap does
+         not bound total memory when messages vary greatly in size. *)
 
   (* "Getters" *)
 
@@ -2545,6 +2599,8 @@ module Make (C : AUTOMATON_CONFIG) :
     | Removing_peer -> fprintf fmtr "Removing_peer"
     | Subscribed -> fprintf fmtr "Subscribed"
     | Subscribe_to_unknown_peer -> fprintf fmtr "Subscribe_to_unknown_peer"
+    | Subscribe_ignored_topic_limit_exceeded ->
+        fprintf fmtr "Subscribe_ignored_topic_limit_exceeded"
     | Unsubscribed -> fprintf fmtr "Unsubscribed"
     | Unsubscribe_from_unknown_peer ->
         fprintf fmtr "Unsubscribe_from_unknown_peer"

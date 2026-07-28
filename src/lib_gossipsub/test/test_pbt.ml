@@ -1443,7 +1443,8 @@ module Test_opportunistic_grafting = struct
         | Joining_topic _ -> return_unit)
     | Subscribe _ -> (
         match output with
-        | Subscribe_to_unknown_peer -> fail (`unexpected_output (O output))
+        | Subscribe_to_unknown_peer | Subscribe_ignored_topic_limit_exceeded ->
+            fail (`unexpected_output (O output))
         | Subscribed -> return_unit)
     | Set_application_score _ -> return_unit
     | Graft _ -> (

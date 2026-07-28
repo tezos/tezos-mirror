@@ -163,6 +163,11 @@ module Limits = struct
   let opportunistic_graft_threshold = 1.
 
   let seen_history_length = 120
+
+  (* A DAL P2P peer is allowed at most this many distinct topics in its
+     subscription set.  The DAL topic space is currently at most ~160 slots ×
+     ~200 active delegates ≈ 32,000. *)
+  let max_topics_per_peer = 65536
 end
 
 module Peer_filter = struct

@@ -138,7 +138,7 @@ let transport_layer_inputs_handler gs_worker p2p_layer ~app_in_callback =
               "Warning: exception in DAL shard reception callback: %s@."
               (Printexc.to_string exn))
     | _ -> ()) ;
-    Worker.(In_message {from_peer; p2p_message} |> p2p_input gs_worker) ;
+    Worker.(In_message {from_peer; p2p_message} |> bounded_p2p_input gs_worker) ;
     loop ()
   in
   loop ()

@@ -106,5 +106,6 @@ let default_limits ?(time_in_mesh_weight = 1.0)
     opportunistic_graft_peers = 2;
     opportunistic_graft_threshold = 1.;
     seen_history_length = 120;
+    max_topics_per_peer = 1024;
     score_limits;
   }

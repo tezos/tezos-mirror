@@ -337,6 +337,12 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
       (** [seen_history_length] controls the size of the message cache used for
           recording seen messages. The seen messages cache will remember messages for
           [seen_history_length] heartbeats. *)
+  max_topics_per_peer : int;
+      (** The maximum number of distinct topics a single remote peer may
+          subscribe to at once. A [Subscribe] message that would exceed this
+          per-peer ceiling is rejected with
+          [Subscribe_ignored_topic_limit_exceeded] without growing state,
+          bounding the heap a peer can force us to allocate. *)
 }
 
 type ('peer, 'message_id) parameters = {
@@ -793,6 +799,10 @@ module type AUTOMATON = sig
     | Subscribe_to_unknown_peer : [`Subscribe] output
         (** The output returned when we receive a subscribe message from a peer
             we don't know.*)
+    | Subscribe_ignored_topic_limit_exceeded : [`Subscribe] output
+        (** The output returned when we ignore a subscribe message because the
+            peer is already subscribed to the maximum number of distinct
+            topics tracked per peer. *)
     | Unsubscribed : [`Unsubscribe] output
         (** The output returned once we successfully processed an unsubscribe
             request sent from a peer. *)
@@ -1237,6 +1247,13 @@ module type WORKER = sig
     | App_input of app_input
     | Check_unknown_messages
     | Process_batch of (GS.receive_message * GS.Peer.Set.t) list
+    | Subscribe_topic_cap_exceeded of {peer : GS.Peer.t; max_topics : int}
+        (** Emitted at most once per 60 s when a remote peer's Subscribe is
+            dropped because it would exceed [max_topics_per_peer]. *)
+    | P2P_queue_drop of {depth : int}
+        (** Emitted at most once per 60 s when [bounded_p2p_input] drops a
+            message because the worker's input queue is at capacity. [depth]
+            is the queue length at the time of the drop. *)
 
   (** [make ~events_logging ~initial_points rng limits parameters] initializes
       a new Gossipsub automaton with the given arguments. Then, it initializes
@@ -1248,6 +1265,7 @@ module type WORKER = sig
     ?events_logging:(event -> unit Monad.t) ->
     ?initial_points:(unit -> Point.t list) ->
     ?batching_interval:GS.span ->
+    ?max_transport_input_queue_length:int ->
     self:GS.Peer.t ->
     Random.State.t ->
     (GS.Topic.t, GS.Peer.t, GS.Message_id.t, GS.span) limits ->
@@ -1271,6 +1289,22 @@ module type WORKER = sig
   (** [p2p_input state p2p_input] adds the given P2P input [p2p_input] to the
       worker's input stream. *)
   val p2p_input : t -> p2p_input -> unit
+
+  (** Default value of the [?max_transport_input_queue_length] parameter to
+      [make]. Exposed so callers and tests can reference the default without
+      constructing a worker. *)
+  val default_max_transport_input_queue_length : int
+
+  (** Like [p2p_input], but drops the event (without enqueuing it) when the
+      worker's input stream already holds at least
+      [max_transport_input_queue_length] unprocessed events (as supplied to
+      [make]).
+
+      The transport layer must use this function instead of [p2p_input] so
+      that a flooding remote peer cannot grow the input queue without bound.
+      Internal callers (heartbeats, application inputs) must continue to use
+      [p2p_input] because those event sources are self-bounded. *)
+  val bounded_p2p_input : t -> p2p_input -> unit
 
   (** [p2p_output_stream t] returns the output stream containing data for the
       P2P layer. *)
