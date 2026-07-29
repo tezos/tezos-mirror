@@ -15,7 +15,8 @@ use crate::{
 };
 use mir::parser::Parser;
 use mir::typechecker::{
-    typecheck_value, AllowForgedLazyStorageId, MichelineContractScript, MichelineView,
+    type_props::TypeProperty, typecheck_value, AllowForgedLazyStorageId,
+    MichelineContractScript, MichelineView,
 };
 use mir::{
     ast::{
@@ -1474,15 +1475,18 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
         Ok(self.host.store_has(&path)?.is_some())
     }
 
-    fn big_map_update(
+    fn big_map_update_ref(
         &mut self,
         id: &BigMapId,
-        key: TypedValue<'a>,
-        value: Option<TypedValue<'a>>,
+        key: &TypedValue<'a>,
+        value: Option<&TypedValue<'a>>,
     ) -> Result<(), LazyStorageError> {
         let parser = Parser::new();
-        let micheline_expr =
-            key.into_micheline_optimized_legacy(&parser.arena, self.gas())?;
+        let micheline_expr = key.clone_into_micheline_optimized_legacy(
+            &parser.arena,
+            self.gas(),
+            Some(TypeProperty::Comparable),
+        )?;
         // key_encoded: raw Micheline encoding (no 0x05 prefix), used in big_map_diff receipts
         let key_encoded = micheline_expr.encode(&mut self.operation_gas.remaining)??;
         // key_hashed: hash of packed encoding (with 0x05 prefix), used for storage path
@@ -1522,7 +1526,11 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
             Some(v) => {
                 let arena = Arena::new();
                 let encoded = v
-                    .into_micheline_optimized_legacy(&arena, self.gas())?
+                    .clone_into_micheline_optimized_legacy(
+                        &arena,
+                        self.gas(),
+                        Some(TypeProperty::BigMapValue),
+                    )?
                     .encode(&mut self.operation_gas.remaining)??;
                 let new_value_size: BigInt = encoded.len().into();
                 let current = total_bytes(self.host, id)?;
@@ -1671,6 +1679,25 @@ pub mod tests {
     };
     use mir::ast::Type;
     use rpds::RedBlackTreeMap;
+
+    fn in_memory_entries<'a>(
+        entries: impl IntoIterator<Item = (TypedValue<'a>, TypedValue<'a>)>,
+    ) -> RedBlackTreeMap<std::rc::Rc<TypedValue<'a>>, std::rc::Rc<TypedValue<'a>>> {
+        entries
+            .into_iter()
+            .map(|(k, v)| (std::rc::Rc::new(k), std::rc::Rc::new(v)))
+            .collect()
+    }
+
+    fn overlay_entries<'a>(
+        entries: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+    ) -> RedBlackTreeMap<std::rc::Rc<TypedValue<'a>>, Option<std::rc::Rc<TypedValue<'a>>>>
+    {
+        entries
+            .into_iter()
+            .map(|(k, v)| (std::rc::Rc::new(k), v.map(std::rc::Rc::new)))
+            .collect()
+    }
     use std::collections::{BTreeMap, BTreeSet};
     use tezos_evm_runtime::runtime::MockKernelHost;
 
@@ -1794,7 +1821,7 @@ pub mod tests {
         ]);
 
         let map = BigMap {
-            content: BigMapContent::InMemory(RedBlackTreeMap::from_iter(content.clone())),
+            content: BigMapContent::InMemory(in_memory_entries(content.clone())),
             key_type: Type::Int,
             value_type: Type::String,
         };
@@ -1899,7 +1926,7 @@ pub mod tests {
         ]);
 
         let map = BigMap {
-            content: BigMapContent::InMemory(RedBlackTreeMap::from_iter(content.clone())),
+            content: BigMapContent::InMemory(in_memory_entries(content.clone())),
             key_type: Type::Int,
             value_type: Type::String,
         };
@@ -2038,10 +2065,7 @@ pub mod tests {
             .unwrap();
         let content_diff = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
-            overlay: RedBlackTreeMap::from_iter([(
-                TypedValue::int(1),
-                Some(TypedValue::int(1)),
-            )]),
+            overlay: overlay_entries([(TypedValue::int(1), Some(TypedValue::int(1)))]),
         });
         let map1 = BigMap {
             content: content_diff,
@@ -2188,7 +2212,7 @@ pub mod tests {
         let returned_storage = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: p.clone(),
-                overlay: RedBlackTreeMap::from_iter([(
+                overlay: overlay_entries([(
                     TypedValue::int(1),
                     Some(TypedValue::String("new".into())),
                 )]),
@@ -2263,7 +2287,7 @@ pub mod tests {
         let original = BigMap {
             content: BigMapContent::FromId(BigMapFromId {
                 id: BigMapId::from(7),
-                overlay: RedBlackTreeMap::from_iter([(
+                overlay: overlay_entries([(
                     TypedValue::int(1),
                     Some(TypedValue::String("v".into())),
                 )]),

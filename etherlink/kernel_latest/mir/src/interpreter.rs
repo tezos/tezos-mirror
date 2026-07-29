@@ -2933,7 +2933,7 @@ fn interpret_one<'a>(
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_get(&key_rc, len)?)?;
                 let result = map.get(arena, &key_rc, *ctx.lazy_storage())?;
-                stack.push(V::new_option(result));
+                stack.push(V::new_option_rc(result));
             }
         },
         I::GetN(n) => {
@@ -2971,8 +2971,8 @@ fn interpret_one<'a>(
                 }
             }
             overloads::Update::BigMap => {
-                let key = pop!();
-                let opt_new_val = pop!(V::Option).map(TypedValue::unwrap_rc);
+                let key = pop_rc!();
+                let opt_new_val = pop!(V::Option);
                 let map = top_mut!(V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
@@ -2999,8 +2999,8 @@ fn interpret_one<'a>(
                 stack.push(V::new_option_rc(opt_old_val));
             }
             overloads::GetAndUpdate::BigMap => {
-                let key = pop!();
-                let opt_new_val = pop!(V::Option).map(TypedValue::unwrap_rc);
+                let key = pop_rc!();
+                let opt_new_val = pop!(V::Option);
                 let map = top_mut!(V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
@@ -3008,7 +3008,7 @@ fn interpret_one<'a>(
                     .consume(interpret_cost::map_get_and_update(&key, len)?)?;
                 let opt_old_val = map.get(arena, &key, *ctx.lazy_storage())?;
                 map.update(key, opt_new_val);
-                stack.push(V::new_option(opt_old_val));
+                stack.push(V::new_option_rc(opt_old_val));
             }
         },
         I::Size(overload) => {
@@ -6675,7 +6675,7 @@ mod interpreter_tests {
             .unwrap();
         let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
             id: big_map_id,
-            overlay: RedBlackTreeMap::from_iter([(
+            overlay: big_map::overlay_entries([(
                 TypedValue::int(2),
                 Some(TypedValue::String("bar".to_owned())),
             )]),
@@ -6852,19 +6852,20 @@ mod interpreter_tests {
             .big_map_storage
             .big_map_new(&Type::Int, &Type::String, false)
             .unwrap();
+        let entries = [
+            (
+                TypedValue::int(1),
+                Some(TypedValue::String("foo".to_owned())),
+            ),
+            (
+                TypedValue::int(2),
+                Some(TypedValue::String("bar".to_owned())),
+            ),
+        ];
         ctx.big_map_storage
             .big_map_bulk_update(
                 &big_map_id,
-                [
-                    (
-                        TypedValue::int(1),
-                        Some(TypedValue::String("foo".to_owned())),
-                    ),
-                    (
-                        TypedValue::int(2),
-                        Some(TypedValue::String("bar".to_owned())),
-                    ),
-                ],
+                entries.iter().map(|(k, v)| (k, v.as_ref())),
             )
             .unwrap();
         let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
@@ -7310,12 +7311,13 @@ mod interpreter_tests {
                 .big_map_storage
                 .big_map_new(&Type::Int, &Type::String, false)
                 .unwrap();
+            let content: Vec<_> = content.into_iter().collect();
             ctx.big_map_storage
-                .big_map_bulk_update(&id, content)
+                .big_map_bulk_update(&id, content.iter().map(|(k, v)| (k, v.as_ref())))
                 .unwrap();
             let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
                 id: id.clone(),
-                overlay: overlay.into_iter().collect(),
+                overlay: big_map::overlay_entries(overlay),
             });
             let big_map = BigMap {
                 content,
@@ -7336,7 +7338,7 @@ mod interpreter_tests {
                 stk![TypedValue::BigMap(BigMap {
                     content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                         id,
-                        overlay: result.into_iter().collect()
+                        overlay: big_map::overlay_entries(result)
                     }),
                     key_type: Type::Int,
                     value_type: Type::String,
@@ -7396,12 +7398,13 @@ mod interpreter_tests {
                 .big_map_storage
                 .big_map_new(&Type::Int, &Type::String, false)
                 .unwrap();
+            let content: Vec<_> = content.into_iter().collect();
             ctx.big_map_storage
-                .big_map_bulk_update(&id, content)
+                .big_map_bulk_update(&id, content.iter().map(|(k, v)| (k, v.as_ref())))
                 .unwrap();
             let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
                 id: id.clone(),
-                overlay: overlay.into_iter().collect(),
+                overlay: big_map::overlay_entries(overlay),
             });
             let big_map = BigMap {
                 content,
@@ -7427,7 +7430,7 @@ mod interpreter_tests {
                     TypedValue::BigMap(BigMap {
                         content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                             id,
-                            overlay: result.into_iter().collect()
+                            overlay: big_map::overlay_entries(result)
                         }),
                         key_type: Type::Int,
                         value_type: Type::String,
