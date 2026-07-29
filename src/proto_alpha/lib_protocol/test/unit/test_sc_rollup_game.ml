@@ -1251,7 +1251,9 @@ let test_inbox_proof_level_confusion () =
         states from tick 1 on, making [1; 2] a distance-one section with a
         [None] start state;
      3. assert the protocol ACCEPTS the defender's [Proof] there and traps the
-        game in a [Final_move] on the [None] chunk. *)
+        game in a [Final_move] on the [None] chunk;
+     4. assert the block-validation plugin REJECTS the same operation with
+        [Sc_rollup_proof_on_missing_start_state_during_dissecting 1]. *)
 let test_proof_on_missing_start_state_forces_indefensible_final_move () =
   let open Lwt_result_wrap_syntax in
   let* ( ctxt,
@@ -1304,9 +1306,12 @@ let test_proof_on_missing_start_state_forces_indefensible_final_move () =
      where the game rules demand a [Proof]. *)
   let* proof = build_well_formed_proof () in
   let choice = tick_of_int_exn 1 in
-  (* PROTOCOL STEP: consensus ACCEPTS the move. [game_move] does not fail —
-     nothing in the protocol forbids a [Proof] on a section whose agreed start
-     state is [None]. *)
+  (* What a baker sees before including the [Proof]: the game still
+     [Dissecting]. *)
+  let ctxt_before_move = ctxt in
+  (* PROTOCOL STEP: consensus ACCEPTS the move — nothing in the protocol forbids
+     a [Proof] on a section whose agreed start state is [None], so only the
+     plugin keeps it out of blocks. *)
   let*@ game_result, ctxt =
     R.game_move
       ctxt
@@ -1348,7 +1353,41 @@ let test_proof_on_missing_start_state_forces_indefensible_final_move () =
            better, so this test's premise is stale and needs revisiting"
     | None -> Test.fail "missing-start-state: game disappeared after the move"
   in
-  return_unit
+  (* PLUGIN CHECK: the same operation, against the start-of-block context, must
+     be rejected with the tick of the [None] start chunk. *)
+  let*! plugin_res =
+    run_block_validation_plugin
+      ~ctxt_before:ctxt_before_move
+      ~source:defender
+      ~opponent:refuter
+      ~rollup
+      ~choice
+      ~proof
+  in
+  match plugin_res with
+  | Ok _ ->
+      Test.fail
+        "missing-start-state: the plugin accepted a Proof on a distance-one \
+         section whose start state is None"
+  | Error trace ->
+      if
+        List.exists
+          (function
+            | Environment.Ecoproto_error
+                (Block_validation
+                 .Sc_rollup_proof_on_missing_start_state_during_dissecting
+                   tick) ->
+                (* The tick tells the baker WHICH chunk is at fault; here the
+                   chosen section is [1; 2], so it must be 1 — not, say, the
+                   stop chunk at tick 2. *)
+                Z.equal tick Z.one
+            | _ -> false)
+          trace
+      then return_unit
+      else
+        Test.fail
+          "missing-start-state: the plugin rejected the operation but not with \
+           Sc_rollup_proof_on_missing_start_state_during_dissecting 1"
 
 let tests =
   [
