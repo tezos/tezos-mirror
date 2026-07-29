@@ -2373,35 +2373,34 @@ fn interpret_one<'a>(
                 *o2 &= o1;
             }
             overloads::And::NatNat => {
-                let o1 = pop!(V::Nat);
-                let o2 = top_mut!(V::Nat);
-                ctx.gas().consume(interpret_cost::and_nat(&o1, o2)?)?;
-                *o2 &= o1;
+                pop_ref!(o1, Nat);
+                pop_ref!(o2, Nat);
+                ctx.gas().consume(interpret_cost::and_nat(o1, o2)?)?;
+                stack.push(V::Nat(o1 & o2));
             }
             overloads::And::IntNat => {
-                let o1 = pop!(V::Int);
-                let o2 = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::and_int_nat(&o1, &o2)?)?;
-                let res = BigUint::try_from(o1 & BigInt::from(o2))
-                    // safe, `neg` & `pos` = `pos`
-                    .unwrap();
+                pop_ref!(o1, Int);
+                pop_ref!(o2, Nat);
+                ctx.gas().consume(interpret_cost::and_int_nat(o1, o2)?)?;
+                let res = if o1.sign() == Sign::Minus {
+                    // Negative operand needs an owned signed value
+                    BigUint::try_from(BigInt::from(o2.clone()) & o1).unwrap()
+                } else {
+                    o1.magnitude() & o2
+                };
                 stack.push(V::Nat(res));
             }
             overloads::And::Bytes => {
-                let mut o1 = pop!(V::Bytes);
-                let o2 = top_mut!(V::Bytes);
-                ctx.gas().consume(interpret_cost::and_bytes(&o1, o2)?)?;
-
-                // The resulting vector length is the smallest length among the
-                // operands, so to reuse memory we put the smallest vector to
-                // the result (`o2`).
-                if o1.len() < o2.len() {
-                    std::mem::swap(&mut o1, o2)
+                pop_ref!(o1, Bytes);
+                pop_ref!(o2, Bytes);
+                ctx.gas().consume(interpret_cost::and_bytes(o1, o2)?)?;
+                // Result length is the smaller operand's; bytes align at the right.
+                let n = min(o1.len(), o2.len());
+                let mut res = vec![0u8; n];
+                for k in 1..=n {
+                    res[n - k] = o1[o1.len() - k] & o2[o2.len() - k];
                 }
-                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev())
-                {
-                    *b2 &= b1;
-                }
+                stack.push(V::Bytes(res));
             }
         },
         I::Or(overload) => match overload {
@@ -2412,26 +2411,27 @@ fn interpret_one<'a>(
                 *o2 |= o1;
             }
             overloads::Or::Nat => {
-                let o1 = pop!(V::Nat);
-                let o2 = top_mut!(V::Nat);
-                ctx.gas().consume(interpret_cost::or_num(&o1, o2)?)?;
-                *o2 |= o1;
+                pop_ref!(o1, Nat);
+                pop_ref!(o2, Nat);
+                ctx.gas().consume(interpret_cost::or_num(o1, o2)?)?;
+                stack.push(V::Nat(o1 | o2));
             }
             overloads::Or::Bytes => {
-                let mut o1 = pop!(V::Bytes);
-                let o2 = top_mut!(V::Bytes);
-                ctx.gas().consume(interpret_cost::or_bytes(&o1, o2)?)?;
-
-                // The resulting vector length is the largest length among the
-                // operands, so to reuse memory we put the largest vector to
-                // the result (`o2`).
-                if o1.len() > o2.len() {
-                    std::mem::swap(&mut o1, o2)
+                pop_ref!(o1, Bytes);
+                pop_ref!(o2, Bytes);
+                ctx.gas().consume(interpret_cost::or_bytes(o1, o2)?)?;
+                // Result length is the larger operand's; shorter combines at the right.
+                let (long, short) = if o1.len() >= o2.len() {
+                    (o1, o2)
+                } else {
+                    (o2, o1)
+                };
+                let mut res = long.to_vec();
+                let off = long.len() - short.len();
+                for (k, b) in short.iter().enumerate() {
+                    res[off + k] |= b;
                 }
-                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev())
-                {
-                    *b2 |= b1;
-                }
+                stack.push(V::Bytes(res));
             }
         },
         I::Xor(overloads) => match overloads {
@@ -2442,26 +2442,27 @@ fn interpret_one<'a>(
                 *o2 ^= o1;
             }
             overloads::Xor::Nat => {
-                let o1 = pop!(V::Nat);
-                let o2 = top_mut!(V::Nat);
-                ctx.gas().consume(interpret_cost::xor_nat(&o1, o2)?)?;
-                *o2 ^= o1;
+                pop_ref!(o1, Nat);
+                pop_ref!(o2, Nat);
+                ctx.gas().consume(interpret_cost::xor_nat(o1, o2)?)?;
+                stack.push(V::Nat(o1 ^ o2));
             }
             overloads::Xor::Bytes => {
-                let mut o1 = pop!(V::Bytes);
-                let o2 = top_mut!(V::Bytes);
-                ctx.gas().consume(interpret_cost::xor_bytes(&o1, o2)?)?;
-
-                // The resulting vector length is the largest length among the
-                // operands, so to reuse memory we put the largest vector to
-                // the result (`o2`).
-                if o1.len() > o2.len() {
-                    std::mem::swap(&mut o1, o2)
+                pop_ref!(o1, Bytes);
+                pop_ref!(o2, Bytes);
+                ctx.gas().consume(interpret_cost::xor_bytes(o1, o2)?)?;
+                // Result length is the larger operand's; shorter combines at the right.
+                let (long, short) = if o1.len() >= o2.len() {
+                    (o1, o2)
+                } else {
+                    (o2, o1)
+                };
+                let mut res = long.to_vec();
+                let off = long.len() - short.len();
+                for (k, b) in short.iter().enumerate() {
+                    res[off + k] ^= b;
                 }
-                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev())
-                {
-                    *b2 ^= b1;
-                }
+                stack.push(V::Bytes(res));
             }
         },
         I::Not(overload) => match overload {
@@ -2471,21 +2472,20 @@ fn interpret_one<'a>(
                 *o = !*o;
             }
             overloads::Not::Int => {
-                let o = pop!(V::Int);
-                ctx.gas().consume(interpret_cost::not_num(&o)?)?;
+                pop_ref!(o, Int);
+                ctx.gas().consume(interpret_cost::not_num(o)?)?;
                 stack.push(V::Int(!o));
             }
             overloads::Not::Nat => {
-                let o = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::not_num(&o)?)?;
-                stack.push(V::Int(!BigInt::from(o)))
+                pop_ref!(o, Nat);
+                ctx.gas().consume(interpret_cost::not_num(o)?)?;
+                // NOT of a nat is `-(n + 1)`, read without owning the operand.
+                stack.push(V::Int(BigInt::from_biguint(Sign::Minus, o + 1u32)))
             }
             overloads::Not::Bytes => {
-                let o = top_mut!(V::Bytes);
+                pop_ref!(o, Bytes);
                 ctx.gas().consume(interpret_cost::not_bytes(o)?)?;
-                for b in o.iter_mut() {
-                    *b = !*b
-                }
+                stack.push(V::Bytes(o.iter().map(|b| !b).collect()));
             }
         },
         // Control-flow / sub-stack instructions are handled by the iterative
@@ -4649,6 +4649,14 @@ mod interpreter_tests {
             check(And(o::And::IntNat), V::int(-8), V::nat(1003), V::nat(1000));
             // large neg int & small nat
             check(And(o::And::IntNat), V::int(-1001), V::nat(12), V::nat(4));
+            // negative operand whose magnitude decrement borrows across a
+            // BigUint digit boundary
+            check(
+                And(o::And::IntNat),
+                V::Int(-(BigInt::from(1u8) << 64u32)),
+                V::Nat((BigUint::from(1u8) << 65u32) - 1u8),
+                V::Nat(BigUint::from(1u8) << 64u32),
+            );
             // large nats (several "digits" in BigUint)
             check(
                 And(o::And::NatNat),
@@ -5144,6 +5152,103 @@ mod interpreter_tests {
                 "{name}: amplification {amp_a:.1} (64 KiB) / {amp_b:.1} (256 KiB) \
                  bytes-per-milligas exceeds the {MAX_BYTES_PER_MILLIGAS} bound; per-gas \
                  clone work is unbounded (L2-1794)",
+            );
+        }
+    }
+
+    // A large operand kept live by extra copies on the stack must not be
+    // copied by the op. A reintroduced operand copy shows up as one extra buffer.
+    #[test]
+    fn dup_shared_bitwise_operands_are_not_copied() {
+        const OPERAND: usize = 262144;
+
+        fn bytes_v() -> TypedValue<'static> {
+            V::Bytes(vec![0xABu8; OPERAND])
+        }
+
+        // Top byte kept clear so increment of the magnitude cannot grow
+        // the limb vector, which would count a reallocation as a copy.
+        fn nat_v() -> TypedValue<'static> {
+            let mut be = vec![0xFFu8; OPERAND];
+            be[0] = 0x7F;
+            V::Nat(BigUint::from_bytes_be(&be))
+        }
+
+        fn int_neg_v() -> TypedValue<'static> {
+            let mut be = vec![0xFFu8; OPERAND];
+            be[0] = 0x80;
+            V::Int(BigInt::from_signed_bytes_be(&be))
+        }
+
+        fn int_pos_v() -> TypedValue<'static> {
+            let mut be = vec![0xFFu8; OPERAND];
+            be[0] = 0x7F;
+            V::Int(BigInt::from_signed_bytes_be(&be))
+        }
+
+        fn buffers<'a>(mut stack: IStack<'a>, prog: &[Instruction<'a>]) -> u64 {
+            let mut ctx = Ctx::default();
+            let before = thread_allocated_bytes();
+            interpret(prog, &mut ctx, &mut stack).unwrap();
+            (thread_allocated_bytes() - before) / OPERAND as u64
+        }
+
+        let binary = |op| vec![Dup(None), Dup(None), op];
+        let unary = |op| vec![Dup(None), op];
+        let int_nat = || vec![Dip(None, vec![Dup(None)]), And(overloads::And::IntNat)];
+        for (name, stack, prog, expected_buffers) in [
+            (
+                "AND bytes",
+                stk![bytes_v()],
+                binary(And(overloads::And::Bytes)),
+                1,
+            ),
+            (
+                "AND nat-nat",
+                stk![nat_v()],
+                binary(And(overloads::And::NatNat)),
+                1,
+            ),
+            ("AND int-nat pos", stk![nat_v(), int_pos_v()], int_nat(), 1),
+            ("AND int-nat neg", stk![nat_v(), int_neg_v()], int_nat(), 1),
+            (
+                "OR bytes",
+                stk![bytes_v()],
+                binary(Or(overloads::Or::Bytes)),
+                1,
+            ),
+            ("OR nat", stk![nat_v()], binary(Or(overloads::Or::Nat)), 1),
+            (
+                "XOR bytes",
+                stk![bytes_v()],
+                binary(Xor(overloads::Xor::Bytes)),
+                1,
+            ),
+            (
+                "XOR nat",
+                stk![nat_v()],
+                binary(Xor(overloads::Xor::Nat)),
+                1,
+            ),
+            (
+                "NOT bytes",
+                stk![bytes_v()],
+                unary(Not(overloads::Not::Bytes)),
+                1,
+            ),
+            (
+                "NOT int",
+                stk![int_neg_v()],
+                unary(Not(overloads::Not::Int)),
+                1,
+            ),
+            ("NOT nat", stk![nat_v()], unary(Not(overloads::Not::Nat)), 1),
+        ] {
+            let allocated = buffers(stack, &prog);
+            assert_eq!(
+                allocated, expected_buffers,
+                "{name}: allocated {allocated} operand-width buffers, expected \
+                 {expected_buffers}; an operand is being copied",
             );
         }
     }
