@@ -55,6 +55,15 @@ General
   your system package manager: ``libclang-dev`` on Debian and Ubuntu.
   (MR :gl:`!22818`, MR :gl:`!22827`)
 
+- Bounded the read that follows the rejection of an oversized RPC request
+  body: the remainder is discarded within a bounded time and number of
+  bytes, after which the connection is released rather than held for as
+  long as the client keeps sending. Without this bound, one endless upload
+  per connection slot would suffice to exhaust the server's active
+  connection slots. As a consequence, a client still uploading more than
+  twice the cap when its request is rejected may see its connection reset
+  instead of reading the 413 response. (MR :gl:`!22629`)
+
 Node
 ----
 

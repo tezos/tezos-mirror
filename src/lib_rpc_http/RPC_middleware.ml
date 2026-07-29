@@ -238,25 +238,250 @@ let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
    materialize. *)
 let default_max_body_size = 16_777_216L (* 16 MiB *)
 
-let request_entity_too_large_response () =
-  (* [Connection: close] lets cohttp close the socket instead of relying on
-     draining the remaining bytes to keep it reusable. *)
-  let headers = Cohttp.Header.init_with "connection" "close" in
+(* Bounds of the lingering read performed on a request that has been rejected
+   for being too large, in the spirit of nginx's [lingering_close]. A client
+   that is still uploading will not look at our response until its own writes
+   stop blocking, so we keep reading for a little while; but never for an
+   unbounded time nor an unbounded number of bytes.
+
+   Three bounds, as nginx has: a per-read idle timeout, which cuts off a
+   client that stalls without punishing one that is uploading at speed; a
+   total timeout, without which a client dribbling one byte at a time would
+   stay under the idle timeout for hours; and a byte ceiling, which caps the
+   bandwidth we are willing to waste on a request we have already refused.
+
+   TODO: https://gitlab.com/tezos/tezos/-/issues/8428
+   All of this is a workaround for two lines in our cohttp fork:
+   [Cohttp_lwt.Server.handle_request] drains the request body in an
+   [Lwt.finalize], unconditionally and without a bound, and
+   [handle_client] derives keep-alive from the request alone so the
+   [Connection: close] we send is ignored. Once the fork drains
+   conditionally, {!shutdown_read} and these bounds can go away. *)
+let lingering_read_idle_timeout = 1.
+
+let lingering_read_total_timeout = 5.
+
+(* The byte ceiling, as a multiple of the cap rather than as a constant. The
+   unread remainder of a rejected request is by construction larger than the
+   cap, so a ceiling below the cap would make {!bounded_drain} always give up
+   and would leave the reusable-connection path below unreachable at every
+   configured cap. Twice the cap lets a client that merely overshot finish
+   sending, and stops there.
+
+   Note that it is the total timeout, not this ceiling, that bounds how long a
+   connection slot is held; the ceiling only bounds the bandwidth. *)
+let lingering_read_max_bytes ~max_body_size = Int64.mul 2L max_body_size
+
+(* Shuts the read half of the connection down, best effort. When it lands,
+   cohttp's pending drain consumes what the kernel has queued and then reads
+   zero bytes, which every transfer decoder turns into [Transfer.Done], so the
+   drain terminates instead of following the client for ever, and the next
+   [Request.read] returns [`Eof].
+
+   Best effort, and the failures are not exceptional: the peer may already be
+   gone, and a connection carrying no file descriptor cannot be shut down at
+   all. Nothing bounds cohttp's drain in those cases. The caller must not read
+   anything into success or failure here beyond that -- in particular, whether
+   to announce [Connection: close] depends on whether the request stream was
+   truncated, not on whether this call worked.
+
+   The shutdown does not, on Linux, discard what the client sends afterwards:
+   bytes already in flight are still queued and still readable, and [recv]
+   reports end of file only once the queue has drained. What it buys is
+   termination, not immediate silence.
+
+   The shutdown also wakes cohttp's EOF monitor, which cancels the request
+   handler, and with it the write of any response not written yet. Callers
+   must therefore return their response straight after this call, without
+   yielding in between: no event emitted, no I/O, no [Lwt.pause]. The response
+   is then safe only because, in our cohttp fork, nothing yields between the
+   handler returning and the response being flushed -- a property of that code,
+   not of ours. https://gitlab.com/tezos/tezos/-/issues/8428 removes the
+   shutdown and, with it, this constraint.
+
+   The write half is untouched, so the response can still be written. Whether
+   the client gets to read it is another matter: closing a socket that still
+   has unread data queued makes the kernel send an RST, which may discard a
+   response already sitting in the peer's receive queue. A client that is still
+   uploading therefore often reports a send failure rather than the 413 -- one
+   more reason for {!bounded_drain} to avoid reaching here when it can.
+
+   Only [TCP] and [Domain_socket] carry a file descriptor. Server side,
+   [Conduit_lwt_unix] never builds the other two: [Tunnel] is only built by the
+   client-side TLS tunnel connector, and the [Vchan] listeners raise in
+   [Conduit_lwt_unix.serve].
+
+   Caveat, TLS: a TLS listener also yields a [TCP] flow, holding the socket
+   *underneath* the TLS session, so the shutdown lands below the TLS layer and
+   [Ssl.read] then fails mid-record instead of returning 0. The connection is
+   still released -- which is the point -- but the 413 is lost and the failure
+   surfaces in the server's exception log. *)
+let shutdown_read (conn : Cohttp_lwt_unix.Server.conn) =
+  match fst conn with
+  | Conduit_lwt_unix.TCP {fd; _} | Conduit_lwt_unix.Domain_socket {fd; _} -> (
+      try Lwt_unix.shutdown fd Unix.SHUTDOWN_RECEIVE with
+      | (Stack_overflow | Out_of_memory) as exn ->
+          (* Not ours to swallow: these report a runtime condition, not a dead
+             connection. *)
+          raise exn
+      | _ ->
+          (* [ENOTCONN] if the peer is already gone -- which is routine, a
+             client that half-closes gets us here -- [EBADF] if the descriptor
+             was closed concurrently, and whatever [Lwt_unix.abort] was handed
+             if it was aborted. Nothing else here should ever escape. *)
+          ())
+  | Conduit_lwt_unix.Tunnel _ | Conduit_lwt_unix.Vchan _ -> ()
+
+(* Reads and discards what is left of [stream] within the bounds above.
+
+   Returns [true] iff the request has been received in full, and hence iff the
+   connection can be handed back for reuse. When the declared length [expected]
+   is known, that means the stream ended *and* exactly that many bytes came out
+   of it: the end of the stream on its own is not enough, since
+   [Cohttp.Transfer] also reports it on a premature EOF and on a malformed
+   chunk header, neither of which leaves a usable connection. Without
+   [expected] -- a chunked body, whose length cohttp does not give us -- the end
+   of the stream is all there is to go on.
+
+   [false] therefore covers both a connection that is broken and one that is
+   merely still busy: a client that stalled, that dribbled past the total
+   timeout, or that has more left to send than we are willing to read. The
+   caller treats them alike, none of them being reusable.
+
+   The loop reads with [Lwt_stream.get], one chunk per call, and that is what
+   keeps its memory at one chunk. Do not replace it with
+   [Lwt_stream.junk_while] (what [Cohttp_lwt.Body.drain_body] uses),
+   [Lwt_stream.iter] or [Lwt_stream.iter_s]: when chunks are ready without
+   blocking, as they are while a client uploads at speed, those recurse
+   through [>>=] on the stack, each frame holding a node already consumed, and
+   hence every chunk read since, until they return. With the byte ceiling
+   below, that is up to twice the cap per connection, for every connection
+   being rejected at once. *)
+let bounded_drain ?expected ~max_bytes stream =
+  let open Lwt_syntax in
+  let rec drain drained =
+    let* read =
+      (* Cancelling [Lwt_stream.get] is safe here: for a stream built with
+         [Lwt_stream.from], which is what [Cohttp_lwt.Body.create_stream]
+         uses, [Lwt_stream.feed] hands the reading promise out through
+         [Lwt.protected]. Cancelling therefore detaches this waiter only --
+         the in-flight read carries on, pushes its chunk into the stream, and
+         whoever reads next (here, cohttp's own drain) picks it up. No byte is
+         lost and no read is issued twice. *)
+      Lwt.pick
+        [
+          (let* chunk = Lwt_stream.get stream in
+           Lwt.return (`Read chunk));
+          (let* () = Lwt_unix.sleep lingering_read_idle_timeout in
+           Lwt.return `Idle);
+        ]
+    in
+    match read with
+    | `Idle -> Lwt.return_false
+    | `Read None -> (
+        match expected with
+        | None -> Lwt.return_true
+        | Some expected -> Lwt.return (Int64.equal drained expected))
+    | `Read (Some chunk) ->
+        let drained = Int64.add drained (Int64.of_int (String.length chunk)) in
+        if Int64.compare drained max_bytes > 0 then Lwt.return_false
+        else drain drained
+  in
+  Lwt.catch
+    (fun () ->
+      Lwt.pick
+        [
+          (let* () = Lwt_unix.sleep lingering_read_total_timeout in
+           Lwt.return_false);
+          drain 0L;
+        ])
+    (function
+      | Lwt.Canceled as exn ->
+          (* The whole callback is being cancelled: the client is gone. *)
+          Lwt.reraise exn
+      | (Stack_overflow | Out_of_memory) as exn ->
+          (* Not ours to swallow: these report a runtime condition, not a
+             broken connection. *)
+          Lwt.reraise exn
+      | _exn ->
+          (* The read failed, so the connection is already broken. Report it
+             as not fully received so that the caller stops trusting it. *)
+          Lwt.return_false)
+
+let request_entity_too_large_response ~connection_closing () =
+  let headers =
+    if connection_closing then
+      (* We did not read the request out in full, so the connection is
+         finished: say so, as RFC 9112 §9.6 requires, and so that no
+         intermediary reuses or pipelines a connection whose request stream we
+         truncated. This header does not drive cohttp itself, which derives
+         keep-alive from the request alone. *)
+      Cohttp.Header.init_with "connection" "close"
+    else
+      (* The request was received in full, so the connection is still usable
+         and saying otherwise would cost the client a handshake. *)
+      Cohttp.Header.init ()
+  in
   let body, encoding = (Cohttp_lwt.Body.empty, Cohttp.Transfer.Fixed 0L) in
   ( Cohttp.Response.make ~status:`Request_entity_too_large ~encoding ~headers (),
     body )
 
+(* Answers 413 after a bounded lingering read, so that a client which is done
+   sending still gets a readable response on a reusable connection, while an
+   endless body cannot hold the connection -- and hence one of the
+   [max_active_rpc_connections] slots, which are taken before [accept] and so
+   wedge the whole listener -- for ever.
+
+   [expected], when known, is the length the client declared for the whole
+   body, none of which has been read yet. *)
+let reject_oversized_body ?expected ~max_body_size conn stream =
+  let open Lwt_syntax in
+  let max_bytes = lingering_read_max_bytes ~max_body_size in
+  let* fully_received =
+    match expected with
+    | Some expected when Int64.compare expected max_bytes > 0 ->
+        (* The client has declared more than we are prepared to read, so the
+           lingering read cannot end in a reusable connection whatever it does.
+           Skip it rather than spend the bandwidth and delay releasing the slot
+           by up to the total timeout: the client ends up reset either way. *)
+        Lwt.return_false
+    | Some _ | None -> bounded_drain ?expected ~max_bytes stream
+  in
+  (* Whether to announce the close turns on the request stream having been
+     truncated, not on the shutdown having landed: a client that half-closed
+     early leaves us a request we cannot complete and a socket whose read half
+     can no longer be shut down, and that connection must still not be
+     advertised as reusable. *)
+  let connection_closing = not fully_received in
+  (* Nothing may yield between the shutdown and returning the response, see
+     {!shutdown_read}. *)
+  if connection_closing then shutdown_read conn ;
+  Lwt.return
+    (`Response (request_entity_too_large_response ~connection_closing ()))
+
 (* Rejects a request whose body exceeds [max_body_size] before the wrapped
    [callback] runs. A declared [Content-Length] over the cap is rejected
-   without reading the body; a chunked or unknown-length body is read and
-   capped as it streams in. *)
+   without the body ever being buffered; a chunked or unknown-length body is
+   read and capped as it streams in. Either way the remainder is disposed of by
+   {!reject_oversized_body} rather than left for cohttp's unbounded drain.
+
+   Not buffering is not the same as not reading: the remainder still goes
+   through the bounded lingering read, which is what lets the client read the
+   413 before the connection goes away. *)
 let limit_body_size ~max_body_size callback conn req body =
   let open Lwt_syntax in
   match Cohttp.Request.encoding req with
   | Cohttp.Transfer.Fixed len when Int64.compare len max_body_size > 0 ->
-      Lwt.return (`Response (request_entity_too_large_response ()))
+      reject_oversized_body
+        ~expected:len
+        ~max_body_size
+        conn
+        (Cohttp_lwt.Body.to_stream body)
   | Cohttp.Transfer.Fixed _ -> callback conn req body
   | Cohttp.Transfer.Chunked | Cohttp.Transfer.Unknown ->
+      (* [Unknown] cannot actually carry a body: [Request.has_body] maps it to
+         [`Unknown], which [Cohttp_lwt.Server.read_body] turns into [`Empty].
+         It is grouped here for safety only. *)
       let stream = Cohttp_lwt.Body.to_stream body in
       let buf = Buffer.create 4096 in
       let exception Body_too_large in
@@ -274,9 +499,11 @@ let limit_body_size ~max_body_size callback conn req body =
           callback conn req (Cohttp_lwt.Body.of_string (Buffer.contents buf)))
         (function
           | Body_too_large ->
-              let* () = Lwt_stream.junk_while (fun _ -> true) stream in
-              Lwt.return (`Response (request_entity_too_large_response ()))
-          | exn -> Lwt.fail exn)
+              (* No [expected]: cohttp does not tell us the length of a chunked
+                 body, so the end of the stream is the only completion signal
+                 available. *)
+              reject_oversized_body ~max_body_size conn stream
+          | exn -> Lwt.reraise exn)
 
 let proxy_server_query_forwarder ?acl ?ctx ?forwarder_events forwarder_resources
     forwarding_endpoint =
