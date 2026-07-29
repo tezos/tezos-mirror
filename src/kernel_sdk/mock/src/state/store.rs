@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Mock runtime store - the durable key-value tree.
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 /// The durable key-value tree backed by irmin in the real PVM.
@@ -17,7 +17,8 @@ pub(crate) struct Store {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct Node {
     pub(crate) value: Option<Rc<Vec<u8>>>,
-    pub(crate) inner: Rc<HashMap<String, Rc<Self>>>,
+    /// Ordered by step, so that iterating a node is deterministic.
+    pub(crate) inner: Rc<BTreeMap<String, Rc<Self>>>,
 }
 
 pub(crate) const VALUE_NAME: &str = "@";
@@ -28,10 +29,7 @@ impl Node {
             writeln!(f, "{} {}", prefix, hex::encode(v.as_ref()))?;
         }
 
-        let mut keys: Vec<_> = self.inner.iter().collect();
-        keys.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
-
-        for (k, v) in keys.iter() {
+        for (k, v) in self.inner.iter() {
             let prefix = format!("{prefix}/{k}");
             v.print(&prefix, f)?;
         }
