@@ -360,6 +360,33 @@ let terminates () =
   List.iter check es3 ;
   List.iter check es4
 
+(* L2-1767: the binary decoder bounds its own recursion depth, so deeply-nested
+   input is rejected with [Too_many_recursive_calls] instead of overflowing the
+   native stack. This holds for every [mu], with no opt-in. *)
+
+(* A self-recursive chain [Foo (Some (... (Foo None)))], reusing [foo] and
+   [discriminated_option] declared above. *)
+let chain_encoding =
+  Data_encoding.mu "depth_chain" (fun e ->
+      Data_encoding.(
+        conv (fun (Foo x) -> x) (fun x -> Foo x) (discriminated_option e)))
+
+(* Binary form of a [depth]-deep chain, built directly: [discriminated_option]
+   encodes [Some] as the tag byte [0x01] and the final [None] as [0x00]. Built
+   by hand rather than with the binary writer, which recurses just as deeply as
+   the reader used to. *)
+let chain_bytes depth =
+  Bytes.init (depth + 1) (fun i -> if i < depth then '\001' else '\000')
+
+let deep_input_is_rejected () =
+  (* Shallow input decodes; input far deeper than the recursion bound is
+     rejected cleanly, with no stack overflow. *)
+  assert (
+    Data_encoding.Binary.of_bytes_opt chain_encoding (chain_bytes 100) <> None) ;
+  match Data_encoding.Binary.of_bytes chain_encoding (chain_bytes 200_000) with
+  | Error Data_encoding.Binary.Too_many_recursive_calls -> ()
+  | Ok _ | Error _ -> assert false
+
 let tests =
   [
     ("points", `Quick, points);
@@ -368,4 +395,5 @@ let tests =
     ("big", `Quick, big_test);
     ("doesnt_terminate", `Quick, doesnt_terminate);
     ("terminates", `Quick, terminates);
+    ("deep input is rejected", `Quick, deep_input_is_rejected);
   ]
