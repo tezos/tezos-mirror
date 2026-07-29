@@ -2050,14 +2050,27 @@ mod review_verification {
     /// allocates per visit, so it cannot exhaust the heap the way the
     /// `Rc::make_mut` walk did. Only the big-map-free memo does.
     ///
-    /// **Reaching the end of this function is the assertion.** At `LEVELS` 40
-    /// the DAG unfolds to `2^40` ≈ 10^12 occurrences, so a walk that explored
-    /// each of them does not finish — remove the memo and this test hangs
-    /// rather than failing. Nothing else here can express the property: the
-    /// value holds no big map, so `f` is never called and there is no count to
-    /// compare. Making the visit count observable needs the walk to price its
-    /// own steps, which is why the quantitative form of this test lives with
-    /// the per-node gas charge instead of here.
+    /// **Finishing at all is the assertion**, which is why the walk runs on a
+    /// worker under a deadline rather than inline. At `LEVELS` 40 the DAG
+    /// unfolds to `2^40` ≈ 10^12 occurrences, so a walk that explored each of
+    /// them does not finish — measured at ~8 hours on release, and worse in
+    /// debug. Nothing else here can express the property: the value holds no
+    /// big map, so `f` is never called, nothing is rebuilt and nothing is
+    /// allocated. Re-exploration has no observable effect except time.
+    ///
+    /// Without the deadline this test would *hang* instead of failing, and
+    /// since `libtest` has no per-test timeout and the suite runs with
+    /// `RUST_TEST_THREADS=1`, that means the whole binary stalls until CI kills
+    /// the job an hour later — reporting no result for this test or any test
+    /// after it. A regression would look like flaky infrastructure rather than
+    /// like this function.
+    ///
+    /// The deadline is wall-clock, which is normally a poor thing to assert
+    /// on. It is sound here only because the two outcomes are about six orders
+    /// of magnitude apart: microseconds when memoized, hours when not. The
+    /// deterministic form needs the walk to price its own steps, so it arrives
+    /// with the per-node gas charge, where an unmemoized walk exhausts its
+    /// budget immediately and the assertion becomes a visit count.
     ///
     /// Note in particular that asserting the two list elements still point at
     /// one allocation would *not* say anything about re-exploration — that is
@@ -2066,13 +2079,36 @@ mod review_verification {
     #[test]
     fn walk_terminates_on_an_exponentially_shared_subtree() {
         const LEVELS: usize = 40;
+        /// Far above the memoized cost and far below the unmemoized one, so
+        /// neither a slow runner nor a warm cache can move the verdict.
+        const BUDGET: std::time::Duration = std::time::Duration::from_secs(30);
 
-        let mut root = shared_dag(TypedValue::Unit, LEVELS);
+        let (done, finished) = std::sync::mpsc::channel();
+        std::thread::Builder::new()
+            // The WASM kernel stack budget, as elsewhere in this module.
+            .stack_size(1024 * 1024)
+            .spawn(move || {
+                // Built inside the worker: `TypedValue` is `Rc`-backed and so
+                // not `Send`. Only the count crosses the channel.
+                let mut root = shared_dag(TypedValue::Unit, LEVELS);
+                let mut visited = 0;
+                root.for_each_big_map_mut(&mut |_| visited += 1);
+                let _ = done.send(visited);
+            })
+            .unwrap();
 
-        let mut visited = 0;
-        root.for_each_big_map_mut(&mut |_| visited += 1);
-
-        assert_eq!(visited, 0, "no big map to visit");
+        // On timeout the worker is left running — a thread cannot be killed —
+        // so it burns one core until the binary exits. That is the price of
+        // failing at all, and it beats stalling the suite.
+        match finished.recv_timeout(BUDGET) {
+            Ok(visited) => assert_eq!(visited, 0, "no big map to visit"),
+            Err(_) => panic!(
+                "the walk did not finish within {BUDGET:?}; at {LEVELS} levels \
+                 the value's in-memory DAG unfolds to 2^{LEVELS} occurrences, \
+                 so it is exploring shared subtrees once per path instead of \
+                 once — the big-map-free memo has regressed"
+            ),
+        }
     }
 
     /// The flip side of [walk_terminates_on_an_exponentially_shared_subtree]:
