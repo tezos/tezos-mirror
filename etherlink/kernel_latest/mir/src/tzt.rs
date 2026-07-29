@@ -439,10 +439,10 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                         Micheline::Seq(elts) => elts,
                         _ => return Err("Big map elements must be a sequence".into()),
                     };
-                    let descr: rpds::RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>> = elts
+                    let descr: rpds::RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>> = elts
                         .iter()
                         .map(
-                            |elt| -> Result<(TypedValue<'a>, TypedValue<'a>), Box<dyn Error>> {
+                            |elt| -> Result<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>), Box<dyn Error>> {
                                 match elt {
                                 // If Micheline::App stores its arguments in a Vec,
                                 // pattern match with a condition to ensure length is 2
@@ -450,7 +450,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                                     let (k_raw, v_raw) = (&kv[0], &kv[1]);
                                     let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty, AllowForgedLazyStorageId::No)?;
                                     let v = typecheck_value(v_raw, &mut Ctx::default(), &val_ty, AllowForgedLazyStorageId::No)?;
-                                    Ok((k, v))
+                                    Ok((Rc::new(k), Rc::new(v)))
                                 }
                                 _ => Err(
                                     "Each big map element must be of the form `Elt <key> <value>`."

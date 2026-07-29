@@ -5319,7 +5319,9 @@ fn step_typecheck_value<'a, 'b>(
                             results.push(TV::BigMap(BigMap::new(
                                 tk,
                                 tv,
-                                acc.into_iter().collect(),
+                                acc.into_iter()
+                                    .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+                                    .collect(),
                             )));
                         }
                     }
@@ -5395,7 +5397,10 @@ fn step_typecheck_value<'a, 'b>(
                                 content: big_map::BigMapContent::FromId(
                                     big_map::BigMapFromId {
                                         id: big_map_id,
-                                        overlay: acc.into_iter().collect(),
+                                        overlay: acc
+                                            .into_iter()
+                                            .map(|(k, v)| (Rc::new(k), v.map(Rc::new)))
+                                            .collect(),
                                     },
                                 ),
                                 key_type: tk_final,
@@ -5446,7 +5451,10 @@ fn step_typecheck_value<'a, 'b>(
                     results.push(TV::BigMap(BigMap {
                         content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                             id: big_map_id,
-                            overlay: acc.into_iter().collect(),
+                            overlay: acc
+                                .into_iter()
+                                .map(|(k, v)| (Rc::new(k), v.map(Rc::new)))
+                                .collect(),
                         }),
                         key_type: tk_final,
                         value_type: tv_final,
@@ -10588,7 +10596,7 @@ mod typecheck_tests {
                 crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Ok(TypedValue::BigMap(BigMap {
-                content: big_map::BigMapContent::InMemory(RedBlackTreeMap::from_iter([
+                content: big_map::BigMapContent::InMemory(big_map::in_memory_entries([
                     (TypedValue::int(7), TypedValue::int(8))
                 ])),
                 key_type: Type::Int,
@@ -10635,7 +10643,7 @@ mod typecheck_tests {
             Ok(TypedValue::BigMap(BigMap {
                 content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                     id: id0.clone(),
-                    overlay: RedBlackTreeMap::from_iter([(
+                    overlay: big_map::overlay_entries([(
                         TypedValue::int(7),
                         Some(TypedValue::int(8))
                     )])
@@ -10656,7 +10664,7 @@ mod typecheck_tests {
             Ok(TypedValue::BigMap(BigMap {
                 content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                     id: id0,
-                    overlay: RedBlackTreeMap::from_iter([(TypedValue::int(7), None)])
+                    overlay: big_map::overlay_entries([(TypedValue::int(7), None)])
                 }),
                 key_type: Type::Int,
                 value_type: Type::Int

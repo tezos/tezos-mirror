@@ -6941,6 +6941,76 @@ code {
      }
 |}
 
+  let test_big_map_dump =
+    register_tezosx_test
+      ~title:"Michelson big-map dump does not exhaust memory on a shared value"
+      ~tags:["michelson"; "oom"; "big_map"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"bigmapdump"
+      ~init:"Pair {} 0x"
+      ~arg:"Unit"
+      ~outcome:(Fails_with "Gas_exhaustion")
+      {|
+parameter unit ;
+storage (pair (big_map bytes bytes) bytes) ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       EMPTY_BIG_MAP bytes bytes ;
+       SWAP ;
+       SOME ;
+       PUSH bytes 0x ;
+       UPDATE ;
+       PAIR ;
+       NIL operation ;
+       PAIR
+     }
+|}
+
+  let test_big_map_drop =
+    register_tezosx_test
+      ~title:"Michelson big-map drop does not exhaust memory on a shared value"
+      ~tags:["michelson"; "oom"; "big_map"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"bigmapdrop"
+      ~init:"Unit"
+      ~arg:"Unit"
+      ~outcome:Succeeds
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       EMPTY_BIG_MAP bytes bytes ;
+       SWAP ;
+       SOME ;
+       PUSH bytes 0x ;
+       UPDATE ;
+       DROP ;
+       DROP ;
+       UNIT ; NIL operation ; PAIR
+     }
+|}
+
   let register () =
     test_hashes [Alpha] ;
     test_check_signature [Alpha] ;
@@ -6950,7 +7020,9 @@ code {
     test_not_bytes [Alpha] ;
     test_bitwise_bytes [Alpha] ;
     test_slice [Alpha] ;
-    test_finalize_storage [Alpha]
+    test_finalize_storage [Alpha] ;
+    test_big_map_dump [Alpha] ;
+    test_big_map_drop [Alpha]
 end
 
 let () =
