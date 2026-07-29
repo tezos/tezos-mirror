@@ -1677,6 +1677,325 @@ let test_metrics_not_on_rpc_listener () =
        when --metrics-addr is not configured (the route is not registered)" ;
   unit
 
+(* Tests for the RPC request body size cap (--rpc-max-request-body) and for
+   the bounded lingering close that follows a rejection. *)
+
+(* The cap used by the tests below. Small, so that the bodies stay cheap. *)
+let max_request_body = 100_000
+
+let post_body_url node =
+  (* Any route will do: the cap is enforced by the outermost middleware layer,
+     before routing and before the ACL. *)
+  Format.sprintf
+    "http://%s:%d/version"
+    Constant.default_host
+    (Node.rpc_port node)
+
+(* Runs [curl] through a shell so that its exit code is discarded: on the
+   endless-body test curl is expected to fail (the server resets the
+   connection under it), and what we assert on is the status it prints and how
+   long it took, not its exit code. *)
+let curl_status ?(timeout = 30) ?(stdin = "/dev/null") args url =
+  let command =
+    Format.sprintf
+      "curl -s -o /dev/null -w '%%{http_code}' --max-time %d %s %s < %s || true"
+      timeout
+      (String.concat " " args)
+      (Filename.quote url)
+      stdin
+  in
+  Process.spawn ~log_output:false "sh" ["-c"; command]
+  |> Process.check_and_read_stdout
+
+let test_rpc_max_request_body () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC request body size cap"
+    ~tags:["rpc"; "body"; "limit"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* node = Node.init [Node.Max_request_body max_request_body] in
+  let url = post_body_url node in
+  let under = Temp.file "under_cap_body" in
+  let over = Temp.file "over_cap_body" in
+  write_file under ~contents:(String.make (max_request_body - 1_000) 'a') ;
+  write_file over ~contents:(String.make (max_request_body * 2) 'a') ;
+  let* status = curl_status ["-X"; "POST"; "--data-binary"; "@" ^ over] url in
+  Check.((String.trim status = "413") string)
+    ~error_msg:
+      "a POST body over the --rpc-max-request-body cap returned %L but must \
+       return 413" ;
+  let* status = curl_status ["-X"; "POST"; "--data-binary"; "@" ^ under] url in
+  Check.((String.trim status <> "413") string)
+    ~error_msg:
+      "a POST body under the --rpc-max-request-body cap returned %L: it must \
+       not be rejected by the size cap" ;
+  unit
+
+(* The body is fully sent and stays within the lingering read's byte ceiling
+   (twice the cap), so the read consumes it in full: the client must get a
+   readable 413 on a connection that stays reusable, i.e. without
+   [Connection: close]. Declaring more than the ceiling is the other case, and
+   is covered by {!test_rpc_max_request_body_closes_connection}. *)
+let test_rpc_max_request_body_keeps_connection () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC request body size cap keeps the connection alive"
+    ~tags:["rpc"; "body"; "limit"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* node = Node.init [Node.Max_request_body max_request_body] in
+  let url = post_body_url node in
+  let over = Temp.file "over_cap_body" in
+  (* Over the cap but inside the lingering read's ceiling of twice the cap. *)
+  write_file over ~contents:(String.make (max_request_body * 3 / 2) 'a') ;
+  (* Two requests on a single connection: curl reuses it when given both URLs,
+     which only works if the server did not tear it down. [-D -] dumps the
+     response headers so that we can also check the connection is not being
+     closed. *)
+  let command =
+    Format.sprintf
+      "curl -s -o /dev/null -D - --max-time 30 -X POST --data-binary @%s %s %s"
+      (Filename.quote over)
+      (Filename.quote url)
+      (Filename.quote url)
+  in
+  let* headers =
+    Process.spawn ~log_output:false "sh" ["-c"; command]
+    |> Process.check_and_read_stdout
+  in
+  let headers = String.lowercase_ascii headers in
+  let occurrences needle =
+    List.length
+      (String.split_on_char '\n' headers
+      |> List.filter (fun line ->
+             line |> String.trim |> fun l ->
+             String.length l >= String.length needle
+             && String.sub l 0 (String.length needle) = needle))
+  in
+  Check.((occurrences "http/1.1 413" = 2) int)
+    ~error_msg:
+      "expected two 413s over one reused connection but got %L: a request \
+       whose body was received in full must not close the connection" ;
+  Check.((occurrences "connection: close" = 0) int)
+    ~error_msg:
+      "the server sent %L [Connection: close] headers: a request whose body \
+       was received in full leaves the connection usable" ;
+  unit
+
+(* Sends a POST that declares [content_length] but writes only [body], then
+   optionally half-closes, and returns whatever the server answers.
+
+   Headers and [body] go out in a single write so that the server cannot reset
+   the connection between the two, which would raise [EPIPE] here.
+
+   Reading the response on a raw socket rather than through [curl] is the whole
+   point: once the server stops reading a body the client is still uploading,
+   the connection is reset, and curl reports the send failure and discards the
+   response bytes it had already received. The 413 does reach the socket. *)
+let raw_post_truncated node ~content_length ~body ~half_close =
+  let socket = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
+  Lwt.finalize
+    (fun () ->
+      let* () =
+        Lwt_unix.connect
+          socket
+          (Unix.ADDR_INET
+             (Unix.inet_addr_of_string Constant.default_host, Node.rpc_port node))
+      in
+      let request =
+        Printf.sprintf
+          "POST /version HTTP/1.1\r\n\
+           Host: %s\r\n\
+           Content-Type: application/json\r\n\
+           Content-Length: %d\r\n\
+           \r\n\
+           %s"
+          Constant.default_host
+          content_length
+          body
+      in
+      let bytes = Bytes.of_string request in
+      let rec write offset =
+        if offset >= Bytes.length bytes then unit
+        else
+          let* written =
+            Lwt_unix.write socket bytes offset (Bytes.length bytes - offset)
+          in
+          if written = 0 then unit else write (offset + written)
+      in
+      let* () = write 0 in
+      if half_close then Lwt_unix.shutdown socket Unix.SHUTDOWN_SEND ;
+      let buffer = Bytes.create 4096 in
+      let* len =
+        (* A reset before we get to read means the response was lost, which the
+           caller reports as an empty answer rather than as an exception. *)
+        Lwt.catch
+          (fun () -> Lwt_unix.read socket buffer 0 (Bytes.length buffer))
+          (function
+            | Unix.Unix_error _ -> Lwt.return 0 | exn -> Lwt.reraise exn)
+      in
+      Lwt.return (String.lowercase_ascii (Bytes.sub_string buffer 0 len)))
+    (fun () -> Lwt.catch (fun () -> Lwt_unix.close socket) (fun _ -> unit))
+
+(* The 413 sent on the shutdown path is not covered by the tests above: they
+   either exercise the reusable-connection path, or -- for an endless body --
+   cannot assert on the status at all because curl loses it. The three clients
+   below are all truncated, declaring a body and then failing to deliver it,
+   and each leaves the lingering read by a different door: past the byte
+   ceiling, past the idle timeout, and on a premature end of stream. In every
+   case the server must still deliver a readable 413, and must say
+   [Connection: close], the request stream having been truncated. *)
+let test_rpc_max_request_body_closes_connection () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC request body size cap closes the connection"
+    ~tags:["rpc"; "body"; "limit"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* node = Node.init [Node.Max_request_body max_request_body] in
+  let check ~scenario response =
+    Check.is_true
+      (String.starts_with ~prefix:"http/1.1 413" response)
+      ~error_msg:
+        (Printf.sprintf
+           "%s: expected a 413 but the server answered %S. A rejected request \
+            must still get a readable response."
+           scenario
+           response) ;
+    Check.is_true
+      (response =~ rex "connection: *close")
+      ~error_msg:
+        (Printf.sprintf
+           "%s: the server answered %S without [Connection: close], but it \
+            truncated the request stream and the connection cannot be reused."
+           scenario
+           response)
+  in
+  (* Declares more than the lingering read is willing to consume (twice the
+     cap), so the read is skipped and the connection shut down at once. *)
+  let* response =
+    raw_post_truncated
+      node
+      ~content_length:(max_request_body * 10)
+      ~body:(String.make 1_000 'a')
+      ~half_close:false
+  in
+  check ~scenario:"beyond the byte ceiling" response ;
+  (* Declares a length the lingering read would consume, then stalls: the idle
+     timeout is what ends it. *)
+  let* response =
+    raw_post_truncated
+      node
+      ~content_length:(max_request_body * 3 / 2)
+      ~body:(String.make 1_000 'a')
+      ~half_close:false
+  in
+  check ~scenario:"stalled below the byte ceiling" response ;
+  (* Same, but half-closes instead of stalling. The stream then ends early,
+     which [Cohttp.Transfer] reports exactly as it reports a body received in
+     full -- so the connection must be closed on the byte count, not on the end
+     of the stream. *)
+  let* response =
+    raw_post_truncated
+      node
+      ~content_length:(max_request_body * 3 / 2)
+      ~body:(String.make 1_000 'a')
+      ~half_close:true
+  in
+  check ~scenario:"half-closed below the byte ceiling" response ;
+  unit
+
+(* The regression test for the unbounded drain. Before the bounded lingering
+   close, the server kept reading this body for ever and the request never
+   completed. Note that we do not assert on the status: once we stop reading,
+   the client is reset while it is still writing, so curl usually reports a
+   send failure rather than the 413. What matters is that the request
+   terminates and the server is unharmed. *)
+let test_rpc_max_request_body_endless () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC request body size cap on an endless body"
+    ~tags:["rpc"; "body"; "limit"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* node = Node.init [Node.Max_request_body max_request_body] in
+  let url = post_body_url node in
+  let start = Unix.gettimeofday () in
+  let* (_ : string) =
+    curl_status
+      ~timeout:20
+      ~stdin:"/dev/zero"
+      ["-X"; "POST"; "-T"; "-"; "-H"; "Expect:"]
+      url
+  in
+  let elapsed = Unix.gettimeofday () -. start in
+  (* The bounds under test are the 1s idle and 5s total timeouts, so anything
+     close to the 20s [--max-time] means the drain did not stop; keep enough
+     headroom for a loaded CI runner without making the oracle vacuous. *)
+  Check.((elapsed < 10.) float)
+    ~error_msg:
+      "an endless request body was still being read after %L seconds: the \
+       server must stop reading and release the connection" ;
+  (* And the node is still serving. *)
+  let* status = curl_status ["-X"; "GET"] url in
+  Check.((String.trim status = "200") string)
+    ~error_msg:
+      "the node answered %L after an endless request body, expected 200" ;
+  unit
+
+(* Connection slots are taken before [accept], so a request that holds one for
+   ever wedges the whole listener. With the cap enforced and the connection
+   released, more abusive uploads than there are slots must not prevent a
+   normal RPC from being served. *)
+let test_rpc_max_request_body_no_slot_exhaustion () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC request body size cap does not leak connection slots"
+    ~tags:["rpc"; "body"; "limit"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let slots = 2 in
+  (* The slot limit is a parameter of [Node.create], not an argument. Passing
+     it as an argument would not work: [Node.config_init] writes arguments to
+     the configuration file and clears them, and [Node.run] then prepends its
+     own [--max-active-rpc-connections], taken from the [Node.create]
+     parameter, which overrides the file. *)
+  let node =
+    Node.create
+      ~max_active_rpc_connections:slots
+      [Node.Max_request_body max_request_body]
+  in
+  let* () = Node.config_init node [] in
+  let* () = Node.identity_generate node in
+  let* () = Node.run node [] in
+  let* () = Node.wait_for_ready node in
+  let url = post_body_url node in
+  let abusers =
+    List.map
+      (fun _ ->
+        curl_status
+          ~timeout:30
+          ~stdin:"/dev/zero"
+          ["-X"; "POST"; "-T"; "-"; "-H"; "Expect:"]
+          url)
+      (Base.range 1 (slots * 2))
+  in
+  (* Give them time to occupy every slot before asking for service. *)
+  let* () = Lwt_unix.sleep 2. in
+  let* status = curl_status ~timeout:20 ["-X"; "GET"] url in
+  Check.((String.trim status = "200") string)
+    ~error_msg:
+      "a normal RPC returned %L while oversized uploads were in flight: the \
+       rejected connections are still holding their slots" ;
+  let* (_ : string list) = Lwt.all abusers in
+  unit
+
 let binary_regression_test () =
   let node = Node.create [] in
   let endpoint = Client.(Node node) in
@@ -1897,4 +2216,9 @@ let register protocols =
         ~tags:["rpc"; "binary"]
         (test_node_binary_mode addr))
     addresses ;
-  test_metrics_not_on_rpc_listener ()
+  test_metrics_not_on_rpc_listener () ;
+  test_rpc_max_request_body () ;
+  test_rpc_max_request_body_keeps_connection () ;
+  test_rpc_max_request_body_closes_connection () ;
+  test_rpc_max_request_body_endless () ;
+  test_rpc_max_request_body_no_slot_exhaustion ()
