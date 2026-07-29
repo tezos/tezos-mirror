@@ -140,6 +140,10 @@
 
 ### Michelson Runtime
 
+- **Security fix:** the returned storage is no longer deep-cloned during
+  end-of-execution finalization when it is `DUP`-shared with an outgoing
+  operation (an OOM-crash vector); it is now handed on behind its shared
+  pointer. (!22636)
 - **Security fix:** `SLICE` no longer under-charges for the buffer it
   allocates on a large `string`/`bytes` (an OOM-crash vector); its gas
   cost is now floored by the allocation cost. (!22640)
