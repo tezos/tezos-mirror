@@ -1292,13 +1292,15 @@ pub mod interpret_cost {
     // corresponds to cost_N_ISlice_string in the Tezos protocol
     pub fn slice_string(length: usize) -> Result<u32, CostOverflow> {
         let s = Checked::from(length);
-        ((s >> 4) + (s >> 5) + (s >> 6) + 75).as_gas_cost()
+        let time = ((s >> 4) + (s >> 5) + (s >> 6) + 75).as_gas_cost()?;
+        Ok(time.max(alloc_cost(s)?))
     }
 
     // corresponds to cost_N_ISlice_bytes in the Tezos protocol
     pub fn slice_bytes(length: usize) -> Result<u32, CostOverflow> {
         let s = Checked::from(length);
-        ((s >> 4) + (s >> 5) + (s >> 6) + (s >> 9) + 80).as_gas_cost()
+        let time = ((s >> 4) + (s >> 5) + (s >> 6) + (s >> 9) + 80).as_gas_cost()?;
+        Ok(time.max(alloc_cost(s)?))
     }
 
     // corresponds to cost_N_IBlake2b in the Tezos protocol
