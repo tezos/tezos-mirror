@@ -27,11 +27,14 @@ use tezos_smart_rollup_host::{
 use tezos_smart_rollup_keyspace::irmin_ds::{
     IrminKeySpaceRegistry, StorageV1KeySpaceCompat,
 };
-use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
+use tezos_smart_rollup_keyspace::{
+    Key, KeySpace, KeySpaceLoader, KeySpaceLoaderError, Name,
+};
 use tezos_smart_rollup_mock::MockHost;
 
-// Set by the node, contains the verbosity for the logs
-pub const VERBOSITY_PATH: RefPath = RefPath::assert_from(b"/base/logging_verbosity");
+// Set by the node, contains the verbosity for the logs. Key inside the `/base`
+// keyspace, resolving to `/base/logging_verbosity`.
+const VERBOSITY_KEY: Key = Key::from_static(b"/logging_verbosity");
 
 // This type has two interesting parts:
 // 1. Host: BorrowMut<R> + Borrow<R>
@@ -276,22 +279,22 @@ impl<R: WasmHost, Host: BorrowMut<R> + Borrow<R>> WasmHost for KernelHost<R, Hos
     }
 }
 
-pub fn read_logs_verbosity(host: &impl StorageV1) -> Level {
-    match host.store_read(&VERBOSITY_PATH, 0, 1) {
-        Ok(value) if value.len() == 1 => {
-            Level::try_from(value[0]).unwrap_or(Level::default())
-        }
-        _ => Level::default(),
+pub fn read_logs_verbosity(base: &impl KeySpace) -> Level {
+    match base.get_prefix_exact::<1>(&VERBOSITY_KEY) {
+        Some([value]) => Level::try_from(value).unwrap_or(Level::default()),
+        None => Level::default(),
     }
 }
 
 // If the flag is set, the kernel consider that this is local evm node execution.
-const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/base/__evm_node");
+// Key inside the `/base` keyspace, resolving to `/base/__evm_node`.
+const EVM_NODE_FLAG_KEY: Key = Key::from_static(b"/__evm_node");
 // TODO: L2-1158 — remove legacy fallback once all kernels are past V51
+// Legacy path, at the storage root and therefore outside the `/base` keyspace.
 const LEGACY_EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 
-pub fn evm_node_flag(host: &impl StorageV1) -> bool {
-    Ok(Some(ValueType::Value)) == host.store_has(&EVM_NODE_FLAG)
+pub fn evm_node_flag(host: &impl StorageV1, base: &impl KeySpace) -> bool {
+    base.contains(&EVM_NODE_FLAG_KEY)
         || Ok(Some(ValueType::Value)) == host.store_has(&LEGACY_EVM_NODE_FLAG)
 }
 
@@ -305,11 +308,8 @@ impl<R, Host: BorrowMut<R> + Borrow<R>> WithGas for KernelHost<R, Host> {
     }
 }
 
-impl<R: StorageV1, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host> {
+impl<R, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host> {
     pub fn init(host: Host) -> Self {
-        let logs_verbosity = read_logs_verbosity(host.borrow());
-        tezos_evm_logging::set_global_verbosity(logs_verbosity);
-
         Self {
             host,
             execution_gas_used: 0,

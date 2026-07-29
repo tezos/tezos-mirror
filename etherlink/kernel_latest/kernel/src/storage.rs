@@ -20,6 +20,7 @@ use tezos_crypto_rs::hash::ChainId;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::nom::NomReader;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::read_logs_verbosity;
 use tezos_indexable_storage::KeyspaceIndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
@@ -88,23 +89,21 @@ pub const STORAGE_VERSION: StorageVersion = StorageVersion::V62;
 /// node-interaction values that do not belong to any world state.
 pub const BASE_KEYSPACE_NAME: Name = Name::from_static("/base");
 
-/// Load the `/base` keyspace.
+/// Load the `/base` keyspace and apply the log verbosity it records.
 ///
-/// Scoping contract (single-owner rule): within any phase (configuration
-/// fetch, stage one, block production), exactly one live `/base` handle may
-/// exist. Load it once at the top of the phase, thread it down as
-/// `&impl KeySpace` (or `&mut impl KeySpace` for writers) and let it drop at
-/// the end of the phase — helpers must receive the handle, never re-load.
-/// Isolated leaf accessors running outside any such phase may load
-/// transiently instead. A failure therefore signals a programming error
-/// (another `/base` handle is still alive, or a keyspace overlapping `/base`
-/// was loaded earlier in the run), never a normal runtime condition.
+/// Single-owner rule: exactly one live `/base` handle per phase
+/// (configuration fetch, stage one, block production). Load it at the top of
+/// the phase, thread it down as `&impl KeySpace` (or `&mut` for writers), and
+/// let it drop at the end; helpers must never re-load. A failure therefore
+/// signals a programming error, never a normal runtime condition.
 pub fn load_base_keyspace<L: KeySpaceLoader>(
     loader: &mut L,
 ) -> Result<L::KeySpace, StorageError> {
-    loader
+    let base = loader
         .load_or_create(BASE_KEYSPACE_NAME)
-        .map_err(StorageError::KeySpaceLoad)
+        .map_err(StorageError::KeySpaceLoad)?;
+    tezos_evm_logging::set_global_verbosity(read_logs_verbosity(&base));
+    Ok(base)
 }
 
 pub const PRIVATE_FLAG_KEY: Key = Key::from_static(b"/remove_whitelist");
@@ -154,12 +153,6 @@ const EVM_CHAIN_ID_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/chain
 
 const MICHELSON_RUNTIME_CHAIN_ID: RefPath =
     RefPath::assert_from(b"/tez/world_state/chain_id");
-
-// Path to the Multichain feature flag. If there is nothing at this path,
-// a single chain is used.
-#[allow(dead_code)]
-pub const ENABLE_MULTICHAIN: RefPath =
-    RefPath::assert_from(b"/base/feature_flags/enable_multichain");
 
 // The absolute form remains for its writers (migrations and tests write the
 // flag through the raw host); the reader goes through the `/base` keyspace.
