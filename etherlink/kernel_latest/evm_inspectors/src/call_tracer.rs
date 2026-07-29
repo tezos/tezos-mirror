@@ -204,6 +204,8 @@ pub struct CallTracer {
     /// [`CallTracer::finalize`].  RLP encoding is deferred to flush time
     /// so the buffer remains readable.
     pending_traces: Vec<CallTrace>,
+    /// Whether a smart contract was called during the transaction lifespan
+    saw_call: bool,
     pub(crate) transaction_hash: Option<B256>,
     spec_id: SpecId,
 }
@@ -218,6 +220,7 @@ impl CallTracer {
             config,
             call_trace: Vec::with_capacity(1),
             pending_traces: Vec::new(),
+            saw_call: false,
             transaction_hash,
             spec_id,
         }
@@ -283,6 +286,50 @@ impl CallTracer {
             t.logs.get_or_insert_with(Vec::new).push(log);
         }
     }
+
+    /// Open the top-level frame mirroring a fake EVM transaction's
+    /// envelope: a `CALL` with `from == to == caller` (the originator
+    /// alias), no value, empty input, and no intrinsic gas.
+    pub fn fake_top_level_call(&mut self, caller: Address, gas_limit: u64) {
+        // Entering the top-level frame: the stack must be empty, so its
+        // depth is 0.
+        assert!(self.call_trace.is_empty());
+        let depth = self.call_trace.len() as u16;
+
+        let mut call_trace = CallTrace::new_minimal_trace(
+            b"CALL".to_vec(),
+            caller,
+            U256::ZERO,
+            Vec::new(),
+            depth,
+        );
+
+        call_trace.add_to(Some(caller));
+        call_trace.add_gas(Some(gas_limit));
+
+        self.saw_call = false;
+        self.call_trace.push(call_trace);
+    }
+
+    /// Close the frame opened by [`CallTracer::fake_top_level_call`]. When
+    /// nothing nested below it, the mirrored operation dispatched no EVM
+    /// call: the frame is dropped without recording anything.
+    pub fn fake_top_level_call_end(&mut self, gas_spent: u64, status: bool) {
+        if !self.saw_call {
+            self.call_trace.pop();
+            return;
+        }
+
+        self.end_transaction_layer(
+            gas_spent,
+            &Bytes::new(),
+            &if status {
+                InstructionResult::Return
+            } else {
+                InstructionResult::Revert
+            },
+        );
+    }
 }
 
 impl<CTX, INTR> Inspector<CTX, INTR> for CallTracer
@@ -298,6 +345,7 @@ where
         // Entering a frame: its depth is the current stack height, before it
         // is pushed.
         let depth = self.call_trace.len() as u16;
+        self.saw_call = self.saw_call || inputs.scheme != CallScheme::StaticCall;
 
         let initial_gas = self.initial_gas(context.tx());
 
@@ -344,6 +392,7 @@ where
         // Entering a frame: its depth is the current stack height, before it
         // is pushed.
         let depth = self.call_trace.len() as u16;
+        self.saw_call = true;
 
         let initial_gas = self.initial_gas(context.tx());
 

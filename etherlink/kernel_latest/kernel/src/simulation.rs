@@ -25,12 +25,16 @@ use crate::{parsable, parsing};
 
 use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
-use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
+use revm::{
+    context::result::ExecutionResult as VMResult,
+    primitives::{Address, B256},
+};
 use revm_etherlink::{
     helpers::legacy::u256_to_alloy, EvmKernelError as RevmError, ExecutionOutcome,
     TransactionOrigin,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
+use tezos_crypto_rs::hash::OperationHash;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
@@ -517,11 +521,20 @@ impl Evaluation {
         // keeping `eth_call`/`estimateGas` consistent with execution. The
         // CracId records `Ethereum` as the origin runtime, matching the
         // EVM-entered applied path so a gateway crossing captures the EVM
-        // caller as Ethereum-native. The operation-hash seed is left zero
-        // (simulated KT1s are non-authoritative, see above).
+        // caller as Ethereum-native. Both hashes are left zero: the
+        // Michelson seed because simulated KT1s are non-authoritative (see
+        // above), and the EVM one because a simulated call has no
+        // transaction hash at all — it is passed as `None` to
+        // `revm_run_transaction` below and never appears in a receipt. A
+        // simulation's tracer input carries no `tx_hash` filter, so
+        // `get_tracer_configuration` honours it regardless of this value.
+        let operation_hashes = journal::TezosXHashes {
+            evm: B256::ZERO,
+            michelson: OperationHash::default(),
+        };
         let mut journal = journal::prepare_tezosx_journal(
             CracId::mock(RuntimeId::Ethereum),
-            &Default::default(),
+            &operation_hashes,
             &constants,
             crate::storage::is_http_trace_enabled(base),
             &debug_features,

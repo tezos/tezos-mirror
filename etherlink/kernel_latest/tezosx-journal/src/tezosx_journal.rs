@@ -5,6 +5,7 @@
 use std::fmt;
 
 use crate::{EvmJournal, MichelsonJournal};
+use revm::primitives::Address;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::block::BlockConstants;
 use tezos_smart_rollup_host::runtime::RuntimeError;
@@ -241,6 +242,20 @@ impl TezosXJournal {
             crac_id,
             original_source: None,
             http_trace_enabled: false,
+        }
+    }
+
+    pub fn fake_top_level_call(&mut self, caller: Address, gas_limit: u64) {
+        if let Some(mut tracer) = self.evm.take_tracer() {
+            tracer.fake_top_level_call(caller, gas_limit);
+            self.evm.restore_tracer(Some(tracer));
+        }
+    }
+
+    pub fn fake_top_level_call_end(&mut self, gas_spent: u64, status: bool) {
+        if let Some(mut tracer) = self.evm.take_tracer() {
+            tracer.fake_top_level_call_end(gas_spent, status);
+            self.evm.restore_tracer(Some(tracer));
         }
     }
 
