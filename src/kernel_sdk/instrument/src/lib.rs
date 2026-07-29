@@ -18,8 +18,9 @@ use wasm_encoder::{
     Module, ValType,
 };
 use wasmparser::{
-    CompositeInnerType, FunctionBody, GlobalSectionReader, Operator, Parser, Payload,
-    TypeRef,
+    CompositeInnerType, FuncToValidate, FuncValidatorAllocations, FunctionBody,
+    GlobalSectionReader, Operator, OperatorsReader, Parser, Payload, TypeRef,
+    ValidPayload, Validator, ValidatorResources, WasmFeatures,
 };
 
 #[derive(Clone)]
@@ -34,22 +35,25 @@ pub struct CallDepthGuard {
     depth: u32,
     /// Number of functions instrumented (for reporting / self-check).
     pub instrumented: u32,
-    max_call_depth: u32,
+    stack_budget: u32,
     /// Result types of every defined function, in code-section order. Used to
     /// give the per-function wrapper block the right result type.
     func_results: Vec<RetType>,
+    /// What one activation of each defined function charges the counter, in
+    /// code-section order. See [`frame_weight`].
+    func_weights: Vec<u32>,
     /// Index (code-section order) of the function currently being rebuilt.
     current_func: usize,
 }
 
 impl CallDepthGuard {
-    fn inject_prologue(&self, f: &mut Function) {
+    fn inject_prologue(&self, weight: u32, f: &mut Function) {
         f.instruction(&Instruction::GlobalGet(self.depth));
-        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Const(weight as i32));
         f.instruction(&Instruction::I32Add);
         f.instruction(&Instruction::GlobalSet(self.depth));
         f.instruction(&Instruction::GlobalGet(self.depth));
-        f.instruction(&Instruction::I32Const(self.max_call_depth as i32));
+        f.instruction(&Instruction::I32Const(self.stack_budget as i32));
         f.instruction(&Instruction::I32GeU);
         f.instruction(&Instruction::If(BlockType::Empty));
         f.instruction(&Instruction::Unreachable);
@@ -121,9 +125,9 @@ impl CallDepthGuard {
     }
 
     /// Decrement the stack depth global counter
-    fn inject_epilogue(&self, f: &mut Function) {
+    fn inject_epilogue(&self, weight: u32, f: &mut Function) {
         f.instruction(&Instruction::GlobalGet(self.depth));
-        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Const(weight as i32));
         f.instruction(&Instruction::I32Sub);
         f.instruction(&Instruction::GlobalSet(self.depth));
         f.instruction(&Instruction::End);
@@ -167,11 +171,15 @@ impl Reencode for CallDepthGuard {
             }
         };
 
+        // Read before `current_func` moves on: the epilogue must refund exactly
+        // what the prologue charged.
+        let weight = self.func_weights[self.current_func];
+
         self.current_func += 1;
 
-        self.inject_prologue(&mut f);
+        self.inject_prologue(weight, &mut f);
         self.instrument_body(wrapper_bt, &mut f, func)?;
-        self.inject_epilogue(&mut f);
+        self.inject_epilogue(weight, &mut f);
 
         code.function(&f);
 
@@ -181,9 +189,104 @@ impl Reencode for CallDepthGuard {
     }
 }
 
+// x86-64 / SysV — 64 bytes.
+//   `gen_prologue_frame_setup` (isa/x64/abi.rs:386) pushes RBP, and the `call` already pushed the
+//   return address: 16. `compute_clobber_size` (isa/x64/abi.rs:911) charges 8 per integer register
+//   and rounds to 16, over the callee-saves of `is_callee_save_systemv` (isa/x64/abi.rs:880): RBX,
+//   RBP, R12, R13, R14, R15, so at most 48. No float register can inflate it — every xmm is
+//   caller-saved under SysV.
+const FRAME_OVERHEAD_BYTES_X86: u32 = 64;
+
+// aarch64 / AAPCS64 — 96 bytes. (worst case scenario)
+//   `gen_prologue_frame_setup` (isa/aarch64/abi.rs:588) stores the FP/LR pair: 16.
+//   `saved_reg_stack_size` (isa/aarch64/abi.rs:46) charges 8 per integer register, rounded up to an
+//   even count, over the callee-saves of `is_reg_saved_in_prologue` (isa/aarch64/abi.rs:1143):
+//   x19-x28, i.e. *ten* of them against x86-64's six, so 80.
+//
+// {Note unused types} bodies using V128 would push the aarch64 worst case to 160: v8-v15 are
+// callee-saved too, at 8 bytes each (AAPCS64 mandates only their low halves), for
+// another 64.
+const FRAME_OVERHEAD_BYTES_AARCH64: u32 = 96;
+
+/// Bytes charged for every frame whatever its contents. We pick the worst case between our
+/// two main supported platforms (x86-64 and aarch64)
+const FRAME_OVERHEAD_BYTES: u32 =
+    const_max(&[FRAME_OVERHEAD_BYTES_X86, FRAME_OVERHEAD_BYTES_AARCH64]);
+
+/// Bytes charged for a value whose type the validator does not know. That is only
+/// ever an operand in unreachable code, a `bottom` the type checker will accept as
+/// anything — including a float, hence the larger of the two slot sizes.
+const UNTYPED_VALUE_BYTES: u32 = 16;
+
+/// Bytes a value of type `ty` costs in a native frame.
+///
+/// Not the value's own width: the size of the spill slot cranelift gives it, which
+/// is what the frame actually spends. Slots are allocated in 8-byte units, and the count comes from
+/// the ISA. In our case every integer or reference costs 8.
+fn val_type_bytes(ty: wasmparser::ValType) -> u32 {
+    match ty {
+        // One 8-byte slot. A reference is a pointer-width integer to the backend.
+        wasmparser::ValType::I32 | wasmparser::ValType::I64 => 8,
+        wasmparser::ValType::Ref(_) => 8,
+        wasmparser::ValType::F32
+        | wasmparser::ValType::F64
+        | wasmparser::ValType::V128 => {
+            panic!("some assumptions were made based on the fact that these types are not used, see {{Note unused types}}")
+        }
+    }
+}
+
+/// Estimate, in bytes, the worst case scenario for the memory allocation that `body`
+/// needs.
+///
+/// Three things make up a native frame: the locals (params included) the backend
+/// spills, the operand stack at its heaviest point, and a per-callee constant the
+/// WASM says nothing about. Only the first two are recoverable from the body; the
+/// third is [`FRAME_OVERHEAD_BYTES`].
+fn frame_weight(
+    to_validate: FuncToValidate<ValidatorResources>,
+    body: &FunctionBody<'_>,
+) -> Result<u32, Box<dyn Error>> {
+    let mut validator = to_validate.into_validator(FuncValidatorAllocations::default());
+    let mut reader = body.get_binary_reader();
+
+    validator.read_locals(&mut reader)?;
+
+    let mut max_operand_bytes = 0u32;
+    let mut ops = OperatorsReader::new(reader);
+
+    while !ops.eof() {
+        let (op, offset) = ops.read_with_offset()?;
+        // Feeds the type checker, which is what pushes and pops the operand stack.
+        // Erroring here also means a malformed body is rejected outright rather
+        // than silently misinstrumented.
+        validator.op(offset, &op)?;
+        let operand_bytes = (0..validator.operand_stack_height())
+            .map(|d| {
+                validator
+                    .get_operand_type(d as usize)
+                    .flatten()
+                    .map_or(UNTYPED_VALUE_BYTES, val_type_bytes)
+            })
+            .sum::<u32>();
+        max_operand_bytes = max_operand_bytes.max(operand_bytes);
+    }
+    ops.finish()?;
+
+    let locals_bytes = (0..validator.len_locals())
+        .map(|i| {
+            validator
+                .get_local_type(i)
+                .map_or(UNTYPED_VALUE_BYTES, val_type_bytes)
+        })
+        .sum::<u32>();
+
+    Ok(FRAME_OVERHEAD_BYTES + locals_bytes + max_operand_bytes)
+}
+
 pub fn prepare_pass(
     bytes: &[u8],
-    max_call_depth: u32,
+    stack_budget: u32,
 ) -> Result<CallDepthGuard, Box<dyn Error>> {
     let mut has_global = false;
     let mut imported = 0u32;
@@ -193,8 +296,23 @@ pub fn prepare_pass(
     let mut type_results: Vec<RetType> = Vec::new();
     // Type index of each defined function, in code-section order.
     let mut func_type_idx: Vec<u32> = Vec::new();
+    // What one activation of each defined function costs, in code-section order.
+    let mut func_weights: Vec<u32> = Vec::new();
+    // A weight needs the module's type and index spaces, so it comes from a
+    // validator fed the very same payload stream. Feeding it also means an
+    // invalid input is rejected here rather than misinstrumented and only caught
+    // by the output validation in `instrument`.
+    let mut validator = Validator::new_with_features(
+        WasmFeatures::default().difference(WasmFeatures::FLOATS),
+    );
     for payload in Parser::new(0).parse_all(bytes) {
-        match payload? {
+        let payload = payload?;
+        // Gather function weights
+        if let ValidPayload::Func(to_validate, body) = validator.payload(&payload)? {
+            func_weights.push(frame_weight(to_validate, &body)?);
+        }
+        // Gather types
+        match payload {
             Payload::ImportSection(reader) => {
                 // One section entry (`Imports`) can expand to several `Import`s in the
                 // compact encoding, hence the nested loop.
@@ -255,11 +373,20 @@ pub fn prepare_pass(
         .map(|&ti| type_results[ti as usize].clone())
         .collect();
 
+    if let Some(&heaviest) = func_weights.iter().max() {
+        if heaviest >= stack_budget {
+            panic!(
+                "one of the function of the kernel can exceed the budget all by itself"
+            )
+        }
+    }
+
     Ok(CallDepthGuard {
         depth: imported + defined,
         instrumented: 0,
-        max_call_depth,
+        stack_budget,
         func_results,
+        func_weights,
         current_func: 0,
     })
 }
@@ -270,6 +397,12 @@ impl CallDepthGuard {
         self.depth
     }
 
+    /// What one activation of each defined function charges the counter, in
+    /// code-section order.
+    pub fn frame_weights(&self) -> &[u32] {
+        &self.func_weights
+    }
+
     /// Number of functions the module declares, as counted by [`prepare_pass`].
     /// Used by [`instrument`] to self-check that every one was rewritten.
     pub fn declared_functions(&self) -> usize {
@@ -277,18 +410,56 @@ impl CallDepthGuard {
     }
 }
 
-/// Call-depth ceiling enforced in every instrumented function's prologue.
+/// Ceiling enforced in every instrumented function's prologue, in the byte units
+/// [`frame_weight`] produces.
 ///
-/// Chosen well below the WASM PVM's own 60_000-frame `stack_size_limit`
-/// (`src/lib_scoru_wasm/wasm_vm.ml`) so that the WASM trap always precedes both
-/// the interpreter's counter and Wasmer's native limit: the kernel then traps at
-/// the same depth under either engine, keeping execution deterministic.
-pub const DEFAULT_MAX_CALL_DEPTH: u32 = 2000;
+/// We give ourself a budget of half the size allocated by Wasmer in practice (1MB).
+/// This gives us headroom in case of an underapproximation somewhere.
+///
+/// The WASM PVM's own 60_000-frame `stack_size_limit`
+/// (`src/lib_scoru_wasm/wasm_vm.ml`) counts frames, not bytes, so it is no longer
+/// directly comparable; it stays out of reach in practice, since 60_000 frames
+/// within this budget would have to average under 9 bytes each.
+pub const DEFAULT_MAX_CALL_DEPTH: u32 = 512 * 1024;
 
 /// An instrumented module and the number of functions rewritten to produce it.
 pub struct Instrumented {
     pub module: Vec<u8>,
     pub functions: u32,
+    frame_weights: Vec<u32>,
+    stack_budget: u32,
+}
+
+impl Instrumented {
+    /// Report how the per-activation weights are distributed, and what they mean
+    /// in frames: the budget buys many thin frames and few fat ones, so the
+    /// spread is what says whether the ceiling is comfortable.
+    pub fn weight_report(&self) -> String {
+        let mut sorted = self.frame_weights.clone();
+        sorted.sort_unstable();
+        let (Some(&min), Some(&max)) = (sorted.first(), sorted.last()) else {
+            return "frame weights: none, the module declares no function".to_string();
+        };
+        let n = sorted.len();
+        let pct = |p: usize| sorted[(n - 1) * p / 100];
+        let mean = sorted.iter().map(|&w| u64::from(w)).sum::<u64>() / n as u64;
+        // The guard trips when the counter *reaches* the ceiling, so a frame of
+        // weight `w` fits `(ceiling - 1) / w` times.
+        let budget = self.stack_budget;
+        let frames = |w: u32| budget.saturating_sub(1) / w;
+
+        format!(
+            "frame weights (bytes/activation): min {min}  p50 {}  p90 {}  p99 {}  \
+             max {max}  mean {mean}\n\
+             budget {budget}: {} frames at min, {} at p50, {} at max",
+            pct(50),
+            pct(90),
+            pct(99),
+            frames(min),
+            frames(pct(50)),
+            frames(max),
+        )
+    }
 }
 
 /// Instrument every function of `bytes` with the call-depth guard.
@@ -297,9 +468,9 @@ pub struct Instrumented {
 /// it rewrote exactly as many functions as the module declares.
 pub fn instrument(
     bytes: &[u8],
-    max_call_depth: u32,
+    stack_budget: u32,
 ) -> Result<Instrumented, Box<dyn Error>> {
-    let mut pass = prepare_pass(bytes, max_call_depth)?;
+    let mut pass = prepare_pass(bytes, stack_budget)?;
     let mut module = Module::new();
     pass.parse_core_module(&mut module, Parser::new(0), bytes)?;
     let out_bytes = module.finish();
@@ -322,7 +493,22 @@ pub fn instrument(
     Ok(Instrumented {
         module: out_bytes,
         functions: pass.instrumented,
+        frame_weights: pass.func_weights,
+        stack_budget,
     })
+}
+
+/// Largest of `bytes`. Hand-rolled because `Ord::max` is not usable in a `const`.
+const fn const_max(bytes: &[u32]) -> u32 {
+    let mut max = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] > max {
+            max = bytes[i];
+        }
+        i += 1;
+    }
+    max
 }
 
 #[cfg(test)]
@@ -491,9 +677,9 @@ mod tests {
         }
     }
 
-    /// `rec(n)` recurses n deep. With the guard at `LIMIT`, a call needing more
-    /// than LIMIT frames must trap with `unreachable`, and one needing fewer
-    /// must succeed.
+    /// `rec(n)` recurses n deep. With the guard at a budget of N frames' worth
+    /// of weight, a call needing more than N frames must trap with
+    /// `unreachable`, and one needing fewer must succeed.
     const RECURSE: &str = r#"
     (module
       (global $g (mut i32) (i32.const 0))
@@ -504,25 +690,32 @@ mod tests {
           (call $rec (i32.sub (local.get 0) (i32.const 1))))))
     "#;
 
+    /// Budget admitting exactly `frames` activations of `$rec` and no more,
+    /// since the guard trips when the counter *reaches* it.
+    fn frame_budget(frames: u32) -> u32 {
+        let pass = prepare_pass(&wat::parse_str(RECURSE).unwrap(), u32::MAX).unwrap();
+        frames * pass.frame_weights()[0] + 1
+    }
+
     #[test]
     fn guard_traps_beyond_the_limit_and_not_below_it() {
-        const LIMIT: u32 = 20;
+        const FRAMES: u32 = 20;
         let orig = wat::parse_str(RECURSE).unwrap();
-        let instr = instrument(&orig, LIMIT).unwrap();
+        let instr = instrument(&orig, frame_budget(FRAMES)).unwrap();
 
         // Uninstrumented, deep recursion is fine — proving the trap below is
         // the guard firing and not an artefact of the fixture.
         assert_eq!(run(&orig, "rec", 100).unwrap(), 100);
 
         // The entry call is frame 1, so `rec(n)` uses n+1 frames.
-        let deepest_ok = LIMIT as i32 - 2;
+        let deepest_ok = FRAMES as i32 - 1;
         assert_eq!(
             run(&instr.module, "rec", deepest_ok).unwrap(),
             deepest_ok,
             "recursion just under the limit must still succeed"
         );
 
-        let err = run(&instr.module, "rec", LIMIT as i32).unwrap_err();
+        let err = run(&instr.module, "rec", FRAMES as i32).unwrap_err();
         assert_eq!(
             trap_code(&err),
             Some(TrapCode::UnreachableCodeReached),
@@ -532,8 +725,9 @@ mod tests {
 
     #[test]
     fn counter_does_not_leak_across_calls() {
-        const LIMIT: u32 = 20;
-        let instr = instrument(&wat::parse_str(RECURSE).unwrap(), LIMIT).unwrap();
+        const FRAMES: u32 = 20;
+        let instr =
+            instrument(&wat::parse_str(RECURSE).unwrap(), frame_budget(FRAMES)).unwrap();
 
         let engine = Engine::default();
         let module = wasmi::Module::new(&engine, &instr.module[..]).unwrap();
@@ -543,10 +737,10 @@ mod tests {
         let rec = inst.get_typed_func::<i32, i32>(&store, "rec").unwrap();
 
         // Each call returns normally, so every prologue must be matched by its
-        // epilogue. If the counter leaked even one per call, the guard would
-        // fire well before the 500th.
+        // epilogue. If the counter leaked even one frame's worth per call, the
+        // guard would fire well before the 500th.
         for i in 0..500 {
-            let n = LIMIT as i32 - 2;
+            let n = FRAMES as i32 - 1;
             assert_eq!(
                 rec.call(&mut store, n).unwrap(),
                 n,
