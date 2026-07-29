@@ -1362,8 +1362,13 @@ mod review_verification {
     //! the `rpds` trees iterate in the same order as the `std` maps they
     //! replaced, and that the read-only big-map walk reaches every position
     //! the mutable walk does.
+    //!
+    //! Extended while reviewing the big-map walk itself: the mutable walk's
+    //! visit order, its key/value pairing, and the fields its `Operation`
+    //! arms carry over were all unpinned, so a change to any of them was
+    //! silent. Everything here describes the walk as it already behaves.
     use super::*;
-    use crate::ast::{MichelsonList, Or, Type};
+    use crate::ast::{CreateContract, MichelsonList, Or, TransferTokens, Type};
     use rpds::RedBlackTreeSet;
 
     /// Consensus-critical invariant behind the whole migration: `rpds`
@@ -1451,5 +1456,259 @@ mod review_verification {
             (0..=5).map(BigMapId::from).collect::<Vec<_>>(),
             "view_big_map_ids missed a big map in some container position"
         );
+    }
+
+    /// A `big_map` leaf carrying `id` and nothing else — the shape the walk
+    /// keys off, with no overlay to complicate what a rebuild has to preserve.
+    fn leaf_big_map(id: i64) -> TypedValue<'static> {
+        TypedValue::BigMap(BigMap {
+            content: BigMapContent::FromId(BigMapFromId {
+                id: id.into(),
+                overlay: RedBlackTreeMap::new(),
+            }),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        })
+    }
+
+    /// Mutable-walk counterpart of
+    /// [view_big_map_ids_covers_all_container_positions]: a big map sitting in
+    /// any container position must be visited by `for_each_big_map_mut`, and
+    /// in AST pre-order. [dump_one_big_map] allocates lazy-storage ids in
+    /// visit order, so this order is consensus-observable — a container arm
+    /// that visits out of order, or not at all, changes execution results.
+    ///
+    /// `test_big_map_to_storage_update::dump_maps` only ever builds a
+    /// right-nested comb of `Pair`s, so without this the `Or` / `Option` /
+    /// `List` / `Map` / `Operation` arms have no ordering coverage.
+    #[test]
+    fn mutable_walk_visits_every_container_position_in_order() {
+        let bm = leaf_big_map;
+        let operation_carrying = |inner: TypedValue<'static>| {
+            TypedValue::new_operation(
+                crate::ast::Operation::TransferTokens(TransferTokens {
+                    param: inner,
+                    destination_address:
+                        crate::ast::michelson_address::Address::try_from(
+                            "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
+                        )
+                        .unwrap(),
+                    // Nonzero, so a rebuild that dropped either would show up
+                    // here rather than matching the zero default. What they
+                    // survive is asserted in `walk_preserves_operation_fields`.
+                    amount: 1_000,
+                }),
+                42,
+            )
+        };
+        // Distinct ids, laid out so that AST pre-order is 0,1,2,3,4,5,6.
+        let mut value = TypedValue::new_pair(
+            TypedValue::new_pair(bm(0), bm(1)),
+            TypedValue::new_pair(
+                TypedValue::Or(Or::Left(Rc::new(bm(2)))),
+                TypedValue::new_pair(
+                    TypedValue::Option(Some(Rc::new(bm(3)))),
+                    TypedValue::new_pair(
+                        TypedValue::List(MichelsonList::from(vec![
+                            Rc::new(bm(4)),
+                            Rc::new(operation_carrying(bm(5))),
+                        ])),
+                        TypedValue::Map(RedBlackTreeMap::from_iter([(
+                            Rc::new(TypedValue::int(0)),
+                            Rc::new(bm(6)),
+                        )])),
+                    ),
+                ),
+            ),
+        );
+
+        let mut visit_order = vec![];
+        value.for_each_big_map_mut(&mut |map| {
+            if let BigMapContent::FromId(ref m) = map.content {
+                visit_order.push(m.id.clone())
+            }
+        });
+        assert_eq!(
+            visit_order,
+            (0..=6).map(BigMapId::from).collect::<Vec<_>>(),
+            "the mutable walk missed a container position or visited out of order"
+        );
+        // The rebuilt value must still expose the same big maps in the same
+        // order, i.e. the rebuild put every child back where it belongs.
+        let mut ids_after = vec![];
+        value.view_big_map_ids(&mut ids_after);
+        assert_eq!(ids_after, (0..=6).map(BigMapId::from).collect::<Vec<_>>());
+    }
+
+    /// `Map` values are visited in ascending key order, and the rebuild must
+    /// put each one back under the key it came from. A single-entry map — all
+    /// the other tests here build one — cannot catch a key/value mispairing,
+    /// nor an out-of-order visit.
+    ///
+    /// **The ascending order pins MIR's behaviour, which diverges from L1.**
+    /// L1's `extract_lazy_storage_updates` walks a map's values *descending*:
+    /// it builds its worklist with `M.OPS.fold (fun k v bs -> (k, v) :: bs)`,
+    /// and since `fold` is ascending, prepending reverses it — then it folds
+    /// left over the result without reversing back. (The same idiom in
+    /// `script_ir_unparser.ml` *does* reverse, via `unparse_items`, which is
+    /// how Michelson map literals come out ascending — so the direction is
+    /// deliberate on both sides.) Because ids are allocated at visit time, a
+    /// `map k (big_map …)` with several entries therefore gets different ids
+    /// on MIR than on L1, and a different `lazy_storage_diff` order.
+    ///
+    /// Pre-existing — the `m.keys()` walk this replaced was ascending too —
+    /// and out of scope here, since changing it is consensus-observable and
+    /// touches the receipt-ordering work of L2-1735. This test exists so the
+    /// current order cannot drift silently while that is decided; it is not
+    /// an assertion that ascending is right.
+    #[test]
+    fn walk_visits_map_values_in_key_order_and_keeps_them_paired() {
+        let key = |k: i64| Rc::new(TypedValue::int(k));
+        // Inserted out of order on purpose: iteration order must come from the
+        // tree, not from insertion.
+        let mut root = TypedValue::Map(RedBlackTreeMap::from_iter([
+            (key(2), Rc::new(leaf_big_map(2))),
+            (key(0), Rc::new(leaf_big_map(0))),
+            (key(1), Rc::new(leaf_big_map(1))),
+        ]));
+
+        // Renumber each big map to id + 10, so the rebuilt map shows where
+        // each visited value landed.
+        let mut visit_order = vec![];
+        root.for_each_big_map_mut(&mut |map| {
+            if let BigMapContent::FromId(ref mut m) = map.content {
+                visit_order.push(m.id.clone());
+                let BigMapId {
+                    value: Zarith(ref id),
+                } = m.id;
+                let renumbered: i64 = id.try_into().expect("small test id");
+                m.id = BigMapId::from(renumbered + 10);
+            }
+        });
+
+        assert_eq!(
+            visit_order,
+            (0..=2).map(BigMapId::from).collect::<Vec<_>>(),
+            "map values were visited out of key order"
+        );
+        let TypedValue::Map(m) = &root else {
+            panic!("root is no longer a map")
+        };
+        assert_eq!(m.size(), 3, "the rebuild changed the map size");
+        for k in 0..=2 {
+            let mut ids = vec![];
+            m.get(&key(k))
+                .expect("key went missing from the rebuilt map")
+                .view_big_map_ids(&mut ids);
+            assert_eq!(
+                ids,
+                vec![BigMapId::from(k + 10)],
+                "the rebuilt map paired a value with the wrong key"
+            );
+        }
+    }
+
+    /// The `Operation` arms rebuild their struct field by field, so the
+    /// compiler enforces that no field is *missing* — but not that each is
+    /// carried over rather than defaulted. `counter` is the one that matters
+    /// most: it is the DFS nonce that orders receipts, so a regression to `0`
+    /// is consensus-observable, and every other test here builds its operation
+    /// with `counter: 0` and never reads it back.
+    #[test]
+    fn walk_preserves_operation_fields() {
+        let destination = crate::ast::michelson_address::Address::try_from(
+            "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
+        )
+        .unwrap();
+        let mut root = TypedValue::new_operation(
+            crate::ast::Operation::TransferTokens(TransferTokens {
+                param: leaf_big_map(3),
+                destination_address: destination.clone(),
+                amount: 123_456,
+            }),
+            77,
+        );
+
+        let mut visited = 0;
+        root.for_each_big_map_mut(&mut |map| {
+            visited += 1;
+            if let BigMapContent::FromId(ref mut m) = map.content {
+                m.id = BigMapId::from(30);
+            }
+        });
+
+        assert_eq!(visited, 1, "the transfer parameter was not visited");
+        let TypedValue::Operation(info) = &root else {
+            panic!("root is no longer an operation")
+        };
+        assert_eq!(info.counter, 77, "the operation nonce was not carried over");
+        let crate::ast::Operation::TransferTokens(t) = &info.operation else {
+            panic!("the operation is no longer a transfer")
+        };
+        assert_eq!(t.amount, 123_456, "the amount was not carried over");
+        assert_eq!(
+            t.destination_address, destination,
+            "the destination was not carried over"
+        );
+        let mut ids = vec![];
+        root.view_big_map_ids(&mut ids);
+        assert_eq!(ids, vec![BigMapId::from(30)]);
+    }
+
+    /// Same, for the `CREATE_CONTRACT` arm, which had no coverage at all: its
+    /// storage must be walked and its five other fields carried over.
+    #[test]
+    fn walk_preserves_create_contract_fields() {
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+
+        let micheline_code = Micheline::Seq(&[]);
+        let code = Rc::new(crate::ast::ContractScript {
+            parameter: Type::Unit,
+            storage: Type::Unit,
+            code: crate::ast::Instruction::Seq(Vec::new()),
+            annotations: Default::default(),
+            views: Default::default(),
+        });
+        let delegate =
+            crate::ast::PublicKeyHash::try_from("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw")
+                .unwrap();
+        let address =
+            ContractKt1Hash::try_from("KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg").unwrap();
+        let mut root = TypedValue::new_operation(
+            crate::ast::Operation::CreateContract(CreateContract {
+                delegate: Some(delegate.clone()),
+                amount: 999,
+                storage: leaf_big_map(4),
+                code: code.clone(),
+                micheline_code: &micheline_code,
+                address: address.clone(),
+            }),
+            88,
+        );
+
+        let mut visited = 0;
+        root.for_each_big_map_mut(&mut |map| {
+            visited += 1;
+            if let BigMapContent::FromId(ref mut m) = map.content {
+                m.id = BigMapId::from(40);
+            }
+        });
+
+        assert_eq!(visited, 1, "the originated storage was not visited");
+        let TypedValue::Operation(info) = &root else {
+            panic!("root is no longer an operation")
+        };
+        assert_eq!(info.counter, 88, "the operation nonce was not carried over");
+        let crate::ast::Operation::CreateContract(cc) = &info.operation else {
+            panic!("the operation is no longer an origination")
+        };
+        assert_eq!(cc.delegate, Some(delegate));
+        assert_eq!(cc.amount, 999);
+        assert_eq!(cc.address, address);
+        assert!(Rc::ptr_eq(&cc.code, &code), "the code was copied");
+        assert_eq!(cc.micheline_code, &micheline_code);
+        let mut ids = vec![];
+        root.view_big_map_ids(&mut ids);
+        assert_eq!(ids, vec![BigMapId::from(40)]);
     }
 }
