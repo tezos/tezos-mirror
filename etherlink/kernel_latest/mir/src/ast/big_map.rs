@@ -23,7 +23,7 @@ use super::{
     CreateContract, Micheline, MichelsonList, OperationInfo, TransferTokens, Type,
     TypedValue,
 };
-use crate::gas::OutOfGas;
+use crate::gas::{tc_cost, OutOfGas};
 use crate::serializer::DecodeError;
 use crate::typechecker::TcError;
 
@@ -365,6 +365,21 @@ pub trait LazyStorage<'a> {
     /// Record a big map's id at its position in the dump walk (AST pre-order);
     /// the receipt builder reverses it to match L1's order. Default: no-op.
     fn record_diff_order(&mut self, _id: &BigMapId) {}
+
+    /// Charge `milligas` for one step of the end-of-execution lazy-storage
+    /// walk. Called once per node visited, with
+    /// [crate::gas::tc_cost::LAZY_STORAGE_CYCLE].
+    ///
+    /// The walk runs on every successful execution, over the returned storage
+    /// and every outgoing operation, on a value whose shape the contract
+    /// chooses — so it is the only traversal in the result pipeline that must
+    /// price its own work. L1 charges `Typecheck_costs.parse_instr_cycle` per
+    /// node in `extract_lazy_storage_updates` for the same reason.
+    ///
+    /// It lives on this trait rather than as a `&mut Gas` parameter because
+    /// the kernel's lazy storage *is* its gas holder, so the two cannot be
+    /// borrowed separately at the call site.
+    fn consume_gas(&mut self, milligas: u32) -> Result<(), LazyStorageError>;
 }
 
 /// Bulk-update the big_map. This trait exists mostly for convenience, and has a
@@ -491,6 +506,15 @@ impl<'a> InMemoryLazyStorage<'a> {
 }
 
 impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
+    /// Unmetered: this storage holds no gas counter, and none of its users —
+    /// the tzt runner, `Ctx`'s default storage, unit tests — runs inside the
+    /// kernel's bounded heap. The kernel's own implementation
+    /// (`tezos_execution`'s `TcCtx`) is where the charge has to bite; a test
+    /// that needs a metered walk wraps this in a counting storage of its own.
+    fn consume_gas(&mut self, _milligas: u32) -> Result<(), LazyStorageError> {
+        Ok(())
+    }
+
     fn big_map_get(
         &mut self,
         _arena: &'a Arena<Micheline<'a>>,
@@ -691,11 +715,16 @@ impl<'a> TypedValue<'a> {
     /// Traverses a `TypedValue` in AST pre-order and applies `f` to every big
     /// map inside it, replacing self with the updated value — or leaving it
     /// untouched, if it held no big map at all.
-    fn for_each_big_map_mut(&mut self, f: &mut impl FnMut(&mut BigMap<'a>)) {
-        if let Some(updated) = self.update_big_maps(f) {
+    fn for_each_big_map_mut<S: LazyStorage<'a> + ?Sized>(
+        &mut self,
+        storage: &mut S,
+        f: &mut impl FnMut(&mut S, &mut BigMap<'a>) -> Result<(), LazyStorageError>,
+    ) -> Result<(), LazyStorageError> {
+        if let Some(updated) = self.update_big_maps(storage, f)? {
             // Sole owner of a freshly built value, so this moves, never clones.
             *self = TypedValue::unwrap_rc(updated);
         }
+        Ok(())
     }
 
     /// Copy-on-write core of [TypedValue::for_each_big_map_mut]: applies `f`
@@ -732,10 +761,27 @@ impl<'a> TypedValue<'a> {
     /// as the iterative `Drop`, `Debug`, comparison and untyper walks
     /// (L2-1446, L2-1672); depth now costs heap, which is already bounded by
     /// the size of the value being walked.
-    fn update_big_maps<'b>(
+    ///
+    /// # Why this is metered
+    ///
+    /// Every visited node is charged
+    /// [crate::gas::tc_cost::LAZY_STORAGE_CYCLE] through
+    /// [LazyStorage::consume_gas], mirroring L1's
+    /// `extract_lazy_storage_updates`. The charge happens *before* the
+    /// `big_map_free` lookup, as L1 charges before its `has_lazy_storage`
+    /// match, so a memo hit still costs a cycle — which is what makes the
+    /// bound hold independently of the memo being correct.
+    ///
+    /// The memo alone does not bound this walk. It caches only the *absence*
+    /// of a big map, so a value with one under a shared spine is still
+    /// unfolded once per occurrence, and `DUP`-sharing puts `2^K` occurrences
+    /// within `O(K²)` gas. Metering is what makes that run out of gas rather
+    /// than out of heap or time.
+    fn update_big_maps<'b, S: LazyStorage<'a> + ?Sized>(
         &'b self,
-        f: &mut impl FnMut(&mut BigMap<'a>),
-    ) -> Option<Rc<Self>> {
+        storage: &mut S,
+        f: &mut impl FnMut(&mut S, &mut BigMap<'a>) -> Result<(), LazyStorageError>,
+    ) -> Result<Option<Rc<Self>>, LazyStorageError> {
         use crate::ast::Or::*;
         use TypedValue::*;
 
@@ -781,17 +827,33 @@ impl<'a> TypedValue<'a> {
         //
         // Without this, a value whose in-memory DAG unfolds to a `2^K`-node
         // tree — `DUP` is an `Rc::clone`, so `DUP; NIL t; SWAP; CONS; SWAP;
-        // CONS` doubles the occurrence count per level for `O(K)` gas while
-        // the *type* grows by one node — is walked as that tree. The walk is
-        // charged no gas and, since it no longer allocates per visit, has
-        // nothing else bounding it (L2-1831).
+        // CONS` doubles the occurrence count per level for `O(K²)` gas while
+        // the *type* grows by one node — is walked as that tree (L2-1831).
+        //
+        // The memo turns that into `O(distinct nodes)`, but only while no big
+        // map is present: with one under the shared spine every result is
+        // `Some`, nothing is cacheable, and the `2^K` unfolding is back. The
+        // per-node gas charge is what bounds that case, and the memo is what
+        // keeps the ordinary case from paying for the bound.
         let mut big_map_free: BTreeSet<*const TypedValue<'a>> = BTreeSet::new();
         let mut frames: Vec<Frame<'b, 'a>> = vec![Frame::Visit(self)];
         let mut results: Vec<std::option::Option<Rc<TypedValue<'a>>>> = Vec::new();
 
-        /// Queues `child`, remembering the answer if it is shared: only a
-        /// node reachable through more than one `Rc` can be visited twice, so
-        /// memoizing the rest would cost an insert per node and never pay.
+        /// Queues `child`, remembering the answer if it is shared.
+        ///
+        /// The gate is an optimisation, not a correctness condition, and it is
+        /// deliberately not an exact "can be reached twice" test — a uniquely
+        /// held child of a shared parent has `strong_count == 1` and is still
+        /// reached once per occurrence of that parent. It costs nothing to
+        /// miss: if such a child is re-reached, some ancestor on those paths
+        /// *is* shared, and the topmost one was memoized on its first visit,
+        /// so the descent stops there. The exception is an ancestor holding a
+        /// big map, which is never memoized — and that case is bounded by gas,
+        /// not by the memo.
+        ///
+        /// Getting the gate wrong in the other direction is equally harmless:
+        /// memoizing a node reached only once wastes one `BTreeSet` insert,
+        /// since "holds no big map" does not depend on how it was reached.
         fn push_child<'b, 'a>(
             frames: &mut Vec<Frame<'b, 'a>>,
             child: &'b Rc<TypedValue<'a>>,
@@ -816,6 +878,10 @@ impl<'a> TypedValue<'a> {
         while let Some(frame) = frames.pop() {
             match frame {
                 Frame::Visit(v) => {
+                    // Charged before the memo lookup, as L1 charges before its
+                    // `has_lazy_storage` match: a skipped subtree still costs
+                    // its root, so the bound does not rest on the memo.
+                    storage.consume_gas(tc_cost::LAZY_STORAGE_CYCLE)?;
                     if big_map_free.contains(&(v as *const TypedValue<'a>)) {
                         results.push(None);
                         continue;
@@ -885,7 +951,7 @@ impl<'a> TypedValue<'a> {
                         }
                         BigMap(m) => {
                             let mut m = m.clone();
-                            f(&mut m);
+                            f(storage, &mut m)?;
                             results.push(Some(Rc::new(BigMap(m))));
                         }
                         Ticket(_) => {
@@ -1015,7 +1081,7 @@ impl<'a> TypedValue<'a> {
 
         // The root's `Visit` pushed exactly one result and every `Build*`
         // replaces the ones it popped, so this is the whole answer.
-        results.pop().flatten()
+        Ok(results.pop().flatten())
     }
 
     /// Read-only counterpart of [TypedValue::update_big_maps]: applies
@@ -1223,31 +1289,40 @@ pub fn dump_big_map_walk<'a>(
     seen_source_ids: &mut BTreeSet<BigMapId>,
 ) -> Result<DeferredBigMapUpdates<'a>, LazyStorageError> {
     let mut deferred_in_place_updates: DeferredBigMapUpdates<'a> = Vec::new();
-    // The per-big-map work is fallible, but for_each_big_map_mut takes an
-    // infallible closure, so the first error is captured here and later big
-    // maps are skipped (the tree walk still completes harmlessly).
-    let mut result: Result<(), LazyStorageError> = Ok(());
-    root.for_each_big_map_mut(&mut |map: &mut BigMap<'a>| {
-        if result.is_ok() {
-            result = dump_one_big_map(
-                map,
-                storage,
-                temporary,
-                seen_source_ids,
-                &mut deferred_in_place_updates,
-            );
-        }
-    });
-    result?;
+    // The walk hands `storage` to the visitor rather than letting it capture
+    // one, so the per-big-map work can be fallible and stop the walk on the
+    // first error — and so the walk itself can charge gas through the same
+    // `&mut` (see [LazyStorage::consume_gas]).
+    root.for_each_big_map_mut(storage, &mut |storage, map: &mut BigMap<'a>| {
+        dump_one_big_map(
+            map,
+            storage,
+            temporary,
+            seen_source_ids,
+            &mut deferred_in_place_updates,
+        )
+    })?;
 
     // Return the deferred updates so a multi-walk caller applies them only
     // after every walk has copied from the pre-update source (L2-1761).
     Ok(deferred_in_place_updates)
 }
 
+/// Runs the mutable walk against a throwaway unmetered storage, for tests that
+/// care only about which big maps are visited and in what order. Tests that
+/// need the gas charge to bite supply a metered storage of their own.
+#[cfg(test)]
+fn walk_big_maps<'a>(root: &mut TypedValue<'a>, f: &mut impl FnMut(&mut BigMap<'a>)) {
+    let mut storage = InMemoryLazyStorage::new();
+    root.for_each_big_map_mut(&mut storage, &mut |_, map| {
+        f(map);
+        Ok(())
+    })
+    .expect("InMemoryLazyStorage is unmetered and this visitor cannot fail")
+}
+
 /// Dump a single big map to the lazy storage, threading the dedup state across
-/// maps. Split from [dump_big_map_walk] so the fallible per-map work can use
-/// `?` inside the infallible [TypedValue::for_each_big_map_mut] closure.
+/// maps. Split from [dump_big_map_walk] to keep the per-map work readable.
 fn dump_one_big_map<'a>(
     map: &mut BigMap<'a>,
     storage: &mut (impl LazyStorage<'a> + ?Sized),
@@ -1361,7 +1436,7 @@ mod test_big_map_to_storage_update {
         // because `TypedValue` implements `Drop` (L2-1672), so we visit through
         // [TypedValue::for_each_big_map_mut] and swap a placeholder in instead.
         let mut out = Vec::new();
-        root.for_each_big_map_mut(&mut |m| {
+        walk_big_maps(&mut root, &mut |m| {
             out.push(mem::replace(m, BigMap::empty(Type::Unit, Type::Unit)));
         });
         out
@@ -1753,7 +1828,7 @@ mod review_verification {
         let strong_before = Rc::strong_count(&shared);
 
         let mut visited = 0;
-        root.for_each_big_map_mut(&mut |_| visited += 1);
+        walk_big_maps(&mut root, &mut |_| visited += 1);
 
         assert_eq!(visited, 0, "no big map to visit");
         assert_eq!(
@@ -1821,7 +1896,7 @@ mod review_verification {
         );
 
         let mut visit_order = vec![];
-        value.for_each_big_map_mut(&mut |map| {
+        walk_big_maps(&mut value, &mut |map| {
             if let BigMapContent::FromId(ref m) = map.content {
                 visit_order.push(m.id.clone())
             }
@@ -1891,7 +1966,7 @@ mod review_verification {
                         };
                         let mut value = build(base, DEPTH);
                         let mut visited = 0;
-                        value.for_each_big_map_mut(&mut |_| visited += 1);
+                        walk_big_maps(&mut value, &mut |_| visited += 1);
                         assert_eq!(visited, usize::from(with_big_map));
                     })
                     .unwrap()
@@ -1993,7 +2068,7 @@ mod review_verification {
 
         // Renumber every visited big map, so each visit is observable.
         let mut visited = 0;
-        root.for_each_big_map_mut(&mut |map| {
+        walk_big_maps(&mut root, &mut |map| {
             visited += 1;
             if let BigMapContent::FromId(ref mut m) = map.content {
                 m.id = BigMapId::from(100 + visited);
@@ -2092,7 +2167,7 @@ mod review_verification {
                 // not `Send`. Only the count crosses the channel.
                 let mut root = shared_dag(TypedValue::Unit, LEVELS);
                 let mut visited = 0;
-                root.for_each_big_map_mut(&mut |_| visited += 1);
+                walk_big_maps(&mut root, &mut |_| visited += 1);
                 let _ = done.send(visited);
             })
             .unwrap();
@@ -2118,7 +2193,9 @@ mod review_verification {
     /// consensus-observable — [dump_one_big_map] gives each occurrence its own
     /// id and keys its dedup off having seen the source before.
     ///
-    /// Deliberately shallow: this one really is exponential, by design.
+    /// Deliberately shallow, and deliberately unmetered: this one really is
+    /// exponential by design, and what stops it in the kernel is gas — see
+    /// [metered_walk_runs_out_of_gas_on_an_exponentially_shared_big_map].
     #[test]
     fn walk_still_visits_every_occurrence_of_a_shared_big_map() {
         const LEVELS: u32 = 4;
@@ -2126,13 +2203,145 @@ mod review_verification {
         let mut root = shared_dag(leaf_big_map(0), LEVELS as usize);
 
         let mut visited = 0;
-        root.for_each_big_map_mut(&mut |_| visited += 1);
+        walk_big_maps(&mut root, &mut |_| visited += 1);
 
         assert_eq!(
             visited,
             2usize.pow(LEVELS),
             "the memo skipped an occurrence of a shared big map"
         );
+    }
+
+    /// [InMemoryLazyStorage] with a gas budget, so a test can watch the walk
+    /// exhaust one. The in-memory storage is unmetered by design, and the
+    /// kernel's own metered implementation lives in another crate.
+    struct MeteredStorage<'a> {
+        inner: InMemoryLazyStorage<'a>,
+        gas: crate::gas::Gas,
+    }
+
+    impl<'a> LazyStorage<'a> for MeteredStorage<'a> {
+        fn consume_gas(&mut self, milligas: u32) -> Result<(), LazyStorageError> {
+            Ok(self.gas.consume(milligas)?)
+        }
+
+        fn big_map_get(
+            &mut self,
+            arena: &'a Arena<Micheline<'a>>,
+            id: &BigMapId,
+            key: &TypedValue,
+            value_type: &Type,
+        ) -> Result<std::option::Option<TypedValue<'a>>, LazyStorageError> {
+            self.inner.big_map_get(arena, id, key, value_type)
+        }
+
+        fn big_map_mem(
+            &mut self,
+            id: &BigMapId,
+            key: &TypedValue,
+        ) -> Result<bool, LazyStorageError> {
+            self.inner.big_map_mem(id, key)
+        }
+
+        fn big_map_update(
+            &mut self,
+            id: &BigMapId,
+            key: TypedValue<'a>,
+            value: std::option::Option<TypedValue<'a>>,
+        ) -> Result<(), LazyStorageError> {
+            self.inner.big_map_update(id, key, value)
+        }
+
+        fn big_map_new(
+            &mut self,
+            key_type: &Type,
+            value_type: &Type,
+            temporary: bool,
+        ) -> Result<BigMapId, LazyStorageError> {
+            self.inner.big_map_new(key_type, value_type, temporary)
+        }
+
+        fn big_map_copy(
+            &mut self,
+            id: &BigMapId,
+            temporary: bool,
+        ) -> Result<BigMapId, LazyStorageError> {
+            self.inner.big_map_copy(id, temporary)
+        }
+
+        fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
+            self.inner.big_map_remove(id)
+        }
+    }
+
+    /// The memo bounds a big-map-*free* DAG, but put a big map under the
+    /// shared spine and every result is `Some`, so nothing is cacheable and
+    /// the `2^K` unfolding is back — that is
+    /// [walk_still_visits_every_occurrence_of_a_shared_big_map], and the
+    /// multiplicity is required, since each occurrence needs its own id.
+    ///
+    /// What bounds *that* is the per-node gas charge. `DUP` is an `Rc::clone`
+    /// and `list t` costs one type node per level, so the shape is `O(K²)`
+    /// gas to build for `2^K` occurrences; the walk must run out of gas
+    /// rather than out of heap or time. At `LEVELS` 20 an unmetered walk
+    /// would visit over a million nodes.
+    #[test]
+    fn metered_walk_runs_out_of_gas_on_an_exponentially_shared_big_map() {
+        const LEVELS: usize = 20;
+        const BUDGET: u32 = 1_000_000;
+
+        let mut storage = MeteredStorage {
+            inner: InMemoryLazyStorage::new(),
+            gas: crate::gas::Gas::new(BUDGET),
+        };
+        let mut root = shared_dag(leaf_big_map(0), LEVELS);
+
+        let mut visited = 0;
+        let result = root.for_each_big_map_mut(&mut storage, &mut |_, _| {
+            visited += 1;
+            Ok(())
+        });
+
+        assert!(
+            matches!(result, Err(LazyStorageError::OutOfGasError(_))),
+            "the walk completed instead of exhausting its budget: {result:?}"
+        );
+        // It stopped when the budget ran out, not after unfolding the DAG.
+        let affordable = (BUDGET / tc_cost::LAZY_STORAGE_CYCLE) as usize;
+        assert!(
+            visited <= affordable,
+            "visited {visited} big maps, but the budget only pays for {affordable} nodes"
+        );
+        assert!(
+            visited < 2usize.pow(LEVELS as u32),
+            "the walk unfolded the whole DAG despite running out of gas"
+        );
+    }
+
+    /// The charge must not price ordinary contracts out: a storage of a few
+    /// hundred nodes costs a few hundred cycles, not a meaningful fraction of
+    /// an operation's budget.
+    #[test]
+    fn metered_walk_completes_on_an_ordinary_value() {
+        const WIDTH: usize = 200;
+
+        let mut storage = MeteredStorage {
+            inner: InMemoryLazyStorage::new(),
+            gas: crate::gas::Gas::new(crate::gas::DEFAULT_GAS_AMOUNT),
+        };
+        let mut root = TypedValue::List(MichelsonList::from(
+            (0..WIDTH)
+                .map(|i| Rc::new(TypedValue::int(i as i64)))
+                .collect::<Vec<_>>(),
+        ));
+
+        let before = storage.gas.milligas().expect("budget is set");
+        root.for_each_big_map_mut(&mut storage, &mut |_, _| Ok(()))
+            .expect("an ordinary value must not exhaust the budget");
+        let spent = before - storage.gas.milligas().expect("budget is set");
+
+        // One cycle for the list itself plus one per element.
+        assert_eq!(spent, (WIDTH as u32 + 1) * tc_cost::LAZY_STORAGE_CYCLE);
     }
 
     /// Only the elements holding a big map are rebuilt; everything around them
@@ -2150,7 +2359,7 @@ mod review_verification {
         ]));
 
         let mut visited = 0;
-        root.for_each_big_map_mut(&mut |map| {
+        walk_big_maps(&mut root, &mut |map| {
             visited += 1;
             if let BigMapContent::FromId(ref mut m) = map.content {
                 m.id = BigMapId::from(50);
@@ -2205,7 +2414,7 @@ mod review_verification {
         // Renumber each big map to id + 10, so the rebuilt map shows where
         // each visited value landed.
         let mut visit_order = vec![];
-        root.for_each_big_map_mut(&mut |map| {
+        walk_big_maps(&mut root, &mut |map| {
             if let BigMapContent::FromId(ref mut m) = map.content {
                 visit_order.push(m.id.clone());
                 let BigMapId {
@@ -2252,7 +2461,7 @@ mod review_verification {
         ]));
 
         let mut visited = 0;
-        root.for_each_big_map_mut(&mut |_| visited += 1);
+        walk_big_maps(&mut root, &mut |_| visited += 1);
 
         assert_eq!(visited, 1);
         let TypedValue::Map(m) = &root else {
@@ -2290,7 +2499,7 @@ mod review_verification {
         );
 
         let mut visited = 0;
-        root.for_each_big_map_mut(&mut |map| {
+        walk_big_maps(&mut root, &mut |map| {
             visited += 1;
             if let BigMapContent::FromId(ref mut m) = map.content {
                 m.id = BigMapId::from(30);
@@ -2347,7 +2556,7 @@ mod review_verification {
         );
 
         let mut visited = 0;
-        root.for_each_big_map_mut(&mut |map| {
+        walk_big_maps(&mut root, &mut |map| {
             visited += 1;
             if let BigMapContent::FromId(ref mut m) = map.content {
                 m.id = BigMapId::from(40);
