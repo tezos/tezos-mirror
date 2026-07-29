@@ -1962,10 +1962,21 @@ mod review_verification {
     /// allocates per visit, so it cannot exhaust the heap the way the
     /// `Rc::make_mut` walk did. Only the big-map-free memo does.
     ///
-    /// Completion is the assertion — at `LEVELS` 40 this is 2^40 ≈ 10^12
-    /// visits without it.
+    /// **Reaching the end of this function is the assertion.** At `LEVELS` 40
+    /// the DAG unfolds to `2^40` ≈ 10^12 occurrences, so a walk that explored
+    /// each of them does not finish — remove the memo and this test hangs
+    /// rather than failing. Nothing else here can express the property: the
+    /// value holds no big map, so `f` is never called and there is no count to
+    /// compare. Making the visit count observable needs the walk to price its
+    /// own steps, which is why the quantitative form of this test lives with
+    /// the per-node gas charge instead of here.
+    ///
+    /// Note in particular that asserting the two list elements still point at
+    /// one allocation would *not* say anything about re-exploration — that is
+    /// the copy-on-write property, and
+    /// [walk_leaves_big_map_free_subtrees_shared] already covers it.
     #[test]
-    fn walk_does_not_reexplore_shared_subtrees() {
+    fn walk_terminates_on_an_exponentially_shared_subtree() {
         const LEVELS: usize = 40;
 
         let mut root = shared_dag(TypedValue::Unit, LEVELS);
@@ -1974,18 +1985,10 @@ mod review_verification {
         root.for_each_big_map_mut(&mut |_| visited += 1);
 
         assert_eq!(visited, 0, "no big map to visit");
-        // Nothing was rebuilt, so the sharing that made it cheap survives.
-        let TypedValue::List(elements) = &root else {
-            panic!("root is no longer a list")
-        };
-        let elements: Vec<_> = elements.iter().collect();
-        assert!(
-            Rc::ptr_eq(elements[0], elements[1]),
-            "the walk unshared a big-map-free subtree"
-        );
     }
 
-    /// The flip side of [walk_does_not_reexplore_shared_subtrees]: the memo
+    /// The flip side of [walk_terminates_on_an_exponentially_shared_subtree]:
+    /// the memo
     /// records only the *absence* of a big map, so a shared subtree that holds
     /// one is still visited once per occurrence. That multiplicity is
     /// consensus-observable — [dump_one_big_map] gives each occurrence its own
