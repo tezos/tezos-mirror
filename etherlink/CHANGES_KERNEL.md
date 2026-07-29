@@ -8,8 +8,11 @@
   payload, which deep-copies it while the stack copy is still live, and the
   copy was not gas-charged, so a large enough payload exhausted the kernel heap
   and aborted it instead of running out of gas. The payload is now shared
-  behind a pointer, and the receipts that serialize it read through that
-  pointer rather than taking it by value (!22617).
+  behind a pointer, and every site that serializes it reads through that
+  pointer rather than taking it by value: the three receipts, and the
+  origination an internal `CREATE_CONTRACT` performs — which a `DUP`ed
+  operation left sharing its storage across occurrences, so taking it by value
+  there copied it whatever the receipt did (!22617).
 - Michelson runtime: **gas change.** The end-of-execution walk that persists
   big maps is now charged per node visited, as L1 charges the same walk, and
   no longer copies values it does not rewrite, revisits a big-map-free subtree
