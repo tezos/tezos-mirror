@@ -989,7 +989,11 @@ where
                 // A transfer parameter is `Passable`, and `operation` is not,
                 // so the walk's refusal of `operation` is unreachable here.
                 let value = param
-                    .clone_into_micheline_optimized_legacy(&parser.arena, tc_ctx.gas())
+                    .clone_into_micheline_optimized_legacy(
+                        &parser.arena,
+                        tc_ctx.gas(),
+                        Some(TypeProperty::Passable),
+                    )
                     .map_err(TransferError::from)?;
                 let encoded_value = value.encode(tc_ctx.gas())?.map_err(|e| {
                     TransferError::MichelineSerializationError(e.to_string())
@@ -1117,6 +1121,7 @@ where
                         .clone_into_micheline_optimized_legacy(
                             &parser.arena,
                             tc_ctx.gas(),
+                            Some(TypeProperty::Storable),
                         )
                         .map_err(OriginationError::from)?
                         .encode(tc_ctx.gas())?
@@ -1194,15 +1199,23 @@ where
                         .clone_into_micheline_optimized_legacy(
                             &parser.arena,
                             tc_ctx.gas(),
+                            Some(TypeProperty::Pushable),
                         )
                         .map_err(|e| match e {
                             mir::ast::BorrowedUnparseError::OutOfGas => {
                                 ApplyOperationError::OutOfGas(mir::gas::OutOfGas)
                             }
-                            mir::ast::BorrowedUnparseError::NonPushable => {
+                            mir::ast::BorrowedUnparseError::UnsupportedUnparsing => {
                                 ApplyOperationError::EmitMichelineSerializationError(
                                     "value carries an operation, which is not pushable"
                                         .to_string(),
+                                )
+                            }
+                            mir::ast::BorrowedUnparseError::UnsatisfiedProperty(prop) => {
+                                ApplyOperationError::EmitMichelineSerializationError(
+                                    format!(
+                                        "value carries a sub-value that is not {prop}"
+                                    ),
                                 )
                             }
                         })?
@@ -2198,7 +2211,11 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1>(
     let storage = dumped
         .as_ref()
         .unwrap_or(&storage)
-        .clone_into_micheline_optimized_legacy(&parser.arena, ctx.gas())
+        .clone_into_micheline_optimized_legacy(
+            &parser.arena,
+            ctx.gas(),
+            Some(TypeProperty::Storable),
+        )
         .map_err(OriginationError::from)?
         .encode(ctx.gas())?
         .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
@@ -13145,6 +13162,7 @@ mod tests {
     /// references denote one allocation distinguishes them.
     mod receipt_payloads_are_not_copied {
         use super::*;
+        use mir::typechecker::type_props::TypeProperty;
         use pretty_assertions::assert_eq;
         use std::rc::Rc;
 
@@ -13174,8 +13192,12 @@ mod tests {
 
             for _ in 0..2 {
                 param
-                    .clone_into_micheline_optimized_legacy(&parser.arena, &mut gas)
-                    .expect("a transfer parameter is Passable, so never NonPushable");
+                    .clone_into_micheline_optimized_legacy(
+                        &parser.arena,
+                        &mut gas,
+                        Some(TypeProperty::Passable),
+                    )
+                    .expect("a transfer parameter is Passable, so it is never refused");
             }
 
             assert_eq!(
@@ -13214,8 +13236,12 @@ mod tests {
             assert_eq!(Rc::strong_count(&storage), 1);
 
             storage
-                .clone_into_micheline_optimized_legacy(&parser.arena, &mut gas)
-                .expect("an originated storage is Storable, so never NonPushable");
+                .clone_into_micheline_optimized_legacy(
+                    &parser.arena,
+                    &mut gas,
+                    Some(TypeProperty::Storable),
+                )
+                .expect("an originated storage is Storable, so it is never refused");
 
             assert_eq!(
                 Rc::strong_count(&storage),
@@ -13267,8 +13293,12 @@ mod tests {
             // occurrence's storage alone, which is what lets the origination
             // take it behind the pointer rather than by value.
             occurrences[0]
-                .clone_into_micheline_optimized_legacy(&parser.arena, &mut gas)
-                .expect("an originated storage is Storable, so never NonPushable");
+                .clone_into_micheline_optimized_legacy(
+                    &parser.arena,
+                    &mut gas,
+                    Some(TypeProperty::Storable),
+                )
+                .expect("an originated storage is Storable, so it is never refused");
 
             assert!(
                 Rc::ptr_eq(&storage, &occurrences[1]),
@@ -13290,8 +13320,11 @@ mod tests {
             let mut gas = Gas::new(1_000);
 
             let param = payload();
-            let result =
-                param.clone_into_micheline_optimized_legacy(&parser.arena, &mut gas);
+            let result = param.clone_into_micheline_optimized_legacy(
+                &parser.arena,
+                &mut gas,
+                Some(TypeProperty::Passable),
+            );
 
             assert!(
                 matches!(result, Err(mir::ast::BorrowedUnparseError::OutOfGas)),
