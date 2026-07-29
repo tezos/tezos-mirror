@@ -4272,8 +4272,8 @@ oc.docker:ci:arm64:
     - script_failure
     - runner_system_failure
 
-oc.install_bin_debian_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
+oc.install_bin_debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-73a6a3d6
   stage: publishing_tests
   tags:
   - gcp
@@ -4304,14 +4304,19 @@ oc.install_bin_debian_trixie:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./docs/introduction/install-bin-deb.sh debian trixie
+  - ./docs/introduction/install-bin-deb.sh $DISTRIBUTION $RELEASE
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
+    DISTRIBUTION: debian
     PREFIX: ""
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
 
-oc.install_bin_debian_trixie_systemd:
+oc.install_bin_debian_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publishing_tests
   tags:
@@ -4352,16 +4357,19 @@ oc.install_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-73a6a3d6
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:$RELEASE-master-73a6a3d6
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
-    RELEASE: trixie
   retry:
     max: 2
     when:
     - script_failure
     - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
 
 oc.integration:compiler-rejections:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -4912,7 +4920,7 @@ oc.test-liquidity-baking-scripts:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.test_keyring_debian_trixie:
+oc.test_keyring_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publishing_tests
   tags:
@@ -4953,16 +4961,19 @@ oc.test_keyring_debian_trixie:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-73a6a3d6
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:$RELEASE-master-73a6a3d6
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
-    RELEASE: trixie
   retry:
     max: 2
     when:
     - script_failure
     - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
 
 oc.unit:non-proto-arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -5419,7 +5430,7 @@ oc.unit:webassembly-x86_64:
   variables:
     CARGO_NET_OFFLINE: "false"
 
-oc.upgrade_bin_debian_trixie_systemd:
+oc.upgrade_bin_debian_systemd:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publishing_tests
   tags:
@@ -5460,16 +5471,19 @@ oc.upgrade_bin_debian_trixie_systemd:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:trixie-master-73a6a3d6
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:$RELEASE-master-73a6a3d6
     DISTRIBUTION: debian
     DOCKER_VERSION: 28.5.1
     PREFIX: ""
-    RELEASE: trixie
   retry:
     max: 2
     when:
     - script_failure
     - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
 
 oc:scripts:release_script_values:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
