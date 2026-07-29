@@ -94,6 +94,15 @@ module type S = sig
     Tezos_types.Contract.t ->
     Z.t option tzresult Lwt.t
 
+  (** [address_registry_index `Main block destination] is the index
+      assigned to [destination] by the [INDEX_ADDRESS] opcode, or
+      [None] when the address was never indexed. *)
+  val address_registry_index :
+    [`Main] ->
+    block_param ->
+    Tezlink_imports.Imported_context.Destination.t ->
+    Z.t option tzresult Lwt.t
+
   val big_map_get :
     [`Main] ->
     block_param ->

@@ -88,6 +88,12 @@
   duplicated with `DUP`) could otherwise be copied into a second full allocation
   and push the interpreter past the 4 GiB wasm heap, trapping the kernel before
   it runs out of gas. (!22582)
+- Expose the address registry through a read-only RPC, `GET
+  .../context/destination/<address>/index`, mirroring L1's
+  `Destination_services.index` (same URL shape and `N`/`null` response). It
+  returns the index assigned to the address by the `INDEX_ADDRESS` opcode, or
+  `null` when the address was never indexed. Destinations cover implicit
+  accounts, originated contracts and smart rollups. (!22621)
 
 ### Native Atomic Composability
 

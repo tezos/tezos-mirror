@@ -949,6 +949,16 @@ let paid_storage_space :
   import_service_with_arg
     Imported_protocol_plugin.RPC.Contract.S.get_paid_storage_space
 
+let destination_index :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context * Imported_context.Destination.t,
+      unit,
+      unit,
+      Z.t option )
+    Tezos_rpc.Service.t =
+  import_service_with_arg Imported_protocol_plugin.Destination_services.S.index
+
 let constants :
     ( [`GET],
       tezlink_rpc_context,

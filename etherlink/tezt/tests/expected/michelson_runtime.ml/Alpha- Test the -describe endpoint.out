@@ -216,6 +216,9 @@ Available services:
               Access the paid storage space of the contract. 
           - GET /chains/main/blocks/head/context/contracts/<contract_id>/storage/used_space
               Access the used storage space of the contract. 
+      - GET /chains/main/blocks/head/context/destination/<destination_id>/index
+          Returns the index assigned to the address if it was indexed by the
+          opcode INDEX_ADDRESS, otherwise returns null 
       - GET /chains/main/blocks/head/context/issuance/expected_issuance
           Returns the expected issued tez for the provided block and the next
           'consensus_rights_delay' cycles (in mutez) 
@@ -280,6 +283,8 @@ Dynamic parameter description:
       Index `n` of the requested validation pass. 
   <block_cycle>
       A cycle integer 
+  <destination_id>
+      A destination identifier encoded in b58check. 
   <contract_id>
       A contract identifier encoded in b58check. 
   <script_expr>

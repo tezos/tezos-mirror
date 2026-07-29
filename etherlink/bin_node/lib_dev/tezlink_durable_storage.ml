@@ -8,10 +8,10 @@
 open Tezos_types
 
 (** Thin readers on top of [Durable_storage] for the Michelson-runtime
-    implicit-account subtree (balance / manager / counter), plus the
-    DA-fee mutez helper. The Originated/Implicit dispatch and the
-    encoding/decoding live in the resolver of the underlying typed
-    constructors. *)
+    implicit-account subtree (balance / manager / counter), the
+    address-registry index, plus the DA-fee mutez helper. The
+    Originated/Implicit dispatch and the encoding/decoding live in the
+    resolver of the underlying typed constructors. *)
 
 let balance state c =
   Durable_storage.read_or_default ~default:Tez.zero (Tezlink_balance c) state
@@ -26,6 +26,12 @@ let manager state pkh =
 
 let counter state pkh =
   Durable_storage.read_or_default ~default:None (Tezlink_counter pkh) state
+
+let address_registry_index state destination =
+  Durable_storage.read_or_default
+    ~default:None
+    (Tezlink_address_registry_index destination)
+    state
 
 (* Mirrors the kernel's genesis block hash ([TezBlock::genesis_block_hash]). *)
 let genesis_block_hash =
