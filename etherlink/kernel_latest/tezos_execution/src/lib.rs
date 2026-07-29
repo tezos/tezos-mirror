@@ -225,15 +225,21 @@ fn untag_internals(tagged: Vec<TaggedInternalOp>) -> Vec<InternalOperationSum> {
 fn finalize_statuses<M: OperationKind>(
     result: Result<M::Success, ApplyOperationError>,
     internal_operation_results: &mut [TaggedInternalOp],
+    internals: SubtreeStatus,
 ) -> ContentResult<M> {
     match result {
         Ok(success) => {
-            // A top-level Applied stays Applied iff the last internal
-            // op is Applied — internals fail linearly, so the last one
-            // carries the cascade signal.
-            let all_internal_succeeded = internal_operation_results
-                .last()
-                .is_none_or(|t| t.op.is_applied());
+            // A top-level Applied stays Applied iff nothing in its
+            // internal-operation subtree failed. Two signals, both
+            // necessary: `internals`, the verdict carried out of
+            // `execute_internal_operations` — an operation that raised
+            // left no receipt to read (L2-1863) — and the last receipt,
+            // which catches a failure recorded without passing through a
+            // frame at all (a re-entrant CRAC receipt).
+            let all_internal_succeeded = internals.all_applied()
+                && internal_operation_results
+                    .last()
+                    .is_none_or(|t| t.op.is_applied());
             if all_internal_succeeded {
                 ContentResult::Applied(success)
             } else {
@@ -338,13 +344,15 @@ fn finalize_and_burn<Host, M, A>(
     top_level_delegated_delta: u64,
     result: Result<M::Success, ApplyOperationError>,
     mut internal_operation_results: Vec<TaggedInternalOp>,
+    internals: SubtreeStatus,
 ) -> OperationResult<M>
 where
     Host: StorageV1,
     M: storage_fees::OperationStorageFees,
     A: TezosAccount,
 {
-    let mut content = finalize_statuses::<M>(result, &mut internal_operation_results);
+    let mut content =
+        finalize_statuses::<M>(result, &mut internal_operation_results, internals);
     let mut storage_limit_remaining: BigUint = storage_limit.0.clone();
     let (mut internals, burn_outcome) = burn_pass(
         host,
@@ -609,25 +617,321 @@ enum Disposition {
     Apply,
 }
 
+/// One suspended batch of sibling internal operations, plus the bookkeeping
+/// needed to finalize the operation that emitted it.
+///
+/// This is the heap-allocated stand-in for what used to be a native stack
+/// frame of [`execute_internal_operations`]. A Michelson call chain (`KT1_a`
+/// calls `KT1_b` calls `KT1_c` ...) used to recurse through
+/// `execute_internal_operations` -> `transfer` -> `execute_internal_operations`,
+/// so its depth grew the wasm shadow stack — a fixed 1 MiB that cannot grow,
+/// and good for only a few hundred levels once the MIR interpreter frames are
+/// counted, while the per-operation gas limit affords well over a thousand.
+/// Nesting now grows this `Vec` on the heap instead, leaving gas as the only
+/// bound — as in L1, where `Apply.apply_internal_operations` loops over a queue
+/// rather than recursing.
+struct InternalOpFrame<'a> {
+    /// Operations still to execute at this nesting level, in emission order.
+    pending: std::vec::IntoIter<OperationInfo<'a>>,
+    /// The contract that emitted `pending`; the `sender` of their receipts.
+    sender: crate::account_storage::TezosOriginatedAccount,
+    /// Set once any sibling at this level has failed; every remaining sibling
+    /// is then reported as `Skipped`.
+    failed: bool,
+}
+
+/// The transfer a nested [`InternalOpFrame`] is the subtree of: its receipt is
+/// built, but whether it reads `Applied`, `BackTracked` or `Failed` depends on
+/// how that subtree ends. Built pre-order, placed post-order by
+/// [`settle_parent_transfer`].
+struct PendingParent {
+    receipt: InternalContentWithMetadata<TransferContent>,
+    /// Where `receipt` goes in `all_internal_receipts`: the length the list had
+    /// when the transfer ran, so the receipt lands ahead of everything its
+    /// subtree contributes and the flat list stays in DFS order.
+    ///
+    /// What DFS order needs is that relative position, not a fixed absolute
+    /// offset — the receipt has to precede its own subtree, nothing more. So
+    /// the load-bearing property is that no insertion lands *before* a live
+    /// parent's `receipt_at`, and every insertion satisfies it:
+    ///
+    /// - an operation's own receipt is appended, at the end of the list;
+    /// - [`splice_reentrant_crac_ops`] splices just after an operation of the
+    ///   innermost frame, itself appended;
+    /// - [`settle_parent_transfer`] inserts at the `receipt_at` of the
+    ///   innermost pending parent, and `receipt_at` never decreases with
+    ///   nesting depth (the list only grows), so that index is at or after
+    ///   every enclosing one.
+    ///
+    /// The last case is routinely an *equality*, not a corner: a linear call
+    /// chain appends nothing on the way down, so every level captures the same
+    /// index — 0 for a chain hanging off the first operation — and settles
+    /// insert there in turn, innermost first. Each ancestor then still lands
+    /// ahead of the whole subtree it is inserting in front of, which is all
+    /// that is required. Anything that inserts further up the list breaks this
+    /// and has to place these receipts differently.
+    receipt_at: usize,
+    /// Storage cost the transfer delegated, dropped if the subtree raises.
+    delegated_storage_cost: u64,
+    /// `(pending, failed, backtracked)` CRAC list lengths captured before the
+    /// subtree ran; see [`splice_reentrant_crac_ops`].
+    crac_watermarks: (usize, usize, usize),
+}
+
+/// Drain the re-entrant CRAC ops accumulated while the operation whose receipt
+/// sits at `receipt_at` executed (a gateway leg that re-entered the Michelson
+/// runtime) and splice the synthetic frame in at `receipt_at + 1` — right after
+/// that operation and ahead of its inline children (e.g. the `%on_result`
+/// callback). The leg runs before the callback that consumes its payload, so
+/// the frame must precede it. Empty drain → no-op.
+fn splice_reentrant_crac_ops(
+    journal: &mut TezosXJournal,
+    all_internal_receipts: &mut Vec<TaggedInternalOp>,
+    receipt_at: usize,
+    (pending, failed, backtracked): (usize, usize, usize),
+) {
+    let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
+        journal,
+        pending,
+        failed,
+        backtracked,
+    );
+    let frame_at = receipt_at + 1;
+    all_internal_receipts.splice(
+        frame_at..frame_at,
+        reentrant_ops.into_iter().map(TaggedInternalOp::from_crac),
+    );
+}
+
+/// Whether anything in an internal-operation subtree failed.
+///
+/// This has to be carried out of the subtree rather than read back off its
+/// receipts, because a receipt list can end on an `Applied` entry even though
+/// the subtree failed: an operation that *raises* contributes no receipt at all
+/// — an unsupported `SET_DELEGATE` and an out-of-gas on the per-operation cost
+/// both do — and it abandons its batch, so no `Skipped` sibling is recorded
+/// after it either. `[EMIT ; SET_DELEGATE]` therefore leaves the applied event
+/// as the last receipt, and reading the tail reports success for a subtree that
+/// failed (L2-1863).
+#[must_use]
+#[derive(Clone, Copy)]
+enum SubtreeStatus {
+    AllApplied,
+    SomeFailed,
+}
+
+impl SubtreeStatus {
+    fn from_failed(failed: bool) -> Self {
+        if failed {
+            Self::SomeFailed
+        } else {
+            Self::AllApplied
+        }
+    }
+
+    fn all_applied(self) -> bool {
+        matches!(self, Self::AllApplied)
+    }
+}
+
+/// How the internal-operation subtree of a [`PendingParent`] ended.
+enum SubtreeEnd {
+    /// Every operation in it was dequeued, carrying the batch's own verdict.
+    Drained(SubtreeStatus),
+    /// Executing it raised, which the recursive version surfaced out of
+    /// `transfer` as `FailedToExecuteInternalOperation`.
+    Raised(ApplyOperationError),
+}
+
+/// Place the receipt of the transfer whose subtree just ended, resolved against
+/// how it ended, and fail `enclosing` — the batch that transfer belongs to — if
+/// it did not stay `Applied`, so its siblings are `Skipped`.
+fn settle_parent_transfer(
+    journal: &mut TezosXJournal,
+    all_internal_receipts: &mut Vec<TaggedInternalOp>,
+    enclosing: &mut InternalOpFrame<'_>,
+    parent: PendingParent,
+    end: SubtreeEnd,
+) {
+    let PendingParent {
+        mut receipt,
+        receipt_at,
+        delegated_storage_cost,
+        crac_watermarks,
+    } = parent;
+    let (applied, delegated_storage_cost) = match end {
+        SubtreeEnd::Drained(status) => {
+            // Both signals are needed. The subtree's own verdict covers what no
+            // receipt records (see [`SubtreeStatus`]); the tail of its receipts
+            // covers what no frame records — a re-entrant CRAC receipt, spliced
+            // in without ever passing through an [`InternalOpFrame`]. Read
+            // before the CRAC splice below, exactly where and when the
+            // recursive version read it.
+            let applied = status.all_applied()
+                && all_internal_receipts
+                    .get(receipt_at..)
+                    .and_then(|sub_ops| sub_ops.last())
+                    .is_none_or(|t| t.op.is_applied());
+            if !applied {
+                receipt.result.backtrack_if_applied();
+            }
+            (applied, delegated_storage_cost)
+        }
+        SubtreeEnd::Raised(err) => {
+            let err = TransferError::FailedToExecuteInternalOperation(err.to_string());
+            log!(Error, "Internal transfer failed: {err:?}");
+            receipt.result = ContentResult::Failed(ApplyOperationError::from(err).into());
+            // The transfer's own `TransferSuccess` and delegated storage cost
+            // are dropped on this path, exactly as they were when the error
+            // travelled out of `transfer` instead.
+            (false, 0)
+        }
+    };
+    if !applied {
+        enclosing.failed = true;
+    }
+    // Insert the receipt BEFORE the subtree's own so the flat list follows DFS
+    // order: parent op, then its sub-ops. See [`PendingParent::receipt_at`].
+    all_internal_receipts.insert(
+        receipt_at,
+        TaggedInternalOp::own(
+            InternalOperationSum::Transfer(receipt),
+            delegated_storage_cost,
+        ),
+    );
+    splice_reentrant_crac_ops(
+        journal,
+        all_internal_receipts,
+        receipt_at,
+        crac_watermarks,
+    );
+}
+
+/// Execute `internal_operations` and everything they transitively emit,
+/// appending their receipts to `all_internal_receipts` in DFS order.
+///
+/// Iterative by design: `nested` is the explicit DFS worklist that replaces what
+/// used to be native recursion through [`transfer`] — see [`InternalOpFrame`].
+/// Only [`transfer_step`] is reached from here, never [`transfer`], so the cycle
+/// is gone.
+///
+/// Every nested frame is paired with the transfer it is the subtree of, and the
+/// batch handed in by the caller is held apart as `root`, so "the frame below
+/// this one" is always a frame and "the outermost batch" is always the one
+/// without a [`PendingParent`].
+///
+/// Returns whether anything in the whole subtree failed — `root`'s own verdict,
+/// which the caller needs to decide the enclosing operation's status and cannot
+/// rederive from the receipts. See [`SubtreeStatus`].
 #[allow(clippy::too_many_arguments)]
 fn execute_internal_operations<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    internal_operations: impl Iterator<Item = OperationInfo<'a>>,
+    internal_operations: Vec<OperationInfo<'a>>,
     sender_account: &crate::account_storage::TezosOriginatedAccount,
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     nonce_counter: &mut u16,
-) -> Result<(), ApplyOperationError>
+) -> Result<SubtreeStatus, ApplyOperationError>
 where
     Host: StorageV1,
 {
-    let mut failed = None;
-    for (index, OperationInfo { operation, counter }) in
-        internal_operations.into_iter().enumerate()
-    {
+    let mut root = InternalOpFrame {
+        pending: internal_operations.into_iter(),
+        sender: sender_account.clone(),
+        failed: false,
+    };
+    let mut nested: Vec<(PendingParent, InternalOpFrame<'a>)> = vec![];
+    loop {
+        let frame = nested.last_mut().map_or(&mut root, |(_, frame)| frame);
+        let raised = match execute_pending_operations(
+            tc_ctx,
+            operation_ctx,
+            registry,
+            journal,
+            frame,
+            parser,
+            all_internal_receipts,
+            nonce_counter,
+        ) {
+            // One of the operations emitted a batch of its own: run that first.
+            // The transfer that emitted it is settled when this frame comes
+            // back on top and drains.
+            Ok(Some(child)) => {
+                nested.push(child);
+                continue;
+            }
+            Ok(None) => None,
+            // A block abort is never contained: it aborts everything.
+            Err(err @ ApplyOperationError::BlockAbort(_)) => return Err(err),
+            // Containment, one nesting level at a time, as in the recursive
+            // version: an error abandons the batch it was raised in, the
+            // transfer that emitted that batch is reported as `Failed`, and
+            // *its* siblings carry on (as `Skipped`).
+            Err(err) => Some(err),
+        };
+        let Some((parent, drained)) = nested.pop() else {
+            // `root` ended, so everything has: there is no transfer left to
+            // settle, and nobody here to contain an error raised in it. Its
+            // verdict is the caller's answer.
+            return match raised {
+                None => Ok(SubtreeStatus::from_failed(root.failed)),
+                Some(err) => Err(err),
+            };
+        };
+        let end = match raised {
+            // The batch that just drained is the authority on whether its own
+            // operations failed; its receipts are not.
+            None => SubtreeEnd::Drained(SubtreeStatus::from_failed(drained.failed)),
+            Some(err) => SubtreeEnd::Raised(err),
+        };
+        let enclosing = nested.last_mut().map_or(&mut root, |(_, frame)| frame);
+        settle_parent_transfer(journal, all_internal_receipts, enclosing, parent, end);
+    }
+}
+
+/// Execute the operations still pending in `frame`, appending a receipt per
+/// operation to `all_internal_receipts`, until either the batch drains
+/// (`Ok(None)`) or one of them is a transfer whose callee emitted internal
+/// operations of its own (`Ok(Some(..))`, that transfer and the batch it
+/// emitted).
+///
+/// Returning that batch instead of executing it here is what keeps a Michelson
+/// call chain off the native stack. The transfer's own receipt travels with it
+/// as a [`PendingParent`], to be placed by [`settle_parent_transfer`] once the
+/// returned frame has drained. `frame` keeps its iterator, so a later call
+/// resumes this batch where it left off.
+#[allow(clippy::too_many_arguments)]
+fn execute_pending_operations<'a, Host>(
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a>,
+    registry: &impl Registry,
+    journal: &mut TezosXJournal,
+    // The batch to execute: supplies each operation's `sender` and carries the
+    // `failed` short-circuit shared by its siblings.
+    frame: &mut InternalOpFrame<'a>,
+    parser: &'a Parser<'a>,
+    all_internal_receipts: &mut Vec<TaggedInternalOp>,
+    nonce_counter: &mut u16,
+) -> Result<Option<(PendingParent, InternalOpFrame<'a>)>, ApplyOperationError>
+where
+    Host: StorageV1,
+{
+    for OperationInfo { operation, counter } in frame.pending.by_ref() {
+        // Where this operation's own receipt, appended below, lands.
+        let receipt_at = all_internal_receipts.len();
+        // Watermarks for the CRAC drain. Everything pushed to the three CRAC
+        // lists between here and the drain belongs to this op's own re-entrant
+        // subtree. Splicing it at the parent site keeps DFS order rather than
+        // letting it reach the top-level merge with a smaller seq than its
+        // outer parent (would invert DFS — L2-1300).
+        let crac_watermarks = (
+            journal.michelson.pending_crac_receipts.len(),
+            journal.michelson.failed_crac_receipts.len(),
+            journal.michelson.backtracked_crac_receipts.len(),
+        );
         tc_ctx
             .operation_gas
             .consume(Cost::manager_operation())
@@ -649,30 +953,19 @@ where
         // is rejected (matching L1 `Internal_operation_replay`) instead
         // of being applied a second time under a fresh display nonce.
         let is_replay = !operation_ctx.applied_counters.insert(counter);
-        let receipts_before = all_internal_receipts.len();
-        // Watermarks for `drain_reentrant_crac_ops`. Execution is
-        // synchronous and stack-nested, so everything pushed to the three
-        // CRAC lists between here and the drain below is this op's own
-        // re-entrant subtree. Splicing it at the parent site keeps DFS
-        // order rather than letting it reach the top-level merge with a
-        // smaller seq than its outer parent (would invert DFS — L2-1300).
-        let pending_crac_receipts_before = journal.michelson.pending_crac_receipts.len();
-        let failed_crac_receipts_before = journal.michelson.failed_crac_receipts.len();
-        let backtracked_crac_receipts_before =
-            journal.michelson.backtracked_crac_receipts.len();
         // Resolve the disposition once: a prior failure short-circuits
         // every kind to `Skip`, a replayed counter to `Replay`, and a
         // replay also fails the enclosing operation. Only `Apply` needs
         // the per-kind logic below.
-        let disposition = if failed.is_some() {
+        let disposition = if frame.failed {
             Disposition::Skip
         } else if is_replay {
-            failed = Some(index);
+            frame.failed = true;
             Disposition::Replay
         } else {
             Disposition::Apply
         };
-        let (internal_receipt, delegated_storage_cost_delta) = match operation {
+        match operation {
             mir::ast::Operation::TransferTokens(TransferTokens {
                 param,
                 destination_address,
@@ -697,13 +990,14 @@ where
                         value: encoded_value,
                     },
                 };
-                let (result, delegated_storage_cost_delta) = match disposition {
-                    Disposition::Skip => (ContentResult::Skipped, 0),
+                let (result, delegated_storage_cost_delta, subtree) = match disposition {
+                    Disposition::Skip => (ContentResult::Skipped, 0, None),
                     Disposition::Replay => (
                         ContentResult::Failed(
                             ApplyOperationError::InternalOperationReplay.into(),
                         ),
                         0,
+                        None,
                     ),
                     Disposition::Apply => {
                         // Internal-operation parameters were produced and
@@ -711,65 +1005,81 @@ where
                         // execution, so they may legitimately reference
                         // big_maps it owns.
                         let allow_forged_lazy_storage_id = AllowForgedLazyStorageId::Yes;
-                        let receipt = transfer(
+                        // `transfer_step`, not `transfer`: the callee's own
+                        // internal operations come back to the driver as a
+                        // new frame instead of recursing through here.
+                        let step = transfer_step(
                             tc_ctx,
                             operation_ctx,
                             registry,
                             journal,
-                            sender_account,
+                            &frame.sender,
                             &content.amount,
                             &content.destination,
                             &content.parameters.entrypoint,
                             value,
                             parser,
-                            all_internal_receipts,
                             false,
                             allow_forged_lazy_storage_id,
-                            nonce_counter,
                         );
-                        let delegated_storage_cost_delta = match &receipt {
-                            Ok((_, delta)) => *delta,
-                            Err(_) => 0,
-                        };
-                        let result = match receipt {
-                            Ok((success, _)) => {
-                                let sub_ops_succeeded = all_internal_receipts
-                                    .get(receipts_before..)
-                                    .and_then(|s| s.last())
-                                    .is_none_or(|t| t.op.is_applied());
-                                if sub_ops_succeeded {
-                                    ContentResult::Applied(success.into())
-                                } else {
-                                    failed = Some(index);
-                                    ContentResult::BackTracked(BacktrackedResult {
-                                        errors: None,
-                                        result: success.into(),
-                                    })
-                                }
-                            }
+                        match step {
+                            Ok(TransferStep {
+                                success,
+                                delegated_storage_cost,
+                                emitted,
+                            }) => (
+                                // Provisional: `settle_parent_transfer` demotes it
+                                // to `BackTracked` should `emitted` end in a
+                                // failure.
+                                ContentResult::Applied(success.into()),
+                                delegated_storage_cost,
+                                emitted,
+                            ),
                             Err(CracError::BlockAbort(msg)) => {
                                 return Err(ApplyOperationError::BlockAbort(msg));
                             }
                             Err(CracError::Operation(err)) => {
-                                failed = Some(index);
+                                frame.failed = true;
                                 log!(Error, "Internal transfer failed: {err:?}");
-                                ContentResult::Failed(
-                                    ApplyOperationError::from(err).into(),
+                                (
+                                    ContentResult::Failed(
+                                        ApplyOperationError::from(err).into(),
+                                    ),
+                                    0,
+                                    None,
                                 )
                             }
-                        };
-                        (result, delegated_storage_cost_delta)
+                        }
                     }
                 };
-                (
-                    InternalOperationSum::Transfer(InternalContentWithMetadata {
-                        content,
-                        sender: sender_account.contract(),
-                        nonce,
-                        result,
-                    }),
+                let receipt = InternalContentWithMetadata {
+                    content,
+                    sender: frame.sender.contract(),
+                    nonce,
+                    result,
+                };
+                if let Some((callee, ops)) = subtree {
+                    // Hand the callee's batch back to the driver rather than
+                    // running it here, and let the receipt ride along: where it
+                    // ends up in `all_internal_receipts` is settled with it.
+                    return Ok(Some((
+                        PendingParent {
+                            receipt,
+                            receipt_at,
+                            delegated_storage_cost: delegated_storage_cost_delta,
+                            crac_watermarks,
+                        },
+                        InternalOpFrame {
+                            pending: ops.into_iter(),
+                            sender: callee,
+                            failed: false,
+                        },
+                    )));
+                }
+                all_internal_receipts.push(TaggedInternalOp::own(
+                    InternalOperationSum::Transfer(receipt),
                     delegated_storage_cost_delta,
-                )
+                ));
             }
             mir::ast::Operation::CreateContract(mir::ast::CreateContract {
                 delegate,
@@ -802,7 +1112,7 @@ where
                         let receipt = originate_contract(
                             tc_ctx,
                             address,
-                            sender_account,
+                            &frame.sender,
                             &amount,
                             Some(&script.code),
                             storage,
@@ -811,7 +1121,7 @@ where
                         match receipt {
                             Ok(success) => ContentResult::Applied(success),
                             Err(err) => {
-                                failed = Some(index);
+                                frame.failed = true;
                                 log!(Error, "Internal origination failed: {err:?}");
                                 ContentResult::Failed(
                                     ApplyOperationError::from(err).into(),
@@ -820,19 +1130,19 @@ where
                         }
                     }
                 };
-                (
+                all_internal_receipts.push(TaggedInternalOp::own(
                     InternalOperationSum::Origination(InternalContentWithMetadata {
                         content: OriginationContent {
                             balance: amount,
                             delegate,
                             script,
                         },
-                        sender: sender_account.contract(),
+                        sender: frame.sender.contract(),
                         nonce,
                         result,
                     }),
                     0,
-                )
+                ));
             }
             mir::ast::Operation::SetDelegate(set_delegate) => {
                 return Err(ApplyOperationError::UnSupportedSetDelegate(format!(
@@ -885,54 +1195,61 @@ where
                         ContentResult::Applied(EventSuccess { consumed_milligas })
                     }
                 };
-                (
+                all_internal_receipts.push(TaggedInternalOp::own(
                     InternalOperationSum::Event(InternalContentWithMetadata {
                         content: EventContent { tag, payload, ty },
-                        sender: sender_account.contract(),
+                        sender: frame.sender.contract(),
                         nonce,
                         result,
                     }),
                     0,
-                )
+                ));
             }
-        };
+        }
         log!(Debug, "Internal operation executed successfully");
-        // Insert the parent receipt BEFORE its children so the flat
-        // list follows DFS order: parent op, then its sub-ops.
-        // `receipts_before` was captured before `transfer()` added the
-        // child receipts, so inserting at that index puts the parent
-        // receipt in the correct position.
-        all_internal_receipts.insert(
-            receipts_before,
-            TaggedInternalOp::own(internal_receipt, delegated_storage_cost_delta),
-        );
-        // Drain the re-entrant CRAC ops accumulated during this op's
-        // execution (a gateway leg that re-entered the Michelson runtime)
-        // and splice the synthetic frame in at `receipts_before + 1` —
-        // right after the parent (just inserted at `receipts_before`) and
-        // ahead of its inline children (e.g. the %on_result callback). The
-        // leg runs before the callback that consumes its payload, so the
-        // frame must precede it. Empty drain → no-op (`frame_at == len`).
-        let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
+        splice_reentrant_crac_ops(
             journal,
-            pending_crac_receipts_before,
-            failed_crac_receipts_before,
-            backtracked_crac_receipts_before,
-        );
-        let frame_at = receipts_before + 1;
-        all_internal_receipts.splice(
-            frame_at..frame_at,
-            reentrant_ops.into_iter().map(TaggedInternalOp::from_crac),
+            all_internal_receipts,
+            receipt_at,
+            crac_watermarks,
         );
     }
-    Ok(())
+    Ok(None)
 }
 
-/// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
+/// The internal operations a transfer's callee emitted, together with that
+/// callee — their `sender`. `None` when no code ran (implicit destination) or
+/// when the transfer was not applied at all, in which case there is no subtree.
+type Subtree<'a> = Option<(
+    crate::account_storage::TezosOriginatedAccount,
+    Vec<OperationInfo<'a>>,
+)>;
+
+/// Outcome of [`transfer_step`]: everything the transfer's own receipt needs,
+/// plus the internal operations its callee emitted, left for the caller to
+/// execute.
+struct TransferStep<'a> {
+    success: TransferSuccess,
+    delegated_storage_cost: u64,
+    emitted: Subtree<'a>,
+}
+
+/// Outcome of [`transfer`]: the transfer's own receipt data, plus the verdict of
+/// the internal-operation subtree it drove — which its caller needs to decide
+/// the enclosing operation's status, see [`SubtreeStatus`].
+struct TransferOutcome {
+    success: TransferSuccess,
+    delegated_storage_cost: u64,
+    subtree: SubtreeStatus,
+}
+
+/// Handles manager transfer operations for both implicit and originated
+/// contracts but with a MIR context, including the internal operations the
+/// callee emits.
 ///
-/// When `skip_sender_debit` is true, only the receiver is credited without
-/// debiting the sender. This is used for cross-runtime calls (e.g. EVM gateway)
-/// where the sender's balance was already debited by the calling runtime.
+/// Only for the outermost transfer of an operation. Internal transfers go
+/// through [`transfer_step`] driven by [`execute_internal_operations`], so
+/// that a Michelson call chain does not recurse on the native stack.
 #[allow(clippy::too_many_arguments)]
 fn transfer<'a, Host>(
     tc_ctx: &mut TcCtx<'a, Host>,
@@ -951,7 +1268,89 @@ fn transfer<'a, Host>(
     // `param`. See [`mir::typechecker::AllowForgedLazyStorageId`].
     allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     nonce_counter: &mut u16,
-) -> Result<(TransferSuccess, u64), CracError>
+) -> Result<TransferOutcome, CracError>
+where
+    Host: StorageV1,
+{
+    let TransferStep {
+        success,
+        delegated_storage_cost,
+        emitted,
+    } = transfer_step(
+        tc_ctx,
+        operation_ctx,
+        registry,
+        journal,
+        sender_account,
+        amount,
+        dest_contract,
+        entrypoint,
+        param,
+        parser,
+        skip_sender_debit,
+        allow_forged_lazy_storage_id,
+    )?;
+    let subtree = match emitted {
+        // No code ran, or nothing was emitted: nothing could have failed.
+        None => SubtreeStatus::AllApplied,
+        Some((callee, internal_operations)) => match execute_internal_operations(
+            tc_ctx,
+            operation_ctx,
+            registry,
+            journal,
+            internal_operations,
+            &callee,
+            parser,
+            all_internal_receipts,
+            nonce_counter,
+        ) {
+            Ok(subtree) => subtree,
+            Err(ApplyOperationError::BlockAbort(msg)) => {
+                return Err(CracError::BlockAbort(msg))
+            }
+            Err(other) => {
+                return Err(CracError::Operation(
+                    TransferError::FailedToExecuteInternalOperation(other.to_string()),
+                ))
+            }
+        },
+    };
+    Ok(TransferOutcome {
+        success,
+        delegated_storage_cost,
+        subtree,
+    })
+}
+
+/// Executes a transfer up to — but not including — the internal operations the
+/// callee emitted, which are returned in [`TransferStep::emitted`] instead.
+///
+/// The split is what makes internal-operation execution iterative: the
+/// transfer's own receipt is fully determined at this point (its
+/// `consumed_milligas` is even reset here, so children's gas is not attributed
+/// to it, matching L1's `Gas.consumed ~since:ctxt_before_op`), so nothing needs
+/// to stay on the native stack while the subtree runs.
+///
+/// When `skip_sender_debit` is true, only the receiver is credited without
+/// debiting the sender. This is used for cross-runtime calls (e.g. EVM gateway)
+/// where the sender's balance was already debited by the calling runtime.
+#[allow(clippy::too_many_arguments)]
+fn transfer_step<'a, Host>(
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a>,
+    registry: &impl Registry,
+    journal: &mut TezosXJournal,
+    sender_account: &impl TezosAccount,
+    amount: &Narith,
+    dest_contract: &Contract,
+    entrypoint: &Entrypoint,
+    param: Micheline<'a>,
+    parser: &'a Parser<'a>,
+    skip_sender_debit: bool,
+    // Whether a forged big_map id (a bare lazy-storage reference) is allowed in
+    // `param`. See [`mir::typechecker::AllowForgedLazyStorageId`].
+    allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
+) -> Result<TransferStep<'a>, CracError>
 where
     Host: StorageV1,
 {
@@ -991,8 +1390,8 @@ where
             } else {
                 transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
             };
-            Ok((
-                TransferSuccess {
+            Ok(TransferStep {
+                success: TransferSuccess {
                     allocated_destination_contract: !already_allocated,
                     consumed_milligas: tc_ctx
                         .operation_gas
@@ -1000,8 +1399,11 @@ where
                         .map_err(TransferError::OutOfGas)?,
                     ..receipt
                 },
-                0,
-            ))
+                delegated_storage_cost: 0,
+                // No code runs for an implicit destination, so there is
+                // nothing to emit.
+                emitted: None,
+            })
         }
         Contract::Originated(kt1) => {
             let dest_account = context::originated_from_kt1(kt1)
@@ -1180,32 +1582,9 @@ where
                 allocated_bytes: paid_storage_size_diff,
             } = storage_space;
 
-            match execute_internal_operations(
-                tc_ctx,
-                operation_ctx,
-                registry,
-                journal,
-                internal_operations.into_iter(),
-                &dest_account,
-                parser,
-                all_internal_receipts,
-                nonce_counter,
-            ) {
-                Ok(()) => {}
-                Err(ApplyOperationError::BlockAbort(msg)) => {
-                    return Err(CracError::BlockAbort(msg))
-                }
-                Err(other) => {
-                    return Err(CracError::Operation(
-                        TransferError::FailedToExecuteInternalOperation(
-                            other.to_string(),
-                        ),
-                    ))
-                }
-            }
             log!(Debug, "Transfer operation succeeded");
-            Ok((
-                TransferSuccess {
+            Ok(TransferStep {
+                success: TransferSuccess {
                     storage: if new_storage.is_empty() {
                         None
                     } else {
@@ -1219,7 +1598,12 @@ where
                     ..receipt
                 },
                 delegated_storage_cost,
-            ))
+                // The operations the callee emitted are deliberately NOT run
+                // here: doing so is what made a Michelson call chain recurse
+                // on the native stack. The caller drives them iteratively —
+                // see `execute_internal_operations`.
+                emitted: Some((dest_account, internal_operations)),
+            })
         }
     }
 }
@@ -1414,7 +1798,7 @@ fn transfer_external<'a, Host>(
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     parser: &'a Parser<'a>,
     nonce_counter: &mut u16,
-) -> Result<(TransferTarget, u64), CracError>
+) -> Result<(TransferTarget, u64, SubtreeStatus), CracError>
 where
     Host: StorageV1,
 {
@@ -1444,7 +1828,13 @@ where
         AllowForgedLazyStorageId::No,
         nonce_counter,
     )
-    .map(|(success, delegated)| (success.into(), delegated))
+    .map(
+        |TransferOutcome {
+             success,
+             delegated_storage_cost,
+             subtree,
+         }| (success.into(), delegated_storage_cost, subtree),
+    )
 }
 
 fn gw<E: ToString>(e: E) -> TransferError {
@@ -1552,14 +1942,17 @@ where
         AllowForgedLazyStorageId::No,
         nonce_counter,
     ) {
-        Ok((success, _)) => {
-            // transfer() returns Ok even when internal operations FAILWITH,
-            // because execute_internal_operations records failures only in
-            // receipts. We must inspect the receipts to detect this case,
-            // matching the pattern used by [`finalize_statuses`] in the
-            // normal Tezos operation path.
-            let all_internal_succeeded =
-                internal_receipts.last().is_none_or(|t| t.op.is_applied());
+        Ok(TransferOutcome {
+            success, subtree, ..
+        }) => {
+            // transfer() returns Ok even when internal operations failed: the
+            // failure is contained and only reported. `subtree` carries the
+            // verdict of the ops it drove, and the receipt tail catches a
+            // failure no frame saw — the same pair [`finalize_statuses`] uses
+            // in the normal Tezos operation path. Deciding on the tail alone
+            // would commit the snapshot of a failed sub-execution (L2-1863).
+            let all_internal_succeeded = subtree.all_applied()
+                && internal_receipts.last().is_none_or(|t| t.op.is_applied());
             if all_internal_succeeded {
                 // promote: discard the snapshot, keep changes
                 journal
@@ -2339,6 +2732,8 @@ where
                 0,
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
+                // A reveal emits no internal operation.
+                SubtreeStatus::AllApplied,
             ))
         }
         OperationContent::Transfer(TransferContent {
@@ -2373,21 +2768,24 @@ where
                 journal.michelson.failed_crac_receipts.len();
             let backtracked_crac_receipts_before =
                 journal.michelson.backtracked_crac_receipts.len();
-            let (transfer_result, top_level_delegated_delta) = match transfer_external(
-                &mut tc_ctx,
-                &mut operation_ctx,
-                registry,
-                journal,
-                amount,
-                destination,
-                parameters,
-                &mut internal_operations_receipts,
-                &parser,
-                nonce_counter,
-            ) {
-                Ok((target, delta)) => (Ok(target), delta),
-                Err(e) => (Err(e), 0),
-            };
+            let (transfer_result, top_level_delegated_delta, internals) =
+                match transfer_external(
+                    &mut tc_ctx,
+                    &mut operation_ctx,
+                    registry,
+                    journal,
+                    amount,
+                    destination,
+                    parameters,
+                    &mut internal_operations_receipts,
+                    &parser,
+                    nonce_counter,
+                ) {
+                    Ok((target, delta, internals)) => (Ok(target), delta, internals),
+                    // The verdict is unused on this path: a failed transfer
+                    // backtracks every internal receipt regardless.
+                    Err(e) => (Err(e), 0, SubtreeStatus::AllApplied),
+                };
             // Drain any re-entrant CRAC ops that accumulated during the
             // top-level gateway call, mirroring `execute_internal_operations`.
             let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
@@ -2421,6 +2819,7 @@ where
                 top_level_delegated_delta,
                 transfer_result.map_err(Into::into),
                 internal_operations_receipts,
+                internals,
             ))
         }
         OperationContent::Origination(OriginationContent {
@@ -2460,6 +2859,8 @@ where
                     0,
                     origination_result.map_err(|e| e.into()),
                     internal_operations_receipts,
+                    // An origination emits no internal operation.
+                    SubtreeStatus::AllApplied,
                 ),
             )
         }
@@ -5564,6 +5965,158 @@ mod tests {
         );
     }
 
+    /// Grows its storage, then emits `[EMIT ; SET_DELEGATE]` — an applied
+    /// operation followed by one the kernel does not support. Executing the
+    /// `SET_DELEGATE` raises without producing any receipt, leaving the applied
+    /// event as the last entry of the receipt list.
+    static EMIT_THEN_SET_DELEGATE_SCRIPT: &str = r#"
+        parameter unit;
+        storage bytes;
+        code {
+            DROP;
+            PUSH bytes 0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef;
+            UNIT;
+            EMIT %tick unit;
+            NONE key_hash;
+            SET_DELEGATE;
+            NIL operation;
+            SWAP;
+            CONS;
+            SWAP;
+            CONS;
+            PAIR }"#;
+
+    /// L2-1863: an internal operation that raises produces no receipt and
+    /// abandons its batch, so no `Skipped` sibling is recorded after it either.
+    /// A sibling applied *before* it is then the last receipt, and deriving the
+    /// enclosing operation's status from that tail reported `Applied` for an
+    /// operation whose subtree failed — committing the callee's storage write
+    /// under a `Failed` receipt, with its storage burn escaped.
+    ///
+    /// The status now comes from the verdict carried out of the subtree, so the
+    /// top-level operation backtracks and the write is rolled back.
+    #[test]
+    fn test_internal_op_raise_after_applied_sibling_backtracks_top_level() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 1_000_000);
+        reveal_account(&mut host, &src);
+
+        // Fans out a single transfer to the contract below.
+        let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &emitter_hash,
+            SCRIPT_EMITING_INTERNAL_TRANSFER,
+            &Micheline::from(()),
+            &1_000_u64.into(),
+        );
+        let raising_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        let initial_storage = Micheline::Bytes(vec![]);
+        let raising_account = init_contract(
+            &mut host,
+            &raising_hash,
+            EMIT_THEN_SET_DELEGATE_SCRIPT,
+            &initial_storage,
+            &1_000_u64.into(),
+        );
+
+        let addrs: Vec<Micheline> = vec![Micheline::Bytes(
+            Contract::Originated(raising_hash.clone())
+                .to_bytes()
+                .unwrap(),
+        )];
+        let operation = make_transfer_operation(
+            10,
+            1,
+            100_000,
+            // Enough storage limit to pay for the callee's growth, so that a
+            // backtrack here can only come from the internal failure.
+            1_000,
+            src.clone(),
+            0_u64.into(),
+            Contract::Originated(emitter_hash),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: Micheline::Seq(&addrs)
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+            },
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        let internal = match &receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result: ContentResult::BackTracked(_),
+                internal_operation_results,
+                ..
+            }) => internal_operation_results,
+            other => panic!(
+                "The top-level transfer must backtrack: its subtree failed, even \
+                 though the last internal receipt is applied. Got {other:?}"
+            ),
+        };
+        assert_eq!(
+            internal.len(),
+            2,
+            "Expected the transfer to the callee and its event, got {internal:?}"
+        );
+        // The transfer whose subtree raised.
+        assert!(
+            matches!(
+                &internal[0],
+                InternalOperationSum::Transfer(InternalContentWithMetadata {
+                    result: ContentResult::Failed(_),
+                    ..
+                })
+            ),
+            "Expected the transfer to the callee to be Failed, got {:?}",
+            internal[0]
+        );
+        // The applied sibling that used to be read as the subtree's verdict: it
+        // is demoted with the rest of the operation instead.
+        assert!(
+            matches!(
+                &internal[1],
+                InternalOperationSum::Event(InternalContentWithMetadata {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "Expected the event emitted before the raise to be BackTracked, got {:?}",
+            internal[1]
+        );
+        // The state effect the `Applied` status used to commit: the callee's
+        // storage write is rolled back with the rest of the operation.
+        assert_eq!(
+            raising_account.storage(&host).unwrap(),
+            initial_storage
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+            "The callee's storage write must be rolled back, not committed under \
+             a failed receipt"
+        );
+    }
+
     #[test]
     fn test_internal_receipts_failure_backtrack_all() {
         let mut host = MockKernelHost::default();
@@ -5764,6 +6317,613 @@ mod tests {
         } else {
             panic!("Second receipt is not a Transfer with Internal Operations");
         }
+    }
+
+    /// On parameter `n : nat`, emits one internal `TRANSFER_TOKENS` back to
+    /// `SELF` with `n - 1`, stopping at `0`: a top-level call with `n` unfolds
+    /// into a chain of `n` internal transfers.
+    static SELF_RECURSIVE_TRANSFER_SCRIPT: &str = r#"
+        parameter nat;
+        storage unit;
+        code {
+            CAR;
+            DUP;
+            INT;
+            EQ;
+            IF { DROP; UNIT; NIL operation; PAIR }
+               { PUSH nat 1;
+                 SWAP;
+                 SUB;
+                 ABS;
+                 SELF;
+                 PUSH mutez 0;
+                 DIG 2;
+                 TRANSFER_TOKENS;
+                 NIL operation;
+                 SWAP;
+                 CONS;
+                 UNIT;
+                 SWAP;
+                 PAIR } }"#;
+
+    /// A deep self-transfer chain applies through the iterative worklist,
+    /// yielding a flat DFS list of one applied internal transfer per level.
+    #[test]
+    fn test_deep_internal_transfer_recursion_applies() {
+        const DEPTH: usize = 400;
+
+        // Run on a deliberately small stack — 1 MiB, the size of the wasm
+        // shadow stack the fast executor overflowed at ~150 levels before
+        // internal-operation processing became iterative (L2-1860). The heap
+        // worklist completes at DEPTH on it; reverting to the `transfer` ⇄
+        // `execute_internal_operations` recursion overflows it. Note a stack
+        // overflow aborts the process ("stack overflow, aborting"), it does not
+        // unwind, so that regression shows up as a hard abort of this test
+        // binary rather than a failure reported through `join` below.
+        // `stack_size` overrides the runner's RUST_MIN_STACK.
+        std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut host = MockKernelHost::default();
+                let src = bootstrap1();
+                init_account(&mut host, &src.pkh, 1_000_000);
+                reveal_account(&mut host, &src);
+
+                let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+                    .expect("ContractKt1Hash b58 conversion should have succeed");
+                init_contract(
+                    &mut host,
+                    &contract_hash,
+                    SELF_RECURSIVE_TRANSFER_SCRIPT,
+                    &Micheline::from(()),
+                    &0_u64.into(),
+                );
+
+                let operation = make_transfer_operation(
+                    10,
+                    1,
+                    660_000,
+                    0,
+                    src.clone(),
+                    0_u64.into(),
+                    Contract::Originated(contract_hash.clone()),
+                    Parameters {
+                        entrypoint: mir::ast::Entrypoint::default(),
+                        value: Micheline::from(DEPTH as i128)
+                            .encode(&mut Gas::default())
+                            .unwrap()
+                            .unwrap(),
+                    },
+                );
+                let receipts = ProcessedOperation::into_receipts(
+                    validate_and_apply_operation(
+                        &mut host,
+                        &NotWiredRegistry,
+                        &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                        operation,
+                        &block_ctx!(),
+                        false,
+                        None,
+                        None,
+                        &test_safe_roots(),
+                    )
+                    .expect(
+                        "validate_and_apply_operation should not have failed with a kernel error",
+                    ),
+                );
+
+                assert_eq!(
+                    receipts.len(),
+                    1,
+                    "There should be a single top-level receipt"
+                );
+                let internal_operation_results = match &receipts[0].receipt {
+                    OperationResultSum::Transfer(OperationResult {
+                        result: ContentResult::Applied(_),
+                        internal_operation_results,
+                        ..
+                    }) => internal_operation_results.clone(),
+                    other => panic!(
+                        "Top-level operation should be an applied transfer but is {other:?}"
+                    ),
+                };
+                assert_eq!(
+                    internal_operation_results.len(),
+                    DEPTH,
+                    "The chain of {DEPTH} self-transfers should yield {DEPTH} internal receipts"
+                );
+                for (i, internal) in internal_operation_results.iter().enumerate() {
+                    match internal {
+                        InternalOperationSum::Transfer(InternalContentWithMetadata {
+                            content: TransferContent { destination, .. },
+                            result: ContentResult::Applied(_),
+                            ..
+                        }) => assert_eq!(
+                            destination,
+                            &Contract::Originated(contract_hash.clone()),
+                            "Internal transfer #{i} should target the recursing contract"
+                        ),
+                        other => panic!(
+                            "Internal operation #{i} should be an applied transfer but is {other:?}"
+                        ),
+                    }
+                }
+            })
+            .expect("failed to spawn the bounded-stack worker")
+            .join()
+            .expect("the deep internal-transfer recursion assertions failed");
+    }
+
+    /// Negative case: depth is bounded by gas, not the stack. Too little gas to
+    /// run the whole chain backtracks the top-level operation (failure
+    /// contained, no kernel error) instead of overflowing.
+    #[test]
+    fn test_deep_internal_transfer_recursion_bounded_by_gas() {
+        const DEPTH: usize = 200;
+
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 1_000_000);
+        reveal_account(&mut host, &src);
+
+        let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &contract_hash,
+            SELF_RECURSIVE_TRANSFER_SCRIPT,
+            &Micheline::from(()),
+            &0_u64.into(),
+        );
+
+        // Enough gas to start the chain but far too little to reach depth 200.
+        let operation = make_transfer_operation(
+            10,
+            1,
+            30_000,
+            0,
+            src.clone(),
+            0_u64.into(),
+            Contract::Originated(contract_hash.clone()),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: Micheline::from(DEPTH as i128)
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+            },
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        assert_eq!(
+            receipts.len(),
+            1,
+            "There should be a single top-level receipt"
+        );
+        let internal = match &receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result: ContentResult::BackTracked(_),
+                internal_operation_results,
+                ..
+            }) => internal_operation_results,
+            other => {
+                panic!("Expected the top-level transfer to backtrack, got {other:?}")
+            }
+        };
+        // The chain must get partway before running out of gas — not die at the
+        // first level for some unrelated reason, nor complete all DEPTH levels.
+        assert!(
+            !internal.is_empty() && internal.len() < DEPTH,
+            "Expected the chain to stop mid-way (0 < len < {DEPTH}), got {}",
+            internal.len()
+        );
+        // The deepest transfer reached is the one that ran out of gas.
+        match internal.last() {
+            Some(InternalOperationSum::Transfer(InternalContentWithMetadata {
+                result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                ..
+            })) => assert!(
+                errors.iter().any(|e| matches!(
+                    e,
+                    ApplyOperationError::Transfer(TransferError::OutOfGas(_))
+                )),
+                "Expected the deepest internal transfer to fail out of gas, got \
+                 {errors:?}"
+            ),
+            other => panic!(
+                "Expected the deepest internal transfer to have failed, got {other:?}"
+            ),
+        }
+    }
+
+    /// Emits one internal `SET_DELEGATE`, which the kernel does not support:
+    /// executing it raises `UnSupportedSetDelegate` rather than producing a
+    /// receipt.
+    static SET_DELEGATE_SCRIPT: &str = r#"
+        parameter unit;
+        storage unit;
+        code {
+            DROP;
+            NONE key_hash;
+            SET_DELEGATE;
+            NIL operation;
+            SWAP;
+            CONS;
+            UNIT;
+            SWAP;
+            PAIR }"#;
+
+    /// On parameter `n : nat`, emits one internal `TRANSFER_TOKENS` back to
+    /// `SELF` with `n - 1`, and `FAILWITH`s at `0`: a call with `n` unfolds
+    /// into a chain of `n` internal transfers whose deepest one fails.
+    static SELF_RECURSIVE_FAILING_SCRIPT: &str = r#"
+        parameter nat;
+        storage unit;
+        code {
+            CAR;
+            DUP;
+            INT;
+            EQ;
+            IF { DROP; PUSH string "bottom of the chain"; FAILWITH }
+               { PUSH nat 1;
+                 SWAP;
+                 SUB;
+                 ABS;
+                 SELF;
+                 PUSH mutez 0;
+                 DIG 2;
+                 TRANSFER_TOKENS;
+                 NIL operation;
+                 SWAP;
+                 CONS;
+                 UNIT;
+                 SWAP;
+                 PAIR } }"#;
+
+    /// Injects a chain of `DEPTH` self-transfers into whatever contract its
+    /// storage points at, on a `unit` call.
+    static CHAIN_STARTER_SCRIPT: &str = r#"
+        parameter unit;
+        storage address;
+        code {
+            CDR;
+            DUP;
+            CONTRACT nat;
+            IF_NONE { PUSH string "Invalid contract address"; FAILWITH } {};
+            PUSH mutez 0;
+            PUSH nat 4;
+            TRANSFER_TOKENS;
+            NIL operation;
+            SWAP;
+            CONS;
+            PAIR }"#;
+
+    /// An error raised while executing a *nested* batch — here an unsupported
+    /// internal `SET_DELEGATE` emitted at depth 2 — is contained: it fails the
+    /// transfer that emitted that batch, whose receipt reads `Failed
+    /// (FailedToExecuteInternalOperation …)` and carries neither its own
+    /// success payload nor its delegated storage cost, and skips that
+    /// transfer's remaining siblings. This is the only path that resolves a
+    /// pending parent from a raise rather than from a drained subtree.
+    #[test]
+    fn test_internal_op_error_fails_the_emitting_transfer() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 1_000_000);
+        reveal_account(&mut host, &src);
+
+        // Fans out to [set-delegate emitter, benign contract].
+        let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &emitter_hash,
+            SCRIPT_EMITING_INTERNAL_TRANSFER,
+            &Micheline::from(()),
+            &1_000_u64.into(),
+        );
+        let set_delegate_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &set_delegate_hash,
+            SET_DELEGATE_SCRIPT,
+            &Micheline::from(()),
+            &1_000_u64.into(),
+        );
+        let sibling_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &sibling_hash,
+            UNIT_SCRIPT,
+            &Micheline::from(()),
+            &1_000_u64.into(),
+        );
+
+        let addrs: Vec<Micheline> = vec![
+            Micheline::Bytes(
+                Contract::Originated(set_delegate_hash.clone())
+                    .to_bytes()
+                    .unwrap(),
+            ),
+            Micheline::Bytes(
+                Contract::Originated(sibling_hash.clone())
+                    .to_bytes()
+                    .unwrap(),
+            ),
+        ];
+        let operation = make_transfer_operation(
+            10,
+            1,
+            100_000,
+            0,
+            src.clone(),
+            0_u64.into(),
+            Contract::Originated(emitter_hash),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: Micheline::Seq(&addrs)
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+            },
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        let internal = match &receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result: ContentResult::BackTracked(_),
+                internal_operation_results,
+                ..
+            }) => internal_operation_results,
+            other => panic!(
+                "Expected the top-level transfer to backtrack on the contained \
+                 error, got {other:?}"
+            ),
+        };
+        // The unsupported SET_DELEGATE itself gets no receipt — the error
+        // replaces the receipt of the transfer that emitted it.
+        assert_eq!(
+            internal.len(),
+            2,
+            "Expected the two transfers the caller emitted and nothing for the \
+             SET_DELEGATE, got {internal:?}"
+        );
+        match &internal[0] {
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                content: TransferContent { destination, .. },
+                result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                ..
+            }) => {
+                assert_eq!(
+                    destination,
+                    &Contract::Originated(set_delegate_hash),
+                    "The failed transfer should be the one to the emitter"
+                );
+                match errors.as_slice() {
+                    [ApplyOperationError::Transfer(
+                        TransferError::FailedToExecuteInternalOperation(msg),
+                    )] => assert!(
+                        msg.contains("Set delegate operation is unsupported"),
+                        "The emitting transfer should report the error its \
+                         subtree raised, got {msg}"
+                    ),
+                    other => panic!(
+                        "Expected a single FailedToExecuteInternalOperation, got \
+                         {other:?}"
+                    ),
+                }
+            }
+            other => panic!(
+                "Expected the transfer whose subtree raised to be Failed, got \
+                 {other:?}"
+            ),
+        }
+        // Its siblings are skipped: the raise failed the enclosing batch, not
+        // just the transfer itself.
+        match &internal[1] {
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                content: TransferContent { destination, .. },
+                result: ContentResult::Skipped,
+                ..
+            }) => assert_eq!(
+                destination,
+                &Contract::Originated(sibling_hash),
+                "The skipped transfer should be the sibling"
+            ),
+            other => panic!("Expected the sibling transfer to be Skipped, got {other:?}"),
+        }
+    }
+
+    /// A failure at the bottom of a nested chain settles every level above it:
+    /// each transfer whose subtree ends non-applied is `BackTracked`, and the
+    /// failure crosses each nesting boundary so the siblings of every one of
+    /// them are `Skipped`. `Skipped` is the discriminating assertion here: the
+    /// top-level backtrack sweeps `Applied` internals to `BackTracked`
+    /// regardless, but leaves `Skipped` alone.
+    #[test]
+    fn test_internal_op_failure_settles_every_enclosing_level() {
+        // The chain the starter injects, from its `PUSH nat 4`: self-calls with
+        // 4, 3, 2, 1 and 0, the last of which FAILWITHs. Counting the transfer
+        // to the starter itself, the failure sits CHAIN + 1 levels below the
+        // top-level operation.
+        const CHAIN: usize = 5;
+
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 1_000_000);
+        reveal_account(&mut host, &src);
+
+        let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &emitter_hash,
+            SCRIPT_EMITING_INTERNAL_TRANSFER,
+            &Micheline::from(()),
+            &1_000_u64.into(),
+        );
+        let recursive_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &recursive_hash,
+            SELF_RECURSIVE_FAILING_SCRIPT,
+            &Micheline::from(()),
+            &1_000_u64.into(),
+        );
+        // Takes the `unit` call the emitter makes and turns it into a `nat`
+        // call on the recursing contract.
+        let starter_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &starter_hash,
+            CHAIN_STARTER_SCRIPT,
+            &Micheline::Bytes(
+                Contract::Originated(recursive_hash.clone())
+                    .to_bytes()
+                    .unwrap(),
+            ),
+            &1_000_u64.into(),
+        );
+
+        // Fan out to [chain starter, an implicit account]. The second transfer
+        // never runs; it is there to be skipped.
+        let addrs: Vec<Micheline> = vec![
+            Micheline::Bytes(
+                Contract::Originated(starter_hash.clone())
+                    .to_bytes()
+                    .unwrap(),
+            ),
+            Micheline::Bytes(Contract::Implicit(src.pkh.clone()).to_bytes().unwrap()),
+        ];
+        let operation = make_transfer_operation(
+            10,
+            1,
+            200_000,
+            0,
+            src.clone(),
+            0_u64.into(),
+            Contract::Originated(emitter_hash),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: Micheline::Seq(&addrs)
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+            },
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        let internal = match &receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result: ContentResult::BackTracked(_),
+                internal_operation_results,
+                ..
+            }) => internal_operation_results,
+            other => {
+                panic!("Expected the top-level transfer to backtrack, got {other:?}")
+            }
+        };
+        // In DFS order: the transfer to the starter, the CHAIN transfers it
+        // injected, then the skipped sibling.
+        assert_eq!(
+            internal.len(),
+            CHAIN + 2,
+            "Expected the starter, its {CHAIN}-transfer chain and the sibling, \
+             got {internal:?}"
+        );
+        // Every level above the failure backtracks...
+        for (i, op) in internal[..CHAIN].iter().enumerate() {
+            assert!(
+                matches!(
+                    op,
+                    InternalOperationSum::Transfer(InternalContentWithMetadata {
+                        result: ContentResult::BackTracked(_),
+                        ..
+                    })
+                ),
+                "Internal transfer #{i} encloses the failure and should be \
+                 BackTracked, got {op:?}"
+            );
+        }
+        // ... the deepest call is the one that actually failed ...
+        match &internal[CHAIN] {
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                content: TransferContent { destination, .. },
+                result: ContentResult::Failed(_),
+                ..
+            }) => assert_eq!(
+                destination,
+                &Contract::Originated(recursive_hash),
+                "The failing transfer should be the deepest self-call"
+            ),
+            other => panic!("Expected the deepest transfer to be Failed, got {other:?}"),
+        }
+        // ... and the failure reached the outermost batch, CHAIN + 1 levels
+        // up, where it skipped the sibling of the transfer that started it.
+        assert!(
+            matches!(
+                &internal[CHAIN + 1],
+                InternalOperationSum::Transfer(InternalContentWithMetadata {
+                    content: TransferContent {
+                        destination: Contract::Implicit(_),
+                        ..
+                    },
+                    result: ContentResult::Skipped,
+                    ..
+                })
+            ),
+            "The sibling of the chain starter should be Skipped, got {:?}",
+            internal[CHAIN + 1]
+        );
     }
 
     /// L2-1637: a contract `DUP`s an `operation` value and emits both

@@ -140,6 +140,18 @@
 
 ### Michelson Runtime
 
+- **Bug fix:** an operation whose internal-operation subtree failed is no longer
+  reported `applied` because the last internal receipt happens to be applied. An
+  internal operation that raises — an unsupported `SET_DELEGATE`, or an
+  out-of-gas on the per-operation cost — produces no receipt of its own, so a
+  contract emitting `[EMIT ; SET_DELEGATE]` used to have its state committed
+  under a failed receipt, with the storage its callee wrote left uncharged.
+  (!22608)
+- **Bug fix:** inter-contract internal-operation processing is now iterative (an
+  explicit heap worklist) instead of recursive. A deep `TRANSFER_TOKENS` call
+  chain is bounded by gas rather than by the kernel stack, so a contract
+  emitting a deep self-referential transfer chain no longer overflows the fast
+  executor's stack and diverges from the reference PVM. (!22608)
 - **Security fix:** a `Reveal`-first manager batch whose payload public
   key does not hash to the batch source is now rejected during
   validation, before any fee is debited or counter incremented.
