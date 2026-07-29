@@ -17,7 +17,7 @@ use mir::{
     gas::{Gas, OutOfGas},
     interpreter::compute_contract_address,
     parser::Parser,
-    typechecker::{AllowForgedLazyStorageId, TypecheckViews},
+    typechecker::{type_props::TypeProperty, AllowForgedLazyStorageId, TypecheckViews},
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
@@ -2384,7 +2384,11 @@ fn execute_smart_contract_originated<'a>(
     // oversized storage runs out of gas instead of exhausting the heap
     // (L2-1840).
     let new_storage = new_storage
-        .clone_into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
+        .clone_into_micheline_optimized_legacy(
+            &parser.arena,
+            ctx.gas(),
+            Some(TypeProperty::Storable),
+        )?
         .encode(ctx.gas())?
         .map_err(|e| TransferError::MichelineSerializationError(e.to_string()))?;
 

@@ -36,8 +36,8 @@ use crate::lexer::Prim;
 use crate::serializer::DecodeError;
 use crate::stack::*;
 use crate::typechecker::{
-    typecheck_contract_address, typecheck_value, typecheck_value_with_views,
-    AllowForgedLazyStorageId, TcError, TypecheckViews,
+    type_props::TypeProperty, typecheck_contract_address, typecheck_value,
+    typecheck_value_with_views, AllowForgedLazyStorageId, TcError, TypecheckViews,
 };
 
 /// Errors possible during interpretation.
@@ -181,8 +181,10 @@ pub enum InterpretInvariant {
     ExpectedListOperation,
     #[error("script result's operation list contained a non-operation element")]
     ExpectedOperationElement,
-    #[error("APPLY reached the borrowed unparser with a non-pushable capture")]
-    NonPushableApplyCapture,
+    #[error("borrowed unparser reached a value it does not unparse")]
+    UnsupportedUnparsing,
+    #[error("borrowed unparser reached a value that is not {0}")]
+    UnparsedValueLacksProperty(TypeProperty),
 }
 
 #[allow(missing_docs)]
@@ -218,8 +220,15 @@ impl<'a> From<BorrowedUnparseError> for InterpretError<'a> {
     fn from(error: BorrowedUnparseError) -> Self {
         match error {
             BorrowedUnparseError::OutOfGas => InterpretError::OutOfGas,
-            BorrowedUnparseError::NonPushable => {
-                InterpretError::InternalError(InterpretInvariant::NonPushableApplyCapture)
+            BorrowedUnparseError::UnsupportedUnparsing => {
+                InterpretError::InternalError(InterpretInvariant::UnsupportedUnparsing)
+            }
+            // The typechecker already rejected such a value; reaching it here
+            // is an internal invariant break, not a script error.
+            BorrowedUnparseError::UnsatisfiedProperty(prop) => {
+                InterpretError::InternalError(
+                    InterpretInvariant::UnparsedValueLacksProperty(prop),
+                )
             }
         }
     }
@@ -3036,7 +3045,11 @@ fn interpret_one<'a>(
             // `Rc` instead of deep-copying it, charging gas before cloning any
             // leaf so an oversized value runs out of gas rather than out of heap.
             let v = pop_rc!();
-            let mich = v.clone_into_micheline_optimized_legacy(arena, ctx.gas())?;
+            let mich = v.clone_into_micheline_optimized_legacy(
+                arena,
+                ctx.gas(),
+                Some(TypeProperty::Packable),
+            )?;
             let encoded = mich.encode_for_pack()??;
             stack.push(V::Bytes(encoded));
         }
@@ -3195,8 +3208,11 @@ fn interpret_one<'a>(
             // charges size-dependent leaves before cloning them into the
             // cache.
             let before_val = ctx.gas().milligas().ok_or(OutOfGas)?;
-            let arg_val_micheline =
-                arg_val.clone_into_micheline_optimized_legacy(arena, ctx.gas())?;
+            let arg_val_micheline = arg_val.clone_into_micheline_optimized_legacy(
+                arena,
+                ctx.gas(),
+                Some(TypeProperty::Pushable),
+            )?;
             let val_cost = before_val - ctx.gas().milligas().ok_or(OutOfGas)?;
             let cached_unparse_cost =
                 ty_cost.checked_add(val_cost).ok_or(CostOverflow)?;
