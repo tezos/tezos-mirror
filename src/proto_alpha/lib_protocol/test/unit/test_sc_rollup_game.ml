@@ -506,6 +506,60 @@ let build_adversarial_proof () =
   in
   build_repr_proof (Some input_proof)
 
+(* Build a [Proof] step with no defect of its own: the PVM step is genuine and
+   [input_proof = None] matches the [No_input_required] request of its start
+   state, so [Sc_rollup_proof_repr.valid] returns [Ok]. Unlike
+   [build_adversarial_proof], it lets
+   [test_proof_on_missing_start_state_forces_indefensible_final_move] exercise a
+   single defect: the [None] agreed start state of the section played on.
+
+   Reaching [No_input_required]: [initial_state] is [Halted], the first [eval]
+   boots the PVM into [Waiting_for_input_message], [set_input] hands it a
+   message, and the second [eval] moves it to [Parsing] — a tick consuming no
+   input. *)
+let build_well_formed_proof () =
+  let open Lwt_result_wrap_syntax in
+  let pvm_ctxt = Arith_pvm.make_empty_context () in
+  let empty = Arith_pvm.make_empty_state () in
+  let is_reveal_enabled = Sc_rollup_helpers.is_reveal_enabled_default in
+  let*! state = Arith_pvm.initial_state ~empty in
+  let*! state = Arith_pvm.eval state in
+  let*! state =
+    Arith_pvm.set_input (Sc_rollup_helpers.make_external_input "1") state
+  in
+  let*! state = Arith_pvm.eval state in
+  (* Guard the construction above: were the arith PVM to stop being input-free
+     at this tick, [input_proof = None] would no longer be well-formed and this
+     helper would silently reintroduce a second defect. *)
+  let*! input_request = Arith_pvm.is_input_state ~is_reveal_enabled state in
+  let* () =
+    match input_request with
+    | Alpha_context.Sc_rollup.No_input_required -> return_unit
+    | _ ->
+        Test.fail
+          "build_well_formed_proof: expected the arith PVM to require no input \
+           here, so that a proof with [input_proof = None] is well-formed"
+  in
+  let*! pvm_step =
+    Arith_pvm.produce_proof pvm_ctxt ~is_reveal_enabled None state
+  in
+  let pvm_step = WithExceptions.Result.get_ok ~loc:__LOC__ pvm_step in
+  let pvm_step =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Alpha_context.Sc_rollup.Proof.serialize_pvm_step
+         ~pvm:(module Arith_pvm)
+         pvm_step
+  in
+  let alpha_proof =
+    Alpha_context.Sc_rollup.Proof.{pvm_step; input_proof = None}
+  in
+  (* Same .mli-seal crossing as in [build_adversarial_proof]. *)
+  return
+    (Data_encoding.Binary.of_bytes_exn Sc_rollup_proof_repr.encoding
+    @@ Data_encoding.Binary.to_bytes_exn
+         Alpha_context.Sc_rollup.Proof.encoding
+         alpha_proof)
+
 (* Reconstruct the [Sc_rollup_refute] operation carrying [repr_refutation]
    (given at the [Sc_rollup_game_repr] level). *)
 let mk_refute_op ~source ~opponent ~rollup ~repr_refutation :
@@ -1179,6 +1233,123 @@ let test_inbox_proof_level_confusion () =
            Sc_rollup_inbox_proof_claimed_level_mismatch {claimed = 2; proven = \
            3}"
 
+(* Companion to [test_multitick_proof_forces_indefensible_final_move] for the
+   OTHER indefensible-[Final_move] shape: a [Proof] played on a distance-one
+   section whose agreed START state is absent ([None]).
+
+   [Sc_rollup_dissection_chunk_repr.default_check] only forbids a [None] chunk
+   followed by a [Some] one, so a dishonest player may publish a dissection with
+   two consecutive [None] chunks one tick apart: the section between them passes
+   the multi-tick check, yet no PVM proof can start from [None]. Both players
+   fail [validity_first_final_move], the protocol anchors a [Final_move] on the
+   [None] chunk, and the game can only resolve as a [Draw] — burning the honest
+   player's bond.
+
+   Through the real on-chain entry points:
+     1. start a game (opening dissection [foo@0; child@10000; None@10001]);
+     2. the refuter dissects [0; 10000] validly, with ticks 0, 1, 2 and [None]
+        states from tick 1 on, making [1; 2] a distance-one section with a
+        [None] start state;
+     3. assert the protocol ACCEPTS the defender's [Proof] there and traps the
+        game in a [Final_move] on the [None] chunk. *)
+let test_proof_on_missing_start_state_forces_indefensible_final_move () =
+  let open Lwt_result_wrap_syntax in
+  let* ( ctxt,
+         rollup,
+         refuter,
+         defender,
+         _staker3,
+         refuter_commitment_hash,
+         defender_commitment_hash ) =
+    two_stakers_in_conflict ()
+  in
+  let*@ ctxt =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(refuter, refuter_commitment_hash)
+      ~opponent:(defender, defender_commitment_hash)
+  in
+  (* The refuter's dissection of the opening section [0; 10000]: its head carries
+     the agreed start state ([hash_string "foo"]), every other chunk is [None] (a
+     valid trailing run, its last element differing from the disputed stop
+     state). Ticks 0, 1, 2 then an even spread, so no section exceeds the maximum
+     size ([distance / 2]). *)
+  let size =
+    Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
+  in
+  let stop_tick = 10_000 in
+  let tick_step = (stop_tick - 2) / (size - 2) in
+  let dissection =
+    Stdlib.List.init (size + 1) (fun i ->
+        mk_dissection_chunk
+        @@
+        if i = 0 then (Some (hash_string "foo"), tick_of_int_exn 0)
+        else if i = size then (None, tick_of_int_exn stop_tick)
+        else if i <= 2 then (None, tick_of_int_exn i)
+        else (None, tick_of_int_exn (2 + ((i - 2) * tick_step))))
+  in
+  let*@ game_result, ctxt =
+    R.game_move
+      ctxt
+      rollup
+      ~player:refuter
+      ~opponent:defender
+      ~choice:Sc_rollup_tick_repr.initial
+      ~step:(G.Dissection dissection)
+  in
+  (* [None] means the move was applied and the game CONTINUES. *)
+  let* () = Assert.is_none ~loc:__LOC__ ~pp:G.pp_game_result game_result in
+  (* The honest defender must now answer on the distance-one section [1; 2],
+     where the game rules demand a [Proof]. *)
+  let* proof = build_well_formed_proof () in
+  let choice = tick_of_int_exn 1 in
+  (* PROTOCOL STEP: consensus ACCEPTS the move. [game_move] does not fail —
+     nothing in the protocol forbids a [Proof] on a section whose agreed start
+     state is [None]. *)
+  let*@ game_result, ctxt =
+    R.game_move
+      ctxt
+      rollup
+      ~player:defender
+      ~opponent:refuter
+      ~choice
+      ~step:(G.Proof proof)
+  in
+  let* () =
+    (* Accepted, yet it resolves NOTHING: the proof cannot even be checked (no
+       PVM proof starts from [None]), so instead of losing, the defender is
+       trapped in a game that can only end in a [Draw]. *)
+    Assert.is_none ~loc:__LOC__ ~pp:G.pp_game_result game_result
+  in
+  let index = G.Index.make refuter defender in
+  let*@ _ctxt, game_opt = R.find_game ctxt rollup index in
+  let* () =
+    match game_opt with
+    | Some {game_state = G.Final_move {agreed_start_chunk; _}; _} ->
+        (* The BUGGY behaviour this test documents: the [Final_move] is anchored
+           on the [None] chunk, so the refuter's answer fails the same
+           start-state check. Neither player can prove anything, the game can
+           only end in a [Draw], and both bonds are slashed — the honest
+           defender is punished for the refuter's dissection. *)
+        Assert.equal_bool
+          ~loc:__LOC__
+          (Option.is_none agreed_start_chunk.D.state_hash)
+          true
+    | Some {game_state = G.Dissecting _; _} ->
+        (* The behaviour consensus SHOULD have: refuse the move (as it already
+           does for a [Proof] whose [choice] names no section) instead of
+           storing a [Final_move] nobody can answer. Reaching this branch means
+           the protocol was fixed — a WELCOME failure: update the test, not the
+           protocol. *)
+        Test.fail
+          "missing-start-state: the accepted Proof no longer moves the game to \
+           Final_move (still Dissecting): consensus behaviour changed for the \
+           better, so this test's premise is stale and needs revisiting"
+    | None -> Test.fail "missing-start-state: game disappeared after the move"
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -1228,6 +1399,11 @@ let tests =
        the attacker win the refutation game (level-confusion soundness bug)."
       `Quick
       test_inbox_proof_level_confusion;
+    Tztest.tztest
+      "A Proof on a distance-one section whose agreed start state is absent \
+       forces an indefensible Final_move."
+      `Quick
+      test_proof_on_missing_start_state_forces_indefensible_final_move;
   ]
 
 let () =
