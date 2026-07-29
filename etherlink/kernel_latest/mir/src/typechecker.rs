@@ -328,7 +328,7 @@ const MAX_TYPECHECK_RECURSION_DEPTH: u16 = 10_000;
 /// `parse_ty_with_entrypoints`. It is not threaded through type construction
 /// (unlike L1's `Type_size`), so types synthesized during typechecking are not
 /// bounded by it.
-const MICHELSON_MAXIMUM_TYPE_SIZE: usize = 2001;
+pub(crate) const MICHELSON_MAXIMUM_TYPE_SIZE: usize = 2001;
 
 std::thread_local! {
     static TYPECHECK_RECURSION_DEPTH: std::cell::Cell<u16> = const { std::cell::Cell::new(0) };

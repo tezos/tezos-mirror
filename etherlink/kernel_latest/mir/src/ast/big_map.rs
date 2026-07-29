@@ -19,7 +19,10 @@ use tezos_data_encoding::types::Zarith;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use typed_arena::Arena;
 
-use super::{Micheline, Type, TypedValue};
+use super::{
+    CreateContract, Micheline, MichelsonList, OperationInfo, TransferTokens, Type,
+    TypedValue,
+};
 use crate::gas::OutOfGas;
 use crate::serializer::DecodeError;
 use crate::typechecker::TcError;
@@ -686,96 +689,361 @@ mod test_big_map_operations {
 
 impl<'a> TypedValue<'a> {
     /// Traverses a `TypedValue` in AST pre-order and applies `f` to every big
-    /// map inside it. Big maps nested in a map value are reached via
-    /// [RedBlackTreeMap::get_mut], which path-copies the node so `f`'s writes
-    /// stick.
+    /// map inside it, replacing self with the updated value — or leaving it
+    /// untouched, if it held no big map at all.
     fn for_each_big_map_mut(&mut self, f: &mut impl FnMut(&mut BigMap<'a>)) {
-        use crate::ast::Or::*;
-        use TypedValue::*;
-        match self {
-            Int(_) => {}
-            Nat(_) => {}
-            Mutez(_) => {}
-            Bool(_) => {}
-            Unit => {}
-            String(_) => {}
-            Bytes(_) => {}
-            Address(_) => {}
-            KeyHash(_) => {}
-            Key(_) => {}
-            Signature(_) => {}
-            ChainId(_) => {}
-            Contract(_) => {}
-            Timestamp(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381Fr(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381G1(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381G2(_) => {}
-            Pair(l, r) => {
-                Rc::make_mut(l).for_each_big_map_mut(f);
-                Rc::make_mut(r).for_each_big_map_mut(f);
-            }
-            Or(p) => match p {
-                Left(l) => Rc::make_mut(l).for_each_big_map_mut(f),
-                Right(r) => Rc::make_mut(r).for_each_big_map_mut(f),
-            },
-            Option(p) => {
-                if let Some(x) = p.as_mut() {
-                    Rc::make_mut(x).for_each_big_map_mut(f)
-                }
-            }
-            List(l) => l
-                .iter_mut()
-                .for_each(|v| Rc::make_mut(v).for_each_big_map_mut(f)),
-            Set(_) => {
-                // Elements are comparable and so have no big maps
-            }
-            Map(m) => {
-                // Keys are comparable (no big maps); visit each value via
-                // get_mut. Collect the keys first so we can call get_mut,
-                // which borrows the map mutably, one at a time.
-                let keys: Vec<Rc<TypedValue<'a>>> = m.keys().cloned().collect();
-                for k in keys {
-                    if let Some(v) = m.get_mut(&k) {
-                        Rc::make_mut(v).for_each_big_map_mut(f)
-                    }
-                }
-            }
-            BigMap(m) => f(m),
-            Ticket(_) => {
-                // Value is comparable, has no big map
-            }
-            Lambda(_) => {
-                // Can contain only pushable values, thus no big maps
-            }
-            Operation(op) => match &mut op.as_mut().operation {
-                crate::ast::Operation::TransferTokens(t) => {
-                    t.param.for_each_big_map_mut(f)
-                }
-                crate::ast::Operation::SetDelegate(_) => {}
-                crate::ast::Operation::Emit(_) => {
-                    // Can contain only pushable values, thus no big maps
-                }
-                crate::ast::Operation::CreateContract(cc) => {
-                    cc.storage.for_each_big_map_mut(f)
-                }
-            },
+        if let Some(updated) = self.update_big_maps(f) {
+            // Sole owner of a freshly built value, so this moves, never clones.
+            *self = TypedValue::unwrap_rc(updated);
         }
     }
 
-    /// Read-only counterpart of [TypedValue::for_each_big_map_mut]: applies
+    /// Copy-on-write core of [TypedValue::for_each_big_map_mut]: applies `f`
+    /// to every big map in self, in AST pre-order, and returns
+    /// `Some(rebuilt)` when self held at least one big map, `None` when it
+    /// held none (in which case self is left untouched).
+    ///
+    /// Only the spine leading to a big map is rebuilt; every other child is
+    /// carried over as an `Rc::clone`. Descending with [Rc::make_mut]
+    /// instead would deep-copy *every* shared child on the way down, big map
+    /// below it or not — including leaves that can hold gigabytes, such as
+    /// `bytes`. A value duplicated N times then cost N full copies, enough to
+    /// exhaust the kernel's `wasm32` heap and abort it (L2-1831).
+    ///
+    /// A shared subtree is still visited once per occurrence and each
+    /// occurrence gets its own rebuilt big map, so [dump_one_big_map]'s dedup
+    /// sees them separately exactly as the `Rc::make_mut` walk made it. Only
+    /// the *absence* of a big map is ever memoized, never a rebuild — see
+    /// `big_map_free` below.
+    ///
+    /// Kept exhaustive (no catch-all) and in lock-step with
+    /// [TypedValue::for_each_big_map], see that function's comment.
+    ///
+    /// # Why this is iterative
+    ///
+    /// The walk descends once per level of a value whose depth the contract
+    /// chooses, against the kernel's 1 MiB `wasm32` stack. Michelson has no
+    /// recursive types, so a value's depth is bounded by its type's depth —
+    /// but this walk only ever sees values at *declared* types (the returned
+    /// storage, a callee's parameter, a `CREATE_CONTRACT` storage), and
+    /// `MICHELSON_MAXIMUM_TYPE_SIZE` still permits about 2 000 levels through
+    /// a `list` spine, which a recursive formulation does not survive. So the
+    /// walk runs on an explicit `frames`/`results` worklist, in the same shape
+    /// as the iterative `Drop`, `Debug`, comparison and untyper walks
+    /// (L2-1446, L2-1672); depth now costs heap, which is already bounded by
+    /// the size of the value being walked.
+    fn update_big_maps<'b>(
+        &'b self,
+        f: &mut impl FnMut(&mut BigMap<'a>),
+    ) -> Option<Rc<Self>> {
+        use crate::ast::Or::*;
+        use TypedValue::*;
+
+        /// One step of the walk. `Visit` descends a source node and pushes
+        /// exactly one result; each `Build*` pops the results its children
+        /// pushed and assembles the replacement node from them.
+        enum Frame<'b, 'a> {
+            Visit(&'b TypedValue<'a>),
+            /// Pops 2: the left child's result, then the right one's.
+            BuildPair(&'b Rc<TypedValue<'a>>, &'b Rc<TypedValue<'a>>),
+            /// Pops 1.
+            BuildOr {
+                is_left: bool,
+            },
+            /// Pops 1.
+            BuildOption,
+            /// Pops one per element, in element order.
+            BuildList(&'b MichelsonList<Rc<TypedValue<'a>>>),
+            /// Pops one per entry, in ascending key order.
+            BuildMap(&'b RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>),
+            /// Pops 1: the transfer parameter.
+            BuildTransferTokens(&'b OperationInfo<'a>, &'b TransferTokens<'a>),
+            /// Pops 1: the originated storage.
+            BuildCreateContract(&'b OperationInfo<'a>, &'b CreateContract<'a>),
+            /// Pops nothing, peeks: records a shared subtree that turned out
+            /// to hold no big map.
+            Memoize(*const TypedValue<'a>),
+        }
+
+        // Subtrees already known to hold no big map, keyed by address.
+        //
+        // Sound because the walk never mutates the source and the caller keeps
+        // it alive throughout, so every address here denotes one live node for
+        // the whole walk and cannot be recycled under us. Sound to *act* on
+        // because "holds no big map" is a property of an immutable subtree,
+        // independent of which occurrence we reached it by: skipping a repeat
+        // visit calls no `f`, allocates no id, records nothing in
+        // `seen_source_ids` and rebuilds nothing, so it is unobservable.
+        //
+        // Caching a `Some` would *not* be: each occurrence of a shared big map
+        // must get its own rebuilt copy, which is what `dump_one_big_map`'s
+        // dedup keys off.
+        //
+        // Without this, a value whose in-memory DAG unfolds to a `2^K`-node
+        // tree — `DUP` is an `Rc::clone`, so `DUP; NIL t; SWAP; CONS; SWAP;
+        // CONS` doubles the occurrence count per level for `O(K)` gas while
+        // the *type* grows by one node — is walked as that tree. The walk is
+        // charged no gas and, since it no longer allocates per visit, has
+        // nothing else bounding it (L2-1831).
+        let mut big_map_free: BTreeSet<*const TypedValue<'a>> = BTreeSet::new();
+        let mut frames: Vec<Frame<'b, 'a>> = vec![Frame::Visit(self)];
+        let mut results: Vec<std::option::Option<Rc<TypedValue<'a>>>> = Vec::new();
+
+        /// Queues `child`, remembering the answer if it is shared: only a
+        /// node reachable through more than one `Rc` can be visited twice, so
+        /// memoizing the rest would cost an insert per node and never pay.
+        fn push_child<'b, 'a>(
+            frames: &mut Vec<Frame<'b, 'a>>,
+            child: &'b Rc<TypedValue<'a>>,
+        ) {
+            if Rc::strong_count(child) > 1 {
+                frames.push(Frame::Memoize(Rc::as_ptr(child)));
+            }
+            frames.push(Frame::Visit(child.as_ref()));
+        }
+
+        /// Wraps a rebuilt operation back up, carrying the nonce over.
+        fn rebuilt_operation<'a>(
+            op: &OperationInfo<'a>,
+            operation: crate::ast::Operation<'a>,
+        ) -> std::option::Option<Rc<TypedValue<'a>>> {
+            Some(Rc::new(TypedValue::Operation(Box::new(OperationInfo {
+                operation,
+                counter: op.counter,
+            }))))
+        }
+
+        while let Some(frame) = frames.pop() {
+            match frame {
+                Frame::Visit(v) => {
+                    if big_map_free.contains(&(v as *const TypedValue<'a>)) {
+                        results.push(None);
+                        continue;
+                    }
+                    match v {
+                        Int(_) => results.push(None),
+                        Nat(_) => results.push(None),
+                        Mutez(_) => results.push(None),
+                        Bool(_) => results.push(None),
+                        Unit => results.push(None),
+                        String(_) => results.push(None),
+                        Bytes(_) => results.push(None),
+                        Address(_) => results.push(None),
+                        KeyHash(_) => results.push(None),
+                        Key(_) => results.push(None),
+                        Signature(_) => results.push(None),
+                        ChainId(_) => results.push(None),
+                        Contract(_) => results.push(None),
+                        Timestamp(_) => results.push(None),
+                        #[cfg(feature = "bls")]
+                        Bls12381Fr(_) => results.push(None),
+                        #[cfg(feature = "bls")]
+                        Bls12381G1(_) => results.push(None),
+                        #[cfg(feature = "bls")]
+                        Bls12381G2(_) => results.push(None),
+                        // Children are queued back-to-front throughout, so
+                        // they are visited front-to-back: [dump_one_big_map]
+                        // allocates lazy-storage ids in visit order, which
+                        // makes that order consensus-observable.
+                        Pair(l, r) => {
+                            frames.push(Frame::BuildPair(l, r));
+                            push_child(&mut frames, r);
+                            push_child(&mut frames, l);
+                        }
+                        Or(p) => match p {
+                            Left(x) => {
+                                frames.push(Frame::BuildOr { is_left: true });
+                                push_child(&mut frames, x);
+                            }
+                            Right(x) => {
+                                frames.push(Frame::BuildOr { is_left: false });
+                                push_child(&mut frames, x);
+                            }
+                        },
+                        Option(None) => results.push(None),
+                        Option(Some(x)) => {
+                            frames.push(Frame::BuildOption);
+                            push_child(&mut frames, x);
+                        }
+                        List(l) => {
+                            frames.push(Frame::BuildList(l));
+                            for x in l.iter().rev() {
+                                push_child(&mut frames, x);
+                            }
+                        }
+                        Set(_) => {
+                            // Elements are comparable and so have no big maps
+                            results.push(None)
+                        }
+                        Map(m) => {
+                            // Keys are comparable (no big maps); only values
+                            // are visited.
+                            frames.push(Frame::BuildMap(m));
+                            for (_, x) in m.iter().rev() {
+                                push_child(&mut frames, x);
+                            }
+                        }
+                        BigMap(m) => {
+                            let mut m = m.clone();
+                            f(&mut m);
+                            results.push(Some(Rc::new(BigMap(m))));
+                        }
+                        Ticket(_) => {
+                            // Value is comparable, has no big map
+                            results.push(None)
+                        }
+                        Lambda(_) => {
+                            // Can contain only pushable values, thus no big maps
+                            results.push(None)
+                        }
+                        // `param` and `storage` are owned, not `Rc`-shared, so
+                        // they are queued directly and never memoized.
+                        Operation(op) => match &op.operation {
+                            crate::ast::Operation::TransferTokens(t) => {
+                                frames.push(Frame::BuildTransferTokens(op, t));
+                                frames.push(Frame::Visit(&t.param));
+                            }
+                            crate::ast::Operation::SetDelegate(_) => results.push(None),
+                            crate::ast::Operation::Emit(_) => {
+                                // Can contain only pushable values, thus no big maps
+                                results.push(None)
+                            }
+                            crate::ast::Operation::CreateContract(cc) => {
+                                frames.push(Frame::BuildCreateContract(op, cc));
+                                frames.push(Frame::Visit(&cc.storage));
+                            }
+                        },
+                    }
+                }
+                Frame::Memoize(node) => {
+                    // The result just pushed is this node's, since the `Visit`
+                    // this frame was queued behind pushes exactly one.
+                    if matches!(results.last(), Some(None)) {
+                        big_map_free.insert(node);
+                    }
+                }
+                Frame::BuildPair(l, r) => {
+                    let new_r = results.pop().expect("BuildPair: missing right");
+                    let new_l = results.pop().expect("BuildPair: missing left");
+                    results.push(match (new_l, new_r) {
+                        (None, None) => None,
+                        (new_l, new_r) => Some(Rc::new(Pair(
+                            new_l.unwrap_or_else(|| l.clone()),
+                            new_r.unwrap_or_else(|| r.clone()),
+                        ))),
+                    });
+                }
+                Frame::BuildOr { is_left } => {
+                    let new = results.pop().expect("BuildOr: missing child");
+                    results.push(
+                        new.map(|x| {
+                            Rc::new(Or(if is_left { Left(x) } else { Right(x) }))
+                        }),
+                    );
+                }
+                Frame::BuildOption => {
+                    let new = results.pop().expect("BuildOption: missing child");
+                    results.push(new.map(|x| Rc::new(Option(Some(x)))));
+                }
+                Frame::BuildList(orig) => {
+                    let at = results.len() - orig.len();
+                    if results[at..].iter().all(std::option::Option::is_none) {
+                        // No big map anywhere in the list: leave it shared,
+                        // without even allocating one pointer per element.
+                        results.truncate(at);
+                        results.push(None);
+                    } else {
+                        let new: Vec<Rc<TypedValue<'a>>> = orig
+                            .iter()
+                            .zip(results.drain(at..))
+                            .map(|(x, new_x)| new_x.unwrap_or_else(|| x.clone()))
+                            .collect();
+                        results.push(Some(Rc::new(List(new.into()))));
+                    }
+                }
+                Frame::BuildMap(orig) => {
+                    let at = results.len() - orig.size();
+                    if results[at..].iter().all(std::option::Option::is_none) {
+                        results.truncate(at);
+                        results.push(None);
+                    } else {
+                        // `insert_mut` path-copies, so `orig` and every other
+                        // holder of it are left untouched; the entries that
+                        // did not change stay shared with it.
+                        let mut new = orig.clone();
+                        for ((k, _), new_v) in orig.iter().zip(results.drain(at..)) {
+                            if let Some(new_v) = new_v {
+                                new.insert_mut(k.clone(), new_v);
+                            }
+                        }
+                        results.push(Some(Rc::new(Map(new))));
+                    }
+                }
+                Frame::BuildTransferTokens(op, t) => {
+                    let new = results.pop().expect("BuildTransferTokens: missing param");
+                    results.push(new.and_then(|param| {
+                        rebuilt_operation(
+                            op,
+                            crate::ast::Operation::TransferTokens(TransferTokens {
+                                // Sole owner of a freshly built value: moves.
+                                param: TypedValue::unwrap_rc(param),
+                                destination_address: t.destination_address.clone(),
+                                amount: t.amount,
+                            }),
+                        )
+                    }));
+                }
+                Frame::BuildCreateContract(op, cc) => {
+                    let new =
+                        results.pop().expect("BuildCreateContract: missing storage");
+                    results.push(new.and_then(|storage| {
+                        rebuilt_operation(
+                            op,
+                            crate::ast::Operation::CreateContract(CreateContract {
+                                storage: TypedValue::unwrap_rc(storage),
+                                delegate: cc.delegate.clone(),
+                                amount: cc.amount,
+                                code: cc.code.clone(),
+                                micheline_code: cc.micheline_code,
+                                address: cc.address.clone(),
+                            }),
+                        )
+                    }));
+                }
+            }
+        }
+
+        // The root's `Visit` pushed exactly one result and every `Build*`
+        // replaces the ones it popped, so this is the whole answer.
+        results.pop().flatten()
+    }
+
+    /// Read-only counterpart of [TypedValue::update_big_maps]: applies
     /// `f` to every big map inside self in AST order without mutating it. Map
     /// values are walked via [RedBlackTreeMap::values].
     ///
     /// Kept exhaustive (no catch-all) and in lock-step with
-    /// [TypedValue::for_each_big_map_mut] on purpose: this read-only walk feeds
-    /// `started_with_map_ids` while the mutable walk feeds `seen_source_ids`,
-    /// and [dump_big_map_updates] removes ids present in the former but not the
-    /// latter. A new big-map-carrying variant must be added to both walks or a
-    /// dropped big map could leak; a wildcard here would silently skip it while
-    /// the mutable walk still compile-errored, so the two would diverge.
+    /// [TypedValue::update_big_maps] **on which variants it visits**: this
+    /// read-only walk feeds `started_with_map_ids` while the mutable walk feeds
+    /// `seen_source_ids`, and [dump_big_map_updates] removes ids present in the
+    /// former but not the latter. A new big-map-carrying variant must be added
+    /// to both walks or a dropped big map could leak; a wildcard here would
+    /// silently skip it while the mutable walk still compile-errored, so the
+    /// two would diverge.
+    ///
+    /// The lock-step is on variant coverage only. This walk is still
+    /// recursive, and it neither memoizes nor is bounded by anything, where
+    /// the mutable walk is iterative and memoized. That is deliberate rather
+    /// than an oversight, because the two see different values: this one runs
+    /// on the storage returned by `typecheck_storage`, parsed from Micheline
+    /// before the contract body runs, so it is a tree with no `Rc` sharing and
+    /// no `DUP`-built DAG can reach it. Its depth is bounded by the storage
+    /// type, hence by `MICHELSON_MAXIMUM_TYPE_SIZE`, and at that depth its
+    /// frame fits the kernel's 1 MiB stack with room to spare — which the
+    /// mutable walk's did not once it grew a rebuild, which is what forced
+    /// that one onto a worklist. Converting this one too would be tidier and
+    /// costs little; it is left alone here to keep the diff to the walk that
+    /// had to change.
     fn for_each_big_map<'b>(&'b self, f: &mut impl FnMut(&'b BigMap<'a>)) {
         use crate::ast::Or::*;
         use TypedValue::*;
@@ -1362,14 +1630,22 @@ mod review_verification {
     //! the `rpds` trees iterate in the same order as the `std` maps they
     //! replaced, and that the read-only big-map walk reaches every position
     //! the mutable walk does.
-    //!
-    //! Extended while reviewing the big-map walk itself: the mutable walk's
-    //! visit order, its key/value pairing, and the fields its `Operation`
-    //! arms carry over were all unpinned, so a change to any of them was
-    //! silent. Everything here describes the walk as it already behaves.
     use super::*;
     use crate::ast::{CreateContract, MichelsonList, Or, TransferTokens, Type};
     use rpds::RedBlackTreeSet;
+
+    /// A `big_map` leaf carrying `id` and nothing else — the shape the walk
+    /// keys off, with no overlay to complicate what a rebuild has to preserve.
+    fn leaf_big_map(id: i64) -> TypedValue<'static> {
+        TypedValue::BigMap(BigMap {
+            content: BigMapContent::FromId(BigMapFromId {
+                id: id.into(),
+                overlay: RedBlackTreeMap::new(),
+            }),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        })
+    }
 
     /// Consensus-critical invariant behind the whole migration: `rpds`
     /// `RedBlackTreeMap`/`RedBlackTreeSet` must iterate in ascending key
@@ -1458,17 +1734,39 @@ mod review_verification {
         );
     }
 
-    /// A `big_map` leaf carrying `id` and nothing else — the shape the walk
-    /// keys off, with no overlay to complicate what a rebuild has to preserve.
-    fn leaf_big_map(id: i64) -> TypedValue<'static> {
-        TypedValue::BigMap(BigMap {
-            content: BigMapContent::FromId(BigMapFromId {
-                id: id.into(),
-                overlay: RedBlackTreeMap::new(),
-            }),
-            key_type: Type::Int,
-            value_type: Type::Int,
-        })
+    /// The mutable walk must not unshare a subtree that holds no big map:
+    /// `DUP` is an `Rc::clone`, so a duplicated multi-gigabyte value would
+    /// otherwise be deep-copied once per occurrence and exhaust the kernel's
+    /// `wasm32` heap (L2-1831). Asserted on pointer identity rather than
+    /// value equality, which a deep copy would still satisfy.
+    #[test]
+    fn walk_leaves_big_map_free_subtrees_shared() {
+        let shared = Rc::new(TypedValue::Bytes(vec![0xab; 64]));
+        // The value shape of the L2-1831 reproduction: one operation `DUP`ed
+        // into a three-element `list operation`, all three elements pointing
+        // at a single allocation.
+        let mut root = TypedValue::List(MichelsonList::from(vec![
+            shared.clone(),
+            shared.clone(),
+            shared.clone(),
+        ]));
+        let strong_before = Rc::strong_count(&shared);
+
+        let mut visited = 0;
+        root.for_each_big_map_mut(&mut |_| visited += 1);
+
+        assert_eq!(visited, 0, "no big map to visit");
+        assert_eq!(
+            Rc::strong_count(&shared),
+            strong_before,
+            "the walk copied a big-map-free subtree"
+        );
+        let TypedValue::List(elements) = &root else {
+            panic!("root is no longer a list")
+        };
+        for element in elements.iter() {
+            assert!(Rc::ptr_eq(element, &shared));
+        }
     }
 
     /// Mutable-walk counterpart of
@@ -1540,6 +1838,338 @@ mod review_verification {
         assert_eq!(ids_after, (0..=6).map(BigMapId::from).collect::<Vec<_>>());
     }
 
+    /// The walk descends once per level of a value whose depth the contract
+    /// chooses, against the kernel's 1 MiB stack. It runs on an explicit
+    /// worklist rather than the call stack, so depth costs heap — already
+    /// bounded by the size of the value being walked — rather than stack, and
+    /// `DEPTH` matches `drop_safety`'s to pin that.
+    ///
+    /// A recursive formulation did not survive the depths reachable here: a
+    /// value only ever reaches this walk at a *declared* type (the returned
+    /// storage, a callee's parameter, a `CREATE_CONTRACT` storage), and
+    /// `MICHELSON_MAXIMUM_TYPE_SIZE` still permits about 2 000 levels through
+    /// a `list` spine and about 1 000 through a `map` — well past what a
+    /// frame of a few hundred bytes per level affords.
+    ///
+    /// Both paths are exercised for each container: a big-map-free spine,
+    /// which returns `None` the whole way up and rebuilds nothing, and the
+    /// same spine with a big map at its base, so every level is rebuilt.
+    #[test]
+    fn walk_survives_a_deep_spine_on_the_kernel_stack() {
+        // Matches `drop_safety`: nothing about the walk is depth-bounded now.
+        const DEPTH: usize = 100_000;
+
+        fn deep_pair(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| TypedValue::new_pair(TypedValue::Unit, acc))
+        }
+        fn deep_list(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| {
+                TypedValue::List(MichelsonList::from(vec![Rc::new(acc)]))
+            })
+        }
+        fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| {
+                TypedValue::Map(RedBlackTreeMap::from_iter([(
+                    Rc::new(TypedValue::int(0)),
+                    Rc::new(acc),
+                )]))
+            })
+        }
+
+        for build in [deep_pair, deep_list, deep_map] {
+            for with_big_map in [false, true] {
+                std::thread::Builder::new()
+                    // The WASM kernel stack budget.
+                    .stack_size(1024 * 1024)
+                    .spawn(move || {
+                        // Built inside the worker: `TypedValue` is `Rc`-backed
+                        // and so not `Send`.
+                        let base = if with_big_map {
+                            leaf_big_map(0)
+                        } else {
+                            TypedValue::Unit
+                        };
+                        let mut value = build(base, DEPTH);
+                        let mut visited = 0;
+                        value.for_each_big_map_mut(&mut |_| visited += 1);
+                        assert_eq!(visited, usize::from(with_big_map));
+                    })
+                    .unwrap()
+                    .join()
+                    .expect("worker thread completes without stack overflow");
+            }
+        }
+    }
+
+    /// [TypedValue::for_each_big_map] is still recursive, where the mutable
+    /// walk is not, so its depth budget is a live constraint rather than a
+    /// formality — and nothing pinned it.
+    ///
+    /// What makes it safe is that the value it walks is bounded twice over.
+    /// Michelson has no recursive types, so a value is never deeper than its
+    /// type; and this walk only ever sees the *committed* storage, parsed at a
+    /// declared type, so [MICHELSON_MAXIMUM_TYPE_SIZE] applies to it — unlike
+    /// instruction-synthesised types, which escape that cap. The depths below
+    /// are what the cap actually permits, per shape: `list t` costs one type
+    /// node per level, `pair a b` and `map k v` cost two. So these are the
+    /// deepest values that can reach this function at all.
+    ///
+    /// The margin is real but not generous, which is the point of deriving the
+    /// depths rather than picking them: `map` is the most expensive shape, and
+    /// at twice its reachable depth this test overflows. Safety here is
+    /// arithmetic — cap times frame size against 1 MiB — where
+    /// [TypedValue::update_big_maps] is depth-independent by construction. A
+    /// few extra locals in this function would eat the margin silently, and
+    /// this is what would catch that.
+    #[test]
+    fn read_only_walk_survives_the_deepest_reachable_spine() {
+        use crate::typechecker::MICHELSON_MAXIMUM_TYPE_SIZE as MAX_TY;
+
+        /// `list t` is one type node per level, so it nests deepest.
+        const LIST_DEPTH: usize = MAX_TY - 1;
+        /// `pair a b` and `map k v` are two nodes per level.
+        const PAIR_DEPTH: usize = (MAX_TY - 1) / 2;
+        const MAP_DEPTH: usize = PAIR_DEPTH;
+
+        fn deep_pair(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| TypedValue::new_pair(TypedValue::Unit, acc))
+        }
+        fn deep_list(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| {
+                TypedValue::List(MichelsonList::from(vec![Rc::new(acc)]))
+            })
+        }
+        fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| {
+                TypedValue::Map(RedBlackTreeMap::from_iter([(
+                    Rc::new(TypedValue::int(0)),
+                    Rc::new(acc),
+                )]))
+            })
+        }
+
+        for (build, depth) in [
+            (
+                deep_pair as fn(TypedValue<'static>, usize) -> TypedValue<'static>,
+                PAIR_DEPTH,
+            ),
+            (deep_list, LIST_DEPTH),
+            (deep_map, MAP_DEPTH),
+        ] {
+            std::thread::Builder::new()
+                // The WASM kernel stack budget.
+                .stack_size(1024 * 1024)
+                .spawn(move || {
+                    // Built inside the worker: `TypedValue` is `Rc`-backed and
+                    // so not `Send`. A big map at the base, so the walk runs
+                    // its `f` at the deepest point rather than stopping short.
+                    let value = build(leaf_big_map(0), depth);
+                    let mut ids = vec![];
+                    value.view_big_map_ids(&mut ids);
+                    assert_eq!(ids, vec![BigMapId::from(0)]);
+                })
+                .unwrap()
+                .join()
+                .expect("worker thread completes without stack overflow");
+        }
+    }
+
+    /// The flip side of [walk_leaves_big_map_free_subtrees_shared]: a big map
+    /// under a shared spine is still reached, still visited once per
+    /// occurrence, and the rebuilt value carries `f`'s writes — while the
+    /// big-map-free sibling stays shared.
+    #[test]
+    fn walk_updates_big_maps_under_a_shared_spine() {
+        let big_map = leaf_big_map;
+        let shared_payload = Rc::new(TypedValue::Bytes(vec![0xcd; 64]));
+        let shared_spine = Rc::new(TypedValue::new_pair_rc(
+            Rc::new(big_map(7)),
+            shared_payload.clone(),
+        ));
+        let mut root = TypedValue::List(MichelsonList::from(vec![
+            shared_spine.clone(),
+            shared_spine.clone(),
+        ]));
+
+        // Renumber every visited big map, so each visit is observable.
+        let mut visited = 0;
+        root.for_each_big_map_mut(&mut |map| {
+            visited += 1;
+            if let BigMapContent::FromId(ref mut m) = map.content {
+                m.id = BigMapId::from(100 + visited);
+            }
+        });
+
+        assert_eq!(visited, 2, "each occurrence must be visited on its own");
+        // Only the pair spine is rebuilt; its big-map-free half is carried
+        // over as an `Rc::clone`, never copied.
+        let TypedValue::List(elements) = &root else {
+            panic!("root is no longer a list")
+        };
+        for element in elements.iter() {
+            let TypedValue::Pair(_, payload) = &**element else {
+                panic!("element is no longer a pair")
+            };
+            assert!(
+                Rc::ptr_eq(payload, &shared_payload),
+                "the big-map-free half of the pair was copied"
+            );
+        }
+        let mut ids = vec![];
+        root.view_big_map_ids(&mut ids);
+        assert_eq!(ids, vec![BigMapId::from(101), BigMapId::from(102)]);
+        // The original is untouched: rebuilding is copy-on-write.
+        let mut original_ids = vec![];
+        shared_spine.view_big_map_ids(&mut original_ids);
+        assert_eq!(original_ids, vec![BigMapId::from(7)]);
+    }
+
+    /// Builds `LEVELS` nested two-element lists whose elements are, at every
+    /// level, the *same* allocation — the in-memory shape of
+    /// `DUP; NIL t; SWAP; CONS; SWAP; CONS` repeated. `LEVELS` nodes, `2^LEVELS`
+    /// occurrences.
+    fn shared_dag(leaf: TypedValue<'static>, levels: usize) -> TypedValue<'static> {
+        let mut node = Rc::new(leaf);
+        for _ in 0..levels {
+            node = Rc::new(TypedValue::List(MichelsonList::from(vec![
+                node.clone(),
+                node,
+            ])));
+        }
+        TypedValue::unwrap_rc(node)
+    }
+
+    /// A value's in-memory DAG can unfold to a tree exponentially larger than
+    /// itself, and the walk must not pay for the unfolding. `DUP` is an
+    /// `Rc::clone`, so the shape above doubles the occurrence count per level
+    /// while the *type* grows by a single node — putting `2^K` occurrences
+    /// within `O(K²)` gas, since `list t` costs one type node per level and so
+    /// stays far under `MICHELSON_MAXIMUM_TYPE_SIZE`.
+    ///
+    /// Nothing else bounds it: the walk is charged no gas, and it no longer
+    /// allocates per visit, so it cannot exhaust the heap the way the
+    /// `Rc::make_mut` walk did. Only the big-map-free memo does.
+    ///
+    /// **Finishing at all is the assertion**, which is why the walk runs on a
+    /// worker under a deadline rather than inline. At `LEVELS` 40 the DAG
+    /// unfolds to `2^40` ≈ 10^12 occurrences, so a walk that explored each of
+    /// them does not finish — measured at ~8 hours on release, and worse in
+    /// debug. Nothing else here can express the property: the value holds no
+    /// big map, so `f` is never called, nothing is rebuilt and nothing is
+    /// allocated. Re-exploration has no observable effect except time.
+    ///
+    /// Without the deadline this test would *hang* instead of failing, and
+    /// since `libtest` has no per-test timeout and the suite runs with
+    /// `RUST_TEST_THREADS=1`, that means the whole binary stalls until CI kills
+    /// the job an hour later — reporting no result for this test or any test
+    /// after it. A regression would look like flaky infrastructure rather than
+    /// like this function.
+    ///
+    /// The deadline is wall-clock, which is normally a poor thing to assert
+    /// on. It is sound here only because the two outcomes are about six orders
+    /// of magnitude apart: microseconds when memoized, hours when not. The
+    /// deterministic form needs the walk to price its own steps, so it arrives
+    /// with the per-node gas charge, where an unmemoized walk exhausts its
+    /// budget immediately and the assertion becomes a visit count.
+    ///
+    /// Note in particular that asserting the two list elements still point at
+    /// one allocation would *not* say anything about re-exploration — that is
+    /// the copy-on-write property, and
+    /// [walk_leaves_big_map_free_subtrees_shared] already covers it.
+    #[test]
+    fn walk_terminates_on_an_exponentially_shared_subtree() {
+        const LEVELS: usize = 40;
+        /// Far above the memoized cost and far below the unmemoized one, so
+        /// neither a slow runner nor a warm cache can move the verdict.
+        const BUDGET: std::time::Duration = std::time::Duration::from_secs(30);
+
+        let (done, finished) = std::sync::mpsc::channel();
+        std::thread::Builder::new()
+            // The WASM kernel stack budget, as elsewhere in this module.
+            .stack_size(1024 * 1024)
+            .spawn(move || {
+                // Built inside the worker: `TypedValue` is `Rc`-backed and so
+                // not `Send`. Only the count crosses the channel.
+                let mut root = shared_dag(TypedValue::Unit, LEVELS);
+                let mut visited = 0;
+                root.for_each_big_map_mut(&mut |_| visited += 1);
+                let _ = done.send(visited);
+            })
+            .unwrap();
+
+        // On timeout the worker is left running — a thread cannot be killed —
+        // so it burns one core until the binary exits. That is the price of
+        // failing at all, and it beats stalling the suite.
+        match finished.recv_timeout(BUDGET) {
+            Ok(visited) => assert_eq!(visited, 0, "no big map to visit"),
+            Err(_) => panic!(
+                "the walk did not finish within {BUDGET:?}; at {LEVELS} levels \
+                 the value's in-memory DAG unfolds to 2^{LEVELS} occurrences, \
+                 so it is exploring shared subtrees once per path instead of \
+                 once — the big-map-free memo has regressed"
+            ),
+        }
+    }
+
+    /// The flip side of [walk_terminates_on_an_exponentially_shared_subtree]:
+    /// the memo
+    /// records only the *absence* of a big map, so a shared subtree that holds
+    /// one is still visited once per occurrence. That multiplicity is
+    /// consensus-observable — [dump_one_big_map] gives each occurrence its own
+    /// id and keys its dedup off having seen the source before.
+    ///
+    /// Deliberately shallow: this one really is exponential, by design.
+    #[test]
+    fn walk_still_visits_every_occurrence_of_a_shared_big_map() {
+        const LEVELS: u32 = 4;
+
+        let mut root = shared_dag(leaf_big_map(0), LEVELS as usize);
+
+        let mut visited = 0;
+        root.for_each_big_map_mut(&mut |_| visited += 1);
+
+        assert_eq!(
+            visited,
+            2usize.pow(LEVELS),
+            "the memo skipped an occurrence of a shared big map"
+        );
+    }
+
+    /// Only the elements holding a big map are rebuilt; everything around them
+    /// is carried over as an `Rc::clone`. The big map sits in the *middle*, so
+    /// both the prefix carried over before it and the suffix after it are
+    /// exercised — a big map at either end would leave one of them empty.
+    #[test]
+    fn walk_carries_over_unchanged_list_elements() {
+        let first = Rc::new(TypedValue::Bytes(vec![0x01; 32]));
+        let last = Rc::new(TypedValue::Bytes(vec![0x02; 32]));
+        let mut root = TypedValue::List(MichelsonList::from(vec![
+            first.clone(),
+            Rc::new(leaf_big_map(5)),
+            last.clone(),
+        ]));
+
+        let mut visited = 0;
+        root.for_each_big_map_mut(&mut |map| {
+            visited += 1;
+            if let BigMapContent::FromId(ref mut m) = map.content {
+                m.id = BigMapId::from(50);
+            }
+        });
+
+        assert_eq!(visited, 1);
+        let TypedValue::List(elements) = &root else {
+            panic!("root is no longer a list")
+        };
+        let elements: Vec<_> = elements.iter().collect();
+        assert_eq!(elements.len(), 3, "the rebuild changed the list length");
+        assert!(Rc::ptr_eq(elements[0], &first), "the prefix was copied");
+        assert!(Rc::ptr_eq(elements[2], &last), "the suffix was copied");
+        let mut ids = vec![];
+        root.view_big_map_ids(&mut ids);
+        assert_eq!(ids, vec![BigMapId::from(50)]);
+    }
+
     /// `Map` values are visited in ascending key order, and the rebuild must
     /// put each one back under the key it came from. A single-entry map — all
     /// the other tests here build one — cannot catch a key/value mispairing,
@@ -1606,6 +2236,36 @@ mod review_verification {
                 "the rebuilt map paired a value with the wrong key"
             );
         }
+    }
+
+    /// Only one entry is rebuilt; the others stay shared with the original
+    /// map, which is what makes the rebuild copy-on-write rather than a copy.
+    #[test]
+    fn walk_rebuilds_only_the_changed_map_entry() {
+        let key = |k: i64| Rc::new(TypedValue::int(k));
+        let low = Rc::new(TypedValue::Bytes(vec![0x0a; 32]));
+        let high = Rc::new(TypedValue::Bytes(vec![0x0b; 32]));
+        let mut root = TypedValue::Map(RedBlackTreeMap::from_iter([
+            (key(0), low.clone()),
+            (key(1), Rc::new(leaf_big_map(9))),
+            (key(2), high.clone()),
+        ]));
+
+        let mut visited = 0;
+        root.for_each_big_map_mut(&mut |_| visited += 1);
+
+        assert_eq!(visited, 1);
+        let TypedValue::Map(m) = &root else {
+            panic!("root is no longer a map")
+        };
+        assert!(
+            Rc::ptr_eq(m.get(&key(0)).unwrap(), &low),
+            "a big-map-free entry was copied"
+        );
+        assert!(
+            Rc::ptr_eq(m.get(&key(2)).unwrap(), &high),
+            "a big-map-free entry was copied"
+        );
     }
 
     /// The `Operation` arms rebuild their struct field by field, so the
