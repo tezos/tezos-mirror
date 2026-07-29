@@ -32,6 +32,11 @@ Release".
 General
 -------
 
+- ``data-encoding``: the binary decoder now bounds its recursion depth,
+  rejecting deeply-nested input with a new ``Too_many_recursive_calls`` decode
+  error instead of recursing on the native OCaml stack. The bound is above the
+  maximum nesting any protocol accepts, so no valid value is affected.
+
 Node
 ----
 
