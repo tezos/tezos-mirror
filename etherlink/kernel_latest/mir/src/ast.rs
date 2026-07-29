@@ -32,6 +32,7 @@ use typed_arena::Arena;
 use crate::{
     gas::{Gas, OutOfGas},
     lexer::Prim,
+    typechecker::type_props::TypeProperty,
 };
 
 #[cfg(feature = "bls")]
@@ -1511,8 +1512,46 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
 }
 
 impl<'a> TypedValue<'a> {
-    /// Unparse a pushable value while retaining the typed value, charging
-    /// before cloning any size-dependent leaf payload.
+    /// Whether this value's own outermost constructor is admissible under
+    /// `prop`.
+    fn head_admits_prop(&self, prop: TypeProperty) -> bool {
+        use TypeProperty as P;
+        use TypedValue::*;
+        match self {
+            Int(_) | Nat(_) | Mutez(_) | Bool(_) | String(_) | Unit | Bytes(_)
+            | Address(_) | ChainId(_) | Key(_) | Signature(_) | KeyHash(_)
+            | Timestamp(_) => true,
+            // Transparent: the walk checks the children on their own frames.
+            Pair(_, _) | Option(_) | Or(_) => true,
+            #[cfg(feature = "bls")]
+            Bls12381Fr(_) | Bls12381G1(_) | Bls12381G2(_) => prop != P::Comparable,
+            List(_) | Set(_) | Map(_) | Lambda(_) => prop != P::Comparable,
+            Ticket(_) => matches!(prop, P::Passable | P::Storable | P::BigMapValue),
+            Contract(_) => matches!(
+                prop,
+                P::Passable | P::Packable | P::Duplicable | P::ViewOutput | P::ViewInput
+            ),
+            BigMap(_) => match prop {
+                P::Duplicable | P::Storable => true,
+                #[cfg(feature = "allow_lazy_storage_transfer")]
+                P::Passable => true,
+                #[cfg(not(feature = "allow_lazy_storage_transfer"))]
+                P::Passable => false,
+                P::Comparable
+                | P::BigMapValue
+                | P::Packable
+                | P::Pushable
+                | P::ViewOutput
+                | P::ViewInput => false,
+            },
+            // `operation` is only ever duplicable — and this walk refuses it
+            // outright regardless, see [BorrowedUnparseError::UnsupportedUnparsing].
+            Operation(_) => prop == P::Duplicable,
+        }
+    }
+
+    /// Unparse a value while retaining the typed value, charging before cloning
+    /// any size-dependent leaf payload.
     ///
     /// `APPLY` needs both representations of its capture: the typed value for
     /// `EXEC`, and Micheline for later `PACK`s. Cloning the whole value before
@@ -1520,10 +1559,19 @@ impl<'a> TypedValue<'a> {
     /// arbitrarily large integers and collection structure before their
     /// unparsing gas was charged. This borrowed worklist walks collections in
     /// place and only clones leaf payloads through charged constructors.
+    ///
+    /// `restrict_to` optionally holds the walk to a [TypeProperty]: every
+    /// sub-value reached is checked against it, and the walk fails with
+    /// [BorrowedUnparseError::UnsatisfiedProperty] on the first offending
+    /// sub-part — before that sub-part is cloned. Pass `None` to unparse
+    /// whatever the value happens to hold. Value should already have been
+    /// constrained at typecheck time, so this is a defence in depth rather
+    /// than the primary check.
     pub fn clone_into_micheline_optimized_legacy(
         &self,
         arena: &'a Arena<Micheline<'a>>,
         gas: &mut Gas,
+        restrict_to: Option<TypeProperty>,
     ) -> Result<Micheline<'a>, BorrowedUnparseError> {
         use Micheline as V;
         use TypedValue as TV;
@@ -1560,6 +1608,12 @@ impl<'a> TypedValue<'a> {
         let mut results = Vec::new();
 
         while let Some(frame) = frames.pop() {
+            if let (Some(prop), Frame::Visit(value)) = (restrict_to, &frame) {
+                if !value.head_admits_prop(prop) {
+                    return Err(BorrowedUnparseError::UnsatisfiedProperty(prop));
+                }
+            }
+
             match frame {
                 Frame::ListNext(mut iter) => {
                     if let Some(value) = iter.next() {
@@ -1684,10 +1738,6 @@ impl<'a> TypedValue<'a> {
                             values.iter().collect::<Vec<_>>().into_iter(),
                         ));
                     }
-                    // Not pushable, so unreachable from `APPLY`, but reachable
-                    // from the returned storage — which is unparsed through
-                    // this borrowed walk precisely so a shared child is not
-                    // deep-copied before its cost is charged (L2-1840).
                     TV::BigMap(map) => match &map.content {
                         big_map::BigMapContent::InMemory(entries) => {
                             frames.push(Frame::BuildSeqOf {
@@ -1735,10 +1785,13 @@ impl<'a> TypedValue<'a> {
                         frames.push(Frame::Visit(&ticket.content));
                         frames.push(Frame::Leaf(ticketer));
                     }
-                    // Operations are neither pushable nor storable, so they
-                    // cannot reach this walk.
+                    // `operation` has a Micheline form (the consuming
+                    // `IntoMicheline` builds it), but this walk deliberately does
+                    // not: `operation` is neither pushable, packable nor storable,
+                    // so no caller can hand one over, and mirroring the arm would
+                    // be untested dead code kept in lock-step for nothing.
                     TV::Operation(_) => {
-                        return Err(BorrowedUnparseError::NonPushable);
+                        return Err(BorrowedUnparseError::UnsupportedUnparsing);
                     }
                 },
                 Frame::BuildPrim1(prim) => {
@@ -1778,10 +1831,16 @@ pub enum BorrowedUnparseError {
     /// this walk charges *before* cloning a leaf payload, running out here
     /// means the copy was never attempted.
     OutOfGas,
-    /// The value carries an `operation`, which this walk cannot unparse.
-    /// Unreachable in practice: `operation` is neither pushable nor storable,
-    /// so it cannot occur in an `APPLY` capture or in a contract's storage.
-    NonPushable,
+    /// The walk does not cover the submitted typed value. Limited to the
+    /// [Operation] value.
+    UnsupportedUnparsing,
+    /// A sub-value does not satisfy the [TypeProperty] the caller restricted
+    /// the walk to. Carries the property rather than the offending sub-value so
+    /// the error stays `Copy`; the value itself was not cloned.
+    ///
+    /// Unreachable in practice: each caller passes the property its value was
+    /// already checked against at typecheck time.
+    UnsatisfiedProperty(TypeProperty),
 }
 
 impl From<OutOfGas> for BorrowedUnparseError {
@@ -2730,7 +2789,11 @@ mod test_untypers {
             .into_micheline_optimized_legacy(&owned_arena, &mut owned_gas)
             .unwrap();
         let borrowed = value
-            .clone_into_micheline_optimized_legacy(&borrowed_arena, &mut borrowed_gas)
+            .clone_into_micheline_optimized_legacy(
+                &borrowed_arena,
+                &mut borrowed_gas,
+                None,
+            )
             .unwrap();
 
         assert_eq!(borrowed, owned);
@@ -2751,12 +2814,7 @@ mod test_untypers {
         }
 
         #[test]
-        fn borrowed_and_owned_pushable_unparsers_match(
-            typed in TS::typed_value_and_type().prop_filter(
-                "APPLY accepts only pushable captures",
-                |typed| typed.ty.ensure_prop(&mut Gas::unmetered(), TypeProperty::Pushable).is_ok(),
-            )
-        ) {
+        fn borrowed_and_owned_unparsers_match(typed in TS::typed_value_and_type()) {
             assert_borrowed_owned_unparse_match(&typed.val);
         }
     }
@@ -2836,11 +2894,13 @@ mod test_untypers {
 
     #[test]
     fn borrowed_unparser_rejects_non_pushable_values_without_panicking() {
-        // `operation` is the only variant the borrowed walk still refuses:
-        // it is neither pushable nor storable, so nothing can reach this
-        // walk carrying one. `big_map` and `ticket` used to be refused too,
-        // until the returned storage started being unparsed through here
-        // (L2-1840) — see `borrowed_unparser_matches_owned_on_storage_values`.
+        // `operation` is the only variant the borrowed walk refuses. A caller
+        // that restricts the walk is told so through the property check, which
+        // fires before the arm is reached; under `restrict_to: None` the arm
+        // itself answers `UnsupportedUnparsing`. `big_map` and `ticket` are the
+        // converse case: refused outright until the returned storage started
+        // being unparsed through here (L2-1840) — see
+        // `borrowed_unparser_matches_owned_on_storage_values`.
         let arena = Arena::new();
         let value = TypedValue::new_operation(
             Operation::SetDelegate(michelson_operation::SetDelegate(None)),
@@ -2848,8 +2908,14 @@ mod test_untypers {
         );
 
         assert_eq!(
-            value.clone_into_micheline_optimized_legacy(&arena, &mut Gas::default()),
-            Err(BorrowedUnparseError::NonPushable)
+            value.clone_into_micheline_optimized_legacy(
+                &arena,
+                &mut Gas::default(),
+                Some(TypeProperty::Pushable)
+            ),
+            Err(BorrowedUnparseError::UnsatisfiedProperty(
+                TypeProperty::Pushable
+            ))
         );
     }
 
