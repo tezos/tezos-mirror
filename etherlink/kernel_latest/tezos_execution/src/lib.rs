@@ -13169,4 +13169,135 @@ mod tests {
         assert_eq!(own_after.nonce, 0);
         assert_eq!(crac_after.nonce, 1);
     }
+
+    /// Pins the unparser contract the receipt sites in
+    /// [`execute_pending_operations`] rely on for L2-1831 and L2-1836.
+    ///
+    /// Scope, stated precisely because it is narrower than it looks. The
+    /// consuming and borrowing unparsers are observationally equivalent —
+    /// same output, same charged gas — and differ only in peak heap. So no
+    /// test here can detect which one a receipt site calls, and reverting a
+    /// site to `TypedValue::unwrap_rc(..)` would leave these green. What they
+    /// do guard is the contract that makes borrowing worth doing: that
+    /// reading through the `Rc` copies nothing, retains nothing, and charges
+    /// before it allocates. Break any of those and the sites become unsafe
+    /// again even while still calling the borrowed walk.
+    ///
+    /// The heap exhaustion itself is not reproducible as a unit test — it
+    /// needs a payload measured in gigabytes. Bounding it, rather than
+    /// reproducing it, is what
+    /// [`an_oversized_payload_runs_out_of_gas_instead_of_allocating`] covers.
+    ///
+    /// These assert on `Rc` identity and refcounts rather than on values,
+    /// because a copy compares equal to its original: only asking whether two
+    /// references denote one allocation distinguishes them.
+    mod receipt_payloads_are_not_copied {
+        use super::*;
+        use pretty_assertions::assert_eq;
+        use std::rc::Rc;
+
+        /// A payload big enough that a copy is obvious in a profile, small
+        /// enough to stay a fast unit test.
+        fn payload() -> Rc<TypedValue<'static>> {
+            Rc::new(TypedValue::Bytes(vec![0xab; 64 * 1024]))
+        }
+
+        /// L2-1831: a `DUP`ed operation's occurrences share one parameter, and
+        /// unparsing each occurrence's receipt must leave that sharing intact.
+        ///
+        /// Reverting the site to `TypedValue::unwrap_rc(param)` fails this:
+        /// at a strong count above one `try_unwrap` cannot succeed, so it
+        /// deep-copies the 64 KiB buffer — unmetered — once per occurrence.
+        #[test]
+        fn a_shared_transfer_parameter_survives_its_receipt_unparse() {
+            let parser = Parser::new();
+            let mut gas = Gas::default();
+
+            let param = payload();
+            // Two occurrences of one `DUP`ed operation, as
+            // `NIL operation; DUP 2; CONS; SWAP; CONS` produces.
+            let second_occurrence = Rc::clone(&param);
+            let before = Rc::as_ptr(&param);
+            assert_eq!(Rc::strong_count(&param), 2);
+
+            for _ in 0..2 {
+                param
+                    .clone_into_micheline_optimized_legacy(&parser.arena, &mut gas)
+                    .expect("a transfer parameter is Passable, so never NonPushable");
+            }
+
+            assert_eq!(
+                Rc::as_ptr(&param),
+                before,
+                "the receipt must read through the Rc, not reallocate the payload"
+            );
+            assert_eq!(
+                Rc::strong_count(&param),
+                2,
+                "unparsing both receipts must not clone the shared payload"
+            );
+            assert!(
+                Rc::ptr_eq(&param, &second_occurrence),
+                "both occurrences must still denote one allocation"
+            );
+        }
+
+        /// L2-1836: borrowing for the receipt leaves the origination's storage
+        /// uniquely owned, so the `unwrap_rc` feeding `originate_contract`
+        /// moves instead of copying.
+        ///
+        /// The previous code was `unwrap_rc(storage.clone())`, where the clone
+        /// bumps the count before `try_unwrap` inspects it — so it could never
+        /// succeed, and *every* origination paid a copy, shared or not. This
+        /// pins the count at one, which is what makes the later move possible.
+        #[test]
+        fn a_create_contract_receipt_leaves_its_storage_uniquely_owned() {
+            let parser = Parser::new();
+            let mut gas = Gas::default();
+
+            let storage = payload();
+            assert_eq!(Rc::strong_count(&storage), 1);
+
+            storage
+                .clone_into_micheline_optimized_legacy(&parser.arena, &mut gas)
+                .expect("an originated storage is Storable, so never NonPushable");
+
+            assert_eq!(
+                Rc::strong_count(&storage),
+                1,
+                "the receipt must not retain a reference, so the origination's \
+                 unwrap_rc moves rather than copying the storage a second time"
+            );
+            // The move is now possible: nothing else holds the payload.
+            assert!(Rc::try_unwrap(storage).is_ok());
+        }
+
+        /// The bound itself: the walk charges before it clones a leaf, so a
+        /// payload too large for the remaining gas fails *without* allocating
+        /// the copy. This is what turns an abort into a recoverable error.
+        ///
+        /// Swapping a charging constructor (`Micheline::bytes_cloned`) for a
+        /// non-charging one would let this budget through and fail the test.
+        #[test]
+        fn an_oversized_payload_runs_out_of_gas_instead_of_allocating() {
+            let parser = Parser::new();
+            // Far below `unparsing_cost::bytes` for 64 KiB, which is
+            // 125 + 10 milligas per byte.
+            let mut gas = Gas::new(1_000);
+
+            let param = payload();
+            let result =
+                param.clone_into_micheline_optimized_legacy(&parser.arena, &mut gas);
+
+            assert!(
+                matches!(result, Err(mir::ast::BorrowedUnparseError::OutOfGas)),
+                "expected a bounded out-of-gas error, got {result:?}"
+            );
+            assert_eq!(
+                Rc::strong_count(&param),
+                1,
+                "running out of gas must not have left a copy behind"
+            );
+        }
+    }
 }
