@@ -45,6 +45,7 @@ type argument =
   | RPC_additional_addr of string
   | RPC_additional_addr_external of string
   | Max_active_rpc_connections of int
+  | Max_request_body of int
   | Enable_http_cache_headers
   | Disable_context_pruning
   | Storage_maintenance_delay of string
@@ -83,6 +84,7 @@ let make_argument = function
   | RPC_additional_addr_external addr -> ["--external-rpc-addr"; addr]
   | Max_active_rpc_connections n ->
       ["--max-active-rpc-connections"; string_of_int n]
+  | Max_request_body n -> ["--rpc-max-request-body"; string_of_int n]
   | Enable_http_cache_headers -> ["--enable-http-cache-headers"]
   | Disable_context_pruning -> ["--disable-context-pruning"]
   | Storage_maintenance_delay x -> ["--storage-maintenance-delay"; x]
@@ -111,6 +113,7 @@ let is_redundant = function
   | Metadata_size_limit _, Metadata_size_limit _
   | Version, Version
   | Max_active_rpc_connections _, Max_active_rpc_connections _
+  | Max_request_body _, Max_request_body _
   | Enable_http_cache_headers, Enable_http_cache_headers
   | Disable_context_pruning, Disable_context_pruning
   | Storage_maintenance_delay _, Storage_maintenance_delay _
@@ -141,6 +144,7 @@ let is_redundant = function
   | RPC_additional_addr_external _, _
   | Version, _
   | Max_active_rpc_connections _, _
+  | Max_request_body _, _
   | Enable_http_cache_headers, _
   | Disable_context_pruning, _
   | Storage_maintenance_delay _, _
