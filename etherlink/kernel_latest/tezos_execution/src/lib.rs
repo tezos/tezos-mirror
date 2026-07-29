@@ -24,6 +24,7 @@ use num_traits::ops::checked::CheckedSub;
 use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::rc::Rc;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_ethereum::wei::michelson_gas_to_mutez;
@@ -1109,10 +1110,9 @@ where
                 let script = Script {
                     code: micheline_code.encode(tc_ctx.gas())?.map_err(encode_err)?,
                     // Borrowed, so the receipt's copy of the storage costs
-                    // nothing and `storage` stays uniquely owned for the
-                    // origination below — where `unwrap_rc` then moves rather
-                    // than copies. Taking it by value here would copy it, and
-                    // copy it again below, with the original still live.
+                    // nothing and the origination below still gets the payload
+                    // behind its `Rc`. Taking it by value here would copy it,
+                    // with the original still live.
                     storage: storage
                         .clone_into_micheline_optimized_legacy(
                             &parser.arena,
@@ -1134,7 +1134,11 @@ where
                             &frame.sender,
                             &amount,
                             Some(&script.code),
-                            TypedValue::unwrap_rc(storage),
+                            // Shared, not unwrapped: the other occurrences of
+                            // a `DUP`ed operation hold the same payload, so
+                            // `unwrap_rc` here would deep-copy it, unmetered
+                            // and before anything charges for it (L2-1836).
+                            storage,
                             &Origin::Native,
                         );
                         match receipt {
@@ -2164,23 +2168,38 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1>(
         })
 }
 
+/// Dump the initial storage's big maps and serialize it.
+///
+/// The storage is only ever read here, so it is taken behind its `Rc`. An
+/// internal `CREATE_CONTRACT` reached through a `DUP`ed operation shares its
+/// storage with the other occurrences, so taking it by value would deep-copy
+/// it — unmetered, and before either the walk or the unparser charges
+/// anything (L2-1836).
 fn handle_storage_with_big_maps<'a, Host: StorageV1>(
     ctx: &mut TcCtx<'a, Host>,
-    mut storage: TypedValue<'a>,
+    storage: Rc<TypedValue<'a>>,
 ) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
     let parser = Parser::new();
 
-    // Dump big_map allocation, starting with empty big_maps
-    mir::ast::big_map::dump_big_map_updates(ctx, &[], &mut storage, false)
-        .map_err(|err| OriginationError::MirBigMapAllocation(err.to_string()))?;
+    // Dump big_map allocation, starting with empty big_maps. The walk rebuilds
+    // only the spine down to a big map, and returns `None` — leaving `storage`
+    // untouched and still shared — when there is none.
+    let dumped =
+        mir::ast::big_map::dump_big_map_updates_shared(ctx, &[], &storage, false)
+            .map_err(|err| OriginationError::MirBigMapAllocation(err.to_string()))?;
     // Drain the diff before the fallible encode below: otherwise an
     // encode failure leaves `ctx.big_map_diff` half-populated and the
     // next operation in the same batch inherits stale entries.
     let big_map_diff_order = ctx.interpret_context.take_big_map_diff_order();
     let lazy_storage_diff =
         convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff), big_map_diff_order);
-    let storage = storage
-        .into_micheline_optimized_legacy(&parser.arena, ctx.gas())?
+    // Borrowed unparse, for the same reason: it reads through the `Rc` and
+    // clones only leaf payloads, through constructors that charge first.
+    let storage = dumped
+        .as_ref()
+        .unwrap_or(&storage)
+        .clone_into_micheline_optimized_legacy(&parser.arena, ctx.gas())
+        .map_err(OriginationError::from)?
         .encode(ctx.gas())?
         .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     Ok((storage, lazy_storage_diff))
@@ -2198,7 +2217,7 @@ pub fn originate_contract<'a, Host>(
     sender_account: &impl TezosAccount,
     initial_balance: &Narith,
     script_code: Option<&[u8]>,
-    script_storage: TypedValue<'a>,
+    script_storage: Rc<TypedValue<'a>>,
     origin: &Origin,
 ) -> Result<OriginationSuccess, OriginationError>
 where
@@ -2890,7 +2909,7 @@ where
                     source_account,
                     balance,
                     Some(&script.code),
-                    storage,
+                    Rc::new(storage),
                     &Origin::Native,
                 ),
                 Err(err) => Err(err),
@@ -13242,14 +13261,17 @@ mod tests {
             );
         }
 
-        /// L2-1836: borrowing for the receipt leaves the origination's storage
-        /// uniquely owned, so the `unwrap_rc` feeding `originate_contract`
-        /// moves instead of copying.
+        /// L2-1836, unique-operation case: borrowing for the receipt retains
+        /// no reference, so a `CREATE_CONTRACT` that was never `DUP`ed still
+        /// holds its storage alone afterwards.
         ///
         /// The previous code was `unwrap_rc(storage.clone())`, where the clone
         /// bumps the count before `try_unwrap` inspects it — so it could never
-        /// succeed, and *every* origination paid a copy, shared or not. This
-        /// pins the count at one, which is what makes the later move possible.
+        /// succeed, and *every* origination paid a copy, shared or not.
+        ///
+        /// This is only half the picture: see
+        /// [`a_duped_create_contract_shares_one_storage_across_occurrences`]
+        /// for why unique ownership here must not be relied on downstream.
         #[test]
         fn a_create_contract_receipt_leaves_its_storage_uniquely_owned() {
             let parser = Parser::new();
@@ -13270,6 +13292,55 @@ mod tests {
             );
             // The move is now possible: nothing else holds the payload.
             assert!(Rc::try_unwrap(storage).is_ok());
+        }
+
+        /// L2-1836, the case that actually bites: a `DUP`ed `CREATE_CONTRACT`
+        /// puts the *same* storage in every occurrence, so the origination
+        /// path cannot assume unique ownership.
+        ///
+        /// ```michelson
+        /// CREATE_CONTRACT { parameter unit ; storage bytes ; ... } ;
+        /// NIL operation ; DUP 2 ; CONS ; SWAP ; CONS ;
+        /// ```
+        ///
+        /// Both occurrences' `OperationInfo` hold `Rc` clones of one payload,
+        /// so a `TypedValue::unwrap_rc(storage)` feeding `originate_contract`
+        /// finds a strong count above one, fails to `try_unwrap`, and
+        /// deep-copies — unmetered, and before `handle_storage_with_big_maps`
+        /// charges anything. Threading the `Rc` through instead is what
+        /// removes that copy.
+        #[test]
+        fn a_duped_create_contract_shares_one_storage_across_occurrences() {
+            let parser = Parser::new();
+            let mut gas = Gas::default();
+
+            // One storage, as `CREATE_CONTRACT` builds it...
+            let storage = payload();
+            // ...and two occurrences of the operation carrying it, as
+            // `DUP 2; CONS; SWAP; CONS` produces. Cloning an `OperationInfo`
+            // clones this field, which is an `Rc` bump.
+            let occurrences = [Rc::clone(&storage), Rc::clone(&storage)];
+
+            assert!(
+                Rc::ptr_eq(&occurrences[0], &occurrences[1]),
+                "a DUPed operation's occurrences must share one storage"
+            );
+            assert!(
+                Rc::strong_count(&occurrences[0]) >= 2,
+                "so unwrap_rc on this path could never move — it would copy"
+            );
+
+            // Unparsing the first occurrence's receipt must leave the second
+            // occurrence's storage alone, which is what lets the origination
+            // take it behind the pointer rather than by value.
+            occurrences[0]
+                .clone_into_micheline_optimized_legacy(&parser.arena, &mut gas)
+                .expect("an originated storage is Storable, so never NonPushable");
+
+            assert!(
+                Rc::ptr_eq(&storage, &occurrences[1]),
+                "the receipt must not have detached the shared storage"
+            );
         }
 
         /// The bound itself: the walk charges before it clones a leaf, so a
