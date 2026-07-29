@@ -54,7 +54,7 @@ fn run_contract<'a>(
             mir::typechecker::AllowForgedLazyStorageId::No,
         )
         .unwrap();
-    let TypedValue::Int(storage_int) = &new_storage else {
+    let TypedValue::Int(storage_int) = new_storage.as_ref() else {
         unreachable!()
     };
     println!("{storage_int}");
