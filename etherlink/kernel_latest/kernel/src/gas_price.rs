@@ -164,6 +164,7 @@ mod test {
     use crate::chains::{TezlinkBlockConstants, TezosXBlockConstants};
     use primitive_types::H160;
     use proptest::prelude::*;
+    use revm::primitives::hardfork::SpecId;
     use std::collections::VecDeque;
     use tezos_ethereum::block::BlockConstants;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -207,6 +208,7 @@ mod test {
                 block_fees,
                 crate::block::GAS_LIMIT,
                 H160::zero(),
+                &SpecId::default(),
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level: 0.into(),

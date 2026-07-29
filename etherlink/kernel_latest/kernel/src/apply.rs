@@ -7,17 +7,13 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
+use evm_inspectors::TracerInput;
 use primitive_types::{H160, U256};
-use revm::primitives::alloy_primitives::IntoLogData;
-use revm::primitives::hardfork::SpecId;
 use revm::primitives::{Address, Bytes, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
-use revm_etherlink::inspectors::call_tracer::CallTracerInput;
-use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
-use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
-    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
+    XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
 };
 use revm_etherlink::precompiles::send_outbox_message::{
     FastWithdrawalInterface, RouterInterface, Withdrawal,
@@ -48,17 +44,13 @@ use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::{CracId, TezosXJournal};
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
-use crate::chains::{DebugFeatures, EvmLimits};
+use crate::chains::{
+    michelson_milligas_to_evm_gas, DebugFeatures, EvmLimits, TezlinkBlockConstants,
+};
 use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
+use crate::journal::{self, close_tezosx_journal};
 use crate::transaction::{Transaction, TransactionContent};
-
-sol! {
-    /// Emitted once at the top of every EVM transaction receipt that
-    /// involves cross-runtime calls, whether incoming or outgoing.
-    /// Allows indexers to correlate operations across derived blocks.
-    event CrossRuntimeCallIdEvent(string crossRuntimeCallId);
-}
 
 pub struct TransactionReceiptInfo {
     pub tx_hash: TransactionHash,
@@ -270,36 +262,22 @@ pub enum RuntimeTransactionResult {
 pub fn extract_cross_runtime_effects(
     journal: &mut TezosXJournal,
     consumed_milligas: u64,
+    block_constants: &TezlinkBlockConstants,
 ) -> Vec<CrossRuntimeEffect> {
     let mut effects = Vec::new();
 
     if let Some(tx_info) = journal.evm.take_crac_data() {
         let crac_id = journal.crac_id().to_string();
-
-        // Build a synthetic CrossRuntimeCallIdEvent log as the first log in the receipt.
-        let crac_id_log = revm::primitives::Log {
-            address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-            data: CrossRuntimeCallIdEvent {
-                crossRuntimeCallId: crac_id.clone(),
-            }
-            .to_log_data(),
-        };
-
-        let mut logs = vec![crac_id_log];
-        logs.extend(journal.evm.inner.logs.iter().cloned());
+        let logs = std::mem::take(&mut journal.evm.inner.logs);
 
         effects.push(CrossRuntimeEffect::Evm(EvmCracEffect {
             crac_id,
             logs,
             source: H160(*tx_info.source.0),
-            gas_used: U256::from(
-                tezosx_interfaces::gas::convert(
-                    RuntimeId::Tezos,
-                    RuntimeId::Ethereum,
-                    consumed_milligas,
-                )
-                .unwrap_or(0),
-            ),
+            gas_used: U256::from(michelson_milligas_to_evm_gas(
+                consumed_milligas,
+                block_constants.michelson_to_evm_gas_multiplier,
+            )),
         }));
     }
 
@@ -581,8 +559,6 @@ pub fn revm_run_transaction<Host>(
     effective_gas_price: U256,
     maximum_gas_per_transaction: u64,
     authorization_list: Option<AuthorizationList>,
-    spec_id: &SpecId,
-    tracer_input: Option<TracerInput>,
     is_simulation: bool,
     origin: revm_etherlink::TransactionOrigin,
 ) -> Result<ExecutionOutcome, Error>
@@ -618,7 +594,6 @@ where
         host,
         registry,
         journal,
-        *spec_id,
         block_constants,
         transaction_hash,
         Address::from_slice(&caller.0),
@@ -627,35 +602,6 @@ where
         gas_data,
         revm::primitives::U256::from_le_slice(&bytes),
         authorization_list.map(signed_authorization),
-        tracer_input.map(|tracer_input| match tracer_input {
-            TracerInput::CallTracer(CallTracerInput {
-                transaction_hash,
-                config,
-            }) => revm_etherlink::inspectors::TracerInput::CallTracer(
-                revm_etherlink::inspectors::call_tracer::CallTracerInput {
-                    config: revm_etherlink::inspectors::call_tracer::CallTracerConfig {
-                        only_top_call: config.only_top_call,
-                        with_logs: config.with_logs,
-                    },
-                    transaction_hash: transaction_hash.map(|hash| B256::from(hash.0)),
-                },
-            ),
-            TracerInput::StructLogger(StructLoggerInput {
-                transaction_hash,
-                config,
-            }) => revm_etherlink::inspectors::TracerInput::StructLogger(
-                revm_etherlink::inspectors::struct_logger::StructLoggerInput {
-                    config:
-                        revm_etherlink::inspectors::struct_logger::StructLoggerConfig {
-                            enable_memory: config.enable_memory,
-                            enable_return_data: config.enable_return_data,
-                            disable_stack: config.disable_stack,
-                            disable_storage: config.disable_storage,
-                        },
-                    transaction_hash: transaction_hash.map(|hash| B256::from(hash.0)),
-                },
-            ),
-        }),
         is_simulation,
         origin,
     )
@@ -672,7 +618,6 @@ fn apply_ethereum_transaction_common<Host>(
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     is_delayed: bool,
     tracer_input: Option<TracerInput>,
-    spec_id: &SpecId,
     limits: &EvmLimits,
     crac_id: CracId,
     http_trace_enabled: bool,
@@ -740,22 +685,28 @@ where
     let call_data = transaction.data.clone();
     log_transaction_type(to, &call_data);
     let value = transaction.value;
-    let operation_hash = TezosXJournal::synthetic_operation_hash(
-        &crac_id,
-        block_constants.chain_id.low_u64(),
-        block_constants.number.low_u64(),
-    );
+    // An EVM-entered synthetic Michelson manager operation has no real
+    // Tezos operation hash, so the origination-nonce seed is derived; the
+    // tracer, however, must key off the Ethereum transaction hash this
+    // transaction's receipt reports.
+    let operation_hashes = journal::TezosXHashes {
+        evm: B256::from(transaction_hash),
+        michelson: TezosXJournal::synthetic_operation_hash(
+            &crac_id,
+            block_constants.chain_id.low_u64(),
+            block_constants.number.low_u64(),
+        ),
+    };
 
-    let mut journal =
-        TezosXJournal::new(crac_id, operation_hash, block_constants.clone());
-    // Fold the block's prior internal ops into this op's cap (anti-DoS).
-    journal
-        .michelson
-        .set_internal_operation_counter(internal_operations_base);
-    journal.set_http_trace_enabled(http_trace_enabled);
-    if debug_features.enable_debug_precompiles {
-        journal.enable_debug_precompiles();
-    }
+    let mut journal = journal::prepare_tezosx_journal(
+        crac_id,
+        &operation_hashes,
+        block_constants,
+        http_trace_enabled,
+        debug_features,
+        internal_operations_base,
+        tracer_input,
+    );
 
     let run_result = revm_run_transaction(
         host,
@@ -771,8 +722,6 @@ where
         effective_gas_price,
         limits.maximum_gas_limit,
         transaction.authorization_list.clone(),
-        spec_id,
-        tracer_input,
         false,
         TransactionOrigin::UserInput {
             access_list: revm_etherlink::helpers::legacy::access_list_to_revm(
@@ -792,11 +741,19 @@ where
         &journal,
     );
 
-    let execution_outcome = run_result?;
+    let execution_outcome = match run_result {
+        Ok(outcome) => outcome,
+        Err(err) => {
+            close_tezosx_journal(host, journal, None)?;
+            return Err(err.into());
+        }
+    };
 
     // Drain any CRAC receipts produced by EVM→Michelson calls during
     // this transaction so they can be included in the Michelson runtime block.
     let crac_receipts = drain_pending_crac_receipts(&mut journal);
+
+    close_tezosx_journal(host, journal, Some(&execution_outcome.result))?;
 
     let transaction_result =
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
@@ -836,7 +793,6 @@ pub fn pure_xtz_deposit<Host>(
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     maximum_gas_limit: u64,
-    spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, Error>
 where
@@ -855,28 +811,35 @@ where
     let to = Some(alloy_to_h160(&XTZ_BRIDGE_SOL_ADDR));
     let gas_limit = XTZ_DEPOSIT_EXECUTION_COST;
     let value = deposit.amount;
-    // Prefund the feeder address for the xtz deposit. The REVM credit-
-    // checkpoint mechanism (`TransactionOrigin::CrossRuntime { credit }`)
-    // can't be reused here: it wraps the transaction in an extra
-    // `journaled_state.checkpoint()`, which increments REVM's call depth
-    // and shifts the top-level frame off depth 0 — breaking the
-    // `CallTracer` whose flush hook keys on `depth == 0`. We therefore
-    // keep the prefund out-of-band and explicitly refund on every
-    // !is_success() exit below.
+    // Prefund the feeder address, refunded on every !is_success() exit
+    // below. `TransactionOrigin::CrossRuntime { credit }` would revert
+    // the credit automatically, but it also skips the journal commit
+    // this top-level transaction needs.
     caller_account.add_balance(host, u256_to_alloy(&value))?;
     let call_data = handle_xtz_depositCall {
         deposit: SolXTZDeposit::from(deposit),
     }
     .abi_encode();
     let effective_gas_price = block_constants.base_fee_per_gas();
-    // Seed the journal with the deposit's own transaction hash so any
-    // origination nonce stays deterministic and unique even though the
-    // kernel-managed XTZ bridge does not NAC into Michelson today.
-    let mut journal = TezosXJournal::new(
+    // Both hashes are the deposit's own transaction hash: it is what the
+    // deposit's receipt reports, so the tracer keys off it, and reusing it
+    // as the origination-nonce seed keeps that seed deterministic and
+    // unique even though the kernel-managed XTZ bridge does not NAC into
+    // Michelson today.
+    let operation_hashes = journal::TezosXHashes {
+        evm: B256::from(transaction_hash),
+        michelson: tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+    };
+    let mut journal = journal::prepare_tezosx_journal(
         CracId::mock(RuntimeId::Ethereum),
-        tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
-        block_constants.clone(),
+        &operation_hashes,
+        &block_constants,
+        false, // http_trace_enabled,
+        &DebugFeatures::default(),
+        0,
+        tracer_input,
     );
+
     match revm_run_transaction(
         host,
         registry,
@@ -891,14 +854,13 @@ where
         effective_gas_price,
         maximum_gas_limit,
         None,
-        spec_id,
-        tracer_input,
         false,
         TransactionOrigin::UserInput {
             access_list: revm::context::transaction::AccessList::default(),
         },
     ) {
         Ok(execution_outcome) => {
+            close_tezosx_journal(host, journal, Some(&execution_outcome.result))?;
             // An EVM-internal revert returns `Ok` with a non-success result,
             // so we must also refund the prefund here, otherwise the deposit
             // value is stranded on FEED_DEPOSIT_ADDR while the receiver is
@@ -906,9 +868,11 @@ where
             if !execution_outcome.result.is_success() {
                 caller_account.sub_balance(host, u256_to_alloy(&value))?;
             }
+
             Ok(execution_outcome)
         }
         Err(err) => {
+            close_tezosx_journal(host, journal, None)?;
             // Something went wrong, we remove the added balance for the xtz deposit.
             caller_account.sub_balance(host, u256_to_alloy(&value))?;
             Err(err)
@@ -977,7 +941,6 @@ pub fn pure_fa_deposit<Host>(
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     maximum_gas_limit: u64,
-    spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, Error>
 where
@@ -1007,15 +970,26 @@ where
         .abi_encode(),
     };
     let effective_gas_price = block_constants.base_fee_per_gas();
-    // Seed the journal with the deposit's own transaction hash so any
-    // origination nonce stays deterministic and unique even though the
-    // kernel-managed FA bridge does not NAC into Michelson today.
-    let mut journal = TezosXJournal::new(
+    // Both hashes are the deposit's own transaction hash, as in
+    // `pure_xtz_deposit`: it is what the deposit's receipt reports, so the
+    // tracer keys off it, and reusing it as the origination-nonce seed keeps
+    // that seed deterministic and unique even though the kernel-managed FA
+    // bridge does not NAC into Michelson today.
+    let operation_hashes = journal::TezosXHashes {
+        evm: B256::from(transaction_hash),
+        michelson: tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
+    };
+    let mut journal = journal::prepare_tezosx_journal(
         CracId::mock(RuntimeId::Ethereum),
-        tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
-        block_constants.clone(),
+        &operation_hashes,
+        &block_constants,
+        false, // http_trace_enabled,
+        &DebugFeatures::default(),
+        0,
+        tracer_input,
     );
-    revm_run_transaction(
+
+    let outcome = revm_run_transaction(
         host,
         registry,
         &mut journal,
@@ -1029,13 +1003,22 @@ where
         effective_gas_price,
         maximum_gas_limit,
         None,
-        spec_id,
-        tracer_input,
         false,
         TransactionOrigin::UserInput {
             access_list: revm::context::transaction::AccessList::default(),
         },
-    )
+    );
+
+    match outcome {
+        Ok(outcome) => {
+            close_tezosx_journal(host, journal, Some(&outcome.result))?;
+            Ok(outcome)
+        }
+        Err(err) => {
+            close_tezosx_journal(host, journal, None)?;
+            Err(err)
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1046,7 +1029,6 @@ fn apply_fa_deposit<Host>(
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     tracer_input: Option<TracerInput>,
-    spec_id: &SpecId,
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, Error>
 where
@@ -1059,7 +1041,6 @@ where
         block_constants,
         transaction_hash,
         limits.maximum_gas_limit,
-        spec_id,
         tracer_input,
     )?;
 
@@ -1114,17 +1095,52 @@ pub struct EvmCracEffect {
     pub gas_used: U256,
 }
 
+pub struct TezosExecutionInfo {
+    pub op: AppliedOperation,
+    pub cross_runtime_effects: Vec<CrossRuntimeEffect>,
+    /// Total milligas consumed by the batch, computed from the gas
+    /// tracker (correct for all outcomes including Failed).
+    pub consumed_milligas: u64,
+}
+
+impl TezosExecutionInfo {
+    /// Build the EVM [`revm::context::result::ExecutionResult`] describing this applied Tezos
+    /// operation, to feed the journal-owned tracer in [`crate::journal::close_tezosx_journal`].
+    pub fn to_execution_result(
+        &self,
+        michelson_to_evm_gas_multiplier: u64,
+    ) -> revm::context::result::ExecutionResult {
+        use revm::context::result::{ExecutionResult, Output, ResultGas, SuccessReason};
+        use tezos_tezlink::operation_result::OperationDataAndMetadata;
+        let gas_used = crate::chains::michelson_milligas_to_evm_gas(
+            self.consumed_milligas,
+            michelson_to_evm_gas_multiplier,
+        );
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            self.op.op_and_receipt;
+        let is_success = batch.operations.iter().all(|op| op.receipt.is_applied());
+        if is_success {
+            ExecutionResult::Success {
+                reason: SuccessReason::Stop,
+                gas: ResultGas::new(gas_used, gas_used, 0, 0, 0),
+                logs: vec![],
+                output: Output::Call(Bytes::new()),
+            }
+        } else {
+            ExecutionResult::Revert {
+                gas: ResultGas::new(gas_used, gas_used, 0, 0, 0),
+                logs: vec![],
+                output: Bytes::new(),
+            }
+        }
+    }
+}
+
 /// Enum distinguishing between Ethereum and Tezos execution info.
 #[allow(clippy::large_enum_variant)]
 pub enum RuntimeExecutionInfo {
     Ethereum(EthereumExecutionInfo),
-    Tezos {
-        op: AppliedOperation,
-        cross_runtime_effects: Vec<CrossRuntimeEffect>,
-        /// Total milligas consumed by the batch, computed from the gas
-        /// tracker (correct for all outcomes including Failed).
-        consumed_milligas: u64,
-    },
+    Tezos(TezosExecutionInfo),
 }
 
 pub enum ExecutionResult<T> {
@@ -1244,11 +1260,11 @@ where
             consumed_milligas,
         } => {
             push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
-            Ok(RuntimeExecutionInfo::Tezos {
+            Ok(RuntimeExecutionInfo::Tezos(TezosExecutionInfo {
                 op,
                 cross_runtime_effects,
                 consumed_milligas,
-            })
+            }))
         }
     }
 }
@@ -1265,7 +1281,6 @@ pub fn apply_transaction<Host>(
     index: u32,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
-    spec_id: &SpecId,
     limits: &EvmLimits,
     http_trace_enabled: bool,
     // Block's prior internal-op count, threaded so the EVM-origin delayed and
@@ -1276,10 +1291,6 @@ pub fn apply_transaction<Host>(
 where
     Host: StorageV1,
 {
-    let tracer_input = get_tracer_configuration(
-        revm::primitives::B256::from_slice(&transaction.tx_hash),
-        tracer_input,
-    );
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
@@ -1289,7 +1300,6 @@ where
             transaction.tx_hash,
             false,
             tracer_input,
-            spec_id,
             limits,
             crac_id,
             http_trace_enabled,
@@ -1304,7 +1314,6 @@ where
             transaction.tx_hash,
             true,
             tracer_input,
-            spec_id,
             limits,
             crac_id,
             http_trace_enabled,
@@ -1320,7 +1329,6 @@ where
                 block_constants,
                 transaction.tx_hash,
                 tracer_input,
-                spec_id,
                 limits,
             )?
         }
@@ -1333,7 +1341,6 @@ where
                 block_constants,
                 transaction.tx_hash,
                 tracer_input,
-                spec_id,
                 limits,
             )?
         }
@@ -1375,6 +1382,7 @@ pub(crate) mod tests {
         fees::gas_for_fees,
     };
     use primitive_types::{H160, U256};
+    use revm::primitives::hardfork::SpecId;
     use revm_etherlink::{
         helpers::legacy::{h160_to_alloy, u256_to_alloy},
         storage::world_state_handler::StorageAccount,
@@ -1401,6 +1409,7 @@ pub(crate) mod tests {
             block_fees,
             crate::block::GAS_LIMIT,
             H160::zero(),
+            &SpecId::default(),
         )
     }
 

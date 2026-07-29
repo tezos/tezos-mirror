@@ -28,12 +28,11 @@ use mir::parser::Parser;
 use mir::typechecker::{
     typecheck_value, typecheck_view, AllowForgedLazyStorageId, TcError,
 };
-use tezos_crypto_rs::hash::OperationHash;
 use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_execution::account_storage::TezosAccount;
 use tezos_execution::context;
 use tezos_execution::mir_ctx::{Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx};
-use tezos_execution::{OriginationNonce, TezlinkOperationGas};
+use tezos_execution::TezlinkOperationGas;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -246,14 +245,13 @@ where
     };
     // Views have no notion of origination or of a running batch: no
     // internal operations are produced (typechecked away by `in_view`)
-    // and no new contract can be originated, so both the operation
-    // hash feeding the origination nonce and the per-operation counter
-    // are left at default — they are never observed by view code.
-    let mut nonce = OriginationNonce::initial(OperationHash::default());
+    // and no new contract can be originated, so the per-operation
+    // counter is left at default — it is never observed by view code.
+    // The origination nonce is not set up at all: it lives on the
+    // journal, and view code cannot reach it.
     let mut counter = 0u128;
     let mut operation_ctx = OperationCtx {
         source: &source_account,
-        origination_nonce: &mut nonce,
         counter: &mut counter,
         // Views cannot emit operations, so no internal-operation
         // replay can occur; the set is left empty.

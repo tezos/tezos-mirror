@@ -237,6 +237,7 @@ fn execute_transaction(
         tezos_experimental_features: false,
         chain_id: U256::from(1337),
         prevrandao: env.block.prevrandao,
+        spec_id,
     };
     let address = env.tx.transact_to.map(|addr| addr.to_fixed_bytes().into());
     let caller = env.tx.caller.to_fixed_bytes().into();
@@ -265,7 +266,6 @@ fn execute_transaction(
         host,
         &registry,
         &mut journal,
-        spec_id,
         &block_constants,
         None,
         caller,
@@ -274,7 +274,6 @@ fn execute_transaction(
         GasData::new(gas_limit, u256_to_u128(env.tx.gas_price), gas_limit),
         revm::primitives::U256::from_le_slice(&bytes),
         // TODO: add authorization list when Prague tests are enabled.
-        None,
         None,
         false,
         TransactionOrigin::UserInput { access_list },

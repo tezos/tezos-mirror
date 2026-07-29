@@ -7,7 +7,7 @@
 
 use crate::apply::{
     CrossRuntimeEffect, EthereumExecutionInfo, EvmCracEffect, RuntimeExecutionInfo,
-    TransactionReceiptInfo,
+    TezosExecutionInfo, TransactionReceiptInfo,
 };
 use crate::block_storage;
 use crate::blueprint_storage::{
@@ -26,12 +26,8 @@ use alloy_consensus::proofs::ordered_trie_root_with_encoder;
 use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
 use primitive_types::{H160, H256, U256};
+use revm::primitives::hardfork::SpecId;
 use revm_etherlink::helpers::legacy::alloy_to_log;
-use revm_etherlink::inspectors::call_tracer::CallTrace;
-use revm_etherlink::inspectors::storage::{
-    flush_call_traces, store_return_value, store_trace_failed, store_trace_gas,
-};
-use revm_etherlink::inspectors::TracerInput;
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
 use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};
@@ -269,6 +265,22 @@ fn decode_tx_objects(
     Ok(objects)
 }
 
+/// Deterministic hash of the fake EVM transaction mirroring a cross-runtime
+/// operation. The block number is included to ensure uniqueness across
+/// blocks, since the CRAC-ID only contains the transaction index within a
+/// block.
+pub(crate) fn compute_crac_fake_tx_hash(block_number: U256, crac_id: &str) -> [u8; 32] {
+    use sha3::{Digest, Keccak256};
+
+    let mut hasher = Keccak256::new();
+    hasher.update(b"CROSS-RUNTIME-CALL-TX");
+    let mut block_number_bytes = [0u8; 32];
+    block_number.to_big_endian(&mut block_number_bytes);
+    hasher.update(block_number_bytes);
+    hasher.update(crac_id.as_bytes());
+    hasher.finalize().into()
+}
+
 impl BlockInProgress {
     pub fn queue_length(&self) -> usize {
         self.tx_queue.len()
@@ -323,6 +335,7 @@ impl BlockInProgress {
 
     /// Derive `BlockConstants` based on current block in progress.
     /// Number and timestamp are taken from `self`.
+    #[allow(clippy::too_many_arguments)]
     pub fn constants(
         &self,
         chain_id: U256,
@@ -331,6 +344,7 @@ impl BlockInProgress {
         gas_limit: u64,
         coinbase: H160,
         tezos_experimental_features: bool,
+        spec_id: SpecId,
     ) -> BlockConstants {
         let timestamp = U256::from(self.timestamp.as_u64());
         let block_fees = BlockFees::new(
@@ -347,6 +361,7 @@ impl BlockInProgress {
             chain_id,
             tezos_experimental_features,
             prevrandao: None,
+            spec_id,
         }
     }
 
@@ -401,7 +416,6 @@ impl BlockInProgress {
         execution_info: RuntimeExecutionInfo,
         host: &mut Host,
         michelson_to_evm_gas_multiplier: u64,
-        tracer_input: Option<TracerInput>,
     ) -> Result<(), anyhow::Error>
     where
         Host: WithGas + StorageV1,
@@ -439,11 +453,11 @@ impl BlockInProgress {
                     .list
                     .extend(pending_crac_receipts);
             }
-            RuntimeExecutionInfo::Tezos {
+            RuntimeExecutionInfo::Tezos(TezosExecutionInfo {
                 op: operation_and_receipt,
                 cross_runtime_effects,
                 consumed_milligas,
-            } => {
+            }) => {
                 let cumulative_execution_gas =
                     crate::chains::michelson_milligas_to_evm_gas(
                         consumed_milligas,
@@ -459,11 +473,7 @@ impl BlockInProgress {
                 for effect in cross_runtime_effects {
                     match effect {
                         CrossRuntimeEffect::Evm(evm_effect) => {
-                            self.register_crac_evm_transaction(
-                                host,
-                                evm_effect,
-                                tracer_input,
-                            )?;
+                            self.register_crac_evm_transaction(evm_effect)?;
                         }
                     }
                 }
@@ -666,29 +676,11 @@ impl BlockInProgress {
     /// execution data. This transaction appears in the EVM block as if
     /// it were a regular transaction, carrying all logs emitted during
     /// cross-runtime calls from a foreign runtime.
-    fn register_crac_evm_transaction<Host>(
+    fn register_crac_evm_transaction(
         &mut self,
-        host: &mut Host,
         effect: EvmCracEffect,
-        tracer_input: Option<TracerInput>,
-    ) -> Result<(), anyhow::Error>
-    where
-        Host: StorageV1,
-    {
-        use revm::primitives::B256;
-        use sha3::{Digest, Keccak256};
-
-        // Compute deterministic tx hash from block number and CRAC-ID.
-        // The block number is included to ensure uniqueness across blocks,
-        // since the CRAC-ID only contains the transaction index within a
-        // block.
-        let mut hasher = Keccak256::new();
-        hasher.update(b"CROSS-RUNTIME-CALL-TX");
-        let mut block_number_bytes = [0u8; 32];
-        self.number.to_big_endian(&mut block_number_bytes);
-        hasher.update(block_number_bytes);
-        hasher.update(effect.crac_id.as_bytes());
-        let hash_bytes: [u8; 32] = hasher.finalize().into();
+    ) -> Result<(), anyhow::Error> {
+        let hash_bytes = compute_crac_fake_tx_hash(self.number, &effect.crac_id);
 
         // Neutral envelope: `from == to == originator alias`, carrying no
         // value. The originator (`X-Tezos-Source`) is the only invariant,
@@ -717,98 +709,6 @@ impl BlockInProgress {
 
         let logs_bloom = TransactionReceipt::logs_to_bloom(&logs);
         self.logs_bloom.accrue_bloom(&logs_bloom);
-
-        // If a tracer is active and targets this CRAC fake tx hash
-        // (or traces all txs in the block), write a synthetic trace to
-        // durable storage.
-        //
-        // Returns Some(trace_hash) when tracing is needed (inner Option
-        // is None for block-level tracing, Some(h) for per-tx tracing),
-        // or None when no tracing should happen.
-        let target_hash = match &tracer_input {
-            Some(TracerInput::CallTracer(input)) => Some(input.transaction_hash),
-            Some(TracerInput::StructLogger(input)) => Some(input.transaction_hash),
-            None => None,
-        };
-        let trace_target = match target_hash {
-            Some(None) => Some(None),
-            Some(Some(h)) if h == B256::from_slice(&hash_bytes) => Some(Some(h)),
-            Some(Some(_)) => None,
-            None => None,
-        };
-        if let Some(trace_hash) = trace_target {
-            let gas_used_u64 = gas_used.as_u64();
-            match &tracer_input {
-                Some(TracerInput::CallTracer(input)) => {
-                    let alloy_from =
-                        revm::primitives::Address::from_slice(from.as_bytes());
-                    let alloy_to = to.map(|addr| {
-                        revm::primitives::Address::from_slice(addr.as_bytes())
-                    });
-                    // Envelope carries no value (see `from`/`to` above).
-                    let alloy_value = revm::primitives::U256::ZERO;
-                    let mut trace = CallTrace::new_minimal_trace(
-                        b"CALL".to_vec(),
-                        alloy_from,
-                        alloy_value,
-                        Vec::new(), // CRAC fake txs have empty input
-                        0,          // depth 0 = top-level call
-                    );
-                    trace.add_to(alloy_to);
-                    trace.add_gas(Some(gas_used_u64));
-                    trace.add_gas_used(gas_used_u64);
-                    trace.add_output(Some(Vec::new()));
-                    if input.config.with_logs {
-                        trace.add_logs(Some(effect.logs.clone()));
-                    }
-                    if let Err(e) = flush_call_traces(host, &[trace], &trace_hash) {
-                        log!(
-                            Debug,
-                            "Failed to flush call traces for cross-runtime call tx: {:?}",
-                            e
-                        );
-                    }
-                }
-                Some(TracerInput::StructLogger(_)) => {
-                    // Write minimal StructLogger output (gas, failed,
-                    // return_value) with no opcode logs -- CRAC fake
-                    // txs have no EVM opcodes to trace.
-                    macro_rules! log_store_err {
-                        ($op:expr, $result:expr) => {
-                            if let Err(e) = $result {
-                                log!(
-                                    Debug,
-                                    "Failed to {} for cross-runtime call tx: {:?}",
-                                    $op,
-                                    e
-                                );
-                            }
-                        };
-                    }
-                    log_store_err!(
-                        "store trace gas",
-                        store_trace_gas(host, gas_used_u64, &trace_hash)
-                    );
-                    // CRAC txs that reach this point are always
-                    // successful (failures are not registered).
-                    // Note: the parameter is `is_success`, not `failed`.
-                    log_store_err!(
-                        "store trace failed",
-                        store_trace_failed(host, true, &trace_hash)
-                    );
-                    log_store_err!(
-                        "store return value",
-                        store_return_value(host, &[], &trace_hash)
-                    );
-                }
-                None => {}
-            }
-            log!(
-                Debug,
-                "Wrote synthetic trace for cross-runtime call fake tx {}",
-                hex::encode(hash_bytes)
-            );
-        }
 
         // Account for the CRAC's gas *before* building the receipt so that
         // `cumulative_gas_used` reflects the post-transaction block total, as
@@ -1047,16 +947,13 @@ mod tests {
     /// was added (L2-1478).
     #[test]
     fn test_crac_fake_receipt_cumulative_gas_includes_own_gas() {
-        use tezos_evm_runtime::runtime::MockKernelHost;
-
-        let mut host = MockKernelHost::default();
         let mut bip =
             BlockInProgress::new(U256::from(1), Default::default(), U256::one());
 
         // Pre-existing block gas (as if a prior transaction had run).
         bip.cumulative_gas = U256::from(100u64);
 
-        bip.register_crac_evm_transaction(&mut host, dummy_crac_effect(7), None)
+        bip.register_crac_evm_transaction(dummy_crac_effect(7))
             .expect("CRAC registration should succeed");
 
         assert_eq!(
@@ -1066,7 +963,7 @@ mod tests {
         );
 
         // A second CRAC must keep the staircase monotonic.
-        bip.register_crac_evm_transaction(&mut host, dummy_crac_effect(13), None)
+        bip.register_crac_evm_transaction(dummy_crac_effect(13))
             .expect("CRAC registration should succeed");
 
         assert_eq!(

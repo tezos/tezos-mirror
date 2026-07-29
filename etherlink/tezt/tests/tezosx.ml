@@ -1673,6 +1673,26 @@ let evm_gateway_staticcall_forwarder_init_code =
 let evm_gateway_delegatecall_forwarder_init_code =
   "603d80600b6000396000f33660006000376000600036600073ff000000000000000000000000000000000000075af4156032573d600060003e3d6000f35b3d600060003e3d6000fd"
 
+(** Init code for a minimal EVM contract that forwards its incoming
+    calldata to the runtime gateway precompile via a plain CALL (opcode
+    0xf1) with [value = 0], then RETURNs the returndata on success or
+    REVERTs with the returndata on failure.
+
+    Unlike the STATICCALL/DELEGATECALL forwarders above, this reaches
+    the state-mutating [call] entry from a nested EVM frame. It is used
+    to check that a gateway call issued from a smart contract (rather
+    than a top-level EOA transaction) still emits its precompile logs
+    exactly once — the extra call frame must not duplicate them.
+
+    Runtime bytecode (63 bytes):
+    - CALLDATACOPY memory[0..calldatasize] ← calldata
+    - CALL(gas, 0xff..0007, 0, 0, calldatasize, 0, 0)
+    - ISZERO + JUMPI → jump to the revert path on failure
+    - On success: RETURNDATACOPY then RETURN returndata
+    - On failure: RETURNDATACOPY then REVERT with returndata *)
+let evm_gateway_call_forwarder_init_code =
+  "603f80600b6000396000f336600060003760006000366000600073ff000000000000000000000000000000000000075af1156034573d600060003e3d6000f35b3d600060003e3d6000fd"
+
 (** ABI encoding of uint256(42). *)
 let abi_encoded_uint256_42 =
   "000000000000000000000000000000000000000000000000000000000000002a"
@@ -6700,6 +6720,303 @@ let test_michelson_address_registry_view_lambda () =
   in
   check_storage ~__LOC__ get_kt1 "Some 2"
 
+let test_crac_id_log_in_debug_trace ~runtime () =
+  Setup.register_sandbox_with_oberver_test
+    ~title:"debug_traceTransaction surfaces the EVM->Michelson CRAC-id log"
+    ~tags:["rpc"; "cross_runtime"; "trace"; "crac_id"; "with_logs"]
+    ~with_runtimes:[runtime]
+    ~uses_client:true
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~eth_bootstrap_accounts:[Eth_account.bootstrap_accounts.(0).address]
+  @@ fun {sandbox; observer = _} ->
+  (* Originate the Michelson contract that will be the CRAC target. *)
+  let* tez_client = tezos_client sandbox in
+  let script_path =
+    Michelson_script.(
+      find ["opcodes"; "store_input"] Michelson_contracts.tezlink_protocol
+      |> path)
+  in
+  let* kt1_address =
+    Client.originate_contract
+      ~alias:"store_input_crac_trace"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:{|""|}
+      ~prg:script_path
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let url = sf "http://tezos/%s/default" kt1_address in
+  let micheline_hello = "0x010000000e48656c6c6f2066726f6d2045564d" in
+  (* CRAC-id log helpers shared by the single- and nested-crossing checks
+     below. [CrossRuntimeCallSent(string,string,string,uint256)] has only
+     non-indexed arguments, so [topic[0]] is the sole topic and carries the
+     event selector, while the ABI-encoded [data] carries the
+     [crossRuntimeCallId] first. *)
+  let crac_sent_topic =
+    "0x63d7b3745d574412126b88bc586adea349b617cd75e87d47aff3dbc765bd834b"
+  in
+  let topic0 log =
+    match JSON.(log |-> "topics" |> as_list) with
+    | t :: _ -> String.lowercase_ascii (JSON.as_string t)
+    | [] -> ""
+  in
+  let is_crac_log log = topic0 log = String.lowercase_ascii crac_sent_topic in
+  (* CRAC-id logs attributed to [frame] itself, nested frames excluded. *)
+  let own_crac_logs frame =
+    List.filter
+      is_crac_log
+      (Option.value ~default:[] JSON.(frame |-> "logs" |> as_list_opt))
+  in
+  (* All CRAC-id logs attributed to [frame] and its nested call frames. *)
+  let rec crac_logs_in frame =
+    let nested =
+      Option.value ~default:[] JSON.(frame |-> "calls" |> as_list_opt)
+    in
+    own_crac_logs frame @ List.concat_map crac_logs_in nested
+  in
+  (* The first frame in [frame]'s subtree whose callee ([to]) is [address]. *)
+  let rec find_frame_to address frame =
+    let this =
+      String.lowercase_ascii
+        (Option.value ~default:"" JSON.(frame |-> "to" |> as_string_opt))
+    in
+    if this = String.lowercase_ascii address then Some frame
+    else
+      List.find_map
+        (find_frame_to address)
+        (Option.value ~default:[] JSON.(frame |-> "calls" |> as_list_opt))
+  in
+  let trace_tx ?(with_logs = true) tx_hash =
+    Rpc.trace_transaction
+      ~transaction_hash:tx_hash
+      ~tracer:"callTracer"
+      ~tracer_config:
+        [("withLog", `Bool with_logs); ("onlyTopCall", `Bool false)]
+      sandbox
+  in
+  let assert_gateway_attributed ~where log =
+    let log_address =
+      String.lowercase_ascii JSON.(log |-> "address" |> as_string)
+    in
+    Check.(
+      (log_address = String.lowercase_ascii evm_gateway_address)
+        string
+        ~error_msg:
+          ("[" ^ where
+         ^ "] CRAC-id log must be attributed to the gateway precompile %R, got \
+            %L"))
+  in
+  (* Trace [tx_hash] and assert its callTracer tree carries exactly one
+     CrossRuntimeCallSent (CRAC-id) log, attributed to the gateway precompile
+     frame. [where] labels the scenario in failure messages. *)
+  let check_single_crac_log ~where ~tx_hash =
+    let*@ trace = trace_tx tx_hash in
+    (match crac_logs_in trace with
+    | [log] -> assert_gateway_attributed ~where log
+    | logs ->
+        Test.fail
+          "[%s] Expected exactly one CrossRuntimeCallSent (CRAC-id) log in the \
+           debug_traceTransaction call tree, got %d. Precompile-emitted logs \
+           must be forwarded to the tracer, not only to the tx receipt."
+          where
+          (List.length logs)) ;
+    (* The gateway frame itself must carry the log: mis-attributing it to an
+       enclosing frame would keep both the count and the log's [address]. *)
+    (match find_frame_to evm_gateway_address trace with
+    | None ->
+        Test.fail
+          "[%s] Could not find the gateway precompile frame in the call tree"
+          where
+    | Some gateway_frame ->
+        Check.(
+          (List.length (own_crac_logs gateway_frame) = 1)
+            int
+            ~error_msg:
+              ("[" ^ where
+             ^ "] The gateway precompile frame must carry the CRAC-id log \
+                itself, got %L."))) ;
+    unit
+  in
+  (* Trace [tx_hash] for an EVM -> Michelson -> EVM -> Michelson scenario and
+     assert both EVM->Michelson gateway crossings emit exactly one CRAC-id log
+     each. There is the outer top-level crossing, and the inner one issued from
+     within [evm_nac] -- the EVM contract entered through a Michelson->EVM
+     native-access call (NAC). Both logs must be attributed to the gateway
+     precompile. This guards against the inner crossing dropping or duplicating
+     its log because it runs nested inside a NAC frame. *)
+  let check_nested_crac_logs ~where ~evm_nac ~tx_hash =
+    let*@ trace = trace_tx tx_hash in
+    let all_crac_logs = crac_logs_in trace in
+    Check.(
+      (List.length all_crac_logs = 2)
+        int
+        ~error_msg:
+          ("[" ^ where
+         ^ "] Expected exactly two CrossRuntimeCallSent (CRAC-id) logs (one \
+            per EVM->Michelson crossing) in the debug_traceTransaction call \
+            tree, got %L.")) ;
+    List.iter (assert_gateway_attributed ~where) all_crac_logs ;
+    (* Isolate the inner EVM gateway call: the frame running the EVM contract
+       reached through the Michelson->EVM native-access call. Its subtree must
+       carry exactly one CRAC-id log. *)
+    match find_frame_to evm_nac trace with
+    | None ->
+        Test.fail
+          "[%s] Could not find the inner EVM (NAC) frame %s in the call tree"
+          where
+          evm_nac
+    | Some nac_frame ->
+        Check.(
+          (List.length (crac_logs_in nac_frame) = 1)
+            int
+            ~error_msg:
+              ("[" ^ where
+             ^ "] The inner EVM gateway call (inside the NAC frame) must emit \
+                exactly one CRAC-id log, got %L.")) ;
+        unit
+  in
+  (* Scenario 1: the EOA calls the gateway precompile top-level (the original
+     shape). *)
+  let* receipt =
+    craft_and_send_evm_transaction
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:0
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~abi_signature:"call(string,(string,string)[],bytes,uint8)"
+      ~arguments:[url; "[]"; micheline_hello; "1"]
+      ()
+  in
+  let* () =
+    check_single_crac_log
+      ~where:"top-level EOA call"
+      ~tx_hash:receipt.transactionHash
+  in
+  (* [withLog: false] must also silence the precompile-injected logs. *)
+  let*@ trace = trace_tx ~with_logs:false receipt.transactionHash in
+  Check.(
+    (List.length (crac_logs_in trace) = 0)
+      int
+      ~error_msg:
+        "withLog:false must suppress precompile logs in the trace, got %L \
+         CRAC-id log(s)") ;
+  (* Scenario 2: a nested EVM frame issues the gateway call. Deploy a
+     forwarder contract that relays its incoming calldata to the gateway
+     precompile via a plain CALL, so the trace shows EOA -> forwarder ->
+     gateway. The extra frame must not duplicate the forwarded log. *)
+  let* forwarder =
+    deploy_evm_contract
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:1
+      ~init_code:evm_gateway_call_forwarder_init_code
+      ()
+  in
+  let* receipt =
+    craft_and_send_evm_transaction
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:2
+      ~value:Wei.zero
+      ~address:forwarder
+      ~abi_signature:"call(string,(string,string)[],bytes,uint8)"
+      ~arguments:[url; "[]"; micheline_hello; "1"]
+      ()
+  in
+  let* () =
+    check_single_crac_log
+      ~where:"nested call via forwarder"
+      ~tx_hash:receipt.transactionHash
+  in
+  (* Scenario 3: EVM -> Michelson -> EVM -> Michelson. The top-level EVM tx
+     reaches a [gateway_caller.tz] Michelson contract, which issues a
+     Michelson->EVM call (a NAC frame) into a [transfer_crac] EVM contract,
+     which in turn calls the gateway precompile again to reach a final
+     Michelson contract. The inner gateway call runs nested inside the NAC
+     frame; it must still emit exactly one CRAC-id log. *)
+  let* crac_caller_contract =
+    Solidity_contracts.transfer_crac (Kernel.select_evm_version Kernel.Latest)
+  in
+  let crac_caller_bin = Tezt.Base.read_file crac_caller_contract.bin in
+  let* crac_caller_address =
+    deploy_evm_contract
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:3
+      ~init_code:("0x" ^ crac_caller_bin)
+      ()
+  in
+  (* Final Michelson contract (unit parameter), reached by the inner EVM
+     gateway call with an empty body. *)
+  let source_script_path =
+    Michelson_script.(
+      find ["opcodes"; "source"] Michelson_contracts.tezlink_protocol |> path)
+  in
+  let* final_kt1 =
+    Client.originate_contract
+      ~alias:"crac_trace_final"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:(sf {|"%s"|} Constant.bootstrap1.public_key_hash)
+      ~prg:source_script_path
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  (* ABI-encode the final KT1 as the sole [crac(string)] argument, stripping
+     the [0x] prefix and the 4-byte selector: the enshrined gateway re-adds the
+     selector from the method signature stored in [gateway_caller]. *)
+  let* crac_calldata = Cast.calldata ~args:[final_kt1] "crac(string)" in
+  let abi_final_kt1 =
+    String.sub crac_calldata 10 (String.length crac_calldata - 10)
+  in
+  (* Michelson contract that relays the top-level call into the EVM contract
+     via the enshrined gateway's %call_evm entrypoint. *)
+  let gateway_caller_script_path =
+    Michelson_script.(
+      find
+        ["mini_scenarios"; "gateway_caller"]
+        Michelson_contracts.tezlink_protocol
+      |> path)
+  in
+  let* gateway_caller_kt1 =
+    Client.originate_contract
+      ~alias:"crac_trace_gateway_caller"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:
+        (sf
+           {|Pair "%s" (Pair "%s" (Pair "crac(string)" 0x%s))|}
+           gateway_address
+           crac_caller_address
+           abi_final_kt1)
+      ~prg:gateway_caller_script_path
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  (* Top-level EVM tx into the gateway precompile, reaching the gateway_caller
+     Michelson contract (unit parameter, empty body). *)
+  let* receipt =
+    craft_and_send_evm_transaction
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:4
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~abi_signature:"call(string,(string,string)[],bytes,uint8)"
+      ~arguments:[sf "http://tezos/%s" gateway_caller_kt1; "[]"; "0x"; "1"]
+      ()
+  in
+  check_nested_crac_logs
+    ~where:"EVM -> Michelson -> EVM -> Michelson"
+    ~evm_nac:crac_caller_address
+    ~tx_hash:receipt.transactionHash
+
 let () =
   test_native_branch_valid_applied () ;
   test_native_branch_valid_delayed_applied [Alpha] ;
@@ -6764,6 +7081,7 @@ let () =
   test_script_no_synthetic_views_for_originated_contract () ;
   test_trace_call_evm ~runtime:Tezos () ;
   test_http_trace_replay ~runtime:Tezos () ;
+  test_crac_id_log_in_debug_trace ~runtime:Tezos () ;
   test_cross_runtime_evm_sender_is_alias () ;
   test_cross_runtime_michelson_sender_is_alias () ;
   test_alias_forwarder_forwards_to_evm () ;

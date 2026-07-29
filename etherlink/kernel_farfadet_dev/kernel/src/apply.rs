@@ -13,7 +13,7 @@ use revm::primitives::{Address, Bytes, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
 use revm_etherlink::inspectors::call_tracer::CallTracerInput;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
-use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
+use revm_etherlink::inspectors::TracerInput;
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
     XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
@@ -802,10 +802,6 @@ pub fn apply_transaction<Host: Runtime>(
     spec_id: &SpecId,
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
-    let tracer_input = get_tracer_configuration(
-        revm::primitives::B256::from_slice(&transaction.tx_hash),
-        tracer_input,
-    );
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,

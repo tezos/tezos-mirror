@@ -18,6 +18,7 @@ michelson-types.workspace = true
 evm-types.workspace = true
 tezosx-journal.workspace = true
 tezosx-constants.workspace = true
+evm-inspectors.workspace = true
 
 # Types
 http.workspace = true
@@ -53,4 +54,8 @@ tezosx-ethereum-runtime = { workspace = true, features = ["testing"] }
 http.workspace = true
 
 [features]
-tracing = ["dep:tracing", "tezos-evm-logging/tracing"]
+tracing = [
+  "dep:tracing",
+  "tezos-evm-logging/tracing",
+  "evm-inspectors/tracing",
+]

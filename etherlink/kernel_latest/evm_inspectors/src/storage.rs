@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use super::error::InspectorError;
 use super::struct_logger::StructLog;
-use crate::error::EvmKernelError;
 
 use revm::primitives::B256;
 use tezos_evm_logging::{log, Level::Debug};
@@ -23,7 +23,7 @@ const RETURN_VALUE: RefPath = RefPath::assert_from(b"/return_value");
 pub fn trace_tx_path(
     hash: &Option<B256>,
     field: &RefPath,
-) -> Result<OwnedPath, EvmKernelError> {
+) -> Result<OwnedPath, InspectorError> {
     let trace_tx_path = match hash {
         None => EVM_TRACE.into(),
         Some(hash) => {
@@ -40,7 +40,7 @@ pub fn flush_call_traces(
     host: &mut impl StorageV1,
     traces: &[impl rlp::Encodable],
     hash: &Option<B256>,
-) -> Result<(), EvmKernelError> {
+) -> Result<(), InspectorError> {
     let path = trace_tx_path(hash, &CALL_TRACE)?;
     let call_trace_storage = IndexableStorage::new_owned_path(path);
 
@@ -54,7 +54,7 @@ pub fn store_trace_gas(
     host: &mut impl StorageV1,
     gas: u64,
     hash: &Option<B256>,
-) -> Result<(), EvmKernelError> {
+) -> Result<(), InspectorError> {
     let path = trace_tx_path(hash, &GAS)?;
     host.store_write(&path, gas.to_le_bytes().as_slice(), 0)?;
     Ok(())
@@ -64,7 +64,7 @@ pub fn store_trace_failed<Host>(
     host: &mut Host,
     is_success: bool,
     hash: &Option<B256>,
-) -> Result<(), EvmKernelError>
+) -> Result<(), InspectorError>
 where
     Host: StorageV1,
 {
@@ -78,7 +78,7 @@ pub fn store_return_value<Host>(
     host: &mut Host,
     value: &[u8],
     hash: &Option<B256>,
-) -> Result<(), EvmKernelError>
+) -> Result<(), InspectorError>
 where
     Host: StorageV1,
 {
@@ -92,7 +92,7 @@ pub fn store_struct_log<Host>(
     host: &mut Host,
     struct_log: &StructLog,
     hash: &Option<B256>,
-) -> Result<(), EvmKernelError>
+) -> Result<(), InspectorError>
 where
     Host: StorageV1,
 {

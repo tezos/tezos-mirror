@@ -30,8 +30,8 @@ use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
+use evm_inspectors::TracerInput;
 use primitive_types::{H160, H256, U256};
-use revm_etherlink::inspectors::TracerInput;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
@@ -215,7 +215,6 @@ where
                     execution_info,
                     host,
                     multiplier,
-                    tracer_input,
                 )?;
             }
             ExecutionResult::Invalid => {
@@ -712,6 +711,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::apply::TezosExecutionInfo;
     use crate::block_in_progress::BlockInProgress;
     use crate::block_storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
@@ -2041,7 +2041,7 @@ mod tests {
                 ExecutionResult::Valid(info) => info,
                 ExecutionResult::Invalid => panic!("delayed op must be valid"),
             };
-            let RuntimeExecutionInfo::Tezos { op, .. } = info else {
+            let RuntimeExecutionInfo::Tezos(TezosExecutionInfo { op, .. }) = info else {
                 panic!("delayed op must yield Tezos execution info");
             };
             let OperationDataAndMetadata::OperationWithMetadata(batch) =
@@ -2396,6 +2396,7 @@ mod tests {
                 block_fees.unwrap(),
                 crate::block::GAS_LIMIT,
                 H160::zero(),
+                &SpecId::default(),
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level: (0.into()),

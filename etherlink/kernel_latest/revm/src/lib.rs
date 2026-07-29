@@ -3,18 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    inspectors::EtherlinkInspector, journal::Journal,
-    storage::world_state_handler::StorageAccount,
-};
+use crate::{journal::Journal, storage::world_state_handler::StorageAccount};
 use database::EtherlinkVMDB;
 pub use error::{EvmDbError, EvmKernelError, EvmRunError};
+use evm_inspectors::TracerInspector;
+use handler::EtherlinkHandler;
 use helpers::storage::u256_to_le_bytes;
-use inspectors::{
-    call_tracer::{CallTracer, CallTracerInput},
-    struct_logger::{StructLogger, StructLoggerInput},
-    EtherlinkHandler, EvmInspection, TracerInput,
-};
 pub use michelson_types::Withdrawal;
 use precompiles::constants::{
     alias_forwarder_delegation, alias_forwarder_delegation_code_hash,
@@ -44,8 +38,8 @@ use tezosx_journal::TezosXJournal;
 
 pub mod database;
 mod error;
+pub mod handler;
 pub mod helpers;
-pub mod inspectors;
 pub mod journal;
 pub mod precompiles;
 pub mod storage;
@@ -66,6 +60,14 @@ type EvmContext<'a, Host, R> = Evm<
     EthFrame<EthInterpreter>,
 >;
 
+pub type EvmInspection<'a, Host, INSP, R> = Evm<
+    EVMInnerContext<'a, Host, R>,
+    INSP,
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, R>>,
+    EtherlinkPrecompiles,
+    EthFrame<EthInterpreter>,
+>;
+
 /// Controls commit behavior and optional balance injection in `run_transaction`.
 pub enum TransactionOrigin {
     /// Original caller: commit EVM journal to durable storage, return withdrawals.
@@ -74,13 +76,9 @@ pub enum TransactionOrigin {
     /// If `credit` is `Some`, inject a balance credit into the REVM journal
     /// before executing the transaction.
     ///
-    /// Note: the credit lives behind a `journaled_state.checkpoint()`,
-    /// which increments REVM's call depth. That's safe for cross-runtime
-    /// calls (already nested below a real top-level frame) but would
-    /// shift the top-level call off depth 0 for a `UserInput` caller —
-    /// breaking the `CallTracer` whose flush hook keys on `depth == 0`.
-    /// Top-level callers that need a prefund (e.g. the XTZ-deposit
-    /// feeder) must do it out-of-band on `StorageAccount` instead.
+    /// Note: the credit lives behind an extra `journaled_state.checkpoint()`;
+    /// the `CallTracer` keeps its own frame stack, so recorded traces are
+    /// unaffected (`test_credit_checkpoint_keeps_call_tracer_depths`).
     CrossRuntime { credit: Option<(Address, U256)> },
     /// Read-only cross-runtime call: no balance credit, no journal
     /// commit, and the top-level frame runs with `is_static = true`
@@ -222,34 +220,6 @@ fn tx_env(
     Ok(tx_env)
 }
 
-#[instrument(skip_all)]
-fn get_inspector_from<'a, Host, R>(
-    tracer_input: TracerInput,
-    precompiles: EtherlinkPrecompiles,
-    spec_id: SpecId,
-) -> Box<dyn EtherlinkInspector<'a, Host, R>>
-where
-    Host: StorageV1 + 'a,
-    R: Registry + 'a,
-{
-    match tracer_input {
-        TracerInput::CallTracer(CallTracerInput {
-            config,
-            transaction_hash,
-        }) => Box::new(CallTracer::new(
-            config,
-            precompiles,
-            spec_id,
-            transaction_hash,
-        )) as Box<dyn EtherlinkInspector<'a, Host, R>>,
-        TracerInput::StructLogger(StructLoggerInput {
-            config,
-            transaction_hash,
-        }) => Box::new(StructLogger::new(config, transaction_hash))
-            as Box<dyn EtherlinkInspector<'a, Host, R>>,
-    }
-}
-
 /// EVM opcode for `ORIGIN` (0x32). Stable across all hardforks since
 /// Frontier; named here so the override site reads as code, not magic.
 const ORIGIN_OPCODE: u8 = 0x32;
@@ -372,12 +342,7 @@ fn install_etherlink_gasprice<'a, Host, R, INSP>(
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn build_evm_inspector_context<
-    'a,
-    Host,
-    R: Registry,
-    INSP: EtherlinkInspector<'a, Host, R>,
->(
+fn build_evm_inspector_context<'a, Host, R>(
     db: EtherlinkVMDB<'a, Host, R>,
     journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
@@ -386,13 +351,13 @@ fn build_evm_inspector_context<
     precompiles: EtherlinkPrecompiles,
     chain_id: u64,
     spec_id: SpecId,
-    inspector: INSP,
     is_simulation: bool,
     is_cross_runtime: bool,
     alias_delegation: Option<Address>,
-) -> Result<EvmInspection<'a, Host, INSP, R>, EvmRunError>
+) -> Result<EvmInspection<'a, Host, TracerInspector, R>, EvmRunError>
 where
     Host: StorageV1,
+    R: Registry,
 {
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
@@ -426,7 +391,7 @@ where
         error: Ok(()),
     };
     let mut evm = ctx
-        .build_mainnet_with_inspector(inspector)
+        .build_mainnet_with_inspector(TracerInspector)
         .with_precompiles(precompiles);
     install_etherlink_origin(&mut evm);
     if is_cross_runtime {
@@ -560,7 +525,6 @@ pub fn run_transaction<'a, Host, R: Registry>(
     host: &'a mut Host,
     registry: &'a R,
     journal: &'a mut TezosXJournal,
-    spec_id: SpecId,
     block_constants: &'a BlockConstants,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
     caller: Address,
@@ -569,7 +533,6 @@ pub fn run_transaction<'a, Host, R: Registry>(
     gas_data: GasData,
     value: U256,
     authorization_list: Option<Vec<SignedAuthorization>>,
-    tracer_input: Option<TracerInput>,
     is_simulation: bool,
     mut origin: TransactionOrigin,
 ) -> Result<ExecutionOutcome, EvmRunError>
@@ -606,21 +569,18 @@ where
     let classify_native = (!is_cross_runtime).then_some(caller);
     let db = EtherlinkVMDB::new(host, registry, block_constants, classify_native)?;
 
-    if let Some(tracer_input) = tracer_input {
+    if journal.evm.has_tracer() {
+        let precompiles =
+            EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled());
         let mut evm_context = build_evm_inspector_context(
             db,
             journal,
             &block_env,
             &tx,
             gas_data.maximum_gas_per_transaction,
-            EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled()),
+            precompiles,
             block_constants.chain_id.as_u64(),
-            spec_id,
-            get_inspector_from::<Host, R>(
-                tracer_input,
-                EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled()),
-                spec_id,
-            ),
+            block_constants.spec_id,
             is_simulation,
             is_cross_runtime,
             alias_delegation,
@@ -666,16 +626,6 @@ where
             }
         }
 
-        if evm_context.inspector.is_struct_logger() {
-            StructLogger::store_outcome(
-                evm_context.ctx.db_mut().host,
-                result.is_success(),
-                result.output(),
-                result.gas_used(),
-                evm_context.inspector.get_transaction_hash(),
-            )?
-        }
-
         let withdrawals = if matches!(origin, TransactionOrigin::UserInput { .. }) {
             evm_context.commit_inner();
             evm_context.db_mut().take_withdrawals()
@@ -696,7 +646,7 @@ where
             gas_data.maximum_gas_per_transaction,
             EtherlinkPrecompiles::new(journal.evm.debug_precompiles_are_enabled()),
             block_constants.chain_id.as_u64(),
-            spec_id,
+            block_constants.spec_id,
             is_simulation,
             is_cross_runtime,
             alias_delegation,
@@ -834,7 +784,7 @@ mod test {
     mod utilities {
         use alloy_sol_types::sol;
         use primitive_types::U256 as PU256;
-        use revm::primitives::hardfork::SpecId;
+        use revm::primitives::{hardfork::SpecId, Address, U256};
         use tezos_smart_rollup_host::{
             path::{concat, OwnedPath, RefPath},
             storage::StorageV1,
@@ -846,11 +796,34 @@ mod test {
         };
         use tezosx_journal::TezosXJournal;
 
-        use crate::test::GAS_LIMIT;
+        use crate::{
+            storage::world_state_handler::{AccountInfo, StorageAccount},
+            test::GAS_LIMIT,
+        };
 
         /// Milligas consumed by the mock Tezos runtime for every CRAC call.
         /// 10_000 milligas = 1_000 EVM gas (Tezos milligas / 10).
         pub(crate) const MOCK_TEZOS_GAS_CONSUMED: u64 = 10_000;
+
+        /// Compiled deploy bytecode for `contracts/tests/static_caller.sol`,
+        /// shared across the test submodules that probe precompile
+        /// dispatch through a Solidity `StaticCaller` helper.
+        pub(crate) const STATIC_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033";
+
+        /// Give `address` an effectively unlimited balance so it can act
+        /// as the caller/originator of a test transaction.
+        pub(crate) fn fund(host: &mut impl StorageV1, address: Address) {
+            let mut account = StorageAccount::from_address(&address).unwrap();
+            account
+                .set_info(
+                    host,
+                    AccountInfo {
+                        balance: U256::MAX,
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+        }
 
         // Test-only Registry struct that implements the Registry trait from tezosx-interfaces.
         // It contains a MockTezosRuntime for testing cross-runtime functionality,
@@ -1258,7 +1231,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -1266,7 +1238,6 @@ mod test {
             Bytes::new(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_sent,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -1341,7 +1312,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -1349,7 +1319,6 @@ mod test {
             Bytes::new(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_sent,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -1423,7 +1392,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -1431,7 +1399,6 @@ mod test {
             calldata.into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_sent,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -1533,7 +1500,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -1541,7 +1507,6 @@ mod test {
             Bytes::new(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             value_sent,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -1653,7 +1618,6 @@ mod test {
                 &mut host,
                 &registry,
                 &mut journal,
-                DEFAULT_SPEC_ID,
                 &block_constants,
                 None,
                 caller,
@@ -1661,7 +1625,6 @@ mod test {
                 Bytes::new(),
                 GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::CrossRuntime { credit: None },
@@ -1695,6 +1658,147 @@ mod test {
         );
     }
 
+    /// The cross-runtime balance credit wraps the leg's run in a journal
+    /// checkpoint that bumps `JournalInner::depth`, but it is not a call
+    /// frame. Now that the `CallTracer` tracks frame nesting on its own
+    /// stack instead of reading the journal depth, that bump must not
+    /// shift the frames it records — a value-carrying crossing takes the
+    /// credit checkpoint while a zero-amount one does not, so a depth
+    /// leak would surface only under value. Run the same CALL-chain leg
+    /// with and without a value-carrying credit and assert the recorded
+    /// traces are byte-identical.
+    #[test]
+    fn test_credit_checkpoint_keeps_call_tracer_depths() {
+        use evm_inspectors::{
+            call_tracer::{CallTracer, CallTracerConfig},
+            storage::trace_tx_path,
+            Tracer,
+        };
+        use tezos_indexable_storage::IndexableStorage;
+        use tezos_smart_rollup_host::path::RefPath;
+
+        // Same shape as `test_revm_call_depth_caps_inner_revm_chain`: the
+        // contract CALLs into 0x3333... and returns the CALL result.
+        let code_hex = concat!(
+            "60006000600060006000",
+            "73",
+            "3333333333333333333333333333333333333333",
+            "5af1",
+            "60005260206000f3",
+        );
+        let bytecode = Bytecode::new_raw(Bytes::from_hex(code_hex).unwrap());
+        let callee_bytecode = Bytecode::new_raw(Bytes::from_hex("00").unwrap());
+
+        let run_with_credit = |credit: Option<(Address, U256)>| -> Vec<Vec<u8>> {
+            let mut host = MockKernelHost::default();
+            let block_constants = BlockConstants::test_block_with_no_fees();
+            let caller =
+                Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+            let contract =
+                Address::from_hex("2222222222222222222222222222222222222222").unwrap();
+            let callee =
+                Address::from_hex("3333333333333333333333333333333333333333").unwrap();
+            StorageAccount::from_address(&caller)
+                .unwrap()
+                .set_info_without_code(
+                    &mut host,
+                    AccountInfo {
+                        balance: U256::MAX,
+                        nonce: 0,
+                        code_hash: Default::default(),
+                        origin: AccountOrigin::Unclassified,
+                        code: None,
+                    },
+                )
+                .unwrap();
+            StorageAccount::from_address(&contract)
+                .unwrap()
+                .set_info(
+                    &mut host,
+                    AccountInfo {
+                        balance: U256::ZERO,
+                        nonce: 0,
+                        code_hash: bytes_hash(bytecode.original_byte_slice()),
+                        origin: AccountOrigin::Unclassified,
+                        code: Some(bytecode.clone()),
+                    },
+                )
+                .unwrap();
+            StorageAccount::from_address(&callee)
+                .unwrap()
+                .set_info(
+                    &mut host,
+                    AccountInfo {
+                        balance: U256::ZERO,
+                        nonce: 0,
+                        code_hash: bytes_hash(callee_bytecode.original_byte_slice()),
+                        origin: AccountOrigin::Unclassified,
+                        code: Some(callee_bytecode.clone()),
+                    },
+                )
+                .unwrap();
+
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+            journal.evm.set_tracer(Tracer::CallTracer(CallTracer::new(
+                CallTracerConfig {
+                    only_top_call: false,
+                    with_logs: false,
+                },
+                DEFAULT_SPEC_ID,
+                None,
+            )));
+
+            let outcome = run_transaction(
+                &mut host,
+                &registry,
+                &mut journal,
+                &block_constants,
+                None,
+                caller,
+                Some(contract),
+                Bytes::new(),
+                GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+                U256::ZERO,
+                None,
+                false,
+                TransactionOrigin::CrossRuntime { credit },
+            )
+            .unwrap();
+
+            journal
+                .evm
+                .take_tracer()
+                .expect("tracer should still be attached")
+                .finalize(&mut host, &outcome.result)
+                .expect("tracer finalization should succeed");
+
+            // With no tx hash on the tracer the traces land under the base
+            // trace path.
+            let path =
+                trace_tx_path(&None, &RefPath::assert_from(b"/call_trace")).unwrap();
+            let store = IndexableStorage::new_owned_path(path);
+            let len = store.length(&host).unwrap();
+            (0..len)
+                .map(|i| store.get_value(&host, i).unwrap())
+                .collect()
+        };
+
+        let without_credit = run_with_credit(None);
+        let with_credit = run_with_credit(Some((
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap(),
+            U256::from(42u64),
+        )));
+        assert!(
+            !without_credit.is_empty(),
+            "expected the leg's frames to be recorded"
+        );
+        assert_eq!(
+            without_credit, with_credit,
+            "a value-carrying credit must not shift the recorded call traces"
+        );
+    }
+
     #[test]
     fn test_contract_deployment() {
         let mut host = MockKernelHost::default();
@@ -1722,7 +1826,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -1741,7 +1844,6 @@ mod test {
             Bytes::from_hex("6080604052600160005534801561001557600080fd5b50610133806100256000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c80633fa4f24514603757806355241077146051575b600080fd5b603d6069565b604051604891906090565b60405180910390f35b606760048036038101906063919060d5565b606f565b005b60005481565b8060008190555050565b6000819050919050565b608a816079565b82525050565b600060208201905060a360008301846083565b92915050565b600080fd5b60b5816079565b811460bf57600080fd5b50565b60008135905060cf8160ae565b92915050565b60006020828403121560e85760e760a9565b5b600060f48482850160c2565b9150509291505056fea26469706673582212202dba9d4631e2c42eb5a90449e79df9c7031f4e73f695987b580809d987c057c864736f6c63430008120033").unwrap(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput { access_list: AccessList::default() },
@@ -1826,7 +1928,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -1834,7 +1935,6 @@ mod test {
             Bytes::from_hex(calldata).unwrap(),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             withdrawn_amount,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -1923,7 +2023,6 @@ mod test {
                 host,
                 &registry,
                 &mut journal,
-                DEFAULT_SPEC_ID,
                 &block_constants,
                 None,
                 caller,
@@ -1931,7 +2030,6 @@ mod test {
                 Bytes::copy_from_slice(&calldata),
                 GasData::new(10_000_000, 0, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -2038,7 +2136,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2046,7 +2143,6 @@ mod test {
             Bytes::copy_from_slice(&calldata),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::MAX,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2088,7 +2184,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2097,7 +2192,6 @@ mod test {
             Bytes::from_hex("60806040526040518060400160405280601381526020017f536f6c6964697479206279204578616d706c6500000000000000000000000000815250600390816200004a91906200033c565b506040518060400160405280600781526020017f534f4c4259455800000000000000000000000000000000000000000000000000815250600490816200009191906200033c565b506012600560006101000a81548160ff021916908360ff160217905550348015620000bb57600080fd5b5062000423565b600081519050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b600060028204905060018216806200014457607f821691505b6020821081036200015a5762000159620000fc565b5b50919050565b60008190508160005260206000209050919050565b60006020601f8301049050919050565b600082821b905092915050565b600060088302620001c47fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8262000185565b620001d0868362000185565b95508019841693508086168417925050509392505050565b6000819050919050565b6000819050919050565b60006200021d620002176200021184620001e8565b620001f2565b620001e8565b9050919050565b6000819050919050565b6200023983620001fc565b62000251620002488262000224565b84845462000192565b825550505050565b600090565b6200026862000259565b620002758184846200022e565b505050565b5b818110156200029d57620002916000826200025e565b6001810190506200027b565b5050565b601f821115620002ec57620002b68162000160565b620002c18462000175565b81016020851015620002d1578190505b620002e9620002e08562000175565b8301826200027a565b50505b505050565b600082821c905092915050565b60006200031160001984600802620002f1565b1980831691505092915050565b60006200032c8383620002fe565b9150826002028217905092915050565b6200034782620000c2565b67ffffffffffffffff811115620003635762000362620000cd565b5b6200036f82546200012b565b6200037c828285620002a1565b600060209050601f831160018114620003b457600084156200039f578287015190505b620003ab85826200031e565b8655506200041b565b601f198416620003c48662000160565b60005b82811015620003ee57848901518255600182019150602085019450602081019050620003c7565b868310156200040e57848901516200040a601f891682620002fe565b8355505b6001600288020188555050505b505050505050565b610d6a80620004336000396000f3fe608060405234801561001057600080fd5b50600436106100a95760003560e01c806342966c681161007157806342966c681461016857806370a082311461018457806395d89b41146101b4578063a0712d68146101d2578063a9059cbb146101ee578063dd62ed3e1461021e576100a9565b806306fdde03146100ae578063095ea7b3146100cc57806318160ddd146100fc57806323b872dd1461011a578063313ce5671461014a575b600080fd5b6100b661024e565b6040516100c391906109be565b60405180910390f35b6100e660048036038101906100e19190610a79565b6102dc565b6040516100f39190610ad4565b60405180910390f35b6101046103ce565b6040516101119190610afe565b60405180910390f35b610134600480360381019061012f9190610b19565b6103d4565b6040516101419190610ad4565b60405180910390f35b610152610585565b60405161015f9190610b88565b60405180910390f35b610182600480360381019061017d9190610ba3565b610598565b005b61019e60048036038101906101999190610bd0565b61066f565b6040516101ab9190610afe565b60405180910390f35b6101bc610687565b6040516101c991906109be565b60405180910390f35b6101ec60048036038101906101e79190610ba3565b610715565b005b61020860048036038101906102039190610a79565b6107ec565b6040516102159190610ad4565b60405180910390f35b61023860048036038101906102339190610bfd565b610909565b6040516102459190610afe565b60405180910390f35b6003805461025b90610c6c565b80601f016020809104026020016040519081016040528092919081815260200182805461028790610c6c565b80156102d45780601f106102a9576101008083540402835291602001916102d4565b820191906000526020600020905b8154815290600101906020018083116102b757829003601f168201915b505050505081565b600081600260003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055508273ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925846040516103bc9190610afe565b60405180910390a36001905092915050565b60005481565b600081600260008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546104629190610ccc565b9250508190555081600160008673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546104b89190610ccc565b9250508190555081600160008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825461050e9190610d00565b925050819055508273ffffffffffffffffffffffffffffffffffffffff168473ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef846040516105729190610afe565b60405180910390a3600190509392505050565b600560009054906101000a900460ff1681565b80600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546105e79190610ccc565b92505081905550806000808282546105ff9190610ccc565b92505081905550600073ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef836040516106649190610afe565b60405180910390a350565b60016020528060005260406000206000915090505481565b6004805461069490610c6c565b80601f01602080910402602001604051908101604052809291908181526020018280546106c090610c6c565b801561070d5780601f106106e25761010080835404028352916020019161070d565b820191906000526020600020905b8154815290600101906020018083116106f057829003601f168201915b505050505081565b80600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546107649190610d00565b925050819055508060008082825461077c9190610d00565b925050819055503373ffffffffffffffffffffffffffffffffffffffff16600073ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef836040516107e19190610afe565b60405180910390a350565b600081600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825461083d9190610ccc565b9250508190555081600160008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008282546108939190610d00565b925050819055508273ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef846040516108f79190610afe565b60405180910390a36001905092915050565b6002602052816000526040600020602052806000526040600020600091509150505481565b600081519050919050565b600082825260208201905092915050565b60005b8381101561096857808201518184015260208101905061094d565b60008484015250505050565b6000601f19601f8301169050919050565b60006109908261092e565b61099a8185610939565b93506109aa81856020860161094a565b6109b381610974565b840191505092915050565b600060208201905081810360008301526109d88184610985565b905092915050565b600080fd5b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000610a10826109e5565b9050919050565b610a2081610a05565b8114610a2b57600080fd5b50565b600081359050610a3d81610a17565b92915050565b6000819050919050565b610a5681610a43565b8114610a6157600080fd5b50565b600081359050610a7381610a4d565b92915050565b60008060408385031215610a9057610a8f6109e0565b5b6000610a9e85828601610a2e565b9250506020610aaf85828601610a64565b9150509250929050565b60008115159050919050565b610ace81610ab9565b82525050565b6000602082019050610ae96000830184610ac5565b92915050565b610af881610a43565b82525050565b6000602082019050610b136000830184610aef565b92915050565b600080600060608486031215610b3257610b316109e0565b5b6000610b4086828701610a2e565b9350506020610b5186828701610a2e565b9250506040610b6286828701610a64565b9150509250925092565b600060ff82169050919050565b610b8281610b6c565b82525050565b6000602082019050610b9d6000830184610b79565b92915050565b600060208284031215610bb957610bb86109e0565b5b6000610bc784828501610a64565b91505092915050565b600060208284031215610be657610be56109e0565b5b6000610bf484828501610a2e565b91505092915050565b60008060408385031215610c1457610c136109e0565b5b6000610c2285828601610a2e565b9250506020610c3385828601610a2e565b9150509250929050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b60006002820490506001821680610c8457607f821691505b602082108103610c9757610c96610c3d565b5b50919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000610cd782610a43565b9150610ce283610a43565b9250828203905081811115610cfa57610cf9610c9d565b5b92915050565b6000610d0b82610a43565b9150610d1683610a43565b9250828201905080821115610d2e57610d2d610c9d565b5b9291505056fea264697066735822122066c43ea8566df927073ea47efbfa7f9ed97ebc53ac46b1f05dd52d5af93b50be64736f6c63430008120033").unwrap(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput { access_list: AccessList::default() },
@@ -2121,7 +2215,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2130,7 +2223,6 @@ mod test {
             Bytes::from_hex("a0712d68000000000000000000000000000000000000000000000000000000000000002a").unwrap(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput { access_list: AccessList::default() },
@@ -2171,7 +2263,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2179,7 +2270,6 @@ mod test {
             deploy_call_and_revert_bytecode,
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2258,7 +2348,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2266,7 +2355,6 @@ mod test {
             Bytes::from(call_and_revert_call.abi_encode()),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2318,7 +2406,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2326,7 +2413,6 @@ mod test {
             deploy_create_and_revert_bytecode,
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2361,7 +2447,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2369,7 +2454,6 @@ mod test {
             Bytes::from(create_and_revert_call.abi_encode()),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2441,7 +2525,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2453,7 +2536,6 @@ mod test {
             .into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2506,7 +2588,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2515,7 +2596,6 @@ mod test {
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_sent,
             Some(vec![]),
-            None,
             false,
             TransactionOrigin::UserInput {
                 access_list: AccessList::default(),
@@ -2554,7 +2634,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             FEED_DEPOSIT_ADDR,
@@ -2562,7 +2641,6 @@ mod test {
             FABridge::queueCall { deposit }.abi_encode().into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2578,7 +2656,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2590,7 +2667,6 @@ mod test {
             .into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2649,7 +2725,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2657,7 +2732,6 @@ mod test {
             deploy_bytecode,
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2690,7 +2764,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             FEED_DEPOSIT_ADDR,
@@ -2698,7 +2771,6 @@ mod test {
             FABridge::queueCall { deposit }.abi_encode().into(),
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2744,7 +2816,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -2752,7 +2823,6 @@ mod test {
             Bytes::from(call_and_revert_call.abi_encode()),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             U256::ZERO,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -2824,9 +2894,10 @@ mod test {
                     MockFaBridgeWrapper::{Burn, Mint},
                 },
                 utilities::{
+                    fund,
                     FABridge::{claimCall, queueCall, withdrawCall, Deposit, Withdrawal},
                     ITable::FaDepositWithProxy,
-                    Registry, DEFAULT_SPEC_ID,
+                    Registry, STATIC_CALLER_BYTECODE,
                 },
                 GAS_LIMIT,
             },
@@ -2925,7 +2996,6 @@ mod test {
                 host,
                 &registry,
                 &mut journal,
-                DEFAULT_SPEC_ID,
                 &BlockConstants::test_block_with_no_fees(),
                 None,
                 FEED_DEPOSIT_ADDR,
@@ -2933,7 +3003,6 @@ mod test {
                 queueCall { deposit }.abi_encode().into(),
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -2960,7 +3029,6 @@ mod test {
                 host,
                 &registry,
                 &mut journal,
-                DEFAULT_SPEC_ID,
                 &BlockConstants::test_block_with_no_fees(),
                 None,
                 caller,
@@ -2972,7 +3040,6 @@ mod test {
                 .into(),
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -3006,7 +3073,6 @@ mod test {
                 host,
                 &registry,
                 &mut journal,
-                DEFAULT_SPEC_ID,
                 &BlockConstants::test_block_with_no_fees(),
                 None,
                 caller,
@@ -3014,7 +3080,6 @@ mod test {
                 call_data,
                 GasData::new(gas_limit, 0, GAS_LIMIT),
                 value,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -3029,23 +3094,13 @@ mod test {
             caller: Address,
             calldata: Bytes,
         ) -> Address {
-            let mut caller_account = StorageAccount::from_address(&caller).unwrap();
-            caller_account
-                .set_info(
-                    host,
-                    AccountInfo {
-                        balance: U256::MAX,
-                        ..Default::default()
-                    },
-                )
-                .unwrap();
+            fund(host, caller);
             let registry = Registry::new();
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let result_create = run_transaction(
                 host,
                 &registry,
                 &mut journal,
-                DEFAULT_SPEC_ID,
                 &BlockConstants::test_block_with_no_fees(),
                 None,
                 caller,
@@ -3053,7 +3108,6 @@ mod test {
                 calldata,
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -3126,7 +3180,7 @@ mod test {
             init_precompile_bytecodes(&mut host, true).unwrap();
 
             let caller = Address::from([1; 20]);
-            let static_call_bytecode = Bytes::from_hex("6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033").unwrap();
+            let static_call_bytecode = Bytes::from_hex(STATIC_CALLER_BYTECODE).unwrap();
             let static_caller = deploy_contract(&mut host, caller, static_call_bytecode);
 
             let ticket_owner = Address::from([1; 20]);
@@ -3721,10 +3775,10 @@ mod test {
                 },
             },
             run_transaction,
-            storage::world_state_handler::{AccountInfo, StorageAccount},
             test::{
                 utilities::{
-                    last_recorded_sender, last_recorded_source, Registry, DEFAULT_SPEC_ID,
+                    fund, last_recorded_sender, last_recorded_source, Registry,
+                    STATIC_CALLER_BYTECODE,
                 },
                 GAS_LIMIT,
             },
@@ -3738,11 +3792,6 @@ mod test {
         use self::DelegateCaller::makeDelegateCallCall;
         use self::StaticCaller::makeStaticCallCall;
 
-        // Compiled deploy bytecode for `contracts/tests/static_caller.sol`.
-        // Mirrors the inline literal used by `mod fa_bridge` —
-        // duplicated here to keep the module self-contained.
-        const STATIC_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033";
-
         // Compiled deploy bytecode for `contracts/tests/delegate_caller.sol`.
         const DELEGATE_CALLER_BYTECODE: &str = "6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80638771074f1461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855af49150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220065aceddd10343ed6e9faf40c53bcf49432de8e786641789238cf6d0eaf59c7364736f6c634300081e0033";
 
@@ -3750,18 +3799,6 @@ mod test {
             let mut bc = BlockConstants::test_block_with_no_fees();
             bc.tezos_experimental_features = true;
             bc
-        }
-
-        fn fund_caller(host: &mut MockKernelHost, caller: Address) {
-            let mut acct = StorageAccount::from_address(&caller).unwrap();
-            acct.set_info(
-                host,
-                AccountInfo {
-                    balance: U256::MAX,
-                    ..Default::default()
-                },
-            )
-            .unwrap();
         }
 
         fn deploy(
@@ -3776,7 +3813,6 @@ mod test {
                 host,
                 &registry,
                 &mut journal,
-                DEFAULT_SPEC_ID,
                 &block_constants(),
                 None,
                 caller,
@@ -3784,7 +3820,6 @@ mod test {
                 calldata,
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -3813,7 +3848,6 @@ mod test {
                 host,
                 &registry,
                 &mut journal,
-                DEFAULT_SPEC_ID,
                 &block_constants(),
                 None,
                 caller,
@@ -3821,7 +3855,6 @@ mod test {
                 calldata,
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -3873,7 +3906,7 @@ mod test {
         fn runtime_gateway_rejects_delegate_call_on_call_michelson() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let delegate_caller = deploy(&mut host, caller, DELEGATE_CALLER_BYTECODE);
 
             let outer = makeDelegateCallCall::new((
@@ -3898,7 +3931,7 @@ mod test {
         fn runtime_gateway_rejects_delegate_call_on_call_michelson_view() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let delegate_caller = deploy(&mut host, caller, DELEGATE_CALLER_BYTECODE);
 
             let outer = makeDelegateCallCall::new((
@@ -3927,7 +3960,7 @@ mod test {
         fn runtime_gateway_rejects_static_call_on_call_michelson() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -3955,7 +3988,7 @@ mod test {
         fn runtime_gateway_rejects_static_call_on_call_post() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -3986,7 +4019,7 @@ mod test {
         fn runtime_gateway_allows_static_call_on_call_michelson_view() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -4011,7 +4044,7 @@ mod test {
         fn runtime_gateway_allows_static_call_on_call_get() {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
@@ -4047,7 +4080,6 @@ mod test {
                 host,
                 &registry,
                 &mut journal,
-                DEFAULT_SPEC_ID,
                 &block_constants(),
                 None,
                 caller,
@@ -4055,7 +4087,6 @@ mod test {
                 calldata,
                 GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
                 U256::ZERO,
-                None,
                 None,
                 false,
                 TransactionOrigin::UserInput {
@@ -4090,7 +4121,7 @@ mod test {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]); // immediate sender
             let originator = Address::from([2u8; 20]); // transitive source
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
 
             let res = call_gateway_with_originator(
                 &mut host,
@@ -4130,7 +4161,7 @@ mod test {
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
             let originator = Address::from([2u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
 
             let res = call_gateway_with_originator(
                 &mut host,
@@ -4181,7 +4212,7 @@ mod test {
             fn view_gas(input_len: usize) -> u64 {
                 let mut host = MockKernelHost::default();
                 let caller = Address::from([1u8; 20]);
-                fund_caller(&mut host, caller);
+                fund(&mut host, caller);
                 let payload =
                     RuntimeGatewayCalls::callMichelsonView(callMichelsonViewCall {
                         destination: "KT1abc".to_string(),
@@ -4207,7 +4238,7 @@ mod test {
             fn get_gas(body_len: usize) -> u64 {
                 let mut host = MockKernelHost::default();
                 let caller = Address::from([1u8; 20]);
-                fund_caller(&mut host, caller);
+                fund(&mut host, caller);
                 let payload = RuntimeGatewayCalls::call(callCall {
                     url: "http://tezos/KT1abc/balanceOf".to_string(),
                     headers: vec![],
@@ -4279,7 +4310,7 @@ mod test {
             // Typed surface: callMichelson(destination, entrypoint, params).
             let mut host = MockKernelHost::default();
             let caller = Address::from([1u8; 20]);
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let typed = call_into(
                 &mut host,
                 caller,
@@ -4301,7 +4332,7 @@ mod test {
 
             // Generic surface: call(POST) to the same contract+entrypoint.
             let mut host = MockKernelHost::default();
-            fund_caller(&mut host, caller);
+            fund(&mut host, caller);
             let generic = call_into(
                 &mut host,
                 caller,
@@ -4333,6 +4364,487 @@ mod test {
             assert_eq!(
                 typed_target, generic_target,
                 "targetAddress must not depend on the ABI surface"
+            );
+        }
+    }
+
+    mod call_tracer_precompile {
+        use alloy_sol_types::{sol, SolCall};
+        use evm_inspectors::{
+            call_tracer::{CallTracer, CallTracerConfig},
+            storage::trace_tx_path,
+            Tracer,
+        };
+        use revm::{
+            context::{
+                result::{ExecutionResult, Output},
+                transaction::AccessList,
+            },
+            primitives::{hex::FromHex, Address, Bytes, B256, U256},
+        };
+        use rlp::Rlp;
+        use tezos_ethereum::block::BlockConstants;
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_indexable_storage::IndexableStorage;
+        use tezos_smart_rollup_host::path::RefPath;
+        use tezosx_interfaces::RuntimeId;
+        use tezosx_journal::TezosXJournal;
+
+        use crate::{
+            run_transaction,
+            test::{
+                utilities::{fund, Registry, DEFAULT_SPEC_ID, STATIC_CALLER_BYTECODE},
+                GAS_LIMIT,
+            },
+            ExecutionOutcome, GasData, TransactionOrigin,
+        };
+
+        sol!("contracts/tests/static_caller.sol");
+        use self::StaticCaller::makeStaticCallCall;
+
+        fn identity_precompile() -> Address {
+            Address::from_hex("0000000000000000000000000000000000000004").unwrap()
+        }
+
+        // Shared driver for both the deploy and the traced-call paths;
+        // they differ only in the destination (`None` creates a contract)
+        // and whether a tracer is attached.
+        fn run(
+            host: &mut MockKernelHost,
+            caller: Address,
+            to: Option<Address>,
+            calldata: Bytes,
+            tracer: Option<Tracer>,
+        ) -> ExecutionOutcome {
+            let registry = Registry::new();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+            if let Some(tracer) = tracer {
+                journal.evm.set_tracer(tracer);
+            }
+            let outcome = run_transaction(
+                host,
+                &registry,
+                &mut journal,
+                &BlockConstants::test_block_with_no_fees(),
+                None,
+                caller,
+                to,
+                calldata,
+                GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
+                U256::ZERO,
+                None,
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
+            )
+            .unwrap();
+
+            if let Some(mut tracer) = journal.evm.take_tracer() {
+                tracer
+                    .finalize(host, &outcome.result)
+                    .expect("tracer finalization should succeed");
+            }
+            outcome
+        }
+
+        fn deploy(host: &mut MockKernelHost, caller: Address) -> Address {
+            let outcome = run(
+                host,
+                caller,
+                None,
+                Bytes::from_hex(STATIC_CALLER_BYTECODE).unwrap(),
+                None,
+            );
+            match outcome.result {
+                ExecutionResult::Success {
+                    output: Output::Create(_, Some(addr)),
+                    ..
+                } => addr,
+                other => panic!("StaticCaller deploy failed: {other:?}"),
+            }
+        }
+
+        fn run_traced(
+            host: &mut MockKernelHost,
+            caller: Address,
+            destination: Address,
+            calldata: Bytes,
+            tracer: Tracer,
+        ) -> ExecutionOutcome {
+            run(host, caller, Some(destination), calldata, Some(tracer))
+        }
+
+        fn call_tracer(tx_hash: B256) -> Tracer {
+            Tracer::CallTracer(CallTracer::new(
+                CallTracerConfig {
+                    only_top_call: false,
+                    with_logs: false,
+                },
+                DEFAULT_SPEC_ID,
+                Some(tx_hash),
+            ))
+        }
+
+        // The `CallTracer` flushes its buffered traces, RLP-encoded, into
+        // an `IndexableStorage` keyed on the transaction hash. There is no
+        // Rust decoder for `CallTrace` (the node side decodes the RLP), so
+        // we read the raw encodings back and inspect them positionally.
+        fn read_traces(host: &MockKernelHost, tx_hash: B256) -> Vec<Vec<u8>> {
+            let path =
+                trace_tx_path(&Some(tx_hash), &RefPath::assert_from(b"/call_trace"))
+                    .unwrap();
+            let storage = IndexableStorage::new_owned_path(path);
+            let length = storage.length(host).unwrap();
+            (0..length)
+                .map(|index| storage.get_value(host, index).unwrap())
+                .collect()
+        }
+
+        // Positional accessors over `CallTrace::rlp_append` (a list of 11
+        // fields: type, from, to, value, gas, gas_used, input, output,
+        // error, logs, depth).
+        fn trace_type(trace: &Rlp) -> Vec<u8> {
+            trace.val_at(0).unwrap()
+        }
+
+        fn trace_to(trace: &Rlp) -> Option<Address> {
+            trace
+                .val_at::<Option<Vec<u8>>>(2)
+                .unwrap()
+                .map(|bytes| Address::from_slice(&bytes))
+        }
+
+        fn trace_output(trace: &Rlp) -> Option<Vec<u8>> {
+            trace.val_at(7).unwrap()
+        }
+
+        fn trace_depth(trace: &Rlp) -> u16 {
+            let bytes: Vec<u8> = trace.val_at(10).unwrap();
+            let mut buffer = [0u8; 2];
+            buffer[..bytes.len()].copy_from_slice(&bytes);
+            u16::from_le_bytes(buffer)
+        }
+
+        /// A precompile invoked as a nested `STATICCALL` must be recorded
+        /// as its own child frame carrying the precompile's real output.
+        #[test]
+        fn nested_precompile_call_records_real_outcome() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([0x11; 20]);
+            fund(&mut host, caller);
+            let static_caller = deploy(&mut host, caller);
+
+            let identity = identity_precompile();
+            let payload = Bytes::from(vec![0xAB; 64]);
+            let calldata: Bytes = makeStaticCallCall::new((identity, payload.clone()))
+                .abi_encode()
+                .into();
+
+            let tx_hash = B256::from([0xC1; 32]);
+            let tracer = call_tracer(tx_hash);
+            let outcome = run_traced(&mut host, caller, static_caller, calldata, tracer);
+            assert!(
+                outcome.result.is_success(),
+                "static call to the identity precompile should succeed"
+            );
+
+            let traces = read_traces(&host, tx_hash);
+            assert_eq!(
+                traces.len(),
+                2,
+                "expected the outer CALL and the nested precompile frame"
+            );
+
+            let precompile_frame = traces
+                .iter()
+                .map(|bytes| Rlp::new(bytes))
+                .find(|trace| trace_depth(trace) == 1)
+                .expect("nested precompile frame should be recorded");
+
+            assert_eq!(trace_type(&precompile_frame), b"STATICCALL".to_vec());
+            assert_eq!(trace_to(&precompile_frame), Some(identity));
+            // The identity precompile echoes its input; recording the real
+            // `call_end` outcome means the frame's output is the echoed
+            // payload rather than empty (the frame being dropped) or a
+            // duplicated pre-simulation.
+            assert_eq!(trace_output(&precompile_frame), Some(payload.to_vec()));
+        }
+
+        /// A transaction sent directly to a builtin precompile must record
+        /// a single top-level frame carrying the precompile's real output.
+        #[test]
+        fn top_level_precompile_call_records_real_outcome() {
+            let mut host = MockKernelHost::default();
+            let caller = Address::from([0x11; 20]);
+            fund(&mut host, caller);
+
+            let identity = identity_precompile();
+            let input = Bytes::from(vec![0x42; 96]);
+
+            let tx_hash = B256::from([0xD2; 32]);
+            let tracer = call_tracer(tx_hash);
+            let outcome = run_traced(&mut host, caller, identity, input.clone(), tracer);
+            assert!(
+                outcome.result.is_success(),
+                "call to the identity precompile should succeed"
+            );
+
+            let traces = read_traces(&host, tx_hash);
+            assert_eq!(traces.len(), 1, "expected a single top-level frame");
+
+            let frame = Rlp::new(&traces[0]);
+            assert_eq!(trace_depth(&frame), 0);
+            assert_eq!(trace_type(&frame), b"CALL".to_vec());
+            assert_eq!(trace_to(&frame), Some(identity));
+            assert_eq!(trace_output(&frame), Some(input.to_vec()));
+        }
+    }
+
+    /// A frame must account the intrinsic (initial) gas of *its own*
+    /// transaction — captured when the frame opens — rather than a
+    /// tracer-global value that an inner cross-runtime leg can overwrite
+    /// mid-crossing.
+    ///
+    /// The regression: `CallTracer` used to hold a single `initial_gas`
+    /// field refreshed on every `call`/`create`. An inner cross-runtime
+    /// leg carries its own `TxEnv` (hence its own intrinsic gas); when it
+    /// opened its frame it clobbered that field, and the outer frame —
+    /// closing after the crossing returned — added the inner leg's
+    /// intrinsic gas to its own `gas_used`.
+    ///
+    /// We drive the tracer's `Inspector` hooks directly to reproduce the
+    /// exact interleaving (outer opens; inner opens under a different
+    /// `TxEnv`; inner closes; outer closes) and assert the outer frame's
+    /// recorded `gas_used` reflects the *outer* transaction's intrinsic
+    /// gas. Before the fix it recorded the inner leg's instead. Using only
+    /// the stable `Inspector` API, this test compiles on both revisions
+    /// and fails on the pre-fix one.
+    mod call_tracer_frame_intrinsic_gas {
+        use evm_inspectors::{
+            call_tracer::{CallTracer, CallTracerConfig},
+            storage::trace_tx_path,
+        };
+        use revm::{
+            context::{
+                result::{ExecutionResult, Output, ResultGas, SuccessReason},
+                CfgEnv, Context, LocalContext, TxEnv,
+            },
+            context_interface::journaled_state::JournalTr,
+            interpreter::{
+                gas::{calculate_initial_tx_gas_for_tx, Gas},
+                interpreter::EthInterpreter,
+                CallInput, CallInputs, CallOutcome, CallScheme, CallValue,
+                InstructionResult, InterpreterResult,
+            },
+            primitives::{Address, Bytes, TxKind, B256, U256},
+            Inspector,
+        };
+        use rlp::Rlp;
+        use tezos_ethereum::block::BlockConstants;
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_indexable_storage::IndexableStorage;
+        use tezos_smart_rollup_host::path::RefPath;
+        use tezosx_interfaces::RuntimeId;
+        use tezosx_journal::TezosXJournal;
+
+        use crate::{
+            block_env,
+            database::EtherlinkVMDB,
+            journal::Journal,
+            test::utilities::{Registry, DEFAULT_SPEC_ID},
+        };
+
+        // `CallTrace::rlp_append` emits 11 little-endian fields;
+        // `gas_used` is at index 5 and `depth` at index 10.
+        fn trace_gas_used(trace: &Rlp) -> u64 {
+            let bytes: Vec<u8> = trace.val_at(5).unwrap();
+            let mut buf = [0u8; 8];
+            buf[..bytes.len()].copy_from_slice(&bytes);
+            u64::from_le_bytes(buf)
+        }
+
+        fn trace_depth(trace: &Rlp) -> u16 {
+            let bytes: Vec<u8> = trace.val_at(10).unwrap();
+            let mut buf = [0u8; 2];
+            buf[..bytes.len()].copy_from_slice(&bytes);
+            u16::from_le_bytes(buf)
+        }
+
+        fn call_inputs(gas_limit: u64) -> CallInputs {
+            CallInputs {
+                input: CallInput::Bytes(Bytes::new()),
+                return_memory_offset: 0..0,
+                gas_limit,
+                bytecode_address: Address::ZERO,
+                known_bytecode: None,
+                target_address: Address::ZERO,
+                caller: Address::ZERO,
+                value: CallValue::Transfer(U256::ZERO),
+                scheme: CallScheme::Call,
+                is_static: false,
+            }
+        }
+
+        // A frame that closes successfully having spent `gas_spent`.
+        fn call_outcome(gas_spent: u64) -> CallOutcome {
+            let mut gas = Gas::new(1_000_000);
+            let _ = gas.record_cost(gas_spent);
+            CallOutcome::new(
+                InterpreterResult {
+                    result: InstructionResult::Return,
+                    output: Bytes::new(),
+                    gas,
+                },
+                0..0,
+            )
+        }
+
+        #[test]
+        fn outer_frame_keeps_its_own_intrinsic_gas_across_crossing() {
+            let mut host = MockKernelHost::default();
+            let registry = Registry::new();
+            let block_constants = BlockConstants::test_block_with_no_fees();
+            let block = block_env(&block_constants).unwrap();
+
+            // Two legs with deliberately different calldata so their
+            // intrinsic gas differs: the crossing swaps one for the other
+            // while the outer frame is still open.
+            let outer_tx = TxEnv {
+                kind: TxKind::Call(Address::ZERO),
+                data: Bytes::new(),
+                ..Default::default()
+            };
+            let inner_tx = TxEnv {
+                kind: TxKind::Call(Address::ZERO),
+                // 256 non-zero calldata bytes: a strictly larger intrinsic
+                // gas than the empty outer calldata.
+                data: Bytes::from(vec![0xFFu8; 256]),
+                ..Default::default()
+            };
+
+            let outer_initial =
+                calculate_initial_tx_gas_for_tx(&outer_tx, DEFAULT_SPEC_ID).initial_gas;
+            let inner_initial =
+                calculate_initial_tx_gas_for_tx(&inner_tx, DEFAULT_SPEC_ID).initial_gas;
+            assert_ne!(
+                outer_initial, inner_initial,
+                "the two legs must have distinct intrinsic gas for the test \
+                 to tell per-frame accounting apart from tracer-global"
+            );
+
+            let outer_gas_spent = 50_000u64;
+            let tx_hash = B256::from([0xE7; 32]);
+
+            let mut tracer = CallTracer::new(
+                CallTracerConfig {
+                    only_top_call: false,
+                    with_logs: false,
+                },
+                DEFAULT_SPEC_ID,
+                Some(tx_hash),
+            );
+
+            {
+                let db = EtherlinkVMDB::new(&mut host, &registry, &block_constants, None)
+                    .unwrap();
+                let mut evm_journal = TezosXJournal::mock(RuntimeId::Ethereum);
+                let mut journaled_state = Journal::new_with_inner(db, &mut evm_journal);
+                journaled_state.set_spec_id(DEFAULT_SPEC_ID);
+
+                let cfg = CfgEnv::new()
+                    .with_chain_id(block_constants.chain_id.as_u64())
+                    .with_spec_and_mainnet_gas_params(DEFAULT_SPEC_ID);
+
+                let mut ctx = Context {
+                    tx: &outer_tx,
+                    block: &block,
+                    cfg,
+                    journaled_state,
+                    chain: (),
+                    local: LocalContext::default(),
+                    error: Ok(()),
+                };
+
+                let mut outer_inputs = call_inputs(900_000);
+                let mut inner_inputs = call_inputs(400_000);
+
+                // depth 0: the outer frame opens under the outer tx.
+                Inspector::<_, EthInterpreter>::call(
+                    &mut tracer,
+                    &mut ctx,
+                    &mut outer_inputs,
+                );
+
+                // The cross-runtime leg installs its own TxEnv one frame
+                // deeper.
+                ctx.journaled_state.checkpoint();
+                ctx.tx = &inner_tx;
+
+                // depth 1: the inner frame opens and closes under the
+                // inner tx.
+                Inspector::<_, EthInterpreter>::call(
+                    &mut tracer,
+                    &mut ctx,
+                    &mut inner_inputs,
+                );
+                let mut inner_outcome = call_outcome(10_000);
+                Inspector::<_, EthInterpreter>::call_end(
+                    &mut tracer,
+                    &mut ctx,
+                    &inner_inputs,
+                    &mut inner_outcome,
+                );
+
+                // The crossing returns to depth 0. The inner TxEnv is left
+                // in place — exactly the state a tracer-global intrinsic
+                // gas would have been overwritten into.
+                ctx.journaled_state.checkpoint_commit();
+
+                // depth 0: the outer frame closes and both frames move to
+                // the tracer's pending buffer.
+                let mut outer_outcome = call_outcome(outer_gas_spent);
+                Inspector::<_, EthInterpreter>::call_end(
+                    &mut tracer,
+                    &mut ctx,
+                    &outer_inputs,
+                    &mut outer_outcome,
+                );
+            }
+
+            // The CallTracer ignores the outcome's content: any result does.
+            let result = ExecutionResult::Success {
+                reason: SuccessReason::Stop,
+                gas: ResultGas::new(1_000_000, outer_gas_spent, 0, 0, 0),
+                logs: vec![],
+                output: Output::Call(Bytes::new()),
+            };
+            tracer
+                .finalize(&mut host, &result)
+                .expect("tracer finalization should succeed");
+
+            // Read the flushed traces back and locate the top frame.
+            let path =
+                trace_tx_path(&Some(tx_hash), &RefPath::assert_from(b"/call_trace"))
+                    .unwrap();
+            let storage = IndexableStorage::new_owned_path(path);
+            let length = storage.length(&host).unwrap();
+            let traces: Vec<Vec<u8>> = (0..length)
+                .map(|index| storage.get_value(&host, index).unwrap())
+                .collect();
+            assert_eq!(traces.len(), 2, "expected the outer and inner frames");
+
+            let outer_frame = traces
+                .iter()
+                .map(|bytes| Rlp::new(bytes))
+                .find(|trace| trace_depth(trace) == 0)
+                .expect("the top-level frame should be recorded");
+
+            assert_eq!(
+                trace_gas_used(&outer_frame),
+                outer_gas_spent + outer_initial,
+                "the top frame must account its own transaction's intrinsic \
+                 gas, not the inner cross-runtime leg's"
             );
         }
     }
@@ -4389,7 +4901,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             caller,
@@ -4397,7 +4908,6 @@ mod test {
             Bytes::new(),
             GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
             value_sent,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {
@@ -5089,7 +5599,6 @@ mod test {
             &mut host,
             &registry,
             &mut journal,
-            DEFAULT_SPEC_ID,
             &block_constants,
             None,
             sender,
@@ -5097,7 +5606,6 @@ mod test {
             Bytes::new(), // empty calldata triggers receive()
             GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
             value_to_send,
-            None,
             None,
             false,
             TransactionOrigin::UserInput {

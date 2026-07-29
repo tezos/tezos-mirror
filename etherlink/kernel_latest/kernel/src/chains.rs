@@ -3,14 +3,18 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    apply::{extract_cross_runtime_effects, RuntimeExecutionInfo},
-    block_in_progress::BlockInProgress,
+    apply::{extract_cross_runtime_effects, RuntimeExecutionInfo, TezosExecutionInfo},
+    block_in_progress::{compute_crac_fake_tx_hash, BlockInProgress},
     blueprint_storage::{DelayedTransactionFetchingResult, EVMBlockHeader},
     bridge::{execute_tezlink_deposit, Deposit, TEZLINK_DEPOSITOR},
     configuration::EVM_CHAIN_ID,
     delayed_inbox::DelayedInbox,
     error,
     fees::{DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER, MINIMUM_BASE_FEE_PER_GAS},
+    journal::{
+        close_tezosx_journal, fake_top_level_call_from_tezos_operation,
+        prepare_tezosx_journal, TezosXHashes,
+    },
     l2block::L2Block,
     registry_impl::RegistryImpl,
     simulation::start_simulation_mode,
@@ -20,19 +24,22 @@ use crate::{
     tick_model::constants::MAXIMUM_GAS_LIMIT,
     transaction::TransactionContent,
 };
+use evm_inspectors::TracerInput;
 use mir::ast::PublicKeyHash;
 use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
-use revm::primitives::hardfork::SpecId;
+use revm::{
+    context::result::ExecutionResult,
+    primitives::{hardfork::SpecId, B256},
+};
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
-    inspectors::TracerInput,
     storage::{block::BLOCKS_STORED, world_state_handler::StorageAccount},
 };
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use std::fmt::Debug;
-use tezos_crypto_rs::hash::{BlockHash, ChainId, UnknownSignature};
+use tezos_crypto_rs::hash::{BlockHash, ChainId, OperationHash, UnknownSignature};
 use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
@@ -492,6 +499,7 @@ impl TezosXChainConfig {
                 crate::block::GAS_LIMIT,
                 coinbase,
                 self.is_tezos_runtime_enabled(level.into()),
+                self.spec_id,
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level,
@@ -672,7 +680,6 @@ impl TezosXChainConfig {
                     index,
                     sequencer_pool_address,
                     tracer_input,
-                    &self.spec_id,
                     &self.limits,
                     http_trace_enabled,
                     internal_operations_base,
@@ -766,28 +773,50 @@ impl TezosXChainConfig {
     {
         let tx_hash = operation.tx_hash;
         let crac_id = tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
-        // The seed must NOT be the operation's real hash: the
-        // normal Michelson path inside `apply_tezos_operation`
-        // builds its own `OriginationNonce::initial(real_hash)`
-        // starting at index 0, and if the journal's CRAC nonce
-        // shared the same seed both nonces would derive
-        // colliding KT1s at index 1.  Use a synthetic seed so
-        // the two nonce universes stay disjoint.
-        let operation_hash = TezosXJournal::synthetic_operation_hash(
-            &crac_id,
-            self.evm_chain_id.low_u64(),
-            block_in_progress.number.low_u64(),
-        );
+        let operation_hashes = TezosXHashes {
+            // The EVM-side identity of this operation is the fake transaction
+            // it registers in the EVM block, NOT its Tezos hash: that fake
+            // hash is what a `debug_trace*` request targets. Recompute it
+            // exactly as `register_crac_evm_transaction` does at block
+            // generation, or the tracer filter never matches and the trace
+            // silently comes back empty.
+            evm: B256::from(compute_crac_fake_tx_hash(
+                block_in_progress.number,
+                &crac_id.to_string(),
+            )),
+            // The journal holds the single origination nonce for the whole
+            // manager operation, seeded from the Tezos operation hash. Both
+            // arms seed it with the very hash the operation's receipt carries,
+            // so the KT1s a `CREATE_CONTRACT` derives and the hash observers
+            // see in the Tezos block cannot drift apart.
+            michelson: match &operation.content {
+                TezlinkContent::Tezos(operation) => operation.hash()?,
+                // Mirroring `pure_xtz_deposit` / `pure_fa_deposit` in apply.rs, which likewise seed the
+                // journal with the deposit's own `transaction_hash`
+                TezlinkContent::Deposit(_) => OperationHash::from(operation.tx_hash),
+            },
+        };
         // Seed the journal with this block's EVM environment so any
         // inbound CRAC the Michelson operation dispatches to the EVM
         // runtime exposes the live block observables (BASEFEE,
         // GASLIMIT, ...) rather than zero.
-        let mut journal = TezosXJournal::new(
+        let mut journal = prepare_tezosx_journal(
             crac_id,
-            operation_hash,
-            block_constants.evm_runtime_block_constants.clone(),
+            &operation_hashes,
+            &block_constants.evm_runtime_block_constants,
+            http_trace_enabled,
+            &DebugFeatures::default(),
+            0,
+            tracer_input,
         );
-        journal.set_http_trace_enabled(http_trace_enabled);
+        fake_top_level_call_from_tezos_operation(
+            &mut journal,
+            registry,
+            &operation,
+            block_constants
+                .michelson_runtime_block_constants
+                .michelson_to_evm_gas_multiplier,
+        );
         let result = apply_tezos_operation(
             &self.michelson_chain_id,
             block_in_progress,
@@ -826,7 +855,35 @@ impl TezosXChainConfig {
             &tx_hash,
             &journal,
         );
-        result
+
+        match result {
+            Ok(crate::apply::ExecutionResult::Valid(res)) => {
+                let result = res.to_execution_result(
+                    self.michelson_to_evm_gas_multiplier(block_constants),
+                );
+                journal.fake_top_level_call_end(
+                    michelson_milligas_to_evm_gas(
+                        res.consumed_milligas,
+                        block_constants
+                            .michelson_runtime_block_constants
+                            .michelson_to_evm_gas_multiplier,
+                    ),
+                    matches!(result, ExecutionResult::Success { .. }),
+                );
+                close_tezosx_journal(host, journal, Some(&result))?;
+                Ok(crate::apply::ExecutionResult::Valid(
+                    RuntimeExecutionInfo::Tezos(res),
+                ))
+            }
+            Ok(crate::apply::ExecutionResult::Invalid) => {
+                close_tezosx_journal(host, journal, None)?;
+                Ok(crate::apply::ExecutionResult::Invalid)
+            }
+            Err(err) => {
+                close_tezosx_journal(host, journal, None)?;
+                Err(err)
+            }
+        }
     }
 }
 
@@ -981,7 +1038,7 @@ pub(crate) fn michelson_milligas_to_evm_gas(
 /// Deposits have no user-declared gas limit, so they are reported
 /// as zero (always fitting). Their cost is bounded by the bridge
 /// precompile.
-fn tezos_op_evm_gas_limit(
+pub(crate) fn tezos_op_evm_gas_limit(
     op: &TezlinkOperation,
     michelson_to_evm_gas_multiplier: u64,
 ) -> anyhow::Result<u64> {
@@ -1076,7 +1133,7 @@ pub fn apply_tezos_operation<Host>(
     tracing_enabled: bool,
     http_trace_enabled: bool,
     enable_da_fees: bool,
-) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
+) -> Result<crate::apply::ExecutionResult<TezosExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1,
 {
@@ -1095,8 +1152,9 @@ where
 
     match operation.content {
         TezlinkContent::Tezos(operation) => {
-            // Compute the hash of the operation
-            let hash = operation.hash()?;
+            // Read the operation hash back from the journal rather than computing for a second
+            // blake2b.
+            let hash = external_journal.michelson.operation_hash().clone();
 
             let FeesData {
                 required_fees: fees,
@@ -1147,7 +1205,6 @@ where
                 host,
                 registry,
                 journal,
-                hash.clone(),
                 operation,
                 &block_ctx,
                 skip_signature_check,
@@ -1192,8 +1249,11 @@ where
             // runs `JournalInner::finalize()` which clears
             // `inner.logs` as part of revm's standard cleanup, so
             // reading them after gives an empty buffer.
-            let cross_runtime_effects =
-                extract_cross_runtime_effects(journal, consumed_milligas);
+            let cross_runtime_effects = extract_cross_runtime_effects(
+                journal,
+                consumed_milligas,
+                block_constants,
+            );
 
             if let (Some(outbox_queue), Some(evm_block_constants)) =
                 (outbox_queue, evm_block_constants)
@@ -1207,13 +1267,11 @@ where
                 push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
             }
 
-            Ok(crate::apply::ExecutionResult::Valid(
-                RuntimeExecutionInfo::Tezos {
-                    op: applied_operation,
-                    cross_runtime_effects,
-                    consumed_milligas,
-                },
-            ))
+            Ok(crate::apply::ExecutionResult::Valid(TezosExecutionInfo {
+                op: applied_operation,
+                cross_runtime_effects,
+                consumed_milligas,
+            }))
         }
         TezlinkContent::Deposit(deposit) => {
             log!(Debug, "Execute Tezlink deposit: {deposit:?}");
@@ -1250,14 +1308,12 @@ where
                     },
                 ),
             };
-            Ok(crate::apply::ExecutionResult::Valid(
-                RuntimeExecutionInfo::Tezos {
-                    op: applied_operation,
-                    cross_runtime_effects: Vec::new(),
-                    // Deposits bypass the Michelson interpreter — no gas consumed.
-                    consumed_milligas: 0,
-                },
-            ))
+            Ok(crate::apply::ExecutionResult::Valid(TezosExecutionInfo {
+                op: applied_operation,
+                cross_runtime_effects: Vec::new(),
+                // Deposits bypass the Michelson interpreter — no gas consumed.
+                consumed_milligas: 0,
+            }))
         }
     }
 }

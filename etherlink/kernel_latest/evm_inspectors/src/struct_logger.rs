@@ -2,23 +2,21 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    database::EtherlinkVMDB,
-    error::EvmKernelError,
-    helpers::rlp::{append_option_canonical, append_u16_le, append_u64_le},
-    inspectors::EtherlinkInspector,
+use super::{
+    error::InspectorError,
+    rlp_helpers::{append_option_canonical, append_u16_le, append_u64_le},
 };
 
 use revm::{
-    context::{ContextTr, JournalTr},
+    context::{result::ExecutionResult, ContextTr, JournalTr},
     inspector::inspectors::GasInspector,
     interpreter::{
         interpreter::ReturnDataImpl,
-        interpreter_types::{Jumps, LoopControl, MemoryTr, StackTr},
+        interpreter_types::{Jumps, LoopControl, MemoryTr},
         CallInputs, CallOutcome, CreateInputs, CreateOutcome, InstructionResult,
-        Interpreter, InterpreterTypes,
+        Interpreter, InterpreterTypes, Stack,
     },
-    primitives::{Address, Bytes, B256},
+    primitives::{Address, Bytes, Log, B256},
     state::AccountInfo,
     Database, Inspector,
 };
@@ -26,13 +24,12 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::rlp_helpers::{check_list, decode_field, decode_option, next};
 use tezos_evm_logging::{log, tracing::instrument, Level::Debug};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_interfaces::Registry;
 
 use super::{
     storage::{
         store_return_value, store_struct_log, store_trace_failed, store_trace_gas,
     },
-    StructStack,
+    HasHost,
 };
 
 const STRUCT_LOGGER_CONFIG_SIZE: usize = 5;
@@ -198,7 +195,7 @@ impl StructLogger {
         output: Option<&Bytes>,
         gas_used: u64,
         transaction_hash: Option<B256>,
-    ) -> Result<(), EvmKernelError>
+    ) -> Result<(), InspectorError>
     where
         Host: StorageV1,
     {
@@ -209,32 +206,44 @@ impl StructLogger {
         };
         Ok(())
     }
-}
 
-impl<'a, Host, R> EtherlinkInspector<'a, Host, R> for StructLogger
-where
-    Host: StorageV1 + 'a,
-    R: Registry + 'a,
-{
-    fn is_struct_logger(&self) -> bool {
-        true
+    pub fn finalize<Host>(
+        &mut self,
+        host: &mut Host,
+        result: &ExecutionResult,
+    ) -> Result<(), InspectorError>
+    where
+        Host: StorageV1,
+    {
+        Self::store_outcome(
+            host,
+            result.is_success(),
+            result.output(),
+            result.gas_used(),
+            self.transaction_hash,
+        )
     }
 
-    fn get_transaction_hash(&self) -> Option<B256> {
-        self.transaction_hash
-    }
+    pub fn inject_log(&mut self, _log: Log) {}
+
+    pub fn fake_top_level_call(&mut self, _caller: Address, _gas_limit: u64) {}
+
+    pub fn fake_top_level_call_end(&mut self, _gas_spent: u64, _status: bool) {}
 }
 
-impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for StructLogger
+fn to_structured_stack(st: &Stack) -> Vec<B256> {
+    let stack: Vec<B256> = st
+        .data()
+        .iter()
+        .map(|e| B256::from_slice(e.to_be_bytes::<32>().as_slice()))
+        .collect();
+    stack
+}
+
+impl<CTX, INTR> Inspector<CTX, INTR> for StructLogger
 where
-    Host: StorageV1 + 'a,
-    R: Registry + 'a,
-    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
-    INTR: InterpreterTypes<
-        Stack: StackTr + StructStack,
-        ReturnData = ReturnDataImpl,
-        Memory: MemoryTr,
-    >,
+    CTX: ContextTr<Db: HasHost<H: StorageV1>>,
+    INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl, Memory: MemoryTr>,
 {
     fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, _: &mut CTX) {
         self.gas_inspector.initialize_interp(&interp.gas);
@@ -252,7 +261,7 @@ where
             interp.gas.remaining(),
             depth,
             if !self.config.disable_stack {
-                Some(interp.stack.to_structured_stack())
+                Some(to_structured_stack(&interp.stack))
             } else {
                 None
             },
@@ -275,7 +284,7 @@ where
                     vec![]
                 } else {
                     let address = self.execution_address;
-                    let mut stack = interp.stack.to_structured_stack();
+                    let mut stack = to_structured_stack(&interp.stack);
                     let index = stack.pop().unwrap_or_default();
                     let value = stack.pop().unwrap_or_default();
                     let storage_map_item = StorageMapItem {
@@ -315,7 +324,7 @@ where
 
             let struct_log =
                 struct_log.complete(depth, self.gas_inspector.last_gas_cost(), error);
-            struct_log.store(context.db_mut().host, &self.transaction_hash);
+            struct_log.store(context.db_mut().as_host_mut(), &self.transaction_hash);
         }
     }
 

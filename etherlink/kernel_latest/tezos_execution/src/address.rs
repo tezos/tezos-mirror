@@ -7,8 +7,7 @@ use tezos_crypto_rs::hash::{ContractKt1Hash, OperationHash};
 use tezos_data_encoding::enc::BinWriter;
 
 // Inspired by src/proto_alpha/lib_protocol/origination_nonce.ml
-#[derive(BinWriter, Clone)]
-#[cfg_attr(test, derive(Default))]
+#[derive(BinWriter, Clone, Default)]
 pub struct OriginationNonce {
     pub operation: OperationHash,
     pub index: u32,

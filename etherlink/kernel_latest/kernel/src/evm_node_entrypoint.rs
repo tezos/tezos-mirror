@@ -10,7 +10,10 @@
 //! using the inbox and a specific message.
 
 use crate::{
-    apply::{ExecutionResult, RuntimeExecutionInfo, WITHDRAWAL_OUTBOX_QUEUE},
+    apply::{
+        ExecutionResult, RuntimeExecutionInfo, TezosExecutionInfo,
+        WITHDRAWAL_OUTBOX_QUEUE,
+    },
     block::bip_from_blueprint,
     blueprint::Blueprint,
     blueprint_storage::read_current_blueprint_header,
@@ -26,6 +29,7 @@ use mir::parser::Parser;
 use primitive_types::{H160, H256, U256};
 use rlp::{Rlp, RlpStream};
 use std::collections::HashMap;
+use tezos_crypto_rs::hash::OperationHash;
 use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::{
     rlp_helpers::{
@@ -312,17 +316,37 @@ where
     // external journal so we can capture HTTP traces.  For Ethereum
     // transactions, go through the normal apply_transaction path.
     let trace_crac_id = tezosx_journal::CracId::new(0, 0);
-    // Both arms seed the journal via `synthetic_operation_hash`.  The
-    // normal Michelson path that runs inside `apply_tezos_operation`
-    // builds its own `OriginationNonce::initial(real_hash)` starting
-    // at index 0, so reusing the real hash here would let CRACs and
-    // normal originations collide on a child KT1.  A synthetic seed
-    // keeps the two nonce universes disjoint.
-    let trace_operation_hash = tezosx_journal::TezosXJournal::synthetic_operation_hash(
-        &trace_crac_id,
-        chain_config.get_evm_chain_id().low_u64(),
-        block_in_progress.number.low_u64(),
-    );
+    // Seed the journal's origination nonce exactly as
+    // `TezosXChainConfig::apply_tezos_operation` does, so pre-applied KT1s
+    // match the ones application produces: a Michelson operation uses its
+    // real hash, a deposit its blueprint-supplied `tx_hash`.
+    // `apply_tezos_operation` also reads this back as the receipt's
+    // operation hash. An Ethereum transaction never reaches
+    // `apply_tezos_operation`, so its journal only needs a seed that is
+    // unique per simulation — hence the synthetic one.
+    let trace_operation_hash = match &transaction {
+        chains::TezosXTransaction::Tezos(operation) => match &operation.content {
+            chains::TezlinkContent::Tezos(inner) => match inner.hash() {
+                Ok(hash) => hash,
+                Err(err) => {
+                    log!(
+                        Error,
+                        "Tezos X simulation: failed to hash operation: {:?}",
+                        err
+                    );
+                    return;
+                }
+            },
+            chains::TezlinkContent::Deposit(_) => OperationHash::from(operation.tx_hash),
+        },
+        chains::TezosXTransaction::Ethereum(_) => {
+            tezosx_journal::TezosXJournal::synthetic_operation_hash(
+                &trace_crac_id,
+                chain_config.get_evm_chain_id().low_u64(),
+                block_in_progress.number.low_u64(),
+            )
+        }
+    };
     // Seed the journal with the live simulation block (built above from
     // `block_in_progress`), exactly as the applied path seeds the real
     // block, so a CRAC dispatched during a simulated/pre-applied Michelson
@@ -373,6 +397,12 @@ where
                 true,
                 false, // da fees are disabled in simulation
             )
+            .map(|x| match x {
+                ExecutionResult::Valid(res) => {
+                    ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(res))
+                }
+                ExecutionResult::Invalid => ExecutionResult::Invalid,
+            })
         }
         _ => chain_config.apply_transaction(
             &block_in_progress,
@@ -417,11 +447,11 @@ where
     }
 
     let applied_operation = match execution_result {
-        ExecutionResult::Valid(RuntimeExecutionInfo::Tezos {
+        ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(TezosExecutionInfo {
             op,
             cross_runtime_effects: _,
             consumed_milligas: _,
-        }) => op,
+        })) => op,
         ExecutionResult::Valid(RuntimeExecutionInfo::Ethereum(_)) => {
             log!(
                 Error,

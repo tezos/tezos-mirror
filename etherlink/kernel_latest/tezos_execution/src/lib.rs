@@ -15,6 +15,7 @@ use mir::{
     ast::{big_map::BigMapId, IntoMicheline, Micheline},
     context::CtxTrait,
     gas::{Gas, OutOfGas},
+    interpreter::compute_contract_address,
     parser::Parser,
     typechecker::{AllowForgedLazyStorageId, TypecheckViews},
 };
@@ -23,7 +24,6 @@ use num_traits::ops::checked::CheckedSub;
 use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_ethereum::wei::michelson_gas_to_mutez;
@@ -57,7 +57,6 @@ use tezosx_journal::TezosXJournal;
 use crate::account_storage::{
     OriginatedContractInfo, StorageSpace, TezosImplicitAccount,
 };
-pub use crate::address::OriginationNonce;
 use crate::gas::Cost;
 pub use crate::gas::TezlinkOperationGas;
 use crate::mir_ctx::{
@@ -155,6 +154,10 @@ extern crate alloc;
 pub const NULL_PKH: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
 
 pub mod account_storage;
+// Test-only oracle for KT1 derivation: production claims indices from
+// the Michelson journal and derives addresses with
+// `mir::interpreter::compute_contract_address` directly.
+#[cfg(test)]
 mod address;
 pub mod context;
 pub mod enshrined_contracts;
@@ -2008,7 +2011,6 @@ pub fn validate_and_apply_operation<Host>(
     host: &mut Host,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    hash: OperationHash,
     operation: Operation,
     block_ctx: &BlockCtx,
     skip_signature_check: bool,
@@ -2075,14 +2077,18 @@ where
     // Each operation uses 0-based nonces; block-sequential nonces are
     // assigned at block finalization by renumber_nonces().
     let mut nonce_counter: u16 = 0;
-    let mut origination_nonce = OriginationNonce::initial(hash);
+    // The origination nonce lives on the journal.
+    // Snapshot the index so the revert branch below can put it back: unlike an EVM-driven frame,
+    // this path never opens a journal frame, so `revert_frame` does not roll it back for us — and a
+    // backtracked batch must not consume indices, since on L1 the nonce dies with the reverted
+    // context.
+    let origination_index_before = journal.michelson.origination_index();
     // We use `mut` here because apply_batch does not handle fee refund,
     // so we append the refund balance updates to processed_ops afterwards.
     let (mut processed_ops, applied) = apply_batch(
         &mut safe_host,
         registry,
         journal,
-        &mut origination_nonce,
         validation_info,
         block_ctx,
         &mut nonce_counter,
@@ -2117,6 +2123,11 @@ where
         // journal (not `evm`), so drop it here too — a backtracked
         // operation's originator must not leak into the next one.
         journal.reset_original_source();
+        // Give the origination-nonce indices back: none of this batch's
+        // originations survived, so none of them may consume an index.
+        journal
+            .michelson
+            .restore_origination_index(origination_index_before);
     }
 
     // Apply fee refund after all transactional work is done.
@@ -2192,7 +2203,6 @@ fn apply_batch<Host>(
     host: &mut Host,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    origination_nonce: &mut OriginationNonce,
     validation_info: validate::ValidatedBatch,
     block_ctx: &BlockCtx,
     nonce_counter: &mut u16,
@@ -2232,7 +2242,6 @@ where
                 host,
                 registry,
                 journal,
-                origination_nonce,
                 &source_account,
                 &source_public_key,
                 validated_operation,
@@ -2289,7 +2298,6 @@ fn apply_operation<Host>(
     host: &mut Host,
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    origination_nonce: &mut OriginationNonce,
     source_account: &TezosImplicitAccount,
     source_public_key: &[u8],
     validated_operation: validate::ValidatedOperation,
@@ -2342,7 +2350,6 @@ where
                 source: source_account,
                 counter: &mut counter,
                 applied_counters: BTreeSet::new(),
-                origination_nonce,
                 level: block_ctx.level,
                 now: block_ctx.now,
                 chain_id: block_ctx.chain_id,
@@ -2421,7 +2428,13 @@ where
             delegate: _,
             ref script,
         }) => {
-            let address = origination_nonce.generate_kt1();
+            // Claim from the operation's single origination nonce, held
+            // by the journal, so this top-level `Origination` and any
+            // `CREATE_CONTRACT` reached through a CRAC of the same
+            // operation can never derive the same KT1.
+            let index = journal.michelson.next_origination_index();
+            let address =
+                compute_contract_address(journal.michelson.operation_hash(), index);
             let typechecked_storage =
                 typecheck_code_and_storage(&mut tc_ctx, &parser, script);
             let origination_result = match typechecked_storage {
@@ -2536,6 +2549,18 @@ mod tests {
     use tezos_smart_rollup::types::Timestamp;
     use tezos_smart_rollup_host::path::OwnedPath;
     use tezos_tezlink::enc_wrappers::BlockNumber;
+
+    /// Journal seeded with `hash`, so the operation's origination nonce
+    /// derives the same child KT1s the production path would. Tests that
+    /// do not assert on originated addresses use
+    /// [`TezosXJournal::mock`], whose seed is the zero hash.
+    fn journal_with_operation_hash(hash: OperationHash) -> TezosXJournal {
+        TezosXJournal::new(
+            tezosx_journal::CracId::mock(RuntimeId::Ethereum),
+            hash,
+            tezos_ethereum::block::BlockConstants::dummy(),
+        )
+    }
 
     /// Test-only SafeStorage root matching the production Michelson accounts
     /// root, used to build the account/big-map paths in tests.
@@ -3166,7 +3191,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -3203,7 +3227,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -3240,7 +3263,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -3291,7 +3313,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -3374,7 +3395,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -3444,7 +3464,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -3509,7 +3528,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -3565,7 +3583,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -3645,7 +3662,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -3729,7 +3745,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -3827,7 +3842,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -3952,7 +3966,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -4104,7 +4117,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -4197,7 +4209,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -4336,7 +4347,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -4402,7 +4412,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -4512,7 +4521,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation.clone(),
                 &block_ctx!(),
                 false,
@@ -4620,7 +4628,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation.clone(),
                 &block_ctx!(),
                 false,
@@ -4747,7 +4754,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -4839,7 +4845,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -4913,7 +4918,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -5001,7 +5005,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 batch.clone(),
                 &block_ctx!(),
                 false,
@@ -5189,7 +5192,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             batch,
             &block_ctx!(),
             false,
@@ -5298,7 +5300,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 batch,
                 &block_ctx!(),
                 false,
@@ -5419,7 +5420,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -5648,7 +5648,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -5848,7 +5847,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -5972,7 +5970,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -6091,7 +6088,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -6203,8 +6199,7 @@ mod tests {
         let _processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            operation.hash().unwrap(),
+            &mut journal_with_operation_hash(operation.hash().unwrap()),
             operation,
             &block_ctx!(),
             false,
@@ -6278,8 +6273,7 @@ mod tests {
         let _processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            operation.hash().unwrap(),
+            &mut journal_with_operation_hash(operation.hash().unwrap()),
             operation,
             &block_ctx!(),
             false,
@@ -6355,8 +6349,7 @@ mod tests {
         let _processed = validate_and_apply_operation(
             &mut host,
             &NotWiredRegistry,
-            &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            operation.hash().unwrap(),
+            &mut journal_with_operation_hash(operation.hash().unwrap()),
             operation,
             &block_ctx!(),
             false,
@@ -6432,7 +6425,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation.clone(),
                 &block_ctx!(),
                 false,
@@ -6586,7 +6578,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation.clone(),
                 &block_ctx!(),
                 false,
@@ -6776,7 +6767,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &BlockCtx {
                     level: &0u32.into(),
@@ -6868,8 +6858,7 @@ mod tests {
             validate_and_apply_operation(
                 &mut host,
                 &NotWiredRegistry,
-                &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                op_hash.clone(),
+                &mut journal_with_operation_hash(op_hash.clone()),
                 operation,
                 &block_ctx!(),
                 false,
@@ -7010,7 +6999,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation.clone(),
                 &block_ctx!(),
                 false,
@@ -7280,7 +7268,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 batch.clone(),
                 &block_ctx!(),
                 false,
@@ -7571,7 +7558,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -7630,7 +7616,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -7714,7 +7699,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -7794,7 +7778,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -7844,7 +7827,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -7895,7 +7877,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -7954,7 +7935,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -8054,7 +8034,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -8153,7 +8132,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -8264,7 +8242,6 @@ mod tests {
                 ctx.host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -8574,7 +8551,6 @@ mod tests {
                 ctx.host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -8845,7 +8821,6 @@ mod tests {
                 ctx.host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -8951,7 +8926,6 @@ mod tests {
                 ctx.host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -9084,7 +9058,6 @@ mod tests {
                 ctx.host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -9186,7 +9159,6 @@ mod tests {
             &mut host,
             &registry,
             &mut journal,
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -9263,7 +9235,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -9316,7 +9287,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             batch,
             &block_ctx!(),
             false,
@@ -9370,7 +9340,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -9425,7 +9394,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -9488,7 +9456,6 @@ mod tests {
                 &mut host,
                 &registry,
                 &mut journal,
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -9578,7 +9545,6 @@ mod tests {
                 &mut host,
                 &registry,
                 &mut journal,
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -9646,7 +9612,6 @@ mod tests {
                 &mut host,
                 &registry,
                 &mut journal,
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -9753,7 +9718,6 @@ mod tests {
             &mut host,
             &registry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -9894,7 +9858,6 @@ mod tests {
                 host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 op,
                 &block_ctx!(),
                 false,
@@ -10146,14 +10109,12 @@ mod tests {
             interpret_context: crate::mir_ctx::InterpretContext::new(),
             next_temporary_id: &mut mir::ast::big_map::BigMapId { value: (-1).into() },
         };
-        let mut origination_nonce = OriginationNonce::default();
         let mut counter = 0u128;
         let level = BlockNumber { block_number: 0 };
         let now = Timestamp::from(0);
         let chain_id = tezos_crypto_rs::hash::ChainId::from([0, 0, 0, 0]);
         let mut operation_ctx = crate::mir_ctx::OperationCtx {
             source: &sender_account,
-            origination_nonce: &mut origination_nonce,
             counter: &mut counter,
             level: &level,
             now: &now,
@@ -10387,14 +10348,12 @@ mod tests {
             interpret_context: crate::mir_ctx::InterpretContext::new(),
             next_temporary_id: &mut mir::ast::big_map::BigMapId { value: (-1).into() },
         };
-        let mut origination_nonce = OriginationNonce::default();
         let mut counter = 0u128;
         let level = BlockNumber { block_number: 0 };
         let now = Timestamp::from(0);
         let chain_id = tezos_crypto_rs::hash::ChainId::from([0, 0, 0, 0]);
         let mut operation_ctx = crate::mir_ctx::OperationCtx {
             source: &sender_account,
-            origination_nonce: &mut origination_nonce,
             counter: &mut counter,
             level: &level,
             now: &now,
@@ -10656,7 +10615,6 @@ mod tests {
             &mut host,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
-            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -10885,7 +10843,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 first_operation,
                 &block_ctx!(),
                 false,
@@ -10955,7 +10912,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 second_operation,
                 &block_ctx!(),
                 false,
@@ -11087,7 +11043,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -11230,7 +11185,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -11366,7 +11320,6 @@ mod tests {
                     host,
                     &NotWiredRegistry,
                     &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                    OperationHash::default(),
                     operation,
                     &block_ctx!(),
                     false,
@@ -11478,7 +11431,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -11576,7 +11528,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation,
                 &block_ctx!(),
                 false,
@@ -11620,7 +11571,6 @@ mod tests {
                 &mut host2,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 operation2,
                 &block_ctx!(),
                 false,
@@ -11704,7 +11654,6 @@ mod tests {
                 &mut host,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
-                OperationHash::default(),
                 batch,
                 &block_ctx!(),
                 false,

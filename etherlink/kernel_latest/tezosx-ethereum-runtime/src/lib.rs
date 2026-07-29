@@ -21,7 +21,6 @@ use revm_etherlink::{
     run_transaction,
     storage::{
         code::CodeStorage,
-        version::read_evm_version,
         world_state_handler::{AccountInfo, AccountOrigin, StorageAccount},
     },
     EvmRunError, ExecutionOutcome, GasData, TransactionOrigin,
@@ -120,7 +119,6 @@ impl EthereumRuntime {
         .abi_encode();
 
         // Set up block constants for EVM execution
-        let evm_version = read_evm_version(host);
         let block_constants = self.create_block_constants(host, journal, context);
 
         // Use the caller's remaining gas so it controls the budget. The
@@ -142,7 +140,6 @@ impl EthereumRuntime {
             host,
             registry,
             journal,
-            evm_version.into(),
             &block_constants,
             None, // no transaction hash for internal transactions
             TEZOSX_CALLER_ADDRESS,
@@ -151,7 +148,6 @@ impl EthereumRuntime {
             gas_data,
             AlloyU256::ZERO, // no value transfer
             None,            // no authorization list
-            None,            // no tracer
             false,           // not a simulation
             TransactionOrigin::CrossRuntime { credit: None },
         )
@@ -423,7 +419,6 @@ where
         block_number: hdrs.block_number,
     };
 
-    let evm_version = read_evm_version(host);
     let block_constants = runtime.create_block_constants(host, journal, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
     let crac_log = Log {
@@ -444,7 +439,12 @@ where
         }
         .into_log_data(),
     };
-    journal.evm.inner.log(crac_log);
+
+    journal.evm.inner.log(crac_log.clone());
+    if let Some(mut tracer) = journal.evm.take_tracer() {
+        tracer.inject_log(crac_log);
+        journal.evm.restore_tracer(Some(tracer));
+    }
 
     // `tx.origin` returns the inbound CRAC originator
     // (`X-Tezos-Source`) instead of `TxEnv.caller`, via a custom
@@ -470,7 +470,6 @@ where
         host,
         registry,
         journal,
-        evm_version.into(),
         &block_constants,
         None,
         hdrs.sender,
@@ -478,7 +477,6 @@ where
         call_data,
         gas_data,
         hdrs.amount,
-        None,
         None,
         // Disable EIP-3607 (via `is_simulation = true`): an inbound CRAC
         // caller is not a user-signed EVM transaction but a trusted,
@@ -561,7 +559,6 @@ where
         block_number: hdrs.block_number,
     };
 
-    let evm_version = read_evm_version(host);
     let block_constants = runtime.create_block_constants(host, journal, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
 
@@ -579,7 +576,6 @@ where
         host,
         registry,
         journal,
-        evm_version.into(),
         &block_constants,
         None,
         hdrs.sender,
@@ -587,7 +583,6 @@ where
         call_data,
         gas_data,
         revm::primitives::U256::ZERO,
-        None,
         None,
         // `is_simulation = true` disables EIP-3607 so a contract-aliased
         // caller (e.g. a Michelson contract's deterministic EVM alias,

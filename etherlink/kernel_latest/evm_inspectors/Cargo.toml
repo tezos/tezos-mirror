@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "evm-inspectors"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+
+# VM
+revm.workspace = true
+
+# Encoding
+rlp.workspace = true
+hex.workspace = true
+primitive-types.workspace = true
+
+# Types
+tezos_ethereum.workspace = true
+
+# SDK
+tezos-smart-rollup-host.workspace = true
+tezos-indexable-storage.workspace = true
+
+# Miscs
+tezos-evm-logging.workspace = true
+thiserror.workspace = true
+tracing = { workspace = true, optional = true }
+
+[features]
+tracing = ["dep:tracing", "tezos-evm-logging/tracing"]

@@ -24,6 +24,7 @@ use revm::{
 };
 use std::vec::Vec;
 
+use evm_inspectors::{Tracer, TracerContainer};
 use tezosx_journal::{LayeredStateError, OriginalSource, TezosXJournal};
 
 use crate::database::EtherlinkVMDB;
@@ -79,6 +80,18 @@ impl<'a, Host: StorageV1, R: Registry> Journal<'a, Host, R> {
     /// Take any deferred error from michelson journal checkpoint operations.
     pub fn take_deferred_error(&mut self) -> Option<RuntimeError> {
         self.deferred_error.take()
+    }
+}
+
+/// Expose the journal-owned tracer to the `TracerInspector` filling the
+/// `Evm` inspector slot (see `evm_inspectors::TracerInspector`).
+impl<'a, Host: StorageV1, R: Registry> TracerContainer for Journal<'a, Host, R> {
+    fn take_tracer(&mut self) -> Option<Box<Tracer>> {
+        self.journal.evm.take_tracer()
+    }
+
+    fn restore_tracer(&mut self, tracer: Option<Box<Tracer>>) {
+        self.journal.evm.restore_tracer(tracer)
     }
 }
 

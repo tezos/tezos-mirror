@@ -2,37 +2,33 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::storage::flush_call_traces;
-use crate::{
-    database::EtherlinkVMDB,
-    helpers::rlp::{
+use crate::error::InspectorError;
+
+use super::{
+    rlp_helpers::{
         append_address, append_option_address, append_option_canonical,
         append_option_u64_le, append_u16_le, append_u256_le, append_u64_le,
     },
-    inspectors::EtherlinkInspector,
-    precompiles::provider::EtherlinkPrecompiles,
+    storage::flush_call_traces,
 };
 
 use revm::{
-    context::{ContextTr, CreateScheme, JournalTr, Transaction},
+    context::{result::ExecutionResult, ContextTr, CreateScheme, Transaction},
     interpreter::{
-        gas::calculate_initial_tx_gas_for_tx, interpreter::ReturnDataImpl,
-        interpreter_types::StackTr, CallInputs, CallOutcome, CallScheme, CreateInputs,
-        CreateOutcome, Gas, InitialAndFloorGas, InstructionResult, InterpreterResult,
-        InterpreterTypes,
+        gas::calculate_initial_tx_gas_for_tx, interpreter::ReturnDataImpl, CallInputs,
+        CallOutcome, CallScheme, CreateInputs, CreateOutcome, InitialAndFloorGas,
+        InstructionResult, InterpreterTypes,
     },
-    primitives::{hardfork::SpecId, hash_map::HashMap, Address, Bytes, Log, B256, U256},
+    primitives::{hardfork::SpecId, Address, Bytes, Log, B256, U256},
     Inspector,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
-use std::ops::Range;
 use tezos_ethereum::{
     rlp_helpers::{check_list, decode_field, decode_option, next},
     Log as RlpLog,
 };
 use tezos_evm_logging::{log, Level::Debug};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_interfaces::Registry;
 
 const CALL_TRACER_CONFIG_SIZE: usize = 3;
 
@@ -85,6 +81,11 @@ pub struct CallTrace {
     logs: Option<Vec<Log>>,
     /// `depth` is helpful to reconstruct the tree of call on the EVM node's side.
     depth: u16,
+    /// Intrinsic gas of the transaction this frame belongs to, captured when
+    /// the frame opens (an inner cross-runtime leg has its own TxEnv, so a
+    /// tracer-global value would be overwritten mid-crossing). Added to
+    /// `gas_used` at close; not part of the encoded trace.
+    initial_gas: u64,
 }
 
 impl Encodable for CallTrace {
@@ -120,20 +121,6 @@ impl Encodable for CallTrace {
     }
 }
 
-impl<'a, Host, R> EtherlinkInspector<'a, Host, R> for CallTracer
-where
-    Host: StorageV1 + 'a,
-    R: Registry + 'a,
-{
-    fn is_struct_logger(&self) -> bool {
-        false
-    }
-
-    fn get_transaction_hash(&self) -> Option<B256> {
-        self.transaction_hash
-    }
-}
-
 impl CallTrace {
     pub fn new_minimal_trace(
         type_: Vec<u8>,
@@ -154,6 +141,7 @@ impl CallTrace {
             error: None,
             logs: None,
             depth,
+            initial_gas: 0,
         }
     }
 
@@ -204,114 +192,162 @@ impl CallTrace {
     }
 }
 
+#[derive(Debug)]
 pub struct CallTracer {
     config: CallTracerConfig,
-    precompiles: EtherlinkPrecompiles,
-    call_trace: HashMap<u16, CallTrace>,
-    /// Traces buffered in memory, flushed to storage once at the end of
-    /// each transaction (depth == 0).  RLP encoding is deferred to flush
-    /// time so the buffer remains readable.
+    /// Stack of currently-open call frames: `call`/`create` push a frame on
+    /// entry and `call_end`/`create_end` pop it on exit. The frame's entry
+    /// depth is its position in this stack, so no separate depth counter is
+    /// needed.
+    call_trace: Vec<CallTrace>,
+    /// Traces buffered in memory, flushed to storage in one batch by
+    /// [`CallTracer::finalize`].  RLP encoding is deferred to flush time
+    /// so the buffer remains readable.
     pending_traces: Vec<CallTrace>,
-    pub transaction_hash: Option<B256>,
-    initial_gas: u64,
+    /// Whether a smart contract was called during the transaction lifespan
+    saw_call: bool,
+    pub(crate) transaction_hash: Option<B256>,
     spec_id: SpecId,
 }
 
 impl CallTracer {
     pub fn new(
         config: CallTracerConfig,
-        precompiles: EtherlinkPrecompiles,
         spec_id: SpecId,
         transaction_hash: Option<B256>,
     ) -> Self {
         Self {
             config,
-            precompiles,
-            call_trace: HashMap::with_capacity(1),
+            call_trace: Vec::with_capacity(1),
             pending_traces: Vec::new(),
+            saw_call: false,
             transaction_hash,
-            initial_gas: 0,
             spec_id,
         }
     }
 
     #[inline]
-    pub fn tx_hash(&self) -> Option<B256> {
-        self.transaction_hash
-    }
-
-    #[inline]
-    fn set_call_trace(&mut self, depth: u16, call_trace: CallTrace) {
-        self.call_trace.insert(depth, call_trace);
-    }
-
-    #[inline]
-    fn set_initial_gas(&mut self, tx: impl Transaction) {
+    fn initial_gas(&self, tx: impl Transaction) -> u64 {
         let InitialAndFloorGas { initial_gas, .. } =
             calculate_initial_tx_gas_for_tx(tx, self.spec_id);
-        self.initial_gas = initial_gas;
+        initial_gas
     }
 
-    fn end_transaction_layer<'a, Host, R, CTX>(
+    fn end_transaction_layer(
         &mut self,
-        context: &mut CTX,
         gas_spent: u64,
         output: &Bytes,
         instruction_result: &InstructionResult,
-    ) where
-        Host: StorageV1 + 'a,
-        R: Registry + 'a,
-        CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
-    {
-        let depth = context.journal().depth() as u16;
+    ) {
+        // Leaving a frame: pop it off the stack.
+        if let Some(mut call_trace) = self.call_trace.pop() {
+            // In `only_top_call` mode nested frames are still pushed to keep
+            // the stack in sync, but only the top-level frame is reported.
+            if !(self.config.only_top_call && call_trace.depth > 0) {
+                let initial_gas = call_trace.initial_gas;
+                call_trace.add_gas_used(gas_spent + initial_gas);
+                call_trace.add_output(Some(output.to_vec()));
+                call_trace.add_error_from_instruction_result(instruction_result);
 
-        if self.config.only_top_call && depth > 0 {
-            return;
-        }
-
-        if let Some(mut call_trace) = self.call_trace.remove(&depth) {
-            if self.config.with_logs {
-                call_trace.add_logs(Some(context.journal_mut().take_logs()));
+                self.pending_traces.push(call_trace);
             }
-            call_trace.add_gas_used(gas_spent + self.initial_gas);
-            call_trace.add_output(Some(output.to_vec()));
-            call_trace.add_error_from_instruction_result(instruction_result);
-
-            self.pending_traces.push(call_trace);
         }
+    }
 
-        // At depth 0 (end of top-level transaction), flush all buffered
-        // traces to storage in a single batch operation.
-        if depth == 0 && !self.pending_traces.is_empty() {
+    /// Flush the buffered traces to storage in one batch.
+    pub fn finalize<Host>(
+        &mut self,
+        host: &mut Host,
+        _result: &ExecutionResult,
+    ) -> Result<(), InspectorError>
+    where
+        Host: StorageV1,
+    {
+        if !self.pending_traces.is_empty() {
             let traces = std::mem::take(&mut self.pending_traces);
-            flush_call_traces(context.db_mut().host, &traces, &self.transaction_hash)
+            flush_call_traces(host, &traces, &self.transaction_hash)
                 .inspect_err(|err| {
                     log!(Debug, "Flushing call traces failed with: {err:?}");
                 })
                 .ok();
         }
+
+        Ok(())
+    }
+
+    pub fn inject_log(&mut self, log: Log) {
+        if !self.config.with_logs {
+            return;
+        }
+
+        // The frame that emitted the LOG opcode is the one currently
+        // executing, i.e. the frame on top of the stack.
+        if let Some(t) = self.call_trace.last_mut() {
+            t.logs.get_or_insert_with(Vec::new).push(log);
+        }
+    }
+
+    /// Open the top-level frame mirroring a fake EVM transaction's
+    /// envelope: a `CALL` with `from == to == caller` (the originator
+    /// alias), no value, empty input, and no intrinsic gas.
+    pub fn fake_top_level_call(&mut self, caller: Address, gas_limit: u64) {
+        // Entering the top-level frame: the stack must be empty, so its
+        // depth is 0.
+        assert!(self.call_trace.is_empty());
+        let depth = self.call_trace.len() as u16;
+
+        let mut call_trace = CallTrace::new_minimal_trace(
+            b"CALL".to_vec(),
+            caller,
+            U256::ZERO,
+            Vec::new(),
+            depth,
+        );
+
+        call_trace.add_to(Some(caller));
+        call_trace.add_gas(Some(gas_limit));
+
+        self.saw_call = false;
+        self.call_trace.push(call_trace);
+    }
+
+    /// Close the frame opened by [`CallTracer::fake_top_level_call`]. When
+    /// nothing nested below it, the mirrored operation dispatched no EVM
+    /// call: the frame is dropped without recording anything.
+    pub fn fake_top_level_call_end(&mut self, gas_spent: u64, status: bool) {
+        if !self.saw_call {
+            self.call_trace.pop();
+            return;
+        }
+
+        self.end_transaction_layer(
+            gas_spent,
+            &Bytes::new(),
+            &if status {
+                InstructionResult::Return
+            } else {
+                InstructionResult::Revert
+            },
+        );
     }
 }
 
-impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for CallTracer
+impl<CTX, INTR> Inspector<CTX, INTR> for CallTracer
 where
-    Host: StorageV1 + 'a,
-    R: Registry + 'a,
-    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
-    INTR: InterpreterTypes<Stack: StackTr, ReturnData = ReturnDataImpl>,
+    CTX: ContextTr,
+    INTR: InterpreterTypes<ReturnData = ReturnDataImpl>,
 {
     fn call(
         &mut self,
         context: &mut CTX,
         inputs: &mut CallInputs,
     ) -> Option<CallOutcome> {
-        let depth = context.journal().depth() as u16;
+        // Entering a frame: its depth is the current stack height, before it
+        // is pushed.
+        let depth = self.call_trace.len() as u16;
+        self.saw_call = self.saw_call || inputs.scheme != CallScheme::StaticCall;
 
-        if self.config.only_top_call && depth > 0 {
-            return None;
-        }
-
-        self.set_initial_gas(context.tx());
+        let initial_gas = self.initial_gas(context.tx());
 
         let (type_, from) = match inputs.scheme {
             CallScheme::Call => ("CALL", inputs.caller),
@@ -330,63 +366,18 @@ where
             depth,
         );
 
+        call_trace.initial_gas = initial_gas;
         call_trace.add_to(Some(inputs.bytecode_address));
-        call_trace.add_gas(Some(inputs.gas_limit + self.initial_gas));
+        call_trace.add_gas(Some(inputs.gas_limit + initial_gas));
 
-        self.set_call_trace(depth, call_trace);
-
-        if let Some(precompile) = self
-            .precompiles
-            .builtins
-            .precompiles
-            .get(&inputs.bytecode_address)
-        {
-            // Hack-ish behavior. In case the invoked address is a precompile we need to
-            // pre-simulate its result because the `call_end` hook is never called when a
-            // precompile contract is called.
-
-            let memory_offset = Range { start: 0, end: 0 }; // Ignored.
-            let mut outcome = match precompile.execute(&call_data, inputs.gas_limit) {
-                Ok(result) => CallOutcome {
-                    result: InterpreterResult {
-                        result: InstructionResult::Return,
-                        output: result.bytes,
-                        gas: Gas::new_spent(result.gas_used),
-                    },
-                    memory_offset,
-                    was_precompile_called: true,
-                    precompile_call_logs: vec![],
-                },
-                Err(_) => CallOutcome {
-                    result: InterpreterResult {
-                        result: InstructionResult::PrecompileError,
-                        // No return data, indicates a precompile contract error.
-                        output: Bytes::new(),
-                        gas: Gas::new_spent(inputs.gas_limit),
-                    },
-                    memory_offset,
-                    was_precompile_called: true,
-                    precompile_call_logs: vec![],
-                },
-            };
-
-            <CallTracer as Inspector<CTX, INTR>>::call_end(
-                self,
-                context,
-                inputs,
-                &mut outcome,
-            );
-
-            return None;
-        }
+        self.call_trace.push(call_trace);
 
         // NB: Always return [None] or else the result of the call will be overriden.
         None
     }
 
-    fn call_end(&mut self, context: &mut CTX, _: &CallInputs, outcome: &mut CallOutcome) {
+    fn call_end(&mut self, _: &mut CTX, _: &CallInputs, outcome: &mut CallOutcome) {
         self.end_transaction_layer(
-            context,
             outcome.gas().spent(),
             outcome.output(),
             outcome.instruction_result(),
@@ -398,13 +389,12 @@ where
         context: &mut CTX,
         inputs: &mut CreateInputs,
     ) -> Option<CreateOutcome> {
-        let depth = context.journal().depth() as u16;
+        // Entering a frame: its depth is the current stack height, before it
+        // is pushed.
+        let depth = self.call_trace.len() as u16;
+        self.saw_call = true;
 
-        if self.config.only_top_call && depth > 0 {
-            return None;
-        }
-
-        self.set_initial_gas(context.tx());
+        let initial_gas = self.initial_gas(context.tx());
 
         let (type_, from) = match inputs.scheme() {
             CreateScheme::Create => ("CREATE", inputs.caller()),
@@ -421,29 +411,37 @@ where
             depth,
         );
 
-        call_trace.add_gas(Some(inputs.gas_limit() + self.initial_gas));
+        call_trace.initial_gas = initial_gas;
+        call_trace.add_gas(Some(inputs.gas_limit() + initial_gas));
 
-        self.set_call_trace(depth, call_trace);
+        self.call_trace.push(call_trace);
 
         // NB: Always return [None] or else the result of the create will be overriden.
         None
     }
 
-    fn create_end(
-        &mut self,
-        context: &mut CTX,
-        _: &CreateInputs,
-        outcome: &mut CreateOutcome,
-    ) {
-        let depth = context.journal().depth() as u16;
-        if let Some(call_trace) = self.call_trace.get_mut(&depth) {
+    fn create_end(&mut self, _: &mut CTX, _: &CreateInputs, outcome: &mut CreateOutcome) {
+        // The frame being left is on top of the stack: record the created
+        // address on it before `end_transaction_layer` pops it.
+        if let Some(call_trace) = self.call_trace.last_mut() {
             call_trace.add_to(outcome.address);
         }
         self.end_transaction_layer(
-            context,
             outcome.gas().spent(),
             outcome.output(),
             outcome.instruction_result(),
         );
+    }
+
+    // At-emission delivery. Deliberately not `log`: revm replays a resolved precompile frame's
+    // journal logs through that hook, which would duplicate nested logs onto the caller's frame.
+    // Precompile logs arrive via `inject_log`.
+    fn log_full(
+        &mut self,
+        _interpreter: &mut revm::interpreter::Interpreter<INTR>,
+        _context: &mut CTX,
+        log: Log,
+    ) {
+        self.inject_log(log);
     }
 }
