@@ -51,7 +51,7 @@ fn run_contract(parameter: Micheline, storage: Micheline) {
             mir::typechecker::AllowForgedLazyStorageId::No,
         )
         .unwrap();
-    let TypedValue::Nat(storage_nat) = &new_storage else {
+    let TypedValue::Nat(storage_nat) = new_storage.as_ref() else {
         unreachable!()
     };
     println!("{storage_nat}");

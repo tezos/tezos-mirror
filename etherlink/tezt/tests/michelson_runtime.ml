@@ -6902,6 +6902,45 @@ code {
      }
 |}
 
+  let test_finalize_storage =
+    register_tezosx_test
+      ~title:
+        "Michelson storage finalization does not exhaust memory on a shared \
+         storage"
+      ~tags:["michelson"; "oom"; "finalize"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"finalizestorage"
+      ~init:"0x"
+      ~arg:"Pair 0x 0x"
+      ~outcome:(Fails_with "OutOfGas")
+      {|
+parameter (pair bytes bytes) ;
+storage bytes ;
+code {
+       DROP ;
+       SENDER ; SELF_ADDRESS ; COMPARE ; EQ ;
+       IF { PUSH bytes 0x ; NIL operation ; PAIR }
+          {
+            PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+            NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+            DIP { DROP } ;
+            PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+            NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+            DIP { DROP } ;
+            DUP ;
+            DIP { PAIR } ;
+            SWAP ;
+            DIP { SELF ; PUSH mutez 0 } ;
+            TRANSFER_TOKENS ;
+            NIL operation ; SWAP ; CONS ;
+            PAIR }
+     }
+|}
+
   let register () =
     test_hashes [Alpha] ;
     test_check_signature [Alpha] ;
@@ -6910,7 +6949,8 @@ code {
     test_concat_pair [Alpha] ;
     test_not_bytes [Alpha] ;
     test_bitwise_bytes [Alpha] ;
-    test_slice [Alpha]
+    test_slice [Alpha] ;
+    test_finalize_storage [Alpha]
 end
 
 let () =

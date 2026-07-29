@@ -54,12 +54,16 @@ fn run_contract(parameter: Micheline) {
                     mir::typechecker::AllowForgedLazyStorageId::No,
                 )
                 .unwrap();
-            let TypedValue::Nat(storage_nat) = &new_storage else {
+            let TypedValue::Nat(storage_nat) = new_storage.as_ref() else {
                 unreachable!()
             };
             println!("{storage_nat}");
             new_storage
-                .into_micheline_optimized_legacy(&Arena::new(), &mut Gas::default())
+                .clone_into_micheline_optimized_legacy(
+                    &Arena::new(),
+                    &mut Gas::default(),
+                    Some(mir::typechecker::type_props::TypeProperty::Storable),
+                )
                 .unwrap()
                 .encode(ctx.gas())
                 .unwrap()
