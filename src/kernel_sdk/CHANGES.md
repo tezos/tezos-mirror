@@ -63,6 +63,9 @@
 - Add initial NDS support for the Wasm PVM - via `WasmNds` trait and `WasmNdsHandle`. Intended for use by kernels only via the
   `KeySpace` trait in future.
 - Add `clear_reboot_mark` to `WasmHost`, to cancel the effect of `mark_for_reboot`.
+- `store_get_hash` in the `MockHost` now hashes the stored subtree, so it is
+  idempotent and sensitive only to that subtree, and returns `StoreNotANode` for
+  an absent path as the PVM does. The values still do not match the PVM's.
 
 ### Installer client/kernel
 

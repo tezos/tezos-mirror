@@ -223,6 +223,80 @@ mod tests {
         assert_eq!(None, state.handle_read_input(MAX_INPUT_MESSAGE_SIZE));
     }
 
+    /// Regression guard: the previous implementation hashed a call counter.
+    #[test]
+    fn store_get_hash_is_idempotent() {
+        let state = HostState::default();
+        let path: &[u8] = b"/test/path";
+        state.store.handle_store_write(path, 0, &[1, 2, 3]).unwrap();
+
+        let first = state.store.handle_internal_store_get_hash(path).unwrap();
+        let second = state.store.handle_internal_store_get_hash(path).unwrap();
+
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn store_get_hash_tracks_content() {
+        let state = HostState::default();
+        let path: &[u8] = b"/test/path";
+
+        state.store.handle_store_write(path, 0, &[1, 2, 3]).unwrap();
+        let before = state.store.handle_internal_store_get_hash(path).unwrap();
+
+        state.store.handle_store_write(path, 0, &[4, 5, 6]).unwrap();
+        let after = state.store.handle_internal_store_get_hash(path).unwrap();
+
+        assert_ne!(before, after);
+    }
+
+    #[test]
+    fn store_get_hash_notices_a_deleted_value() {
+        let state = HostState::default();
+        let path: &[u8] = b"/test/path";
+
+        state.store.handle_store_write(path, 0, &[1, 2, 3]).unwrap();
+        let with_value = state.store.handle_internal_store_get_hash(path).unwrap();
+
+        state.store.handle_store_delete_value(path).unwrap();
+        let without_value = state.store.handle_internal_store_get_hash(path).unwrap();
+
+        assert_ne!(with_value, without_value);
+    }
+
+    #[test]
+    fn store_get_hash_is_scoped_to_the_subtree() {
+        let state = HostState::default();
+        let hashed: &[u8] = b"/test/hashed";
+        let unrelated: &[u8] = b"/test/unrelated";
+
+        state
+            .store
+            .handle_store_write(hashed, 0, &[1, 2, 3])
+            .unwrap();
+        let before = state.store.handle_internal_store_get_hash(hashed).unwrap();
+
+        state
+            .store
+            .handle_store_write(unrelated, 0, &[4, 5, 6])
+            .unwrap();
+        let after = state.store.handle_internal_store_get_hash(hashed).unwrap();
+
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn store_get_hash_rejects_an_absent_node() {
+        let state = HostState::default();
+
+        assert_eq!(
+            Err(tezos_smart_rollup_host::Error::StoreNotANode),
+            state
+                .store
+                .handle_internal_store_get_hash(b"/never/written")
+        );
+    }
+
     #[test]
     fn store_write_new_path() {
         // Arrange
