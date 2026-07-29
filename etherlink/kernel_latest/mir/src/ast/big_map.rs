@@ -1901,6 +1901,79 @@ mod review_verification {
         }
     }
 
+    /// [TypedValue::for_each_big_map] is still recursive, where the mutable
+    /// walk is not, so its depth budget is a live constraint rather than a
+    /// formality — and nothing pinned it.
+    ///
+    /// What makes it safe is that the value it walks is bounded twice over.
+    /// Michelson has no recursive types, so a value is never deeper than its
+    /// type; and this walk only ever sees the *committed* storage, parsed at a
+    /// declared type, so [MICHELSON_MAXIMUM_TYPE_SIZE] applies to it — unlike
+    /// instruction-synthesised types, which escape that cap. The depths below
+    /// are what the cap actually permits, per shape: `list t` costs one type
+    /// node per level, `pair a b` and `map k v` cost two. So these are the
+    /// deepest values that can reach this function at all.
+    ///
+    /// The margin is real but not generous, which is the point of deriving the
+    /// depths rather than picking them: `map` is the most expensive shape, and
+    /// at twice its reachable depth this test overflows. Safety here is
+    /// arithmetic — cap times frame size against 1 MiB — where
+    /// [TypedValue::update_big_maps] is depth-independent by construction. A
+    /// few extra locals in this function would eat the margin silently, and
+    /// this is what would catch that.
+    #[test]
+    fn read_only_walk_survives_the_deepest_reachable_spine() {
+        use crate::typechecker::MICHELSON_MAXIMUM_TYPE_SIZE as MAX_TY;
+
+        /// `list t` is one type node per level, so it nests deepest.
+        const LIST_DEPTH: usize = MAX_TY - 1;
+        /// `pair a b` and `map k v` are two nodes per level.
+        const PAIR_DEPTH: usize = (MAX_TY - 1) / 2;
+        const MAP_DEPTH: usize = PAIR_DEPTH;
+
+        fn deep_pair(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| TypedValue::new_pair(TypedValue::Unit, acc))
+        }
+        fn deep_list(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| {
+                TypedValue::List(MichelsonList::from(vec![Rc::new(acc)]))
+            })
+        }
+        fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| {
+                TypedValue::Map(RedBlackTreeMap::from_iter([(
+                    Rc::new(TypedValue::int(0)),
+                    Rc::new(acc),
+                )]))
+            })
+        }
+
+        for (build, depth) in [
+            (
+                deep_pair as fn(TypedValue<'static>, usize) -> TypedValue<'static>,
+                PAIR_DEPTH,
+            ),
+            (deep_list, LIST_DEPTH),
+            (deep_map, MAP_DEPTH),
+        ] {
+            std::thread::Builder::new()
+                // The WASM kernel stack budget.
+                .stack_size(1024 * 1024)
+                .spawn(move || {
+                    // Built inside the worker: `TypedValue` is `Rc`-backed and
+                    // so not `Send`. A big map at the base, so the walk runs
+                    // its `f` at the deepest point rather than stopping short.
+                    let value = build(leaf_big_map(0), depth);
+                    let mut ids = vec![];
+                    value.view_big_map_ids(&mut ids);
+                    assert_eq!(ids, vec![BigMapId::from(0)]);
+                })
+                .unwrap()
+                .join()
+                .expect("worker thread completes without stack overflow");
+        }
+    }
+
     /// The flip side of [walk_leaves_big_map_free_subtrees_shared]: a big map
     /// under a shared spine is still reached, still visited once per
     /// occurrence, and the rebuilt value carries `f`'s writes — while the
