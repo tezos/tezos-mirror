@@ -392,30 +392,19 @@ impl InMemoryStore {
         Ok(store.get_value(&path).len() as i32)
     }
 
-    /// Stand in implementation deterministically returns dummy hash
-    /// values.
-    ///
-    /// This will _not_ match the values that the irmin-backed durable
-    /// storage in the WASM PVM returns.
+    /// Hash of the subtree stored at `path`, per
+    /// [`super::store::Node::subtree_hash`]. An absent `path` gives
+    /// [`Error::StoreNotANode`], mirroring the PVM's `Store_not_a_node`.
     pub(crate) fn handle_internal_store_get_hash(
         &self,
         path: &[u8],
     ) -> Result<[u8; STORE_HASH_SIZE], Error> {
-        thread_local! {
-            static COUNTER: std::cell::Cell<i32> = const { std::cell::Cell::new(0) };
+        let path = validate_path(path)?;
+
+        let store = self.0.borrow();
+        match store.node_from_path(&path) {
+            Some(node) => Ok(node.subtree_hash()),
+            None => Err(Error::StoreNotANode),
         }
-
-        let _ = validate_path(path)?;
-
-        let count = COUNTER.with(|counter| {
-            let count = counter.get();
-            counter.set(count.wrapping_add(1));
-            count
-        });
-
-        let mut to_hash = count.to_le_bytes().to_vec();
-        to_hash.extend_from_slice(path);
-
-        Ok(tezos_crypto_rs::blake2b::digest_256(to_hash.as_slice()))
     }
 }

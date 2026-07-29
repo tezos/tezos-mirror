@@ -7,6 +7,7 @@
 //! Mock runtime store - the durable key-value tree.
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use tezos_smart_rollup_core::STORE_HASH_SIZE;
 
 /// The durable key-value tree backed by irmin in the real PVM.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -35,6 +36,34 @@ impl Node {
         }
 
         Ok(())
+    }
+
+    /// Hash of the subtree rooted at this node: a fold over its value and its
+    /// children, taken in step order.
+    ///
+    /// Not memoised, so each call is linear in the size of the subtree.
+    pub(crate) fn subtree_hash(&self) -> [u8; STORE_HASH_SIZE] {
+        let mut preimage = Vec::new();
+
+        // Tagged, so an absent value cannot hash like a present empty one.
+        match &self.value {
+            Some(value) => {
+                preimage.push(1);
+                preimage.extend_from_slice(&(value.len() as u64).to_le_bytes());
+                preimage.extend_from_slice(value);
+            }
+            None => preimage.push(0),
+        }
+
+        preimage.extend_from_slice(&(self.inner.len() as u64).to_le_bytes());
+        for (step, child) in self.inner.iter() {
+            // Length-prefixed, so steps ("a", "bc") cannot hash as ("ab", "c").
+            preimage.extend_from_slice(&(step.len() as u64).to_le_bytes());
+            preimage.extend_from_slice(step.as_bytes());
+            preimage.extend_from_slice(&child.subtree_hash());
+        }
+
+        tezos_crypto_rs::blake2b::digest_256(&preimage)
     }
 }
 
