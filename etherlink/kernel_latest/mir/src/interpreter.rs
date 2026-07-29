@@ -5457,6 +5457,51 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn slice_charges_for_the_buffer_it_allocates() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        // Gas above the slice's pre-floor time cost but below the cost of
+        // allocating its SIZE-byte result. Without the `alloc_cost` floor the
+        // charge passes and the buffer is allocated; with it the slice runs
+        // out of gas before allocating.
+        {
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(2_000_000);
+            let mut stack = IStack::new();
+            stack.push(V::Bytes(vec![0u8; SIZE])); // source
+            stack.push(V::Nat(BigUint::from(SIZE))); // length: full slice
+            stack.push(V::nat(0)); // offset
+            let before = thread_allocated_bytes();
+            let outcome =
+                interpret(&[Slice(overloads::Slice::Bytes)], &mut ctx, &mut stack);
+            let allocated = thread_allocated_bytes() - before;
+            assert!(matches!(outcome, Err(InterpretError::OutOfGas)));
+            assert!(
+                allocated < SIZE as u64,
+                "SLICE (bytes) allocated its {SIZE}-byte result ({allocated} \
+                 bytes) before running out of gas; floor its cost by alloc_cost.",
+            );
+        }
+        {
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(2_000_000);
+            let mut stack = IStack::new();
+            stack.push(V::String("0".repeat(SIZE))); // source
+            stack.push(V::Nat(BigUint::from(SIZE))); // length: full slice
+            stack.push(V::nat(0)); // offset
+            let before = thread_allocated_bytes();
+            let outcome =
+                interpret(&[Slice(overloads::Slice::String)], &mut ctx, &mut stack);
+            let allocated = thread_allocated_bytes() - before;
+            assert!(matches!(outcome, Err(InterpretError::OutOfGas)));
+            assert!(
+                allocated < SIZE as u64,
+                "SLICE (strings) allocated its {SIZE}-byte result ({allocated} \
+                 bytes) before running out of gas; floor its cost by alloc_cost.",
+            );
+        }
+    }
+
+    #[test]
     fn test_int_nat() {
         let mut stack = stk![V::nat(20), V::nat(10)];
         let expected_stack = stk![V::nat(20), V::int(10)];

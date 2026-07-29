@@ -6874,6 +6874,34 @@ code {
     in
     unit
 
+  let test_slice =
+    register_tezosx_test
+      ~title:"Michelson SLICE does not exhaust memory on a full-length slice"
+      ~tags:["michelson"; "oom"; "slice"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"slice"
+      ~outcome:(Fails_with "Gas_exhaustion")
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ; SIZE ; PUSH nat 0 ; SLICE ;
+       IF_NONE { PUSH string "slice out of bounds" ; FAILWITH } {} ;
+       DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }
+|}
+
   let register () =
     test_hashes [Alpha] ;
     test_check_signature [Alpha] ;
@@ -6881,7 +6909,8 @@ code {
     test_shift_bytes [Alpha] ;
     test_concat_pair [Alpha] ;
     test_not_bytes [Alpha] ;
-    test_bitwise_bytes [Alpha]
+    test_bitwise_bytes [Alpha] ;
+    test_slice [Alpha]
 end
 
 let () =
