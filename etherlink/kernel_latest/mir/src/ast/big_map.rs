@@ -1023,12 +1023,27 @@ impl<'a> TypedValue<'a> {
     /// values are walked via [RedBlackTreeMap::values].
     ///
     /// Kept exhaustive (no catch-all) and in lock-step with
-    /// [TypedValue::update_big_maps] on purpose: this read-only walk feeds
-    /// `started_with_map_ids` while the mutable walk feeds `seen_source_ids`,
-    /// and [dump_big_map_updates] removes ids present in the former but not the
-    /// latter. A new big-map-carrying variant must be added to both walks or a
-    /// dropped big map could leak; a wildcard here would silently skip it while
-    /// the mutable walk still compile-errored, so the two would diverge.
+    /// [TypedValue::update_big_maps] **on which variants it visits**: this
+    /// read-only walk feeds `started_with_map_ids` while the mutable walk feeds
+    /// `seen_source_ids`, and [dump_big_map_updates] removes ids present in the
+    /// former but not the latter. A new big-map-carrying variant must be added
+    /// to both walks or a dropped big map could leak; a wildcard here would
+    /// silently skip it while the mutable walk still compile-errored, so the
+    /// two would diverge.
+    ///
+    /// The lock-step is on variant coverage only. This walk is still
+    /// recursive, and it neither memoizes nor is bounded by anything, where
+    /// the mutable walk is iterative and memoized. That is deliberate rather
+    /// than an oversight, because the two see different values: this one runs
+    /// on the storage returned by `typecheck_storage`, parsed from Micheline
+    /// before the contract body runs, so it is a tree with no `Rc` sharing and
+    /// no `DUP`-built DAG can reach it. Its depth is bounded by the storage
+    /// type, hence by `MICHELSON_MAXIMUM_TYPE_SIZE`, and at that depth its
+    /// frame fits the kernel's 1 MiB stack with room to spare — which the
+    /// mutable walk's did not once it grew a rebuild, which is what forced
+    /// that one onto a worklist. Converting this one too would be tidier and
+    /// costs little; it is left alone here to keep the diff to the walk that
+    /// had to change.
     fn for_each_big_map<'b>(&'b self, f: &mut impl FnMut(&'b BigMap<'a>)) {
         use crate::ast::Or::*;
         use TypedValue::*;
