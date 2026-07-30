@@ -17,14 +17,14 @@
 //! at typechecking time.
 
 use std::collections::BTreeMap;
-use std::rc::Rc;
 
 use mir::ast::big_map::BigMapId;
-use mir::ast::{AddressHash, IntoMicheline, Micheline, Type, TypedValue};
+use mir::ast::{AddressHash, BorrowedUnparseError, Micheline, Type, TypedValue};
 use mir::context::{CtxTrait, TypecheckingCtx};
 use mir::gas::OutOfGas;
 use mir::interpreter::{EnshrinedViewDispatchError, InterpretError};
 use mir::parser::Parser;
+use mir::typechecker::type_props::TypeProperty;
 use mir::typechecker::{
     typecheck_value, typecheck_view, AllowForgedLazyStorageId, TcError,
 };
@@ -403,11 +403,24 @@ where
         let result_rc = stk.pop().ok_or_else(|| {
             TezosXRuntimeError::Custom("view execution left an empty stack".into())
         })?;
-        let result = Rc::try_unwrap(result_rc).unwrap_or_else(|rc| (*rc).clone());
 
-        result
-            .into_micheline_optimized_legacy(&parser.arena, mir_ctx.gas())
-            .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
+        result_rc
+            .clone_into_micheline_optimized_legacy(
+                &parser.arena,
+                mir_ctx.gas(),
+                Some(TypeProperty::Packable),
+            )
+            .map_err(|e| match e {
+                BorrowedUnparseError::OutOfGas => TezosXRuntimeError::OutOfGas,
+                BorrowedUnparseError::UnsupportedUnparsing => TezosXRuntimeError::Custom(
+                    "view result carries an operation, which cannot be unparsed".into(),
+                ),
+                BorrowedUnparseError::UnsatisfiedProperty(prop) => {
+                    TezosXRuntimeError::Custom(format!(
+                        "view result carries a sub-value that is not {prop}"
+                    ))
+                }
+            })?
             .encode(mir_ctx.gas())
             .map_err(|OutOfGas| TezosXRuntimeError::OutOfGas)?
             .map_err(|e| {
