@@ -111,6 +111,8 @@ local hasExporter(name) = std.member(hardwareExporters, name);
 
   peer_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", peer=~"$peer"}',
 
+  delegate_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", delegate_name=~"$delegate"}',
+
   // Prometheus query
   prometheus(q, legendFormat='', namespace=self.namespace):
     local withLegendFormat = if legendFormat != ''
@@ -343,5 +345,42 @@ local hasExporter(name) = std.member(hardwareExporters, name);
       [self.prometheusDatasource, self.nodeInstanceDal, self.slotIndex, self.pkh, self.peer]
     else
       [self.nodeInstanceDal, self.slotIndex, self.pkh, self.peer],
+
+  // Node-instance variable anchored on the delegate RPC exporter metrics
+  // (octez_delegate_*), for dashboards fed by a delegate-monitoring exporter
+  // rather than by the node's own metrics.
+  nodeInstanceDelegate:
+    local datasource = if self.enable_datasource_selection then '$prometheus_datasource' else self.datasource_default;
+    local base_var = variableQuery.new(
+                       name='node_instance',
+                       query='label_values(octez_delegate_baking_power,' + std.extVar('node_instance_label') + ')',
+                     )
+                     + variableQuery.generalOptions.withLabel('Node Instance')
+                     + variableQuery.refresh.onLoad()
+                     + variableQuery.withDatasource('prometheus', datasource);
+    if self.enable_datasource_selection then
+      base_var { refresh: 'on variable change' }
+    else
+      base_var,
+
+  delegateName:
+    local datasource = if self.enable_datasource_selection then '$prometheus_datasource' else self.datasource_default;
+    variableQuery.new(
+      name='delegate',
+      query='label_values(octez_delegate_baking_power{' + std.extVar('node_instance_label') + '="$node_instance"}, delegate_name)',
+    )
+    + variableQuery.generalOptions.withLabel('Delegate')
+    + variableQuery.selectionOptions.withIncludeAll(true)
+    + { allValue: '.*' }
+    + variableQuery.selectionOptions.withMulti(true)
+    + variableQuery.refresh.onLoad()
+    + variableQuery.withDatasource('prometheus', datasource),
+
+  // Helper function for the delegates dashboard
+  standardVariablesDelegates:
+    if self.enable_datasource_selection then
+      [self.prometheusDatasource, self.nodeInstanceDelegate, self.delegateName]
+    else
+      [self.nodeInstanceDelegate, self.delegateName],
 
 }
