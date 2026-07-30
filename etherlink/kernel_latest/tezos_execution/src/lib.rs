@@ -35,7 +35,6 @@ use num_traits::ops::checked::CheckedSub;
 use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::rc::Rc;
 use tezos_crypto_rs::{
     hash::{ContractKt1Hash, ContractTz1Hash},
     PublicKeyWithHash,
@@ -3310,7 +3309,7 @@ where
                     source_account,
                     balance,
                     Some(&script.code),
-                    Rc::new(storage).into(),
+                    RcTypedValue::new(storage),
                     &Origin::Native,
                 ),
                 Err(err) => Err(err),
@@ -13900,14 +13899,14 @@ mod tests {
     /// references denote one allocation distinguishes them.
     mod receipt_payloads_are_not_copied {
         use super::*;
+        use mir::ast::RcTypedValue;
         use mir::typechecker::type_props::TypeProperty;
         use pretty_assertions::assert_eq;
-        use std::rc::Rc;
 
         /// A payload big enough that a copy is obvious in a profile, small
         /// enough to stay a fast unit test.
-        fn payload() -> Rc<TypedValue<'static>> {
-            Rc::new(TypedValue::Bytes(vec![0xab; 64 * 1024]))
+        fn payload() -> RcTypedValue<'static> {
+            RcTypedValue::new(TypedValue::Bytes(vec![0xab; 64 * 1024]))
         }
 
         /// L2-1831: a `DUP`ed operation's occurrences share one parameter, and
@@ -13924,9 +13923,8 @@ mod tests {
             let param = payload();
             // Two occurrences of one `DUP`ed operation, as
             // `NIL operation; DUP 2; CONS; SWAP; CONS` produces.
-            let second_occurrence = Rc::clone(&param);
-            let before = Rc::as_ptr(&param);
-            assert_eq!(Rc::strong_count(&param), 2);
+            let second_occurrence = param.clone();
+            assert_eq!(param.strong_count(), 2);
 
             for _ in 0..2 {
                 param
@@ -13939,17 +13937,12 @@ mod tests {
             }
 
             assert_eq!(
-                Rc::as_ptr(&param),
-                before,
-                "the receipt must read through the Rc, not reallocate the payload"
-            );
-            assert_eq!(
-                Rc::strong_count(&param),
+                param.strong_count(),
                 2,
                 "unparsing both receipts must not clone the shared payload"
             );
             assert!(
-                Rc::ptr_eq(&param, &second_occurrence),
+                param.ptr_eq(&second_occurrence),
                 "both occurrences must still denote one allocation"
             );
         }
@@ -13971,7 +13964,7 @@ mod tests {
             let mut gas = Gas::default();
 
             let storage = payload();
-            assert_eq!(Rc::strong_count(&storage), 1);
+            assert_eq!(storage.strong_count(), 1);
 
             storage
                 .clone_into_micheline_optimized_legacy(
@@ -13982,13 +13975,13 @@ mod tests {
                 .expect("an originated storage is Storable, so it is never refused");
 
             assert_eq!(
-                Rc::strong_count(&storage),
+                storage.strong_count(),
                 1,
                 "the receipt must not retain a reference, so the origination's \
                  unwrap_rc moves rather than copying the storage a second time"
             );
             // The move is now possible: nothing else holds the payload.
-            assert!(Rc::try_unwrap(storage).is_ok());
+            assert!(storage.try_unwrap().is_ok());
         }
 
         /// L2-1836, the case that actually bites: a `DUP`ed `CREATE_CONTRACT`
@@ -14016,14 +14009,14 @@ mod tests {
             // ...and two occurrences of the operation carrying it, as
             // `DUP 2; CONS; SWAP; CONS` produces. Cloning an `OperationInfo`
             // clones this field, which is an `Rc` bump.
-            let occurrences = [Rc::clone(&storage), Rc::clone(&storage)];
+            let occurrences = [storage.clone(), storage.clone()];
 
             assert!(
-                Rc::ptr_eq(&occurrences[0], &occurrences[1]),
+                occurrences[0].ptr_eq(&occurrences[1]),
                 "a DUPed operation's occurrences must share one storage"
             );
             assert!(
-                Rc::strong_count(&occurrences[0]) >= 2,
+                occurrences[0].strong_count() >= 2,
                 "so unwrap_rc on this path could never move — it would copy"
             );
 
@@ -14039,7 +14032,7 @@ mod tests {
                 .expect("an originated storage is Storable, so it is never refused");
 
             assert!(
-                Rc::ptr_eq(&storage, &occurrences[1]),
+                storage.ptr_eq(&occurrences[1]),
                 "the receipt must not have detached the shared storage"
             );
         }
@@ -14069,7 +14062,7 @@ mod tests {
                 "expected a bounded out-of-gas error, got {result:?}"
             );
             assert_eq!(
-                Rc::strong_count(&param),
+                param.strong_count(),
                 1,
                 "running out of gas must not have left a copy behind"
             );

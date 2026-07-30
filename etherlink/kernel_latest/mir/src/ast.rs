@@ -895,23 +895,6 @@ impl<'a> From<TypedValue<'a>> for RcTypedValue<'a> {
     }
 }
 
-/// Migration scaffolding: free bridges (the `Rc` moves, nothing is cloned)
-/// between the raw `Rc<TypedValue>` spelling and the newtype, so call sites
-/// can be converted one module at a time with each step compiling. Removed
-/// by the last step of the migration.
-impl<'a> From<Rc<TypedValue<'a>>> for RcTypedValue<'a> {
-    fn from(rc: Rc<TypedValue<'a>>) -> Self {
-        RcTypedValue(rc)
-    }
-}
-
-/// Migration scaffolding, see [`From<Rc<TypedValue>> for RcTypedValue`].
-impl<'a> From<RcTypedValue<'a>> for Rc<TypedValue<'a>> {
-    fn from(v: RcTypedValue<'a>) -> Self {
-        v.0
-    }
-}
-
 impl<'a> std::ops::Deref for RcTypedValue<'a> {
     type Target = TypedValue<'a>;
 
