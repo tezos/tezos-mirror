@@ -12,6 +12,7 @@ type error +=
   | Unsupported_chain_parameter of string
   | Unsupported_block_parameter of string
   | Failed_operation_forging
+  | Run_script_view_unsupported_field of string
 
 let () =
   register_error_kind
@@ -42,7 +43,23 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Operation forging RPC failed")
     Data_encoding.empty
     (function Failed_operation_forging -> Some () | _ -> None)
-    (fun () -> Failed_operation_forging)
+    (fun () -> Failed_operation_forging) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezosx.run_script_view_unsupported_field"
+    ~title:"Unsupported run_script_view field"
+    ~description:
+      "The run_script_view RPC was called with a field the Michelson runtime \
+       does not support."
+    ~pp:(fun ppf field ->
+      Format.fprintf
+        ppf
+        "The Michelson runtime does not support the `%s` field of \
+         run_script_view"
+        field)
+    Data_encoding.(obj1 (req "field" string))
+    (function Run_script_view_unsupported_field f -> Some f | _ -> None)
+    (fun f -> Run_script_view_unsupported_field f)
 
 module Mempool = Tezos_protocol_plugin_025_PsUshuai.Mempool
 
@@ -468,6 +485,61 @@ let build_block_static_directory ~l2_chain_id
        ~service:Tezos_services.pack_data
        ~impl:(fun _ctxt () (data, ty, gas) ->
          Tezlink_mock.pack_data ~data ~ty ~gas)
+  |> register
+       ~service:Tezos_services.run_script_view
+       ~impl:(fun
+           (((), chain), block)
+           ()
+           ( ( contract_hash,
+               view,
+               input,
+               unlimited_gas,
+               chain_id,
+               (* On L1 the "source" JSON field carries the *sender*, but
+                  `VIEW` overrides `SENDER` with the viewed contract in
+                  this RPC, so for an ordinary view the field is inert. *)
+               _sender,
+               payer,
+               gas,
+               unparsing_mode,
+               now ),
+             (level, other_contracts, extra_big_maps) )
+         ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         (* Both ask for fictitious contracts / big-maps to be
+            materialised before execution, which has no equivalent here.
+            Reject rather than silently answer against a different state
+            than the caller asked for. *)
+         let reject_unsupported name = function
+           | Some (_ :: _) ->
+               Result_syntax.tzfail (Run_script_view_unsupported_field name)
+           | _ -> Result_syntax.return_unit
+         in
+         let*? () = reject_unsupported "other_contracts" other_contracts in
+         let*? () = reject_unsupported "extra_big_maps" extra_big_maps in
+         Backend.run_script_view
+           chain
+           block
+           ~contract:(Tezos_types.Contract.of_originated contract_hash)
+           ~view
+           ~input
+           ~chain_id
+           ~unlimited_gas
+           ~gas:
+             (Option.map
+                Tezlink_imports.Imported_context.Gas.Arith.integral_to_z
+                gas)
+           ~payer
+           ~now:
+             (Option.map
+                Tezlink_imports.Imported_protocol.Script_timestamp.to_zint
+                now)
+           ~level:
+             (Option.map
+                Tezlink_imports.Imported_protocol.Script_int.to_zint
+                level)
+           ~unparsing_mode)
   |> register
        ~service:Tezos_services.preapply_operations
        ~impl:(fun (((), chain), block) param ops ->

@@ -147,4 +147,36 @@ module type S = sig
     Tezos_types.Contract.t ->
     normalize_types:bool ->
     entrypoints_info option tzresult Lwt.t
+
+  (** [run_script_view _ block ~contract ~view ~input ...] simulates a
+      call to the Michelson view [view] of [contract] and returns the
+      value it produces, normalized with [unparsing_mode].
+
+      Mirrors the L1 [helpers/scripts/run_script_view] RPC, including
+      its defaults and error kinds:
+      - [gas] defaults to, and is clamped at, this runtime's
+        per-operation hard gas limit; unlike on L1, [unlimited_gas] is
+        accepted but raises nothing;
+      - [payer] is what [SOURCE] reports inside the view, defaulting to
+        the null implicit account;
+      - [now] and [level] (the raw integers behind L1's
+        [Script_timestamp.t] and [Script_int.n num]) default to the
+        block's own values;
+      - [SELF], [SENDER] and [BALANCE] describe [contract] and [AMOUNT]
+        is zero — the [VIEW] instruction sets them, not the caller. *)
+  val run_script_view :
+    [`Main] ->
+    block_param ->
+    contract:Tezos_types.Contract.t ->
+    view:string ->
+    input:Tezlink_imports.Imported_context.Script.expr ->
+    chain_id:Chain_id.t ->
+    unlimited_gas:bool ->
+    gas:Z.t option ->
+    payer:Tezos_types.Contract.implicit option ->
+    now:Z.t option ->
+    level:Z.t option ->
+    unparsing_mode:
+      Tezlink_imports.Imported_protocol.Script_ir_unparser.unparsing_mode ->
+    Tezlink_imports.Imported_context.Script.expr tzresult Lwt.t
 end

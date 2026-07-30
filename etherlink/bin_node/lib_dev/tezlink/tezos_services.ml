@@ -981,6 +981,36 @@ let pack_data :
     Tezos_rpc.Service.t =
   import_service Imported_protocol_plugin.RPC.Scripts.S.pack_data
 
+module Scripts_services = Imported_protocol_plugin.RPC.Scripts.S
+
+(** Simulate a call to a Michelson view. Same path, encodings and error
+    kinds as the L1 service of the same name; the two knobs the
+    Michelson runtime cannot honour ([other_contracts] and
+    [extra_big_maps], which materialise fictitious contracts and
+    big-maps in the context before execution) are rejected rather than
+    ignored. See {!Tezlink_backend_sig.S.run_script_view}. *)
+let run_script_view :
+    ( [`POST],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      unit,
+      (Imported_protocol.Contract_hash.t
+      * string
+      * Imported_context.Script.expr
+      * bool
+      * Chain_id.t
+      * Imported_context.Contract.t option
+      * Imported_context.public_key_hash option
+      * Imported_context.Gas.Arith.integral option
+      * Imported_protocol.Script_ir_unparser.unparsing_mode
+      * Imported_protocol.Script_timestamp.t option)
+      * (Imported_protocol.Script_int.n Imported_protocol.Script_int.num option
+        * Scripts_services.other_contract_description list option
+        * Scripts_services.extra_big_map_description list option),
+      Imported_context.Script.expr )
+    Tezos_rpc.Service.t =
+  import_service Scripts_services.run_script_view
+
 let monitor_heads :
     ( [`GET],
       unit,

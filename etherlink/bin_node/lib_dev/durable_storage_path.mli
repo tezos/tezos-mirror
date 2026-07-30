@@ -198,6 +198,14 @@ module Tezosx_entrypoints : sig
   val result : path
 end
 
+(** Kernel communication channel for running an arbitrary Michelson
+    script against the current state, without originating it *)
+module Tezosx_run_code : sig
+  val input : path
+
+  val result : path
+end
+
 val delayed_input : storage_version:int -> path
 
 (** Kernel communication canal for block assembling (instant confirmations) *)
