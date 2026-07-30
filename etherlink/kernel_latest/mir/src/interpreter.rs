@@ -23,8 +23,8 @@ use tezos_crypto_rs::{
 use typed_arena::Arena;
 
 use crate::ast::big_map::{
-    apply_deferred_big_map_updates, dump_big_map_walk, remove_unreferenced_big_maps,
-    BigMap, LazyStorageError,
+    apply_deferred_big_map_updates, dump_big_map_walk, dump_big_map_walk_shared,
+    remove_unreferenced_big_maps, BigMap, LazyStorageError,
 };
 use crate::ast::*;
 #[cfg(feature = "bls")]
@@ -287,7 +287,7 @@ impl<'a> ContractScript<'a> {
         // typechecked with forged ids allowed.
         parameter_allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     ) -> Result<
-        (impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>),
+        (impl Iterator<Item = OperationInfo<'a>>, Rc<TypedValue<'a>>),
         ContractInterpretError<'a>,
     > {
         let wrapped_parameter = self.wrap_parameter(
@@ -317,7 +317,7 @@ impl<'a> ContractScript<'a> {
             InterpretError::InternalError(InterpretInvariant::EmptyValueStackPop),
         )?);
         let mut result = result;
-        let (operation_list, storage) = match &mut result {
+        let (operation_list, mut storage) = match &mut result {
             V::Pair(operation_list, storage) => {
                 (std::mem::take(operation_list), std::mem::take(storage))
             }
@@ -329,7 +329,6 @@ impl<'a> ContractScript<'a> {
             }
         };
         let mut operation_list = TypedValue::unwrap_rc(operation_list);
-        let mut storage = TypedValue::unwrap_rc(storage);
         let lazy_storage = *ctx.lazy_storage();
         // Dump the contract result in two walks that share a single
         // removal decision. A big map can be moved out of the
@@ -344,8 +343,15 @@ impl<'a> ContractScript<'a> {
         // storage.
         let mut seen_in_storage = BTreeSet::new();
         // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
-        let deferred_storage =
-            dump_big_map_walk(lazy_storage, &mut storage, false, &mut seen_in_storage)?;
+        let (updated_storage, deferred_storage) = dump_big_map_walk_shared(
+            lazy_storage,
+            &storage,
+            false,
+            &mut seen_in_storage,
+        )?;
+        if let Some(updated_storage) = updated_storage {
+            storage = updated_storage;
+        }
         // Handle big_maps that appears in the operation list, those big_maps are temporary and it depends to
         // the internal operation to determine what to do with it
         let mut seen_in_operations = BTreeSet::new();
@@ -5499,6 +5505,47 @@ mod interpreter_tests {
                  bytes) before running out of gas; floor its cost by alloc_cost.",
             );
         }
+    }
+
+    #[test]
+    fn interpret_does_not_clone_the_returned_storage() {
+        use Instruction as I;
+        const SIZE: usize = 16 * 1024 * 1024;
+        let value = Rc::new(V::String("0".repeat(SIZE)));
+        let contract: ContractScript = ContractScript {
+            code: Seq(vec![I::Drop(None), I::Push(value.clone()), I::Nil, I::Pair]),
+            parameter: Type::Unit,
+            storage: Type::String,
+            annotations: HashMap::from([(
+                FieldAnnotation::default(),
+                (vec![], Type::Unit),
+            )]),
+            views: HashMap::new(),
+        };
+        let arena = typed_arena::Arena::new();
+        let ctx = &mut Ctx::default();
+        let param = ().into();
+        let storage_in = "".into();
+        let before = thread_allocated_bytes();
+        let (_, storage) = contract
+            .interpret(
+                ctx,
+                &arena,
+                param,
+                &Entrypoint::default(),
+                &storage_in,
+                crate::typechecker::AllowForgedLazyStorageId::No,
+            )
+            .unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        assert!(
+            std::rc::Rc::ptr_eq(&storage, &value),
+            "finalization deep-copied the shared returned storage"
+        );
+        assert!(
+            allocated < SIZE as u64,
+            "interpret cloned the {SIZE}-byte returned storage ({allocated} bytes allocated)",
+        );
     }
 
     #[test]

@@ -114,7 +114,7 @@
 //! let (operations_iter, new_storage) = contract_typechecked
 //!     .interpret(&mut ctx, &parser.arena, parameter, &Entrypoint::default(), &storage, mir::typechecker::AllowForgedLazyStorageId::No)
 //!     .unwrap();
-//! let TypedValue::Int(new_storage_int) = &new_storage else { unreachable!() };
+//! let TypedValue::Int(new_storage_int) = new_storage.as_ref() else { unreachable!() };
 //! assert_eq!(new_storage_int, &22698374052006863956975682u128.into());
 //! assert_eq!(operations_iter.collect::<Vec<_>>(), vec![]);
 //! // Arena passed in here does not need to outlive `ctx`. Could reuse the one
@@ -122,7 +122,11 @@
 //! // not concerned about memory consumption, it may be faster to reuse the
 //! // same arena everywhere.
 //! let packed_new_storage = new_storage
-//!     .into_micheline_optimized_legacy(&Arena::new(), &mut Gas::default())
+//!     .clone_into_micheline_optimized_legacy(
+//!         &Arena::new(),
+//!         &mut Gas::default(),
+//!         Some(mir::typechecker::type_props::TypeProperty::Storable),
+//!     )
 //!     .unwrap()
 //!     .encode(ctx.gas())
 //!     .unwrap()
@@ -483,8 +487,9 @@ mod tests {
                 crate::typechecker::AllowForgedLazyStorageId::No,
             );
         use TypedValue as TV;
-        match &interp_res.unwrap() {
-            (_, TV::Map(m)) => {
+        let result = interp_res.unwrap();
+        match result.1.as_ref() {
+            TV::Map(m) => {
                 assert_eq!(
                     m.get(&TV::String("foo".to_owned())).unwrap().as_ref(),
                     &TV::int(1)
@@ -1564,12 +1569,15 @@ mod multisig_tests {
     // This function collects the iterator into a vector so we can use `assert_eq!`.
     fn collect_ops<'a>(
         result: Result<
-            (impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>),
+            (
+                impl Iterator<Item = OperationInfo<'a>>,
+                std::rc::Rc<TypedValue<'a>>,
+            ),
             ContractInterpretError<'a>,
         >,
     ) -> Result<(Vec<OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
     {
-        result.map(|(ops, val)| (ops.collect(), val))
+        result.map(|(ops, val)| (ops.collect(), TypedValue::unwrap_rc(val)))
     }
 
     // From: https://github.com/murbard/smart-contracts/blob/eb2b7d81aedcfeaea219da8b66cdd86652bf42f7/multisig/michelson/multisig.tz
